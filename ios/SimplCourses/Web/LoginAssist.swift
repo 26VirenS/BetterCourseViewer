@@ -75,6 +75,10 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
 
     @Published var phase: Phase = .idle
     @Published var askStay = false
+    /// The school's page is shown in the middle of a sign-in, for the student to do a step of it (a two-factor
+    /// code, a consent page, a page the reader could not fill, or one they asked to see): a note over it says so,
+    /// and the sign-in carries on once Canvas is reached.
+    @Published var handoff = false
     @Published var prefillUser = ""
 
     static let world = WKContentWorld.world(name: "SimplLogin")
@@ -130,7 +134,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     private func handle(kind: String, host: String, error: String?, secure: Bool) {
         if kind == "none" {
             // a page with nothing to fill: two-factor, a consent page, a hop — shown, not covered
-            if phase == .working { reveal() }
+            if phase == .working { handOver() }
             return
         }
         guard secure else { return } // never on a page that is not https
@@ -157,6 +161,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         }
         if prefillUser.isEmpty { prefillUser = typed?.user ?? saved?.user ?? "" }
         watchdog?.cancel()
+        handoff = false
         phase = .capture(host: host, error: nil)
     }
 
@@ -172,9 +177,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
             switch result {
             case .success(let value):
                 // nothing to press: the page is shown with the details in it, to be sent by hand
-                if let r = value as? [String: Any], (r["pressed"] as? Bool) == false { self?.reveal() }
+                if let r = value as? [String: Any], (r["pressed"] as? Bool) == false { self?.handOver() }
             case .failure:
-                self?.reveal()
+                self?.handOver()
             }
         }
         arm(seconds: 25)
@@ -187,6 +192,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         prefillUser = typed?.user ?? saved?.user ?? prefillUser
         typed = nil
         watchdog?.cancel()
+        handoff = false
         phase = .capture(host: host, error: error ?? "That username or password didn’t work. Try again.")
     }
 
@@ -196,12 +202,24 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         if phase != .idle { phase = .idle }
     }
 
+    /// The page shown in the middle of a sign-in, with the note that says what to do on it.
+    private func handOver() {
+        if phase == .working { handoff = true }
+        reveal()
+    }
+
+    /// "Show the page", pressed under "Logging you in": the school's page, to do what it asks by hand.
+    func showPage() {
+        handoff = true
+        reveal()
+    }
+
     private func arm(seconds: Double) {
         watchdog?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             if self.webView?.isLoading == true { self.arm(seconds: 2); return } // (a page still on its way: a little longer)
-            if self.phase == .working { self.reveal() }
+            if self.phase == .working { self.handOver() }
         }
         watchdog = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
@@ -239,6 +257,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         attempt = nil
         autoOff = false
         prefillUser = ""
+        handoff = false
         reveal()
     }
 
@@ -263,6 +282,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
             let viaForm = attempt != nil && attempt?.auto == false && typed != nil
             attempt = nil
             autoOff = false
+            handoff = false
             reveal()
             // details typed in the form got the student in: they are offered to be kept (or kept anew, where
             // the saved ones had stopped working)
@@ -276,6 +296,6 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// The page could not be loaded at all.
     func pageFailed() {
         attempt = nil
-        reveal()
+        handOver()
     }
 }

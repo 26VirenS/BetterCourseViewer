@@ -37,7 +37,9 @@ struct QuizScreen: View {
         .task {
             run.engine = engine
             await run.loadIntro()
-            if launch.begin, run.intro?.canStart == true, run.intro?.needsCode != true {
+            if launch.feedback, let last = run.intro?.last, last.feedback {
+                await run.openFeedback(last.attempt)
+            } else if launch.begin, run.intro?.canStart == true, run.intro?.needsCode != true {
                 await run.begin()
                 if let k = launch.startAt { await run.go(to: k) }
             }
@@ -111,7 +113,10 @@ struct QuizScreen: View {
             ProgressView(run.intro?.begin.hasPrefix("Continue") == true ? "Resuming your attempt…" : "Starting your attempt…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .taking:
-            QuizTakeView(run: run, tint: tint)
+            QuizTakeView(run: run, tint: tint) {
+                // the pull-and-hold's end: a blank question is asked about first, otherwise it is handed in
+                if run.answeredCount < run.questions.count { confirmSubmit = true } else { Task { await run.submit() } }
+            }
         case .review, .submitting:
             QuizReviewView(run: run, tint: tint) { confirmSubmit = true }
         case .receipt:
@@ -219,6 +224,9 @@ private struct QuizIntroView: View {
                     }
                     Text(intro.title).font(.title2.weight(.bold))
                     Text(intro.facts.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary)
+                    if let note = intro.note, !note.isEmpty {
+                        Text(note).font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.vertical, 4)
             }
@@ -263,36 +271,37 @@ private struct QuizIntroView: View {
                             else if let why = last.why, !why.isEmpty { Text(why).font(.footnote).foregroundStyle(.secondary) }
                         }
                         Spacer()
-                        if last.feedback {
-                            Button("See Feedback") { Task { await run.openFeedback(last.attempt) } }
-                                .glassButton()
-                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .refreshable { await run.loadIntro() }
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 6) {
-                Button {
-                    Haptics.tap()
-                    Task { await run.begin() }
-                } label: {
-                    Text(codeMissing && intro.canStart ? "Enter the Access Code" : intro.begin)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 50)
-                }
-                .glassProminentButton()
-                .buttonBorderShape(.capsule)
-                .disabled(!intro.canStart || codeMissing)
-                if let note = intro.note, !note.isEmpty {
-                    Text(note).font(.footnote).foregroundStyle(.secondary)
-                }
+        .safeAreaInset(edge: .bottom) { actions }
+    }
+
+    /// Just the buttons (1.4): an attempt under way, Continue; a finished one with its feedback and another
+    /// attempt left, Take Quiz and See Feedback side by side; with none left, See Feedback alone.
+    @ViewBuilder
+    private var actions: some View {
+        let feedback = intro.last?.feedback == true && !intro.begin.hasPrefix("Continue")
+        ActionBar {
+            if feedback && intro.canStart {
+                ActionButton(title: codeMissing ? "Enter the Code" : (intro.survey ? "Take Survey" : "Take Quiz"), tint: tint) { Task { await run.begin() } }
+                    .disabled(codeMissing)
+                ActionButton(title: "See Feedback", tint: tint, prominent: false) { openLastFeedback() }
+            } else if feedback {
+                ActionButton(title: "See Feedback", symbol: "text.bubble.fill", tint: tint) { openLastFeedback() }
+            } else {
+                ActionButton(title: codeMissing && intro.canStart ? "Enter the Access Code" : intro.begin, tint: tint) { Task { await run.begin() } }
+                    .disabled(!intro.canStart || codeMissing)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
         }
+    }
+
+    private func openLastFeedback() {
+        guard let last = intro.last else { return }
+        Task { await run.openFeedback(last.attempt) }
     }
 
     private var codeMissing: Bool { intro.needsCode && run.code.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -311,66 +320,234 @@ private struct QuizIntroView: View {
 private struct QuizTakeView: View {
     @ObservedObject var run: QuizRun
     let tint: Color
+    /// The last question's pull-and-hold, held to the end: hand it in.
+    let submit: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pull = Pull()
+    @State private var touching = false
+    @State private var hold: CGFloat = 0
+    @State private var holdTask: Task<Void, Never>?
+    @State private var advance: Task<Void, Never>?
+
+    /// How far past either end of the question the page is pulled (the scroll view's own rubber band: the
+    /// finger travels two or three times as far, the inertia the student feels).
+    struct Pull: Equatable {
+        var up: CGFloat = 0
+        var down: CGFloat = 0
+    }
+
+    /// Past this, letting go moves to the next (or the last) question; on the last one, holding here hands in.
+    static let line: CGFloat = 70
+    static let holdTime = 0.9
 
     var body: some View {
         VStack(spacing: 0) {
             QuizStrip(run: run, tint: tint)
             Divider()
-            ScrollViewReader { proxy in
-                ScrollView {
-                    if let q = run.current {
-                        QuestionView(run: run, q: q, total: run.questions.count, tint: tint)
-                            .id(q.id)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 18)
-                            .opacity(run.moving != nil ? 0.4 : 1)
-                            .allowsHitTesting(run.moving == nil)
-                    } else {
-                        ContentUnavailableView("This quiz has no questions.", systemImage: "questionmark.circle")
-                    }
+            ZStack {
+                if let q = run.current {
+                    page(q)
+                        .id(q.id)
+                        .transition(pageTransition)
+                } else {
+                    ContentUnavailableView("This quiz has no questions.", systemImage: "questionmark.circle")
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onChange(of: run.idx) { if let id = run.current?.id { proxy.scrollTo(id, anchor: .top) } }
             }
+            .clipped()
+            .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.12), value: run.idx)
         }
         .safeAreaInset(edge: .bottom) { footer }
-        .animation(.snappy(duration: 0.25), value: run.idx)
+        .onDisappear {
+            advance?.cancel()
+            holdTask?.cancel()
+        }
+    }
+
+    /// The page goes the way the student went: on, up and out with the next rising from below; back, the other way.
+    private var pageTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        return run.forward
+            ? .asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .move(edge: .top).combined(with: .opacity))
+            : .asymmetric(insertion: .move(edge: .top).combined(with: .opacity), removal: .move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func page(_ q: QuizQuestion) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                QuestionView(run: run, q: q, total: run.questions.count, tint: tint) { picked(q) }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 18)
+                endHint
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 34)
+                    .padding(.bottom, 28)
+            }
+        }
+        .scrollBounceBehavior(.always)
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: Pull.self) { g in
+            let top = -g.contentInsets.top
+            let bottom = max(top, g.contentSize.height - g.containerSize.height + g.contentInsets.bottom)
+            return Pull(up: max(0, g.contentOffset.y - bottom), down: max(0, top - g.contentOffset.y))
+        } action: { _, p in
+            pulled(p)
+        }
+        .onScrollPhaseChange { old, new in
+            if new == .interacting { touching = true }
+            if old == .interacting && new != .interacting { released() }
+        }
+        .overlay(alignment: .bottom) { upBadge }
+        .overlay(alignment: .top) { downBadge }
+        .opacity(run.moving != nil ? 0.5 : 1)
+        .animation(.easeOut(duration: 0.2), value: run.moving)
+        .allowsHitTesting(run.moving == nil)
+        .accessibilityAction(named: run.isLast ? "Submit Quiz" : "Next Question") { if run.isLast { submit() } else { next() } }
+        .accessibilityAction(named: "Previous Question") { if run.canGoBack { back() } }
+    }
+
+    // MARK: Pulling
+
+    private func pulled(_ p: Pull) {
+        let was = pull
+        pull = p
+        guard touching else { return }
+        if p.up >= Self.line && was.up < Self.line {
+            Haptics.play(run.isLast ? "medium" : "select")
+            if run.isLast { startHold() }
+        } else if p.up < Self.line && was.up >= Self.line {
+            cancelHold()
+        }
+        if run.canGoBack && p.down >= Self.line && was.down < Self.line { Haptics.select() }
+    }
+
+    private func released() {
+        touching = false
+        let p = pull
+        if p.up >= Self.line && !run.isLast { next() }
+        else if p.down >= Self.line && run.canGoBack { back() }
+        cancelHold() // (the last question: let go before the hold is done, nothing is handed in)
+    }
+
+    private func startHold() {
+        guard holdTask == nil else { return }
+        withAnimation(.linear(duration: Self.holdTime)) { hold = 1 }
+        holdTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(Self.holdTime * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            holdTask = nil
+            Haptics.success()
+            submit()
+            withAnimation(.spring(duration: 0.3)) { hold = 0 }
+        }
+    }
+
+    private func cancelHold() {
+        holdTask?.cancel()
+        holdTask = nil
+        if hold > 0 { withAnimation(.spring(duration: 0.3, bounce: 0)) { hold = 0 } }
+    }
+
+    private func next() {
+        advance?.cancel()
+        Haptics.tap()
+        Task { await run.next() }
+    }
+
+    private func back() {
+        advance?.cancel()
+        Haptics.tap()
+        Task { await run.back() }
+    }
+
+    /// One answer picked on a one-answer question: a beat to see it marked, then on to the next by itself.
+    private func picked(_ q: QuizQuestion) {
+        guard q.kind == "choice", !run.isLast else { return }
+        advance?.cancel()
+        advance = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 550_000_000)
+            guard !Task.isCancelled, run.current?.id == q.id, !touching else { return }
+            await run.next()
+        }
+    }
+
+    // MARK: What the pull says
+
+    private var nextNumber: Int { min(run.idx + 2, run.questions.count) }
+
+    /// At the foot of every question, what pulling does there.
+    private var endHint: some View {
+        Label(run.isLast ? "Pull up and hold to submit" : "Pull up for question \(nextNumber)", systemImage: run.isLast ? "paperplane" : "arrow.up")
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+    }
+
+    /// Rising from the bottom as the page is pulled: a ring filling to the line (on the last question, filling
+    /// again as it is held), and what letting go will do.
+    @ViewBuilder
+    private var upBadge: some View {
+        let p = min(pull.up / Self.line, 1)
+        if pull.up > 2 {
+            let past = p >= 1
+            let words = run.isLast
+                ? (past ? (hold >= 1 ? "Submitting…" : "Keep holding to submit") : "Pull up and hold to submit")
+                : (past ? "Release for question \(nextNumber)" : "Pull up for question \(nextNumber)")
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().stroke(tint.opacity(0.22), lineWidth: 3)
+                    Circle()
+                        .trim(from: 0, to: run.isLast && past ? max(hold, 0.02) : p)
+                        .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Image(systemName: run.isLast ? "paperplane.fill" : "arrow.up")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(tint)
+                        .scaleEffect(past ? 1.15 : 1)
+                }
+                .frame(width: 26, height: 26)
+                Text(words).font(.subheadline.weight(.semibold)).contentTransition(.opacity)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .modifier(GlassCapsule())
+            .opacity(min(1, pull.up / 18))
+            .scaleEffect(0.92 + 0.08 * p)
+            .padding(.bottom, 10)
+            .animation(.snappy(duration: 0.2), value: past)
+            .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var downBadge: some View {
+        if pull.down > 2 && run.canGoBack {
+            let p = min(pull.down / Self.line, 1)
+            Label(p >= 1 ? "Release for question \(run.idx)" : "Pull down for question \(run.idx)", systemImage: "arrow.down")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .modifier(GlassCapsule())
+                .opacity(min(1, pull.down / 18))
+                .scaleEffect(0.92 + 0.08 * p)
+                .padding(.top, 10)
+                .allowsHitTesting(false)
+        }
     }
 
     private var footer: some View {
-        VStack(spacing: 8) {
-            Text("\(run.answeredCount) of \(run.questions.count) answered\(run.saveWord.isEmpty ? "" : " · \(run.saveWord)")")
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                if run.attempt?.noBack != true {
-                    Button { Task { await run.back() } } label: {
-                        Label("Back", systemImage: "chevron.backward").font(.headline).frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .glassButton()
-                    .buttonBorderShape(.capsule)
-                    .disabled(!run.canGoBack || run.moving != nil)
-                }
-                Button {
-                    Haptics.tap()
-                    Task { if run.isLast { await run.toReview() } else { await run.next() } }
-                } label: {
-                    HStack(spacing: 6) {
-                        if run.moving != nil { ProgressView().tint(.white) }
-                        Text(run.isLast ? "Review Answers" : "Next")
-                        if !run.isLast { Image(systemName: "chevron.forward") }
-                    }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .glassProminentButton()
-                .buttonBorderShape(.capsule)
-                .disabled(run.moving != nil)
-            }
+        HStack(spacing: 8) {
+            Text("\(run.answeredCount) of \(run.questions.count) answered")
+                .contentTransition(.numericText(value: Double(run.answeredCount)))
+                .animation(.snappy(duration: 0.25), value: run.answeredCount)
+            if !run.saveWord.isEmpty { Text("· \(run.saveWord)") }
+            Spacer()
+            if run.moving != nil { ProgressView().controlSize(.small) }
         }
+        .font(.footnote.monospacedDigit())
+        .foregroundStyle(.secondary)
         .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+        .padding(.vertical, 10)
         .background(.bar)
     }
 }
@@ -436,6 +613,8 @@ private struct QuestionView: View {
     let q: QuizQuestion
     let total: Int
     let tint: Color
+    /// One answer picked on a one-answer question (the page moves on by itself).
+    var picked: () -> Void = {}
     @EnvironmentObject private var engine: Engine
     @State private var importing = false
     @State private var photos: [PhotosPickerItem] = []
@@ -500,28 +679,38 @@ private struct QuestionView: View {
             ForEach(q.options) { o in
                 let on = multi ? q.picks.contains(o.id) : q.pick == o.id
                 Button {
-                    run.set(q.id) { x in
-                        if multi {
-                            if let i = x.picks.firstIndex(of: o.id) { x.picks.remove(at: i) } else { x.picks.append(o.id) }
-                        } else {
-                            x.pick = o.id
+                    withAnimation(.snappy(duration: 0.22)) {
+                        run.set(q.id) { x in
+                            if multi {
+                                if let i = x.picks.firstIndex(of: o.id) { x.picks.remove(at: i) } else { x.picks.append(o.id) }
+                            } else {
+                                x.pick = o.id
+                            }
                         }
                     }
+                    if !multi { picked() }
                 } label: {
                     HStack(alignment: .center, spacing: 12) {
-                        Text(o.letter)
-                            .font(.subheadline.weight(.bold))
-                            .frame(width: 30, height: 30)
-                            .foregroundStyle(on ? Color.white : Color.secondary)
-                            .background(RoundedRectangle(cornerRadius: multi ? 8 : 15, style: .continuous).fill(on ? tint : Color(.tertiarySystemFill)))
+                        Group {
+                            if multi {
+                                Text(o.letter).frame(width: 30, height: 30).innerFill(on ? tint : Color(.tertiarySystemFill), radius: 8, minimum: 8)
+                            } else {
+                                Text(o.letter).frame(width: 30, height: 30).background(on ? tint : Color(.tertiarySystemFill), in: Circle())
+                            }
+                        }
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(on ? Color.white : Color.secondary)
                         OptionLabel(text: o.text, html: o.html)
                         Spacer(minLength: 0)
                         Image(systemName: on ? (multi ? "checkmark.square.fill" : "checkmark.circle.fill") : (multi ? "square" : "circle"))
                             .font(.title3)
                             .foregroundStyle(on ? tint : Color(.tertiaryLabel))
+                            .contentTransition(.symbolEffect(.replace))
+                            .symbolEffect(.bounce, value: on)
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .containerShape(RoundedRectangle(cornerRadius: 16, style: .continuous)) // (the letter's square is concentric with the row)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(on ? tint.opacity(0.12) : Color(.secondarySystemBackground)))
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(on ? tint : .clear, lineWidth: 1.5))
                     .contentShape(Rectangle())
@@ -749,26 +938,11 @@ private struct QuizReviewView: View {
         }
         .listStyle(.insetGrouped)
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 12) {
-                Button { Task { await run.keepWorking() } } label: {
-                    Text("Keep Working").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
-                }
-                .glassButton()
-                .buttonBorderShape(.capsule)
-                Button(action: submit) {
-                    HStack(spacing: 8) {
-                        if run.stage == .submitting { ProgressView().tint(.white) }
-                        Text(run.stage == .submitting ? "Submitting…" : "Submit Quiz")
-                    }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                }
-                .glassProminentButton()
-                .buttonBorderShape(.capsule)
+            ActionBar {
+                ActionButton(title: "Keep Working", tint: tint, prominent: false) { Task { await run.keepWorking() } }
+                ActionButton(title: run.stage == .submitting ? "Submitting…" : "Submit Quiz", tint: tint, busy: run.stage == .submitting, action: submit)
             }
             .disabled(run.stage == .submitting)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
         }
     }
 
@@ -834,22 +1008,12 @@ private struct QuizReceiptView: View {
             .padding(.horizontal, 20)
         }
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 10) {
+            ActionBar {
+                ActionButton(title: "Done", tint: tint, prominent: r?.feedback != true, action: done)
                 if r?.feedback == true {
-                    Button { Task { await run.openFeedback(r?.attempt) } } label: {
-                        Text("See Feedback").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
-                    }
-                    .glassProminentButton()
-                    .buttonBorderShape(.capsule)
+                    ActionButton(title: "See Feedback", tint: tint) { Task { await run.openFeedback(r?.attempt) } }
                 }
-                Button(action: done) {
-                    Text("Done").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
-                }
-                .glassButton()
-                .buttonBorderShape(.capsule)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
         }
     }
 
@@ -1018,7 +1182,7 @@ private struct FeedbackCard: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.tertiarySystemFill)))
+                .innerFill(Color(.tertiarySystemFill), radius: 12, minimum: 10)
             } else if row.noSolution {
                 Text("Your instructor left no worked solution for this question.").font(.footnote).foregroundStyle(.secondary)
             }
@@ -1047,7 +1211,7 @@ private struct FeedbackCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(tinted && !row.essay ? color.opacity(0.12) : Color(.tertiarySystemFill)))
+        .innerFill(tinted && !row.essay ? color.opacity(0.12) : Color(.tertiarySystemFill), radius: 12, minimum: 10)
     }
 
     private func matchTable(_ m: QuizFeedback.MatchTable) -> some View {
@@ -1067,7 +1231,7 @@ private struct FeedbackCard: View {
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(r.ok == true ? Color.green.opacity(0.1) : r.ok == false ? Color.red.opacity(0.1) : Color(.tertiarySystemFill)))
+                .innerFill(r.ok == true ? Color.green.opacity(0.1) : r.ok == false ? Color.red.opacity(0.1) : Color(.tertiarySystemFill), radius: 10, minimum: 8)
             }
         }
     }

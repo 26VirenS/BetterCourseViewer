@@ -376,6 +376,8 @@ try {
   const kinds = (qa.questions || []).map((q) => q.kind);
   check(!qb.error && ['choice', 'multi', 'number', 'match', 'drops', 'essay', 'file'].every((k) => kinds.includes(k)) && qa.timed && !!qa.endAt && qa.questions.every((q) => q.html && q.id && q.n) && qk('match').matches.length >= 3 && qk('drops').blanks.length === 2 && qk('drops').blanks.every((b) => b.options.length >= 2) && /<span style="[^"]*">1<\/span>/.test(qk('drops').html) && qk('choice').options.length >= 2 && qa.questions.some((q) => q.points !== null), `an attempt begun from the app: every kind, a match's list, a blank's own options and its numbered mark in the words, the clock's end, each question's points: ${JSON.stringify({ kinds, endAt: qa.endAt, error: qb.error, drops: qk('drops')?.html })}`);
   const mc = qk('choice'), ma = qk('multi'), nu = qk('number'), mt = qk('match'), dr = qk('drops'), es = qk('essay');
+  // (1.4) the review's one line per question reads a formula picture as maths, never as its LaTeX ("\\vec{v}")
+  check(!/\\/.test(ma.plain) && /vector quantities, such as v\?/.test(ma.plain), `the review's line reads a formula as maths, not LaTeX commands: ${JSON.stringify(ma.plain)}`);
   const saves = [
     await nc('quizAnswer', { course: '101', quiz: '9011', question: mc.id, value: { pick: mc.options[0].id } }),
     await nc('quizAnswer', { course: '101', quiz: '9011', question: ma.id, value: { picks: [ma.options[0].id, ma.options[2].id] } }),

@@ -18,8 +18,8 @@ extension Notification.Name {
     static let simplInterfaceToggled = Notification.Name("SimplCourses.interfaceToggled")
 }
 
-/// App-level state: which Canvas host the student uses, the settings sheet, and the appearance the
-/// web interface chose (so the status bar matches it).
+/// App-level state: which Canvas host the student uses and the settings sheet. Light or dark is the
+/// phone's own (1.4): nothing here pins it.
 final class AppSession: ObservableObject {
     private static let hostKey = "canvasHost"
 
@@ -32,7 +32,6 @@ final class AppSession: ObservableObject {
     }
 
     @Published var showSettings = false
-    @Published private(set) var colorScheme: ColorScheme?
     private var interfaceOn = Bridge.shared.interfaceOn
     private var bag = Set<AnyCancellable>()
 
@@ -40,7 +39,7 @@ final class AppSession: ObservableObject {
         // the simulator suite (-SimplDemo YES): the guided setup and the first-run notes marked done, as for a
         // student who has used the app, before the first page reads them
         if UserDefaults.standard.bool(forKey: "SimplDemo") { Bridge.shared.seed(AppSession.demoSeed()) }
-        colorScheme = AppSession.scheme(from: Bridge.shared.settings)
+        Bridge.shared.followPhoneAppearance()
         NotificationCenter.default.publisher(for: .simplOpenSettings)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.showSettings = true }
@@ -54,7 +53,6 @@ final class AppSession: ObservableObject {
             .sink { [weak self] note in
                 guard let self = self else { return }
                 let settings = note.userInfo as? [String: Any] ?? [:]
-                self.colorScheme = AppSession.scheme(from: settings)
                 let on = Bridge.interfaceOn(settings)
                 if on != self.interfaceOn {
                     self.interfaceOn = on
@@ -62,16 +60,6 @@ final class AppSession: ObservableObject {
                 }
             }
             .store(in: &bag)
-    }
-
-    /// The extension's appearance.darkMode: "on" / "off" pin the scheme; "system" follows the device.
-    static func scheme(from settings: [String: Any]) -> ColorScheme? {
-        let mode = (settings["appearance"] as? [String: Any])?["darkMode"] as? String
-        switch mode {
-        case "on": return .dark
-        case "off": return .light
-        default: return nil
-        }
     }
 
     /// "catcourses.ucmerced.edu", "https://school.instructure.com/login" … → the bare host.

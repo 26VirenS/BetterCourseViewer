@@ -118,6 +118,7 @@ struct AssignmentsList: View {
                         ForEach(s.rows) { r in
                             Button { engine.go(r.url, title: r.title) } label: { ARowView(row: r, color: s.title == "Overdue" ? .red : Color(hex: d.color)) }
                                 .buttonStyle(.plain)
+                                .workSwipe(WorkAction(r), engine: engine)
                         }
                     } header: {
                         HStack {
@@ -147,6 +148,7 @@ struct QuizzesList: View {
                 ForEach(d.rows) { r in
                     Button { engine.go(r.url, title: r.title) } label: { ARowView(row: r, color: Color(hex: d.color)) }
                         .buttonStyle(.plain)
+                        .workSwipe(WorkAction(r), engine: engine)
                 }
             }
             .listStyle(.insetGrouped)

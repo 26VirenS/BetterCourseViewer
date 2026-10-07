@@ -65,6 +65,13 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var barSize = CGSize(width: 0, height: 62)
     /// A screen with a bar of its own over the tab bar keeps the tab bar full size (no minimising as it scrolls).
     @Published var holdTabBar = false
+    /// What a swipe on a piece of work asked for, for the screen it opens to do on arriving (1.4): Hand In
+    /// (the screen's own main action) or the feedback.
+    struct Arrival: Equatable {
+        let id: String
+        let feedback: Bool
+    }
+    var arrival: Arrival?
     /// An external tool open in its sheet (ToolSheet).
     @Published var tool: ToolLaunch?
     /// A quiz open in the app's own quiz screen (QuizScreen), over everything.
@@ -337,6 +344,24 @@ final class Engine: ObservableObject, ShellListener {
     func openQuiz(_ q: QuizLaunch) {
         Haptics.tap()
         quiz = q
+    }
+
+    /// A swipe on a piece of work: hand it in (take the quiz, open the discussion) or see its feedback, from the
+    /// list — the quiz in its screen (straight at the feedback), an assignment's screen doing it on arrival.
+    func act(on raw: String?, title: String, feedback: Bool) {
+        guard let raw, !raw.isEmpty else { return }
+        Haptics.play("medium")
+        if var q = quizLaunch(for: raw, title: title) {
+            q.feedback = feedback
+            quiz = q // (the swipe's own feel already played: not openQuiz's as well)
+            return
+        }
+        if let route = nativeRoute(for: raw, title: title), case .assignment(_, let id) = route {
+            arrival = Arrival(id: id, feedback: feedback)
+            push(route)
+            return
+        }
+        openWeb(raw, title: title)
     }
 
     func openNotifications() {

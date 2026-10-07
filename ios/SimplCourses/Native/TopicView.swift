@@ -51,18 +51,12 @@ struct TopicView: View {
                 .refreshable { await load() }
                 .safeAreaInset(edge: .bottom) {
                     if d.canReply == true {
-                        Button {
-                            Haptics.tap()
-                            replyTo = ReplyTarget(id: "topic", parent: nil, quote: d.title)
-                        } label: {
-                            Label("Reply", systemImage: "arrowshape.turn.up.left.fill")
-                                .font(.body.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 4)
+                        // the main action at the very bottom, as on an assignment (ActionButton, 1.4)
+                        ActionBar {
+                            ActionButton(title: "Reply", symbol: "arrowshape.turn.up.left.fill", tint: Color(hex: d.color)) {
+                                replyTo = ReplyTarget(id: "topic", parent: nil, quote: d.title)
+                            }
                         }
-                        .glassProminentButton()
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
                     }
                 }
             } else {
@@ -82,6 +76,7 @@ struct TopicView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .toolbar(.hidden, for: .tabBar) // (Reply takes the tab bar's place at the bottom)
         .sheet(item: $replyTo) { t in
             ReplySheet(title: t.parent == nil ? "Reply" : "Reply to \(t.quote)") { text in
                 var args: [String: Any] = ["ctx": ctx, "id": id, "text": text]

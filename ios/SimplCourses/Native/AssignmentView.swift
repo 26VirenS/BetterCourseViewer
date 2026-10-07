@@ -4,9 +4,9 @@ import UniformTypeIdentifiers
 
 /// One assignment: its due date, points and kind, the instructions, where your work stands, what you
 /// handed in, the grade with the class's numbers, the comments — the rubric in a sheet of its own from a
-/// button by the grade — and Hand In, a bar the size of the tab bar above it, opening a half sheet for
-/// text, a web address or files (from Files or Photos), as the assignment takes them. A quiz opens in the
-/// app's own quiz screen, a tool in its sheet, a discussion in its screen.
+/// button by the grade — and Hand In at the very bottom where the tab bar was (hidden here, 1.4), opening a
+/// half sheet for text, a web address or files (from Files or Photos), as the assignment takes them. A quiz
+/// opens in the app's own quiz screen, a tool in its sheet, a discussion in its screen.
 struct AssignmentView: View {
     let course: String
     let id: String
@@ -15,13 +15,15 @@ struct AssignmentView: View {
     @State private var handIn = false
     @State private var comment = false
     @State private var rubric = false
+    @State private var jump: String?
 
     var body: some View {
         Group {
             if let d = model.data {
+                ScrollViewReader { proxy in
                 List {
                     Section { header(d) }
-                    if let g = d.grade { Section("Grade") { gradeBlock(g, d) } }
+                    if let g = d.grade { Section("Grade") { gradeBlock(g, d) }.id("grade") }
                     else if d.held == true {
                         Section { Label("Graded, but your teacher has not released the grade yet.", systemImage: "eye.slash").foregroundStyle(.secondary) }
                     }
@@ -50,6 +52,12 @@ struct AssignmentView: View {
                 .listStyle(.insetGrouped)
                 .refreshable { await load() }
                 .safeAreaInset(edge: .bottom) { action(d) }
+                .onChange(of: jump) {
+                    guard let j = jump else { return }
+                    jump = nil
+                    withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(j, anchor: .top) }
+                }
+                }
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -67,8 +75,7 @@ struct AssignmentView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
-        .onAppear { engine.holdTabBar = true } // (the Hand In bar sits over a full-size tab bar)
-        .onDisappear { engine.holdTabBar = false }
+        .toolbar(.hidden, for: .tabBar) // (the main action takes the tab bar's place at the bottom)
         .sheet(isPresented: $rubric) {
             if let d = model.data { RubricSheet(data: d) }
         }
@@ -145,7 +152,7 @@ struct AssignmentView: View {
                     .foregroundStyle(color)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .innerFill(color.opacity(0.14), radius: 12, minimum: 10) // (concentric with the grade's cell)
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Rubric")
@@ -206,31 +213,34 @@ struct AssignmentView: View {
         .padding(.vertical, 3)
     }
 
-    /// The one thing to do next, at the bottom: hand in (again), take the quiz, open the tool or the discussion —
-    /// a bar exactly the tab bar's width and height (measured, so on any iPhone and either way round), just above it.
+    /// The one thing to do next, at the very bottom where the tab bar was: hand in (again), take the quiz, open
+    /// the tool or the discussion — the course's colour, concentric with the phone's corners (ActionButton).
     @ViewBuilder
     private func action(_ d: AssignmentData) -> some View {
         if let label = actionLabel(d) {
-            let size = engine.barSize
-            Button {
-                Haptics.tap()
-                if d.canSubmit { handIn = true }
-                else if let q = d.quizId { engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title)) }
-                else if let q = d.quizUrl { engine.go(q, title: d.title) }
-                else if let u = d.discussionUrl { engine.go(u, title: d.title) }
-                else if d.toolUrl != nil { engine.openTool(.assignment(course: course, id: id, title: d.title)) }
-            } label: {
-                Label(label.0, systemImage: label.1)
-                    .font(.title3.weight(.semibold))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ActionBar {
+                ActionButton(title: label.0, symbol: label.1, tint: Color(hex: d.color)) { act(d) }
             }
-            .glassProminentButton()
-            .buttonBorderShape(.capsule)
-            .tint(Color(hex: d.color))
-            .frame(width: size.width > 0 ? size.width : nil, height: size.height)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, size.width > 0 ? 0 : 21)
-            .padding(.bottom, 8)
+        }
+    }
+
+    private func act(_ d: AssignmentData) {
+        if d.canSubmit { handIn = true }
+        else if let q = d.quizId { engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title)) }
+        else if let q = d.quizUrl { engine.go(q, title: d.title) }
+        else if let u = d.discussionUrl { engine.go(u, title: d.title) }
+        else if d.toolUrl != nil { engine.openTool(.assignment(course: course, id: id, title: d.title)) }
+    }
+
+    /// Arrived from a swipe in a list: its Hand In done at once, or its feedback shown (a quiz's in the quiz screen).
+    private func arrived(_ d: AssignmentData) {
+        guard let a = engine.arrival, a.id == id else { return }
+        engine.arrival = nil
+        if a.feedback {
+            if let q = d.quizId { engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title, feedback: true)) }
+            else if d.grade != nil { jump = "grade" }
+        } else if actionLabel(d) != nil {
+            act(d)
         }
     }
 
@@ -245,6 +255,7 @@ struct AssignmentView: View {
     private func load() async {
         await model.load(engine, "assignment", ["course": course, "id": id])
         if model.data?.canSubmit == true, LaunchOpen.take("handin") != nil { handIn = true }
+        if let d = model.data { arrived(d) }
     }
 }
 

@@ -9,6 +9,8 @@ struct QuizLaunch: Identifiable {
     /// Straight to the attempt (the simulator suite's way in), not the intro, and on to this question.
     var begin = false
     var startAt: Int? = nil
+    /// Straight to the last attempt's feedback (a swipe on the quiz in a list).
+    var feedback = false
 }
 
 /// A quiz before an attempt: what it is, its rules, and whether (and how) it can be begun (`quizIntro`).

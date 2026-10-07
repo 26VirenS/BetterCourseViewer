@@ -4,7 +4,8 @@ import WebKit
 /// Canvas's own rich text inside a native screen (an announcement, a discussion, an assignment's
 /// instructions, a page): the HTML the page has already cleaned, in a small web view of its own that
 /// grows to the height of what it holds — the system font at the reader's text size, the system's
-/// colours in light and dark, pictures and videos at the width of the screen. It shares the app's
+/// colours in light and dark (a formula, which Canvas draws as black on clear, turned light in dark),
+/// pictures and videos at the width of the screen. It shares the app's
 /// Canvas session, so the course's own pictures and files load. A link pressed in it goes through the
 /// app: one of the school's pages opens its native screen (or the web screen), another site Safari.
 struct RichText: View {
@@ -74,6 +75,8 @@ struct HTMLBlock: UIViewRepresentable {
         body{font:-apple-system-body;color:CanvasText;-webkit-text-size-adjust:100%;overflow-wrap:anywhere;line-height:1.42}
         a{color:#0a84ff;text-decoration:none}
         img,video{max-width:100%;height:auto;border-radius:8px}
+        img.equation_image,img[src*="/equation_images/"]{border-radius:0;vertical-align:middle;display:inline-block}
+        @media (prefers-color-scheme:dark){img.equation_image,img[src*="/equation_images/"]{filter:invert(1) hue-rotate(180deg)}}
         iframe{max-width:100%;width:100%;aspect-ratio:16/9;height:auto;border:0;border-radius:10px}
         table{display:block;overflow-x:auto;border-collapse:collapse;max-width:100%}
         td,th{border:1px solid rgba(128,128,128,.3);padding:6px 8px;vertical-align:top}

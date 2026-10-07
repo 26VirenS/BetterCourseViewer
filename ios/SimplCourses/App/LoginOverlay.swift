@@ -12,8 +12,12 @@ struct LoginLayer: View {
             case .idle:
                 // (a view, not nothing: "Stay logged in?" is asked from here once the cover is gone)
                 Color.clear.allowsHitTesting(false)
+                if assist.handoff {
+                    HandoffNote { assist.handoff = false }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
             case .working:
-                LoggingInView()
+                LoggingInView { assist.showPage() }
                     .transition(.opacity)
             case .capture(let host, let error):
                 LoginForm(assist: assist, host: host, error: error)
@@ -21,6 +25,7 @@ struct LoginLayer: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: assist.phase)
+        .animation(.spring(duration: 0.4, bounce: 0.15), value: assist.handoff)
         .alert("Stay logged in?", isPresented: $assist.askStay) {
             Button("Not now", role: .cancel) { assist.stay(false) }
             Button("Stay logged in") { assist.stay(true) }
@@ -31,9 +36,11 @@ struct LoginLayer: View {
 }
 
 /// "Logging you in": a ring going round, over the whole screen, while the page underneath is filled
-/// in and sent.
+/// in and sent — and, after a moment, "Show the page", for a sign-in that wants something done by hand.
 struct LoggingInView: View {
+    var showPage: () -> Void = {}
     @State private var turning = false
+    @State private var offer = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -49,12 +56,84 @@ struct LoggingInView: View {
             .frame(width: 54, height: 54)
             Text("Logging you in")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottom) {
+            if offer {
+                VStack(spacing: 8) {
+                    Text("Something to do on your school’s page?")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        Haptics.tap()
+                        showPage()
+                    } label: {
+                        Label("Show the Page", systemImage: "safari")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                    }
+                    .glassButton()
+                    .buttonBorderShape(.capsule)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .onAppear { turning = true }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Logging you in")
+        .task {
+            // (a sign-in that goes through by itself never shows it; one that waits, a two-step code, a page the
+            // reader cannot see, gets a way to the page)
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            withAnimation(.spring(duration: 0.45, bounce: 0.1)) { offer = true }
+        }
+    }
+}
+
+/// Over the school's page in the middle of a sign-in: what to do there, and that Simpl carries on by itself.
+struct HandoffNote: View {
+    let close: () -> Void
+
+    var body: some View {
+        VStack {
+            HStack(spacing: 12) {
+                Image(systemName: "hand.point.up.left.fill")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Finish signing in below").font(.subheadline.weight(.semibold))
+                    Text("Simpl carries on once you’re through.").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                Button(action: close) {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Hide")
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .padding(.vertical, 10)
+            .modifier(GlassCapsule())
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
+            Spacer()
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Liquid Glass in a capsule on iOS 26, a material before it.
+struct GlassCapsule: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background(.regularMaterial, in: Capsule())
+        }
     }
 }
 

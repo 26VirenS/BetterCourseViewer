@@ -113,7 +113,7 @@ struct TodoView: View {
             Button { toggle(row, !row.done) } label: { Label(row.done ? "Not Done" : "Done", systemImage: row.done ? "arrow.uturn.backward" : "checkmark") }
                 .tint(row.done ? .gray : .green)
         }
-        .swipeActions(edge: .leading) {
+        .workSwipe(WorkAction(row), engine: engine) {
             Button { prioritizing = row } label: { Label("Priority", systemImage: "flag.fill") }
                 .tint(.orange)
         }

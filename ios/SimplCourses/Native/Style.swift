@@ -52,7 +52,8 @@ extension View {
     /// attention. (Liquid Glass is for the bars and controls over the content, as in Apple's apps — glass tiles
     /// in a list drew a grey band behind their row.)
     func contentCard(cornerRadius: CGFloat = 20, tint: Color? = nil) -> some View {
-        self.background {
+        self.containerShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)) // (what is drawn inside is concentric with it)
+            .background {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
                 .overlay {
@@ -60,6 +61,18 @@ extension View {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(tint.opacity(0.14))
                     }
                 }
+        }
+    }
+
+    /// A fill inside a rounded container (a list's cell, a card, an answer's row) whose corners are concentric
+    /// with it on iOS 26 — `ConcentricRectangle`, the radius taken from the container less the gap between them,
+    /// never under `minimum` — and a fixed `radius` before.
+    @ViewBuilder
+    func innerFill<S: ShapeStyle>(_ style: S, radius: CGFloat, minimum: CGFloat = 6) -> some View {
+        if #available(iOS 26.0, *) {
+            self.background(style, in: ConcentricRectangle(corners: .concentric(minimum: minimum), isUniform: true))
+        } else {
+            self.background(style, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
     }
 
@@ -107,6 +120,84 @@ extension View {
         } else {
             self.buttonStyle(.bordered)
         }
+    }
+}
+
+// MARK: - The one thing to do next, at the bottom (1.4)
+
+/// A screen's main action (Hand In, Take Quiz, Reply, See Feedback…) at the very bottom, where the tab bar was —
+/// Liquid Glass on iOS 26 in a rectangle whose corners are concentric with the phone's own (`ConcentricRectangle`:
+/// the farther from the screen's corner, the smaller the radius, never under 22), a capsule before it.
+/// `prominent`: tinted with the course's colour, white words; otherwise clear glass.
+struct ActionButton: View {
+    let title: String
+    var symbol: String? = nil
+    var tint: Color = .accentColor
+    var prominent = true
+    var busy = false
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            HStack(spacing: 8) {
+                if busy { ProgressView().tint(prominent ? .white : nil) }
+                else if let symbol { Image(systemName: symbol) }
+                Text(title).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ActionStyle(tint: tint, prominent: prominent))
+    }
+}
+
+/// The surface of an `ActionButton`: tinted or clear glass, concentric with the screen's corners.
+struct ActionStyle: ButtonStyle {
+    let tint: Color
+    let prominent: Bool
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(prominent ? Color.white : Color.primary)
+            .modifier(ActionSurface(tint: enabled ? tint : Color(.systemGray3), prominent: prominent, pressed: configuration.isPressed))
+            .opacity(enabled ? 1 : 0.55)
+    }
+}
+
+struct ActionSurface: ViewModifier {
+    let tint: Color
+    let prominent: Bool
+    let pressed: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            let shape = ConcentricRectangle(corners: .concentric(minimum: 22), isUniform: true)
+            content
+                .glassEffect(prominent ? .regular.tint(tint).interactive() : .regular.interactive(), in: shape)
+                .contentShape(shape)
+        } else {
+            content
+                .background(prominent ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.secondarySystemFill)), in: Capsule())
+                .scaleEffect(pressed ? 0.97 : 1)
+                .animation(.spring(duration: 0.25, bounce: 0.3), value: pressed)
+        }
+    }
+}
+
+/// The bar the actions sit in: the screen's edges inset as Apple's own bottom bars are, side by side when two.
+struct ActionBar<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 10) { content }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
     }
 }
 

@@ -42,6 +42,7 @@ struct TodayView: View {
                             WorkRowView(row: row) { done in toggle(row, done) }
                                 .contentShape(Rectangle())
                                 .onTapGesture { open(row) }
+                                .workSwipe(WorkAction(row), engine: engine)
                                 .swipeActions(edge: .trailing) {
                                     Button { toggle(row, !row.done) } label: {
                                         Label(row.done ? "Not Done" : "Done", systemImage: row.done ? "arrow.uturn.backward" : "checkmark")
@@ -212,6 +213,9 @@ struct ItemsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var data: ItemsSheetData?
     @State private var error: String?
+    /// Half the screen first, every time (1.4): a sheet left to pick its own height came up at the top
+    /// whenever its list was long enough to scroll; a swipe up on the list takes it to the top first.
+    @State private var detent: PresentationDetent = .medium
 
     var body: some View {
         NavigationStack {
@@ -260,7 +264,8 @@ struct ItemsSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
+        .presentationContentInteraction(.resizes)
         .presentationDragIndicator(.visible)
         .task { await load() }
     }

@@ -600,6 +600,101 @@
   const absUrl = (u) => { try { return u ? new URL(u, location.origin).href : null; } catch { return null; } };
   const local = (u) => { try { const x = new URL(u, location.origin); return x.origin === location.origin ? x.pathname + x.search + x.hash : x.href; } catch { return u || null; } };
   const textOf = (html, n = 240) => (BCV.utils?.htmlToText ? BCV.utils.htmlToText(html || '', n) : String(html || '').replace(/<[^>]+>/g, ' ')).trim();
+
+  // ---- formulas in a line of plain words (1.4) ----------------------------------------------------------------
+  // Canvas keeps a formula as a picture with its LaTeX on the tag; a line of plain words (the review's line for
+  // each question) read that LaTeX out as it stands — "\frac{d}{dx}\left(x^{2}\right)", a spill of commands.
+  // mathText reads it as a person would write it on one line: d/dx(x²), √(x+1), ∫ x dx, θ, ≤.
+  const TEX_SYM = {
+    alpha: 'α', beta: 'β', gamma: 'γ', Gamma: 'Γ', delta: 'δ', Delta: 'Δ', epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', Theta: 'Θ',
+    iota: 'ι', kappa: 'κ', lambda: 'λ', Lambda: 'Λ', mu: 'μ', nu: 'ν', xi: 'ξ', Xi: 'Ξ', pi: 'π', Pi: 'Π', rho: 'ρ', sigma: 'σ', Sigma: 'Σ', tau: 'τ',
+    upsilon: 'υ', phi: 'φ', varphi: 'φ', Phi: 'Φ', chi: 'χ', psi: 'ψ', Psi: 'Ψ', omega: 'ω', Omega: 'Ω',
+    cdot: '·', times: '×', div: '÷', pm: '±', mp: '∓', le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≈', equiv: '≡', sim: '∼',
+    to: '→', rightarrow: '→', leftarrow: '←', Rightarrow: '⇒', Leftarrow: '⇐', leftrightarrow: '↔', Leftrightarrow: '⇔', mapsto: '↦',
+    infty: '∞', int: '∫', iint: '∬', oint: '∮', sum: 'Σ', prod: 'Π', partial: '∂', nabla: '∇', circ: '∘', degree: '°', angle: '∠', perp: '⊥', parallel: '∥',
+    in: '∈', notin: '∉', subset: '⊂', subseteq: '⊆', cup: '∪', cap: '∩', emptyset: '∅', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨',
+    ldots: '…', cdots: '⋯', dots: '…', prime: '′', hbar: 'ℏ', ell: 'ℓ', Re: 'ℜ', Im: 'ℑ', propto: '∝', therefore: '∴', because: '∵',
+    sin: 'sin', cos: 'cos', tan: 'tan', sec: 'sec', csc: 'csc', cot: 'cot', arcsin: 'arcsin', arccos: 'arccos', arctan: 'arctan', sinh: 'sinh', cosh: 'cosh', tanh: 'tanh',
+    ln: 'ln', log: 'log', exp: 'exp', lim: 'lim', max: 'max', min: 'min', det: 'det', gcd: 'gcd', deg: 'deg', lvert: '|', rvert: '|', vert: '|', mid: '|', langle: '⟨', rangle: '⟩',
+  };
+  const TEX_SUP = Object.fromEntries([...'0123456789+-=()niaxybcdekmtrs°'].map((c, i) => [c, '⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱᵃˣʸᵇᶜᵈᵉᵏᵐᵗʳˢ°'[i]]));
+  const TEX_SUB = Object.fromEntries([...'0123456789+-=()aeinoxkmtjr'].map((c, i) => [c, '₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑᵢₙₒₓₖₘₜⱼᵣ'[i]]));
+  const TEX_DROP = new Set(['left', 'right', 'displaystyle', 'textstyle', 'scriptstyle', 'big', 'Big', 'bigg', 'Bigg', 'bigl', 'bigr', 'Bigl', 'Bigr', 'limits', 'nolimits', 'mathstrut']);
+  const TEX_KEEP = new Set(['text', 'textrm', 'mathrm', 'mathbf', 'mathit', 'mathsf', 'mathtt', 'mathcal', 'mathbb', 'operatorname', 'textbf', 'textit', 'mbox', 'boldsymbol', 'bm', 'overline', 'underline', 'vec', 'hat', 'bar', 'tilde', 'dot', 'ddot', 'widehat', 'overrightarrow']);
+  function mathText(tex) {
+    const s0 = String(tex || '');
+    const atomic = (x) => /^[A-Za-z0-9.]+$/.test(x) || [...x].length === 1 || /^[A-Za-z0-9.′']+\([^()]*\)$/.test(x); // (a name, a number, f(x))
+    const wrap = (x) => (atomic(x) ? x : `(${x})`);
+    const script = (x, map, mark) => (x && [...x].every((c) => map[c]) ? [...x].map((c) => map[c]).join('') : `${mark}${wrap(x)}`);
+    const arg = (s, i) => { // the argument at i: a {group}, a \command, or one character
+      while (s[i] === ' ') i++;
+      if (s[i] === '{') {
+        let d = 0, j = i;
+        for (; j < s.length; j++) { if (s[j] === '{') d++; else if (s[j] === '}' && --d === 0) break; }
+        return [s.slice(i + 1, j), j + 1];
+      }
+      if (s[i] === '\\') { const m = /^\\([a-zA-Z]+|.)/.exec(s.slice(i)); return [m ? m[0] : '', i + (m ? m[0].length : 1)]; }
+      return [s[i] || '', i + 1];
+    };
+    const conv = (s, depth = 0) => {
+      if (depth > 40) return s;
+      let out = '', i = 0;
+      while (i < s.length) {
+        const ch = s[i];
+        if (ch === '\\') {
+          const m = /^\\([a-zA-Z]+|.)/.exec(s.slice(i));
+          const name = m ? m[1] : '';
+          i += m ? m[0].length : 1;
+          if (/^[dtc]?frac$/.test(name)) { const [a, j] = arg(s, i); const [b, k] = arg(s, j); i = k; out += `${wrap(conv(a, depth + 1))}/${wrap(conv(b, depth + 1))}`; continue; }
+          if (name === 'sqrt') {
+            let n = '';
+            if (s[i] === '[') { const e = s.indexOf(']', i); n = e > i ? s.slice(i + 1, e) : ''; i = e > i ? e + 1 : i + 1; }
+            const [a, j] = arg(s, i); i = j;
+            out += `${n ? script(conv(n, depth + 1), TEX_SUP, '') : ''}√${wrap(conv(a, depth + 1))}`;
+            continue;
+          }
+          if (TEX_KEEP.has(name)) { const [a, j] = arg(s, i); i = j; out += conv(a, depth + 1); continue; }
+          if (TEX_DROP.has(name)) continue;
+          if (TEX_SYM[name]) { out += /^[a-z]{2,}$/.test(TEX_SYM[name]) ? `${TEX_SYM[name]} ` : TEX_SYM[name]; continue; }
+          if (/^[,;:! ]$/.test(name) || name === 'quad' || name === 'qquad' || name === '\\') { out += ' '; continue; }
+          out += name; // a command not known here: its own name, still readable
+          continue;
+        }
+        if (ch === '^' || ch === '_') {
+          const [a, j] = arg(s, i + 1); i = j;
+          const x = conv(a, depth + 1).trim();
+          if (ch === '_' && /\b(lim|max|min|sum|Σ|Π)\s*$/.test(out)) { out = `${out.trimEnd()}(${x}) `; continue; } // (lim over x → 0: "lim(x → 0)")
+          out += ch === '^' ? (x === '∘' ? '°' : script(x, TEX_SUP, '^')) : script(x, TEX_SUB, '_');
+          continue;
+        }
+        if (ch === '{' || ch === '}') { i++; continue; }
+        out += ch === '~' ? ' ' : ch;
+        i++;
+      }
+      return out;
+    };
+    return conv(s0).replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim();
+  }
+  /** Canvas's HTML with every formula in it — a picture with its LaTeX, a math span, LaTeX typed between \( \) or
+   *  $$ $$ — turned into the line mathText reads, before it is made plain words. */
+  function mathAware(html) {
+    if (!html || !/equation|\\\(|\\\[|\$\$|math/.test(html)) return html || '';
+    const doc = new DOMParser().parseFromString(`<div id="x">${html}</div>`, 'text/html');
+    const root = doc.getElementById('x') || doc.body;
+    root.querySelectorAll('img').forEach((img) => {
+      const tex = img.getAttribute('data-equation-content') || (img.classList.contains('equation_image') || /\/equation_images\//.test(img.getAttribute('src') || '') ? img.getAttribute('title') || (img.getAttribute('alt') || '').replace(/^LaTeX:\s*/i, '') : '');
+      if (tex) img.replaceWith(doc.createTextNode(` ${mathText(tex)} `));
+    });
+    root.querySelectorAll('script[type^="math/tex"], .math_equation_latex').forEach((n) => n.replaceWith(doc.createTextNode(` ${mathText(n.textContent)} `)));
+    const walker = doc.createTreeWalker(root, 4 /* text */);
+    const texts = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n);
+    for (const t of texts) {
+      const v = t.nodeValue;
+      if (/\\\(|\\\[|\$\$/.test(v)) t.nodeValue = v.replace(/\\\(([\s\S]+?)\\\)|\\\[([\s\S]+?)\\\]|\$\$([\s\S]+?)\$\$/g, (_, a, b, c) => mathText(a ?? b ?? c));
+    }
+    return root.innerHTML;
+  }
   const esc = (t) => (BCV.utils?.escapeHtml ? BCV.utils.escapeHtml(t) : String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]));
   /** Plain words typed on the phone as Canvas's HTML: paragraphs at blank lines, line breaks kept (the web screens' rule). */
   const textToHtml = (t) => String(t || '').trim().split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
@@ -1134,13 +1229,13 @@
     const a = q.answer;
     const out = {
       id: String(q.id), n: k + 1, kind, type: q.question_type || '', name: q.question_name || '', html: kind === 'pending' ? '' : questionHtml(L, q, blanks),
-      plain: textOf(L.noFields(q.question_text || '', q) || '', 160) || q.question_name || `Question ${k + 1}`, // (the review's line)
+      plain: textOf(mathAware(L.noFields(q.question_text || '', q) || ''), 160).replace(/\s+([?.,;:!)])/g, '$1') || q.question_name || `Question ${k + 1}`, // (the review's line: formulas read as maths, not LaTeX)
       points: L.hasNum(q.points_possible) ? Number(q.points_possible) : null, flagged: !!q.flagged, answered: L.isAnswered(q), loaded: q.loaded !== false,
       options: [], matches: [], blanks: [], hint: '',
       pick: null, picks: [], text: '', map: {}, files: [],
     };
     if (kind === 'choice' || kind === 'multi' || kind === 'match') out.options = (q.answers || []).map(optOf);
-    if (kind === 'match') out.matches = (q.matches || []).filter((m) => L.hasId(m.match_id)).map((m) => ({ id: String(m.match_id), text: String(m.text || '').trim() || textOf(m.html || '', 120) }));
+    if (kind === 'match') out.matches = (q.matches || []).filter((m) => L.hasId(m.match_id)).map((m) => ({ id: String(m.match_id), text: String(m.text || '').trim() || textOf(mathAware(m.html || ''), 120) }));
     if (blanks.length) {
       out.blanks = blanks.map((b, i) => ({ id: b, n: i + 1, label: /^[0-9a-f]{8,}$/i.test(b) ? `Blank ${i + 1}` : b, options: kind === 'drops' ? (q.answers || []).filter((x) => String(x.blank_id) === b).map((x) => ({ id: String(x.id), text: String(x.text || '').trim() || textOf(x.html || '', 120) })) : [] }));
     }

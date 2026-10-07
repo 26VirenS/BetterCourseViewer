@@ -658,6 +658,8 @@
   // Reset everything above is what clears the settings, keys and history in every case.
   function paintUninstall() {
     const proto = location.protocol;
+    // (on the iPhone light or dark is the phone's own setting, never the app's: no Light / Dark / System to pick)
+    if (proto === 'file:' && !inApp) $('themes').style.display = 'none'; // (.themes is a flex row: the hidden attribute alone would not hide it)
     const platform = inApp || proto === 'safari-web-extension:' ? 'safari' : proto === 'file:' ? 'ios' : proto === 'moz-extension:' ? 'firefox' : 'chrome';
     const li = (parts) => h('li', {}, parts.map((p) => (typeof p === 'string' ? document.createTextNode(p) : p)));
     const b = (t) => h('b', { text: t });

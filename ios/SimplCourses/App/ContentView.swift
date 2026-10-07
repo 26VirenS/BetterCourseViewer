@@ -12,6 +12,5 @@ struct ContentView: View {
                 SchoolPickerView()
             }
         }
-        .preferredColorScheme(session.colorScheme) // the status bar follows the interface's appearance
     }
 }

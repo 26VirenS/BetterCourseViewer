@@ -19,6 +19,26 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         _ = store.set(items)
     }
 
+    /// On the iPhone the look follows the phone (1.4): light or dark is the phone's own setting, never one
+    /// of the app's. A saved choice from before is turned back to "system", and so is one written later
+    /// (a settings page, an old command): the page draws whatever the phone is set to.
+    static func followingPhone(_ items: [String: Any]) -> [String: Any] {
+        guard var s = items["settings"] as? [String: Any], var a = s["appearance"] as? [String: Any],
+              let mode = a["darkMode"] as? String, mode != "system" else { return items }
+        a["darkMode"] = "system"
+        s["appearance"] = a
+        var out = items
+        out["settings"] = s
+        return out
+    }
+
+    func followPhoneAppearance() {
+        let s = store.get("settings")
+        let mode = ((s["settings"] as? [String: Any])?["appearance"] as? [String: Any])?["darkMode"] as? String
+        guard let mode, mode != "system" else { return }
+        _ = store.set(Bridge.followingPhone(s))
+    }
+
     func register(_ webView: WKWebView, world: WKContentWorld) {
         views[ObjectIdentifier(webView)] = (WeakBox(webView), world)
     }
@@ -43,7 +63,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "storage.get":
             replyHandler(store.get(body["keys"]), nil)
         case "storage.set":
-            let items = body["items"] as? [String: Any] ?? [:]
+            let items = Bridge.followingPhone(body["items"] as? [String: Any] ?? [:])
             let changes = store.set(items)
             replyHandler(nil, nil)
             broadcast(changes)

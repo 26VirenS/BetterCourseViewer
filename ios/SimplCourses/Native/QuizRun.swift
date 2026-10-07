@@ -30,6 +30,8 @@ final class QuizRun: ObservableObject {
     @Published var askCode = false
     /// A move on a one-at-a-time attempt under way, to this question.
     @Published private(set) var moving: Int?
+    /// Which way the last move went (the page slides that way): on to a later question, or back.
+    @Published private(set) var forward = true
     @Published var receipt: QuizReceipt?
     @Published var feedback: QuizFeedback?
     @Published var feedbackError: String?
@@ -245,17 +247,27 @@ final class QuizRun: ObservableObject {
         guard let a = attempt, a.questions.indices.contains(k), k != idx, moving == nil else { return }
         if a.noBack && k < idx { return }
         Haptics.select()
+        await heading(k > idx)
         if a.paged { await move(question: a.questions[k].id, to: k) } else { idx = k }
     }
 
     func next() async {
         guard let a = attempt, moving == nil else { return }
+        await heading(true)
         if a.paged { await move("next", to: idx + 1) } else { idx = min(idx + 1, a.questions.count - 1) }
     }
 
     func back() async {
         guard let a = attempt, moving == nil, canGoBack else { return }
+        await heading(false)
         if a.paged { await move("prev", to: idx - 1) } else { idx = max(0, idx - 1) }
+    }
+
+    /// The way a move goes, set a frame before the move itself: the page leaving reads it as it leaves.
+    private func heading(_ on: Bool) async {
+        guard forward != on else { return }
+        forward = on
+        try? await Task.sleep(nanoseconds: 30_000_000)
     }
 
     /// A move on a one-at-a-time attempt, through Canvas's own page (every answer is on Canvas first).

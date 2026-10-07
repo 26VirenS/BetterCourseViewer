@@ -263,6 +263,63 @@ struct TitleSubtitle: ViewModifier {
 
 /// The simulator suite's way into a sheet (-SimplOpen handin, -SimplOpen grades:101): taken once a launch.
 @MainActor
+/// Swipe right on a piece of work (1.4): Hand In — Take Quiz, Reply, Open for a quiz, a discussion, a tool —
+/// while it waits on you; Feedback once it is handed in or graded. A full swipe does it.
+struct WorkAction {
+    let url: String?
+    let title: String
+    let kind: String?
+    let handedIn: Bool
+    let open: Bool
+
+    /// A row of a course's lists: what its status says.
+    init(_ r: ARow) {
+        url = r.url
+        title = r.title
+        kind = r.kind
+        let k = r.status?.kind ?? ""
+        let word = r.status?.word ?? ""
+        handedIn = k == "good" || word.hasPrefix("Submitted")
+        open = k != "muted"
+    }
+
+    /// A row of Today or To Do: done is handed in (a task of your own has nothing to hand in).
+    init(_ w: WorkRow) {
+        url = w.custom == true ? nil : w.url
+        title = w.title
+        kind = w.type
+        handedIn = w.done
+        open = true
+    }
+
+    var label: (String, String) {
+        switch (kind ?? "").lowercased() {
+        case "quiz": return ("Take Quiz", "checklist")
+        case "discussion", "discussion_topic": return ("Reply", "bubble.left.fill")
+        case "tool": return ("Open", "puzzlepiece.extension.fill")
+        default: return ("Hand In", "tray.and.arrow.up.fill")
+        }
+    }
+}
+
+extension View {
+    /// The swipe-right action of a piece of work (WorkAction), with whatever else that edge already holds after it.
+    func workSwipe<More: View>(_ w: WorkAction, engine: Engine, @ViewBuilder more: () -> More = { EmptyView() }) -> some View {
+        self.swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if let url = w.url, !url.isEmpty {
+                if w.handedIn {
+                    Button { engine.act(on: url, title: w.title, feedback: true) } label: { Label("Feedback", systemImage: "text.bubble.fill") }
+                        .tint(.purple)
+                } else if w.open {
+                    Button { engine.act(on: url, title: w.title, feedback: false) } label: { Label(w.label.0, systemImage: w.label.1) }
+                        .tint(.green)
+                }
+            }
+            more()
+        }
+    }
+}
+
 enum LaunchOpen {
     private static var used = false
 

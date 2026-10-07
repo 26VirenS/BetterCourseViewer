@@ -216,8 +216,8 @@ extension View {
     func shellToolbar(bell: Bool = false, calendar: Bool = false, add: (() -> Void)? = nil, menu: AnyView? = nil) -> some View { modifier(ShellToolbar(bell: bell, calendar: calendar, add: add, menu: menu)) }
 }
 
-/// What the web interface kept under the avatar on a phone (Inbox, Groups, Tools, the appearance,
-/// Settings, the guided setup, What's New, the Canvas profile, Sign out), as Apple's own menu.
+/// What the web interface kept under the avatar on a phone (Inbox, Groups, Settings, What's New, the
+/// Canvas profile, Sign out), as Apple's own menu. (No light/dark switch: the phone's own setting rules, 1.4.)
 struct AccountMenu: View {
     var size: CGFloat = 30
     @EnvironmentObject private var engine: Engine
@@ -227,7 +227,6 @@ struct AccountMenu: View {
     var body: some View {
         let me = engine.snapshot?.me
         let inbox = engine.snapshot?.inboxUnread ?? 0
-        let dark = engine.snapshot?.dark ?? false
         Menu {
             Section(me.map { "\($0.name)\($0.email.map { "\n\($0)" } ?? "")" } ?? "Account") {
                 Button { engine.push(.inbox) } label: {
@@ -237,15 +236,6 @@ struct AccountMenu: View {
                 // (no Tools on the iPhone yet, 1.2)
             }
             Section {
-                Button {
-                    Haptics.select()
-                    Task {
-                        _ = try? await engine.call("appearance", ["dark": !dark], as: OK.self)
-                        await engine.refreshSnapshot()
-                    }
-                } label: {
-                    Label(dark ? "Light Appearance" : "Dark Appearance", systemImage: dark ? "sun.max" : "moon")
-                }
                 Button { session.showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 Button {
                     Task {

@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.5', date: '2026-10-07', notes: [
+      { kind: 'new', title: 'Pull up, next question', body: 'Pick an answer or pull up; hold to submit.', icon: P.list },
+      { kind: 'new', title: 'Swipe to hand in', body: 'Swipe right on work to hand in or see feedback.', icon: P.arrows },
+      { kind: 'improved', title: 'Follows your iPhone', body: 'Light or dark now matches your phone’s setting.', icon: P.eye },
+      { kind: 'improved', title: 'Buttons at the bottom', body: 'Hand In and Reply sit where the tab bar was.', icon: P.layers },
+      { kind: 'fixed', title: 'Formulas read right', body: 'Readable in dark mode and on the quiz review.', icon: P.check },
+    ] },
     { version: '2.99.4', date: '2026-10-07', notes: [
       { kind: 'improved', title: 'Smoother boxes', body: 'Counters and grades open without dropping frames.', icon: P.layers },
       { kind: 'improved', title: 'Search glides', body: 'The floating search moves smoothly, even when busy.', icon: P.sparkle },
