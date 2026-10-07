@@ -209,6 +209,20 @@ extension InfoRow where Trailing == EmptyView {
     }
 }
 
+/// A line under a screen's large title (iOS 26: the bar's own subtitle, on the title's edge).
+struct TitleSubtitle: ViewModifier {
+    let text: String?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            if let text, !text.isEmpty { content.navigationSubtitle(text) } else { content }
+        } else {
+            content
+        }
+    }
+}
+
 /// The simulator suite's way into a sheet (-SimplOpen handin, -SimplOpen grades:101): taken once a launch.
 @MainActor
 enum LaunchOpen {

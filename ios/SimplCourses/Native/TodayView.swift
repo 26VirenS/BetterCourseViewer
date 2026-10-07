@@ -12,6 +12,10 @@ struct TodayView: View {
 
     struct SheetKey: Identifiable { let id: String }
 
+    static let dateInBar: Bool = {
+        if #available(iOS 26.0, *) { return true } else { return false }
+    }()
+
     private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
@@ -19,18 +23,16 @@ struct TodayView: View {
             if let d = data {
                 List {
                     Section {
-                        // the date over the cards, at their edge and the title's (a section header sits a cell's
-                        // inset further in, which put it out of line with both)
-                        VStack(alignment: .leading, spacing: 10) {
-                            if let line = d.dateLine {
-                                Text(line).font(.headline).foregroundStyle(.secondary)
-                            }
-                            LazyVGrid(columns: columns, spacing: 10) {
-                                ForEach(d.counters) { c in counterTile(c) }
-                            }
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            ForEach(d.counters) { c in counterTile(c) }
                         }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
+                    } header: {
+                        // iOS 26: the date is the title's own subtitle, on its edge (as a header it sat a cell's inset
+                        // further in, out of line with the title and the cards; in the row, the list's round corner
+                        // clipped its first letter). Before iOS 26 it stays the header.
+                        if !TodayView.dateInBar, let line = d.dateLine { Text(line).textCase(nil) }
                     }
                     Section {
                         if d.list.rows.isEmpty {
@@ -81,6 +83,7 @@ struct TodayView: View {
             }
         }
         .navigationTitle("Today")
+        .modifier(TitleSubtitle(text: data?.dateLine))
         .shellToolbar(bell: true, calendar: true)
         .task(id: engine.dataVersion) { await load() }
         .sheet(item: $sheet) { key in
