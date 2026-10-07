@@ -28,6 +28,7 @@ struct QuizScreen: View {
     var body: some View {
         NavigationStack {
             content
+                .animation(.spring(duration: 0.45, bounce: 0.1), value: run.stage == .review || run.stage == .submitting) // (the last question pulled up: the review rises in)
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
@@ -114,12 +115,14 @@ struct QuizScreen: View {
             ProgressView(run.intro?.begin.hasPrefix("Continue") == true ? "Resuming your attempt…" : "Starting your attempt…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .taking:
-            QuizTakeView(run: run, tint: tint) {
+            QuizTakeView(run: run, tint: tint)
+                .transition(.opacity)
+        case .review, .submitting:
+            QuizReviewView(run: run, tint: tint, submit: { confirmSubmit = true }, held: {
                 // the pull-and-hold's end: a blank question is asked about first, otherwise it is handed in
                 if run.answeredCount < run.questions.count { confirmSubmit = true } else { Task { await run.submit() } }
-            }
-        case .review, .submitting:
-            QuizReviewView(run: run, tint: tint) { confirmSubmit = true }
+            })
+            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
         case .receipt:
             QuizReceiptView(run: run, tint: tint) { dismiss() }
         case .feedback:
@@ -322,25 +325,9 @@ private struct QuizIntroView: View {
 private struct QuizTakeView: View {
     @ObservedObject var run: QuizRun
     let tint: Color
-    /// The last question's pull-and-hold, held to the end: hand it in.
-    let submit: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pull = Pull()
-    @State private var touching = false
-    @State private var hold: CGFloat = 0
-    @State private var holdTask: Task<Void, Never>?
     @State private var advance: Task<Void, Never>?
-
-    /// How far past either end of the question the page is pulled (the scroll view's own rubber band: the
-    /// finger travels two or three times as far, the inertia the student feels).
-    struct Pull: Equatable {
-        var up: CGFloat = 0
-        var down: CGFloat = 0
-    }
-
-    /// Past this, letting go moves to the next (or the last) question; on the last one, holding here hands in.
-    static let line: CGFloat = 70
-    static let holdTime = 0.9
+    @State private var touching = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -359,10 +346,7 @@ private struct QuizTakeView: View {
             .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.12), value: run.idx)
         }
         .safeAreaInset(edge: .bottom) { footer }
-        .onDisappear {
-            advance?.cancel()
-            holdTask?.cancel()
-        }
+        .onDisappear { advance?.cancel() }
     }
 
     /// The page goes the way the student went: on, up and out with the next rising from below; back, the other way.
@@ -373,81 +357,45 @@ private struct QuizTakeView: View {
             : .asymmetric(insertion: .move(edge: .top).combined(with: .opacity), removal: .move(edge: .bottom).combined(with: .opacity))
     }
 
+    /// What pulling up past the end of this question does: the next question, or — on the last — the review.
+    private var up: PullEdges.Up {
+        run.isLast
+            ? .init(pull: "Pull up to review your answers", release: "Release to review your answers", symbol: "list.bullet.rectangle")
+            : .init(pull: "Pull up for question \(nextNumber)", release: "Release for question \(nextNumber)", symbol: "arrow.up")
+    }
+
     private func page(_ q: QuizQuestion) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 QuestionView(run: run, q: q, total: run.questions.count, tint: tint) { picked(q) }
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
-                endHint
+                Label(up.pull, systemImage: run.isLast ? "list.bullet.rectangle" : "arrow.up")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 34)
                     .padding(.bottom, 28)
+                    .accessibilityHidden(true)
             }
         }
-        .scrollBounceBehavior(.always)
         .scrollDismissesKeyboard(.interactively)
-        .onScrollGeometryChange(for: Pull.self) { g in
-            let top = -g.contentInsets.top
-            let bottom = max(top, g.contentSize.height - g.containerSize.height + g.contentInsets.bottom)
-            return Pull(up: max(0, g.contentOffset.y - bottom), down: max(0, top - g.contentOffset.y))
-        } action: { _, p in
-            pulled(p)
-        }
-        .onScrollPhaseChange { old, new in
-            if new == .interacting { touching = true }
-            if old == .interacting && new != .interacting { released() }
-        }
-        .overlay(alignment: .bottom) { upBadge }
-        .overlay(alignment: .top) { downBadge }
+        .modifier(PullEdges(
+            tint: tint,
+            up: up,
+            down: run.canGoBack ? PullEdges.Up(pull: "Pull down for question \(run.idx)", release: "Release for question \(run.idx)", symbol: "arrow.down") : nil,
+            onUp: { if run.isLast { toReview() } else { next() } },
+            onDown: back,
+            touching: $touching
+        ))
         .opacity(run.moving != nil ? 0.5 : 1)
         .animation(.easeOut(duration: 0.2), value: run.moving)
         .allowsHitTesting(run.moving == nil)
-        .accessibilityAction(named: run.isLast ? "Submit Quiz" : "Next Question") { if run.isLast { submit() } else { next() } }
+        .accessibilityAction(named: run.isLast ? "Review Answers" : "Next Question") { if run.isLast { toReview() } else { next() } }
         .accessibilityAction(named: "Previous Question") { if run.canGoBack { back() } }
     }
 
-    // MARK: Pulling
-
-    private func pulled(_ p: Pull) {
-        let was = pull
-        pull = p
-        guard touching else { return }
-        if p.up >= Self.line && was.up < Self.line {
-            Haptics.play(run.isLast ? "medium" : "select")
-            if run.isLast { startHold() }
-        } else if p.up < Self.line && was.up >= Self.line {
-            cancelHold()
-        }
-        if run.canGoBack && p.down >= Self.line && was.down < Self.line { Haptics.select() }
-    }
-
-    private func released() {
-        touching = false
-        let p = pull
-        if p.up >= Self.line && !run.isLast { next() }
-        else if p.down >= Self.line && run.canGoBack { back() }
-        cancelHold() // (the last question: let go before the hold is done, nothing is handed in)
-    }
-
-    private func startHold() {
-        guard holdTask == nil else { return }
-        withAnimation(.linear(duration: Self.holdTime)) { hold = 1 }
-        holdTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(Self.holdTime * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            holdTask = nil
-            Haptics.success()
-            submit()
-            withAnimation(.spring(duration: 0.3)) { hold = 0 }
-        }
-    }
-
-    private func cancelHold() {
-        holdTask?.cancel()
-        holdTask = nil
-        if hold > 0 { withAnimation(.spring(duration: 0.3, bounce: 0)) { hold = 0 } }
-    }
+    private var nextNumber: Int { min(run.idx + 2, run.questions.count) }
 
     private func next() {
         advance?.cancel()
@@ -461,6 +409,12 @@ private struct QuizTakeView: View {
         Task { await run.back() }
     }
 
+    private func toReview() {
+        advance?.cancel()
+        Haptics.tap()
+        Task { await run.toReview() }
+    }
+
     /// One answer picked on a one-answer question: a beat to see it marked, then on to the next by itself.
     private func picked(_ q: QuizQuestion) {
         guard q.kind == "choice", !run.isLast else { return }
@@ -469,71 +423,6 @@ private struct QuizTakeView: View {
             try? await Task.sleep(nanoseconds: 550_000_000)
             guard !Task.isCancelled, run.current?.id == q.id, !touching else { return }
             await run.next()
-        }
-    }
-
-    // MARK: What the pull says
-
-    private var nextNumber: Int { min(run.idx + 2, run.questions.count) }
-
-    /// At the foot of every question, what pulling does there.
-    private var endHint: some View {
-        Label(run.isLast ? "Pull up and hold to submit" : "Pull up for question \(nextNumber)", systemImage: run.isLast ? "paperplane" : "arrow.up")
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(.secondary)
-            .accessibilityHidden(true)
-    }
-
-    /// Rising from the bottom as the page is pulled: a ring filling to the line (on the last question, filling
-    /// again as it is held), and what letting go will do.
-    @ViewBuilder
-    private var upBadge: some View {
-        let p = min(pull.up / Self.line, 1)
-        if pull.up > 2 {
-            let past = p >= 1
-            let words = run.isLast
-                ? (past ? (hold >= 1 ? "Submitting…" : "Keep holding to submit") : "Pull up and hold to submit")
-                : (past ? "Release for question \(nextNumber)" : "Pull up for question \(nextNumber)")
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().stroke(tint.opacity(0.22), lineWidth: 3)
-                    Circle()
-                        .trim(from: 0, to: run.isLast && past ? max(hold, 0.02) : p)
-                        .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Image(systemName: run.isLast ? "paperplane.fill" : "arrow.up")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(tint)
-                        .scaleEffect(past ? 1.15 : 1)
-                }
-                .frame(width: 26, height: 26)
-                Text(words).font(.subheadline.weight(.semibold)).contentTransition(.opacity)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .modifier(GlassCapsule())
-            .opacity(min(1, pull.up / 18))
-            .scaleEffect(0.92 + 0.08 * p)
-            .padding(.bottom, 10)
-            .animation(.snappy(duration: 0.2), value: past)
-            .allowsHitTesting(false)
-        }
-    }
-
-    @ViewBuilder
-    private var downBadge: some View {
-        if pull.down > 2 && run.canGoBack {
-            let p = min(pull.down / Self.line, 1)
-            Label(p >= 1 ? "Release for question \(run.idx)" : "Pull down for question \(run.idx)", systemImage: "arrow.down")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(tint)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .modifier(GlassCapsule())
-                .opacity(min(1, pull.down / 18))
-                .scaleEffect(0.92 + 0.08 * p)
-                .padding(.top, 10)
-                .allowsHitTesting(false)
         }
     }
 
@@ -551,6 +440,129 @@ private struct QuizTakeView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .background(.bar)
+    }
+}
+
+/// Pulling a scroll view past either end to act (1.4): the scroll view's own rubber band is the resistance — the
+/// finger travels two or three times as far as the page — and a badge rises from that edge with a ring filling to
+/// the line. Let go past it: `onUp` / `onDown`. An `Up` that `hold`s acts only once the pull is held past the line
+/// for `holdTime` (the ring fills a second time) — handing a quiz in.
+struct PullEdges: ViewModifier {
+    struct Up {
+        var pull: String
+        var release: String
+        var symbol: String
+        var hold = false
+    }
+
+    let tint: Color
+    let up: Up?
+    var down: Up? = nil
+    let onUp: () -> Void
+    var onDown: () -> Void = {}
+    @Binding var touching: Bool
+    @State private var pull = Pull()
+    @State private var hold: CGFloat = 0
+    @State private var holdTask: Task<Void, Never>?
+
+    struct Pull: Equatable {
+        var up: CGFloat = 0
+        var down: CGFloat = 0
+    }
+
+    static let line: CGFloat = 70
+    static let holdTime = 0.9
+
+    func body(content: Content) -> some View {
+        content
+            .scrollBounceBehavior(.always)
+            .onScrollGeometryChange(for: Pull.self) { g in
+                let top = -g.contentInsets.top
+                let bottom = max(top, g.contentSize.height - g.containerSize.height + g.contentInsets.bottom)
+                return Pull(up: max(0, g.contentOffset.y - bottom), down: max(0, top - g.contentOffset.y))
+            } action: { _, p in
+                pulled(p)
+            }
+            .onScrollPhaseChange { old, new in
+                if new == .interacting { touching = true }
+                if old == .interacting && new != .interacting { released() }
+            }
+            .overlay(alignment: .bottom) {
+                if let up, pull.up > 2 { badge(up, amount: pull.up, edge: .bottom) }
+            }
+            .overlay(alignment: .top) {
+                if let down, pull.down > 2 { badge(down, amount: pull.down, edge: .top) }
+            }
+            .onDisappear { holdTask?.cancel() }
+    }
+
+    private func pulled(_ p: Pull) {
+        let was = pull
+        pull = p
+        guard touching else { return }
+        if let up, p.up >= Self.line && was.up < Self.line {
+            Haptics.play(up.hold ? "medium" : "select")
+            if up.hold { startHold() }
+        } else if p.up < Self.line && was.up >= Self.line {
+            cancelHold()
+        }
+        if down != nil && p.down >= Self.line && was.down < Self.line { Haptics.select() }
+    }
+
+    private func released() {
+        touching = false
+        let p = pull
+        if let up, !up.hold, p.up >= Self.line { onUp() }
+        else if down != nil, p.down >= Self.line { onDown() }
+        cancelHold() // (a hold let go before it is done does nothing)
+    }
+
+    private func startHold() {
+        guard holdTask == nil else { return }
+        withAnimation(.linear(duration: Self.holdTime)) { hold = 1 }
+        holdTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(Self.holdTime * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            holdTask = nil
+            Haptics.success()
+            onUp()
+            withAnimation(.spring(duration: 0.3)) { hold = 0 }
+        }
+    }
+
+    private func cancelHold() {
+        holdTask?.cancel()
+        holdTask = nil
+        if hold > 0 { withAnimation(.spring(duration: 0.3, bounce: 0)) { hold = 0 } }
+    }
+
+    private func badge(_ u: Up, amount: CGFloat, edge: VerticalEdge) -> some View {
+        let p = min(amount / Self.line, 1)
+        let past = p >= 1
+        let words = past ? (u.hold && hold >= 1 ? "Submitting…" : u.release) : u.pull
+        return HStack(spacing: 10) {
+            ZStack {
+                Circle().stroke(tint.opacity(0.22), lineWidth: 3)
+                Circle()
+                    .trim(from: 0, to: u.hold && past ? max(hold, 0.02) : p)
+                    .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Image(systemName: u.symbol)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(tint)
+                    .scaleEffect(past ? 1.15 : 1)
+            }
+            .frame(width: 26, height: 26)
+            Text(words).font(.subheadline.weight(.semibold)).contentTransition(.opacity)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .modifier(GlassCapsule())
+        .opacity(min(1, amount / 18))
+        .scaleEffect(0.92 + 0.08 * p)
+        .padding(edge == .bottom ? .bottom : .top, 10)
+        .animation(.snappy(duration: 0.2), value: past)
+        .allowsHitTesting(false)
     }
 }
 
@@ -920,7 +932,11 @@ private struct OptionLabel: View {
 private struct QuizReviewView: View {
     @ObservedObject var run: QuizRun
     let tint: Color
+    /// Submit Quiz pressed: asked first.
     let submit: () -> Void
+    /// Pulled up and held at the foot of the list: the hold was the asking (a blank question is still raised).
+    let held: () -> Void
+    @State private var touching = false
 
     var body: some View {
         let blank = run.questions.count - run.answeredCount
@@ -937,8 +953,22 @@ private struct QuizReviewView: View {
             } footer: {
                 Text(noBack ? "This quiz seals each question once you leave it." : "Tap a question to change it. Submitting ends the attempt; blank questions are graded as incorrect.")
             }
+            Section {
+                Label("Pull up and hold to submit", systemImage: "paperplane")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .accessibilityHidden(true)
+            }
         }
         .listStyle(.insetGrouped)
+        .modifier(PullEdges(
+            tint: tint,
+            up: run.stage == .submitting ? nil : PullEdges.Up(pull: "Pull up and hold to submit", release: "Keep holding to submit", symbol: "paperplane.fill", hold: true),
+            onUp: held,
+            touching: $touching
+        ))
         .safeAreaInset(edge: .bottom) {
             ActionBar {
                 ActionButton(title: "Keep Working", tint: tint, prominent: false) { Task { await run.keepWorking() } }
