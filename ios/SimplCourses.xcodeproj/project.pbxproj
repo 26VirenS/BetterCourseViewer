@@ -51,6 +51,7 @@
 		6A99D53CFA4C31BE5AFA13C4 /* QuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5D57E48C5AD9EA4BCCBD7D6 /* QuizView.swift */; };
 		8036D8CFDACB199C24BBD703 /* TabBarProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3F8AF0EE9DA96087C6F65E /* TabBarProbe.swift */; };
 		5E1D0A7B3C9F4E2A8B6D1C01 /* Reminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D0A7B3C9F4E2A8B6D1C02 /* Reminders.swift */; };
+		5E1D0A7B3C9F4E2A8B6D1C03 /* Activity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D0A7B3C9F4E2A8B6D1C04 /* Activity.swift */; };
 		3438780C1CEBCF932B4D526C /* ToolSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA39D269F874824A865B8166 /* ToolSheet.swift */; };
 		9058FF99027A13078E174731 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */; };
 /* End PBXBuildFile section */
@@ -101,6 +102,7 @@
 		B5D57E48C5AD9EA4BCCBD7D6 /* QuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizView.swift; sourceTree = "<group>"; };
 		4C3F8AF0EE9DA96087C6F65E /* TabBarProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarProbe.swift; sourceTree = "<group>"; };
 		5E1D0A7B3C9F4E2A8B6D1C02 /* Reminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reminders.swift; sourceTree = "<group>"; };
+		5E1D0A7B3C9F4E2A8B6D1C04 /* Activity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Activity.swift; sourceTree = "<group>"; };
 		FA39D269F874824A865B8166 /* ToolSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolSheet.swift; sourceTree = "<group>"; };
 		AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -210,6 +212,7 @@
 				B5D57E48C5AD9EA4BCCBD7D6 /* QuizView.swift */,
 				4C3F8AF0EE9DA96087C6F65E /* TabBarProbe.swift */,
 				5E1D0A7B3C9F4E2A8B6D1C02 /* Reminders.swift */,
+				5E1D0A7B3C9F4E2A8B6D1C04 /* Activity.swift */,
 				FA39D269F874824A865B8166 /* ToolSheet.swift */,
 				AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */,
 			);
@@ -293,6 +296,7 @@
 				3438780C1CEBCF932B4D526C /* ToolSheet.swift in Sources */,
 				8036D8CFDACB199C24BBD703 /* TabBarProbe.swift in Sources */,
 				5E1D0A7B3C9F4E2A8B6D1C01 /* Reminders.swift in Sources */,
+				5E1D0A7B3C9F4E2A8B6D1C03 /* Activity.swift in Sources */,
 				6A99D53CFA4C31BE5AFA13C4 /* QuizView.swift in Sources */,
 				DCCD23225C710AA60223AD54 /* QuizRun.swift in Sources */,
 				1F027A0E753835C2D64354B0 /* QuizModels.swift in Sources */,
@@ -372,7 +376,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -391,7 +395,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.4.9;
+				MARKETING_VERSION = 1.5;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -474,7 +478,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -487,7 +491,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.4.9;
+				MARKETING_VERSION = 1.5;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

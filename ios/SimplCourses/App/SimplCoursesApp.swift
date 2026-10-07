@@ -16,5 +16,9 @@ struct SimplCoursesApp: App {
             ContentView()
                 .environmentObject(session)
         }
+        // iOS woke the app to look for new activity (Background App Refresh: it picks the moment)
+        .backgroundTask(.appRefresh(Activity.taskID)) {
+            await Activity.shared.backgroundCheck()
+        }
     }
 }

@@ -82,6 +82,7 @@ final class AppSession: ObservableObject {
 
     func changeSchool() {
         Task { await Reminders.shared.clear() } // (another school's work: none of these reminders are its)
+        Task { await Activity.shared.reset() }
         UserDefaults.standard.removeObject(forKey: AppSession.hostKey)
         host = nil
     }
@@ -90,6 +91,7 @@ final class AppSession: ObservableObject {
     /// saved sign-in (or the app would sign straight back in).
     func signOut(completion: @escaping () -> Void = {}) {
         Task { await Reminders.shared.clear() } // (the next account's work is not this one's)
+        Task { await Activity.shared.reset() }
         CookieJar.shared.clear()
         LoginVault.clear()
         WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {

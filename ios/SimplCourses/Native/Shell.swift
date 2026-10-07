@@ -74,8 +74,10 @@ struct RootView: View {
         .onChange(of: engine.phase) { openReminder() }
         // back in the foreground: the reminders set again from what Canvas says now
         .onChange(of: scenePhase) {
+            if scenePhase == .background { Activity.shared.schedule() } // (the next look for new activity, while away)
             guard scenePhase == .active, engine.phase == .native else { return }
             Task { await Reminders.shared.reschedule(engine) }
+            Task { await Activity.shared.sync(engine) }
         }
     }
 

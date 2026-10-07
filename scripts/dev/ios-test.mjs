@@ -438,6 +438,10 @@ try {
   const rmTd = await nc('todo', { showDone: true });
   const rmDone = new Set((rmTd.sections || []).flatMap((s) => s.rows).filter((r) => r.done).map((r) => r.id));
   check(!rm.error && Array.isArray(rm.items) && rm.items.length > 0 && rm.items.every((i) => i.id && i.title && i.kind && i.due && Date.parse(i.due) > rmNow && !rmDone.has(i.id)) && rm.items.every((i, k, a) => k === 0 || a[k - 1].due <= i.due) && new Set(rm.items.map((i) => i.id)).size === rm.items.length, `reminders: work still to hand in, every due time still ahead, nothing done or handed in, soonest first, each once: ${JSON.stringify({ n: rm.items?.length, first: rm.items?.slice(0, 3).map((i) => `${i.kind}:${i.title}@${i.due}`), error: rm.error })}`);
+  // (1.5) new activity: what the phone's background check reads Canvas's stream with — the courses chosen, the student's id
+  const wi = await nc('watchInfo');
+  const wiSel = (await nc('courses')).current?.filter?.((c) => c.on !== false) || [];
+  check(!wi.error && wi.me && Array.isArray(wi.courses) && wi.courses.length > 0 && wi.courses.every((c) => c.id && c.name), `the background check's context: the student's id and the courses chosen, each with the name the app shows: ${JSON.stringify({ me: wi.me, courses: wi.courses?.map((c) => `${c.id}:${c.name}`), shown: wiSel.length, error: wi.error })}`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

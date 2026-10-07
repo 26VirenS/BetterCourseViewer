@@ -12,8 +12,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.4.9" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
-    CURRENT_PROJECT_VERSION: "14"
+    MARKETING_VERSION: "1.5" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
+    CURRENT_PROJECT_VERSION: "15"
     CODE_SIGN_STYLE: Automatic
 targets:
   SimplCourses:
@@ -57,6 +57,8 @@ targets:
         NSCameraUsageDescription: Lets you take a photo when an assignment asks for a file.
         NSPhotoLibraryUsageDescription: Lets you attach a photo or video to an assignment.
         ITSAppUsesNonExemptEncryption: false
+        UIBackgroundModes: [fetch] # (1.5: Background App Refresh — iOS wakes the app now and then to look for new activity, Native/Activity.swift)
+        BGTaskSchedulerPermittedIdentifiers: [com.simplcourses.app.activity]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.simplcourses.app # the same record as the Mac app in App Store Connect (one app, two platforms)

@@ -7,6 +7,7 @@ struct SettingsSheet: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var engine: Engine
     @ObservedObject private var reminders = Reminders.shared
+    @ObservedObject private var activity = Activity.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var confirmSignOut = false
@@ -33,6 +34,7 @@ struct SettingsSheet: View {
                 signInSection
                 simplSection
                 remindersSection
+                activitySection
                 if live {
                     gradesSection
                     recordSection
@@ -67,7 +69,10 @@ struct SettingsSheet: View {
                 }
             }
             .task(id: live) { if live { await loadInfo() } }
-            .task { await reminders.checkRefused() }
+            .task {
+                await reminders.checkRefused()
+                activity.checkRefresh()
+            }
             .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
             .fileImporter(isPresented: $importing, allowedContentTypes: importKind.types, allowsMultipleSelection: false) { result in
                 picked(importKind, result)
@@ -166,6 +171,40 @@ struct SettingsSheet: View {
             Text("Alerts for work still to hand in over the next three weeks, set on this iPhone: they come on time even with Simpl closed, and nothing is sent anywhere. New work is picked up each time you open Simpl.")
         }
         .animation(.snappy, value: reminders.on)
+    }
+
+    /// New activity (1.5): alerts for what is posted while Simpl is closed, read when iOS wakes the app.
+    private var activitySection: some View {
+        Section {
+            Toggle(isOn: Binding(get: { activity.on }, set: { on in
+                Haptics.select()
+                if on { Task { await activity.enable(engine) } } else { activity.disable() }
+            })) {
+                Label("New Activity", systemImage: "app.badge")
+            }
+            if activity.on {
+                ForEach(Activity.Kind.allCases) { k in
+                    Toggle(k.label, isOn: Binding(get: { activity.kinds.contains(k) }, set: { v in
+                        Haptics.select()
+                        if v { activity.kinds.insert(k) } else { activity.kinds.remove(k) }
+                    }))
+                }
+                if let last = activity.lastCheck {
+                    LabeledContent("Last checked") { Text(last, format: .relative(presentation: .named)) }
+                }
+                if activity.refreshOff {
+                    Text("Background App Refresh is off for Simpl Courses, so it cannot look for new activity while closed.").foregroundStyle(.secondary)
+                    Button("Open iOS Settings") {
+                        if let u = URL(string: UIApplication.openSettingsURLString) { openURL(u) }
+                    }
+                }
+            }
+        } header: {
+            Text("New Activity")
+        } footer: {
+            Text("Alerts when something is posted while Simpl is closed. iOS decides when Simpl may look — usually within an hour or a few, more often if you use Simpl a lot — and not after you swipe Simpl away or in Low Power Mode. Read with the sign-in on this iPhone: nothing is sent anywhere.")
+        }
+        .animation(.snappy, value: activity.on)
     }
 
     @ViewBuilder private var gradesSection: some View {

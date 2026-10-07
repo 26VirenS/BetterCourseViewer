@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.9', date: '2026-10-07', notes: [
+      { kind: 'new', title: 'New-activity alerts', body: 'On iPhone: posts, grades and messages while closed.', icon: P.sparkle },
+    ] },
     { version: '2.99.8', date: '2026-10-07', notes: [
       { kind: 'new', title: 'Due-date reminders', body: 'On iPhone: alerts before work is due, even when closed.', icon: P.clock },
     ] },

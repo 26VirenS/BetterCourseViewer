@@ -406,6 +406,14 @@
     return { items: out.slice(0, 120) };
   }
 
+  // New activity (1.5): what the phone's own background check (Native/Activity.swift) needs to read Canvas's activity
+  // stream by itself while the app is closed — the courses chosen (their ids, and the names the app shows) and the
+  // student's own id (a comment of their own is not news). The check itself is the app's, not this page's.
+  async function watchInfo() {
+    const [sel, me] = await Promise.all([selection(), store.me().catch(() => null)]);
+    return { me: me?.id ? String(me.id) : null, courses: (sel.list || []).map((c) => ({ id: String(c.id), name: c.shortName || c.name || '' })) };
+  }
+
   async function todo({ group = null, showDone = null } = {}) {
     if (group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
     if (showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
@@ -1787,7 +1795,7 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, reminders, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */

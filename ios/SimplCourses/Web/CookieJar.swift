@@ -80,6 +80,20 @@ final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
         group.notify(queue: .main, execute: completion)
     }
 
+    /// The saved cookies, as cookies: what the background check (Native/Activity.swift) reads Canvas with while
+    /// no web view is up. Expired ones are left out.
+    func cookies() -> [HTTPCookie] {
+        guard let data = read(), let list = try? JSONDecoder().decode([Stored].self, from: data) else { return [] }
+        let now = Date()
+        return list.compactMap { s in
+            if let t = s.expires, Date(timeIntervalSince1970: t) <= now { return nil }
+            var props: [HTTPCookiePropertyKey: Any] = [.name: s.name, .value: s.value, .domain: s.domain, .path: s.path]
+            if let t = s.expires { props[.expires] = Date(timeIntervalSince1970: t) }
+            if s.secure { props[.secure] = "TRUE" }
+            return HTTPCookie(properties: props)
+        }
+    }
+
     func clear() {
         pending?.cancel()
         SecItemDelete(query() as CFDictionary)

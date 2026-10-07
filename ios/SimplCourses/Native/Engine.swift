@@ -194,6 +194,7 @@ final class Engine: ObservableObject, ShellListener {
         }
         await refreshSnapshot()
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
+        Task { await Activity.shared.sync(self) } // (and what the stream holds now is seen: the app is showing it)
         // the first run: the iPhone's own setup (the courses that count, the goals), before anything else
         if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
             queuePopup(.setup)
