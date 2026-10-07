@@ -118,7 +118,7 @@ struct QuizScreen: View {
             QuizTakeView(run: run, tint: tint)
                 .transition(.opacity)
         case .review, .submitting:
-            QuizReviewView(run: run, tint: tint, submit: { confirmSubmit = true }, held: {
+            QuizReviewView(run: run, tint: tint, held: {
                 // the pull-and-hold's end: a blank question is asked about first, otherwise it is handed in
                 if run.answeredCount < run.questions.count { confirmSubmit = true } else { Task { await run.submit() } }
             })
@@ -471,7 +471,7 @@ struct PullEdges: ViewModifier {
     }
 
     static let line: CGFloat = 70
-    static let holdTime = 1.8 // (1.4.4: twice the 0.9s it was — handing in is never an accident)
+    static let holdTime = 2.4 // (1.4.6: 0.9s, then 1.8s, now 2.4s — handing in is never an accident)
 
     func body(content: Content) -> some View {
         content
@@ -932,9 +932,8 @@ private struct OptionLabel: View {
 private struct QuizReviewView: View {
     @ObservedObject var run: QuizRun
     let tint: Color
-    /// Submit Quiz pressed: asked first.
-    let submit: () -> Void
-    /// Pulled up and held at the foot of the list: the hold was the asking (a blank question is still raised).
+    /// Pulled up and held at the foot of the list, the only way to hand it in (1.4.6: no buttons): the hold was
+    /// the asking (a blank question is still raised). A question is changed by tapping it.
     let held: () -> Void
     @State private var touching = false
 
@@ -954,12 +953,21 @@ private struct QuizReviewView: View {
                 Text(noBack ? "This quiz seals each question once you leave it." : "Tap a question to change it. Submitting ends the attempt; blank questions are graded as incorrect.")
             }
             Section {
-                Label("Pull up and hold to submit", systemImage: "paperplane")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-                    .accessibilityHidden(true)
+                Group {
+                    if run.stage == .submitting {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Submitting…")
+                        }
+                    } else {
+                        Label("Pull up and hold to submit", systemImage: "paperplane")
+                    }
+                }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+                .accessibilityHidden(run.stage != .submitting)
             }
         }
         .listStyle(.insetGrouped)
@@ -969,13 +977,7 @@ private struct QuizReviewView: View {
             onUp: held,
             touching: $touching
         ))
-        .safeAreaInset(edge: .bottom) {
-            ActionBar {
-                ActionButton(title: "Keep Working", tint: tint, prominent: false) { Task { await run.keepWorking() } }
-                ActionButton(title: run.stage == .submitting ? "Submitting…" : "Submit Quiz", tint: tint, busy: run.stage == .submitting, action: submit)
-            }
-            .disabled(run.stage == .submitting)
-        }
+        .accessibilityAction(named: "Submit Quiz") { if run.stage != .submitting { held() } } // (VoiceOver cannot pull and hold)
     }
 
     private func row(_ q: QuizQuestion) -> some View {
