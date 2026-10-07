@@ -366,6 +366,39 @@ try {
   const cgHigh = await nc('courseGrades', { id: '101', tried: { [ungradedRow.id]: ungradedRow.possible } });
   const cgBack = await nc('courseGrades', { id: '101', tried: {} });
   check(!cg.error && cg.total === 92.4 && cg.letter && cg.groups.length > 0 && cg.rows.length > 0 && cg.scale.length === 11 && !cg.whatIf && cgLow.whatIf && cgHigh.whatIf && cgLow.total < cgHigh.total && cgLow.rows.find((r) => r.id === ungradedRow.id)?.hypothetical && cgLow.rows.find((r) => r.id === ungradedRow.id)?.scoreText === `0/${ungradedRow.possible}` && Number.isFinite(cgLow.gpaIf) && cgLow.gpaIf <= cgHigh.gpaIf && cgBack.total === cg.total && !cgBack.whatIf, `a course's grades for the app's sheet; a what-if zero and a what-if full mark move the total, the letter and the term GPA apart, and clearing them brings Canvas's total back (nothing saved): ${JSON.stringify({ total: cg.total, letter: cg.letter, groups: cg.groups.map((g) => `${g.name} ${g.weightText} ${g.value}`), row: ungradedRow?.name, zero: [cgLow.total, cgLow.letter, cgLow.gpaIf], full: [cgHigh.total, cgHigh.letter, cgHigh.gpaIf], back: cgBack.total })}`);
+  // (1.3) a quiz taken in the app's own screens: every Classic kind, saved, flagged, handed in, its feedback read
+  await sp.evaluate(() => fetch('/__mock/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: true, moreTypes: true }) }));
+  const qi = await nc('quizIntro', { course: '101', quiz: '9011' });
+  check(!qi.error && qi.title === 'Lec06-PreQuiz' && qi.canStart && /Begin/.test(qi.begin) && qi.rules.some((r) => r.symbol === 'timer') && qi.facts.length === 3 && qi.html, `a quiz's intro for the app: its facts, its rules as lines (the time limit among them), and Begin: ${JSON.stringify({ title: qi.title, begin: qi.begin, facts: qi.facts, rules: qi.rules?.map((r) => r.symbol), error: qi.error })}`);
+  const qb = await nc('quizBegin', { course: '101', quiz: '9011' });
+  const qa = qb.attempt || {};
+  const qk = (k) => (qa.questions || []).find((q) => q.kind === k);
+  const kinds = (qa.questions || []).map((q) => q.kind);
+  check(!qb.error && ['choice', 'multi', 'number', 'match', 'drops', 'essay', 'file'].every((k) => kinds.includes(k)) && qa.timed && !!qa.endAt && qa.questions.every((q) => q.html && q.id && q.n) && qk('match').matches.length >= 3 && qk('drops').blanks.length === 2 && qk('drops').blanks.every((b) => b.options.length >= 2) && /<span style="[^"]*">1<\/span>/.test(qk('drops').html) && qk('choice').options.length >= 2 && qa.questions.some((q) => q.points !== null), `an attempt begun from the app: every kind, a match's list, a blank's own options and its numbered mark in the words, the clock's end, each question's points: ${JSON.stringify({ kinds, endAt: qa.endAt, error: qb.error, drops: qk('drops')?.html })}`);
+  const mc = qk('choice'), ma = qk('multi'), nu = qk('number'), mt = qk('match'), dr = qk('drops'), es = qk('essay');
+  const saves = [
+    await nc('quizAnswer', { course: '101', quiz: '9011', question: mc.id, value: { pick: mc.options[0].id } }),
+    await nc('quizAnswer', { course: '101', quiz: '9011', question: ma.id, value: { picks: [ma.options[0].id, ma.options[2].id] } }),
+    await nc('quizAnswer', { course: '101', quiz: '9011', question: nu.id, value: { text: '3,15' } }),
+    await nc('quizAnswer', { course: '101', quiz: '9011', question: mt.id, value: { map: Object.fromEntries(mt.options.map((o, i) => [o.id, mt.matches[i % mt.matches.length].id])) } }),
+    await nc('quizAnswer', { course: '101', quiz: '9011', question: dr.id, value: { map: Object.fromEntries(dr.blanks.map((b) => [b.id, b.options[0].id])) } }),
+    await nc('quizAnswer', { course: '101', quiz: '9011', question: es.id, value: { text: 'Pros:\n\n• together\n• faster' } }),
+  ];
+  const qf = await nc('quizFlag', { course: '101', quiz: '9011', question: nu.id, on: true });
+  const again = await nc('quizAttempt', { course: '101', quiz: '9011' });
+  const byId = (id) => again.questions.find((q) => q.id === id);
+  check(saves.every((x) => x.ok && x.done) && qf.ok && byId(mc.id).pick === mc.options[0].id && byId(ma.id).picks.length === 2 && byId(nu.id).text === '3.15' && byId(nu.id).flagged && Object.keys(byId(mt.id).map).length === mt.options.length && Object.keys(byId(dr.id).map).length === 2 && /together/.test(byId(es.id).text) && !/</.test(byId(es.id).text), `answers of every kind saved from the app (a comma decimal as a number, a match's pairs, a blank each, an essay as Canvas's HTML shown back as words), a flag, and the attempt read again as it stands: ${JSON.stringify({ saves, qf, essay: byId(es.id)?.text })}`);
+  const qs1 = await nc('quizSubmit', { course: '101', quiz: '9011' });
+  check(!qs1.error && qs1.ok && /Submitted/.test(qs1.title) && /of/.test(qs1.answered), `the attempt handed in from the app, its receipt: ${JSON.stringify(qs1)}`);
+  const fb = await nc('quizFeedback', { course: '101', quiz: '9011' });
+  check(!fb.error && (fb.hidden || (fb.rows.length >= 6 && fb.rows.every((r) => r.verdict && r.html) && fb.rows.some((r) => r.options?.some((o) => o.mine)) && fb.score !== undefined)), `its feedback for the app, question by question (or why it is held back): ${JSON.stringify({ hidden: fb.hidden, rows: fb.rows?.map((r) => `${r.n}:${r.verdict}:${r.score}`), score: fb.score, error: fb.error })}`);
+  const qp = await nc('quizBegin', { course: '101', quiz: '9014' }); // (Lec07: one question at a time, no going back — read from Canvas's own take page)
+  const qpa = qp.attempt || {};
+  const qn = qpa.questions?.length ? await nc('quizGo', { course: '101', quiz: '9014', move: 'next' }) : null;
+  check(!qp.error && qpa.paged && qpa.noBack && qpa.questions.length >= 4 && qpa.questions[qpa.idx]?.loaded && qn && !qn.error && qn.idx === qpa.idx + 1 && qn.questions[qn.idx].loaded, `a one-at-a-time quiz in the app: its questions from Canvas's take page, and Next moves through that page: ${JSON.stringify({ paged: qpa.paged, n: qpa.questions?.length, idx: qpa.idx, next: qn?.idx, error: qp.error || qn?.error })}`);
+  const coded = await nc('quizBegin', { course: '102', quiz: '10019' });
+  check(coded.needsCode && /access code/i.test(coded.refused || ''), `a quiz with an access code asks for it before it begins (no attempt opened): ${JSON.stringify(coded)}`);
+  await sp.evaluate(() => fetch('/__mock/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: false, moreTypes: false }) }));
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

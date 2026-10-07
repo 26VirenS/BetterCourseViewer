@@ -34,6 +34,44 @@ struct Ring: View {
     }
 }
 
+/// Rings inside rings, as the Activity rings: the course's total outermost, then one ring per assignment
+/// group that has graded work (its own colour), each filling once as `Ring` does.
+struct NestedRings: View {
+    struct Band: Identifiable {
+        let id: Int
+        let value: Double?
+        let color: Color
+    }
+
+    let bands: [Band] // outermost first
+    var outerWidth: CGFloat = 5
+    var innerWidth: CGFloat = 3.5
+    var gap: CGFloat = 1.5
+
+    var body: some View {
+        ZStack {
+            ForEach(bands) { b in
+                Ring(value: b.value, color: b.color, lineWidth: b.id == 0 ? outerWidth : innerWidth)
+                    .padding(b.id == 0 ? 0 : outerWidth + gap + CGFloat(b.id - 1) * (innerWidth + gap))
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// The colours a group takes when Canvas's answer names none.
+    static let palette: [Color] = [.blue, .purple, .orange, .teal, .pink, .indigo]
+
+    /// The total and up to `limit` groups, as bands.
+    static func bands(total: Double?, color: Color, groups: [(pct: Double?, color: String?)], limit: Int) -> [Band] {
+        var out = [Band(id: 0, value: total, color: color)]
+        for (i, g) in groups.filter({ $0.pct != nil }).prefix(limit).enumerated() {
+            let c = g.color.map { Color(hex: $0) } ?? palette[i % palette.count]
+            out.append(Band(id: i + 1, value: g.pct, color: c))
+        }
+        return out
+    }
+}
+
 /// A status in words on a wash of its colour (Missing, Late, Graded, Submitted, Locked …).
 struct StatusChip: View {
     let text: String

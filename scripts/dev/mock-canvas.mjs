@@ -517,6 +517,8 @@ const htmlPages = {
   // a widget's file at an address (the importer's "An address" pane fetches it through the background)
   '/dev/widget.html': () => `<!doctype html>\n<meta name="simpl-widget" content='{"name":"Fetched widget","note":"Came from an address.","icon":"globe","size":"S"}'>\n<p id="hi">Hello from an address.</p>\n<script>simpl.ready(function (t) { document.getElementById('hi').textContent = 'Hello from an address, ' + (t.dark ? 'dark' : 'light') + '.'; });</script>`,
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
+  // the tool a sessionless launch opens: its own page, at the top level
+  '/mock-tool': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resources & Policy</title></head><body style="font-family:-apple-system,sans-serif;padding:24px"><h2 id="mock-tool">Resources &amp; Policy (the tool's own page)</h2><p>Opened by a sessionless launch, at the top level: no Canvas frame around it.</p><button onclick="alert('The tool says hello')">Say hello</button></body></html>`,
   '/accounts/1/external_tools/77': () => page({ title: 'My Materials', body: '<h2 id="account-tool">My Materials (an account-level tool, launched by Canvas)</h2><iframe id="tool_content" title="My Materials" src="/courses/104/external_tools/t1/resource_selection"></iframe>' }),
   // a homework-submission tool's own picker, framed by the assignment page exactly as Canvas frames it;
   // when a file is chosen the return page posts externalContentReady to the window that framed it
@@ -1037,6 +1039,12 @@ const homeworkTools = {
     { id: 't2', name: 'Office 365', description: 'Attach a Word or PowerPoint file', homework_submission: { enabled: true, text: 'Office 365', url: 'https://o365.example.com/lti' } },
   ],
 };
+// Canvas's sessionless launch: a one-time address the tool opens at the top level (the iPhone app's tool sheet)
+on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (url, m) => {
+  const q = url.searchParams;
+  const what = q.get('assignment_id') ? `assignment ${q.get('assignment_id')}` : q.get('module_item_id') ? `module item ${q.get('module_item_id')}` : q.get('id') ? `tool ${q.get('id')}` : 'a launch URL';
+  return { id: q.get('id') || '9', name: 'Resources & Policy', url: `http://localhost:${port}/mock-tool?for=${encodeURIComponent(what)}&course=${m[1]}` };
+});
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));
 on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self\/files$/, (url, m, body) => {
   const a = allAssignments(m[1]).find((x) => x.id === m[2]);

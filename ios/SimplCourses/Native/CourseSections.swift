@@ -248,7 +248,11 @@ struct ModulesList: View {
                 .padding(.leading, pad)
         } else {
             let locked = it.locked == true
-            Button { engine.go(it.url, title: it.title) } label: {
+            Button {
+                // a module's tool opens in the tool sheet; everything else where it leads
+                if it.type == "ExternalTool", ctx.hasPrefix("courses/") { engine.openTool(.moduleItem(course: ContextHome.id(of: ctx), id: it.id, title: it.title)) }
+                else { engine.go(it.url, title: it.title) }
+            } label: {
                 HStack(spacing: 12) {
                     IconTile(symbol: locked ? "lock.fill" : Glyph.item(it.type), color: locked ? .gray : color, size: 28)
                     VStack(alignment: .leading, spacing: 2) {
@@ -275,7 +279,7 @@ struct ModulesList: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(locked || it.url == nil)
+            .disabled(locked || (it.url == nil && it.type != "ExternalTool"))
             .swipeActions {
                 if it.markable == true {
                     Button { mark(it, m, it.done != true) } label: {

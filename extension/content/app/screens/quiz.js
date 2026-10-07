@@ -138,6 +138,174 @@
   };
   const INFO = new Set(['text_only_question']);
 
+  // ---- the answer and feedback rules, shared with the iPhone app's own quiz (native-app.js) ----------------
+  // A question with more than one part is answered when every part of it is. A blank kind saves one
+  // value per blank and matching saves a pair per value, so with one of three blanks filled the old
+  // test — anything in the object at all — called the question answered, painted its number blue and
+  // counted it in the total, while two thirds of it was still empty.
+  const isAnswered = (q) => {
+    if (INFO.has(q.question_type)) return true;
+    if (q.loaded === false) return !!q.answered; // not yet read from Canvas's page: what its list says
+    if (BLANKS.has(q.question_type)) {
+      const bs = blanksOf(q);
+      const held = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer) ? q.answer : {};
+      return bs.length ? bs.every((b) => answered(held[b])) : answered(q.answer);
+    }
+    if (MATCH.has(q.question_type)) {
+      const pairs = pairsOf(q.answer);
+      return (q.answers || []).length ? pairs.length >= q.answers.length : !!pairs.length;
+    }
+    return answered(q.answer);
+  };
+  /** An answer as something to compare: ids as text, lists in any order, an empty one as nothing. */
+  const canon = (v) => {
+    if (v === null || v === undefined || v === '') return '';
+    if (Array.isArray(v)) return JSON.stringify(v.map((x) => (x && typeof x === 'object' ? JSON.stringify(Object.entries(x).map(([k, y]) => [k, String(y)]).sort()) : String(x))).sort());
+    if (typeof v === 'object') return JSON.stringify(Object.entries(v).filter(([, y]) => hasId(y)).map(([k, y]) => [k, String(y)]).sort());
+    return String(v).trim();
+  };
+  // a question's words and an option's, for telling the same question apart from another in the same place
+  const flat = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  // (a blank's field — a box or a list rendered into the words on the attempt being taken, [name] on a finished one's — is no word of the question)
+  const wordsOf = (q) => flat(htmlToText(String(q.question_text || '').replace(/<select[\s\S]*?<\/select>/gi, ' ').replace(/<input[^>]*>/gi, ' ').replace(/\[[^\]\s]+\]/g, ' '), 8000));
+  const optWords = (a) => flat(a.text || a.left || htmlToText(a.html || '', 400));
+  const optSet = (q) => (q.answers || []).map(optWords).sort().join('|');
+  /** The very same question: of the same kind, in the same words, with the same options (their words, in any order). */
+  function sameQuestion(q, e) {
+    if (!e || q.question_type !== e.question_type || wordsOf(q) !== wordsOf(e)) return false;
+    if (CHOICE.has(q.question_type) || MULTI.has(q.question_type) || MATCH.has(q.question_type) || DROPS.has(q.question_type)) {
+      if (optSet(q) !== optSet(e)) return false;
+      if (MATCH.has(q.question_type) && (q.matches || []).map((m) => flat(m.text)).sort().join('|') !== (e.matches || []).map((m) => flat(m.text)).sort().join('|')) return false;
+    }
+    return true;
+  }
+  /** An answer given to the earlier twin, put in today's question's terms: each option it names found again by
+   *  its words (a group's draw can give the same options other ids); null when one of them is not there. */
+  function carryOver(q, e, answer) {
+    if (answer === null || answer === undefined) return null;
+    const byWords = (list, words) => list.find((a) => optWords(a) === words);
+    const option = (id, blank = null) => {
+      const was = (e.answers || []).find((a) => String(a.id) === String(id) && (blank === null || String(a.blank_id) === String(blank)));
+      if (!was) return null;
+      const now = byWords((q.answers || []).filter((a) => blank === null || String(a.blank_id) === String(blank)), optWords(was));
+      return now ? whole(now.id) : null;
+    };
+    if (CHOICE.has(q.question_type)) return option(answer);
+    if (MULTI.has(q.question_type)) { const ids = [].concat(answer).map((id) => option(id)); return ids.every((id) => id !== null) && ids.length ? ids : null; }
+    if (MATCH.has(q.question_type)) {
+      const pairs = pairsOf(answer).map((p) => {
+        const left = option(p.answer_id);
+        const m = (e.matches || []).find((x) => String(x.match_id) === String(p.match_id));
+        const mNow = m && (q.matches || []).find((x) => flat(x.text) === flat(m.text));
+        return left !== null && mNow ? { answer_id: left, match_id: whole(mNow.match_id) } : null;
+      });
+      return pairs.length && pairs.every(Boolean) ? pairs : null;
+    }
+    if (DROPS.has(q.question_type)) {
+      const out = {};
+      for (const [blank, id] of Object.entries(answer || {})) { const now = option(id, blank); if (now === null) return null; out[blank] = now; }
+      return Object.keys(out).length ? out : null;
+    }
+    return answer; // (words or a number typed: the same question takes them as they were)
+  }
+  const parseCorrect = (v) => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : v === 'partial' ? 'partial' : null);
+  /** The student's answer as the graded history records it: answer_id, answer_<id> — a "1" per
+   *  option ticked (multiple answers) or the match each left-hand value was set to (matching) —
+   *  answer_for_<blank> and answer_id_for_<blank> (the blank kinds), or text. */
+  function histAnswer(q, d) {
+    if (FILE.has(q.question_type)) { const ids = (Array.isArray(d.attachment_ids) ? d.attachment_ids : []).filter(hasId).map(whole); return ids.length ? ids : null; }
+    if (MULTI.has(q.question_type)) {
+      const on = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && String(d[k]) === '1').map((k) => Number(k.slice(7)));
+      return on.length ? on : null;
+    }
+    if (MATCH.has(q.question_type)) {
+      const pairs = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && hasId(d[k])).map((k) => ({ answer_id: whole(k.slice(7)), match_id: whole(d[k]) }));
+      return pairs.length ? pairs : null;
+    }
+    if (BLANKS.has(q.question_type)) {
+      const out = {};
+      for (const k of Object.keys(d)) {
+        const blank = /^answer_for_(.+)$/.exec(k)?.[1];
+        if (!blank) continue;
+        const v = DROPS.has(q.question_type) && hasId(d[`answer_id_for_${blank}`]) ? d[`answer_id_for_${blank}`] : d[k];
+        if (hasId(v)) out[blank] = v;
+      }
+      return Object.keys(out).length ? out : null;
+    }
+    const text = d.text === undefined || d.text === null || d.text === '' ? null : d.text;
+    if (CHOICE.has(q.question_type)) return d.answer_id ?? (text !== null && Number.isFinite(Number(text)) ? Number(text) : null);
+    return text;
+  }
+  /** The correct answer(s): the answers Canvas weights 100 (absent when censored), as the pieces
+   *  answerParts gives, so a formula shows as the formula rather than as nothing. */
+  function fbRight(q) {
+    const one = (a) => {
+      if (String(a.text || '').trim() || String(a.html || '').trim()) return { text: a.text || '', html: a.html || '' };
+      if (a.numerical_answer_type === 'range_answer' && a.start !== undefined) return { text: `${a.start} – ${a.end}`, html: '' };
+      if (a.exact !== undefined && a.exact !== null) return { text: Number(a.margin) ? `${a.exact} ± ${a.margin}` : String(a.exact), html: '' };
+      if (a.approximate !== undefined && a.approximate !== null) return { text: String(a.approximate), html: '' };
+      if (a.answer !== undefined && a.answer !== null && a.answer !== '') return { text: String(a.answer), html: '' }; // (a formula's result for this attempt)
+      if (a.left && a.right) return { text: `${a.left} → ${a.right}`, html: '' };
+      return null;
+    };
+    const parts = (q.answers || []).filter((a) => Number(a.weight) === 100).map(one).filter(Boolean);
+    return parts.length ? parts : null;
+  }
+  /** Solution html from the question data: the neutral comment, else the one for this outcome. */
+  function fbSolution(q, ok) {
+    const html = q.neutral_comments_html || (ok ? q.correct_comments_html : q.incorrect_comments_html);
+    if (html && String(html).trim()) return { html };
+    const text = q.neutral_comments || (ok ? q.correct_comments : q.incorrect_comments);
+    return text && String(text).trim() ? { text: String(text).trim() } : null;
+  }
+  /** The correct answer(s) as Canvas's results page marks them, in the pieces answerParts gives: an
+   *  option's own words from the question where it has them (the page's otherwise). */
+  function pageRight(q, pq) {
+    if (!pq?.right?.length) return null;
+    const opts = new Map((q.answers || []).map((a) => [String(a.id), a]));
+    const parts = pq.right.map((x) => {
+      const o = opts.get(String(x.id));
+      const own = o && (String(o.text || '').trim() || String(o.html || '').trim()) ? { text: o.text || '', html: o.html || '' } : { text: x.text || '', html: x.html || '' };
+      return String(own.text).trim() || String(own.html).trim() ? { ...own, text: x.blank && BLANKS.has(q.question_type) && String(own.text).trim() ? `${x.blank}: ${own.text}` : own.text } : null;
+    }).filter(Boolean);
+    return parts.length ? parts : null;
+  }
+  const hasNum = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+  /** An answer as pieces to show: its own words, and the rich content Canvas holds it in when there
+   *  is any — which is how a formula arrives, as an equation image with the LaTeX on the tag. */
+  const partText = (p) => (String(p.text).trim() ? p.text : htmlToText(p.html || '', 80)) || '—';
+  function answerPartsOf(q, files = {}) {
+    const a = q.answer;
+    if (!answered(a)) return null;
+    const opts = q.answers || [];
+    const one = (id) => {
+      const o = opts.find((x) => String(x.id) === String(id));
+      return o ? { text: o.text || '', html: o.html || '' } : { text: String(id), html: '' };
+    };
+    // a pair each: the left-hand value and what it was set to
+    if (MATCH.has(q.question_type)) {
+      const nameOf = (mid) => (q.matches || []).find((m) => String(m.match_id) === String(mid))?.text || String(mid);
+      const pairs = pairsOf(a);
+      if (!pairs.length) return null;
+      return pairs.map((p2) => ({ text: `${one(p2.answer_id).text || partText(one(p2.answer_id))} → ${nameOf(p2.match_id)}`, html: '' }));
+    }
+    // one value per blank, named for the blank it fills
+    if (BLANKS.has(q.question_type)) {
+      const filled = Object.entries(filledOf(a));
+      if (!filled.length) return null;
+      return filled.map(([blank, v]) => {
+        const named = !/^[0-9a-f]{8,}$/i.test(blank); // a quiz read from Canvas's own page knows the blank only as a hash of its name
+        const o = DROPS.has(q.question_type) ? opts.find((x) => String(x.id) === String(v) && String(x.blank_id) === String(blank)) : null;
+        return { text: `${named ? `${blank}: ` : ''}${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };
+      });
+    }
+    if (FILE.has(q.question_type)) return a.map((id) => ({ text: files[String(id)] || `File ${id}`, html: '' })); // (the name, where it was uploaded here)
+    if (Array.isArray(a)) return a.map(one);
+    if (CHOICE.has(q.question_type)) return [one(a)];
+    if (looksHtml(a)) return [{ text: '', html: String(a), block: true }]; // (an essay written in Canvas's editor: formatting, not tags)
+    return [{ text: String(a), html: '', block: q.question_type === 'essay_question' && (String(a).length > 90 || /\n/.test(String(a))) }];
+  }
+
   async function render(ctx, course) {
     const { app, route } = ctx;
     const cid = course.id;
@@ -329,24 +497,6 @@
 
     // ---- state helpers -------------------------------------------------------------
     const cur = () => st.questions[Math.min(st.idx, st.questions.length - 1)];
-    // A question with more than one part is answered when every part of it is. A blank kind saves one
-    // value per blank and matching saves a pair per value, so with one of three blanks filled the old
-    // test — anything in the object at all — called the question answered, painted its number blue and
-    // counted it in the total, while two thirds of it was still empty.
-    const isAnswered = (q) => {
-      if (INFO.has(q.question_type)) return true;
-      if (q.loaded === false) return !!q.answered; // not yet read from Canvas's page: what its list says
-      if (BLANKS.has(q.question_type)) {
-        const bs = blanksOf(q);
-        const held = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer) ? q.answer : {};
-        return bs.length ? bs.every((b) => answered(held[b])) : answered(q.answer);
-      }
-      if (MATCH.has(q.question_type)) {
-        const pairs = pairsOf(q.answer);
-        return (q.answers || []).length ? pairs.length >= q.answers.length : !!pairs.length;
-      }
-      return answered(q.answer);
-    };
     const answeredCount = () => st.questions.filter(isAnswered).length;
     const answeredLabel = () => `${answeredCount()} of ${st.questions.length} answered`;
     const saveState = () => (st.saving > 0 ? 'Saving…' : st.savedAt ? 'Saved' : '');
@@ -367,13 +517,6 @@
      * was made. */
     let writeChain = Promise.resolve();
     const inTurn = (fn) => { const run = writeChain.then(fn); writeChain = run.catch(() => {}); return run; };
-    /** An answer as something to compare: ids as text, lists in any order, an empty one as nothing. */
-    const canon = (v) => {
-      if (v === null || v === undefined || v === '') return '';
-      if (Array.isArray(v)) return JSON.stringify(v.map((x) => (x && typeof x === 'object' ? JSON.stringify(Object.entries(x).map(([k, y]) => [k, String(y)]).sort()) : String(x))).sort());
-      if (typeof v === 'object') return JSON.stringify(Object.entries(v).filter(([, y]) => hasId(y)).map(([k, y]) => [k, String(y)]).sort());
-      return String(v).trim();
-    };
     /** The answers Canvas holds for this attempt now, by question id (as picked: tidy), or null where it cannot say. */
     async function answersOnCanvas() {
       if (st.paged) return null; // (Canvas lists no questions for a one-at-a-time quiz)
@@ -503,50 +646,6 @@
       } finally {
         devBtn.disabled = false;
       }
-    }
-    // a question's words and an option's, for telling the same question apart from another in the same place
-    const flat = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    // (a blank's field — a box or a list rendered into the words on the attempt being taken, [name] on a finished one's — is no word of the question)
-    const wordsOf = (q) => flat(htmlToText(String(q.question_text || '').replace(/<select[\s\S]*?<\/select>/gi, ' ').replace(/<input[^>]*>/gi, ' ').replace(/\[[^\]\s]+\]/g, ' '), 8000));
-    const optWords = (a) => flat(a.text || a.left || htmlToText(a.html || '', 400));
-    const optSet = (q) => (q.answers || []).map(optWords).sort().join('|');
-    /** The very same question: of the same kind, in the same words, with the same options (their words, in any order). */
-    function sameQuestion(q, e) {
-      if (!e || q.question_type !== e.question_type || wordsOf(q) !== wordsOf(e)) return false;
-      if (CHOICE.has(q.question_type) || MULTI.has(q.question_type) || MATCH.has(q.question_type) || DROPS.has(q.question_type)) {
-        if (optSet(q) !== optSet(e)) return false;
-        if (MATCH.has(q.question_type) && (q.matches || []).map((m) => flat(m.text)).sort().join('|') !== (e.matches || []).map((m) => flat(m.text)).sort().join('|')) return false;
-      }
-      return true;
-    }
-    /** An answer given to the earlier twin, put in today's question's terms: each option it names found again by
-     *  its words (a group's draw can give the same options other ids); null when one of them is not there. */
-    function carryOver(q, e, answer) {
-      if (answer === null || answer === undefined) return null;
-      const byWords = (list, words) => list.find((a) => optWords(a) === words);
-      const option = (id, blank = null) => {
-        const was = (e.answers || []).find((a) => String(a.id) === String(id) && (blank === null || String(a.blank_id) === String(blank)));
-        if (!was) return null;
-        const now = byWords((q.answers || []).filter((a) => blank === null || String(a.blank_id) === String(blank)), optWords(was));
-        return now ? whole(now.id) : null;
-      };
-      if (CHOICE.has(q.question_type)) return option(answer);
-      if (MULTI.has(q.question_type)) { const ids = [].concat(answer).map((id) => option(id)); return ids.every((id) => id !== null) && ids.length ? ids : null; }
-      if (MATCH.has(q.question_type)) {
-        const pairs = pairsOf(answer).map((p) => {
-          const left = option(p.answer_id);
-          const m = (e.matches || []).find((x) => String(x.match_id) === String(p.match_id));
-          const mNow = m && (q.matches || []).find((x) => flat(x.text) === flat(m.text));
-          return left !== null && mNow ? { answer_id: left, match_id: whole(mNow.match_id) } : null;
-        });
-        return pairs.length && pairs.every(Boolean) ? pairs : null;
-      }
-      if (DROPS.has(q.question_type)) {
-        const out = {};
-        for (const [blank, id] of Object.entries(answer || {})) { const now = option(id, blank); if (now === null) return null; out[blank] = now; }
-        return Object.keys(out).length ? out : null;
-      }
-      return answer; // (words or a number typed: the same question takes them as they were)
     }
     /** What was right before for a question, when Import answers has shown it on this attempt (undefined otherwise). */
     const hintFor = (q) => (st.hints && st.hints.sub === st.sub?.id ? st.hints.map.get(String(q.id)) : undefined);
@@ -1231,40 +1330,7 @@
       ask(); // (the first mark, once the page is on the screen)
     }
 
-    /** An answer as pieces to show: its own words, and the rich content Canvas holds it in when there
-     *  is any — which is how a formula arrives, as an equation image with the LaTeX on the tag. */
-    const partText = (p) => (String(p.text).trim() ? p.text : htmlToText(p.html || '', 80)) || '—';
-    function answerParts(q) {
-      const a = q.answer;
-      if (!answered(a)) return null;
-      const opts = q.answers || [];
-      const one = (id) => {
-        const o = opts.find((x) => String(x.id) === String(id));
-        return o ? { text: o.text || '', html: o.html || '' } : { text: String(id), html: '' };
-      };
-      // a pair each: the left-hand value and what it was set to
-      if (MATCH.has(q.question_type)) {
-        const nameOf = (mid) => (q.matches || []).find((m) => String(m.match_id) === String(mid))?.text || String(mid);
-        const pairs = pairsOf(a);
-        if (!pairs.length) return null;
-        return pairs.map((p2) => ({ text: `${one(p2.answer_id).text || partText(one(p2.answer_id))} → ${nameOf(p2.match_id)}`, html: '' }));
-      }
-      // one value per blank, named for the blank it fills
-      if (BLANKS.has(q.question_type)) {
-        const filled = Object.entries(filledOf(a));
-        if (!filled.length) return null;
-        return filled.map(([blank, v]) => {
-          const named = !/^[0-9a-f]{8,}$/i.test(blank); // a quiz read from Canvas's own page knows the blank only as a hash of its name
-          const o = DROPS.has(q.question_type) ? opts.find((x) => String(x.id) === String(v) && String(x.blank_id) === String(blank)) : null;
-          return { text: `${named ? `${blank}: ` : ''}${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };
-        });
-      }
-      if (FILE.has(q.question_type)) return a.map((id) => ({ text: st.files[String(id)] || `File ${id}`, html: '' })); // (the name, where it was uploaded here)
-      if (Array.isArray(a)) return a.map(one);
-      if (CHOICE.has(q.question_type)) return [one(a)];
-      if (looksHtml(a)) return [{ text: '', html: String(a), block: true }]; // (an essay written in Canvas's editor: formatting, not tags)
-      return [{ text: String(a), html: '', block: q.question_type === 'essay_question' && (String(a).length > 90 || /\n/.test(String(a))) }];
-    }
+    const answerParts = (q) => answerPartsOf(q, st.files);
     /** The same, flattened to one line — for the review list and anywhere a plain string is wanted. */
     function answerText(q) {
       const parts = answerParts(q);
@@ -1440,69 +1506,6 @@
       if (quiz.show_correct_answers_last_attempt && allowed !== null && attemptsLeft > 0) return false;
       return true;
     }
-    const parseCorrect = (v) => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : v === 'partial' ? 'partial' : null);
-    /** The student's answer as the graded history records it: answer_id, answer_<id> — a "1" per
-     *  option ticked (multiple answers) or the match each left-hand value was set to (matching) —
-     *  answer_for_<blank> and answer_id_for_<blank> (the blank kinds), or text. */
-    function histAnswer(q, d) {
-      if (FILE.has(q.question_type)) { const ids = (Array.isArray(d.attachment_ids) ? d.attachment_ids : []).filter(hasId).map(whole); return ids.length ? ids : null; }
-      if (MULTI.has(q.question_type)) {
-        const on = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && String(d[k]) === '1').map((k) => Number(k.slice(7)));
-        return on.length ? on : null;
-      }
-      if (MATCH.has(q.question_type)) {
-        const pairs = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && hasId(d[k])).map((k) => ({ answer_id: whole(k.slice(7)), match_id: whole(d[k]) }));
-        return pairs.length ? pairs : null;
-      }
-      if (BLANKS.has(q.question_type)) {
-        const out = {};
-        for (const k of Object.keys(d)) {
-          const blank = /^answer_for_(.+)$/.exec(k)?.[1];
-          if (!blank) continue;
-          const v = DROPS.has(q.question_type) && hasId(d[`answer_id_for_${blank}`]) ? d[`answer_id_for_${blank}`] : d[k];
-          if (hasId(v)) out[blank] = v;
-        }
-        return Object.keys(out).length ? out : null;
-      }
-      const text = d.text === undefined || d.text === null || d.text === '' ? null : d.text;
-      if (CHOICE.has(q.question_type)) return d.answer_id ?? (text !== null && Number.isFinite(Number(text)) ? Number(text) : null);
-      return text;
-    }
-    /** The correct answer(s): the answers Canvas weights 100 (absent when censored), as the pieces
-     *  answerParts gives, so a formula shows as the formula rather than as nothing. */
-    function fbRight(q) {
-      const one = (a) => {
-        if (String(a.text || '').trim() || String(a.html || '').trim()) return { text: a.text || '', html: a.html || '' };
-        if (a.numerical_answer_type === 'range_answer' && a.start !== undefined) return { text: `${a.start} – ${a.end}`, html: '' };
-        if (a.exact !== undefined && a.exact !== null) return { text: Number(a.margin) ? `${a.exact} ± ${a.margin}` : String(a.exact), html: '' };
-        if (a.approximate !== undefined && a.approximate !== null) return { text: String(a.approximate), html: '' };
-        if (a.answer !== undefined && a.answer !== null && a.answer !== '') return { text: String(a.answer), html: '' }; // (a formula's result for this attempt)
-        if (a.left && a.right) return { text: `${a.left} → ${a.right}`, html: '' };
-        return null;
-      };
-      const parts = (q.answers || []).filter((a) => Number(a.weight) === 100).map(one).filter(Boolean);
-      return parts.length ? parts : null;
-    }
-    /** Solution html from the question data: the neutral comment, else the one for this outcome. */
-    function fbSolution(q, ok) {
-      const html = q.neutral_comments_html || (ok ? q.correct_comments_html : q.incorrect_comments_html);
-      if (html && String(html).trim()) return { html };
-      const text = q.neutral_comments || (ok ? q.correct_comments : q.incorrect_comments);
-      return text && String(text).trim() ? { text: String(text).trim() } : null;
-    }
-    /** The correct answer(s) as Canvas's results page marks them, in the pieces answerParts gives: an
-     *  option's own words from the question where it has them (the page's otherwise). */
-    function pageRight(q, pq) {
-      if (!pq?.right?.length) return null;
-      const opts = new Map((q.answers || []).map((a) => [String(a.id), a]));
-      const parts = pq.right.map((x) => {
-        const o = opts.get(String(x.id));
-        const own = o && (String(o.text || '').trim() || String(o.html || '').trim()) ? { text: o.text || '', html: o.html || '' } : { text: x.text || '', html: x.html || '' };
-        return String(own.text).trim() || String(own.html).trim() ? { ...own, text: x.blank && BLANKS.has(q.question_type) && String(own.text).trim() ? `${x.blank}: ${own.text}` : own.text } : null;
-      }).filter(Boolean);
-      return parts.length ? parts : null;
-    }
-    const hasNum = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
     async function loadFeedback(sub) {
       // Canvas's questions carry the latest attempt's answers and marks alone: an earlier attempt
       // asked for is read from the graded history, its own answers and its own ticks
@@ -1845,5 +1848,9 @@
     return screen;
   }
 
-  BCV.screens.quiz = { render };
+  BCV.screens.quiz = {
+    render,
+    // the rules the iPhone app's quiz shares (native-app.js): what an answer is, how one is compared, and how a finished one is read
+    logic: { LETTERS, CHOICE, MULTI, TEXT, NUMERIC, FILE, MATCH, DROPS, BLANKS, INFO, whole, hasId, answered, isAnswered, pairsOf, filledOf, tidy, blanksOf, noFields, looksHtml, htmlToPlain, plainToHtml, heldBack, HELD_LINE, canon, sameQuestion, carryOver, parseCorrect, histAnswer, fbRight, fbSolution, pageRight, hasNum, partText, answerParts: answerPartsOf },
+  };
 })();

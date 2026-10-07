@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The iPhone app's screens on the iOS Simulator, against the mock Canvas: each tab, a counter's sheet,
 # Notifications, a course and an assignment pushed from the native screens, a course's grades sheet,
-# Hand In, a discussion, modules, files, Groups and the Inbox — in light and in dark.
+# Hand In, a discussion, modules, files, Groups and the Inbox, a quiz and a tool — in light and in dark.
 # Run by .github/workflows/ios-shots.yml after the app is built and installed on a booted simulator and
 # the mock is serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801). Pictures in ./shots.
 set -u
@@ -9,6 +9,8 @@ OUT="${OUT:-shots}"
 mkdir -p "$OUT"
 BID=com.simplcourses.app
 xcrun simctl status_bar booted override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 >/dev/null 2>&1 || true
+# every kind of quiz question in the mock's quizzes (matching, blanks, essay, formula, file upload), for the quiz pictures
+curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
 
 # launch <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it:
 # -SimplDemo), then a picture after <wait> seconds
@@ -49,6 +51,10 @@ for mode in light dark; do
   launch "$mode-15-files" 18 -SimplTab courses -SimplPush /courses/101/files
   launch "$mode-16-groups" 16 -SimplPush /groups
   launch "$mode-17-inbox" 16 -SimplPush /conversations
+  # (1.3) a quiz in the app's own screen: its intro, a question being answered; a course's tool in its sheet
+  launch "$mode-18-quiz" 18 -SimplOpen quiz:101:9011
+  launch "$mode-19-quiz-question" 24 -SimplOpen quiz:101:9011:take:5
+  launch "$mode-20-tool" 20 -SimplOpen tool:101:9
 done
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 

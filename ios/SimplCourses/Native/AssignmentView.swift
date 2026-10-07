@@ -3,9 +3,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// One assignment: its due date, points and kind, the instructions, where your work stands, what you
-/// handed in, the grade with the class's numbers, the rubric, the comments — and Hand In, a sheet for
-/// text, a web address or files (from Files or Photos), as the assignment takes them. A quiz, a tool
-/// or a discussion opens where it is taken.
+/// handed in, the grade with the class's numbers, the comments — the rubric in a sheet of its own from a
+/// button by the grade — and Hand In, a bar the size of the tab bar above it, opening a half sheet for
+/// text, a web address or files (from Files or Photos), as the assignment takes them. A quiz opens in the
+/// app's own quiz screen, a tool in its sheet, a discussion in its screen.
 struct AssignmentView: View {
     let course: String
     let id: String
@@ -13,6 +14,7 @@ struct AssignmentView: View {
     @StateObject private var model = Loader<AssignmentData>()
     @State private var handIn = false
     @State private var comment = false
+    @State private var rubric = false
 
     var body: some View {
         Group {
@@ -23,11 +25,20 @@ struct AssignmentView: View {
                     else if d.held == true {
                         Section { Label("Graded, but your teacher has not released the grade yet.", systemImage: "eye.slash").foregroundStyle(.secondary) }
                     }
+                    if d.grade == nil && !d.rubric.isEmpty {
+                        Section {
+                            Button { openRubric() } label: {
+                                InfoRow(title: d.rubricTitle ?? "Rubric", sub: "\(d.rubric.count) criteria · how this is marked", symbol: "list.bullet.clipboard", tint: Color(hex: d.color)) {
+                                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                     if !d.html.isEmpty {
                         Section("Instructions") { RichText(html: d.html).padding(.vertical, 4) }
                     }
                     workSection(d)
-                    if !d.rubric.isEmpty { rubricSection(d) }
                     Section {
                         if d.comments.isEmpty { Text("No comments.").foregroundStyle(.secondary) }
                         ForEach(d.comments) { c in commentRow(c) }
@@ -56,6 +67,11 @@ struct AssignmentView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .onAppear { engine.holdTabBar = true } // (the Hand In bar sits over a full-size tab bar)
+        .onDisappear { engine.holdTabBar = false }
+        .sheet(isPresented: $rubric) {
+            if let d = model.data { RubricSheet(data: d) }
+        }
         .sheet(isPresented: $handIn) {
             if let d = model.data {
                 SubmitSheet(data: d) {
@@ -118,8 +134,29 @@ struct AssignmentView: View {
                 if let late = g.late, !late.isEmpty { Text(late).font(.caption).foregroundStyle(.orange) }
                 if let st = d.stats, !st.isEmpty { Text(st).font(.caption).foregroundStyle(.secondary) }
             }
+            Spacer(minLength: 4)
+            if !d.rubric.isEmpty {
+                // the rubric beside the grade it explains, in its own sheet
+                Button { openRubric() } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: "list.bullet.clipboard").font(.title3)
+                        Text(d.rubricScore?.isEmpty == false ? d.rubricScore! : "Rubric").font(.caption2.weight(.semibold)).monospacedDigit()
+                    }
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Rubric")
+            }
         }
         .padding(.vertical, 4)
+    }
+
+    private func openRubric() {
+        Haptics.tap()
+        rubric = true
     }
 
     @ViewBuilder
@@ -138,40 +175,6 @@ struct AssignmentView: View {
                         .buttonStyle(.plain)
                 }
                 if let why = d.why, !why.isEmpty { Label(why, systemImage: "info.circle").font(.subheadline).foregroundStyle(.secondary) }
-            }
-        }
-    }
-
-    private func rubricSection(_ d: AssignmentData) -> some View {
-        Section {
-            ForEach(d.rubric) { r in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(r.name).font(.subheadline.weight(.semibold))
-                        Spacer()
-                        if let p = r.pts { Text(p).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary) }
-                    }
-                    ForEach(Array(r.ratings.enumerated()), id: \.offset) { _, rating in
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: rating.got == true ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(rating.got == true ? Color.green : Color(.tertiaryLabel))
-                                .font(.caption)
-                            Text(rating.text).font(.caption).foregroundStyle(rating.got == true ? .primary : .secondary)
-                            Spacer(minLength: 4)
-                            if let p = rating.pts { Text(p).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
-                        }
-                    }
-                    if let c = r.comment, !c.isEmpty {
-                        Text(c).font(.caption).padding(8).frame(maxWidth: .infinity, alignment: .leading).contentCard(cornerRadius: 10, tint: .blue)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        } header: {
-            HStack {
-                Text(d.rubricTitle ?? "Rubric")
-                Spacer()
-                if let s = d.rubricScore, !s.isEmpty { Text(s).textCase(nil).monospacedDigit() }
             }
         }
     }
@@ -203,34 +206,39 @@ struct AssignmentView: View {
         .padding(.vertical, 3)
     }
 
-    /// The one thing to do next, at the bottom: hand in (again), take the quiz, open the tool or the discussion.
+    /// The one thing to do next, at the bottom: hand in (again), take the quiz, open the tool or the discussion —
+    /// a bar exactly the tab bar's width and height (measured, so on any iPhone and either way round), just above it.
     @ViewBuilder
     private func action(_ d: AssignmentData) -> some View {
         if let label = actionLabel(d) {
+            let size = engine.barSize
             Button {
                 Haptics.tap()
                 if d.canSubmit { handIn = true }
+                else if let q = d.quizId { engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title)) }
                 else if let q = d.quizUrl { engine.go(q, title: d.title) }
                 else if let u = d.discussionUrl { engine.go(u, title: d.title) }
-                else if let t = d.toolUrl { engine.openWebScreen(t, title: d.title) }
+                else if d.toolUrl != nil { engine.openTool(.assignment(course: course, id: id, title: d.title)) }
             } label: {
                 Label(label.0, systemImage: label.1)
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                    .font(.title3.weight(.semibold))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .glassProminentButton()
+            .buttonBorderShape(.capsule)
             .tint(Color(hex: d.color))
-            .padding(.horizontal, 20)
+            .frame(width: size.width > 0 ? size.width : nil, height: size.height)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, size.width > 0 ? 0 : 21)
             .padding(.bottom, 8)
         }
     }
 
     private func actionLabel(_ d: AssignmentData) -> (String, String)? {
         if d.canSubmit { return (d.resubmit == true ? "Hand In Again" : "Hand In", "tray.and.arrow.up.fill") }
-        if d.quizUrl != nil { return ("Open Quiz", "checklist") }
+        if d.quizUrl != nil { return ("Take Quiz", "checklist") }
         if d.discussionUrl != nil { return ("Open Discussion", "bubble.left.and.bubble.right.fill") }
-        if d.toolUrl != nil { return ("Open Tool", "arrow.up.right.square.fill") }
+        if d.toolUrl != nil { return d.ltiQuiz == true ? ("Take Quiz", "checklist") : ("Open Tool", "puzzlepiece.extension.fill") }
         return nil
     }
 
@@ -322,6 +330,7 @@ struct SubmitSheet: View {
             .onChange(of: photos) { pickedPhotos() }
             .onAppear { if type.isEmpty { type = data.types.first ?? "" } }
         }
+        .presentationDetents([.fraction(0.5), .large]) // (a small sheet, half the screen; drag it up for more room)
         .presentationDragIndicator(.visible)
     }
 
@@ -444,5 +453,59 @@ struct SubmitSheet: View {
             }
             sending = false
         }
+    }
+}
+
+/// The rubric, in a sheet of its own: each criterion with its ratings (the one given marked), its points and
+/// the teacher's comment, and the total.
+struct RubricSheet: View {
+    let data: AssignmentData
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let s = data.rubricScore, !s.isEmpty {
+                    Section {
+                        HStack {
+                            Text("Score").font(.headline)
+                            Spacer()
+                            Text(s).font(.title3.weight(.bold).monospacedDigit())
+                        }
+                    }
+                }
+                ForEach(data.rubric) { r in
+                    Section {
+                        ForEach(Array(r.ratings.enumerated()), id: \.offset) { _, rating in
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: rating.got == true ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(rating.got == true ? Color.green : Color(.tertiaryLabel))
+                                Text(rating.text).font(.subheadline).foregroundStyle(rating.got == true ? .primary : .secondary)
+                                Spacer(minLength: 6)
+                                if let p = rating.pts { Text(p).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary) }
+                            }
+                            .listRowBackground(rating.got == true ? Color.green.opacity(0.12) : nil)
+                        }
+                        if let c = r.comment, !c.isEmpty {
+                            Label(c, systemImage: "text.bubble").font(.subheadline)
+                        }
+                    } header: {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(r.name).textCase(nil)
+                            Spacer()
+                            if let p = r.pts { Text(p).textCase(nil).monospacedDigit() }
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle(data.rubricTitle ?? "Rubric")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }

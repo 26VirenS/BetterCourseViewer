@@ -59,6 +59,14 @@ final class Engine: ObservableObject, ShellListener {
     @Published var whatsNew: WhatsNewSheetItem?
     /// Bumps when a screen's data may have changed under it (a tick in a web screen, an account change): the native screens read again.
     @Published private(set) var dataVersion = 0
+    /// The tab bar's glass as drawn (TabBarProbe): a bar a screen puts above it takes this width and height.
+    @Published private(set) var barSize = CGSize(width: 0, height: 62)
+    /// A screen with a bar of its own over the tab bar keeps the tab bar full size (no minimising as it scrolls).
+    @Published var holdTabBar = false
+    /// An external tool open in its sheet (ToolSheet).
+    @Published var tool: ToolLaunch?
+    /// A quiz open in the app's own quiz screen (QuizScreen), over everything.
+    @Published var quiz: QuizLaunch?
 
     private var ready = false
     private var slots: [UUID: WeakBox<SlotView>] = [:]
@@ -145,6 +153,14 @@ final class Engine: ObservableObject, ShellListener {
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty {
             if push == "notifications" { openNotifications() } else { openWeb(push, title: "") }
         }
+        // (-SimplOpen quiz:101:9011, quiz:101:9011:take:5 straight into the attempt at question 6, tool:101:9 a course's tool)
+        if let q = LaunchOpen.take("quiz:") {
+            let parts = q.split(separator: ":").map(String.init)
+            if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && parts[2] == "take", startAt: parts.count > 3 ? Int(parts[3]) : nil) }
+        } else if let t = LaunchOpen.take("tool:") {
+            let parts = t.split(separator: ":").map(String.init)
+            if parts.count == 2 { tool = .courseTool(course: parts[0], id: parts[1], title: "Tool") }
+        }
         await refreshSnapshot()
         if let wn = try? await call("whatsNew", ["due": true], as: WhatsNewData.self), !wn.releases.isEmpty {
             whatsNew = WhatsNewSheetItem(data: wn)
@@ -153,6 +169,11 @@ final class Engine: ObservableObject, ShellListener {
 
     func refreshSnapshot() async {
         if let s = try? await call("snapshot", as: Snapshot.self) { snapshot = s }
+    }
+
+    func setBarSize(_ s: CGSize) {
+        guard abs(s.width - barSize.width) > 0.5 || abs(s.height - barSize.height) > 0.5 else { return }
+        barSize = s
     }
 
     func changed() {
@@ -211,6 +232,14 @@ final class Engine: ObservableObject, ShellListener {
     /// A Canvas address on the stack showing: its native screen when the app has one (a course and
     /// everything in it, Groups, the Inbox — Router.swift), else the web interface's screen for it.
     func openWeb(_ url: String, title: String) {
+        if let t = toolLaunch(for: url, title: title) {
+            openTool(t)
+            return
+        }
+        if let q = quizLaunch(for: url, title: title) {
+            openQuiz(q)
+            return
+        }
         if let route = nativeRoute(for: url, title: title) {
             push(route)
             return
@@ -232,6 +261,17 @@ final class Engine: ObservableObject, ShellListener {
         if path.last == route { return }
         path.append(route)
         paths[tab] = path
+    }
+
+    /// An external tool, in a sheet of its own over everything.
+    func openTool(_ t: ToolLaunch) {
+        Haptics.tap()
+        tool = t
+    }
+
+    func openQuiz(_ q: QuizLaunch) {
+        Haptics.tap()
+        quiz = q
     }
 
     func openNotifications() {

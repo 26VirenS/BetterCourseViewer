@@ -28,6 +28,7 @@ struct MoreLink: Codable, Identifiable, Hashable {
     var label: String
     var url: String
     var external: Bool?
+    var tool: String?
     var id: String { url }
 }
 
@@ -250,7 +251,9 @@ struct AssignmentData: Codable {
     var why: String?
     var resubmit: Bool?
     var quizUrl: String?
+    var quizId: String?
     var toolUrl: String?
+    var ltiQuiz: Bool?
     var discussionUrl: String?
     var canvasUrl: String?
     var comments: [CommentRow]
@@ -349,11 +352,13 @@ struct CGRow: Codable, Identifiable, Hashable {
     var earned: Double?
     var effective: Double?
     var hypothetical: Bool?
+    var added: Bool?
     var badge: String?
     var dropped: Bool?
     var grade: String?
     var counted: Bool?
     var dueText: String?
+    var due: String?
     var url: String?
     var scoreText: String
 }

@@ -6,15 +6,14 @@ private struct DayGPA: Identifiable {
     let gpa: Double
 }
 
-/// Grades: the term GPA against your goal and its trend, a ring per course (pressed, the course's grades
-/// in a sheet of their own, with what-if scores), and every graded item by letter.
+/// Grades: the term GPA against your goal and its trend, and each course as rings inside rings — its total and
+/// its assignment groups — pressed, the course's grades in a sheet of their own (every assignment, sorted as
+/// you like, and what-if scores).
 struct GradesView: View {
     @EnvironmentObject private var engine: Engine
     @State private var data: GradesData?
     @State private var error: String?
     @State private var goal: Double = 4
-    @State private var band = "all"
-    @State private var showAll = false
     @State private var goalSave: Task<Void, Never>?
     @State private var sheet: GradeRow?
 
@@ -32,9 +31,8 @@ struct GradesView: View {
                     } header: {
                         Text("Courses")
                     } footer: {
-                        Text("Press a course for its grades and what-if scores.")
+                        Text("Press a course for each assignment's grade and what-if scores.")
                     }
-                    if !d.items.isEmpty { itemsSection(d) }
                     Section {
                         Text("Term GPA is worked out here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -136,22 +134,22 @@ struct GradesView: View {
             sheet = r
         } label: {
             HStack(spacing: 14) {
-                ZStack {
-                    Ring(value: r.pct, color: color, lineWidth: 5)
-                    if let l = r.letter {
-                        Text(l).font(.caption.weight(.bold)).foregroundStyle(color).minimumScaleFactor(0.6)
-                    }
-                }
-                .frame(width: 46, height: 46)
+                NestedRings(bands: NestedRings.bands(total: r.pct, color: color, groups: r.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3))
+                    .frame(width: 54, height: 54)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(r.code).font(.headline).lineLimit(1)
                     Text("\(r.name ?? "") · \(r.total > 0 ? "\(r.graded) of \(r.total) graded" : "nothing graded")")
                         .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                 }
-                .separatorAtText() // (else a ring with a letter starts its divider under the letter)
+                .separatorAtText()
                 Spacer(minLength: 6)
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(r.pct.map { String(format: "%.1f%%", $0) } ?? "N/A").font(.body.weight(.semibold).monospacedDigit())
+                    HStack(spacing: 6) {
+                        if let l = r.letter {
+                            Text(l).font(.caption.weight(.bold)).foregroundStyle(GradesView.bandColor(String(l.prefix(1))))
+                        }
+                        Text(r.pct.map { String(format: "%.1f%%", $0) } ?? "N/A").font(.body.weight(.semibold).monospacedDigit())
+                    }
                     if let t = r.target { Text("Target \(t)").font(.caption2).foregroundStyle(.secondary) }
                 }
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
@@ -164,48 +162,6 @@ struct GradesView: View {
         .contextMenu {
             Button { engine.push(.course(id: r.id)) } label: { Label("Open Course", systemImage: "arrow.up.right") }
             Button { sheet = r } label: { Label("Grades & What-If", systemImage: "chart.bar") }
-        }
-    }
-
-    // MARK: - Item grades
-
-    private func itemsSection(_ d: GradesData) -> some View {
-        let bands = ["all", "A", "B", "C", "D", "F"]
-        let pick = band == "all" ? d.items : d.items.filter { $0.band == band }
-        let shown = showAll ? pick : Array(pick.prefix(12))
-        return Section {
-            Picker("Letter", selection: $band) {
-                ForEach(bands, id: \.self) { b in
-                    Text(b == "all" ? "All" : "\(b) \(d.counts?[b] ?? 0)").tag(b)
-                }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: band) {
-                Haptics.select()
-                showAll = false
-            }
-            if shown.isEmpty { Text("No \(band) grades in your courses.").foregroundStyle(.secondary) }
-            ForEach(shown) { it in
-                Button { if let u = it.url { engine.openWeb(u, title: it.name) } } label: {
-                    HStack(spacing: 12) {
-                        Circle().fill(Color(hex: it.color)).frame(width: 9, height: 9)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(it.name).lineLimit(1)
-                            Text("\(it.course) · \(it.pctText)").font(.footnote).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(it.band).font(.caption.weight(.bold)).foregroundStyle(GradesView.bandColor(it.band))
-                        Text(it.score).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            if pick.count > shown.count {
-                Button("Show all \(pick.count)") { showAll = true }
-            }
-        } header: {
-            Text("Item grades")
         }
     }
 
@@ -237,10 +193,19 @@ struct GradesView: View {
     }
 }
 
-/// One course's grades: the total in a ring with its letter, each assignment group with its weight and
-/// score, every assignment's mark — and what-if scores: press an assignment to try a score, and the
-/// total, the letter and the term GPA follow, worked out by the same grade rules the web screens use.
-/// Nothing is saved. As a sheet from Grades, or pushed as a course's Grades.
+/// What-if assignments the student adds to a group: a name, the points it is out of, the score tried.
+struct AddedWork: Identifiable, Hashable {
+    let id: String
+    let groupId: String
+    var name: String
+    var possible: Double
+}
+
+/// One course's grades: the total and each assignment group as rings inside rings, with a legend; every
+/// assignment's mark, by group or sorted by grade, due date or name — and What-If: switched on, every mark
+/// becomes a field to type a score into, and each group takes what-if assignments; the total, the letter
+/// and the term GPA follow, worked out by the grade rules the web screens use. Nothing is saved. As a sheet
+/// from Grades, or pushed as a course's Grades.
 struct CourseGradesView: View {
     let courseId: String
     var inSheet = false
@@ -248,51 +213,55 @@ struct CourseGradesView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var data: CourseGradesData?
     @State private var error: String?
-    @State private var tried: [String: Double?] = [:]
-    @State private var editing: CGRow?
-    @State private var entry = ""
+    @State private var whatIf = false
+    @State private var drafts: [String: String] = [:]
+    @State private var added: [AddedWork] = []
+    @State private var sort: Sort = .groups
+    @State private var addingTo: CGGroup?
+    @State private var applying: Task<Void, Never>?
+    @FocusState private var focused: String?
+
+    enum Sort: String, CaseIterable, Identifiable {
+        case groups = "By Group", high = "Highest Grade", low = "Lowest Grade", due = "Due Date", name = "Name"
+        var id: String { rawValue }
+        var symbol: String {
+            switch self {
+            case .groups: return "square.grid.2x2"
+            case .high: return "arrow.down"
+            case .low: return "arrow.up"
+            case .due: return "calendar"
+            case .name: return "textformat"
+            }
+        }
+    }
 
     var body: some View {
         Group {
             if let d = data {
                 List {
                     Section { header(d) }
-                    if d.whatIf {
-                        Section {
-                            Label("What-if scores: this is not your actual grade.", systemImage: "wand.and.stars")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.orange)
-                            if let g = d.gpaIf {
-                                HStack {
-                                    Text("Term GPA would be")
-                                    Spacer()
-                                    Text(String(format: "%.2f", g)).bold().monospacedDigit().contentTransition(.numericText(value: g))
-                                    if let now = d.gpa { Text(String(format: "(now %.2f)", now)).font(.footnote).foregroundStyle(.secondary) }
-                                }
+                    Section {
+                        Toggle(isOn: Binding(get: { whatIf }, set: { setWhatIf($0) })) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("What-If Scores").font(.body.weight(.semibold))
+                                Text(whatIf ? "Type a score into any assignment, or add one. Nothing is saved." : "Try scores and see where your grade would land.")
+                                    .font(.footnote).foregroundStyle(.secondary)
                             }
+                        }
+                        .tint(.orange)
+                        if whatIf, let g = d.gpaIf {
+                            HStack {
+                                Text("Term GPA would be")
+                                Spacer()
+                                Text(String(format: "%.2f", g)).bold().monospacedDigit().contentTransition(.numericText(value: g))
+                                if let now = d.gpa { Text(String(format: "(now %.2f)", now)).font(.footnote).foregroundStyle(.secondary) }
+                            }
+                        }
+                        if whatIf && (!drafts.isEmpty || !added.isEmpty) {
                             Button(role: .destructive) { reset() } label: { Label("Clear What-If Scores", systemImage: "arrow.uturn.backward") }
                         }
                     }
-                    ForEach(d.groups) { g in
-                        let rows = d.rows.filter { $0.groupId == g.id }
-                        if !rows.isEmpty {
-                            Section {
-                                ForEach(rows) { r in row(r, d) }
-                            } header: {
-                                HStack {
-                                    Text(g.name)
-                                    Spacer()
-                                    Text([g.weightText, g.value].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")).textCase(nil)
-                                }
-                            } footer: {
-                                if let detail = g.detail, !detail.isEmpty { Text(detail) }
-                            }
-                        }
-                    }
-                    Section {
-                        Text("Press an assignment to try a score. Nothing you try here is saved or sent to Canvas.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
+                    rowsSections(d)
                 }
                 .listStyle(.insetGrouped)
                 .refreshable { await load(fresh: true) }
@@ -309,84 +278,234 @@ struct CourseGradesView: View {
                     Button { dismiss(); engine.push(.course(id: courseId)) } label: { Text("Course") }
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Sort", selection: $sort) {
+                        ForEach(Sort.allCases) { s in Label(s.rawValue, systemImage: s.symbol).tag(s) }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .accessibilityLabel("Sort")
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { focused = nil }
+            }
         }
+        .onChange(of: sort) { Haptics.select() }
         .task { await load(fresh: true) }
-        .alert(editing?.name ?? "What-if score", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
-            TextField("Score", text: $entry).keyboardType(.decimalPad)
-            Button("Try It") { apply(entry) }
-            if let e = editing, tried[e.id] != nil { Button("Use My Real Score", role: .destructive) { clear(e) } }
-            Button("Cancel", role: .cancel) { editing = nil }
-        } message: {
-            if let e = editing { Text(e.possible > 0 ? "Out of \(CourseGradesView.num(e.possible)) points." : "A score in points.") }
+        .sheet(item: $addingTo) { g in
+            AddWhatIfSheet(group: g) { name, possible, score in
+                let id = "whatif-\(UUID().uuidString.prefix(8))"
+                added.append(AddedWork(id: id, groupId: g.id, name: name, possible: possible))
+                drafts[id] = score.map { CourseGradesView.num($0) } ?? ""
+                Haptics.success()
+                Task { await load() }
+            }
         }
     }
 
+    // MARK: - The total and the groups
+
     private func header(_ d: CourseGradesData) -> some View {
         let color = Color(hex: d.color)
-        return HStack(spacing: 18) {
-            ZStack {
-                Ring(value: d.total, color: d.whatIf ? .orange : color, lineWidth: 10)
-                VStack(spacing: 0) {
-                    Text(d.totalText).font(.system(.title3, design: .rounded).weight(.bold)).monospacedDigit()
+        let rings = NestedRings.bands(total: d.total, color: whatIf ? .orange : color, groups: d.groups.map { (pct: $0.pct, color: $0.color) }, limit: 4)
+        let legend = Array(d.groups.filter { $0.pct != nil }.prefix(rings.count - 1))
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 18) {
+                NestedRings(bands: rings, outerWidth: 11, innerWidth: 7, gap: 2.5)
+                    .frame(width: 124, height: 124)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(d.totalText)
+                        .font(.system(size: 34, weight: .bold, design: .rounded)).monospacedDigit()
                         .contentTransition(.numericText(value: d.total ?? 0))
-                    if let l = d.letter { Text(l).font(.subheadline.weight(.semibold)).foregroundStyle(d.whatIf ? .orange : color) }
+                    if let l = d.letter {
+                        Text(whatIf ? "\(l) with what-if" : l)
+                            .font(.headline).foregroundStyle(whatIf ? .orange : color)
+                    }
+                    Menu {
+                        Picker("Target", selection: Binding(get: { d.target ?? "" }, set: { setTarget($0) })) {
+                            Text("No target").tag("")
+                            ForEach(d.scale, id: \.letter) { s in Text(s.letter).tag(s.letter) }
+                        }
+                    } label: {
+                        Label(d.target.map { "Target \($0)" } ?? "Set a target", systemImage: "scope").font(.subheadline)
+                    }
                 }
             }
-            .frame(width: 110, height: 110)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(d.name ?? d.code).font(.headline).lineLimit(2)
+            // the legend: each ring's group, its weight and its score
+            if !legend.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(legend.enumerated()), id: \.offset) { i, g in
+                        HStack(spacing: 8) {
+                            Circle().fill(rings[i + 1].color).frame(width: 9, height: 9)
+                            Text(g.name).font(.subheadline).lineLimit(1)
+                            Spacer(minLength: 6)
+                            if let w = g.weightText, !w.isEmpty { Text(w).font(.caption).foregroundStyle(.secondary) }
+                            Text(g.value ?? "—").font(.subheadline.weight(.semibold).monospacedDigit())
+                        }
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
                 if let note = d.note, !note.isEmpty { Text(note).font(.footnote).foregroundStyle(.secondary) }
                 if let f = d.final, !f.isEmpty { Text(f).font(.caption).foregroundStyle(.tertiary) }
-                Menu {
-                    Picker("Target", selection: Binding(get: { d.target ?? "" }, set: { setTarget($0) })) {
-                        Text("No target").tag("")
-                        ForEach(d.scale, id: \.letter) { s in Text(s.letter).tag(s.letter) }
-                    }
-                } label: {
-                    Label(d.target.map { "Target \($0)" } ?? "Set a target", systemImage: "scope").font(.subheadline)
-                }
             }
         }
         .padding(.vertical, 8)
     }
 
-    private func row(_ r: CGRow, _ d: CourseGradesData) -> some View {
-        let tried = r.hypothetical == true
-        return Button {
-            guard r.counted != false else { return }
-            Haptics.tap()
-            entry = r.effective.map { CourseGradesView.num($0) } ?? ""
-            editing = r
-        } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(r.name).lineLimit(2).foregroundStyle(r.dropped == true ? .secondary : .primary)
-                    HStack(spacing: 6) {
-                        if let b = r.badge, !b.isEmpty { StatusChip(text: b, tone: CourseGradesView.tone(b)) }
-                        if r.dropped == true { StatusChip(text: "Dropped") }
-                        if let due = r.dueText, !due.isEmpty { Text(due).font(.caption).foregroundStyle(.secondary) }
+    // MARK: - The assignments
+
+    @ViewBuilder
+    private func rowsSections(_ d: CourseGradesData) -> some View {
+        if sort == .groups {
+            ForEach(d.groups) { g in
+                let rows = d.rows.filter { $0.groupId == g.id }
+                if !rows.isEmpty || whatIf {
+                    Section {
+                        ForEach(rows) { r in row(r, d, showGroup: false) }
+                        if whatIf {
+                            Button { addingTo = g } label: { Label("Add What-If Assignment", systemImage: "plus.circle") }
+                        }
+                    } header: {
+                        HStack {
+                            Text(g.name)
+                            Spacer()
+                            Text([g.weightText, g.value].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")).textCase(nil)
+                        }
+                    } footer: {
+                        if let detail = g.detail, !detail.isEmpty { Text(detail) }
                     }
                 }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(r.scoreText)
-                        .font(.body.weight(tried ? .bold : .medium).monospacedDigit())
-                        .foregroundStyle(tried ? Color.orange : (r.effective == nil ? Color.secondary : Color.primary))
-                        .contentTransition(.numericText())
-                    if tried { Text("what-if").font(.caption2.weight(.semibold)).foregroundStyle(.orange) }
-                    else if let g = r.grade, !g.isEmpty { Text(g).font(.caption2).foregroundStyle(.secondary) }
+            }
+        } else {
+            Section {
+                ForEach(sorted(d)) { r in row(r, d, showGroup: true) }
+            } header: {
+                Text("All assignments · \(sort.rawValue)")
+            }
+        }
+    }
+
+    private func sorted(_ d: CourseGradesData) -> [CGRow] {
+        let pct: (CGRow) -> Double? = { r in
+            guard let e = r.effective, r.possible > 0 else { return nil }
+            return e / r.possible * 100
+        }
+        switch sort {
+        case .high, .low:
+            let graded = d.rows.filter { pct($0) != nil }.sorted { a, b in
+                sort == .high ? pct(a)! > pct(b)! : pct(a)! < pct(b)!
+            }
+            return graded + d.rows.filter { pct($0) == nil }
+        case .due:
+            return d.rows.sorted { ($0.due ?? "9999") < ($1.due ?? "9999") }
+        case .name:
+            return d.rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .groups:
+            return d.rows
+        }
+    }
+
+    private func letter(_ r: CGRow, _ d: CourseGradesData) -> String? {
+        guard let e = r.effective, r.possible > 0 else { return nil }
+        let p = e / r.possible * 100
+        return d.scale.first { p >= $0.min }?.letter ?? d.scale.last?.letter
+    }
+
+    @ViewBuilder
+    private func row(_ r: CGRow, _ d: CourseGradesData, showGroup: Bool) -> some View {
+        if whatIf {
+            rowContent(r, d, showGroup: showGroup) // (the score field takes the taps)
+        } else {
+            Button {
+                guard let u = r.url else { return }
+                if inSheet { dismiss() }
+                engine.go(u, title: r.name)
+            } label: {
+                rowContent(r, d, showGroup: showGroup)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func rowContent(_ r: CGRow, _ d: CourseGradesData, showGroup: Bool) -> some View {
+        let tried = r.hypothetical == true || r.added == true
+        let groupName = showGroup ? d.groups.first { $0.id == r.groupId }?.name : nil
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    if r.added == true { Image(systemName: "wand.and.stars").font(.caption).foregroundStyle(.orange) }
+                    Text(r.name).lineLimit(2).foregroundStyle(r.dropped == true ? .secondary : .primary)
+                }
+                HStack(spacing: 6) {
+                    if let b = r.badge, !b.isEmpty { StatusChip(text: b, tone: CourseGradesView.tone(b)) }
+                    if r.dropped == true { StatusChip(text: "Dropped") }
+                    if let gn = groupName { Text(gn).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    if let due = r.dueText, !due.isEmpty { Text(due).font(.caption).foregroundStyle(.secondary) }
                 }
             }
-            .contentShape(Rectangle())
+            .separatorAtText()
+            Spacer(minLength: 8)
+            if whatIf && r.counted != false {
+                scoreField(r, tried: tried)
+            } else {
+                VStack(alignment: .trailing, spacing: 1) {
+                    HStack(spacing: 6) {
+                        if let l = letter(r, d) {
+                            Text(l).font(.caption.weight(.bold)).foregroundStyle(GradesView.bandColor(String(l.prefix(1))))
+                        }
+                        Text(r.scoreText)
+                            .font(.body.weight(.medium).monospacedDigit())
+                            .foregroundStyle(r.effective == nil ? Color.secondary : Color.primary)
+                    }
+                    if let g = r.grade, !g.isEmpty { Text(g).font(.caption2).foregroundStyle(.secondary) }
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .swipeActions {
-            if tried { Button { clear(r) } label: { Label("Real Score", systemImage: "arrow.uturn.backward") }.tint(.gray) }
+            if r.added == true {
+                Button(role: .destructive) { remove(r) } label: { Label("Remove", systemImage: "trash") }
+            } else if drafts[r.id] != nil {
+                Button { useReal(r) } label: { Label("Real Score", systemImage: "arrow.uturn.backward") }.tint(.gray)
+            }
         }
         .contextMenu {
-            if let u = r.url { Button { engine.openWeb(u, title: r.name) } label: { Label("Open Assignment", systemImage: "arrow.up.right") } }
-            if tried { Button { clear(r) } label: { Label("Use My Real Score", systemImage: "arrow.uturn.backward") } }
+            if let u = r.url {
+                Button { if inSheet { dismiss() }; engine.go(u, title: r.name) } label: { Label("Open Assignment", systemImage: "arrow.up.right") }
+            }
+            if drafts[r.id] != nil && r.added != true { Button { useReal(r) } label: { Label("Use My Real Score", systemImage: "arrow.uturn.backward") } }
         }
+    }
+
+    /// A what-if score typed straight into the row (no window over the list): the score, then what it is out of.
+    private func scoreField(_ r: CGRow, tried: Bool) -> some View {
+        HStack(spacing: 4) {
+            TextField("—", text: Binding(
+                get: { drafts[r.id] ?? r.effective.map { CourseGradesView.num($0) } ?? "" },
+                set: { v in
+                    drafts[r.id] = v
+                    scheduleApply()
+                }
+            ))
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .font(.body.weight(tried ? .bold : .regular).monospacedDigit())
+            .foregroundStyle(tried ? Color.orange : Color.primary)
+            .focused($focused, equals: r.id)
+            .frame(width: 58)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .background(tried ? Color.orange.opacity(0.14) : Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Text("/ \(CourseGradesView.num(r.possible))")
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("What-if score for \(r.name), out of \(CourseGradesView.num(r.possible))")
     }
 
     static func num(_ v: Double) -> String {
@@ -402,26 +521,46 @@ struct CourseGradesView: View {
         }
     }
 
-    private func apply(_ text: String) {
-        guard let e = editing else { return }
-        editing = nil
-        let cleaned = text.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)
-        guard let v = Double(cleaned), v >= 0 else { Haptics.error(); return }
+    // MARK: - What-if
+
+    private func setWhatIf(_ on: Bool) {
         Haptics.select()
-        tried[e.id] = v
+        withAnimation(.snappy) { whatIf = on }
+        if !on {
+            focused = nil
+            drafts = [:]
+            added = []
+        }
         Task { await load() }
     }
 
-    private func clear(_ r: CGRow) {
-        editing = nil
+    private func scheduleApply() {
+        applying?.cancel()
+        applying = Task {
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard !Task.isCancelled else { return }
+            await load()
+        }
+    }
+
+    private func useReal(_ r: CGRow) {
         Haptics.select()
-        tried.removeValue(forKey: r.id)
+        drafts.removeValue(forKey: r.id)
+        Task { await load() }
+    }
+
+    private func remove(_ r: CGRow) {
+        Haptics.select()
+        added.removeAll { $0.id == r.id }
+        drafts.removeValue(forKey: r.id)
         Task { await load() }
     }
 
     private func reset() {
         Haptics.play("warning")
-        tried = [:]
+        focused = nil
+        drafts = [:]
+        added = []
         Task { await load() }
     }
 
@@ -435,14 +574,63 @@ struct CourseGradesView: View {
     }
 
     private func load(fresh: Bool = false) async {
-        var t: [String: Any] = [:]
-        for (k, v) in tried { t[k] = v ?? NSNull() }
+        var tried: [String: Any] = [:]
+        for (k, v) in drafts {
+            let t = v.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)
+            tried[k] = t
+        }
+        let extra: [[String: Any]] = added.map { ["id": $0.id, "groupId": $0.groupId, "name": $0.name, "possible": $0.possible] }
         do {
-            let d = try await engine.call("courseGrades", ["id": courseId, "tried": t, "fresh": fresh], as: CourseGradesData.self)
+            let d = try await engine.call("courseGrades", ["id": courseId, "tried": tried, "added": extra, "on": whatIf, "fresh": fresh], as: CourseGradesData.self)
             withAnimation(.snappy) { data = d }
             error = nil
         } catch {
             if data == nil { self.error = error.localizedDescription }
         }
+    }
+}
+
+/// A what-if assignment for a group: its name, what it is out of, and the score to try — a small sheet.
+struct AddWhatIfSheet: View {
+    let group: CGGroup
+    let add: (String, Double, Double?) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var possible = "100"
+    @State private var score = ""
+    @FocusState private var focus: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name (optional)", text: $name).focused($focus)
+                    HStack {
+                        TextField("Score", text: $score).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                        Text("out of").foregroundStyle(.secondary)
+                        TextField("Points", text: $possible).keyboardType(.decimalPad).frame(width: 64)
+                    }
+                } footer: {
+                    Text("Counts in \(group.name)\(group.weightText.map { $0.isEmpty ? "" : " (\($0))" } ?? ""). Nothing is saved to Canvas.")
+                }
+            }
+            .navigationTitle("What-If Assignment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let p = Double(possible.replacingOccurrences(of: ",", with: ".")) ?? 0
+                        let s = Double(score.replacingOccurrences(of: ",", with: "."))
+                        add(name.trimmingCharacters(in: .whitespaces).isEmpty ? "What-if assignment" : name, p, s)
+                        dismiss()
+                    }
+                    .disabled((Double(possible.replacingOccurrences(of: ",", with: ".")) ?? 0) <= 0)
+                }
+            }
+            .onAppear { focus = true }
+        }
+        .presentationDetents([.height(300), .medium])
+        .presentationDragIndicator(.visible)
     }
 }

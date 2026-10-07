@@ -35,6 +35,15 @@ struct RootView: View {
         .sheet(item: $engine.whatsNew) { item in
             WhatsNewSheet(data: item.data)
         }
+        .sheet(item: $engine.tool) { t in
+            ToolSheet(launch: t)
+                .environmentObject(engine)
+                .presentationDetents([.large])
+        }
+        .fullScreenCover(item: $engine.quiz) { q in
+            QuizScreen(launch: q)
+                .environmentObject(engine)
+        }
         .onAppear { engine.start() }
         .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
             engine.web.login.forget()
@@ -87,7 +96,8 @@ struct NativeShell: View {
                 stack(.search) { SearchView() }
             }
         }
-        .minimizingTabBar()
+        .minimizingTabBar(!engine.holdTabBar)
+        .background(TabBarProbe(engine: engine).allowsHitTesting(false))
         .sensoryFeedback(.selection, trigger: engine.tab)
     }
 

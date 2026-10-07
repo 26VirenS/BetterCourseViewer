@@ -608,7 +608,7 @@
       if (t.hidden || t.id === 'settings' || t.id === 'home') continue;
       const k = TAB_KIND[t.id];
       if (k && !sections.some((x) => x.kind === k) && (c.kind === 'courses' || DEFAULT_SECTIONS.groups.includes(k))) sections.push({ kind: k, label: t.label || SECTION_LABEL[k] });
-      else if (!k) more.push({ label: t.label || 'Open', url: local(t.html_url || t.full_url || ''), external: t.type === 'external' || String(t.id).startsWith('context_external_tool') });
+      else if (!k) { const tm = /^context_external_tool_(\d+)$/.exec(String(t.id)); more.push({ label: t.label || 'Open', url: local(t.html_url || t.full_url || ''), external: t.type === 'external' || !!tm, tool: tm ? tm[1] : null }); }
     }
     return { sections, more: more.filter((m) => m.url) };
   }
@@ -791,6 +791,7 @@
       : !here.length ? '' : '';
     const canSubmit = !locked && !sub.excused && attemptsLeft && !closed && here.length > 0;
     const isQuiz = types.includes('online_quiz') || !!a.is_quiz_assignment;
+    const ltiQuiz = !!a.is_quiz_lti_assignment && !a.quiz_id; // (New Quizzes: an external tool)
     const pct = scored && Number(a.points_possible) > 0 ? (Number(sub.score) / Number(a.points_possible)) * 100 : null;
     const assess = sub.rubric_assessment || {};
     const R = BCV.screens?.course;
@@ -810,8 +811,8 @@
       submitted: sub.submitted_at ? `Submitted ${U.fmtAt(sub.submitted_at)}${sub.late ? ' · late' : ''}` : '', attemptsText,
       submission: { files: (sub.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'File', url: absUrl(x.url) })).filter((x) => x.url), url: sub.url || null, text: sub.body ? textOf(sub.body, 600) : '' },
       types: here, allowed: (a.allowed_extensions || []).map((x) => String(x).toLowerCase()), canSubmit, why, resubmit: !!sub.submitted_at,
-      quizUrl: isQuiz ? (a.quiz_id ? `/courses/${cid}/quizzes/${a.quiz_id}` : `/courses/${cid}/assignments/${aid}?bcv=native`) : null,
-      toolUrl: types.includes('external_tool') ? `/courses/${cid}/assignments/${aid}?bcv=native` : null,
+      quizUrl: isQuiz && a.quiz_id ? `/courses/${cid}/quizzes/${a.quiz_id}` : null, quizId: isQuiz && a.quiz_id ? String(a.quiz_id) : null,
+      toolUrl: types.includes('external_tool') || ltiQuiz ? `/courses/${cid}/assignments/${aid}?bcv=native` : null, ltiQuiz,
       discussionUrl: a.discussion_topic?.id ? `/courses/${cid}/discussion_topics/${a.discussion_topic.id}` : null,
       canvasUrl: `/courses/${cid}/assignments/${aid}?bcv=native`,
       comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: cm.comment || (cm.media_comment ? 'Media comment' : ''), attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),
@@ -909,10 +910,509 @@
     return { title: 'Syllabus', context: info.title, color: info.color, html: clean(body || ''), rows: dated.map((a) => aRow(a, c.id)), empty: 'The syllabus is empty.' };
   }
 
+  /** An external tool's launch for the app's tool sheet: Canvas's sessionless launch — a one-time address the tool
+   *  opens at the top of its own page (no Canvas frame around it, no third-party cookie to lose) — for an assignment
+   *  (and a New Quizzes quiz), a module item, a course's own tool, or a launch URL; else the page Canvas launches
+   *  it from. */
+  async function toolLaunch({ course, assignment = null, moduleItem = null, tool = null, url = null } = {}) {
+    const cid = String(course || '');
+    if (!/^\d+$/.test(cid)) throw new Error('That tool could not be found.');
+    const params = assignment ? { launch_type: 'assessment', assignment_id: String(assignment) }
+      : moduleItem ? { launch_type: 'module_item', module_item_id: String(moduleItem) }
+      : tool ? { id: String(tool), launch_type: 'course_navigation' }
+      : url ? { url: String(url) } : null;
+    if (!params) throw new Error('That tool could not be found.');
+    try {
+      const r = await BCV.canvas.get(`/api/v1/courses/${cid}/external_tools/sessionless_launch`, { params });
+      if (r?.url) return { url: String(r.url), name: r.name || '', sessionless: true };
+    } catch { /* Canvas's own page below */ }
+    const page = assignment ? `/courses/${cid}/assignments/${assignment}`
+      : moduleItem ? `/courses/${cid}/modules/items/${moduleItem}`
+      : tool ? `/courses/${cid}/external_tools/${tool}`
+      : `/courses/${cid}/external_tools/retrieve?display=borderless&url=${encodeURIComponent(url)}`;
+    return { url: absUrl(page), name: '', sessionless: false };
+  }
+
+  // ---- A quiz taken in the app's own screens (Classic Quizzes) -------------------------------------------
+  // The web quiz screen's rules (screens/quiz.js: BCV.screens.quiz.logic) and its sources: Canvas's quiz
+  // submission API for every action, and Canvas's own take page for a quiz set to one question at a time
+  // (quiz-page.js), which the API will not list. The attempt is held here between the app's calls, and
+  // found again from Canvas (the open attempt resumed) should the page have been reloaded in between.
+  const openQuizzes = new Map(); // "course:quiz" → the quiz and its attempt as this page holds them
+  async function quizRules() {
+    if (!BCV.screens?.quiz?.logic || !BCV.quizPage) await BCV.lazy?.load?.('quiz');
+    const L = BCV.screens?.quiz?.logic;
+    if (!L || !BCV.quizPage) throw new Error('The quiz could not be opened here.');
+    return L;
+  }
+  // the access code, for the whole attempt (Canvas wants it on every save): kept for this page under the web screen's own key
+  const codeKey = (qid) => `bcv:qzcode:${qid}`;
+  const rememberedCode = (qid) => { try { return sessionStorage.getItem(codeKey(qid)) || ''; } catch { return ''; } };
+  const rememberCode = (qid, code) => { try { if (code) sessionStorage.setItem(codeKey(qid), code); else sessionStorage.removeItem(codeKey(qid)); } catch { /* fine without */ } };
+  const codeOf = (Q) => (Q.code || '').trim() || rememberedCode(Q.qid);
+  const codeRefused = (e) => /access code/i.test(String(e?.message || ''));
+  /** The quiz, its attempts and its rules, read afresh (`fresh`) or as held. */
+  async function quizOf(course, id, { fresh = false } = {}) {
+    const cid = String(course || ''), qid = String(id || '');
+    if (!/^\d+$/.test(cid) || !qid) throw new Error('That quiz could not be found.');
+    const key = `${cid}:${qid}`;
+    let Q = openQuizzes.get(key);
+    if (Q && !fresh) return Q;
+    const [info, quiz, subs] = await Promise.all([contextInfo(ctxOf(`courses/${cid}`)), store.quiz(cid, qid, { force: true }).catch(() => null), store.quizSubmissions(cid, qid, { force: true }).catch(() => [])]);
+    if (!quiz) throw new Error('This quiz could not be loaded.');
+    const asub = quiz.assignment_id ? await store.submission(cid, quiz.assignment_id, { force: fresh }).catch(() => null) : null;
+    const L = await quizRules();
+    Q = Object.assign(Q || { cid, qid, url: `/courses/${cid}/quizzes/${qid}`, questions: [], files: {}, chain: Promise.resolve(), inflight: new Set(), page: null, idx: 0, code: '' }, {
+      info, quiz, subs: subs || [], held: L.heldBack(asub), limit: store.quizAttemptLimit(quiz, subs || []),
+    });
+    if (!Q.sub || Q.sub.workflow_state !== 'untaken') Q.sub = (subs || []).find((s) => s.workflow_state === 'untaken') || null;
+    Q.paged = !!quiz.one_question_at_a_time || !!Q.paged;
+    openQuizzes.set(key, Q);
+    return Q;
+  }
+  const isSurvey = (quiz) => /survey/.test(quiz.quiz_type || '');
+  const finishedSub = (s) => !!s && (s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
+  const latestFinished = (Q) => [...Q.subs, ...(Q.done && finishedSub(Q.done) ? [Q.done] : [])].filter(finishedSub).sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
+  /** Why an attempt's results are kept back (a sentence), or null when Canvas shows them (the web screen's rule). */
+  function resultsHidden(L, Q, sub) {
+    const { quiz, limit } = Q;
+    if (quiz.hide_results === 'always') return 'Your instructor has hidden the results for this quiz.';
+    if (quiz.hide_results === 'until_after_last_attempt' && limit.allowed !== null && limit.left > 0) return `Results show after your last attempt — ${U.plural(limit.left, 'attempt')} left.`;
+    if (Q.held) return L.HELD_LINE;
+    if (sub && sub.workflow_state === 'untaken') return 'This attempt is still open.';
+    return null;
+  }
+  /** Before an attempt: what the quiz is, its rules as lines, and whether (and how) it can be begun. */
+  async function quizIntro({ course, quiz: id } = {}) {
+    const L = await quizRules();
+    const Q = await quizOf(course, id, { fresh: true });
+    const { quiz, limit } = Q;
+    const timed = !!quiz.time_limit;
+    const noBack = !!quiz.cant_go_back;
+    const survey = isSurvey(quiz), gradedSurvey = quiz.quiz_type === 'graded_survey';
+    const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${store.fmtPts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` : 'Ungraded';
+    const needsCode = !!(quiz.access_code || quiz.has_access_code || Q.needsCode);
+    const lockdown = !!quiz.require_lockdown_browser;
+    const rules = [
+      noBack ? ['lock.fill', 'orange', 'Each question is sealed once you leave it: an answer cannot be changed and you cannot go back.'] : null,
+      survey ? ['checkmark.circle.fill', 'green', 'A survey has no right answers. Your responses save as you go, and you can leave and come back.'] : ['checkmark.circle.fill', 'green', 'Answers save as you pick them. You can leave and come back.'],
+      quiz.anonymous_submissions ? ['person.2.fill', 'gray', 'Your responses are anonymous.'] : null,
+      timed ? ['timer', 'orange', `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
+      quiz.one_question_at_a_time ? ['rectangle.portrait', 'gray', noBack ? 'One question at a time, with no going back.' : 'One question at a time.'] : null,
+      limit.allowed !== null ? ['bolt.fill', 'gray', limit.left > 0 ? `${U.plural(limit.left, 'attempt')} left of ${limit.allowed}.` : `No attempts left — this quiz allows ${U.plural(limit.allowed, 'attempt')}.`] : ['bolt.fill', 'gray', 'Unlimited attempts.'],
+      quiz.lock_at ? ['calendar.badge.clock', 'gray', `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
+      needsCode ? ['key.fill', 'orange', 'This quiz needs an access code from your instructor.'] : null,
+      quiz.ip_filter ? ['network', 'orange', 'This quiz can only be taken from an allowed network, such as the classroom or campus.'] : null,
+      lockdown ? ['lock.shield.fill', 'orange', 'This quiz needs Respondus LockDown Browser. Open Canvas in that browser to take it.'] : null,
+    ].filter(Boolean).map(([symbol, tint, text]) => ({ symbol, tint, text }));
+    const canStart = !quiz.locked_for_user && !lockdown && (limit.left === null || limit.left > 0 || !!Q.sub);
+    const last = latestFinished(Q);
+    const lastHidden = last ? resultsHidden(L, Q, last) : null;
+    const lastScore = last && !survey && !lastHidden && last.workflow_state !== 'pending_review' && (last.kept_score ?? last.score) !== null && (last.kept_score ?? last.score) !== undefined ? `${store.fmtPts(last.kept_score ?? last.score)} / ${store.fmtPts(quiz.points_possible || 0)}` : null;
+    return {
+      title: quiz.title || 'Quiz', context: Q.info.title, color: Q.info.color,
+      facts: [U.plural(quiz.question_count || 0, 'question'), survey ? (gradedSurvey ? `${pts} for taking part` : 'Not graded') : pts, quiz.due_at ? `Due ${U.fmtAtUpper(quiz.due_at)}` : 'No due date'],
+      html: clean(quiz.description || ''), rules, needsCode, code: needsCode ? codeOf(Q) : '',
+      canStart, survey, timed, timeLimit: quiz.time_limit || null, oneAtATime: !!quiz.one_question_at_a_time, noBack,
+      begin: canStart ? (Q.sub ? (survey ? 'Continue Survey' : 'Continue Attempt') : (survey ? 'Begin Survey' : 'Begin Attempt')) : lockdown ? 'Needs LockDown Browser' : quiz.locked_for_user ? 'Locked' : 'No Attempts Left',
+      note: Q.sub ? `Started ${U.fmtAtUpper(Q.sub.started_at)} · attempt ${Q.sub.attempt}` : limit.allowed !== null ? (limit.left > 0 ? `Attempt ${limit.used + 1} of ${limit.allowed}` : `${U.plural(limit.used, 'attempt')} used of ${limit.allowed}`) : 'Nothing is submitted until you say so.',
+      lockText: quiz.locked_for_user ? (textOf(quiz.lock_explanation || '', 200) || 'This quiz is locked.') : '',
+      last: last ? { attempt: Number(last.attempt) || 1, score: lastScore, feedback: !survey && !lastHidden, why: lastHidden || '' } : null,
+      takeUrl: `${Q.url}/take?bcv=native`,
+    };
+  }
+  // a blank's place in the question's words: a numbered mark, the same number its field wears
+  const BLANK_MARK = 'display:inline-block;min-width:1.5em;padding:0 .35em;margin:0 .12em;border-radius:.5em;background:rgba(10,132,255,.16);color:#0a84ff;font-weight:600;text-align:center;line-height:1.4';
+  /** A question's words for the app: Canvas's own HTML, cleaned, with each blank (a field Canvas's page wrote
+   *  into the sentence, or the [name] the API writes) shown as its numbered mark (the web screen's weave). */
+  function questionHtml(L, q, blanks) {
+    const raw = String(q.question_text || '');
+    if (!raw.trim()) return q.question_name ? `<p>${esc(q.question_name)}</p>` : '';
+    if (!blanks.length) return clean(raw);
+    const doc = new DOMParser().parseFromString(`<div id="x">${raw}</div>`, 'text/html');
+    const root = doc.getElementById('x');
+    const num = new Map(blanks.map((b, i) => [b, i + 1]));
+    const ids = new Map(blanks.map((b) => [b, new Set((q.answers || []).filter((a) => String(a.blank_id) === b).map((a) => String(a.id)))]));
+    const used = new Set();
+    const free = () => blanks.filter((b) => !used.has(b));
+    const mark = (b) => { const s = doc.createElement('span'); s.setAttribute('style', BLANK_MARK); s.textContent = b ? String(num.get(b)) : '?'; return s; };
+    const head = `question_${q.id}_`;
+    for (const w of [...root.querySelectorAll(`select[name^="${head}"], input[name^="${head}"], textarea[name^="${head}"], select.question_input, input.question_input`)]) {
+      let b = null;
+      if (w.tagName === 'SELECT') { const vals = [...w.options].map((o) => String(o.value)).filter(Boolean); b = vals.length ? free().find((x) => vals.every((v) => ids.get(x).has(v))) || null : null; }
+      if (!b) { const tail = (w.getAttribute('name') || '').replace(head, ''); if (num.has(tail) && !used.has(tail)) b = tail; }
+      if (!b) b = free()[0] || null;
+      if (b) used.add(b);
+      w.replaceWith(mark(b));
+    }
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const hits = [];
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) if (/\[[^\]\s]+\]/.test(t.nodeValue)) hits.push(t);
+    for (const t of hits) {
+      const frag = doc.createDocumentFragment();
+      const re = /\[([^\]\s]+)\]/g;
+      let last = 0;
+      for (let m = re.exec(t.nodeValue); m; m = re.exec(t.nodeValue)) {
+        if (!num.has(m[1])) continue;
+        frag.append(t.nodeValue.slice(last, m.index), mark(m[1]));
+        last = m.index + m[0].length;
+      }
+      if (last) { frag.append(t.nodeValue.slice(last)); t.replaceWith(frag); }
+    }
+    return clean(root.innerHTML);
+  }
+  const kindOfQ = (L, q) => {
+    const t = q.question_type;
+    if (q.loaded === false) return 'pending';
+    return L.CHOICE.has(t) ? 'choice' : L.MULTI.has(t) ? 'multi' : t === 'essay_question' ? 'essay' : L.NUMERIC.has(t) ? 'number' : L.TEXT.has(t) ? 'text'
+      : L.MATCH.has(t) ? 'match' : L.DROPS.has(t) ? 'drops' : L.BLANKS.has(t) ? 'blanks' : L.FILE.has(t) ? 'file' : L.INFO.has(t) ? 'info' : 'other';
+  };
+  const optOf = (a, j) => ({ id: String(a.id), letter: L_LETTERS[j] || String(j + 1), text: String(a.text || a.left || '').trim(), html: String(a.html || '').trim() ? clean(a.html) : '' });
+  const L_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  /** One question as the app draws it, with its answer as picked. */
+  function questionOut(L, Q, q, k) {
+    const kind = kindOfQ(L, q);
+    const blanks = L.BLANKS.has(q.question_type) ? L.blanksOf(q).map(String) : [];
+    const a = q.answer;
+    const out = {
+      id: String(q.id), n: k + 1, kind, type: q.question_type || '', name: q.question_name || '', html: kind === 'pending' ? '' : questionHtml(L, q, blanks),
+      plain: textOf(L.noFields(q.question_text || '', q) || '', 160) || q.question_name || `Question ${k + 1}`, // (the review's line)
+      points: L.hasNum(q.points_possible) ? Number(q.points_possible) : null, flagged: !!q.flagged, answered: L.isAnswered(q), loaded: q.loaded !== false,
+      options: [], matches: [], blanks: [], hint: '',
+      pick: null, picks: [], text: '', map: {}, files: [],
+    };
+    if (kind === 'choice' || kind === 'multi' || kind === 'match') out.options = (q.answers || []).map(optOf);
+    if (kind === 'match') out.matches = (q.matches || []).filter((m) => L.hasId(m.match_id)).map((m) => ({ id: String(m.match_id), text: String(m.text || '').trim() || textOf(m.html || '', 120) }));
+    if (blanks.length) {
+      out.blanks = blanks.map((b, i) => ({ id: b, n: i + 1, label: /^[0-9a-f]{8,}$/i.test(b) ? `Blank ${i + 1}` : b, options: kind === 'drops' ? (q.answers || []).filter((x) => String(x.blank_id) === b).map((x) => ({ id: String(x.id), text: String(x.text || '').trim() || textOf(x.html || '', 120) })) : [] }));
+    }
+    if (q.question_type === 'calculated_question' && q.formula_decimal_places !== null && q.formula_decimal_places !== '' && Number.isInteger(Number(q.formula_decimal_places))) {
+      const p = Number(q.formula_decimal_places);
+      out.hint = p ? `Give the answer to ${p} decimal ${p === 1 ? 'place' : 'places'}.` : 'Give the answer as a whole number.';
+    }
+    if (kind === 'choice') out.pick = a !== null && a !== undefined && a !== '' ? String(a) : null;
+    else if (kind === 'multi') out.picks = (Array.isArray(a) ? a : []).map(String);
+    else if (kind === 'essay') out.text = a === null || a === undefined ? '' : L.looksHtml(a) ? L.htmlToPlain(a) : String(a);
+    else if (kind === 'text' || kind === 'number') out.text = a === null || a === undefined ? '' : String(a);
+    else if (kind === 'match') out.map = Object.fromEntries(L.pairsOf(a).map((p) => [String(p.answer_id), String(p.match_id)]));
+    else if (kind === 'drops' || kind === 'blanks') out.map = Object.fromEntries(Object.entries(L.filledOf(a)).map(([b, v]) => [String(b), String(v)]));
+    else if (kind === 'file') out.files = (Array.isArray(a) ? a : []).filter(L.hasId).map((x) => ({ id: String(x), name: Q.files[String(x)] || `File ${x}` }));
+    return out;
+  }
+  /** The attempt as the app draws it: every question, where it stands, the clock, and how it moves. */
+  function attemptOut(L, Q) {
+    const { quiz, sub } = Q;
+    const f = Q.page?.form || {};
+    return {
+      title: quiz.title || 'Quiz', context: Q.info.title, color: Q.info.color, attempt: Number(sub?.attempt) || 1,
+      paged: !!Q.paged, noBack: !!quiz.cant_go_back, survey: isSurvey(quiz), html: clean(quiz.description || ''),
+      timed: !!quiz.time_limit, endAt: quiz.time_limit && sub?.end_at ? sub.end_at : null, startedAt: sub?.started_at || null,
+      idx: Math.max(0, Math.min(Q.idx || 0, Q.questions.length - 1)),
+      canPrev: Q.paged ? !!f.prevAction || Q.idx > 0 : true, last: Q.paged ? !f.nextAction : null,
+      questions: Q.questions.map((q, k) => questionOut(L, Q, q, k)),
+      takeUrl: `${Q.url}/take?bcv=native`,
+    };
+  }
+  /** A page of Canvas's take page folded into the attempt (the web screen's applyPage). */
+  function foldPage(L, Q, pg) {
+    if (!pg.ok || !pg.questions.length) throw BCV.quizPage.notShown(pg);
+    Q.page = pg;
+    const known = new Map(Q.questions.map((q) => [String(q.id), q]));
+    const shown = new Map(pg.questions.map((q) => [String(q.id), q]));
+    const spine = pg.list.length ? pg.list : pg.questions.map((q) => ({ id: q.id, name: q.question_name, answered: L.answered(q.answer), flagged: q.flagged, textOnly: q.question_type === 'text_only_question' }));
+    Q.questions = spine.map((e, k) => {
+      const full = shown.get(String(e.id));
+      if (full) return L.tidy({ ...full, position: k + 1 });
+      const old = known.get(String(e.id));
+      if (old && old.loaded !== false) return { ...old, position: k + 1, flagged: !!e.flagged };
+      return { id: String(e.id), position: k + 1, question_name: e.name, question_type: e.textOnly ? 'text_only_question' : 'unknown_question', question_text: '', answers: [], answer: null, answered: !!e.answered, flagged: !!e.flagged, loaded: false };
+    });
+    const at = Q.questions.findIndex((q) => String(q.id) === String(pg.questions[0].id));
+    Q.idx = at >= 0 ? at : 0;
+  }
+  /** The attempt's questions read in (the API's list, or Canvas's take page for a one-at-a-time quiz), with each one's points. */
+  async function readQuestions(L, Q) {
+    if (!Q.paged) {
+      try {
+        Q.questions = (await store.quizApi.questions(Q.sub)).map(L.tidy);
+      } catch (e) {
+        if (!/one question at a time/i.test(e.message || '')) throw e;
+        Q.paged = true; // (the quiz did not say so, but Canvas did)
+      }
+    }
+    if (Q.paged) { foldPage(L, Q, await BCV.quizPage.fetchPage(Q.url, { accessCode: codeOf(Q) })); return; }
+    for (const q of Q.questions) q.flagged = !!q.flagged;
+    Q.idx = Q.quiz.cant_go_back ? Math.max(0, Q.questions.findIndex((q) => !L.isAnswered(q))) : 0;
+    // the points each is worth: Canvas's API keeps them from a student, its take page shows them
+    if (Q.questions.some((q) => !L.hasNum(q.points_possible))) {
+      const pg = await BCV.quizPage.fetchPage(Q.url, { accessCode: codeOf(Q) }).catch(() => null);
+      if (pg?.ok) {
+        const pts = new Map(pg.questions.filter((q) => L.hasNum(q.points_possible)).map((q) => [String(q.id), Number(q.points_possible)]));
+        for (const q of Q.questions) if (!L.hasNum(q.points_possible) && pts.has(String(q.id))) q.points_possible = pts.get(String(q.id));
+      }
+    }
+  }
+  /** The attempt open now, its questions read: the one held, or Canvas's open one resumed (the page reloaded between calls). */
+  async function openAttempt(course, id) {
+    const L = await quizRules();
+    let Q = await quizOf(course, id);
+    if (!Q.sub) Q = await quizOf(course, id, { fresh: true });
+    if (!Q.sub) throw new Error('This attempt is no longer open.');
+    if (!Q.questions.length) await readQuestions(L, Q);
+    return { L, Q };
+  }
+  /** Begin (or resume) the attempt: with the access code where the quiz wants one. A refusal for the code or the
+   *  network comes back as words for the screen (needsCode), not an error. */
+  async function quizBegin({ course, quiz: id, code = '' } = {}) {
+    const L = await quizRules();
+    const Q = await quizOf(course, id, { fresh: true });
+    const typed = String(code || '').trim();
+    if (typed) Q.code = typed;
+    const needsCode = !!(Q.quiz.access_code || Q.quiz.has_access_code || Q.needsCode);
+    if (needsCode && !codeOf(Q)) return { needsCode: true, refused: 'Enter the access code first.' };
+    try {
+      Q.sub = await store.quizApi.start(Q.cid, Q.qid, codeOf(Q));
+    } catch (e) {
+      const msg = String(e?.message || '');
+      if (codeRefused(e)) { Q.needsCode = true; return { needsCode: true, refused: codeOf(Q) ? 'That access code was refused. Check it with your instructor.' : 'This quiz needs an access code. Enter it, then begin.' }; }
+      if (/ip address|ip filter|from your (ip|location|network)/i.test(msg)) return { refused: 'Canvas only allows this quiz from certain networks (an IP filter). Try from the classroom or campus network.' };
+      throw e;
+    }
+    if (codeOf(Q)) rememberCode(Q.qid, codeOf(Q));
+    Q.questions = [];
+    Q.page = null;
+    await readQuestions(L, Q);
+    return { attempt: attemptOut(L, Q) };
+  }
+  /** The attempt as it stands (the screen opened again on an attempt in progress). */
+  async function quizAttempt({ course, quiz: id } = {}) {
+    const { L, Q } = await openAttempt(course, id);
+    return attemptOut(L, Q);
+  }
+  /** Every write about the attempt goes up one at a time, in order: Canvas rewrites the attempt's whole record on each. */
+  const inTurn = (Q, fn) => { const run = Q.chain.then(fn); Q.chain = run.catch(() => {}); Q.inflight.add(run); run.catch(() => {}).finally(() => Q.inflight.delete(run)); return run; };
+  const settledQuiz = async (Q) => { if (Q.inflight.size) await Promise.allSettled([...Q.inflight]); };
+  /** What the app sends for an answer, as Canvas takes it (ids as whole numbers; an essay as Canvas's HTML). */
+  function toCanvasAnswer(L, q, v = {}) {
+    const t = q.question_type;
+    if (L.CHOICE.has(t)) return L.hasId(v.pick) ? L.whole(v.pick) : null;
+    if (L.MULTI.has(t)) return (Array.isArray(v.picks) ? v.picks : []).filter(L.hasId).map(L.whole);
+    if (t === 'essay_question') { const s = String(v.text ?? ''); return L.looksHtml(q.answer) || /\n/.test(s) || /^\s*([•\-*]|\d+[.)])\s+/.test(s) ? L.plainToHtml(s) : s; }
+    if (L.NUMERIC.has(t)) { const s = String(v.text ?? '').trim().replace(/^([-+]?\d*),(\d+)$/, '$1.$2'); return s === '' ? '' : Number.isFinite(Number(s)) ? Number(s) : s; }
+    if (L.TEXT.has(t)) return String(v.text ?? '');
+    if (L.MATCH.has(t)) return Object.entries(v.map || {}).map(([aid, mid]) => ({ answer_id: L.whole(aid), match_id: L.whole(mid) })).filter((p) => Number.isInteger(p.answer_id) && Number.isInteger(p.match_id));
+    if (L.BLANKS.has(t)) {
+      const out = {};
+      for (const [b, x] of Object.entries(v.map || {})) { const s = String(x ?? '').trim(); if (s) out[b] = L.DROPS.has(t) ? L.whole(s) : s; }
+      return out;
+    }
+    if (L.FILE.has(t)) return (Array.isArray(v.files) ? v.files : []).map((f) => (f && typeof f === 'object' ? f.id : f)).filter(L.hasId).map(L.whole);
+    return null;
+  }
+  async function saveQuizAnswer(Q, q, answer) {
+    q.answer = answer;
+    await inTurn(Q, () => store.quizApi.answer(Q.sub, q.id, answer, codeOf(Q)));
+  }
+  const counted = (L, Q) => ({ answered: Q.questions.filter(L.isAnswered).length, total: Q.questions.length });
+  /** One answer saved (`code`: the access code, given when Canvas asked for it). Refused for the code: needsCode. */
+  async function quizAnswer({ course, quiz: id, question, value = {}, code = '' } = {}) {
+    const { L, Q } = await openAttempt(course, id);
+    const q = Q.questions.find((x) => String(x.id) === String(question));
+    if (!q) throw new Error('That question is not in this attempt.');
+    if (String(code || '').trim()) Q.code = String(code).trim();
+    try {
+      await saveQuizAnswer(Q, q, toCanvasAnswer(L, q, value));
+    } catch (e) {
+      if (codeRefused(e)) return { ok: false, needsCode: true };
+      throw e;
+    }
+    if (String(code || '').trim()) rememberCode(Q.qid, Q.code);
+    return { ok: true, done: L.isAnswered(q), ...counted(L, Q) };
+  }
+  async function quizFlag({ course, quiz: id, question, on = true } = {}) {
+    const { Q } = await openAttempt(course, id);
+    const q = Q.questions.find((x) => String(x.id) === String(question));
+    if (!q) throw new Error('That question is not in this attempt.');
+    await inTurn(Q, () => store.quizApi.flag(Q.sub, q.id, !!on, codeOf(Q)));
+    q.flagged = !!on;
+    return { ok: true, flagged: q.flagged };
+  }
+  /** A file for a file-upload question: the app's pick (base64 here) uploaded to the student's quiz files, the answer set to name it. */
+  async function quizUpload({ course, quiz: id, question, name = 'file', type = '', data = '' } = {}) {
+    const { L, Q } = await openAttempt(course, id);
+    const q = Q.questions.find((x) => String(x.id) === String(question));
+    if (!q) throw new Error('That question is not in this attempt.');
+    const bin = atob(String(data || ''));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const fileId = await store.quizApi.uploadFile(Q.cid, Q.qid, new File([bytes], name || 'file', { type: type || 'application/octet-stream' }));
+    Q.files[String(fileId)] = name;
+    try {
+      await saveQuizAnswer(Q, q, [L.whole(fileId)]);
+    } catch (e) {
+      if (codeRefused(e)) return { ok: false, needsCode: true };
+      throw e;
+    }
+    return { ok: true, file: { id: String(fileId), name }, ...counted(L, Q) };
+  }
+  /** A move on a one-at-a-time attempt, made through Canvas's own page: Next and Previous post its record-answer
+   *  form (which is what "no going back" rests on); a question by id fetches its page. */
+  async function quizGo({ course, quiz: id, move = 'next', question = null } = {}) {
+    const { L, Q } = await openAttempt(course, id);
+    if (!Q.paged) { if (question) Q.idx = Math.max(0, Q.questions.findIndex((q) => String(q.id) === String(question))); return attemptOut(L, Q); }
+    await settledQuiz(Q);
+    const f = Q.page?.form || {};
+    const fields = { attempt: f.attempt ?? Q.sub.attempt, validation_token: f.validationToken || Q.sub.validation_token, last_question_id: f.lastQuestionId || Q.questions[Q.idx]?.id || null };
+    const prevId = Q.questions[Q.idx - 1]?.id || null;
+    const pg = move === 'next' && f.nextAction ? await BCV.quizPage.advance(f.nextAction, fields)
+      : move === 'prev' && f.prevAction ? await BCV.quizPage.advance(f.prevAction, fields)
+      : await BCV.quizPage.fetchPage(Q.url, { questionId: question || (move === 'prev' ? prevId : null), accessCode: codeOf(Q) });
+    foldPage(L, Q, pg);
+    return attemptOut(L, Q);
+  }
+  /** The answers Canvas holds for the attempt now, by question id (null when it cannot say: a one-at-a-time quiz). */
+  async function answersOnCanvas(L, Q) {
+    if (Q.paged) return null;
+    const list = await store.quizApi.questions(Q.sub).catch(() => null);
+    return list ? new Map(list.map((q) => [String(q.id), L.tidy({ ...q }).answer])) : null;
+  }
+  /** Hand the attempt in. First every answer given here is on Canvas: one it does not hold is sent again, and one that
+   *  will not stay comes back (missing, by number) for the student to decide — `force` hands it in all the same. */
+  async function quizSubmit({ course, quiz: id, force = false } = {}) {
+    const { L, Q } = await openAttempt(course, id);
+    await settledQuiz(Q);
+    if (!force) {
+      let held = await answersOnCanvas(L, Q);
+      if (held) {
+        const want = Q.questions.filter((q) => !L.INFO.has(q.question_type) && L.answered(q.answer));
+        const off = want.filter((q) => L.canon(held.get(String(q.id))) !== L.canon(q.answer));
+        for (const q of off) await inTurn(Q, () => store.quizApi.answer(Q.sub, q.id, q.answer, codeOf(Q))).catch(() => {});
+        if (off.length) held = await answersOnCanvas(L, Q);
+        const missing = held ? want.filter((q) => !L.answered(held.get(String(q.id)))) : [];
+        if (missing.length) return { ok: false, missing: missing.map((q) => Q.questions.indexOf(q) + 1) };
+      }
+    }
+    const done = await store.quizApi.complete(Q.cid, Q.qid, Q.sub, codeOf(Q));
+    const answeredNow = counted(L, Q);
+    const survey = isSurvey(Q.quiz), gradedSurvey = Q.quiz.quiz_type === 'graded_survey';
+    Q.done = done || { ...Q.sub, workflow_state: 'complete', finished_at: new Date().toISOString() };
+    Q.sub = null;
+    Q.questions = [];
+    Q.page = null;
+    const fresh = await quizOf(Q.cid, Q.qid, { fresh: true }).catch(() => Q); // (attempts left, and a grade held back, read again)
+    const d = fresh.done || Q.done;
+    const scoreVisible = !survey && !Q.quiz.hide_results && !fresh.held && d.score !== null && d.score !== undefined && d.workflow_state !== 'pending_review';
+    app()?.refreshCounts?.();
+    store.todoWindow?.({ force: true }).catch?.(() => {});
+    return {
+      ok: true, survey, title: survey ? 'Responses Recorded' : 'Attempt Submitted', attempt: Number(d.attempt) || 1,
+      lead: `${Q.quiz.title} · submitted ${U.fmtAtUpper(d.finished_at || new Date())}. ${survey ? (gradedSurvey ? 'Thanks for taking part — the points for it post to your grades.' : 'Thanks for taking part.') : scoreVisible ? '' : 'Your score posts once your instructor releases it.'}`.trim(),
+      answered: `${answeredNow.answered} of ${answeredNow.total}`,
+      score: scoreVisible ? `${store.fmtPts(d.kept_score ?? d.score)} / ${store.fmtPts(Q.quiz.points_possible || 0)}` : null,
+      takingPart: gradedSurvey && Q.quiz.points_possible ? `${store.fmtPts(Q.quiz.points_possible)} ${Number(Q.quiz.points_possible) === 1 ? 'point' : 'points'}` : null,
+      feedback: scoreVisible && !resultsHidden(L, fresh, d),
+    };
+  }
+  const partsOut = (parts) => (parts || []).map((p) => ({ text: String(p.text || '').trim(), html: String(p.html || '').trim() && !String(p.text || '').trim() ? clean(p.html) : '', block: !!p.block }));
+  const VERDICT_WORD = { right: 'Correct', wrong: 'Incorrect', partial: 'Partly Right', none: 'Not Marked Yet' };
+  /** A finished attempt, question by question (the web screen's feedback): what you answered, the correct answer
+   *  where the quiz shows it, every option, the worked solution, the instructor's comments. */
+  async function quizFeedback({ course, quiz: id, attempt = null } = {}) {
+    const L = await quizRules();
+    const Q = await quizOf(course, id, { fresh: true });
+    const { quiz, cid, qid } = Q;
+    const finished = Q.subs.filter(finishedSub);
+    const n = Number(attempt);
+    let sub = (n > 0 && finished.find((s) => Number(s.attempt) === n)) || null;
+    if (!sub && n > 0 && Q.subs[0]) sub = { ...Q.subs[0], attempt: n, workflow_state: 'complete', finished_at: null, score: null, kept_score: null }; // (an earlier attempt, read through the same submission)
+    if (!sub) sub = latestFinished(Q);
+    if (!sub) return { hidden: 'No finished attempts yet — feedback appears here once one is submitted.' };
+    const hidden = resultsHidden(L, Q, sub);
+    if (hidden) return { hidden };
+    const live = Q.subs[0];
+    const older = !!live && Number(sub.attempt) !== Number(live.attempt);
+    const [qs, asub, page] = await Promise.all([
+      store.quizApi.questions(sub, { courseId: cid, quizId: qid }),
+      quiz.assignment_id ? store.submission(cid, quiz.assignment_id, { force: true }).catch(() => null) : Promise.resolve(null),
+      BCV.quizPage.results(cid, qid, sub).catch(() => null),
+    ]);
+    if (L.heldBack(asub)) return { hidden: L.HELD_LINE };
+    const me = String(store.env().current_user_id || '');
+    const comments = (asub?.submission_comments || []).filter((c) => !me || String(c.author_id ?? '') !== me).map((c) => ({ author: c.author_name || c.author?.display_name || 'Instructor', text: c.comment || '' }));
+    const hist = (asub?.submission_history || []).find((x) => Number(x.attempt) === Number(sub.attempt)) || null;
+    const graded = new Map((hist?.submission_data || []).map((d) => [String(d.question_id), d]));
+    const now = Date.now();
+    const correctVisible = !!quiz.show_correct_answers && !(quiz.show_correct_answers_at && U.parse(quiz.show_correct_answers_at) > now) && !(quiz.hide_correct_answers_at && U.parse(quiz.hide_correct_answers_at) < now) && !(quiz.show_correct_answers_last_attempt && Q.limit.allowed !== null && Q.limit.left > 0);
+    const rows = qs.map(L.tidy).map((q, k) => {
+      const d = graded.get(String(q.id)) || null;
+      const pq = page?.get(String(q.id)) || null;
+      if (d && (older || !L.answered(q.answer))) q.answer = L.histAnswer(q, d);
+      const flag = older && d ? L.parseCorrect(d.correct) : (L.parseCorrect(q.correct) ?? (d ? L.parseCorrect(d.correct) : null));
+      const possible = L.hasNum(q.points_possible) ? Number(q.points_possible) : L.hasNum(pq?.possible) ? Number(pq.possible) : null;
+      const pts = d && L.hasNum(d.points) ? Number(d.points) : null;
+      const correct = pts !== null && possible > 0 && (flag !== null || pts > 0) ? (pts >= possible - 1e-9 ? true : pts > 0 ? 'partial' : false) : flag;
+      const earned = pts !== null ? pts : correct === true ? possible : correct === false ? 0 : null;
+      const rightIds = new Set([...(q.answers || []).filter((a) => Number(a.weight) === 100).map((a) => String(a.id)), ...(pq?.right || []).map((x) => String(x.id))]);
+      return { q, k, correct, possible, earned, rightIds, shown: correctVisible || !!pq?.shown, match: pq?.match || null, sol: L.fbSolution(q, correct === true) || (pq?.comment ? { html: pq.comment } : null), read: !!pq, right: L.fbRight(q) || L.pageRight(q, pq) };
+    }).filter((r) => !L.INFO.has(r.q.question_type));
+    const verdictOf = (r) => (r.correct === true ? 'right' : r.correct === false ? 'wrong' : r.correct === 'partial' ? 'partial' : 'none');
+    const out = rows.map((r) => {
+      const q = r.q;
+      const v = verdictOf(r);
+      const reveal = v !== 'right' && r.correct !== null && r.shown;
+      const yours = L.answerParts(q, Q.files);
+      const worth = r.possible !== null ? `${store.fmtPts(r.possible)} pts` : '';
+      let match = null;
+      if (L.MATCH.has(q.question_type) && (q.answers || []).length) {
+        const set = new Map(L.pairsOf(q.answer).map((p) => [String(p.answer_id), String(p.match_id)]));
+        const nameOf = (mid) => (q.matches || []).find((m) => String(m.match_id) === String(mid))?.text ?? null;
+        const mrows = (q.answers || []).map((a) => {
+          const mid = set.get(String(a.id));
+          const mine = mid === undefined ? null : (nameOf(mid) ?? mid);
+          const pr = r.match?.get(String(a.id)) || null;
+          const right = reveal ? (String(a.right || '').trim() || (L.hasId(a.match_id) ? nameOf(a.match_id) : null) || pr?.right || (pr?.ok === true ? mine : null)) : null;
+          return { left: String(a.text || a.left || '').trim() || textOf(a.html || '', 120) || '—', mine, right, ok: pr?.ok ?? null };
+        });
+        const showRight = mrows.some((x) => x.right !== null);
+        match = { showRight, rows: mrows.map((x) => ({ left: x.left, mine: x.mine === null ? null : String(x.mine), right: showRight && x.right !== null ? String(x.right) : null, ok: !showRight ? null : x.ok !== null ? x.ok : x.right !== null && x.mine !== null ? String(x.mine).trim() === String(x.right).trim() : x.mine === null ? false : null })) };
+      }
+      const opts = (L.CHOICE.has(q.question_type) || L.MULTI.has(q.question_type)) && (q.answers || []).length ? (() => {
+        const a = q.answer;
+        const mine = new Set((Array.isArray(a) ? a : L.answered(a) ? [a] : []).map(String));
+        const marksRight = r.shown && r.correct !== null;
+        return (q.answers || []).map((o, j) => ({ ...optOf(o, j), mine: mine.has(String(o.id)), right: marksRight && r.rightIds.has(String(o.id)) }));
+      })() : null;
+      return {
+        n: r.k + 1, verdict: v, verdictText: VERDICT_WORD[v],
+        score: r.earned !== null ? (r.possible !== null ? `${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)}` : `${store.fmtPts(r.earned)} ${Number(r.earned) === 1 ? 'pt' : 'pts'}`) : v === 'partial' ? (worth ? `Partial · ${worth}` : 'Partial') : worth,
+        html: clean(L.noFields(q.question_text, q) || '') || (q.question_name ? `<p>${esc(q.question_name)}</p>` : ''),
+        yours: partsOut(yours), essay: !!yours?.some((p) => p.block),
+        right: reveal && r.right?.length && !match ? partsOut(r.right) : [],
+        match, options: opts,
+        solution: r.sol ? (r.sol.html ? { html: clean(r.sol.html), text: '' } : { html: '', text: String(r.sol.text || '') }) : null,
+        noSolution: !r.sol && r.read,
+      };
+    });
+    const released = rows.some((r) => r.correct !== null);
+    const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + (r.possible || 0), 0);
+    const scoreRaw = hist?.score ?? sub.score ?? sub.kept_score;
+    const score = scoreRaw === null || scoreRaw === undefined ? null : Number(scoreRaw);
+    const nRight = out.filter((r) => r.verdict === 'right').length;
+    return {
+      title: quiz.title || 'Quiz', color: Q.info.color, attempt: Number(sub.attempt) || 1,
+      attempts: finished.length > 1 || (Number(live?.attempt) || 0) > 1 ? Array.from({ length: Math.max(...finished.map((s) => Number(s.attempt) || 1), Number(sub.attempt) || 1) }, (_, i) => i + 1) : [],
+      score: score !== null ? store.fmtPts(score) : '—', possible: store.fmtPts(possible), pct: possible > 0 && score !== null ? (score / possible) * 100 : null,
+      summary: `${released ? `${nRight} of ${out.length} correct · ` : ''}${sub.workflow_state === 'pending_review' ? 'awaiting your instructor’s review' : `graded ${U.fmtAtUpper(asub?.graded_at || sub.finished_at || new Date())}`}`,
+      released, comments, rows: out,
+    };
+  }
+
   // One course's grades, with what-if scores (the course Grades screen's model; nothing saved)
   const gradeCache = new Map();
   let gradesRows = null; // the Grades screen's last courses, for the term GPA a what-if score would give
-  async function courseGrades({ id, tried = {}, fresh = false } = {}) {
+  /** `on`: the what-if switch (scores typed in `tried`, by assignment id; '' clears a real one); `added`: what-if
+   *  assignments, { id, groupId, name, possible }, their scores in `tried` too. */
+  async function courseGrades({ id, tried = {}, added = [], on: switchOn = false, fresh = false } = {}) {
     const G = BCV.screens.gpa;
     const key = String(id);
     let entry = gradeCache.get(key);
@@ -929,21 +1429,24 @@
     }
     const wi = {};
     for (const [k, v] of Object.entries(tried && typeof tried === 'object' ? tried : {})) wi[k] = v === null || v === undefined ? '' : String(v);
-    const on = Object.keys(wi).length > 0;
-    const m = store.gradeModel(entry.groups, entry.c, wi, on, false, [], { ownWeights: entry.own });
+    const extra = (Array.isArray(added) ? added : []).filter((x) => x && x.id && x.groupId).map((x) => ({ id: String(x.id), groupId: String(x.groupId), name: String(x.name || 'What-if assignment').slice(0, 120), possible: Math.max(0, Number(x.possible) || 0) }));
+    const on = !!switchOn || Object.keys(wi).length > 0 || extra.length > 0;
+    const m = store.gradeModel(entry.groups, entry.c, wi, on, false, extra, { ownWeights: entry.own });
     const total = m.total === null || m.total === undefined ? null : Number(m.total);
     const canvasLetter = !on && entry.c.grade && !entry.own ? String(entry.c.grade).replace(/-/g, '−') : null;
     const letter = total === null ? null : canvasLetter || G.letterFor(total)[0];
     const legend = new Map((m.legend || []).map((g) => [String(g.id), g]));
     const ungraded = new Map((m.ungraded || []).map((g) => [String(g.id), g]));
+    // each group keeps its own colour while scores are tried (the web screen greys its rings instead)
+    if (!entry.colors) entry.colors = new Map((store.gradeModel(entry.groups, entry.c, {}, false, false, [], { ownWeights: entry.own }).legend || []).map((g) => [String(g.id), g.color]));
     const groups = (entry.groups || []).map((g) => {
       const l = legend.get(String(g.id));
       const u = ungraded.get(String(g.id));
-      return { id: String(g.id), name: g.name || 'Assignments', weightText: l?.weightText || (u?.weightText ? `${u.weightText} of grade` : ''), value: l ? l.value : 'ungraded', pct: l?.pct ?? null, detail: l?.detail || '', color: l?.color || null };
+      return { id: String(g.id), name: g.name || 'Assignments', weightText: l?.weightText || (u?.weightText ? `${u.weightText} of grade` : ''), value: l ? l.value : 'ungraded', pct: l?.pct ?? null, detail: l?.detail || '', color: entry.colors.get(String(g.id)) || l?.color || null };
     });
-    const rows = (m.rows || []).filter((r) => !r.added).map((r) => ({
-      id: String(r.id), name: r.name, groupId: String(r.groupId), possible: Number(r.possible) || 0, earned: r.earned, effective: r.effective, hypothetical: !!r.hypothetical, badge: r.badge || '', dropped: !!r.dropped, grade: r.grade || null, counted: r.counted !== false,
-      dueText: r.due ? `Due ${U.fmtShort(r.due)}` : '', url: `/courses/${key}/assignments/${r.id}`,
+    const rows = (m.rows || []).map((r) => ({
+      id: String(r.id), name: r.name, groupId: String(r.groupId), possible: Number(r.possible) || 0, earned: r.earned, effective: r.effective, hypothetical: !!r.hypothetical, added: !!r.added, badge: r.badge || '', dropped: !!r.dropped, grade: r.grade || null, counted: r.counted !== false,
+      dueText: r.due ? `Due ${U.fmtShort(r.due)}` : '', due: r.due ? (U.parse(r.due)?.toISOString() || null) : null, url: r.added ? null : `/courses/${key}/assignments/${r.id}`,
       scoreText: r.effective === null || r.effective === undefined ? `—/${store.fmtPts(r.possible)}` : `${store.fmtPts(r.effective)}/${store.fmtPts(r.possible)}`,
     }));
     let gpa = null, gpaIf = null;
@@ -1020,7 +1523,8 @@
   }
 
   const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, refresh,
-    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage };
+    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
+    toolLaunch, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];

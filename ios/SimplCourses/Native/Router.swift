@@ -3,8 +3,8 @@ import UIKit
 /// Which Canvas addresses the app draws itself (1.2): a course and what is in it — its home,
 /// announcements, discussions and a discussion, assignments and an assignment, modules, pages and a
 /// page, files, people, quizzes, the syllabus, its grades — a group and what is in it, the list of
-/// groups, and the Inbox. Everything else (a quiz being taken, a file, an external tool, a page of
-/// the interface asked for by name with ?bcv=) stays the web interface's screen.
+/// groups, and the Inbox. A quiz opens in the app's own quiz screen and an external tool in its sheet; everything
+/// else (a file, a page of the interface asked for by name with ?bcv=) stays the web interface's screen.
 extension Engine {
     func nativeRoute(for raw: String, title: String) -> Route? {
         guard let url = absolute(raw), let host = url.host?.lowercased(), host == web.baseURL.host?.lowercased() else { return nil }
@@ -51,6 +51,24 @@ extension Engine {
     }
 
     static func numeric(_ s: String) -> Bool { !s.isEmpty && s.allSatisfy(\.isNumber) }
+
+    /// A course's own external tool (…/courses/1/external_tools/9): opened in the tool sheet, not a screen.
+    func toolLaunch(for raw: String, title: String) -> ToolLaunch? {
+        guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
+        let p = url.path.split(separator: "/").map(String.init)
+        guard p.count == 4, p[0] == "courses", Engine.numeric(p[1]), p[2] == "external_tools", Engine.numeric(p[3]) else { return nil }
+        return .courseTool(course: p[1], id: p[3], title: title.isEmpty ? "Tool" : title)
+    }
+
+    /// A Classic quiz (…/courses/1/quizzes/9, or its take page): the app's own quiz screen, over everything.
+    /// Canvas's own quiz page asked for by name (?bcv=…) stays the web screen.
+    func quizLaunch(for raw: String, title: String) -> QuizLaunch? {
+        guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
+        if let q = url.query, q.contains("bcv=") || q.contains("display=") { return nil }
+        let p = url.path.split(separator: "/").map(String.init)
+        guard p.count == 4 || (p.count == 5 && p[4] == "take"), p[0] == "courses", Engine.numeric(p[1]), p[2] == "quizzes", Engine.numeric(p[3]) else { return nil }
+        return QuizLaunch(course: p[1], quiz: p[3], title: title.isEmpty ? "Quiz" : title)
+    }
 
     /// A course file's own address (…/files/12/download): it opens in the phone's viewer, not a screen.
     static func isDownload(_ url: URL) -> Bool {

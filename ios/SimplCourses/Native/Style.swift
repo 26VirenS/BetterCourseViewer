@@ -82,9 +82,9 @@ extension View {
 
     /// The tab bar shrinks to its active tab as a list scrolls down (iOS 26), as Apple's own apps do.
     @ViewBuilder
-    func minimizingTabBar() -> some View {
+    func minimizingTabBar(_ on: Bool = true) -> some View {
         if #available(iOS 26.0, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
+            self.tabBarMinimizeBehavior(on ? .onScrollDown : .never)
         } else {
             self
         }

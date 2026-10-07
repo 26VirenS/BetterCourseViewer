@@ -63,7 +63,10 @@ struct ContextHome: View {
                     if let more = d.more, !more.isEmpty {
                         Section("More") {
                             ForEach(more) { m in
-                                Button { engine.go(m.url, title: m.label) } label: {
+                                Button {
+                                    if let t = m.tool, d.kind == "courses" { engine.openTool(.courseTool(course: ContextHome.id(of: ctx), id: t, title: m.label)) }
+                                    else { engine.go(m.url, title: m.label) }
+                                } label: {
                                     InfoRow(title: m.label, symbol: m.external == true ? "puzzlepiece.extension" : "link", tint: Color(hex: d.color)) {
                                         Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                                     }
