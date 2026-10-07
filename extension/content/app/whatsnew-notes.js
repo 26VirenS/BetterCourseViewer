@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.3', date: '2026-10-07', notes: [
+      { kind: 'new', title: 'Quizzes on iPhone', body: 'Every question kind, flags, the clock and your feedback.', icon: P.list },
+      { kind: 'new', title: 'Tools open on iPhone', body: 'External tools open in a sheet of their own.', icon: P.tool },
+      { kind: 'new', title: 'iPhone setup', body: 'Pick your courses and goals in a few quick steps.', icon: P.steps },
+      { kind: 'improved', title: 'Rings within rings', body: 'Each course shows its groups; what-if has a switch.', icon: P.eye },
+      { kind: 'improved', title: 'Hand In fits the bar', body: 'As big as the tab bar; the rubric opens in a sheet.', icon: P.clip },
+    ] },
     { version: '2.99.2', date: '2026-10-06', notes: [
       { kind: 'new', title: 'iPhone: courses inside', body: 'Announcements, modules, discussions, Inbox and Groups.', icon: P.layers },
       { kind: 'new', title: 'Hand in on iPhone', body: 'Text, a link, or files from Files and Photos.', icon: P.clip },
