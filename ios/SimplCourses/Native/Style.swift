@@ -70,7 +70,7 @@ extension View {
     @ViewBuilder
     func innerFill<S: ShapeStyle>(_ style: S, radius: CGFloat, minimum: CGFloat = 6) -> some View {
         if #available(iOS 26.0, *) {
-            self.background(style, in: ConcentricRectangle(corners: .concentric(minimum: minimum), isUniform: true))
+            self.background(style, in: ConcentricRectangle(corners: .concentric(minimum: .fixed(minimum)), isUniform: true))
         } else {
             self.background(style, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
@@ -176,7 +176,7 @@ struct ActionSurface: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            let shape = ConcentricRectangle(corners: .concentric(minimum: 22), isUniform: true)
+            let shape = ConcentricRectangle(corners: .concentric(minimum: .fixed(22)), isUniform: true)
             content
                 .glassEffect(prominent ? .regular.tint(tint).interactive() : .regular.interactive(), in: shape)
                 .contentShape(shape)
