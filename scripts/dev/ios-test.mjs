@@ -419,6 +419,19 @@ try {
   const after = await nc('whatsNew', { due: true, peek: true });
   const webNotes = await sp.evaluate(() => !!document.querySelector('.bcv-wn, #bcv-whatsnew, .bcv-whatsnew'));
   check(peek1.releases?.length > 0 && peek2.releases?.length > 0 && peek2.version === manifest.version && seenCall.ok && after.releases?.length === 0 && !webNotes, `What's New for the app's sheet: still due however often it is asked for, seen once the sheet says it is up, and never the page's own notes under the app's screens: ${JSON.stringify({ first: peek1.releases?.map((r) => r.version), second: peek2.releases?.length, seen: seenCall, after: after.releases?.length, webNotes })}`);
+  // (1.4.3) Settings as the phone's own rows: the options page's Grades and Data through the page's calls
+  const si0 = await nc('settingsInfo');
+  const si1 = await nc('settingsSave', { tracking: true, goal: 3.456, whatIf: false });
+  const hi = await nc('historyImport', { text: 'date,term_gpa\n2026-01-12,3.512\n2026-01-13,3.6' });
+  const hi2 = await nc('historyImport', { text: 'date,term_gpa\n2026-01-12,2.0' });
+  const he = await nc('historyExport');
+  const ri = await nc('recordImport', { text: 'course,grade,credits\nMATH 21,A,4\nWRI 10,B,4\nPE 1,P,1', name: 'past.csv' });
+  const rc = await nc('recordClear');
+  const se = await nc('settingsExport');
+  const sBad = await nc('settingsImport', { text: 'not json' });
+  const sGood = await nc('settingsImport', { text: se.text });
+  const si2 = await nc('settingsSave', { tracking: si0.tracking, goal: si0.goal, whatIf: si0.whatIf });
+  check(!si0.error && typeof si0.history === 'string' && typeof si0.recordNote === 'string' && si1.tracking && si1.goal === 3.46 && si1.whatIf === false && !hi.error && /Imported 2 days/.test(hi.message) && hi.info.days >= 2 && /Nothing new/.test(hi2.message) && he.text.split('\n')[0] === 'date,term_gpa' && he.text.includes('2026-01-12,3.512') && !ri.error && /^3\.50 across 2 courses/.test(ri.message) && /1 skipped/.test(ri.message) && /^3\.50 across 2 courses before this term$/.test(ri.info.record) && /past\.csv/.test(ri.info.recordNote) && rc.record === null && rc.tracking && se.name.endsWith('.json') && JSON.parse(se.text).appearance && /not a settings export/.test(sBad.error || '') && sGood.ok && si2.goal === si0.goal && si2.whatIf === si0.whatIf, `Settings in the app: the switches and goal saved and read back, a GPA history imported (a day already here kept) and exported, a record read from a CSV and cleared, the settings exported and imported (a wrong file refused): ${JSON.stringify({ si0, si1: [si1.tracking, si1.goal, si1.whatIf], hi: hi.message || hi.error, hi2: hi2.message, he: he.text?.slice(0, 60), ri: ri.message || ri.error, rec: ri.info?.record, note: ri.info?.recordNote, rc: rc.record, bad: sBad.error, good: sGood })}`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

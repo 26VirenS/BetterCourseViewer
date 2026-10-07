@@ -70,6 +70,8 @@ for mode in light dark; do
   launch "$mode-19b-quiz-review" 26 -SimplOpen quiz:101:9011:review
   launch "$mode-20-tool" 20 -SimplOpen tool:101:9
   launch "$mode-21-setup" 18 -SimplOpen setup
+  # (1.4.3) Settings, all of it the phone's own rows: the look, grades, the record, data
+  launch "$mode-22-settings" 18 -SimplOpen settings
 done
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 collect end

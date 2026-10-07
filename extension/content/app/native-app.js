@@ -107,6 +107,96 @@
     return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done };
   }
 
+  // ---- Simpl's own settings, in the app's Settings (1.4.3) ------------------------------------------------------
+  // What the settings page held that means something on the iPhone, drawn as the phone's own Settings rows: the
+  // grade history and its goal, the record before this term, what-if scores, and the settings themselves
+  // (export, import, reset). The look follows the phone; the interface switch is written by the app itself
+  // (Bridge.swift), so it can be turned back on while this page is off.
+  const dayWords = (iso) => { const d = iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`) : null; return d && !Number.isNaN(+d) ? (U.fmtLong ? U.fmtLong(d) : String(iso)) : ''; };
+  async function settingsInfo() {
+    const [tracking, goal, whatIf, snaps] = await Promise.all([store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('whatIfScores'), store.pref('gpaSnapshots')]);
+    // the options page's own words (options.js paintGrades / paintRecord), so the two read alike
+    const t = tracking && typeof tracking === 'object' && (tracking.since || Number.isFinite(tracking.priorGpa)) ? tracking : null;
+    const list = Array.isArray(snaps) ? snaps : [];
+    const n = list.length;
+    const since = [t?.since, list[0]?.date].filter(Boolean).sort()[0] || null;
+    const has = !!t && Number.isFinite(t.priorGpa) && t.priorCourses > 0;
+    const rec = has && t.record && Array.isArray(t.record.courses) ? t.record : null;
+    return {
+      tracking: !!t, goal: goal !== null && Number.isFinite(Number(goal)) ? Number(goal) : 4, whatIf: whatIf !== false, days: n,
+      history: t ? (n ? `${U.plural(n, 'day')} recorded` : 'Recording from today') : (n ? 'History paused' : 'No history yet'),
+      historyNote: t ? (since ? `Since ${dayWords(since)}` : '') : (n ? 'Existing snapshots kept.' : 'Turn tracking on to keep one snapshot a day.'),
+      record: has ? `${t.priorGpa.toFixed(2)} across ${U.plural(t.priorCourses, 'course')} before this term` : null,
+      recordNote: rec
+        ? `From ${rec.name || 'a CSV'}${Number.isFinite(rec.credits) ? ` · ${rec.credits} credits, so the GPA is credit-weighted` : ' · every course counts equally'}${rec.skipped ? ` · ${U.plural(rec.skipped, 'row')} skipped (no letter grade)` : ''}`
+        : has ? 'Entered by hand on the Grades page. Upload a CSV of your past courses to replace it.'
+          : 'Upload a CSV of your past courses: a header row, then one course a line (course, grade, and credits and term if you have them). Letters, percentages and 4.0 points all read; P/NP, W and the like are skipped.',
+    };
+  }
+  async function settingsSave({ tracking = null, goal = null, whatIf = null } = {}) {
+    if (tracking !== null && tracking !== undefined) {
+      const before = await store.pref('gpaTracking');
+      await store.setPref('gpaTracking', tracking ? (before && typeof before === 'object' ? before : { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) }) : null);
+    }
+    if (goal !== null && goal !== undefined) {
+      const g = Math.max(0, Math.min(4, Number(goal)));
+      if (Number.isFinite(g)) await store.setPref('gpaGoal', +g.toFixed(2));
+    }
+    if (whatIf !== null && whatIf !== undefined) await store.setPref('whatIfScores', !!whatIf);
+    return settingsInfo();
+  }
+  /** A GPA history exported before (date,term_gpa a line; or a term and a GPA): a day already here is kept as it is. */
+  async function historyImport({ text = '' } = {}) {
+    const R = BCV.recordCsv;
+    let rows;
+    try { rows = R.history(String(text)); } catch { throw new Error('That file is not a GPA history: a date (or a term) and a GPA a line.'); }
+    const snaps = await store.pref('gpaSnapshots');
+    const r = R.mergeHistory(Array.isArray(snaps) ? snaps : [], rows);
+    if (r.added) await store.setPref('gpaSnapshots', r.snaps);
+    return { message: r.added ? `Imported ${U.plural(r.added, 'day')}.` : 'Nothing new to import.', info: await settingsInfo() };
+  }
+  async function historyExport() {
+    const snaps = await store.pref('gpaSnapshots');
+    const list = Array.isArray(snaps) ? snaps : [];
+    return { name: `simpl-courses-gpa-${location.host}.csv`, text: ['date,term_gpa', ...list.map((s) => `${s.date},${Number.isFinite(s.gpa) ? s.gpa.toFixed(3) : ''}`)].join('\n') };
+  }
+  /** The record before this term: a CSV of past courses read into a GPA (lib/record-csv.js); a history export goes to the history. */
+  async function recordImport({ text = '', name = 'record.csv' } = {}) {
+    const R = BCV.recordCsv;
+    if (/^\s*date\s*,\s*term_gpa/i.test(String(text))) return historyImport({ text });
+    let rec;
+    try { rec = R.record(String(text), String(name)); } catch (e) { throw new Error(R.explain ? R.explain(e) : 'That file could not be read.'); }
+    const before = await store.pref('gpaTracking');
+    const t = before && typeof before === 'object' ? before : {};
+    await store.setPref('gpaTracking', { ...t, ...rec, since: t.since || new Date().toISOString().slice(0, 10) });
+    return { message: `${rec.priorGpa.toFixed(2)} across ${U.plural(rec.priorCourses, 'course')}${rec.record?.skipped ? `, ${rec.record.skipped} skipped` : ''}.`, info: await settingsInfo() };
+  }
+  async function recordClear() {
+    const t = await store.pref('gpaTracking');
+    if (t && typeof t === 'object') {
+      const next = { ...t, priorGpa: null, priorCourses: 0 };
+      delete next.record;
+      await store.setPref('gpaTracking', next);
+    }
+    return settingsInfo();
+  }
+  async function settingsExport() {
+    return { name: 'simpl-courses-settings.json', text: JSON.stringify(await BCV.settings.get(), null, 2) };
+  }
+  async function settingsImport({ text = '' } = {}) {
+    let data = null;
+    try { data = JSON.parse(String(text)); } catch { /* not JSON */ }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('That file is not a settings export.');
+    await BCV.settings.replace(data);
+    return { ok: true };
+  }
+  /** Reset everything: preferences, grade history and every flag kept here (the setup runs again). */
+  async function resetEverything() {
+    try { await BCV.api.storage.local.clear(); } catch { /* nothing kept */ }
+    await BCV.settings.replace({});
+    return { ok: true };
+  }
+
   // The guided setup, the iPhone's own (1.3): the courses that count and the grade goals — no look, no
   // dashboard, no sidebar (the app draws those itself). The same answers the web setup writes, read and
   // written here; the app shows it on the first run (snapshot.setupDone false) and from its Settings.
@@ -1677,7 +1767,7 @@
 
   const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, setupInfo, setupSave, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
+    toolLaunch, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];

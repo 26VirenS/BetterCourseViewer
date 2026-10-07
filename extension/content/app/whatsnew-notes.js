@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.6', date: '2026-10-07', notes: [
+      { kind: 'new', title: 'Settings, built in', body: 'Grades, history and data in the app’s own Settings.', icon: P.toggle },
+      { kind: 'new', title: 'Review before submit', body: 'Check every answer before you hand in a quiz.', icon: P.check },
+      { kind: 'fixed', title: 'Start sign-in over', body: 'A stuck school sign-in can start again.', icon: P.arrows },
+    ] },
     { version: '2.99.5', date: '2026-10-07', notes: [
       { kind: 'new', title: 'Pull up, next question', body: 'Pick an answer or pull up; hold to submit.', icon: P.list },
       { kind: 'new', title: 'Swipe to hand in', body: 'Swipe right on work to hand in or see feedback.', icon: P.arrows },

@@ -48,10 +48,27 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         store.get("settings")["settings"] as? [String: Any] ?? [:]
     }
 
-    /// appearance.skin: the redesigned interface is on (the default) or the student chose stock Canvas.
+    /// appearance.skin: the redesigned interface is on (the default) or the student chose stock Canvas — and a
+    /// turn-off for a while is over once its time has come (lib/settings.js lookOn, which every reader asks).
     var interfaceOn: Bool { Bridge.interfaceOn(settings) }
-    static func interfaceOn(_ settings: [String: Any]) -> Bool {
-        ((settings["appearance"] as? [String: Any])?["skin"] as? Bool) ?? true
+    static func interfaceOn(_ settings: [String: Any], now: Date = Date()) -> Bool {
+        let a = settings["appearance"] as? [String: Any] ?? [:]
+        if (a["skin"] as? Bool) != false { return true }
+        let until = (a["offUntil"] as? NSNumber)?.doubleValue ?? 0
+        return until > 0 && now.timeIntervalSince1970 * 1000 >= until
+    }
+
+    /// The interface on or off from the app's own Settings (lib/settings.js lookPatch: off until turned on again).
+    /// Written here, not through the page, so it can be turned back on while the page is Canvas's own.
+    func setInterface(_ on: Bool) {
+        var s = settings
+        var a = s["appearance"] as? [String: Any] ?? [:]
+        a["skin"] = on
+        a["offUntil"] = 0
+        s["appearance"] = a
+        let changes = store.set(["settings": s])
+        broadcast(changes)
+        NotificationCenter.default.post(name: .simplSettingsChanged, object: nil, userInfo: s)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
