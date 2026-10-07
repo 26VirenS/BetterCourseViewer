@@ -471,7 +471,7 @@ struct PullEdges: ViewModifier {
     }
 
     static let line: CGFloat = 70
-    static let holdTime = 0.9
+    static let holdTime = 1.8 // (1.4.4: twice the 0.9s it was — handing in is never an accident)
 
     func body(content: Content) -> some View {
         content
