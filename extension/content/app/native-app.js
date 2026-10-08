@@ -1004,7 +1004,7 @@
     const [info, mods] = await Promise.all([contextInfo(c), store.modules(c.id)]);
     const byId = new Map((mods || []).map((m) => [String(m.id), m]));
     return {
-      title: 'Modules', context: info.title, color: info.color, empty: 'No modules in this course.',
+      title: BCV.lms?.d2l ? 'Content' : 'Modules', context: info.title, color: info.color, empty: BCV.lms?.d2l ? 'No content in this course.' : 'No modules in this course.', // (Brightspace's own name, as the course's sections say it)
       modules: (mods || []).map((m) => {
         const locked = m.state === 'locked';
         const pre = (m.prerequisite_module_ids || []).map((x) => byId.get(String(x))?.name).filter(Boolean);
@@ -1169,7 +1169,7 @@
     const groups = new Map();
     for (const p of list || []) { const r = roleOf(p); if (!groups.has(r)) groups.set(r, []); groups.get(r).push({ id: String(p.id), name: p.name || p.short_name || 'Someone', pronouns: p.pronouns || '', avatar: p.avatar_url && !/avatar-50|no_pic|dotted_pic/.test(p.avatar_url) ? p.avatar_url : null }); }
     const sections = [...groups.entries()].sort((x, y) => (order.indexOf(x[0]) + 1 || 99) - (order.indexOf(y[0]) + 1 || 99)).map(([title, rows]) => ({ title: title === 'Member' ? 'Members' : `${title}${rows.length === 1 ? '' : title.endsWith('s') ? '' : 's'}`, rows }));
-    return { title: 'People', context: info.title, color: info.color, sections, empty: 'Nobody to show.' };
+    return { title: BCV.lms?.d2l && c.kind === 'courses' ? 'Classlist' : 'People', context: info.title, color: info.color, sections, empty: 'Nobody to show.' };
   }
   async function quizzes({ ctx } = {}) {
     const c = ctxOf(ctx);

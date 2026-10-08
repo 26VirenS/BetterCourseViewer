@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.23', date: '2026-10-08', notes: [
+      { kind: 'new', title: 'Brightspace in apps', body: 'The iPhone and Mac apps now work on Brightspace too.', icon: P.sparkle },
+      { kind: 'new', title: 'Brightspace alerts', body: 'New-activity alerts read Brightspace news and grades.', icon: P.clock },
+      { kind: 'new', title: 'Find your Brightspace', body: 'On iPhone and Mac, search your school’s name to find it.', icon: P.steps },
+      { kind: 'fixed', title: 'Handed-in files open', body: 'On Brightspace, the files you handed in now open.', icon: P.clip },
+      { kind: 'fixed', title: 'Brightspace Mark done', body: 'It opens the topic’s Brightspace page, which takes it.', icon: P.check },
+    ] },
     { version: '2.99.22', date: '2026-10-08', notes: [
       { kind: 'new', title: 'Brightspace support', body: 'Simpl now works on Brightspace (D2L) too.', icon: P.sparkle },
       { kind: 'fixed', title: 'No stray “null” word', body: 'Setup and Grade needed no longer show the word null.', icon: P.check },
