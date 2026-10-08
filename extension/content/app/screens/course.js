@@ -454,27 +454,6 @@
     return U.statusBadge(st.graded ? { word: st.late ? 'Graded · late' : 'Graded', kind: 'good' } : st, '');
   }
 
-  // ---- reader overlay ("Immersive Reader") ---------------------------------------
-  function openReader(title, html) {
-    document.querySelector('.bcv-reader-ov')?.remove();
-    let size = 19;
-    const doc = U.el('bcv-reader-ov__doc', [h('h1', { text: title }), prose(html)]);
-    const ov = U.el('bcv-reader-ov', [
-      U.el('bcv-reader-ov__bar', [
-        U.svg(IC.reader, { size: 16, stroke: 'var(--bcv-blue)', width: 1.8 }),
-        U.text('bcv-reader-ov__title', title, 'span'),
-        U.btn('A−', { kind: 'xs', onClick: () => { size = Math.max(14, size - 2); doc.style.setProperty('--bcv-reader-size', `${size}px`); } }),
-        U.btn('A+', { kind: 'xs', onClick: () => { size = Math.min(32, size + 2); doc.style.setProperty('--bcv-reader-size', `${size}px`); } }),
-        U.iconbtn(IC.close, { title: 'Close reader', onClick: () => BCV.ui.dismiss(ov) }),
-      ]),
-      doc,
-    ]);
-    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') BCV.ui.dismiss(ov); });
-    document.body.append(ov);
-    ov.tabIndex = -1;
-    ov.focus();
-  }
-
   // The rail groups the context's own tabs the way the mockup does. Anything
   // internal that is not listed lands under Materials; external tools are
   // plain links under Campus tools.
@@ -553,7 +532,7 @@
     next();
   }
 
-  /** Header (back link, colour, title, pills, Immersive Reader) plus the
+  /** Header (back link, colour, title, pills) plus the
    *  grouped rail of the context's tabs, for courses and groups. */
   async function contextShell(ctx, shell, { backLabel, backHref, tabs, activeId, pills = [] }) {
     const { app } = ctx;
@@ -582,18 +561,9 @@
           : h('span', { class: 'bcv-dot bcv-dot--sq', style: { background: c.color } }),
         h('h1', { class: 'bcv-h1 bcv-h1--30', text: c.name }),
         ...pills.filter(Boolean),
-        U.btn('Immersive Reader', { icon: IC.reader, kind: 'card', iconColor: 'var(--bcv-blue)', cls: 'bcv-ml-auto bcv-reader-btn', onClick: () => {
-          if (shell.reader) openReader(shell.reader.title, shell.reader.html);
-        } }),
       ]),
     ]));
-    // The reader button exists only where there is a body to read (a front page, a page, an
-    // assignment or announcement description, the syllabus); a tab without one closes the row up.
-    const readerBtn = head.querySelector('.bcv-reader-btn');
-    let readerVal = shell.reader || null;
-    const syncReader = () => { readerBtn.hidden = !(readerVal && String(readerVal.html || '').trim()) || !!BCV.phone?.active(); }; // no Immersive Reader on the phone
-    Object.defineProperty(shell, 'reader', { configurable: true, enumerable: true, get: () => readerVal, set: (v) => { readerVal = v; syncReader(); } });
-    syncReader();
+    // (2.99.20: no Immersive Reader — the screens still note their body as shell.reader, which nothing reads now)
     // under the title: who teaches it, its code (or its real name under a nickname), the sections,
     // and the term's dates — the facts Canvas's own course page keeps in its header
     if (!BCV.phone?.active() && shell.kind === 'courses') {
@@ -1466,6 +1436,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricMorph, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricMorph, linksFrom, typeIcon, ptsLabel, statusBadge, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

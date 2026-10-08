@@ -25,6 +25,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.20', date: '2026-10-08', notes: [
+      { kind: 'improved', title: 'Smoother in Safari', body: 'Springs run on the GPU now, at your screen’s full rate.', icon: P.sparkle },
+      { kind: 'fixed', title: 'Back stays one line', body: 'A long name beside Previous / Next is cut, not wrapped.', icon: P.check },
+      { kind: 'improved', title: 'Blur follows the box', body: 'Switching tabs, the blur round it glides with the box.', icon: P.layers },
+      { kind: 'improved', title: 'No Immersive Reader', body: 'The reader button is gone from the course header.', icon: P.check },
+    ] },
     { version: '2.99.19', date: '2026-10-08', notes: [
       { kind: 'fixed', title: 'Fact boxes read whole', body: 'The small line under Due, Points and more is no longer cut.', icon: P.check },
     ] },

@@ -16,7 +16,8 @@
   const mainCol = () => h('div', { class: 'bcv-col', style: { flex: '1 1 560px' } });
   const sideCol = () => h('div', { class: 'bcv-col bcv-col--16', style: { flex: '1 1 300px' } });
   const meta = (pairs) => U.el('bcv-detail__meta', pairs.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => h('span', { class: 'bcv-detail__meta-item' }, [h('b', { text: `${k} ` }), String(v)])));
-  const backBtn = (app, href, lbl) => h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back', onclick: () => { app.markBack?.(); app.go(href); } }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), lbl]);
+  // (2.99.20) the name on one line, cut short with an ellipsis (the whole of it on hover): a long item's name wrapped onto two
+  const backBtn = (app, href, lbl) => h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back', title: lbl, onclick: () => { app.markBack?.(); app.go(href); } }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { class: 'bcv-detail__backlabel bcv-ellip', text: lbl })]);
   /** The item's Back: the screen it was opened from (Modules, the Dashboard, another item…), else the list it belongs to. */
   const backTo = (app, href, lbl) => { const b = app.backTo ? app.backTo({ href, label: lbl }) : { href, label: lbl }; return backBtn(app, b.href, b.label); };
   const nativeHref = (path) => `${path}${path.includes('?') ? '&' : '?'}bcv=native`;
@@ -681,7 +682,7 @@
     }
 
     // ---- the row along the top: the way back, and the assignments either side --------------------------------------
-    const backEl = h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back bcv-asg__back', onclick: () => { app.markBack?.(); app.go(back.href); } }, [U.svg('M15 5l-7 7 7 7', { size: 15, stroke: 'currentColor', width: 2.4 }), back.label]);
+    const backEl = h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back bcv-asg__back', title: back.label, onclick: () => { app.markBack?.(); app.go(back.href); } }, [U.svg('M15 5l-7 7 7 7', { size: 15, stroke: 'currentColor', width: 2.4 }), h('span', { class: 'bcv-detail__backlabel bcv-ellip', text: back.label })]);
     const top = itemTop(ctx, c, backEl, 'Assignment', a.id);
     const titleEl = h('h1', { class: 'bcv-detail__title bcv-asg__title bcv-pretty', text: a.name });
     let statusNow = statusEl(s), factsNow = factsEl(s), actionNow = actionEl(s);

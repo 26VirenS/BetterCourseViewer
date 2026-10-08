@@ -1453,7 +1453,7 @@
       const trail = app.state?.trail || [];
       const top = trail[trail.length - 1];
       const label = top && r && top.url === r.url ? String(top.label || '').trim() : '';
-      const shown = document.querySelector('.bcv-reader-ov__doc h1, .bcv-sb__h1, .bcv-qz__h1, .bcv-sheet:not(.bcv-tool) .bcv-sheet__title')?.textContent?.trim() || '';
+      const shown = document.querySelector('.bcv-sb__h1, .bcv-qz__h1, .bcv-sheet:not(.bcv-tool) .bcv-sheet__title')?.textContent?.trim() || '';
       const c = r?.courseId ? (app.state?.favs || []).find((x) => String(x.id) === String(r.courseId)) : null;
       const courseName = c?.shortName || c?.name || '';
       if (r && r.screen === 'course' && r.courseId) {

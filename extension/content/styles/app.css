@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.19"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.20"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -71,7 +71,7 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
 @keyframes bcv-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bcv-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes bcv-sheet { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
-@keyframes bcv-shimmer { 0% { background-position: -320px 0; } 100% { background-position: 320px 0; } }
+@keyframes bcv-shimmer { from { translate: 0 0; } to { translate: 640px 0; } } /* (2.99.20: the light moved by translate — see .bcv-skel__b) */
 @keyframes bcv-load { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes bcv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 /* mockup 11: a sheet grows out of the control that opened it (transform-origin set per sheet), the scrim blurs in */
@@ -108,14 +108,12 @@ html.bcv-phone .bcv-main > .bcv-screen--tab { animation: bcv-fade-in var(--bcv-t
 /* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter).
    The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
 .bcv-enter { animation: bcv-fade-up var(--bcv-dur, var(--bcv-t-settle)) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }
-.bcv-reader-btn[hidden] { display: none; } /* the Immersive Reader button only exists where there is a body to read */
 .bcv-sheet-ov { animation: bcv-scrim var(--bcv-t-scrim) var(--bcv-spring-scrim) both; }
 .bcv-sheet { animation: bcv-morph var(--bcv-t-gentle) var(--bcv-spring-gentle) backwards; transform-origin: 50% 50%; }
 html.bcv-phone .bcv-sheet { animation: bcv-sheet var(--bcv-t-phone) var(--bcv-spring-phone) both; } /* the phone's bottom sheets keep their rise */
  .bcv-menu, .bcv-gpa__pop { animation: bcv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; } /* (a menu grows out of the edge it hangs from: ui.anchor sets its transform origin) */
 @keyframes bcv-toast-in { from { opacity: 0; transform: translateY(calc(-100% - 28px)) scale(.94); } to { opacity: 1; transform: none; } }
 .bcv-toast { animation: bcv-toast-in var(--bcv-t-gentle) var(--bcv-spring-snappy) both; } /* (floats down from above the window, on the snappy spring's overshoot, over the gentle beat) */
-.bcv-reader-ov { animation: bcv-fade-in .2s ease both; }
 /* Exits (ui.js dismiss): a sheet shrinks and fades with its scrim, a bottom sheet slides down, a menu or panel pops out. */
 @keyframes bcv-leave { to { opacity: 0; } }
 @keyframes bcv-leave-shrink { to { opacity: 0; transform: scale(.97); } }
@@ -125,10 +123,9 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet var(--bcv-t-phone) var(--bcv-sp
 .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-shrink var(--bcv-t-fast) ease both; }
 html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down .22s var(--bcv-ease) both; }
 .bcv-menu.is-closing, .bcv-quicknav.is-closing { animation: bcv-leave-pop .14s ease both; pointer-events: none; }
-.bcv-reader-ov.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; }
 .bcv-toast.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; } /* (2.99.7: without the springs a toast had no exit and went in a frame) */
 @media (prefers-reduced-motion: reduce) { /* (they still fade — 150ms of opacity, no shrinking or sliding — and the sheet goes with its scrim, not on its own) */
-  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-reader-ov.is-closing, .bcv-toast.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
+  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-toast.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
   .bcv-sheet-ov.is-closing > .bcv-sheet, html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: none; }
 }
 /* A press is felt: a row or an item dips while the pointer is down, a card darkens a touch. */
@@ -175,7 +172,12 @@ html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down
 /* skeletons shaped like the content they replace; a load faster than 150ms never shows them */
 .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(120,120,128,.1) 0px, rgba(120,120,128,.18) 120px, rgba(120,120,128,.1) 240px); display: flex; flex-direction: column; gap: 10px; animation: bcv-fade-in .2s ease .15s both; }
 html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(255,255,255,.05) 0px, rgba(255,255,255,.12) 120px, rgba(255,255,255,.05) 240px); }
-.bcv-skel__b { display: block; background: var(--bcv-skel); background-size: 320px 100%; animation: bcv-shimmer 1.1s linear infinite; border-radius: 6px; }
+/* (2.99.20) the light travels as a layer of its own, two tiles wider than the bar and slid across it by translate: Safari's
+   compositor plays that at the screen's rate; the background-position it slid by before was drawn again on the main thread,
+   every bar, every frame, for as long as the page was loading — the moment the main thread has least to spare */
+.bcv-skel__b { display: block; position: relative; overflow: hidden; border-radius: 6px; }
+.bcv-skel__b::after { content: ''; position: absolute; top: 0; bottom: 0; left: -640px; right: 0; background: var(--bcv-skel); background-size: 320px 100%; animation: bcv-shimmer 1.1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .bcv-skel__b::after { animation: none; } }
 .bcv-skel__row { background: var(--bcv-card); border-radius: var(--bcv-r-row); padding: 15px 18px; box-shadow: var(--bcv-shadow); display: flex; align-items: center; gap: 14px; }
 .bcv-skel__tile { flex: none; width: 30px; height: 30px; border-radius: 9px; }
 .bcv-skel__lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
@@ -197,7 +199,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
   /* screens, sheets, menus, toasts and panels still arrive — as a 150ms fade, nothing moving (a sheet with its scrim,
      not on its own; a screen drawn again in place not at all); data lands on its final value at once; the loading
      indicators (the row wash, the shimmer) stay */
-  .bcv-main > .bcv-screen:not(.bcv-screen--still, .bcv-screen--skel), .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-pv { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
+  .bcv-main > .bcv-screen:not(.bcv-screen--still, .bcv-screen--skel), .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-pv { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
   .bcv-sheet, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-ring--unfill, .bcv-ring--track-out, .bcv-gpa__ringletter.is-back, .bcv-gpa__line--draw, .bcv-gpa__pt--in, .bcv-gpa__area--in { animation: none; }
   .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail, #bcv-app, #bcv-app::before, .bcv-switch__knob, .bcv-module__toggle, .bcv-work__more-ic { transition: none; }
@@ -348,10 +350,14 @@ html.bcv-phone.bcv-on #bcv-report, html.bcv-setup-open #bcv-report, html.bcv-in-
   animation: bcv-tour-in .45s ease both; }
 html.bcv-noblur .bcv-tour__blur { display: none; } /* (Chrome drawing without graphics acceleration: the dim alone) */
 .bcv-tour__block { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: auto; touch-action: pan-x pan-y; }
-.bcv-tour__ring { position: fixed; left: 0; top: 0; box-sizing: border-box; pointer-events: none; border-radius: 14px; box-shadow: 0 0 0 2px var(--bcv-blue), 0 0 0 5px color-mix(in srgb, var(--bcv-blue) 30%, transparent); animation: bcv-tour-ring 1.8s ease-in-out infinite; transition: box-shadow .3s ease; }
+.bcv-tour__ring { position: fixed; left: 0; top: 0; box-sizing: border-box; pointer-events: none; border-radius: 14px; box-shadow: 0 0 0 2px var(--bcv-blue); transition: box-shadow .3s ease; }
 .bcv-tour__ring[hidden] { display: none; }
-.bcv-tour__ring.is-done { animation: none; box-shadow: 0 0 0 2px #34c759, 0 0 0 7px rgba(52,199,89,.3); }
-@keyframes bcv-tour-ring { 0%, 100% { box-shadow: 0 0 0 2px var(--bcv-blue), 0 0 0 4px color-mix(in srgb, var(--bcv-blue) 34%, transparent); } 50% { box-shadow: 0 0 0 2px var(--bcv-blue), 0 0 0 12px color-mix(in srgb, var(--bcv-blue) 0%, transparent); } }
+/* (2.99.20) the ring's breathing halo is a layer of its own that swells and fades — opacity and scale, which Safari's compositor
+   plays; a box-shadow pulsing, as before, was drawn again on the main thread every frame the tour was up */
+.bcv-tour__ring::after { content: ''; position: absolute; inset: -2px; border-radius: inherit; box-shadow: 0 0 0 6px color-mix(in srgb, var(--bcv-blue) 30%, transparent); animation: bcv-tour-ring 1.8s ease-in-out infinite; transition: box-shadow .3s ease; }
+.bcv-tour__ring.is-done { box-shadow: 0 0 0 2px #34c759; }
+.bcv-tour__ring.is-done::after { animation: none; box-shadow: 0 0 0 5px rgba(52,199,89,.3); }
+@keyframes bcv-tour-ring { 0%, 100% { opacity: 1; scale: 1; } 50% { opacity: 0; scale: 1.025; } }
 /* the pointer: the gesture at the thing — a press (a ripple), a hover (it comes to rest), typing (keys), a drag (to where the thing goes) */
 .bcv-tour__hand { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; transform: translate(var(--hx, 50vw), var(--hy, 50vh)); transition: transform .5s var(--bcv-ease), opacity .2s ease; }
 .bcv-tour__hand[data-act="none"] { opacity: 0; }
@@ -409,7 +415,7 @@ html[data-bcv-theme="dark"] .bcv-tour__card.is-away .bcv-tour__do { color: #ffb3
 .bcv-tour__card[data-side="right"] .bcv-tour__notch { display: block; left: -6px; top: calc(var(--ny, 50%) - 7px); box-shadow: -1px 1px 0 0 var(--bcv-hair); }
 .bcv-tour__card[data-side="left"] .bcv-tour__notch { display: block; right: -6px; top: calc(var(--ny, 50%) - 7px); box-shadow: 1px -1px 0 0 var(--bcv-hair); }
 @media (prefers-reduced-motion: reduce) {
-  .bcv-tour__ring, .bcv-tour__pt, .bcv-tour__tap, .bcv-tour__keys i, .bcv-tour__glyph, .bcv-tour__card, .bcv-tour__veil, .bcv-tour__blur { animation: none !important; }
+  .bcv-tour__ring, .bcv-tour__ring::after, .bcv-tour__pt, .bcv-tour__tap, .bcv-tour__keys i, .bcv-tour__glyph, .bcv-tour__card, .bcv-tour__veil, .bcv-tour__blur { animation: none !important; }
   .bcv-tour__hand, .bcv-tour__card { transition: none; }
 }
 
@@ -425,7 +431,7 @@ html.bcv-on.bcv-setup-open body { overflow: hidden !important; }
    rubric ring, a tool, the viewer, the reader, the search afloat. On a phone the page's scroll is simply switched
    off (its scrollbars float, so nothing moves); on the desktop ui.js holds the wheel and the scroll keys instead,
    so a drawn scrollbar is not taken away and nothing behind the overlay shifts sideways. */
-html.bcv-on.bcv-phone body:has(> :is(.bcv-sheet-ov:not(.is-closing, .is-folding), .bcv-reader-ov:not(.is-closing), .bcv-spot-ov:not(.is-folding))) { overflow: hidden !important; }
+html.bcv-on.bcv-phone body:has(> :is(.bcv-sheet-ov:not(.is-closing, .is-folding), .bcv-spot-ov:not(.is-folding))) { overflow: hidden !important; }
 html.bcv-on #application, html.bcv-on body > .ic-app, html.bcv-on #flash_message_holder, html.bcv-on #flash_screenreader_holder, html.bcv-on #immersive_reader_mount_point, html.bcv-on #nav-tray-portal, html.bcv-on #header, html.bcv-on #wrapper { display: none !important; }
 html.bcv-on #bcv-app { display: flex; }
 
@@ -950,7 +956,7 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 #bcv-app .bcv-sky__more:hover { color: var(--bcv-ink); }
 .bcv-sky__city { flex: 1; min-height: 148px; margin-top: 8px; display: flex; align-items: flex-end; border-bottom: 1px solid var(--bcv-sep); }
 .bcv-sky__col, .bcv-sky__name { flex: 1 1 0; min-width: 0; }
-.bcv-sky__col { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.bcv-sky__col { display: flex; flex-direction: column; align-items: center; gap: 7px; overflow: hidden; padding: 3px 3px 0; margin: -3px -3px 0; } /* (2.99.20: the street's edge, where a tower rises from: below it, nothing shows; round it, room for the focus ring) */
 .bcv-sky__pct { font: 700 13px/1 var(--bcv-font); letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: var(--bcv-ink); }
 .bcv-sky__tower { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; flex: none; padding: 7px 5px 0; border: 0; border-radius: 7px 7px 0 0; background: linear-gradient(180deg, var(--sky-c), color-mix(in srgb, var(--sky-c) 66%, #000)); overflow: hidden; cursor: pointer; transition: filter .16s ease; }
 .bcv-sky__tower:hover { filter: brightness(1.07); }
@@ -971,7 +977,9 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-sky__name { padding: 0 2px; text-align: center; font: 600 11px/1.2 var(--bcv-font); letter-spacing: .05em; text-transform: uppercase; color: var(--bcv-ink3); }
 /* entry: the towers rise out of the street one after another, their scores after them; the windows light as they land */
 .bcv-sky__tower--rise { animation: bcv-sky-rise .3s var(--bcv-ease-out) var(--bcv-delay, 0ms) both; }
-@keyframes bcv-sky-rise { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+/* (2.99.20) out of the street by translate, not a clip that opens upward: Safari's compositor plays a move at the screen's own
+   rate, where a clip-path is drawn again on the main thread every frame */
+@keyframes bcv-sky-rise { from { translate: 0 100%; } to { translate: 0 0; } }
 .bcv-sky__pct--in { animation: bcv-fade-up var(--bcv-t-settle) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }
 /* …and the windows fade in where they stand, one by one in reading order, 45ms apart (2.98.93: no flight, no bounce) */
 .bcv-sky__win--in { animation: bcv-sky-win .4s ease-out var(--wd, 0ms) both; }
@@ -2132,6 +2140,11 @@ html[data-bcv-theme="dark"] .bcv-sb__chip--due { color: #ffb44d; }
 .bcv-asg__card { padding: 22px 26px 30px; }
 .bcv-asg__top { display: flex; align-items: center; gap: 10px; min-height: 34px; }
 .bcv-asg__spring { flex: 1; }
+/* (2.99.20) a long name for the way back stays on one line, cut short, and shares the row with the pill: never wrapped into two */
+.bcv-asg__top > .bcv-detail__back { flex: 0 1 auto; min-width: 0; max-width: 50%; justify-content: flex-start; text-align: left; }
+.bcv-asg__top > .bcv-detail__back svg { flex: none; }
+.bcv-detail__backlabel { min-width: 0; line-height: 1.25; }
+.bcv-asg__top > .bcv-asg__nav { flex: 0 1 auto; }
 #bcv-app .bcv-asg__back { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px 6px 2px; border: 0; border-radius: 10px; background: transparent; font: 500 14px/1 var(--bcv-font); color: var(--bcv-cc-ink); cursor: pointer; transition: scale .1s ease-out; }
 .bcv-asg__back:active, .bcv-asg__navbtn:active { scale: .96; }
 .bcv-asg__nav { display: flex; padding: 2px; gap: 2px; border-radius: 12px; background: var(--bcv-fill); min-width: 0; }
@@ -2818,12 +2831,6 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
 .bcv-qz__donebtns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .bcv-qz__donebtns .bcv-qz__big { flex: none; height: 46px; padding: 0 22px; border-radius: 23px; font-size: 15px; }
 
-/* ---- reader overlay -------------------------------------------------------- */
-.bcv-reader-ov { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: var(--bcv-bg); overflow: auto; }
-.bcv-reader-ov__bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 24px; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
-.bcv-reader-ov__title { flex: 1; min-width: 0; font: 600 14px/1.3 var(--bcv-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bcv-reader-ov__doc { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; font-size: var(--bcv-reader-size, 19px); line-height: 1.7; }
-.bcv-reader-ov__doc h1 { font: 700 34px/1.15 var(--bcv-display); letter-spacing: -.025em; margin: 0 0 24px; }
 
 /* ---- an item previewed beside the list ------------------------------------
  * The interface keeps its place and gives up its right edge: #bcv-app takes a padding the width of
@@ -3071,7 +3078,6 @@ html.bcv-phone .bcv-seg { width: 100%; }
 html.bcv-phone .bcv-seg__btn { flex: 1; text-align: center; padding: 9px 0; }
 html.bcv-phone .bcv-linkbtn { display: none; } /* the back bar has the way back */
 html.bcv-phone .bcv-hint { padding: 0 4px; }
-html.bcv-phone .bcv-reader-btn { display: none !important; } /* no Immersive Reader on the phone: iOS has Reader, Speak Screen and Dynamic Type */
 /* sheets come up from the bottom, with a grab handle */
 @keyframes bcv-sheet-up { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: none; } }
 html.bcv-phone .bcv-sheet-ov { align-items: flex-end; padding: 0; }
@@ -3470,7 +3476,7 @@ html.bcv-phone .bcv-sb__footin { padding: 12px 16px calc(12px + var(--bcv-ph-bot
 #bcv-app .bcv-tabbar__item.is-active, #bcv-app .bcv-topbar__back { color: var(--bcv-blue); }
 /* the course header on a phone (the mockup): dot, name, one line of detail, then the chip row; the
  * term pill folds into the detail line and the reader button moves up into the back bar */
-html.bcv-phone .bcv-head .bcv-reader-btn, html.bcv-phone .bcv-course__title-row .bcv-pill--term { display: none !important; }
+html.bcv-phone .bcv-course__title-row .bcv-pill--term { display: none !important; }
 html.bcv-phone .bcv-ph-head__sub { font: 400 13px/1.35 var(--bcv-font); color: var(--bcv-ink3); margin: 2px 0 0 22px; }
 .bcv-topbar__right { display: flex; justify-content: flex-end; align-items: center; }
 

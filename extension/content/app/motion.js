@@ -112,15 +112,34 @@
   const supportsLinear = (() => {
     try { return typeof CSS !== 'undefined' && CSS.supports('animation-timing-function', 'linear(0, 1)'); } catch { return false; }
   })();
+  // (2.99.20) Safari — any WebKit on Apple's Core Animation, the iPhone's and iPad's browsers and the app's web view with it —
+  // cannot hand an animation eased by linear() (or steps()) to its compositor: CAMediaTimingFunction has no such curve, so
+  // WebKit plays it on the main thread instead, at the page's own rendering rate (60 Hz at most, on a 120 Hz screen too) and
+  // behind whatever script is running. Each spring there is the cubic-bezier() closest to it over its settle time (within
+  // 1%, the bouncy snappy within 2.2%: scripts/dev/fit-springs.mjs fits them), which the compositor plays at the display's
+  // own rate. Script-driven motion (run) is unaffected: its keyframes are joined by straight lines, which it can play.
+  const BEZIER = { snappy: [0.304, 0.43, 0.056, 1.23], gentle: [0.229, 0.147, 0.179, 1.007], settle: [0.225, 0.109, 0.225, 1.039], scrim: [0.225, 0.164, 0.155, 1.015], phone: [0.227, 0.133, 0.195, 1.023], island: [0.231, 0.129, 0.205, 0.998], pin: [0.226, 0.141, 0.183, 1.029] };
+  const coreAnimation = (() => {
+    try {
+      if (self.BCV_CORE_ANIMATION !== undefined) return !!self.BCV_CORE_ANIMATION; // (tests: either way)
+      const ua = String(navigator.userAgent || '');
+      return /AppleWebKit\//.test(ua) && !/(Chrome|Chromium|Edg|OPR|Android)\//.test(ua);
+    } catch { return false; }
+  })();
+  /** The easing a stylesheet rule plays a preset with here: the spring's own curve, or on Safari its bezier. */
+  function cssEasing(preset) {
+    if (coreAnimation && typeof preset === 'string' && BEZIER[preset]) return `cubic-bezier(${BEZIER[preset].join(', ')})`;
+    return supportsLinear ? easing(preset) : `cubic-bezier(${BEZIER.gentle.join(', ')})`;
+  }
   /** The springs handed to the stylesheet: --bcv-spring-<preset> (the easing) and --bcv-t-<preset>
    *  (the duration) on the root, so `animation: name var(--bcv-t-gentle) var(--bcv-spring-gentle)`
    *  is that spring. Where linear() is unknown the vars block's bezier and durations stand. */
   function installTokens(root) {
-    if (!supportsLinear) return false;
+    if (!supportsLinear && !coreAnimation) return false;
     root = root || (typeof document !== 'undefined' ? document.documentElement : null);
     if (!root) return false;
     for (const name of Object.keys(PRESETS)) {
-      root.style.setProperty(`--bcv-spring-${name}`, easing(name));
+      root.style.setProperty(`--bcv-spring-${name}`, cssEasing(name));
       root.style.setProperty(`--bcv-t-${name}`, `${Math.round(duration(name) * 1000)}ms`);
     }
     root.classList.add('bcv-springs');
@@ -280,5 +299,5 @@
   }
 
   installTokens();
-  BCV.motion = { PRESETS, spring, easing, duration, run, exit, settle, progressOf, reduced, supportsLinear, installTokens };
+  BCV.motion = { PRESETS, BEZIER, spring, easing, cssEasing, duration, run, exit, settle, progressOf, reduced, supportsLinear, coreAnimation, installTokens };
 })();

@@ -2093,6 +2093,15 @@ try {
   const want = [ordered[at1003 - 1] && { dir: 'prev', kicker: 'Previous', name: ordered[at1003 - 1].name }, ordered[at1003 + 1] && { dir: 'next', kicker: 'Next', name: ordered[at1003 + 1].name }].filter(Boolean);
   const navAt = await page.evaluate(() => { const n = document.querySelector('.bcv-asg__nav').getBoundingClientRect(), b = document.querySelector('.bcv-asg__back').getBoundingClientRect(); return { sameRow: Math.abs((n.top + n.bottom) / 2 - (b.top + b.bottom) / 2) < 3, aboveTitle: n.bottom <= document.querySelector('.bcv-asg__title').getBoundingClientRect().top }; });
   check(JSON.stringify(navBtns) === JSON.stringify(want) && navAt.sameRow && navAt.aboveTitle, `Previous and Next name the assignments either side, in the tab's order, on the way back's own row: ${navBtns.map((b) => `${b.kicker}: ${b.name}`).join(' | ')} ${JSON.stringify(navAt)}`);
+  // (2.99.20) a long name for the way back stays on one line, cut short, the pill beside it: never wrapped onto two
+  const longBack = await page.evaluate(() => {
+    const bk = document.querySelector('.bcv-asg__back'), l = bk.querySelector('.bcv-detail__backlabel'), was = l.textContent;
+    l.textContent = 'Lab04 - Local g - (week 1, in-progress) - UPLOAD and a few more words to be sure';
+    const r = { h: Math.round(bk.getBoundingClientRect().height), cut: l.scrollWidth > l.clientWidth, row: Math.round(document.querySelector('.bcv-asg__top').getBoundingClientRect().height), left: getComputedStyle(bk).justifyContent, title: !!bk.title };
+    l.textContent = was;
+    return r;
+  });
+  check(longBack.h <= 32 && longBack.row <= 36 && longBack.cut && longBack.title, `a long way back stays one line, cut short, its whole name on hover: ${JSON.stringify(longBack)}`);
   await page.click('.bcv-asg__nav .bcv-asg__navbtn--next');
   // the old title is still on screen while the next page comes: wait for the new one, not for a title
   const nextOpened = await page.waitForFunction((x) => location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name, ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
@@ -2391,6 +2400,24 @@ try {
   check(pdfOnly.sub === 'PDF only · others converted' && pdfOnly.title === 'Word, text and pictures are converted to PDF for you' && pdfOnly.accept === '.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif', `where only PDF is allowed, the drop says the others are converted (its title which), and the picker does not grey a Word file out (${JSON.stringify(pdfOnly)})`);
   await shot(page, '17b-handin-pdf-only');
   await mockConfig({ ext: {} });
+  // (2.99.20) the box taking a new size (another tab) takes the page round it along: the old blur fades out as a new one,
+  // its clear middle where the box now is, fades in, while the box glides — not the backdrop jumping at once
+  const nbWas = await page.evaluate(() => { const nb = document.documentElement.classList.contains('bcv-noblur'); document.documentElement.classList.remove('bcv-noblur'); return nb; });
+  await handIn();
+  await page.evaluate(() => document.documentElement.classList.remove('bcv-noblur')); // (the reload above draws it as the run does)
+  await page.waitForTimeout(700);
+  const { blurMid, blurEnd } = await realMotion(page, async () => {
+    const lastTab = await page.$$eval('.bcv-sb__tab', (els) => els.at(-1)?.dataset.tab);
+    await page.click(`.bcv-sb__tab[data-tab="${lastTab}"]`);
+    // (read in the page, frame by frame, until both layers are part-way: a loaded machine starts the fade a little late)
+    const mid = await page.evaluate(() => new Promise((res) => { const t0 = performance.now(); let last = []; const look = () => { last = [...document.querySelectorAll('.bcv-sheet-ov > .bcv-card-blur')].map((e) => Math.round(+getComputedStyle(e).opacity * 100) / 100); if ((last.length === 2 && last.every((o) => o > 0.05 && o < 0.95)) || performance.now() - t0 > 600) res(last); else requestAnimationFrame(look); }; look(); }));
+    await page.waitForTimeout(800);
+    return { blurMid: mid, blurEnd: await page.$$eval('.bcv-sheet-ov > .bcv-card-blur', (els) => els.map((e) => +getComputedStyle(e).opacity)) };
+  });
+  check(blurMid.length === 2 && blurMid.every((o) => o > 0.05 && o < 0.95) && blurEnd.length === 1 && blurEnd[0] === 1, `a new size cross-fades the page's blur to the box's new place, not at once: ${JSON.stringify({ blurMid, blurEnd })}`);
+  await page.click('.bcv-sb__tab[data-tab="file"]'); // (the tab is remembered: the checks below start on the file one)
+  await page.waitForTimeout(300);
+  if (nbWas) await page.evaluate(() => document.documentElement.classList.add('bcv-noblur'));
   await handIn();
   const footIs = (re) => eventually(async () => re.test((await texts('.bcv-sb__footnote'))[0] || ''), 8000);
   // a file of another type is offered as what it can become — a text file as a PDF — converted here and attached under its new name
@@ -2652,14 +2679,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-row--p12-16 .bcv-row__title').length >= 3, null, { timeout: 10000 });
   check((await texts('.bcv-row--p12-16 .bcv-row__title')).some((t) => /Dis01/.test(t)), 'course To Do card');
   await shot(page, '11-course-home');
-  await page.click('.bcv-head .bcv-btn--card');
-  await page.waitForSelector('.bcv-reader-ov', { timeout: 5000 });
-  check((await texts('.bcv-reader-ov h1'))[0] === 'Course Information', 'Immersive Reader overlay opens the front page');
-  await shot(page, '11b-immersive-reader');
-  await page.keyboard.press('Escape');
-  const readerGone = await page.waitForFunction(() => !document.querySelector('.bcv-reader-ov'), null, { timeout: 3000 }).then(() => true, () => false); // (it fades out)
-  check(readerGone, 'Escape closes the reader');
-  if (!readerGone) await page.click('.bcv-reader-ov .bcv-iconbtn');
+  check(!(await page.$('.bcv-reader-btn')) && !(await page.$$eval('.bcv-head button', (els) => els.some((e) => /Immersive Reader/.test(e.textContent)))), 'no Immersive Reader in the course header (2.99.20: taken out)');
 
   // announcements
   await tab('announcements');
@@ -4776,11 +4796,9 @@ try {
   await shot(page, '25-dark-dashboard');
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
-  check((await page.$('.bcv-reader-btn')) && !(await visible('.bcv-reader-btn')), 'Immersive Reader button is left out where there is nothing to read (Grades)');
   await shot(page, '26-dark-grades');
   await page.goto(`${BASE}/courses/101`);
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
-  check(await visible('.bcv-reader-btn'), 'Immersive Reader button is there on the course front page');
   await shot(page, '27-dark-course-home');
   // a Canvas page that paints its own light panel keeps dark text there, so a school's template
   // does not read as blank in the dark appearance
@@ -5107,9 +5125,9 @@ try {
   const skel = await page.evaluate(() => {
     const s = document.querySelector('.bcv-skel');
     const fav = document.querySelector('.bcv-fav.is-loading .bcv-load');
-    return { aria: s.getAttribute('aria-hidden'), rows: s.querySelectorAll('.bcv-skel__row').length, shimmer: getComputedStyle(s.querySelector('.bcv-skel__b')).animationName, delay: getComputedStyle(s).animationDelay, favWash: fav ? getComputedStyle(fav).backgroundColor : null, favRow: document.querySelector('.bcv-fav.is-loading')?.textContent.trim() };
+    return { aria: s.getAttribute('aria-hidden'), rows: s.querySelectorAll('.bcv-skel__row').length, shimmer: getComputedStyle(s.querySelector('.bcv-skel__b'), '::after').animationName, light: getComputedStyle(s.querySelector('.bcv-skel__b'), '::after').animationName === 'bcv-shimmer' && getComputedStyle(s.querySelector('.bcv-skel__b')).overflow === 'hidden', delay: getComputedStyle(s).animationDelay, favWash: fav ? getComputedStyle(fav).backgroundColor : null, favRow: document.querySelector('.bcv-fav.is-loading')?.textContent.trim() };
   });
-  check(skel.aria === 'true' && skel.rows === 6 && skel.shimmer === 'bcv-shimmer' && skel.delay === '0.15s' && /^rgba\(\d+, \d+, \d+, 0\.2\)$/.test(skel.favWash) && skel.favRow === 'F26-SPRK 010 103', `while a response is slow the course's own sidebar row fills with its colour and skeleton rows shimmer, hidden from screen readers: ${JSON.stringify(skel)}`);
+  check(skel.aria === 'true' && skel.rows === 6 && skel.shimmer === 'bcv-shimmer' && skel.light && skel.light && skel.delay === '0.15s' && /^rgba\(\d+, \d+, \d+, 0\.2\)$/.test(skel.favWash) && skel.favRow === 'F26-SPRK 010 103', `while a response is slow the course's own sidebar row fills with its colour and skeleton rows shimmer, hidden from screen readers: ${JSON.stringify(skel)}`);
   await page.unroute(slow);
   await page.waitForSelector('.bcv-sb__foot', { timeout: 15000 });
   check(!(await page.$('.bcv-skel')) && !(await page.$('.bcv-load')), 'the skeleton and the wash leave when the content lands');
@@ -7824,6 +7842,18 @@ try {
   const runInApp = (name) => sw.evaluate(async ([base, n]) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (what) => { if (what === 'toast') self.BCV.ui.toast('Springs'); else if (what === 'stuck') { const ov = document.querySelector('.bcv-sheet-ov'); self.BCV.ui.dismiss(ov); for (const a of ov.getAnimations({ subtree: true })) a.pause(); } }, args: [n] }); }, [BASE, name]);
   const springs = await page.evaluate(() => { const cs = getComputedStyle(document.documentElement); const screen = getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')); return { cls: document.documentElement.classList.contains('bcv-springs'), gentle: cs.getPropertyValue('--bcv-spring-gentle').trim().slice(0, 9), t: cs.getPropertyValue('--bcv-t-gentle').trim(), screenEase: screen.animationTimingFunction.slice(0, 7), screenDur: screen.animationDuration, stops: cs.getPropertyValue('--bcv-spring-gentle').split(',').length, qn: getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-snappy').trim().slice(0, 7) }; });
   check(springs.cls && springs.gentle === 'linear(0,' && /^\d{3}ms$/.test(springs.t) && springs.screenEase === 'linear(' && Math.round(parseFloat(springs.screenDur) * 1000) === parseInt(springs.t, 10) && springs.stops >= 12, `the springs are the stylesheet's easings: the root carries each preset as a linear() curve with its own settle time, and a screen's rise runs on it: ${JSON.stringify(springs)}`);
+  // (2.99.20) in Safari each spring is its bezier: Core Animation cannot play linear(), and a rule eased by one would run on
+  // the main thread at the page's rate. Asked as Safari (its user agent in every world, the content script's too)
+  const sfPage = await context.newPage();
+  const sfCdp = await context.newCDPSession(sfPage);
+  await sfCdp.send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15' });
+  await sfPage.goto(`${BASE}/`);
+  await sfPage.waitForSelector('.bcv-main > .bcv-screen', { timeout: 15000 });
+  const sfSprings = await sfPage.evaluate(() => { const cs = getComputedStyle(document.documentElement); return { gentle: cs.getPropertyValue('--bcv-spring-gentle').trim(), snappy: cs.getPropertyValue('--bcv-spring-snappy').trim(), t: cs.getPropertyValue('--bcv-t-gentle').trim(), screen: getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationTimingFunction }; });
+  check(/^cubic-bezier\(0\.229, ?0\.147, ?0\.179, ?1\.007\)$/.test(sfSprings.gentle) && /^cubic-bezier\(/.test(sfSprings.snappy) && springs.t === sfSprings.t && /^cubic-bezier\(/.test(sfSprings.screen), `in Safari the springs are beziers its compositor plays, over the same settle times: ${JSON.stringify(sfSprings)}`);
+  await sfPage.close();
+  const fitRun = (await import('node:child_process')).spawnSync(process.execPath, [join(root, 'scripts/dev/fit-springs.mjs'), '--check'], { encoding: 'utf8' });
+  check(fitRun.status === 0, `each bezier is within 2.5% of its spring (scripts/dev/fit-springs.mjs): ${(fitRun.stdout || fitRun.stderr).trim().split('\n').map((l) => l.replace(/\s+/g, ' ')).join(' | ')}`);
   // the search panel's entrance, which 2.96 had written with two easings in one shorthand (dropped whole by the parser), plays now: read from the panel on the screen (the quick nav's is checked the same way in the side-courses suite)
   await page.click('#bcv-omni');
   await page.keyboard.type('a');

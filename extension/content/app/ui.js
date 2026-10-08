@@ -1304,7 +1304,7 @@
   // left where it is (hiding it would widen the page under the overlay); a phone's page is simply switched
   // off in the stylesheet. The listeners are there only while something is up — a wheel listener that can
   // cancel holds every wheel scroll for the page's script.
-  const ATTENTION = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-folding), .bcv-reader-ov:not(.is-closing), .bcv-spot-ov:not(.is-folding))';
+  const ATTENTION = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-folding), .bcv-spot-ov:not(.is-folding))';
   const SCROLL_KEYS = { ' ': 1, PageDown: 1, PageUp: -1, End: 1, Home: -1, ArrowDown: 1, ArrowUp: -1 };
   /** Whether something other than the page, from `from` outwards, can still scroll that way. */
   function movesInside(from, dy, dx) {
@@ -1455,13 +1455,16 @@
       dim.style.translate = `${pxs(x)} ${pxs(y)}`;
       dim.style.scale = String(dimK * (far ? dimFar : 1));
     };
-    /** Put the box where it goes, at once (its shadow's place with it). */
-    function layout() {
+    /** Put the box where it goes, at once (its shadow's place with it). `keepDim`: the dim keeps its stops and takes the
+     *  box's new size by its scale alone (which glides), not by stops set at once. */
+    function layout({ keepDim = false } = {}) {
+      const r0Was = G ? Math.hypot(G.w, G.h) / 2 : 0;
       G = geometry();
       const s = { left: `${Math.round(G.x)}px`, top: `${Math.round(G.y)}px`, width: `${Math.round(G.w)}px`, height: `${Math.round(G.h)}px` };
       Object.assign(sheet.style, s);
       Object.assign(shadow.style, s);
-      dimFor(G);
+      if (keepDim && r0Was > 0) dimK *= Math.hypot(G.w, G.h) / 2 / r0Was;
+      else dimFor(G);
       // the blur's clear hole: where the box lands, set with it — never animated (Safari drops a blur whose hole moves, once it settles)
       ov.style.setProperty('--bcv-mx', `${Math.round(G.x + G.w / 2)}px`);
       ov.style.setProperty('--bcv-my', `${Math.round(G.y + G.h / 2)}px`);
@@ -1510,7 +1513,22 @@
       const at = kids.map((k) => k.getBoundingClientRect());
       const now = geometry();
       if (before && Math.abs(now.x - before.x) < 1 && Math.abs(now.y - before.y) < 1 && Math.abs(now.w - before.w) < 1 && Math.abs(now.h - before.h) < 1) return;
-      layout();
+      // (2.99.20) the page round the box goes with it: the dim by its scale and place, which glide; the blur's clear hole
+      // (never animated: Safari drops a blur whose mask moves) by a new blur layer, its hole where the box lands, faded in
+      // over the old one fading out — opacity alone, as the box glides. Before, both jumped to the new size at once.
+      const hole = (o) => ['--bcv-mx', '--bcv-my', '--bcv-mr'].map((k) => o.style.getPropertyValue(k));
+      const holeWas = hole(ov);
+      layout({ keepDim: true });
+      const blurWas = [...ov.querySelectorAll(':scope > .bcv-card-blur')].pop();
+      if (blurWas && !reducedMotion() && !document.documentElement.classList.contains('bcv-noblur') && holeWas.join() !== hole(ov).join()) {
+        ['--bcv-mx', '--bcv-my', '--bcv-mr'].forEach((k, i) => blurWas.style.setProperty(k, holeWas[i])); // (the old layer keeps the old hole)
+        const blurNow = el('bcv-card-blur', null, { 'aria-hidden': 'true' });
+        blurWas.after(blurNow);
+        const ms = gentleMs();
+        blurNow.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: 'ease' }); // (no fill: once in, the stylesheet's own fold takes it out)
+        const out = blurWas.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: 'ease', fill: 'forwards' });
+        out.finished.then(() => blurWas.remove(), () => blurWas.remove());
+      }
       still([sheet, shadow], () => {
         sheet.style.clipPath = clipAs(was, BOX_R);
         shadowAs(was);
