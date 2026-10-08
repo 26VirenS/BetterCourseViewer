@@ -734,6 +734,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
    with the box, never animated), fading in on the press and out as the box folds. Safari drew an earlier blur, whose
    strength and hole were animated, while they moved — then dropped it the moment they settled. */
 .bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; transition: opacity .25s ease .3s; }
+.bcv-sheet-ov--card.is-under { opacity: 0; pointer-events: none; transition: opacity .18s ease; } /* (2.99.10: a mark's card under the rubric opened from its ring; it comes back as the rubric goes) */
 /* the dim and the blur are layers of their own under the box (z 0 to its 1); the box itself never fades in */
 /* the dim and the blur are layers of their own under the box (z 0 to its 1); the box itself never fades in. The dim's stops
    (--bcv-d1..3, on the layer itself) are the box's: its own half-diagonal × .8, + 220px and + 900px out, as a share of the
@@ -807,10 +808,75 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-fb--box .bcv-fb__facts { gap: 4px 16px; }
 .bcv-fb--box .bcv-card--empty { padding: 14px 16px; font-size: 13px; }
 .bcv-fb--box .bcv-fb__btns .bcv-qz__big { flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 17px; font-size: 13.5px; } /* (a button, not a slab across the box) */
-/* (2.99.10) a compact card: the header tighter, the reply a single slim row — its heading gone (the field says it), its note small */
-.bcv-mark > .bcv-sheet__head { padding: 12px 14px 11px; gap: 11px; }
-.bcv-mark .bcv-sheet__tile { width: 32px; height: 32px; border-radius: 10px; }
-.bcv-mark .bcv-sheet__value { font-size: 21px; }
+/* (2.99.10) the mark's card (screens/feedback.js card, ring): the ring and the score over the work's name and its course;
+   then when, the instructor's words as bubbles, the attempts as tiles; a comment in one pill at the foot. One ground, the
+   sections parted by inset hairlines, the foot by a full one. */
+.bcv-mark > .bcv-sheet__head { padding: 20px 20px 16px; gap: 16px; align-items: center; border-bottom: 0; }
+.bcv-mark > .bcv-sheet__head .bcv-sheet__close { align-self: flex-start; }
+.bcv-mark .bcv-mark__ringslot { width: 56px; height: 56px; border-radius: 50%; background: none; transition: opacity .22s ease .14s; }
+.bcv-mark.is-at-card .bcv-mark__ringslot, .bcv-sheet-ov.is-folding .bcv-mark .bcv-mark__ringslot { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
+.bcv-mark .bcv-sheet__value { font: 700 34px/1 var(--bcv-display); letter-spacing: -.03em; }
+.bcv-mark .bcv-sheet__label { font: 600 18px/1 var(--bcv-display); color: var(--bcv-ink3); }
+.bcv-mark .bcv-sheet__line { gap: 6px; }
+.bcv-mark__title { margin-top: 7px; font: 700 16px/1.25 var(--bcv-font); color: var(--bcv-ink); letter-spacing: -.01em; }
+.bcv-mark .bcv-mark__meta { display: flex; align-items: center; gap: 7px; margin-top: 4px; font: 400 13.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-mark .bcv-mark__dot { flex: none; width: 10px; height: 10px; border-radius: 2.5px; }
+.bcv-mring { position: relative; flex: none; display: grid; place-items: center; width: 56px; height: 56px; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; }
+.bcv-mring > svg { position: absolute; inset: 0; }
+.bcv-mring__dim { opacity: .26; }
+.bcv-mring__pct { position: relative; font: 700 13px/1 var(--bcv-font); letter-spacing: -.02em; }
+.bcv-mring--rubric { cursor: pointer; transition: scale .16s var(--bcv-spring-snappy); }
+@media (hover: hover) and (pointer: fine) { .bcv-mring--rubric:hover { scale: 1.06; } }
+.bcv-mring--rubric:active { scale: .96; }
+.bcv-mring--rubric:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 3px; }
+.bcv-mark > .bcv-sheet__list.bcv-mark__body { background: none; }
+.bcv-mcard { display: flex; flex-direction: column; }
+.bcv-mcard__body { display: flex; flex-direction: column; padding: 0 20px; }
+.bcv-mcard__row { padding: 14px 0; border-top: 1px solid var(--bcv-sep); }
+.bcv-mcard__times { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.bcv-mcard__when { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bcv-mcard__when--end { align-items: flex-end; text-align: right; }
+.bcv-mcard__k { font: 400 13px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-mcard__v { font: 700 15px/1.25 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-mcard__link { position: relative; width: 56px; height: 9px; }
+.bcv-mcard__link::before { content: ''; position: absolute; left: 0; right: 4px; top: 4px; height: 1.5px; border-radius: 1px; background: var(--bcv-ink3); opacity: .45; }
+.bcv-mcard__link::after { content: ''; position: absolute; right: 0; top: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--bcv-ink3); opacity: .5; }
+.bcv-mcard__link.is-done::after { background: var(--bcv-mtone, var(--bcv-green)); opacity: 1; }
+.bcv-mcard__handed { display: flex; flex-wrap: wrap; gap: 6px; }
+.bcv-mark .bcv-mcard__chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; height: 30px; padding: 0 11px 0 6px; border: 0; border-radius: 15px; background: var(--bcv-fill); color: var(--bcv-ink); font: 500 13px/1 var(--bcv-font); cursor: pointer; transition: scale .16s var(--bcv-spring-snappy); }
+.bcv-mark .bcv-mcard__chip:active { scale: .96; }
+.bcv-mark .bcv-mcard__chip--link { padding-left: 11px; color: var(--bcv-blue); text-decoration: none; }
+.bcv-mcard__chipk { flex: none; padding: 3px 5px; border-radius: 6px; background: var(--bcv-card); font: 700 9.5px/1 var(--bcv-font); letter-spacing: .04em; color: var(--bcv-ink2); }
+.bcv-mcard__chipn { min-width: 0; }
+.bcv-mcard__quote { width: 100%; font: 400 13.5px/1.45 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-mcard__words { display: flex; flex-direction: column; gap: 12px; }
+.bcv-mcard__bubble { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; max-width: 88%; }
+.bcv-mcard__bubble.is-mine { align-self: flex-end; align-items: flex-end; }
+.bcv-mcard__btext { padding: 10px 14px; border-radius: 18px; background: var(--bcv-fill); font: 400 14.5px/1.4 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-mcard__bubble.is-mine .bcv-mcard__btext { background: var(--bcv-blue-soft); }
+.bcv-mcard__btext p { margin: 0; white-space: pre-wrap; }
+.bcv-mark .bcv-mcard__blink { display: block; margin-top: 4px; padding: 0; border: 0; background: none; color: var(--bcv-blue); font: 500 13px/1.3 var(--bcv-font); cursor: pointer; }
+.bcv-mcard__bwho { padding: 0 6px; font: 400 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-mcard__attempts { display: flex; flex-direction: column; gap: 9px; }
+.bcv-mcard__head { display: flex; justify-content: space-between; gap: 12px; }
+.bcv-mcard__tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.bcv-mark .bcv-mcard__tile { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; box-sizing: border-box; margin: 0; padding: 9px 12px; border: 1.5px solid transparent; border-radius: 14px; background: var(--bcv-fill); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: scale .16s var(--bcv-spring-snappy), border-color .18s ease, background-color .18s ease; }
+.bcv-mark .bcv-mcard__tile:active { scale: .96; }
+.bcv-mark .bcv-mcard__tile.is-on:not(.is-kept) { border-color: var(--bcv-ink3); }
+.bcv-mark .bcv-mcard__tile:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 2px; }
+.bcv-mcard__tilek { font: 400 12.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-mcard__tilev { font: 700 15px/1.2 var(--bcv-font); color: var(--bcv-ink); font-variant-numeric: tabular-nums; }
+.bcv-mark .bcv-mcard__tile.is-kept { border-color: var(--bcv-mtone, var(--bcv-green)); background: color-mix(in srgb, var(--bcv-mtone, var(--bcv-green)) 15%, transparent); }
+.bcv-mark .bcv-mcard__tile.is-kept .bcv-mcard__tilev { color: var(--bcv-mtone, var(--bcv-green)); }
+.bcv-mcard__foot { position: sticky; bottom: 0; z-index: 1; padding: 14px 20px 16px; border-top: 1px solid var(--bcv-sep); background: var(--bcv-card); } /* (held at the card's foot when what is above it scrolls) */
+.bcv-mcard__pill { display: flex; align-items: center; height: 46px; padding: 0 5px 0 0; border: 1px solid var(--bcv-edge); border-radius: 23px; background: var(--bcv-fill); }
+.bcv-mark .bcv-mcard__input { flex: 1; min-width: 0; box-sizing: border-box; height: 44px; margin: 0; padding: 0 16px; border: 0; border-radius: 22px; outline: none; box-shadow: none; background: transparent; color: var(--bcv-ink); font: 400 15px/normal var(--bcv-font); } /* (every box-model value said: Canvas's own input styles reach the page body, where the box lives) */
+.bcv-mark .bcv-mcard__input::placeholder { color: var(--bcv-ink3); }
+.bcv-mcard__pill:focus-within { border-color: var(--bcv-blue); }
+.bcv-mark .bcv-mcard__send { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--bcv-blue); color: #fff; cursor: pointer; transition: background-color .18s ease, color .18s ease, scale .16s var(--bcv-spring-snappy); }
+.bcv-mark .bcv-mcard__send:disabled { background: var(--bcv-fill2, rgba(120,120,128,.24)); color: var(--bcv-ink3); cursor: default; }
+.bcv-mark .bcv-mcard__send:active:not(:disabled) { scale: .92; }
+.bcv-mcard__perm { padding: 8px 6px 0; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-fb--box .bcv-fb__composer { gap: 6px; }
 .bcv-fb--box .bcv-fb__composer > .bcv-fb__kicker { display: none; }
 .bcv-fb--box .bcv-fb__compose { gap: 6px; }

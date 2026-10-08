@@ -177,7 +177,7 @@
   function open(a, sub, { from, dev = false } = {}) {
     unmorph();
     live?.close(true);
-    document.querySelector('.bcv-sheet-ov')?.remove();
+    document.querySelector('.bcv-sheet-ov:not(.bcv-sheet-ov--card)')?.remove(); // (a mark's card stays under it: pressed from its ring, the rubric closes back onto it)
     const m = model(a, sub);
     if (!m.n) return null;
     const { crit, hues, seg, n } = m;

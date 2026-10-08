@@ -27,7 +27,7 @@
   self.BCV_WHATS_NEW = [
     { version: '2.99.10', date: '2026-10-08', notes: [
       { kind: 'fixed', title: 'Tool grades open here', body: 'Hovering a tool or quiz grade opens its card, not a page.', icon: P.check },
-      { kind: 'improved', title: 'A slimmer grade card', body: 'The grade card is narrower and fits what it holds.', icon: P.layers },
+      { kind: 'improved', title: 'A new grade card', body: 'A score ring, dates and attempts; the ring opens the rubric.', icon: P.layers },
     ] },
     { version: '2.99.9', date: '2026-10-07', notes: [
       { kind: 'new', title: 'New-activity alerts', body: 'On iPhone: posts, grades and messages while closed.', icon: P.sparkle },

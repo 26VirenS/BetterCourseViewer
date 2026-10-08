@@ -64,15 +64,14 @@
     const word = (sel) => from.querySelector(sel)?.textContent?.trim() || '';
     // the header's words are the chip's own, so each glides from where it stands: the score (or the standing) as the value, the percent beside it, the when-line in the note
     const value = posted ? store.fmtPts(s.score) : word('.bcv-detail__gradepc') || 'Submitted'; // (the chip's own word, exactly, so it glides from where it stands: the score alone, or the standing)
-    const label = posted ? `/ ${a.points_possible ?? '—'} · ${word('.bcv-detail__gradepc')}` : '';
+    const label = posted ? `/ ${a.points_possible ?? '—'}` : ''; // (2.99.10: the share is the ring's, beside it)
     const when = word('.bcv-detail__gradewhen');
-    const tone = posted ? { icon: IC.chart, color: '#34c759' } : held ? { icon: IC.clock, color: '#ff9f0a' } : { icon: IC.check, color: '#34c759' };
     const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': `${a.name}: ${posted ? 'your mark' : 'what you handed in'}` }); // (is-far: the dim and blur start out wide, to close in on the box)
     let folding = false;
     let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the chip)
-    // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 420 wide,
+    // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 400 wide,
     // as tall as what it holds up to 560 (2.99.10: a compact card, not a panel), or what the window allows, pushed back inside it
-    const M = 16, W = 420, H = 560;
+    const M = 16, W = 400, H = 560;
     let boxH = H; // (as tall as its content wants, up to H: measured once built)
     function geometry(back) {
       const r = from.getBoundingClientRect();
@@ -112,13 +111,34 @@
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey);
     ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
-    const built = BCV.screens.feedback.build(ctx, c, a, s, { box: true });
+    // (2.99.10) the card: the ring (the rubric's, where there is one: a press on it opens the rubric), the score, the
+    // work's name, its course and kind; then what feedback.card draws — when, the words, the attempts, a comment
+    const F = BCV.screens.feedback;
+    const built = F.card(ctx, c, a, s);
+    // the ring pressed: the rubric takes the stage, the card stepping back under it, and comes back as the rubric goes
+    // (onto the ring it was opened from). The rubric's own code is loaded ahead, so the press opens it at once.
+    if (a.rubric?.length) BCV.lazy?.load?.('rubric').catch(() => {});
+    const toRubric = () => {
+      ov.classList.add('is-under');
+      CS().openRubric(a, s);
+      const t0 = Date.now();
+      let seen = false;
+      const back = () => {
+        if (!ov.isConnected) return;
+        const rr = document.querySelector('.bcv-rr-ov');
+        seen = seen || !!rr;
+        if (rr ? !rr.classList.contains('is-leaving') && !rr.classList.contains('is-closing') : !seen && Date.now() - t0 < 4000) { setTimeout(back, 90); return; }
+        ov.classList.remove('is-under');
+      };
+      back();
+    };
     const sheet = U.el('bcv-sheet bcv-sheet--card bcv-mark is-at-card', [
-      U.el('bcv-sheet__head', [
-        h('span', { class: 'bcv-sheet__tile' }, U.svg(tone.icon, { size: 19, stroke: tone.color, width: 1.9 })),
+      U.el('bcv-sheet__head bcv-mark__head', [
+        h('span', { class: 'bcv-sheet__tile bcv-mark__ringslot' }, F.ring(a, s, { onRubric: toRubric })),
         U.el('bcv-sheet__titles', [
           U.el('bcv-sheet__line', [U.text('bcv-sheet__value', value, 'span'), label ? U.text('bcv-sheet__label', label, 'span') : null]),
-          U.text('bcv-sheet__note bcv-pretty', [a.name, when].filter(Boolean).join(' · ')),
+          U.text('bcv-mark__title bcv-pretty', a.name),
+          U.el('bcv-sheet__note bcv-mark__meta', [h('span', { class: 'bcv-mark__dot', style: { background: c.color || 'var(--bcv-ink3)' }, 'aria-hidden': 'true' }), U.text('bcv-ellip', [c.shortName || c.name, F.kindOf(a, s), when && !posted ? when : null].filter(Boolean).join(' · '), 'span')]),
         ]),
         h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
       ]),
