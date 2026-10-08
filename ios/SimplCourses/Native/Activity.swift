@@ -102,7 +102,8 @@ final class Activity: ObservableObject {
     /// The kinds of activity Settings offers for this school.
     var kindsOffered: [Kind] { onBrightspace ? Kind.brightspace : Kind.allCases }
     #if os(macOS)
-    /// (the Mac app: it runs while it is open, so a look every 20 minutes is a timer of its own)
+    /// (the Mac app: it runs while it is open, so a look every 3 minutes (1.2.1) is a timer of its own; the look itself is
+    /// its own requests with the kept sign-in, read off the main thread — never the page the screens ask)
     private var timer: Timer?
     #endif
 
@@ -201,12 +202,14 @@ final class Activity: ObservableObject {
         try? BGTaskScheduler.shared.submit(r)
         #else
         guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 20 * 60, repeats: true) { _ in
+        let t = Timer.scheduledTimer(withTimeInterval: 3 * 60, repeats: true) { _ in
             Task { @MainActor in
                 guard Activity.shared.on else { return }
                 _ = await Activity.shared.check(notify: true)
             }
         }
+        t.tolerance = 20
+        timer = t
         #endif
     }
 
@@ -261,7 +264,8 @@ final class Activity: ObservableObject {
         return said.count
     }
 
-    /// The school read as the check reads it, with the sign-in kept on this device.
+    /// The school read as the check reads it, with the sign-in kept on this device: requests of its own, read and sorted
+    /// off the main thread (the readers are nonisolated), so a look never holds up the app.
     private func read(_ ctx: Context) async -> Read {
         guard let base = Activity.baseURL() else { return .failed }
         let host = base.host?.lowercased() ?? ""
@@ -291,7 +295,7 @@ final class Activity: ObservableObject {
     // MARK: - Reading the stream
 
     /// A GET with the kept sign-in's cookies: the answer and its status, or nil with no answer.
-    private static func get(_ url: URL, cookies: [String: String]) async -> (data: Data, status: Int)? {
+    private nonisolated static func get(_ url: URL, cookies: [String: String]) async -> (data: Data, status: Int)? {
         var req = URLRequest(url: url, timeoutInterval: 20)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.httpShouldHandleCookies = false
@@ -301,7 +305,7 @@ final class Activity: ObservableObject {
     }
 
     /// Canvas: the student's activity stream, its newest forty.
-    private static func readCanvas(_ base: URL, ctx: Context, cookies: [String: String]) async -> Read {
+    private nonisolated static func readCanvas(_ base: URL, ctx: Context, cookies: [String: String]) async -> Read {
         guard var comps = URLComponents(url: base.appendingPathComponent("api/v1/users/self/activity_stream"), resolvingAgainstBaseURL: false) else { return .failed }
         comps.queryItems = [URLQueryItem(name: "per_page", value: "40"), URLQueryItem(name: "only_active_courses", value: "true")]
         guard let url = comps.url, let answer = await get(url, cookies: cookies) else { return .failed }
@@ -313,7 +317,7 @@ final class Activity: ObservableObject {
     /// (1.7) Brightspace: each chosen course's news, and its grades released with the teacher's comment on each —
     /// the last month's (an older one has long been seen, and what was seen is a list kept short). Who is signed in is
     /// asked first: refused there, the sign-in has ended (a course refusing says only that the course does).
-    private static func readBrightspace(_ base: URL, ctx: Context, cookies: [String: String]) async -> Read {
+    private nonisolated static func readBrightspace(_ base: URL, ctx: Context, cookies: [String: String]) async -> Read {
         let lp = ctx.lp ?? "1.50", le = ctx.le ?? "1.82"
         guard let who = await get(base.appendingPathComponent("d2l/api/lp/\(lp)/users/whoami"), cookies: cookies) else { return .failed }
         if who.status == 401 || who.status == 403 { return .refused }
@@ -357,14 +361,14 @@ final class Activity: ObservableObject {
     }
 
     /// Brightspace's rich text ({ Text, Html }): the HTML, or the plain text when there is no HTML.
-    private static func rich(_ v: Any?) -> String? {
+    private nonisolated static func rich(_ v: Any?) -> String? {
         guard let r = v as? [String: Any] else { return nil }
         if let h = r["Html"] as? String, !h.isEmpty { return h }
         return r["Text"] as? String
     }
 
     /// The same short stamp for the same words on every launch (Swift's own hash differs from one launch to the next).
-    private static func stamp(_ s: String) -> String {
+    private nonisolated static func stamp(_ s: String) -> String {
         var h: UInt64 = 0xcbf2_9ce4_8422_2325
         for b in s.utf8 { h = (h ^ UInt64(b)) &* 0x0000_0100_0000_01b3 }
         return String(h, radix: 36)
@@ -388,33 +392,28 @@ final class Activity: ObservableObject {
     }
 
     /// Canvas's JSON, its `while(1);` guard taken off.
-    private static func json(_ data: Data) -> Any? {
+    private nonisolated static func json(_ data: Data) -> Any? {
         let guardBytes = Data("while(1);".utf8)
         let body = data.starts(with: guardBytes) ? data.dropFirst(guardBytes.count) : data[...]
         return try? JSONSerialization.jsonObject(with: Data(body))
     }
 
-    private static func str(_ v: Any?) -> String? {
+    private nonisolated static func str(_ v: Any?) -> String? {
         if let s = v as? String { return s }
         if let n = v as? NSNumber { return n.stringValue }
         return nil
     }
 
-    private static let isoFull: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
-
-    private static let isoPlain = ISO8601DateFormatter()
-
-    private static func date(_ v: Any?) -> Date? {
+    private nonisolated static func date(_ v: Any?) -> Date? {
         guard let s = str(v) else { return nil }
-        return isoFull.date(from: s) ?? isoPlain.date(from: s)
+        // (made here: the reading runs off the main thread, where the class's own would not reach)
+        let full = ISO8601DateFormatter()
+        full.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return full.date(from: s) ?? ISO8601DateFormatter().date(from: s)
     }
 
     /// HTML to a line of plain words.
-    private static func plain(_ html: Any?, max: Int = 160) -> String {
+    private nonisolated static func plain(_ html: Any?, max: Int = 160) -> String {
         var s = str(html) ?? ""
         s = s.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
         for (k, v) in ["&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&rsquo;": "’", "&lsquo;": "‘", "&ldquo;": "“", "&rdquo;": "”", "&hellip;": "…"] {
@@ -425,7 +424,7 @@ final class Activity: ObservableObject {
     }
 
     /// What one stream item has to say, in the Notifications screen's own terms (store.js notifications()).
-    private static func events(from a: [String: Any], ctx: Context) -> [Event] {
+    private nonisolated static func events(from a: [String: Any], ctx: Context) -> [Event] {
         guard let id = str(a["id"]), let type = a["type"] as? String else { return [] }
         let courseId = str(a["course_id"])
         // only the courses chosen (a message, which has no course, always counts)
