@@ -26,7 +26,7 @@
   };
   self.BCV_WHATS_NEW = [
     { version: '2.99.14', date: '2026-10-08', notes: [
-      { kind: 'improved', title: 'The button grows', body: 'Submit stretches into its panel, in its own colour.', icon: P.sparkle },
+      { kind: 'improved', title: 'The button grows', body: 'Submit grows out of its middle into the panel.', icon: P.sparkle },
       { kind: 'improved', title: 'Marks on your work', body: 'Handed-in files open in Canvas’s viewer, with its notes.', icon: P.pen },
     ] },
     { version: '2.99.13', date: '2026-10-08', notes: [

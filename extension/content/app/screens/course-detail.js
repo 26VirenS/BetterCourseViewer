@@ -60,8 +60,8 @@
   /** (2.99.13) A box that grows out of what opened it (U.cardBox): the mark's card from a grade, the hand-in panel from the
    *  assignment's big pill. `make(api)` fills it — { cls, kids, measure(), glide?: [[box's word, button's word]] } — and
    *  can call api.swap(make2) to turn it into something else in place (the card's Submit again), api.relayout() when what
-   *  it holds changes height, api.close() to fold it back. `anchor` is the button's corner it hangs from: 'right' (a chip
-   *  at the end of a row) or 'left' (a pill at the start of one). */
+   *  it holds changes height, api.close() to fold it back. `anchor` is where it grows from: 'right' (hung from a chip's
+   *  corner at the end of a row), 'left' (from a button's start), or 'center' (out of the button's middle, every way). */
   function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null } = {}, make) {
     const prev = document.querySelector('.bcv-sheet-ov');
     if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return prev.bcvApi; } // (pressed again as it folds: it opens again from where it is)
@@ -75,8 +75,9 @@
       const r = from.getBoundingClientRect();
       if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
       const vw = innerWidth, vh = innerHeight, w = Math.min(width, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
-      const x = anchor === 'left' ? r.left : r.right - w;
-      return { x: Math.max(M, Math.min(x, vw - M - w)), y: Math.max(M, Math.min(r.top, vh - M - hgt)), w, h: hgt };
+      const x = anchor === 'center' ? r.left + r.width / 2 - w / 2 : anchor === 'left' ? r.left : r.right - w;
+      const y = anchor === 'center' ? r.top + r.height / 2 - hgt / 2 : r.top; // (centre: the box's middle on the button's, growing out of it every way)
+      return { x: Math.max(M, Math.min(x, vw - M - w)), y: Math.max(M, Math.min(y, vh - M - hgt)), w, h: hgt };
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
     const onKey = (e) => {
@@ -185,7 +186,7 @@
     // laid out where it goes, at its measured height, and drawn only where the button is — the copy of its words set over the
     // button's own place in it — before anything is painted: the first frame is the button
     const g0 = box.start();
-    if (anchor === 'left') Object.assign(copy.style, { left: `${Math.round(r0.left - g0.x)}px`, right: 'auto', top: `${Math.round(r0.top - g0.y)}px` });
+    if (anchor !== 'right') Object.assign(copy.style, { left: `${Math.round(r0.left - g0.x)}px`, right: 'auto', top: `${Math.round(r0.top - g0.y)}px` });
     else Object.assign(copy.style, { right: `${Math.round(g0.x + g0.w - r0.right)}px`, top: `${Math.round(r0.top - g0.y)}px` });
     box.open(glide);
     // the button is what grows: the real one steps out while its box is up (the box's first and last frames are it
@@ -474,12 +475,12 @@
         return { cls: 'bcv-hand', kids: [handScreen], measure: () => handScreen.scrollHeight + 2, after: () => setTimeout(() => (handScreen.querySelector('.bcv-sb__tab.is-active, .bcv-sb__tab, .bcv-sb__drop, .bcv-sb__ta') || handScreen).focus?.({ preventScroll: true }), 60) };
       };
       if (api) { api.swap(content, { W: 400 }); return; }
-      opened = growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'left', onClosed: afterClose, vars: courseVars(c) }, content);
+      opened = growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', onClosed: afterClose, vars: courseVars(c) }, content);
     };
     let sentOff = false;
     const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)
     const openCard = (pill, { hover = false } = {}) => {
-      const run = () => { opened = openMarkBox(ctx, c, a, current, pill, { anchor: 'left', hover, onClosed: afterClose, again: canAgain(current) ? (bx) => openHand(pill, bx) : null }); };
+      const run = () => { opened = openMarkBox(ctx, c, a, current, pill, { anchor: 'center', hover, onClosed: afterClose, again: canAgain(current) ? (bx) => openHand(pill, bx) : null }); };
       const need = [BCV.screens.feedback?.card ? null : BCV.lazy?.load?.('submit'), a.rubric?.length && !BCV.rubricRing ? BCV.lazy?.load?.('rubric')?.catch(() => null) : null].filter(Boolean);
       if (!need.length) run(); else Promise.all(need).then(() => { if (pill.isConnected) run(); }).catch(() => { if (!hover) app.go(`${c.url}/assignments/${a.id}?bcv=feedback`); });
     };
