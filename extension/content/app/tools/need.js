@@ -137,7 +137,7 @@
       nowHint.textContent = c ? (c.score === null ? 'Canvas has no score for this course yet.' : 'From Canvas: your current score, graded work only.') : 'Your current grade, as a percentage.';
       const opts = [...st.pieces.map((x) => ({ value: x.id, text: `${x.name} · ${x.worth}%` })), { value: 'custom', text: 'Something else…' }];
       pieceBox.hidden = !c;
-      pieceBox.replaceChildren(c ? U.picker(opts, st.piece, (v) => { st.piece = v; const x = pieceOf(); if (x) { st.worth = String(x.worth); worthF.inp.value = st.worth; } paint(); }, { label: 'What is left', placeholder: st.loading ? 'Reading the assignments…' : 'Choose what is left' }) : null);
+      pieceBox.replaceChildren(...(c ? [U.picker(opts, st.piece, (v) => { st.piece = v; const x = pieceOf(); if (x) { st.worth = String(x.worth); worthF.inp.value = st.worth; } paint(); }, { label: 'What is left', placeholder: st.loading ? 'Reading the assignments…' : 'Choose what is left' })] : [])); // (a null handed to replaceChildren is written out as the word)
       const x = pieceOf();
       worthF.el.hidden = !!x;
       pieceHint.textContent = x ? (c?.weighted || st.own ? `${x.group} is ${x.groupWeight}% of the grade${st.own ? ' (your own weights)' : ''}; this is ${U.plural(x.pts, 'point')} of the group's ${x.groupPts}.` : `${U.plural(x.pts, 'point')} of the course's ${x.total}.`) : st.loading ? 'Reading the assignments…' : c && !st.pieces.length ? 'Nothing left ungraded that Canvas knows of. Type what the work is worth.' : 'How much of the final grade the work still to come is worth.';

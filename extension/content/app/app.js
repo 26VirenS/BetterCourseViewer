@@ -1290,9 +1290,9 @@
 
   /** ?bcv=whatsnew (Settings → General → What's new): the parameter is dropped, the page drawn, and What's new opened over it for this version. */
   async function whatsnewHere() {
-    const url = new URL(location.href);
+    const url = BCV.lms.routeUrl(); // (the interface's own address: on Brightspace its query rides in ?simpl=)
     url.searchParams.delete('bcv');
-    history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
+    history.replaceState(navState(false), '', BCV.lms.pageFor(url));
     state.route = parseRoute();
     await render();
     BCV.whatsnew?.open(BCV.app, { manual: true });
@@ -1307,9 +1307,9 @@
   /** ?bcv=rubric (Settings → Developer → Rubric): the parameter is dropped and a made-up rubric's ring opened over
    *  the page, Try scores on it (content/app/rubric-ring.js). The ring is the desktop's: a phone is told so. */
   async function rubricHere() {
-    const url = new URL(location.href);
+    const url = BCV.lms.routeUrl(); // (the interface's own address: on Brightspace its query rides in ?simpl=)
     url.searchParams.delete('bcv');
-    history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
+    history.replaceState(navState(false), '', BCV.lms.pageFor(url));
     state.route = parseRoute();
     if (phone()) { U.toast('The rubric ring is drawn on a computer.'); return; }
     try { await BCV.lazy.load('rubric'); } catch { U.toast('The rubric ring could not load.', { error: true }); return; }
@@ -1319,9 +1319,9 @@
   /** ?bcv=welcome (Settings → General → See it again): the parameter is dropped,
    *  the page drawn, and the guided tour that follows the setup runs over it again. */
   async function welcomeHere() {
-    const url = new URL(location.href);
+    const url = BCV.lms.routeUrl(); // (the interface's own address: on Brightspace its query rides in ?simpl=)
     url.searchParams.delete('bcv');
-    history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
+    history.replaceState(navState(false), '', BCV.lms.pageFor(url));
     state.route = parseRoute();
     BCV.welcome.cover();
     await render();
@@ -1746,6 +1746,14 @@
           state.quizOpen = false; // the guard belongs to our screen, and our screen is being left on purpose
           location.href = raw;
           return;
+        }
+        // Brightspace: the page for this screen either way — Brightspace's own with the look off, the interface's with it
+        // on (the page underneath is the homepage the screen was drawn over, which a reload would show instead)
+        if (BCV.lms?.d2l && wasSkin !== st.skin) {
+          const u = BCV.lms.routeUrl();
+          if (st.skin) u.searchParams.delete('bcv'); else u.searchParams.set('bcv', 'native');
+          const to = BCV.lms.pageFor(u);
+          if (to !== location.pathname + location.search + location.hash) { location.href = to; return; }
         }
         location.reload();
         return;

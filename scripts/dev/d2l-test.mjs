@@ -49,12 +49,13 @@ function sandbox({ path = '/d2l/home', search = '', signedIn = true, ctx = { org
   const box = {
     console, setTimeout, clearTimeout, URL, URLSearchParams, Blob, FormData, File, AbortController, TextEncoder, TextDecoder, Promise, JSON, Date, Math, Map, Set, Array, Object, String, Number, Error, Symbol, RegExp,
     location: { hostname: 'localhost', host: `localhost:${PORT}`, origin: BASE, pathname: path, search, hash: '', href: `${BASE}${path}${search}`, replace: (u) => replaced.push(u) },
-    document: { cookie: '', querySelector: () => null, querySelectorAll: () => [], documentElement: { getAttribute: (k) => (k === 'data-global-context' && signedIn ? JSON.stringify(ctx) : null), classList: { add: (c) => classes.add(c), contains: (c) => classes.has(c) } } },
+    document: { cookie: '', querySelector: () => null, querySelectorAll: () => [], addEventListener: () => {}, documentElement: { getAttribute: (k) => (k === 'data-global-context' && signedIn ? JSON.stringify(ctx) : null), classList: { add: (c) => classes.add(c), contains: (c) => classes.has(c) } } },
     localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     fetch: (u, init = {}) => fetch(new URL(u, BASE), { ...init, headers: { ...(init.headers || {}), ...(signedIn ? { cookie: 'd2lSessionVal=ok' } : {}) } }),
   };
   box.self = box;
   box.window = box;
+  box.open = (u) => { box.opened = u; return null; };
   box.top = box;
   box.BCV = { api: { storage: { local: { get: async (k) => (k in local ? { [k]: JSON.parse(JSON.stringify(local[k])) } : {}), set: async (o) => { for (const [k, v] of Object.entries(o)) local[k] = JSON.parse(JSON.stringify(v)); } } } } };
   vm.createContext(box);
@@ -93,7 +94,25 @@ console.log('\naddresses, either way');
   check(L.toPage('/courses/31001/quizzes/802') === '/d2l/lms/quizzing/user/quiz_summary.d2l?qi=802&ou=31001' && L.toPage('/courses/31001/assignments/1000000802') === '/d2l/lms/quizzing/user/quiz_summary.d2l?qi=802&ou=31001' && L.fromPage('/d2l/lms/quizzing/user/quiz_summary.d2l?qi=802&ou=31001') === '/courses/31001/quizzes/802?bcv=native', 'a quiz — by its own id or its assignment’s — is Brightspace’s own quiz page, which the interface leaves as it is');
   check(L.toPage('/courses/31001/modules/items/1308') === '/d2l/le/content/31001/viewContent/1308/View' && L.fromPage('/d2l/le/content/31001/viewContent/1308/View') === '/courses/31001/modules/items/1308?bcv=native', 'a content topic the interface does not draw is Brightspace’s content viewer, left as it is');
   check(L.fromPage('/d2l/lms/dropbox/user/folder_submit_files.d2l?db=702&ou=31001') === '/courses/31001/assignments/702' && L.fromPage('/d2l/le/content/31001/Home') === '/courses/31001/modules' && L.fromPage('/d2l/lms/grades/my_grades/main.d2l?ou=31001') === '/courses/31001/grades' && L.fromPage('/d2l/le/31001/discussions/topics/902/View') === '/courses/31001/discussion_topics/2000000902', 'Brightspace’s own pages for an assignment, the content, the grades and a discussion are the interface’s screens for them');
+  const nat = [
+    ['/courses/31001/assignments/702?bcv=native', '/d2l/lms/dropbox/user/folder_submit_files.d2l?db=702&ou=31001&bcv=native'],
+    ['/courses/31001/grades?bcv=native', '/d2l/lms/grades/my_grades/main.d2l?ou=31001&bcv=native'],
+    ['/courses/31001/discussion_topics/2000000902?bcv=native', '/d2l/le/31001/discussions/topics/902/View?bcv=native'],
+    ['/courses/31001/modules?bcv=native', '/d2l/le/content/31001/Home?bcv=native'],
+  ];
+  const natBad = nat.filter(([c, d]) => L.toPage(c) !== d || L.fromPage(d) !== c);
+  check(!natBad.length && L.toPage('/courses/31001/files/1302?bcv=native') === '/d2l/le/content/31001/viewContent/1302/View', `Brightspace’s own page for a screen, when its own is asked for (“Open in Brightspace”), carries ?bcv=native so the interface leaves it be — and back: ${natBad.map(([c, d]) => `${c} → ${L.toPage(c)} → ${L.fromPage(L.toPage(c))}`).join('; ') || nat.length + ' pairs'}`);
   check(L.fromPage('/d2l/lp/preferences/preferences_main.d2l?ou=6606') === null && L.toPage('https://example.org/x') === 'https://example.org/x' && L.toPage('/d2l/home/31001') === '/d2l/home/31001', 'a Brightspace page the interface has no screen for is left to Brightspace; another site’s address and a Brightspace one pass through');
+  const edit = (raw) => { const u = L.routeUrl(raw); u.searchParams.delete('bcv'); u.searchParams.delete('step'); return L.pageFor(u); };
+  check(edit(`${BASE}/d2l/home?simpl=${encodeURIComponent('/?bcv=setup')}`) === '/d2l/home' && edit(`${BASE}/d2l/home/31001?simpl=${encodeURIComponent('/courses/31001/grades?bcv=whatsnew')}`) === '/d2l/home/31001?simpl=%2Fcourses%2F31001%2Fgrades' && edit(`${BASE}/d2l/home?simpl=${encodeURIComponent('/courses?bcv=setup&step=theme&view=past')}`) === '/d2l/home?simpl=%2Fcourses%3Fview%3Dpast', 'the interface’s own query (?bcv=setup, ?bcv=whatsnew) is edited on its own address, inside ?simpl=, and the page address made again');
+  const cv = sandbox({ path: '/courses/101', search: '?bcv=setup&step=theme', signedIn: false });
+  const cu = cv.BCV.lms.routeUrl();
+  cu.searchParams.delete('bcv');
+  check(cv.BCV.lms.pageFor(cu) === '/courses/101?step=theme', 'on Canvas the same edit is the page’s own address, as before');
+  sb.box.open('/courses/31001/grades', '_blank');
+  const viaOpen = sb.box.opened;
+  sb.box.open('https://example.org/x', '_blank');
+  check(viaOpen === `${BASE}/d2l/home/31001?simpl=%2Fcourses%2F31001%2Fgrades` && sb.box.opened === 'https://example.org/x', `the interface’s own window.open of one of its addresses opens the Brightspace page for it; another site’s as it is: ${viaOpen}`);
   const login = sandbox({ path: '/d2l/login', signedIn: false });
   check(login.BCV.lms.isLoginPage() && !BCV.lms.isLoginPage(), 'Brightspace’s sign-in page is known for what it is');
   const lost = sandbox({ path: '/d2l/error/404/log', search: `?targetUrl=${encodeURIComponent('/courses/31001/assignments/702')}` });
@@ -154,7 +173,7 @@ console.log('\ncontent');
   const page = await get('/api/v1/courses/31001/pages/1301');
   check(page.title === 'Syllabus' && /BIO 110 Syllabus/.test(page.body) && !/<html|<body/i.test(page.body), 'an HTML topic is a page: its body, read with the session');
   const file = await get('/api/v1/files/1302');
-  check(file['content-type'] === 'application/pdf' && file.display_name === 'Cell Diagram' && file.url === '/d2l/api/le/1.82/31001/content/topics/1302/file?stream=false' && file.mime_class === 'pdf', `a file topic is a file, fetched from the topic: ${file.url}`);
+  check(file['content-type'] === 'application/pdf' && file.display_name === 'Cell Diagram' && file.url === '/d2l/api/le/1.82/31001/content/topics/1302/file?stream=false' && file.mime_class === 'pdf' && file.preview_url === '/d2l/le/content/31001/fullscreen/1302/View?skipHeader=True', `a file topic is a file, fetched from the topic, previewed in Brightspace’s own viewer where it is not drawn here: ${file.url}`);
   const seq = await get('/api/v1/courses/31001/module_item_sequence', { asset_type: 'ModuleItem', asset_id: '1302' });
   check(seq.items[0].prev?.title === 'Syllabus' && seq.items[0].next?.title === 'Lab 1: Microscopy', 'Previous and Next run through the topics in reading order');
 }
@@ -310,6 +329,18 @@ try {
   await drawn();
   check(/Lab 2: Osmosis/.test(await mainText()), 'and reloaded there, it is the same screen');
 
+  // the look turned off on a screen: Brightspace's own page for it, left as it is — and back on, the interface's screen
+  await sw.evaluate(() => self.BCV.settings.update(self.BCV.settings.lookPatch(false)));
+  await page.waitForURL((u) => u.pathname === '/d2l/lms/dropbox/user/folders_list.d2l', { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+  const off = await state();
+  check(off.path === '/d2l/lms/dropbox/user/folders_list.d2l?ou=31001&bcv=native' && !off.on && (await page.isVisible('#d2l-folders')), `the look turned off on Assignments lands on Brightspace’s own assignments page: ${off.path}`);
+  await sw.evaluate(() => self.BCV.settings.update(self.BCV.settings.lookPatch(true)));
+  await page.waitForURL((u) => /simpl=/.test(u.search), { timeout: 15000 }).catch(() => {});
+  await drawn();
+  const on = await state();
+  check(on.path === '/d2l/home/31001?simpl=%2Fcourses%2F31001%2Fassignments' && on.on && /Lab 2: Osmosis/.test(await mainText()), `and turned on again there, the interface’s Assignments: ${on.path}`);
+
   // a Canvas-style address typed (or opened from elsewhere): Brightspace's 404 names it, and it is sent on
   await page.goto(`${BASE}/courses/31001/grades`);
   await page.waitForURL((u) => u.pathname === '/d2l/home/31001' && /simpl=/.test(u.search), { timeout: 15000 }).catch(() => {});
@@ -358,6 +389,24 @@ try {
   const content = await mainText();
   check(/Week 1: The Cell/.test(content) && /Optional Reading/i.test(content) && /Cell Biology Primer/.test(content) && !/Instructor notes/.test(content), 'Content: the modules, a module inside one as a heading, the hidden one not there');
   await shot('content');
+  // a link of the interface's opened in a tab of its own (a middle click): the tab gets the Brightspace page for it
+  const link = page.locator('#bcv-main a[href="/courses/31001/assignments/701"]').first();
+  const before = await link.getAttribute('href').catch(() => null);
+  const [tab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }).catch(() => null), link.click({ button: 'middle' }).catch(() => null)]);
+  if (tab) await tab.waitForLoadState('domcontentloaded').catch(() => {});
+  const tabAt = tab ? new URL(tab.url()) : null;
+  await page.mouse.click(5, 300); // (the next press puts the link's own address back)
+  const after = await link.getAttribute('href').catch(() => null);
+  check(before === '/courses/31001/assignments/701' && tabAt?.pathname + tabAt?.search === '/d2l/home/31001?simpl=%2Fcourses%2F31001%2Fassignments%2F701' && after === before, `a link opened in a tab of its own goes to the Brightspace page for it (Brightspace has no page at the interface’s own address), and keeps its own address after: ${before} → ${tabAt ? tabAt.pathname + tabAt.search : 'no tab'} → ${after}`);
+  if (tab) await tab.close().catch(() => {});
+  await page.click('#bcv-main a[href="/courses/31001/files/1302"]');
+  await page.waitForSelector('.bcv-viewer', { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  const viewer = await page.evaluate(() => ({ title: document.querySelector('.bcv-viewer .bcv-sheet__title')?.textContent || '', frame: document.querySelector('.bcv-viewer__frame')?.getAttribute('src') || null, drawn: !!document.querySelector('.bcv-viewer canvas, .bcv-viewer .bcv-dv, .bcv-viewer [class*="pdf"]'), none: document.querySelector('.bcv-viewer__none')?.innerText || '' }));
+  await shot('viewer');
+  check(viewer.title === 'Cell Diagram' && (viewer.drawn || viewer.frame === '/d2l/le/content/31001/fullscreen/1302/View?skipHeader=True') && !viewer.none, `a file in Content opens in the viewer over the page — drawn from its bytes, or Brightspace’s own viewer: ${JSON.stringify(viewer)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
   await page.click('text=Chapter 4 Check');
   await page.waitForURL((u) => u.pathname === '/d2l/lms/quizzing/user/quiz_summary.d2l', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(1500);
@@ -376,6 +425,18 @@ try {
   const cal = await page.evaluate(() => ({ text: (document.querySelector('#bcv-main')?.innerText || ''), appt: !!document.querySelector('.bcv-cal__apptbtn') }));
   check(!cal.appt && /Calendars/.test(cal.text), 'the Calendar, without Canvas’s appointments');
   await shot('calendar');
+
+  // a student new to Simpl: the setup opens over the homepage, and the address it opened at is cleaned at once — on
+  // Brightspace the interface's ?bcv=setup rides inside ?simpl=, and a reload there would open the setup again
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
+  await page.goto(`${BASE}/d2l/home`);
+  await page.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => !/bcv%3Dsetup|bcv=setup/.test(location.search), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1500);
+  const setupAt = await state();
+  check(!!(await page.$('#bcv-setup')) && setupAt.path === '/d2l/home', `a student new to it gets the setup, and the address is the homepage again at once (a reload lands on the page, not the setup): ${setupAt.path}`);
+  await shot('setup');
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'whatsnew:seen': v }), manifest.version);
 
   // signed out: Brightspace sends the page to sign in, and the interface leaves that page alone
   await context.clearCookies();

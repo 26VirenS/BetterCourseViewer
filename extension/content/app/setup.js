@@ -78,7 +78,7 @@
     if (ui) return;
     // The ?bcv=setup that opened this is dropped from the address at once: a reload lands on the
     // page itself, and the welcome comes up on the reloaded page when the steps are done.
-    const url = new URL(location.href);
+    const url = BCV.lms.routeUrl(); // (the interface's own address: on Brightspace its query rides in ?simpl=)
     // Personalize on its own (?bcv=personalize, and the older ?bcv=setup&step=theme): the look, the colour, the photos, for a change later
     const only = url.searchParams.get('bcv') === 'personalize' || (url.searchParams.get('bcv') === 'setup' && url.searchParams.get('step') === 'theme') ? 'personalize' : null;
     // then=appearance (the theme invitation's Personalize): the page after the editor points at the sidebar's Appearance button (welcome.js)
@@ -87,7 +87,7 @@
       url.searchParams.delete('bcv');
       url.searchParams.delete('step');
       url.searchParams.delete('then');
-      history.replaceState(BCV.app?.navState?.(false) || { bcv: true }, '', url.pathname + url.search + url.hash);
+      history.replaceState(BCV.app?.navState?.(false) || { bcv: true }, '', BCV.lms.pageFor(url));
       app.state.route = app.parseRoute();
     }
     const settings = await S.get();
@@ -312,7 +312,7 @@
       head.textContent = COPY.courses[0];
       sub.textContent = COPY.courses[1];
       sub.classList.add('fr__blurb--strong'); // the one thing to get right on this step, said big, bold and blue
-      wrap.replaceChildren(h('div', { class: 'listhead' }, [count, allBtn]), rows, st.courses.length > 5 ? h('p', { class: 'scrollhint', text: 'Scroll down to see more courses' }) : null);
+      wrap.replaceChildren(...[h('div', { class: 'listhead' }, [count, allBtn]), rows, st.courses.length > 5 ? h('p', { class: 'scrollhint', text: 'Scroll down to see more courses' }) : null].filter(Boolean)); // (replaceChildren writes a null out as the word)
       nextBtn.disabled = st.favs.size === 0;
       sayHint();
       paintChrome();
@@ -511,9 +511,9 @@
   function reloadClean() {
     let next = location.href;
     try {
-      const u = new URL(location.href);
+      const u = BCV.lms.routeUrl();
       u.searchParams.delete('bcv'); u.searchParams.delete('step'); u.searchParams.delete('then');
-      next = u.pathname + u.search + u.hash;
+      next = BCV.lms.pageFor(u);
       history.replaceState(null, '', next);
     } catch { /* the address is left as it is */ }
     setTimeout(() => { try { location.reload(); } catch { /* the navigation below is under way */ } }, 1500);

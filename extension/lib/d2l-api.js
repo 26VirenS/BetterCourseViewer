@@ -814,7 +814,9 @@
     const name = decodeURIComponent(String(tp.Url || tp.Title).split('/').pop() || tp.Title);
     const type = mimeOf(name);
     const url = `${await LE(`/${ou}/content/topics/${tp.TopicId}/file`)}?stream=false`;
-    return { id: String(tp.TopicId), uuid: String(tp.TopicId), folder_id: `root-${ou}`, display_name: tp.Title || name, filename: name, 'content-type': type, url, size: null, created_at: null, updated_at: iso(tp.LastModifiedDate), modified_at: iso(tp.LastModifiedDate), locked: !!tp.IsLocked, hidden: false, locked_for_user: !!tp.IsLocked, mime_class: mimeClass(type), preview_url: null, thumbnail_url: null };
+    // (preview: Brightspace's own viewer for the topic, without its header — it shows what the interface does not draw
+    // itself, a slide deck or a spreadsheet made into pages, and counts the topic as viewed, as opening it in Brightspace does)
+    return { id: String(tp.TopicId), uuid: String(tp.TopicId), folder_id: `root-${ou}`, display_name: tp.Title || name, filename: name, 'content-type': type, url, size: null, created_at: null, updated_at: iso(tp.LastModifiedDate), modified_at: iso(tp.LastModifiedDate), locked: !!tp.IsLocked, hidden: false, locked_for_user: !!tp.IsLocked, mime_class: mimeClass(type), preview_url: `/d2l/le/content/${ou}/fullscreen/${tp.TopicId}/View?skipHeader=True`, thumbnail_url: null };
   }
   const fileTopics = async (ou) => (await topicsInOrder(ou)).filter(({ tp }) => tp.TypeIdentifier === 'File' && !/\.html?$/i.test(tp.Url || ''));
   async function filesList(ou) { return Promise.all((await fileTopics(ou)).map(({ tp }) => fileOf(ou, tp))); }

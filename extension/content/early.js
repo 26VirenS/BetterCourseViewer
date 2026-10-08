@@ -124,6 +124,23 @@
     apply({ skin: override ?? true, dark: systemDark() });
   }
 
+  /** A reload for the look turned on or off. On Brightspace, turned on over a page of Brightspace's own that turning it off
+   *  left the page on (?bcv=native, lib/lms.js), it goes to the interface's screen for that page instead: reloaded, the
+   *  page would stay Brightspace's. */
+  function reloadForLook(on) {
+    try {
+      if (on && BCV.lms?.d2l) {
+        const u = BCV.lms.routeUrl();
+        if (u.searchParams.get('bcv') === 'native') {
+          u.searchParams.delete('bcv');
+          const to = BCV.lms.pageFor(u);
+          if (to !== location.pathname + location.search + location.hash) { location.href = to; return; }
+        }
+      }
+    } catch { /* reloaded, then */ }
+    location.reload();
+  }
+
   // 2. Authoritative: extension storage.
   let current = null;
   let shown = null; // the state the page is currently drawn for, so a flip can be told from a first read
@@ -160,7 +177,7 @@
     // site's content scripts when the extension looks at its permissions (opening the toolbar popup
     // does), and a re-injected app.js finds the interface already booted and stands down, leaving
     // this copy with no listener. So the reload is done here when there is no one to do it.
-    if (flipped && !listeners.size && !self.BCVBridge?.native) location.reload();
+    if (flipped && !listeners.size && !self.BCVBridge?.native) reloadForLook(state.skin);
     return state;
   }
   const ready = sync();
@@ -188,7 +205,7 @@
       location.href = raw;
       return;
     }
-    location.reload();
+    reloadForLook(on);
   }
   /** The switch at the top right: green on, red off (2.98.18). Three states under it. 1: the look
    *  on. 0: stock Canvas for this page view only (flipLook's one-page note: the red list's "This

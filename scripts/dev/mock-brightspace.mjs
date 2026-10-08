@@ -350,8 +350,10 @@ const server = http.createServer((req, res) => {
       let r;
       if (path === '/d2l/home' || path === '/d2l/home/') return html(res, 200, page('Homepage', null, '<d2l-my-courses></d2l-my-courses><p class="d2l-widget">My Courses</p>'));
       if ((r = path.match(/^\/d2l\/home\/(\d+)\/?$/))) { const c = course(r[1]); return c && !c.closed ? html(res, 200, page(c.name, c.id, '<p class="d2l-widget">Course homepage</p>')) : redirect(res, `/d2l/error/404/log?targetUrl=${encodeURIComponent(path)}`); }
+      if (path === '/d2l/lms/dropbox/user/folders_list.d2l') return html(res, 200, page('Assignments', q.get('ou'), `<table id="d2l-folders"><tr><td>${(T[q.get('ou')]?.folders || []).filter((f) => !f.IsHidden).map((f) => esc(f.Name)).join('</td></tr><tr><td>')}</td></tr></table>`));
       if (path === '/d2l/lms/quizzing/user/quiz_summary.d2l') return html(res, 200, page('Quiz Summary', q.get('ou'), `<p id="d2l-quiz-summary">Summary of quiz ${esc(q.get('qi') || '')}</p><button id="d2l-quiz-start">Start Quiz!</button>`));
       if ((r = path.match(/^\/d2l\/le\/content\/(\d+)\/viewContent\/(\d+)\/View$/))) return html(res, 200, page('Content', r[1], `<p id="d2l-content-viewer">Topic ${esc(r[2])}</p>`));
+      if ((r = path.match(/^\/d2l\/le\/content\/(\d+)\/fullscreen\/(\d+)\/View$/))) return html(res, 200, `<!DOCTYPE html><html><body><p id="d2l-fullscreen-viewer">Topic ${esc(r[2])}, without the header</p></body></html>`);
       if (path === '/d2l/error/404/log') return html(res, 404, page('Page Not Found', null, `<p id="d2l-404">The page ${esc(q.get('targetUrl') || '')} could not be found.</p>`));
       if (path === '/favicon.ico') { res.writeHead(204); return res.end(); }
       // anything else — a Canvas-style address among them — is Brightspace's 404, which names it
