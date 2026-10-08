@@ -146,7 +146,7 @@ struct PTGrid: View {
                 if !compact, let e = selected {
                     PTCornerCard(element: e, cell: cell)
                         .frame(width: 10 * (cell + gap) - gap, height: 3 * (cell + gap) - gap)
-                        .offset(x: 2 * (cell + gap) + cell * 0.4, y: 0)
+                        .offset(x: 2 * (cell + gap), y: 0)
                 }
                 ForEach(PeriodicTable.elements) { e in
                     PTCell(element: e, cell: cell, compact: compact, selected: selected == e, dimmed: dim(e), matched: matches?.contains(e.number) ?? false)
@@ -160,6 +160,7 @@ struct PTGrid: View {
                     rowLabel("89–103", cell: cell).offset(x: 2 * (cell + gap), y: 6 * (cell + gap))
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
         .aspectRatio(18 / (9 + gapRow), contentMode: .fit)
     }
@@ -271,7 +272,7 @@ private struct PTCornerCard: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.leading, cell * 0.1)
+        .padding(.horizontal, cell * 0.3)
         .transition(.opacity)
         .id(element.number)
     }

@@ -1,6 +1,7 @@
 import AppKit
 import PDFKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 // The PDF annotator, as the web's: a PDF opened in the window and marked up like paper — a highlighter, an underline
 // and a strike-through for words selected, a note pinned to the page, a box of typed text — in six colours, with Undo.

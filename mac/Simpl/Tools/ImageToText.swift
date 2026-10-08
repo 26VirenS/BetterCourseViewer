@@ -2,6 +2,7 @@ import AppKit
 import ImageIO
 import PDFKit
 import SwiftUI
+import UniformTypeIdentifiers
 import Vision
 
 // Image to text, as the web's: the words read off a picture — a photo of the board, a screenshot of a slide, a scanned

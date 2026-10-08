@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // The tools pinned to the toolbar (1.2): the web's tray at the top right, on every screen of the window. Each pin is a
 // toolbar button in its tool's colour; a press opens a popover with the tool's quickest use — the timer's controls, the
