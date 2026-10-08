@@ -94,8 +94,42 @@ struct ToolWindow: View {
                     .help("More")
                 }
             }
+            // (1.2.1) a tool that says to allow third-party cookies: the way round it, at the window's top right
+            ToolbarItem(placement: .primaryAction) {
+                Button { Task { await fixCookies() } } label: { Label("Cookies", systemImage: "checkmark.shield") }
+                    .labelStyle(.titleAndIcon)
+                    .disabled(url == nil)
+                    .help("A tool asks for third-party cookies? This allows them for Simpl and opens the tool on its own page")
+            }
         }
         .task(id: model.engine == nil) { await start() }
+    }
+
+    /// The Cookies button (1.2.1): cross-site cookies allowed for Simpl's web pages, then the tool launched again on
+    /// its own page — where its cookies are its own, not a third party's inside Canvas's frame: Canvas's own one-time
+    /// launch where it gives one, else Canvas's launch form sent to the window instead of the frame, else the page again.
+    private func fixCookies() async {
+        CrossSiteCookies.allow()
+        guard let web = browser.webView else { return }
+        if let here = browser.current ?? url, let args = ToolWindow.launchArgs(for: here), let engine = model.engine,
+           let a = try? await engine.call("toolLaunch", args, as: LaunchAnswer.self), a.sessionless == true, let u = URL(string: a.url) {
+            web.load(URLRequest(url: u))
+            return
+        }
+        let js = "(() => { const f = document.getElementById('tool_form'); if (!f) return false; f.target = '_self'; f.submit(); return true; })()"
+        let sent = ((try? await web.evaluateJavaScript(js)) as? Bool) ?? false
+        if !sent { web.reload() }
+    }
+
+    /// What Canvas needs to launch the tool an address frames: a course's tool, an assignment's, a module item's.
+    static func launchArgs(for u: URL) -> [String: String]? {
+        let p = u.path.split(separator: "/").map(String.init)
+        guard p.count >= 4, p[0] == "courses", p[1].allSatisfy(\.isNumber) else { return nil }
+        let course = p[1]
+        if p[2] == "external_tools", p[3].allSatisfy(\.isNumber) { return ["course": course, "tool": p[3]] }
+        if p[2] == "assignments", p[3].allSatisfy(\.isNumber) { return ["course": course, "assignment": p[3]] }
+        if p.count >= 5, p[2] == "modules", p[3] == "items", p[4].allSatisfy(\.isNumber) { return ["course": course, "moduleItem": p[4]] }
+        return nil
     }
 
     private func start() async {
@@ -156,6 +190,7 @@ struct ToolWebView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> WKWebView {
+        CrossSiteCookies.apply() // (1.2.1: allowed once with the Cookies button, allowed from then on)
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.mediaTypesRequiringUserActionForPlayback = []
@@ -248,5 +283,27 @@ struct ToolWebView: NSViewRepresentable {
                 completionHandler(panel.runModal() == .OK ? panel.urls : nil)
             }
         }
+    }
+}
+
+/// (1.2.1) Cross-site cookies for Simpl's web pages: WebKit's tracking prevention — which keeps a tool's cookies out
+/// when Canvas shows the tool in a frame — turned off for the app's own web data, as Safari's "Prevent cross-site
+/// tracking" turned off would be, for Simpl alone. Allowed with a tool window's Cookies button, and kept.
+@MainActor
+enum CrossSiteCookies {
+    private static let key = "SimplCrossSiteCookies"
+
+    static func allow() {
+        UserDefaults.standard.set(true, forKey: key)
+        apply()
+    }
+
+    static func apply() {
+        guard UserDefaults.standard.bool(forKey: key) else { return }
+        let store = WKWebsiteDataStore.default()
+        let sel = NSSelectorFromString("_setResourceLoadStatisticsEnabled:")
+        guard store.responds(to: sel) else { return } // (a WebKit without it: the relaunch on the tool's own page still helps)
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(store.method(for: sel), to: Setter.self)(store, sel, false)
     }
 }
