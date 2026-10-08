@@ -22,11 +22,16 @@ struct InboxView: View {
     var body: some View {
         Group {
             if let d = model.data {
-                HSplitView {
-                    listPane(d)
-                        .frame(minWidth: 260, idealWidth: 340, maxWidth: 480)
-                    reader
-                        .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                // (the split is held to the width the window gives it: left to itself it asks for its panes' ideal
+                // widths, and on a smaller window that pushed the sidebar off the window's edge)
+                GeometryReader { geo in
+                    HSplitView {
+                        listPane(d)
+                            .frame(minWidth: 260, idealWidth: 340, maxWidth: 480)
+                        reader
+                            .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
                 }
             } else {
                 LoadState(error: model.error) { Task { await load() } }
