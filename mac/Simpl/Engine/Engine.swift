@@ -242,6 +242,7 @@ final class Engine: ObservableObject, ShellListener {
             queuePopup(.setup)
             return
         }
+        Task { await NotificationAsk.afterSetup(self, delay: 4) } // (1.2.1: a setup made before this one asks, once)
         if LaunchOpen.take("whatsnew") != nil, let wn = try? await call("whatsNew", as: WhatsNewData.self) {
             queuePopup(.whatsNew(wn))
             return

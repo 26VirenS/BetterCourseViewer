@@ -470,6 +470,7 @@ struct SetupScreen: View {
             engine.changed()
             Task { await engine.loadSidebar() } // (the sidebar's courses: the ones just chosen, by their new names)
             dismiss()
+            Task { await NotificationAsk.afterSetup(engine) } // (1.2.1: notifications asked for, once the setup is done)
         } catch {
             self.error = error.localizedDescription
         }

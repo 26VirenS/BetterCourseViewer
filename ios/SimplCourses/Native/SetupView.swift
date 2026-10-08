@@ -376,6 +376,7 @@ struct SetupScreen: View {
             Haptics.success()
             engine.changed()
             dismiss()
+            Task { await NotificationAsk.afterSetup(engine) } // (notifications asked for, once the setup is done)
         } catch {
             self.error = error.localizedDescription
             Haptics.error()

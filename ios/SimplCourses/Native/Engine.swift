@@ -207,6 +207,7 @@ final class Engine: ObservableObject, ShellListener {
             queuePopup(.setup)
             return
         }
+        Task { await NotificationAsk.afterSetup(self, delay: 4) } // (a setup made before this one asks, once)
         // after an update: what changed (seen once its sheet is really up — a sign-in still under way only delays it)
         if let wn = try? await call("whatsNew", ["due": true, "peek": true], as: WhatsNewData.self), !wn.releases.isEmpty {
             queuePopup(.whatsNew(wn))

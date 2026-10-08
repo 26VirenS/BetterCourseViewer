@@ -169,3 +169,27 @@ struct ReminderItem: Decodable {
     var due: String
     var url: String?
 }
+
+/// (Mac 1.2.1, iPhone) Notifications asked for once the setup is done: the system's own question, once, and — allowed —
+/// reminders before work is due and alerts for new activity turned on (Settings turns either off). Asked too, once, at
+/// a launch after a setup made before this (a student who set up earlier is asked as well). Never in the screenshot
+/// suite, whose student has used the app.
+@MainActor
+enum NotificationAsk {
+    private static let key = "notifications:asked"
+
+    static func afterSetup(_ engine: Engine, delay: Double = 0.8) async {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: key), !d.bool(forKey: "SimplDemo") else { return }
+        d.set(true, forKey: key)
+        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) // (the setup's sheet gone first)
+        let center = UNUserNotificationCenter.current()
+        let status = await center.notificationSettings().authorizationStatus
+        if status == .denied { return } // (refused before: Settings says where to allow them)
+        let granted = status == .notDetermined ? ((try? await center.requestAuthorization(options: [.alert, .sound])) ?? false) : true
+        await Reminders.shared.checkRefused()
+        guard granted else { return }
+        if !Reminders.shared.on { await Reminders.shared.enable(engine) }
+        if !Activity.shared.on { await Activity.shared.enable(engine) }
+    }
+}
