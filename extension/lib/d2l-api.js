@@ -51,7 +51,7 @@
 
   const signedOut = (res) => res.status === 401 || (res.redirected && /\/d2l\/(login|lp\/auth)/i.test(res.url || ''));
 
-  async function once(method, path, { json, form, blob = false } = {}) {
+  async function once(method, path, { json, form, formType = null, blob = false } = {}) {
     await take();
     let res, text;
     const ac = typeof AbortController === 'function' ? new AbortController() : null;
@@ -60,7 +60,7 @@
       const headers = { accept: 'application/json' };
       let body;
       if (json !== undefined) { headers['content-type'] = 'application/json'; body = JSON.stringify(json); }
-      else if (form) body = form;
+      else if (form) { body = form; if (formType) headers['content-type'] = formType; } // (said outright: a Blob's own type is lowercased, its boundary with it)
       if (method !== 'GET') headers['x-csrf-token'] = await token();
       res = await fetch(path, { method, credentials: 'same-origin', cache: 'no-store', headers, body, signal: ac ? ac.signal : undefined });
       if (blob && res.ok) return res;
@@ -215,7 +215,7 @@
   const quizzes = (ou) => remember(`quizzes:${ou}`, 2 * MIN, async () => pages(await LE(`/${ou}/quizzes/`)).catch(() => []));
   const gradeObjects = (ou) => remember(`gobj:${ou}`, 5 * MIN, async () => list(await call('GET', await LE(`/${ou}/grades/`)).catch(() => [])));
   const gradeCategories = (ou) => remember(`gcat:${ou}`, 5 * MIN, async () => list(await call('GET', await LE(`/${ou}/grades/categories/`)).catch(() => [])));
-  const gradeSetup = (ou) => remember(`gsetup:${ou}`, 15 * MIN, async () => call('GET', await LE(`/${ou}/grades/setup/`)).catch(() => null));
+  const gradeSetup = (ou) => remember(`gsetup:${ou}`, 60 * MIN, async () => call('GET', await LE(`/${ou}/grades/setup/`)).catch(() => null));
   const myGrades = (ou) => remember(`mygrades:${ou}`, MIN, async () => list(await call('GET', await LE(`/${ou}/grades/values/myGradeValues/`)).catch(() => [])));
   const myFinal = (ou) => remember(`myfinal:${ou}`, MIN, async () => call('GET', await LE(`/${ou}/grades/final/values/myGradeValue`)).catch(() => null));
   const mySubs = (ou, fid) => remember(`mysubs:${ou}:${fid}`, MIN, async () => list(await call('GET', await LE(`/${ou}/dropbox/folders/${fid}/submissions/mysubmissions/`)).catch(() => [])));
@@ -247,7 +247,7 @@
   }
 
   // ---- courses -------------------------------------------------------------------------------------------------
-  async function shapeCourse(e, { scores = true, info = null } = {}) {
+  async function shapeCourse(e, { scores = true, info = null, setup = null } = {}) {
     const ou = String(e.OrgUnit.Id);
     const l = await local();
     const role = e.Access?.ClasslistRoleName || '';
@@ -279,23 +279,26 @@
       teachers: [], sections: [], html_url: `/courses/${ou}`,
       access_restricted_by_date: e.Access?.CanAccess === false,
       default_view: 'modules', syllabus_body: null, hide_final_grades: false,
-      apply_assignment_group_weights: false, time_zone: null, calendar: { ics: null },
+      apply_assignment_group_weights: /weighted/i.test(setup?.GradingSystem || ''), time_zone: null, calendar: { ics: null },
     };
   }
   async function courses(params) {
     const es = await enrollments();
     const live = es.filter((e) => e.Access?.CanAccess !== false);
-    // (a course's own record names its semester, Brightspace's term: asked once a course, kept for hours)
-    return Promise.all(live.map(async (e) => shapeCourse(e, { scores: includes(params, 'total_scores'), info: await courseInfo(String(e.OrgUnit.Id)) })));
+    // (a course's own record names its semester, Brightspace's term, and its grade setup whether its categories are
+    // weighted: each asked once a course, and kept)
+    return Promise.all(live.map(async (e) => {
+      const ou = String(e.OrgUnit.Id);
+      const [info, setup] = await Promise.all([courseInfo(ou), gradeSetup(ou)]);
+      return shapeCourse(e, { scores: includes(params, 'total_scores'), info, setup });
+    }));
   }
   async function course(ou, params) {
     const es = await enrollments();
     const e = es.find((x) => String(x.OrgUnit.Id) === String(ou));
     if (!e) throw err('That course could not be found.', 404);
-    const info = await courseInfo(ou);
-    const c = await shapeCourse(e, { info });
-    const setup = await gradeSetup(ou);
-    c.apply_assignment_group_weights = /weighted/i.test(setup?.GradingSystem || '');
+    const [info, setup] = await Promise.all([courseInfo(ou), gradeSetup(ou)]);
+    const c = await shapeCourse(e, { info, setup });
     if (includes(params, 'teachers')) {
       const people = await classlist(ou);
       c.teachers = people.filter((p) => isTeacher(p.ClasslistRoleDisplayName)).map((p) => ({ id: String(p.Identifier), display_name: [p.FirstName, p.LastName].filter(Boolean).join(' ') || p.DisplayName, avatar_image_url: null }));
@@ -341,13 +344,15 @@
     return [];
   }
   /** Where a piece of work stands, as Canvas says it on its submission. */
-  function shapeSubmission({ aid, due, points, value, subs = null, feedback = null }) {
+  function shapeSubmission({ aid, due, points, value, subs = null, feedback = null, takenWhenGraded = false, as = 'online_upload' }) {
     const me = String(page.userId || '');
     const last = subs ? subs.flatMap((s) => list(s.Submissions)).filter((s) => s?.SubmissionDate).sort((a, b) => t(b.SubmissionDate) - t(a.SubmissionDate))[0] : null;
     const graded = !!(value && (num(value.PointsNumerator) !== null || (value.DisplayedGrade && String(value.DisplayedGrade).trim())));
-    const submittedAt = last?.SubmissionDate || null;
+    // (a quiz or a discussion with a grade was taken, or joined: Brightspace gives a student no list of attempts, so the
+    // grade's own time stands for when — a quiz is marked as it is handed in)
+    const submittedAt = last?.SubmissionDate || (takenWhenGraded && graded ? value.LastModified || value.ReleasedDate || null : null);
     const submitted = !!submittedAt || !!(subs && subs.some((s) => Number(s.Status) === 1 || Number(s.Status) === 3));
-    const late = !!(submittedAt && due && t(submittedAt) > t(due));
+    const late = !!(last?.SubmissionDate && due && t(last.SubmissionDate) > t(due)); // (only a hand-in's own time says late: a grade's says nothing of when the quiz was taken)
     const missing = !submitted && !graded && !!(due && t(due) < Date.now());
     const score = num(value?.PointsNumerator);
     const comments = [];
@@ -361,8 +366,8 @@
       grade: value?.DisplayedGrade ? String(value.DisplayedGrade).trim() : score !== null ? String(score) : null,
       entered_score: score, entered_grade: value?.DisplayedGrade || null, posted_at: value?.ReleasedDate || value?.LastModified || null, graded_at: value?.LastModified || null,
       late, missing, excused: false, attempt: submitted ? Math.max(1, subs ? subs.flatMap((s) => list(s.Submissions)).length : 1) : null,
-      seconds_late: late ? Math.round((t(submittedAt) - t(due)) / 1000) : 0,
-      submission_type: submitted ? 'online_upload' : null,
+      seconds_late: late ? Math.round((t(last.SubmissionDate) - t(due)) / 1000) : 0,
+      submission_type: submitted ? as : null,
       attachments: last ? list(last.Files).map((f) => ({ id: String(f.FileId), display_name: f.FileName, filename: f.FileName, size: f.Size, url: null })) : [],
       submission_comments: comments, points_possible: points ?? null,
     };
@@ -393,7 +398,7 @@
       omit_from_final_grade: !!go?.ExcludeFromFinalGradeCalculation, grade_item_id: q.GradeItemId ? String(q.GradeItemId) : null,
       d2l: { kind: 'quiz', id: String(q.QuizId) },
     };
-    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null });
+    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null, takenWhenGraded: true, as: 'online_quiz' });
     return a;
   }
   function topicAssignment(ou, tp, gm, { withSub = false } = {}) {
@@ -407,7 +412,7 @@
       discussion_topic: { id, title: tp.Name, html_url: `/courses/${ou}/discussion_topics/${id}` }, grade_item_id: tp.GradeItemId ? String(tp.GradeItemId) : null,
       d2l: { kind: 'topic', id: String(tp.TopicId), forum: String(tp.forum?.ForumId || tp.ForumId || '') },
     };
-    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null });
+    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null, takenWhenGraded: true, as: 'discussion_topic' });
     return a;
   }
   function gradeItemAssignment(ou, go, gm, { withSub = false } = {}) {
@@ -496,7 +501,7 @@
     return { id, display_name: file.name, filename: file.name, size: file.size, 'content-type': file.type };
   }
   function multipart(parts) {
-    const boundary = `----SimplD2L${Math.random().toString(16).slice(2)}`;
+    const boundary = `----simpl-d2l-${Math.random().toString(16).slice(2)}`; // (lowercase: a boundary must match the header's, and a Blob's type is lowercased)
     const pieces = [];
     for (const p of parts) {
       let head = `--${boundary}\r\nContent-Type: ${p.type}\r\n`;

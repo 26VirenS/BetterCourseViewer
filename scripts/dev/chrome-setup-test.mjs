@@ -27,7 +27,7 @@ const PORT = 8809; // the school's own Canvas (the mock)
 const BASE = `http://localhost:${PORT}`;
 const OTHER = 8810; // a site that is not Canvas, and a Canvas sign-in page
 const OTHER_BASE = `http://localhost:${OTHER}`;
-const D2L = 8811; // the school's own Brightspace (the mock)
+const D2L = 8820; // the school's own Brightspace (the mock; a port of its own, as each suite's are)
 const D2L_BASE = `http://localhost:${D2L}`;
 const extDir = join(tmpdir(), `bcv-chrome-ext-${Date.now()}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
@@ -166,7 +166,7 @@ try {
   await d2l.goto(`${D2L_BASE}/d2l/home`);
   for (let i = 0; i < 80 && !(await domains()).includes(D2L_BASE); i++) await d2l.waitForTimeout(150);
   await d2l.waitForFunction(() => document.documentElement.classList.contains('bcv-d2l') && (!!document.getElementById('bcv-app') || !!document.getElementById('bcv-setup')), null, { timeout: 20000 }).catch(() => {});
-  const d2lRegs = (await registered()).filter((r) => r.startsWith('bcv-http---localhost-8811-'));
+  const d2lRegs = (await registered()).filter((r) => r.startsWith('bcv-http---localhost-8820-'));
   const d2lState = await d2l.evaluate(() => ({ d2l: document.documentElement.classList.contains('bcv-d2l'), app: !!document.getElementById('bcv-app'), setup: !!document.getElementById('bcv-setup') }));
   check((await domains()).includes(D2L_BASE) && d2lRegs.length === 3 && loads4 >= 2 && d2lState.d2l && (d2lState.app || d2lState.setup), `found by its pages under /d2l/ and who is signed in on them, saved as a site of its own and loaded again with the interface up as Brightspace's (${loads4} loads, ${JSON.stringify(d2lState)}, ${d2lRegs.length} scripts)`);
 } catch (e) {
