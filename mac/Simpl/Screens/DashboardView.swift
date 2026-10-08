@@ -85,8 +85,14 @@ struct DashboardView: View {
                 }
             // (laid out once the page's width is known: the counters' rows and the columns follow it)
             if width > 0 {
-                counters(d)
-                content(d)
+                VStack(alignment: .leading, spacing: 26) {
+                    counters(d)
+                    content(d)
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                // (1.2.2) a click anywhere round an opened counter's panel folds it back (the panel keeps its own)
+                .contentShape(Rectangle())
+                .onTapGesture { if open != nil { setOpen(nil) } }
             }
         }
     }
@@ -104,8 +110,9 @@ struct DashboardView: View {
     /// under its own row.
     private func counters(_ d: Today) -> some View {
         let cols = width >= 900 ? 6 : (width >= 520 ? 3 : 2)
-        let rows: [[Counter]] = stride(from: 0, to: d.counters.count, by: cols).map { start in
-            Array(d.counters[start..<min(start + cols, d.counters.count)])
+        let list = DashboardView.ordered(d.counters)
+        let rows: [[Counter]] = stride(from: 0, to: list.count, by: cols).map { start in
+            Array(list[start..<min(start + cols, list.count)])
         }
         return VStack(alignment: .leading, spacing: 14) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
@@ -152,6 +159,15 @@ struct DashboardView: View {
 
     /// A counter's number: never one from before (1.2) — while the page shows what was kept from last time, or the
     /// overdue and graded counts are still being made, the tile says it is counting.
+    /// (1.2.2) The counters in the day's order: today, tomorrow, the next seven days, overdue, unread, graded.
+    static func ordered(_ list: [Counter]) -> [Counter] {
+        let order = ["today", "tomorrow", "next", "overdue", "unread", "graded"]
+        let rank = { (k: String) in order.firstIndex(of: k) ?? order.count }
+        return list.enumerated().sorted { a, b in
+            rank(a.element.key) != rank(b.element.key) ? rank(a.element.key) < rank(b.element.key) : a.offset < b.offset
+        }.map(\.element)
+    }
+
     private func value(_ c: Counter) -> Int? {
         if model.kept { return nil }
         switch c.key {

@@ -138,6 +138,8 @@ struct DashCounterPanel: View {
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
             .clipShape(shape)
             .glass(shape, tint: DashCounterLook.color(counter.key).opacity(0.10))
+            .contentShape(shape)
+            .onTapGesture {} // (1.2.2: a click on the panel is the panel's — the page round it folds it back)
             .onExitCommand { close() }
             .task { await load() }
     }
@@ -146,7 +148,8 @@ struct DashCounterPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             if let d = data {
-                lists(d)
+                // (1.2.2) no taller than three rows' worth: the rest scrolls inside the panel
+                CappedScroll(max: 210) { lists(d) }
             } else if let error {
                 Text(error).font(.sCallout).foregroundStyle(.secondary)
             } else {
@@ -305,5 +308,29 @@ struct DashCounterPanel: View {
                 engine.changed()
             }
         }
+    }
+}
+
+/// (1.2.2) Content at its own height up to `max`, scrolling inside past it — the panel stays short however long its list.
+struct CappedScroll<Content: View>: View {
+    let max: CGFloat
+    @ViewBuilder var content: () -> Content
+    @State private var height: CGFloat = 0
+
+    var body: some View {
+        ScrollView(.vertical) {
+            content()
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background {
+                    GeometryReader { p in
+                        Color.clear
+                            .onAppear { height = p.size.height }
+                            .onChange(of: p.size.height) { _, h in height = h }
+                    }
+                }
+        }
+        .scrollIndicators(height > max ? .automatic : .hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: height > 0 ? min(height, max) : max) // (the cap while it is first measured)
     }
 }
