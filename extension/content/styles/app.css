@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.15"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.16"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2194,6 +2194,31 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-asg__pill.is-graded.is-red { backgroun
 #bcv-app .bcv-asg__prose a { color: var(--bcv-cc-ink); font-weight: 500; }
 .bcv-asg__quiet { margin-top: 26px; padding: 0 2px; font: 400 14px/1.5 var(--bcv-font); color: var(--bcv-ink3); }
 @keyframes bcv-asg-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* (2.99.16) how the class did, as a box plot beside the grade (course-detail.js classPlot): whiskers low to high, the box
+   the middle half, a tick at the median, a ring at the mean, a dot for you in your grade's tone. Hovered, the mark
+   nearest the pointer lights and a readout over it gives its number, gliding mark to mark (transform, 140ms ease-out) */
+.bcv-cplot { position: relative; display: inline-flex; align-items: center; gap: 9px; height: 44px; padding: 0 4px; border-radius: 10px; outline: none; cursor: default; touch-action: pan-y; }
+.bcv-cplot:focus-visible { box-shadow: 0 0 0 2px var(--bcv-blue); }
+.bcv-cplot__k { font: 500 12px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-cplot__plot { position: relative; width: 168px; height: 22px; }
+.bcv-cplot__plot > * { position: absolute; top: 50%; }
+.bcv-cplot__track { left: 0; right: 0; height: 2px; margin-top: -1px; border-radius: 1px; background: var(--bcv-fill); }
+.bcv-cplot__whisker { height: 2px; margin-top: -1px; background: var(--bcv-ink3); opacity: .55; }
+.bcv-cplot__cap { width: 2px; height: 10px; margin: -5px 0 0 -1px; border-radius: 1px; background: var(--bcv-ink3); opacity: .7; }
+.bcv-cplot__box { height: 14px; margin-top: -7px; box-sizing: border-box; border: 1.5px solid color-mix(in srgb, var(--bcv-ink3) 70%, transparent); border-radius: 4px; background: var(--bcv-fill); }
+.bcv-cplot__median { width: 2px; height: 14px; margin: -7px 0 0 -1px; border-radius: 1px; background: var(--bcv-ink2); }
+.bcv-cplot__mean { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; box-sizing: border-box; border: 1.5px solid var(--bcv-ink2); border-radius: 50%; background: var(--bcv-card); }
+.bcv-cplot__me { width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--bcv-cplot-tone, var(--bcv-blue)); box-shadow: 0 0 0 2px var(--bcv-card); }
+.bcv-cplot__plot > :is(.bcv-cplot__cap, .bcv-cplot__median, .bcv-cplot__mean, .bcv-cplot__me, .bcv-cplot__box) { transition: scale .14s cubic-bezier(.23,1,.32,1), opacity .14s ease; }
+.bcv-cplot.is-reading .bcv-cplot__plot > :is(.bcv-cplot__cap, .bcv-cplot__median, .bcv-cplot__mean, .bcv-cplot__box):not(.is-lit) { opacity: .45; }
+.bcv-cplot__plot > .is-lit:not(.bcv-cplot__box) { scale: 1.35; opacity: 1; }
+.bcv-cplot__box.is-lit { border-color: var(--bcv-ink2); }
+.bcv-cplot__tip { top: auto; bottom: calc(100% + 6px); left: 0; z-index: 2; display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 8px; border-radius: 8px; background: var(--bcv-ink); color: var(--bcv-card); white-space: nowrap; pointer-events: none; transform: translate(calc(var(--x, 0px) - 50%), 3px); opacity: 0; transition: opacity .14s cubic-bezier(.23,1,.32,1), transform .14s cubic-bezier(.23,1,.32,1); }
+.bcv-cplot.is-reading .bcv-cplot__tip { opacity: 1; transform: translate(calc(var(--x, 0px) - 50%), 0); }
+.bcv-cplot__tipk { font: 500 11px/1 var(--bcv-font); opacity: .7; }
+.bcv-cplot__tipv { font: 700 12.5px/1 var(--bcv-font); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .bcv-cplot__tip, .bcv-cplot__plot > * { transition: opacity .14s ease; } .bcv-cplot__plot > .is-lit:not(.bcv-cplot__box) { scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .bcv-asg__head, .bcv-asg__facts, .bcv-asg__action, .bcv-asg__prose { animation: none; } }
 
 /* the hand-in panel that grows out of the pill (screens/submit.js, pop): tabs and × on one row, a compact drop, the
@@ -2285,6 +2310,21 @@ html[data-bcv-theme="dark"] .bcv-sb--pop .bcv-sb__tab.is-active { background: #4
 .bcv-mcard__foot:not(.is-writing) .bcv-mcard__perm { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .bcv-mcard__pill .bcv-mcard__send, .bcv-mcard__foot:not(.is-writing) .bcv-mcard__send { scale: 1; transition: opacity .15s ease; } }
 .bcv-mcard.is-side .bcv-mcard__body { padding-bottom: 12px; }
+
+/* (2.99.16) the comments folded away until asked for: one column, and a small button in the card's corner */
+.bcv-mark__cols.is-folded { grid-template-columns: minmax(0, 1fr) 0; }
+.bcv-mark__cols.is-folded > .bcv-mark__right { visibility: hidden; opacity: 0; }
+.bcv-mark__right { min-width: 0; overflow: hidden; transition: opacity .2s cubic-bezier(.23,1,.32,1) .12s; }
+.bcv-mark__cols.is-folded > .bcv-mark__right { transition: opacity .1s ease, visibility 0s .1s; }
+.bcv-mark__cols:not(.is-folded) .bcv-mark__chatbtn { display: none; }
+.bcv-mcard__handed:has(.bcv-mark__chatbtn) { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.bcv-mark .bcv-mark__chatbtn { margin: 0 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: var(--bcv-fill); color: var(--bcv-ink2); font: 600 12.5px/1 var(--bcv-font); cursor: pointer; transition: background-color .15s ease, scale .12s cubic-bezier(.23,1,.32,1); }
+@media (hover: hover) and (pointer: fine) { .bcv-mark .bcv-mark__chatbtn:hover { background: var(--bcv-fill2); color: var(--bcv-ink); } }
+.bcv-mark .bcv-mark__chatbtn:active { scale: .96; }
+.bcv-mark .bcv-mark__chatbtn:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 2px; }
+.bcv-mark__chatrow { display: flex; justify-content: flex-end; }
+.bcv-mark--side .bcv-mark__head .bcv-sheet__close { align-self: flex-start; }
+@media (prefers-reduced-motion: reduce) { .bcv-mark__right { transition: opacity .15s ease; } }
 .bcv-sheet--tool { width: 960px; height: calc(100vh - 56px); }
 .bcv-sheet--tool .bcv-sheet__head { align-items: center; }
 .bcv-sb__frame { flex: 1; width: 100%; border: 0; background: #fff; }

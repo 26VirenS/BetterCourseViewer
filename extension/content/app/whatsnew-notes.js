@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.16', date: '2026-10-08', notes: [
+      { kind: 'new', title: 'How the class did', body: 'A box plot by your grade; hover it for the numbers.', icon: P.steps },
+      { kind: 'improved', title: 'Comments on a press', body: 'The grade card opens small; Comments widens it.', icon: P.layers },
+    ] },
     { version: '2.99.15', date: '2026-10-08', notes: [
       { kind: 'improved', title: 'A snugger grade card', body: 'Sized to what it holds, over the page; comment on a press.', icon: P.layers },
     ] },

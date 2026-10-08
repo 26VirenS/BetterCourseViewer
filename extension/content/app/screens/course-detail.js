@@ -132,6 +132,18 @@
       ov, sheet, close, folding: () => folding,
       /** What it holds changed height: the box takes its new size, the clip growing (or shrinking) to it. */
       relayout() { if (!ov.isConnected || folding || !box) return; boxH = measure(); box.relayout(); },
+      /** Another width (the mark's card unfolding its comments): laid out at it, the clip growing to it from where it is. */
+      widen(w2) {
+        if (!ov.isConnected || folding || !box) return;
+        width = w2;
+        // (measured as it will stand — at the new width, for a moment, before anything is painted — then the clip grows
+        // to it from where the box is drawn now)
+        const was = sheet.style.width;
+        sheet.style.width = `${Math.min(w2, innerWidth - 32)}px`;
+        boxH = measure();
+        sheet.style.width = was;
+        box.relayout();
+      },
       /** Turn into something else in place (the card's Submit again → the hand-in panel). */
       swap(make2, { W: w2 = width } = {}) {
         if (folding) return;
@@ -245,7 +257,7 @@
         U.text('bcv-mark__title bcv-pretty', a.name),
         U.el('bcv-sheet__note bcv-mark__meta', [h('span', { class: 'bcv-mark__dot', style: { background: c.color || 'var(--bcv-ink3)' }, 'aria-hidden': 'true' }), U.text('bcv-ellip', [c.shortName || c.name, F.kindOf(a, s), when && !posted ? when : null].filter(Boolean).join(' · '), 'span')]),
       ]),
-      side ? null : h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: api.close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: api.close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
     ]);
     const againRow = again ? U.el('bcv-mark__again', [h('button', { type: 'button', class: 'bcv-mark__againbtn', onclick: again }, [U.svg('M12 19V5M6 11l6-6 6 6', { size: 14, stroke: 'currentColor', width: 2.4 }), 'Submit again'])]) : null;
     // (under when it was handed in and marked: in sight as the card opens, not below the attempts)
@@ -261,14 +273,38 @@
     if (side) {
       // (2.99.13) sideways: the mark and the work on the left, what is said about it on the right — its own column, the
       // newest words at its foot by the comment pill, the × at its top
+      // (2.99.16) the comments start folded away: a small button in the card's own corner (beside the file, or a row of
+      // its own) widens the card sideways to show them — the box growing to the right, the column fading in — and the
+      // column's own button folds it back
+      const n = (s.submission_comments || []).length;
+      const BUBBLE = 'M5 6.5A2.5 2.5 0 017.5 4h9A2.5 2.5 0 0119 6.5v7a2.5 2.5 0 01-2.5 2.5H11l-4 3.5V16h0A2 2 0 015 14z';
+      const cols = U.el('bcv-mark__cols is-folded');
+      const unfold = (on) => {
+        cols.classList.toggle('is-folded', !on);
+        chatBtn.setAttribute('aria-expanded', String(on));
+        right.inert = !on;
+        api.widen(on ? 680 : 400);
+        if (on) setTimeout(() => built.chat.querySelector('.bcv-mcard__opener')?.focus({ preventScroll: true }), 60); else chatBtn.focus({ preventScroll: true });
+      };
+      const chatBtn = h('button', { type: 'button', class: 'bcv-mark__chatbtn', 'aria-expanded': 'false', title: 'Show the comments', onclick: () => unfold(true) }, [U.svg(BUBBLE, { size: 14, stroke: 'currentColor', width: 2 }), h('span', { text: n ? `Comments · ${n}` : 'Comments' })]);
+      const placeBtn = () => { // (into the row of what was handed in, where there is room beside it; else a row of its own)
+        if (chatBtn.isConnected && chatBtn.parentElement !== built.el) return;
+        const handed = built.el.querySelector('.bcv-mcard__handed');
+        if (handed && !handed.querySelector('.bcv-mcard__quote')) handed.append(chatBtn);
+        else built.el.querySelector('.bcv-mcard__body')?.append(U.el('bcv-mcard__row bcv-mark__chatrow', [chatBtn]));
+      };
+      placeBtn();
+      new MutationObserver(placeBtn).observe(built.el, { childList: true }); // (the card redrawn — a comment sent, a tile pressed — keeps it)
       const left = U.el('bcv-mark__left', [head, U.el('bcv-mark__body', [built.el])]);
       const right = U.el('bcv-mark__right', [
-        U.el('bcv-mark__chathead', [U.text('bcv-mark__chatk', 'Comments', 'span'), h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: api.close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }))]),
+        U.el('bcv-mark__chathead', [U.text('bcv-mark__chatk', 'Comments', 'span'), h('button', { type: 'button', class: 'bcv-sheet__close bcv-mark__fold', 'aria-label': 'Hide the comments', title: 'Hide the comments', onclick: () => unfold(false) }, U.svg('M15 6l-6 6 6 6', { size: 14, stroke: 'var(--bcv-ink2)', width: 2.3 }))]),
         built.chat,
       ]);
+      right.inert = true;
+      cols.append(left, right);
       return {
         cls: 'bcv-mark bcv-mark--side',
-        kids: [U.el('bcv-mark__cols', [left, right])],
+        kids: [cols],
         // (2.99.15) as small as what it holds: the taller of the two columns as they would stand on their own — the
         // thread measured by its bubbles, not by the column it stretches to fill
         measure: () => {
@@ -276,7 +312,8 @@
           const kids = th ? [...th.children] : [];
           const threadH = kids.reduce((n, k) => n + k.offsetHeight, 0) + Math.max(0, kids.length - 1) * 12 + 18;
           const rightH = right.firstElementChild.offsetHeight + threadH + (ft?.offsetHeight || 0);
-          return Math.max(head.offsetHeight + built.el.offsetHeight, rightH) + 2;
+          const leftH = head.offsetHeight + built.el.offsetHeight;
+          return (cols.classList.contains('is-folded') ? leftH : Math.max(leftH, rightH)) + 2;
         },
         glide: glideFrom ? [[valueEl, glideFrom]] : [],
       };
@@ -303,7 +340,7 @@
     if (glideFrom && !glideFrom.dataset.glide) glideFrom.dataset.glide = 'g';
     const room = within?.isConnected ? within.getBoundingClientRect().width - 32 : innerWidth - 32;
     const side = room >= 640; // (sideways where there is room for it: the comments a column to the right)
-    return growBox(ctx, from, { label: `${a.name}: ${posted ? 'your mark' : 'what you handed in'}`, W: side ? 640 : 400, H: 560, anchor, hover, onClosed, within, vars: courseVars(c) }, (api) => markContent(ctx, c, a, s, api, { value, label, when, again: again ? () => again(api) : null, glideFrom, side }));
+    return growBox(ctx, from, { label: `${a.name}: ${posted ? 'your mark' : 'what you handed in'}`, W: 400, H: 560, anchor, hover, onClosed, within, vars: courseVars(c) }, (api) => markContent(ctx, c, a, s, api, { value, label, when, again: again ? () => again(api) : null, glideFrom, side }));
   }
 
   const D = {};
@@ -502,6 +539,68 @@
       const need = [BCV.screens.feedback?.card ? null : BCV.lazy?.load?.('submit'), a.rubric?.length && !BCV.rubricRing ? BCV.lazy?.load?.('rubric')?.catch(() => null) : null].filter(Boolean);
       if (!need.length) run(); else Promise.all(need).then(() => { if (pill.isConnected) run(); }).catch(() => { if (!hover) app.go(`${c.url}/assignments/${a.id}?bcv=feedback`); });
     };
+    /** (2.99.16) How the class did, as a box plot beside the grade: the whiskers from the lowest mark to the highest, the
+     *  box the middle half (lower to upper quartile), a tick at the median, a ring at the mean, and a dot for this student
+     *  in their grade's tone. The numbers are there on a hover (or the arrow keys): the mark nearest the pointer lights
+     *  and a readout over it says what it is; for a screen reader, all of them at once. */
+    function classPlot(st, mine, possible, tone) {
+      const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+      if (!st || num(st.mean) === null || num(st.max) === null) return null;
+      const lo = num(st.min) ?? 0, hi = num(st.max), q1 = num(st.lower_q), md = num(st.median), q3 = num(st.upper_q), mean = num(st.mean), me = num(mine);
+      const P = num(possible) > 0 ? num(possible) : Math.max(hi, me ?? 0, 1);
+      const at = (v) => Math.max(0, Math.min(1, v / P));
+      const pct = (v) => `${(at(v) * 100).toFixed(2)}%`;
+      const marks = [['Low', lo, 'lo'], ['Lower quartile', q1, 'q1'], ['Median', md, 'md'], ['Upper quartile', q3, 'q3'], ['High', hi, 'hi'], ['Mean', mean, 'mean'], ['You', me, 'me']].filter(([, v]) => v !== null);
+      const mk = (cls, style) => h('span', { class: `bcv-cplot__${cls}`, style, 'aria-hidden': 'true' });
+      const tip = h('span', { class: 'bcv-cplot__tip', 'aria-hidden': 'true' }, [h('span', { class: 'bcv-cplot__tipk' }), h('span', { class: 'bcv-cplot__tipv' })]);
+      const els = {
+        lo: mk('cap', { left: pct(lo) }), hi: mk('cap', { left: pct(hi) }),
+        md: md !== null ? mk('median', { left: pct(md) }) : null,
+        mean: mk('mean', { left: pct(mean) }),
+        me: me !== null ? mk('me', { left: pct(me), '--bcv-cplot-tone': `var(--bcv-${tone})` }) : null,
+      };
+      const plot = h('span', { class: 'bcv-cplot__plot' }, [
+        mk('track'),
+        mk('whisker', { left: pct(lo), width: `${((at(hi) - at(lo)) * 100).toFixed(2)}%` }),
+        q1 !== null && q3 !== null ? (els.box = mk('box', { left: pct(q1), width: `${Math.max(0.5, (at(q3) - at(q1)) * 100).toFixed(2)}%` })) : null,
+        els.lo, els.hi, els.md, els.mean, els.me, tip,
+      ]);
+      const said = marks.map(([k, v]) => `${k} ${store.fmtPts(v)}`).join(', ');
+      const wrap = h('span', { class: 'bcv-cplot', tabindex: '0', role: 'img', 'aria-label': `How the class did, out of ${store.fmtPts(P)}: ${said}`, title: '' }, [h('span', { class: 'bcv-cplot__k', text: 'Class' }), plot]);
+      let on = -1;
+      const show = (i) => {
+        on = i;
+        for (const el of plot.querySelectorAll('.is-lit')) el.classList.remove('is-lit');
+        if (i < 0) { wrap.classList.remove('is-reading'); return; }
+        const [k, v, key] = marks[i];
+        const lit = key === 'q1' || key === 'q3' ? els.box : els[key];
+        lit?.classList.add('is-lit');
+        tip.firstChild.textContent = k;
+        tip.lastChild.textContent = store.fmtPts(v);
+        tip.style.setProperty('--x', `${(at(v) * plot.getBoundingClientRect().width).toFixed(1)}px`); // (moved by transform: it glides from mark to mark without a layout each frame)
+        wrap.classList.add('is-reading');
+      };
+      const nearest = (clientX) => {
+        const r = plot.getBoundingClientRect(), f = (clientX - r.left) / Math.max(1, r.width);
+        let best = 0, d = Infinity;
+        // (marks at one place: the student's own first, then the summary in its order)
+        const order = marks.map((m, i) => i).sort((x, y) => (marks[y][2] === 'me') - (marks[x][2] === 'me'));
+        for (const i of order) { const dd = Math.abs(at(marks[i][1]) - f); if (dd < d - 1e-6) { d = dd; best = i; } }
+        return best;
+      };
+      wrap.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || e.pointerType === 'pen') show(nearest(e.clientX)); });
+      wrap.addEventListener('pointerdown', (e) => show(nearest(e.clientX)));
+      wrap.addEventListener('pointerleave', () => { if (document.activeElement !== wrap) show(-1); });
+      wrap.addEventListener('focus', () => show(Math.max(0, marks.findIndex(([, , key]) => key === 'me'))));
+      wrap.addEventListener('blur', () => show(-1));
+      wrap.addEventListener('keydown', (e) => {
+        const byPlace = marks.map((m, i) => i).sort((x, y) => marks[x][1] - marks[y][1]);
+        const at0 = byPlace.indexOf(on);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); show(byPlace[Math.max(0, Math.min(byPlace.length - 1, (at0 < 0 ? 0 : at0) + (e.key === 'ArrowRight' ? 1 : -1)))]); }
+        else if (e.key === 'Escape' && on >= 0) { e.stopPropagation(); show(-1); }
+      });
+      return wrap;
+    }
     /** The pill and what sits beside it, for the submission `x`. */
     function actionEl(x) {
       const p = pct(x);
@@ -526,7 +625,7 @@
           h('span', { class: 'bcv-asg__of', text: `/ ${a.points_possible ?? '—'}` }),
           letter || p !== null ? h('span', { class: 'bcv-asg__pct', text: letter || `${p}%` }) : null,
         ] });
-        aside = note(x.late ? `Late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null, comments ? U.plural(comments, 'comment') : null, a.score_statistics?.mean !== null && a.score_statistics?.mean !== undefined ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : null);
+        aside = note(x.late ? `Late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null, comments ? U.plural(comments, 'comment') : null, classPlot(a.score_statistics, x.score, a.points_possible, toneOf(p)));
       } else if (heldOf(x) || x.submitted_at || x.excused) {
         const word = x.excused ? 'Excused' : heldOf(x) ? 'Submitted' : x.late ? 'Submitted late' : 'Submitted';
         main = pill('done', word, ICONS.tick, { cls: x.excused ? 'is-grey' : '', title: 'What you handed in, and comments', onClick: x.submitted_at || heldOf(x) ? openCard : null, off: !(x.submitted_at || heldOf(x)) });
