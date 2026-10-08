@@ -284,14 +284,26 @@
       if (!mine.length) { idle++; continue; }
       load.push({ id: String(c.id), code: c.shortName || c.name, color: c.color || GRAY, done: mine.filter((it) => it.submitted).length, total: mine.length });
     }
+    // (Simpl for Mac 1.2) each counter's line under its number, in the web Dashboard's words
+    const ptsSum = (list) => store.fmtPts(list.reduce((n, it) => n + (Number(it.points) || 0), 0));
+    const unreadNote = (() => {
+      if (!unread) return '';
+      if (!unread.length) return 'All caught up';
+      const per = new Map();
+      const nameOf = (a) => { const c = sel.list.find((x) => `course_${x.id}` === String(a.context_code || '')); return c?.shortName || c?.name || a.context_name || ''; };
+      for (const a of unread) per.set(nameOf(a), (per.get(nameOf(a)) || 0) + 1);
+      if (per.size !== 1) return `From ${U.plural(per.size, 'course')}`;
+      const top = [...per.keys()][0];
+      return top ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : U.plural(unread.length, 'announcement');
+    })();
     return {
       dateLine: dayLine(now), me: meOf(me), notifUnread: notifs || 0,
       counters: [
-        { key: 'today', label: 'Due today', value: dueToday.length },
-        { key: 'next', label: 'Next 7 days', value: dueNext.length },
-        { key: 'unread', label: 'Unread', value: unread ? unread.length : null },
+        { key: 'today', label: 'Due today', value: dueToday.length, note: `${ptsSum(dueToday)} points total` },
+        { key: 'next', label: 'Next 7 days', value: dueNext.length, note: `Across ${U.plural(W.courseCount(dueNext), 'course')}` },
+        { key: 'unread', label: 'Unread', value: unread ? unread.length : null, note: unreadNote },
         { key: 'overdue', label: 'Overdue', value: null, tone: 'red', pending: true },
-        { key: 'tomorrow', label: 'Tomorrow', value: dueTomorrow.length },
+        { key: 'tomorrow', label: 'Tomorrow', value: dueTomorrow.length, note: dueTomorrow.length ? `${ptsSum(dueTomorrow)} points total` : 'Nothing due tomorrow' },
         { key: 'graded', label: 'Graded', value: null, pending: true },
       ],
       list: {
@@ -310,7 +322,12 @@
     const [od, gr] = await Promise.all([W.overdueP, W.gradedP]);
     if (!od || !gr) return { overdue: null, graded: null };
     st.counts = { od, gr };
-    return { overdue: od.overdue.length, graded: gr.graded.length };
+    return {
+      overdue: od.overdue.length, graded: gr.graded.length,
+      // (Simpl for Mac 1.2) the lines under the two numbers, as the web Dashboard's counters have them
+      overdueNote: od.overdue.length ? `${od.overdue.length} not submitted` : 'Nothing overdue',
+      gradedNote: gr.graded.length ? `${store.fmtPts(gr.earned)} / ${store.fmtPts(gr.possible)} points` : 'No grades posted this week',
+    };
   }
   /** A counter's list, split the Dashboard's way: what wants attention, then (quieter) the rest of the span. */
   const sheetRow = (i, quiet = false) => ({ title: i.title, sub: [i.course, i.meta].filter(Boolean).join(' · '), color: i.color || GRAY, url: i.url || null, quiet, key: i.key || null, clearable: !quiet && !!i.item });
@@ -353,6 +370,182 @@
     clearedOverdue.add(key);
     app()?.refreshCounts?.();
     return { ok: true, overdue: todayState.counts.od.overdue.filter((x) => !clearedOverdue.has(x.key)).length };
+  }
+
+  // ---- the Mac's Dashboard (Simpl for Mac 1.2) ------------------------------------------------------------------------
+  // What the web Dashboard shows beyond Today's counters, by its rules (screens/dashboard.js): the courses as cards, the
+  // work coming up by day (its List), Canvas's recent activity, and the grades skyline. The Mac draws each itself.
+  const sectionOfLink = (l) => {
+    const s = `${l.css_class || ''} ${l.icon || ''} ${l.label || ''} ${l.path || ''}`.toLowerCase();
+    // (the syllabus first: its address is under assignments/)
+    for (const [k, words] of [['syllabus', ['syllabus']], ['announcements', ['announce']], ['assignments', ['assign']], ['discussions', ['discuss']], ['files', ['file', 'folder']], ['grades', ['grade']], ['modules', ['module']], ['quizzes', ['quiz']], ['people', ['people', 'user']], ['pages', ['wiki', 'page']]]) {
+      if (words.some((w) => s.includes(w))) return k;
+    }
+    return '';
+  };
+  /** The course cards: each chosen course with its score, what is due in it, its unread announcements, its quick links. */
+  async function dashCourses() {
+    const now = new Date();
+    const todayStart = U.startOfDay(now);
+    const [sel, planner, feed] = await Promise.all([selection(), store.planner().catch(() => null), store.announcementsFeed().catch(() => null)]);
+    const open = (planner || []).filter((it) => it.isDue && !it.excused && !it.dismissed && !it.complete && !it.submitted && it.type !== 'announcement' && it.date);
+    const unreadFor = (c) => (feed ? feed.filter((a) => a.read_state === 'unread' && String(a.context_code || '') === `course_${c.id}`).length : 0);
+    const DEFAULT_LINKS = [['announcements', 'Announcements', 'announcements'], ['assignments', 'Assignments', 'assignments'], ['discussions', 'Discussions', 'discussion_topics'], ['files', 'Files', 'files']];
+    return {
+      rows: sel.list.map((c) => {
+        const base = c.url || `/courses/${c.id}`;
+        const mine = open.filter((it) => String(it.courseId) === String(c.id) && it.date >= todayStart).sort(byDate);
+        const score = c.score !== null && c.score !== undefined && !c.hideFinal ? Number(c.score) : null;
+        const links = (c.links || []).filter((l) => !l.hidden).slice(0, 4).map((l) => ({ kind: sectionOfLink(l), label: l.label || '', url: l.path || null }));
+        return {
+          id: String(c.id), code: c.shortName || c.name, name: c.nickname ? (c.originalName || c.name) : (c.code && c.code !== c.name ? c.code : c.name),
+          sub: [c.cardTerm || c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '), color: c.color || GRAY, image: c.image || null,
+          score, scoreText: score !== null ? `${store.fmtPts(score)}%` : 'N/A', grade: score !== null && c.grade ? String(c.grade) : null,
+          unread: unreadFor(c), dueToday: mine.filter((it) => U.sameDay(it.date, now)).length,
+          next: mine[0] ? { title: mine[0].title || 'Untitled', when: U.whenShort(mine[0].date, now), url: mine[0].url || null } : null,
+          links: links.length ? links : DEFAULT_LINKS.map(([kind, label, seg]) => ({ kind, label, url: `${base}/${seg}` })),
+          url: base,
+        };
+      }),
+      empty: 'No courses chosen yet. Choose them in the guided setup or Settings.',
+    };
+  }
+  /** The List: what is coming up (three weeks of the planner) by day, done work kept ticked unless it is asked to hide. */
+  async function dashList({ hideDone = null } = {}) {
+    if (hideDone !== null && hideDone !== undefined) await store.setPref('dashHideDone', !!hideDone);
+    const [planner, sel, hidePref] = await Promise.all([store.planner().catch(() => null), selection(), store.pref('dashHideDone', false).catch(() => false)]);
+    if (!planner) return { error: 'Your planner could not be loaded.' };
+    const now = new Date();
+    const todayStart = U.startOfDay(now);
+    const upcoming = planner.filter((it) => !it.dismissed && it.type !== 'announcement' && it.date && it.date >= todayStart && inSelection(sel, it)).sort(byDate);
+    keep(upcoming);
+    const doneOf = (it) => !!(it.complete || it.submitted);
+    const hide = !!hidePref;
+    const shown = hide ? upcoming.filter((it) => !doneOf(it)) : upcoming;
+    const row = (it) => ({
+      id: String(it.id), title: it.title || 'Untitled',
+      course: it.custom ? (it.course ? `${it.course.shortName || it.courseName} · My task` : 'My task') : (it.course?.shortName || it.courseName || ''),
+      color: it.custom && !it.course ? TASK : (it.course?.color || GRAY),
+      kind: it.custom ? 'My task' : `${it.kind}${it.isDue ? '' : ' · to-do date'}`, type: it.type || '',
+      flags: store.workFlags(it).map((f) => ({ word: f.word, kind: f.kind || '' })),
+      points: it.points !== null && it.points !== undefined ? `${store.fmtPts(it.points)} pts` : '',
+      due: it.graded ? 'Graded' : it.submitted && it.isDue ? 'Submitted' : `${it.isDue ? 'Due' : 'At'} ${U.fmtTime(it.date)}`,
+      time: U.fmtTime(it.date), done: doneOf(it), url: it.url || null, custom: !!it.custom,
+    });
+    const days = [];
+    const at = new Map();
+    for (const it of shown) {
+      const k = U.startOfDay(it.date).getTime();
+      if (!at.has(k)) {
+        if (days.length >= 8) break;
+        at.set(k, { title: U.dayTitle(it.date, now), date: `${U.DAYS_LONG[it.date.getDay()]}, ${U.fmtLong(it.date)}`, rows: [] });
+        days.push(at.get(k));
+      }
+      at.get(k).rows.push(row(it));
+    }
+    return { hideDone: hide, done: upcoming.filter(doneOf).length, total: upcoming.length, days, empty: upcoming.length ? 'Everything coming up is done.' : 'Nothing coming up in the next three weeks.' };
+  }
+  /** Recent activity: Canvas's activity stream, each with what it is, where, its first words and whether it is new. */
+  const ACT_KIND = { Announcement: 'Announcement', DiscussionTopic: 'Discussion', Conversation: 'Message', Message: 'Notification', Submission: 'Grade posted', Conference: 'Conference', WebConference: 'Conference', Collaboration: 'Collaboration', AssessmentRequest: 'Peer review' };
+  const actSubmissionKind = (a) => {
+    const posted = a.posted_at === undefined || a.posted_at !== null;
+    const hasScore = (a.score !== null && a.score !== undefined) || (a.grade !== null && a.grade !== undefined && a.grade !== '');
+    const comments = Array.isArray(a.submission_comments) ? a.submission_comments.filter((x) => x && (x.comment || x.media_comment)) : [];
+    if (posted && hasScore) {
+      const possible = a.assignment?.points_possible;
+      const score = a.score !== null && a.score !== undefined ? store.fmtPts(a.score) : a.grade;
+      const letter = a.grade && a.score !== null && a.score !== undefined && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : '';
+      return `Graded · ${score}${possible !== null && possible !== undefined ? ` / ${store.fmtPts(possible)}` : ''}${letter}`;
+    }
+    if (comments.length) return comments.length === 1 ? 'Comment' : `${comments.length} comments`;
+    return 'Submitted';
+  };
+  async function dashActivity() {
+    const [stream, seen, feed, all] = await Promise.all([store.activity().catch(() => null), store.streamSeen().catch(() => new Set()), store.announcementsFeed().catch(() => null), store.courses().catch(() => [])]);
+    if (!Array.isArray(stream)) return { rows: [], empty: 'Recent activity could not be loaded.' };
+    const byId = new Map((all || []).map((c) => [String(c.id), c]));
+    const feedById = feed ? new Map(feed.map((a) => [String(a.id), a])) : null;
+    const unread = (a) => {
+      if (seen.has(String(a.id))) return false;
+      if (a.type === 'Announcement' && feedById && a.announcement_id !== undefined) { const f = feedById.get(String(a.announcement_id)); if (f) return f.read_state === 'unread'; }
+      return a.read_state === false;
+    };
+    const urlOf = (a) => (a.html_url ? a.html_url : a.type === 'Conversation' && a.conversation_id ? `/conversations?id=${a.conversation_id}` : null);
+    return {
+      rows: stream.slice(0, 30).map((a) => {
+        const c = byId.get(String(a.course_id));
+        const kind = a.type === 'Submission' ? actSubmissionKind(a) : ACT_KIND[a.type] || a.type || 'Activity';
+        const extra = a.type === 'DiscussionTopic' && a.total_root_discussion_entries ? ` · ${U.plural(a.total_root_discussion_entries, 'reply', 'replies')}` : '';
+        return {
+          id: String(a.id), type: a.type || '', kind: `${kind}${extra}`, title: a.title || kind,
+          course: c?.name || a.context_name || (a.type === 'Conversation' ? 'Inbox' : ''), color: c?.color || '#5856d6',
+          when: U.fmtShort(a.updated_at || a.created_at), preview: textOf(a.message || a.latest_messages?.[0]?.message || '', 200).replace(/\s+/g, ' '),
+          url: urlOf(a), unread: unread(a),
+        };
+      }),
+      empty: 'No recent activity.',
+    };
+  }
+  /** A stream item opened from the Dashboard: its dot goes (Canvas has no way to mark one read). */
+  async function dashSeen({ id = null } = {}) {
+    if (id !== null && id !== undefined) await store.markStreamSeen(String(id));
+    return { ok: true };
+  }
+  /** The grades skyline: a tower per chosen course as tall as its score, every assignment a window lit in its grade's
+   *  colour once marked and posted (dark while to come; grey where it does not count). `kept`: from the copy kept from
+   *  the last visit (at once), else from Canvas's answer. */
+  function skyNamesOf(courses) {
+    const raw = (c) => `${c.originalName || c.name || ''} ${c.code || ''}`;
+    const subj = (c) => ((String(c.originalName || c.name || '').replace(/^[A-Z]{1,2}\d{2}[-\s]/, '').match(/[A-Za-z]{2,}/) || [c.shortName || c.name || '?'])[0]).toUpperCase();
+    const isLab = (c) => /\blab\b/i.test(raw(c)) || /\d+[A-Z]*L\b/.test(raw(c));
+    const subs = courses.map(subj);
+    const labs = courses.filter(isLab).length;
+    return courses.map((c, i) => {
+      if (c.nickname) return String(c.nickname);
+      const same = courses.filter((_, j) => subs[j] === subs[i]);
+      if (same.length < 2) return subs[i];
+      const lab = isLab(c);
+      const name = lab ? (labs > 1 ? `${subs[i]} LAB` : 'LAB') : subs[i];
+      if (same.filter((x) => isLab(x) === lab).length < 2) return name;
+      const num = raw(c).replace(/^[A-Z]{1,2}\d{2}[-\s]/, '').match(/\d+[A-Z]*/);
+      return num ? `${name} ${num[0]}` : name;
+    });
+  }
+  async function dashSkyline({ kept = false } = {}) {
+    const [sel, ownPref, keptMap] = await Promise.all([selection(), store.pref('gradeWeights', {}).catch(() => ({})), kept ? store.keptAssignments().catch(() => null) : null]);
+    const own = ownPref && typeof ownPref === 'object' ? ownPref : {};
+    const wmap = (o) => (o && typeof o === 'object' && Object.keys(o).length ? new Map(Object.entries(o).map(([g, w]) => [String(g), Number(w) || 0])) : null);
+    const lists = kept
+      ? sel.list.map((c) => ({ c, list: keptMap?.get(String(c.id))?.list || null, weights: wmap(own[c.id]) || (c.weighted ? wmap(keptMap?.get(String(c.id))?.weights) : null) }))
+      : await Promise.all(sel.list.map(async (c) => {
+        const mineW = wmap(own[c.id]);
+        const [list, groups] = await Promise.all([store.assignments(c.id).catch(() => null), !mineW && c.weighted ? store.assignmentGroups(c.id).catch(() => null) : null]);
+        return { c, list: Array.isArray(list) ? list : null, weights: mineW || (Array.isArray(groups) ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null) };
+      }));
+    const names = skyNamesOf(sel.list);
+    const windowsOf = (list, weights) => {
+      const rows = [];
+      for (const a of list) {
+        if (a.published === false) continue;
+        const sub = a.submission;
+        const free = !!(a.omit_from_final_grade || a.grading_type === 'not_graded' || !(Number(a.points_possible) > 0) || sub?.excused || (weights && (Number(weights.get(String(a.assignment_group_id))) || 0) === 0));
+        const posted = !!sub && sub.posted_at !== null;
+        const marked = posted && !sub.excused && ((sub.score !== null && sub.score !== undefined) || (a.grading_type === 'pass_fail' && !!sub.grade));
+        const band = !marked ? null : a.grading_type === 'pass_fail' ? (String(sub.grade).toLowerCase() === 'complete' ? 'A' : 'F') : U.gradeBand(sub.score, a.points_possible, a.grading_type);
+        const at = U.parse(a.due_at) || U.parse(sub?.graded_at) || null;
+        const what = band ? `${store.fmtPts(sub.score)} / ${store.fmtPts(a.points_possible ?? 0)} (${band})` : sub?.excused ? 'excused' : 'not graded yet';
+        rows.push({ band, free, t: at ? at.getTime() : Infinity, title: `${a.name || 'Assignment'} · ${what}${free ? ' · does not count toward the grade' : ''}` });
+      }
+      const order = (x, y) => x.t - y.t;
+      return [...rows.filter((r) => r.band).sort(order), ...rows.filter((r) => !r.band).sort(order)].map(({ band, free, title }) => ({ band, free, title }));
+    };
+    return {
+      courses: lists.map(({ c, list, weights }, i) => ({
+        id: String(c.id), name: names[i] || c.shortName || c.name || 'Course', code: c.shortName || c.name || '', color: c.color || GRAY,
+        score: c.score === null || c.score === undefined || c.hideFinal ? null : Number(c.score), url: `/courses/${c.id}/grades`,
+        windows: list ? windowsOf(list, weights) : null,
+      })),
+    };
   }
 
   // Courses: the selected courses, in their order, with the score and the unread announcements
@@ -1831,7 +2024,7 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */

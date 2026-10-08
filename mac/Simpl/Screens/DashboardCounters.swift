@@ -1,0 +1,309 @@
+import SwiftUI
+
+// The Dashboard's six counters (1.2): each a glass tile with its symbol, its number and the line under it. Pressed, a
+// tile grows where it stands into a panel across the page listing what it counted — no popover to be clipped by the
+// screen's edge — and folds back into its tile when closed (its ✕, Escape, or the tile pressed again).
+
+/// A counter's look, as the web Dashboard's: its symbol and colour, and its name in full for the panel it opens.
+enum DashCounterLook {
+    static func symbol(_ key: String) -> String {
+        switch key {
+        case "today": return "clock"
+        case "next": return "calendar"
+        case "unread": return "megaphone"
+        case "overdue": return "exclamationmark.circle"
+        case "tomorrow": return "sunrise"
+        case "graded": return "chart.bar"
+        default: return "circle"
+        }
+    }
+
+    static func color(_ key: String) -> Color {
+        switch key {
+        case "today": return Color(hex: "#ff453a")
+        case "next": return Color(hex: "#34c759")
+        case "unread": return Color(hex: "#ff9500")
+        case "overdue": return Color(hex: "#ff453a")
+        case "tomorrow": return Color(hex: "#ff9f0a")
+        case "graded": return Color(hex: "#5856d6")
+        default: return .accentColor
+        }
+    }
+
+    static func fullName(_ key: String, _ label: String) -> String {
+        switch key {
+        case "today": return "Due today"
+        case "next": return "Next 7 days"
+        case "unread": return "Unread announcements"
+        case "overdue": return "Overdue"
+        case "tomorrow": return "Due tomorrow"
+        case "graded": return "Graded this week"
+        default: return label
+        }
+    }
+}
+
+extension View {
+    /// The counter's tile and its panel drawn as one shape moving from one to the other (matchedGeometryEffect), unless
+    /// Reduce Motion is on: then the panel simply fades in under its tile.
+    @ViewBuilder
+    func dashMorph(_ id: String, in ns: Namespace.ID, enabled: Bool) -> some View {
+        if enabled {
+            self.matchedGeometryEffect(id: id, in: ns)
+        } else {
+            self
+        }
+    }
+}
+
+/// A counter's number: rolling to a new count on the house spring, a dash while it is still being counted.
+struct DashCount: View {
+    let value: Int?
+    var alert = false
+    var size: CGFloat = 34
+
+    var body: some View {
+        Group {
+            if let v = value {
+                Text("\(v)").contentTransition(.numericText(value: Double(v)))
+            } else {
+                Text("–").foregroundStyle(.tertiary)
+            }
+        }
+        .font(.system(size: size, weight: .bold, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(alert ? Color.red : Color.primary)
+    }
+}
+
+/// A counter's tile: its symbol and name, its number, the line under it.
+struct DashCounterTile: View {
+    let counter: Counter
+    let value: Int?
+    let note: String?
+    let action: () -> Void
+
+    private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 7) {
+                    Image(systemName: DashCounterLook.symbol(counter.key))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DashCounterLook.color(counter.key))
+                    Text(counter.label)
+                        .font(.sCallout.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                DashCount(value: value, alert: alert)
+                Text(note?.isEmpty == false ? note! : " ")
+                    .font(.sCaption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .buttonStyle(CardButtonStyle(radius: 18, tint: alert ? .red : nil))
+        .animation(Motion.snappy, value: value)
+        .help("Show \(DashCounterLook.fullName(counter.key, counter.label).lowercased())")
+        .accessibilityLabel("\(DashCounterLook.fullName(counter.key, counter.label)): \(value.map(String.init) ?? "counting")")
+    }
+}
+
+/// The panel a counter grows into: its header (the tile's symbol, name and number, larger) and what it counted —
+/// what wants attention first, then, quieter, the rest of the same span beside it when the page is wide enough. Each
+/// row opens its work; an overdue one the student has let go can be cleared.
+struct DashCounterPanel: View {
+    let counter: Counter
+    let value: Int?
+    let note: String?
+    /// The page's width: the panel's words are laid out at it from the first frame, so they never squeeze while the
+    /// tile grows (the growing shape shows more of them as it opens).
+    let width: CGFloat
+    let close: () -> Void
+    @EnvironmentObject private var engine: Engine
+    @State private var data: ItemsSheetData?
+    @State private var error: String?
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        content
+            .frame(width: max(width, 280), alignment: .topLeading)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+            .clipShape(shape)
+            .glass(shape, tint: DashCounterLook.color(counter.key).opacity(0.10))
+            .onExitCommand { close() }
+            .task { await load() }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            if let d = data {
+                lists(d)
+            } else if let error {
+                Text(error).font(.sCallout).foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Loading…").font(.sCallout).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 16)
+        .padding(.bottom, 20)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: DashCounterLook.symbol(counter.key))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(DashCounterLook.color(counter.key))
+                    Text(data?.title ?? DashCounterLook.fullName(counter.key, counter.label))
+                        .font(.sHeadline)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    DashCount(value: value, alert: counter.tone == "red" && (value ?? 0) > 0, size: 40)
+                    if let line = data?.note ?? note, !line.isEmpty {
+                        Text(line)
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(DashIconButtonStyle())
+            .keyboardShortcut(.cancelAction)
+            .help("Close (Esc)")
+            .accessibilityLabel("Close")
+        }
+    }
+
+    @ViewBuilder
+    private func lists(_ d: ItemsSheetData) -> some View {
+        if d.sections.isEmpty {
+            EmptyNote(text: d.empty ?? "Nothing here.")
+        } else {
+            let main = d.sections.filter { $0.quiet != true }
+            let quiet = d.sections.filter { $0.quiet == true }
+            if width >= 760, !main.isEmpty, !quiet.isEmpty {
+                HStack(alignment: .top, spacing: 28) {
+                    column(main, columns: 1)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    column(quiet, columns: 1)
+                        .frame(width: min(440, width * 0.4), alignment: .topLeading)
+                }
+            } else {
+                column(main + quiet, columns: width >= 900 && quiet.isEmpty ? 2 : 1)
+            }
+        }
+    }
+
+    /// Sections one under another; a long list alone on a wide page runs in two columns.
+    private func column(_ sections: [SheetSection], columns: Int) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: 4) {
+                    if !section.title.isEmpty {
+                        Text(section.title)
+                            .font(.sSubheadline.weight(.semibold))
+                            .foregroundStyle(section.quiet == true ? .tertiary : .secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 2)
+                    }
+                    if columns > 1 && section.rows.count > 5 {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18, alignment: .top), count: columns), alignment: .leading, spacing: 2) {
+                            ForEach(section.rows) { row in item(row) }
+                        }
+                    } else {
+                        ForEach(section.rows) { row in item(row) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func item(_ row: SheetRow) -> some View {
+        RowLink { if let u = row.url { engine.openWeb(u, title: row.title) } } label: {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color(hex: row.color).opacity(row.quiet == true ? 0.5 : 1))
+                    .frame(width: 4, height: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.title)
+                        .font(.sBody)
+                        .foregroundStyle(row.quiet == true ? .secondary : .primary)
+                        .lineLimit(2)
+                    if let sub = row.sub, !sub.isEmpty {
+                        Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 6)
+                if row.clearable == true, let k = row.key {
+                    Button { clear(k) } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Clear from Overdue")
+                    .accessibilityLabel("Clear \(row.title) from Overdue")
+                } else if row.url != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .contextMenu {
+            if let u = row.url {
+                Button("Open") { engine.openWeb(u, title: row.title) }
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(u, title: row.title) }
+                Button("Copy Link") { if let x = engine.absolute(u) { copyToPasteboard(x.absoluteString) } }
+            }
+            if row.clearable == true, let k = row.key {
+                Divider()
+                Button("Clear from Overdue") { clear(k) }
+            }
+        }
+    }
+
+    private func load() async {
+        do {
+            let d = try await engine.call("todaySheet", ["key": counter.key], as: ItemsSheetData.self)
+            withAnimation(Motion.gentle) {
+                data = d
+                error = nil
+            }
+        } catch {
+            if data == nil { self.error = error.localizedDescription }
+        }
+    }
+
+    private func clear(_ k: String) {
+        Task {
+            if await engine.act("clearOverdue", ["key": k]) {
+                await load()
+                engine.changed()
+            }
+        }
+    }
+}

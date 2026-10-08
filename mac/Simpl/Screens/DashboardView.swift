@@ -1,43 +1,94 @@
 import SwiftUI
 
-/// The Dashboard: the day at a glance, as Simpl's web Today has it. Six counters (each opens what it counted in a
-/// popover from its card), the day's work with its ticks, and the week's load per course.
+/// The Dashboard: the day at a glance, as Simpl's web Dashboard has it (1.2). Six counters, each growing in place into a
+/// panel of what it counted; then one of three views, chosen in the toolbar and kept on this Mac — Cards (the courses as
+/// cards: score, what is due, unread announcements, how much is handed in, quick links), List (every course on one
+/// line, then everything coming up day by day, ticked off where it is done) and Activity (Canvas's recent activity).
+/// Beside the view on a wide window, and under it on a narrow one: the day's work, the grades skyline and the week's
+/// load per course.
 struct DashboardView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<Today>()
+    /// The view chosen (Cards, List, Activity), kept on this Mac. (The screenshot suite: -SimplDashView list.)
+    @AppStorage("SimplDashView") private var chosen: DashView = .cards
     @State private var counts: TodayCounts?
     @State private var open: String?
     @State private var sheetAsked = false
+    @State private var width: CGFloat = 0
+    @State private var courses: DashCoursesData?
+    @State private var progress: [String: CourseProgress] = [:]
+    @State private var progressRead = false
+    @State private var sky: DashSkylineData?
+    @State private var list: DashListData?
+    @State private var listError: String?
+    @State private var activity: DashActivityData?
+    @State private var activityError: String?
+    @Namespace private var morph
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Brightspace has no activity stream: there the Activity view is not offered.
+    private var views: [DashView] { engine.onBrightspace ? [.cards, .list] : DashView.allCases }
+    private var view: DashView { views.contains(chosen) ? chosen : .cards }
+
+    // MARK: - Widths
+
+    /// The side column's width on a wide window.
+    private var railWidth: CGFloat { min(440, max(340, (width * 0.3).rounded())) }
+    /// Wide enough for the view and the side column side by side.
+    private var twoColumns: Bool { width >= 900 }
+    private var mainWidth: CGFloat { twoColumns ? width - railWidth - 28 : width }
 
     var body: some View {
         Group {
             if let d = model.data {
-                Page {
-                    ScreenHeading(title: greeting(d), sub: d.dateLine)
-                    counters(d)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: 18) {
-                            dayList(d).frame(minWidth: 520)
-                            if let load = d.load, d.hasCourses ?? true { weekLoad(load, idle: d.idle).frame(width: 330) }
-                        }
-                        VStack(alignment: .leading, spacing: 18) {
-                            dayList(d)
-                            if let load = d.load, d.hasCourses ?? true { weekLoad(load, idle: d.idle) }
-                        }
-                    }
-                }
+                page(d)
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
         }
         .navigationTitle("Dashboard")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { engine.newTask = true } label: { Label("New Task", systemImage: "plus") }
-                    .help("New Task (⌘N)")
+        .toolbar { toolbarItems }
+        .task(id: engine.dataVersion) { await load() }
+        .onChange(of: chosen) { _, _ in Task { await loadView() } }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Picker("View", selection: $chosen.animation(Motion.gentle)) {
+                ForEach(views) { v in
+                    Text(v.title).tag(v)
+                }
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .help("Cards, a list by day, or recent activity")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button { engine.newTask = true } label: { Label("New Task", systemImage: "plus") }
+                .help("New Task (⌘N)")
+        }
+    }
+
+    // MARK: - The page
+
+    private func page(_ d: Today) -> some View {
+        Page(spacing: 26) {
+            ScreenHeading(title: greeting(d), sub: d.dateLine)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    GeometryReader { g in
+                        Color.clear
+                            .onAppear { width = g.size.width }
+                            .onChange(of: g.size.width) { _, w in width = w }
+                    }
+                }
+            // (laid out once the page's width is known: the counters' rows and the columns follow it)
+            if width > 0 {
+                counters(d)
+                content(d)
             }
         }
-        .task(id: engine.dataVersion) { await load() }
     }
 
     private func greeting(_ d: Today) -> String {
@@ -49,122 +100,360 @@ struct DashboardView: View {
 
     // MARK: - Counters
 
+    /// The counters in rows (six across where they fit, else three or two); a counter opened grows into its panel right
+    /// under its own row.
     private func counters(_ d: Today) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 14)], spacing: 14) {
-            ForEach(d.counters) { c in counterTile(c) }
+        let cols = width >= 900 ? 6 : (width >= 520 ? 3 : 2)
+        let rows: [[Counter]] = stride(from: 0, to: d.counters.count, by: cols).map { start in
+            Array(d.counters[start..<min(start + cols, d.counters.count)])
         }
-    }
-
-    private func counterTile(_ c: Counter) -> some View {
-        let value: Int? = c.key == "overdue" ? counts?.overdue : c.key == "graded" ? counts?.graded : c.value
-        let red = c.tone == "red" && (value ?? 0) > 0
-        return Button {
-            open = c.key
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(c.label)
-                    .font(.sCallout.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Group {
-                    if let v = value {
-                        Text("\(v)").contentTransition(.numericText(value: Double(v)))
-                    } else {
-                        Text("–").foregroundStyle(.tertiary)
-                    }
+        return VStack(alignment: .leading, spacing: 14) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                counterRow(row, cols: cols)
+                if let key = open, let c = row.first(where: { $0.key == key }) {
+                    DashCounterPanel(counter: c, value: value(c), note: note(c), width: width, close: { setOpen(nil) })
+                        .id(key)
+                        .dashMorph(key, in: morph, enabled: !reduceMotion)
+                        .transition(.opacity)
+                        .zIndex(1)
                 }
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .foregroundStyle(red ? Color.red : Color.primary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
-        }
-        .buttonStyle(CardButtonStyle(tint: red ? .red : nil))
-        .animation(Motion.snappy, value: value)
-        .help("Show \(c.label.lowercased())")
-        .popover(isPresented: Binding(get: { open == c.key }, set: { if !$0 && open == c.key { open = nil } }), arrowEdge: .bottom) {
-            CounterList(key: c.key) { url in
-                open = nil
-                engine.openWeb(url, title: "")
-            }
-            .environmentObject(engine)
-        }
-    }
-
-    // MARK: - The day's work
-
-    private func dayList(_ d: Today) -> some View {
-        CardSection(title: d.list.heading, trailing: d.list.note) {
-            if d.list.rows.isEmpty {
-                EmptyNote(text: d.list.empty ?? "Nothing due.")
-                    .padding(.horizontal, 8)
-            }
-            ForEach(Array(d.list.rows.enumerated()), id: \.element.id) { i, row in
-                if i > 0 { RowDivider(inset: 42) }
-                RowLink { openRow(row) } label: {
-                    WorkRowView(row: row) { done in toggle(row, done) }
-                }
-                .workMenu(WorkAction(row), engine: engine)
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
 
-    // MARK: - The week's load
+    private func counterRow(_ row: [Counter], cols: Int) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            ForEach(row) { c in
+                counterSlot(c).frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
 
-    private func weekLoad(_ load: [LoadRow], idle: Int?) -> some View {
-        CardSection(title: "Week load") {
-            VStack(alignment: .leading, spacing: 12) {
-                if load.isEmpty {
-                    EmptyNote(text: "Nothing assigned this week.", symbol: "sun.max")
+    /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
+    /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
+    @ViewBuilder
+    private func counterSlot(_ c: Counter) -> some View {
+        if open == c.key && !reduceMotion {
+            DashCounterTile(counter: c, value: value(c), note: note(c)) {}
+                .hidden()
+                .accessibilityHidden(true)
+        } else {
+            DashCounterTile(counter: c, value: value(c), note: note(c)) { setOpen(open == c.key ? nil : c.key) }
+                .dashMorph(c.key, in: morph, enabled: !reduceMotion)
+                .transition(.opacity)
+        }
+    }
+
+    private func value(_ c: Counter) -> Int? {
+        switch c.key {
+        case "overdue": return counts?.overdue
+        case "graded": return counts?.graded
+        default: return c.value
+        }
+    }
+
+    private func note(_ c: Counter) -> String? {
+        switch c.key {
+        case "overdue": return counts?.overdueNote
+        case "graded": return counts?.gradedNote
+        default: return c.note
+        }
+    }
+
+    private func setOpen(_ key: String?) {
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.18) : Motion.gentle) { open = key }
+    }
+
+    // MARK: - The view and the side column
+
+    @ViewBuilder
+    private func content(_ d: Today) -> some View {
+        if twoColumns {
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 26) { main(d) }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                VStack(alignment: .leading, spacing: 26) { rail(d, narrow: false) }
+                    .frame(width: railWidth, alignment: .topLeading)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 26) {
+                if view != .list { today(d) }
+                main(d)
+                rail(d, narrow: true)
+            }
+        }
+    }
+
+    /// The view chosen.
+    @ViewBuilder
+    private func main(_ d: Today) -> some View {
+        switch view {
+        case .cards: courseCards
+        case .list:
+            courseLines
+            upcoming
+        case .activity: activityList
+        }
+    }
+
+    /// The side column: the day's work (but in List, which has it), the grades skyline and the week's load — under the
+    /// view on a narrow window, the skyline and the load side by side where they fit.
+    @ViewBuilder
+    private func rail(_ d: Today, narrow: Bool) -> some View {
+        if !narrow && view != .list { today(d) }
+        if narrow && width >= 760 {
+            HStack(alignment: .top, spacing: 22) {
+                skyline.frame(maxWidth: .infinity)
+                weekLoad(d).frame(maxWidth: .infinity)
+            }
+        } else {
+            skyline
+            weekLoad(d)
+        }
+    }
+
+    // MARK: - Sections
+
+    /// The day's work (or what is next, when nothing is due today), each with its tick.
+    private func today(_ d: Today) -> some View {
+        PageSection(title: d.list.heading, trailing: d.list.note) {
+            VStack(spacing: 0) {
+                if d.list.rows.isEmpty {
+                    EmptyNote(text: d.list.empty ?? "Nothing due.")
+                        .padding(.horizontal, 10)
                 }
-                ForEach(load) { r in
-                    Button { engine.go(.section("courses/\(r.id)", "assignments")) } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack {
-                                Text(r.code).font(.sCallout.weight(.semibold)).lineLimit(1)
-                                Spacer()
-                                Text("\(r.done) of \(r.total)")
-                                    .font(.sCallout.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                                    .contentTransition(.numericText(value: Double(r.done)))
+                ForEach(Array(d.list.rows.enumerated()), id: \.element.id) { i, row in
+                    if i > 0 { RowDivider(inset: 42) }
+                    Group {
+                        if twoColumns {
+                            DashTodayLine(row: row) { done in toggle(row, done) }
+                        } else {
+                            RowLink { openRow(row) } label: {
+                                WorkRowView(row: row) { done in toggle(row, done) }
                             }
-                            LoadBar(fraction: r.total > 0 ? Double(r.done) / Double(r.total) : 0, color: Color(hex: r.color))
+                            .workMenu(WorkAction(row), engine: engine)
                         }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .help("\(r.code)’s assignments")
-                }
-                if let idle, idle > 0 {
-                    Text("\(idle) \(idle == 1 ? "course" : "courses") with nothing assigned this week")
-                        .font(.sCaption)
-                        .foregroundStyle(.secondary)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
+            .padding(8)
+            .card(radius: 18)
         }
     }
 
-    // MARK: - Doing
+    private var courseCards: some View {
+        PageSection(title: "Courses", trailing: courses.map { "\($0.rows.count) \($0.rows.count == 1 ? "course" : "courses")" }, accessory: {
+            Button("All Courses") { engine.go(.courses) }
+                .buttonStyle(.link)
+                .font(.sCallout)
+        }) {
+            if let c = courses {
+                if c.rows.isEmpty {
+                    EmptyNote(text: c.empty ?? "No courses chosen yet.", symbol: "books.vertical")
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
+                        ForEach(c.rows) { row in
+                            DashCourseCard(course: row, progress: progressOf(row.id))
+                        }
+                    }
+                }
+            } else {
+                loadingNote("Reading your courses…")
+            }
+        }
+    }
+
+    /// A course's share handed in: nil until read; a course left out of the answer has nothing to hand in.
+    private func progressOf(_ id: String) -> CourseProgress? {
+        progress[id] ?? (progressRead ? CourseProgress(done: 0, total: 0) : nil)
+    }
+
+    private var courseLines: some View {
+        PageSection(title: "Courses", trailing: courses.map { "\($0.rows.count) \($0.rows.count == 1 ? "course" : "courses")" }) {
+            if let c = courses {
+                if c.rows.isEmpty {
+                    EmptyNote(text: c.empty ?? "No courses chosen yet.", symbol: "books.vertical")
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(c.rows.enumerated()), id: \.element.id) { i, row in
+                            if i > 0 { RowDivider(inset: 27) }
+                            DashCourseLine(course: row, progress: progressOf(row.id), wide: mainWidth >= 860)
+                        }
+                    }
+                    .padding(8)
+                    .card(radius: 18)
+                }
+            } else {
+                loadingNote("Reading your courses…")
+            }
+        }
+    }
+
+    private var upcoming: some View {
+        PageSection(title: "Coming up", trailing: upcomingNote, accessory: { hideDoneButton }) {
+            if let l = list {
+                DashDayList(data: l, wide: mainWidth >= 760) { row, done in toggleListRow(row, done) }
+            } else if let listError {
+                EmptyNote(text: listError, symbol: "exclamationmark.triangle")
+            } else {
+                loadingNote("Reading your planner…")
+            }
+        }
+    }
+
+    private var upcomingNote: String? {
+        guard let l = list, let total = l.total, total > 0 else { return nil }
+        let done = l.done ?? 0
+        return "\(total - done) to do · \(done) done"
+    }
+
+    @ViewBuilder
+    private var hideDoneButton: some View {
+        if let l = list, (l.done ?? 0) > 0 || l.hideDone == true {
+            let hiding = l.hideDone == true
+            Button {
+                Task { await loadList(hideDone: !hiding) }
+            } label: {
+                Label(hiding ? "Show Completed · \(l.done ?? 0)" : "Hide Completed", systemImage: hiding ? "eye" : "checkmark.circle")
+                    .font(.sCallout)
+            }
+            .glassButton()
+            .help(hiding ? "Completed and handed-in work is hidden" : "Hide completed and handed-in work")
+        }
+    }
+
+    private var activityList: some View {
+        PageSection(title: "Recent activity", trailing: activity.map { a in
+            let n = a.rows.filter { $0.unread == true }.count
+            return n > 0 ? "\(n) new" : ""
+        }) {
+            if let a = activity {
+                DashActivityList(data: a) { row in openActivity(row) }
+            } else if let activityError {
+                EmptyNote(text: activityError, symbol: "exclamationmark.triangle")
+            } else {
+                loadingNote("Reading recent activity…")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var skyline: some View {
+        if let s = sky {
+            PageSection(title: "Grades", accessory: {
+                Button("All Grades") { engine.go(.grades) }
+                    .buttonStyle(.link)
+                    .font(.sCallout)
+            }) {
+                DashSkyline(courses: s.courses)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func weekLoad(_ d: Today) -> some View {
+        if let load = d.load, d.hasCourses ?? true {
+            PageSection(title: "Week load", trailing: "Handed in of assigned") {
+                DashWeekLoad(load: load, idle: d.idle)
+            }
+        }
+    }
+
+    private func loadingNote(_ text: String) -> some View {
+        HStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text(text).font(.sCallout).foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 12)
+    }
+
+    // MARK: - Loading
 
     /// `animated`: after a tick here, the row ticked off leaves and the next one slides in (as To Do's do); any other
     /// load is a redraw, not an arrival.
     private func load(animated: Bool = false) async {
         await model.load(engine, "today", animated: animated)
         guard model.data != nil else { return }
-        // (the screenshot suite: -SimplSheet next opens a counter's list)
+        // (the screenshot suite: -SimplSheet next opens a counter's panel)
         if let key = UserDefaults.standard.string(forKey: "SimplSheet"), !key.isEmpty, !sheetAsked {
             sheetAsked = true
             open = key
         }
-        if let kept = try? await engine.call("todayCounts", ["kept": true], as: TodayCounts.self), kept.overdue != nil { counts = kept }
+        Task { await loadCounts() }
+        Task { await loadCourses() }
+        Task { await loadSkyline() }
+        await loadView()
+    }
+
+    private func loadCounts() async {
+        if let kept = try? await engine.call("todayCounts", ["kept": true], as: TodayCounts.self), kept.overdue != nil, counts == nil { counts = kept }
         if let fresh = try? await engine.call("todayCounts", ["kept": false], as: TodayCounts.self) {
             withAnimation(Motion.snappy) { counts = fresh }
         }
     }
+
+    private func loadCourses() async {
+        if let c = try? await engine.call("dashCourses", as: DashCoursesData.self) {
+            withAnimation(courses == nil ? nil : Motion.gentle) { courses = c }
+        } else if courses == nil {
+            courses = DashCoursesData(rows: [], empty: "Your courses could not be loaded.")
+        }
+        if let p = try? await engine.call("coursesProgress", as: [String: CourseProgress].self) {
+            withAnimation(Motion.gentle) {
+                progress = p
+                progressRead = true
+            }
+        }
+    }
+
+    /// The skyline from the copy kept from the last visit first (at once), then from what Canvas says now.
+    private func loadSkyline() async {
+        if sky == nil, let kept = try? await engine.call("dashSkyline", ["kept": true], as: DashSkylineData.self), sky == nil {
+            sky = kept
+        }
+        if let fresh = try? await engine.call("dashSkyline", ["kept": false], as: DashSkylineData.self) {
+            withAnimation(Motion.gentle) { sky = fresh }
+        }
+    }
+
+    private func loadView() async {
+        switch view {
+        case .cards: break
+        case .list: await loadList()
+        case .activity: await loadActivity()
+        }
+    }
+
+    private func loadList(hideDone: Bool? = nil, animated: Bool = false) async {
+        var args: [String: Any] = [:]
+        if let hideDone { args["hideDone"] = hideDone }
+        do {
+            let l = try await engine.call("dashList", args, as: DashListData.self)
+            withAnimation(animated || hideDone != nil ? Motion.gentle : nil) {
+                list = l
+                listError = nil
+            }
+        } catch {
+            if list == nil { listError = error.localizedDescription }
+        }
+    }
+
+    private func loadActivity() async {
+        do {
+            let a = try await engine.call("dashActivity", as: DashActivityData.self)
+            activity = a
+            activityError = nil
+        } catch {
+            if activity == nil { activityError = error.localizedDescription }
+        }
+    }
+
+    // MARK: - Doing
 
     private func toggle(_ row: WorkRow, _ done: Bool) {
         setDone(row.id, done)
@@ -185,127 +474,42 @@ struct DashboardView: View {
         withAnimation(Motion.snappy) { model.data = d }
     }
 
+    /// A tick in the List: shown at once, then Canvas told; put back if it refuses.
+    private func toggleListRow(_ row: DashRow, _ done: Bool) {
+        setListDone(row.id, done)
+        Task {
+            if !(await engine.act("complete", ["id": row.id, "done": done])) {
+                setListDone(row.id, !done)
+            } else {
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                await loadList(animated: true)
+                engine.changed()
+            }
+        }
+    }
+
+    private func setListDone(_ id: String, _ done: Bool) {
+        guard var l = list else { return }
+        for di in l.days.indices {
+            if let ri = l.days[di].rows.firstIndex(where: { $0.id == id }) {
+                l.days[di].rows[ri].done = done
+            }
+        }
+        withAnimation(Motion.snappy) { list = l }
+    }
+
     private func openRow(_ row: WorkRow) {
         guard let url = row.url else { return }
         engine.openWeb(url, title: row.title)
     }
-}
 
-/// A course's share of the week handed in: a bar in its colour that fills on the house spring, from where it was.
-private struct LoadBar: View {
-    let fraction: Double
-    let color: Color
-    @State private var shown = 0.0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                Capsule().fill(color.opacity(0.16))
-                Capsule().fill(color).frame(width: max(g.size.width * shown, shown > 0 ? 6 : 0))
-            }
+    /// An activity item opened: its dot goes (here and on the web Dashboard), and it opens.
+    private func openActivity(_ row: DashActivityRow) {
+        if row.unread == true, var a = activity, let i = a.rows.firstIndex(where: { $0.id == row.id }) {
+            a.rows[i].unread = false
+            withAnimation(Motion.snappy) { activity = a }
         }
-        .frame(height: 6)
-        .onAppear {
-            if reduceMotion { shown = fraction } else { withAnimation(Motion.fill.delay(0.05)) { shown = fraction } }
-        }
-        .onChange(of: fraction) { _, f in
-            withAnimation(reduceMotion ? nil : Motion.gentle) { shown = f }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// A counter's list (Due today, Next 7 days, Unread, Overdue, Tomorrow, Graded) in a popover from its card: each row
-/// opens its work; an overdue one the student has let go can be cleared.
-private struct CounterList: View {
-    let key: String
-    let open: (String) -> Void
-    @EnvironmentObject private var engine: Engine
-    @State private var data: ItemsSheetData?
-    @State private var error: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let d = data {
-                Text(d.title)
-                    .font(.sHeadline)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
-                    .padding(.bottom, 6)
-                if let note = d.note, !note.isEmpty {
-                    Text(note).font(.sCallout).foregroundStyle(.secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 6)
-                }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if d.sections.isEmpty {
-                            EmptyNote(text: d.empty ?? "Nothing here.")
-                                .padding(.horizontal, 8)
-                        }
-                        ForEach(d.sections) { section in
-                            VStack(alignment: .leading, spacing: 2) {
-                                if !section.title.isEmpty {
-                                    CardHeading(text: section.title).padding(.horizontal, 8).padding(.bottom, 2)
-                                }
-                                ForEach(section.rows) { row in item(row) }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 12)
-                }
-            } else if let error {
-                Text(error).foregroundStyle(.secondary).padding(20)
-            } else {
-                ProgressView().frame(maxWidth: .infinity).padding(30)
-            }
-        }
-        .frame(width: 380)
-        .frame(maxHeight: 460)
-        .task { await load() }
-    }
-
-    private func item(_ row: SheetRow) -> some View {
-        RowLink { if let u = row.url { open(u) } } label: {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 2).fill(Color(hex: row.color)).frame(width: 4, height: 30)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(row.title).foregroundStyle(row.quiet == true ? .secondary : .primary).lineLimit(2)
-                    if let sub = row.sub { Text(sub).font(.sCaption).foregroundStyle(.secondary).lineLimit(2) }
-                }
-                Spacer(minLength: 4)
-                if row.clearable == true, let k = row.key {
-                    Button { clear(k) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
-                        .buttonStyle(.borderless)
-                        .help("Clear from Overdue")
-                        .accessibilityLabel("Clear")
-                }
-            }
-        }
-        .contextMenu {
-            if let u = row.url { Button("Open") { open(u) } }
-            if row.clearable == true, let k = row.key { Button("Clear from Overdue") { clear(k) } }
-        }
-    }
-
-    private func load() async {
-        do {
-            let d = try await engine.call("todaySheet", ["key": key], as: ItemsSheetData.self)
-            withAnimation(data == nil ? nil : Motion.gentle) { data = d }
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    private func clear(_ k: String) {
-        Task {
-            if await engine.act("clearOverdue", ["key": k]) {
-                engine.changed()
-                await load()
-            }
-        }
+        Task { _ = await engine.act("dashSeen", ["id": row.id]) }
+        if let url = row.url { engine.openWeb(url, title: row.title) }
     }
 }

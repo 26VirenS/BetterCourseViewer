@@ -57,6 +57,8 @@ struct Counter: Codable, Identifiable, Hashable {
     var value: Int?
     var tone: String?
     var pending: Bool?
+    /// The line under the number ("35 points total", "From 2 courses"): the Mac's Dashboard shows it (Mac 1.2).
+    var note: String?
     var id: String { key }
 }
 
@@ -89,6 +91,9 @@ struct Today: Codable {
 struct TodayCounts: Codable {
     var overdue: Int?
     var graded: Int?
+    /// The lines under Overdue's and Graded's numbers (Mac 1.2).
+    var overdueNote: String?
+    var gradedNote: String?
 }
 
 struct SheetRow: Codable, Identifiable, Hashable {
