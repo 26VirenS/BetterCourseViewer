@@ -3193,6 +3193,10 @@ try {
   await tab('modules');
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
   check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 4, `modules list: ${(await texts('.bcv-module__item')).length} items (two pages, the quiz, and the assignment the module asks a mark for)`);
+  // (2.99.12) nothing opens by itself: the module last opened here is the one open next time
+  check((await page.$$('.bcv-module.bcv-module--open')).length === 0, 'no module is open before one has been opened');
+  await page.click('.bcv-module__head');
+  check(await eventually(() => page.$$('.bcv-module.bcv-module--open').then((r) => r.length === 1)), 'a press on its head opens it');
   // Back means where you came from: the same page says Modules when opened from Modules, Pages when
   // opened from Pages, and Pages (the list it belongs to) when opened straight in with nothing before
   await clickScreen('.bcv-module__item[href*="/pages/course-information"]');
@@ -3203,6 +3207,8 @@ try {
   // a link in a module opens in a popup over the page, the site framed in it, with Open in new tab for one that refuses
   await page.goto(`${BASE}/courses/102/modules`);
   await page.waitForSelector(`.bcv-module__item[href="${SIM}/sim"]`, { timeout: 15000 });
+  await page.$eval(`.bcv-module__item[href="${SIM}/sim"]`, (e) => { const m = e.closest('.bcv-module'); if (!m.classList.contains('bcv-module--open')) m.querySelector('.bcv-module__head').click(); }); // (2.99.12: modules start closed)
+  await page.waitForTimeout(450);
   const hereBefore = context.pages().length;
   const phetOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click(`.bcv-module__item[href="${SIM}/sim"]`);
@@ -3308,6 +3314,7 @@ try {
   await page.bringToFront();
   await page.goto(`${BASE}/courses/101/modules`);
   await page.waitForSelector('.bcv-module', { timeout: 15000 });
+  check((await page.$$('.bcv-module.bcv-module--open')).length === 1, 'back on Modules after a reload, the module last opened is open again');
   await tab('pages');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   await clickScreen('.bcv-body .bcv-row');
@@ -7309,6 +7316,8 @@ try {
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['calc', 'ptable', 'cite'] })); // (three pinned, the way a student would have them)
   await page.goto(`${BASE}/courses/102/modules`);
   await page.waitForSelector(`.bcv-module__item[href="${SIM}/sim"]`, { timeout: 20000 });
+  await page.$eval(`.bcv-module__item[href="${SIM}/sim"]`, (e) => { const m = e.closest('.bcv-module'); if (!m.classList.contains('bcv-module--open')) m.querySelector('.bcv-module__head').click(); }); // (2.99.12: modules start closed)
+  await page.waitForTimeout(450);
   const wOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click(`.bcv-module__item[href="${SIM}/sim"]`);
   const wTab = await wOpening;

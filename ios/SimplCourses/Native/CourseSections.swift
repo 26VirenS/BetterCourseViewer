@@ -193,7 +193,11 @@ struct ModulesList: View {
     let ctx: String
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<ModulesData>()
-    @State private var folded: Set<String> = []
+    /// (1.5.6) Nothing opens by itself: the one module open is the one last opened in this course, kept on this
+    /// iPhone — let go when it is closed again. Others opened since stay open while the list is up.
+    @State private var opened: Set<String> = []
+    @State private var restored = false
+    private var lastKey: String { "SimplModLast.\(ctx)" }
     /// Marked done (or not) here, before Canvas has answered: the circle fills at once, and goes back if Canvas says no.
     @State private var marking: [String: Bool] = [:]
 
@@ -202,7 +206,7 @@ struct ModulesList: View {
             List {
                 ForEach(d.modules) { m in
                     Section {
-                        if !folded.contains(m.id) {
+                        if opened.contains(m.id) {
                             if m.locked == true, let t = m.lockText, !t.isEmpty {
                                 Label(t, systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
                             }
@@ -216,6 +220,11 @@ struct ModulesList: View {
             }
             .listStyle(.insetGrouped)
             .overlay { if d.modules.isEmpty { EmptyNote(text: d.empty ?? "No modules", symbol: "square.stack.3d.up") } }
+            .onAppear {
+                guard !restored else { return }
+                restored = true
+                if let last = UserDefaults.standard.string(forKey: lastKey), d.modules.contains(where: { $0.id == last }) { opened = [last] }
+            }
         }
     }
 
@@ -223,7 +232,13 @@ struct ModulesList: View {
         Button {
             Haptics.select()
             withAnimation(.snappy) {
-                if folded.contains(m.id) { folded.remove(m.id) } else { folded.insert(m.id) }
+                if opened.contains(m.id) {
+                    opened.remove(m.id)
+                    if UserDefaults.standard.string(forKey: lastKey) == m.id { UserDefaults.standard.removeObject(forKey: lastKey) }
+                } else {
+                    opened.insert(m.id)
+                    UserDefaults.standard.set(m.id, forKey: lastKey)
+                }
             }
         } label: {
             HStack(spacing: 6) {
@@ -234,12 +249,12 @@ struct ModulesList: View {
                 if let p = m.progress, !p.isEmpty { Text(p).textCase(nil).monospacedDigit() }
                 Image(systemName: "chevron.down")
                     .font(.caption.weight(.semibold))
-                    .rotationEffect(.degrees(folded.contains(m.id) ? -90 : 0))
+                    .rotationEffect(.degrees(opened.contains(m.id) ? 0 : -90))
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityHint(folded.contains(m.id) ? "Shows the module's items" : "Hides the module's items")
+        .accessibilityHint(opened.contains(m.id) ? "Hides the module's items" : "Shows the module's items")
     }
 
     @ViewBuilder

@@ -1341,8 +1341,12 @@
     const list = await store.modules(c.id).catch(() => null);
     if (!list) return U.emptyCard('Modules could not be loaded.');
     if (!list.length) return U.emptyCard('No modules yet.');
-    const open = new Set(list.filter((m) => m.state !== 'completed' && m.state !== 'locked').slice(0, 3).map((m) => String(m.id)));
-    if (!open.size && list.length) open.add(String(list[0].id));
+    // (2.99.12) Nothing opens by itself: the one module open is the one last opened here, per course — kept when it is
+    // opened, let go when it is closed (closing it is saying so). Open all / Close all leave it as it was.
+    const lastKey = `modLast:${c.id}`;
+    let last = String((await store.pref(lastKey, '')) || '');
+    const open = new Set(list.some((m) => String(m.id) === last) ? [last] : []);
+    const remember = (id) => { last = id; store.setPref(lastKey, id); };
     const cards = list.map((m) => {
       const items = m.items || [];
       const req = items.filter((it) => it.completion_requirement);
@@ -1412,7 +1416,12 @@
         card.classList.toggle('bcv-module--open', on);
         head.setAttribute('aria-expanded', String(on));
       };
-      head.addEventListener('click', () => card.setOpen(!card.classList.contains('bcv-module--open')));
+      head.addEventListener('click', () => {
+        const on = !card.classList.contains('bcv-module--open');
+        card.setOpen(on);
+        if (on) remember(String(m.id));
+        else if (String(m.id) === last) remember('');
+      });
       return card;
     });
     const col = U.el('bcv-col bcv-col--16');

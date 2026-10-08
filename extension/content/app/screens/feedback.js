@@ -305,9 +305,10 @@
 
   /** The course grade ring's own drawing (gpa.js): a 6-wide stroke round a 22 circle in a 56 box, its round-ended arc
    *  sweeping in from empty (bcv-ring--fill) after `sweep` ms. */
+  const RING = 72; // px: the card's ring (2.99.12: larger than the grade ring's 56, the score's own place)
   function gradeRing(pct, color, sweep) {
     const svg = document.createElementNS(NS, 'svg');
-    for (const [k, v] of Object.entries({ viewBox: '0 0 56 56', width: 56, height: 56, class: 'bcv-mring__svg', 'aria-hidden': 'true' })) svg.setAttribute(k, String(v));
+    for (const [k, v] of Object.entries({ viewBox: '0 0 56 56', width: RING, height: RING, class: 'bcv-mring__svg', 'aria-hidden': 'true' })) svg.setAttribute(k, String(v));
     const circle = (attrs) => { const el = document.createElementNS(NS, 'circle'); for (const [k, v] of Object.entries({ cx: 28, cy: 28, r: 22, fill: 'none', 'stroke-width': 6, ...attrs })) el.setAttribute(k, String(v)); return el; };
     svg.append(circle({ class: 'bcv-mring__track' }));
     if (pct !== null && pct > 0) {
@@ -323,9 +324,9 @@
   function ring(a, s, { onRubric = null } = {}) {
     const st = standing(a, s);
     const SWEEP = 200; // ms: the card is most of the way open
-    const rubric = (a.rubric || []).length ? BCV.rubricRing?.miniRing?.(a, s, { size: 56, sweep: SWEEP }) : null;
+    const rubric = (a.rubric || []).length ? BCV.rubricRing?.miniRing?.(a, s, { size: RING, sweep: SWEEP }) : null;
     const svg = rubric || gradeRing(st.pct, tone(st.pct), SWEEP);
-    const mid = h('span', { class: 'bcv-mring__pct', style: { color: rubric ? 'var(--bcv-ink)' : tone(st.pct) }, text: st.pct === null ? '—' : `${st.pct}%` });
+    const mid = h('span', { class: 'bcv-mring__pct', style: { color: tone(st.pct) }, text: st.pct === null ? '—' : `${st.pct}%` });
     if ((a.rubric || []).length && onRubric) {
       return h('button', { type: 'button', class: 'bcv-mring bcv-mring--rubric', title: 'Open the rubric', 'aria-label': `Rubric${st.pct !== null ? `, ${st.pct}%` : ''}`, onclick: (e) => { e.stopPropagation(); onRubric(); } }, [svg, mid]);
     }

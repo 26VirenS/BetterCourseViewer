@@ -1152,8 +1152,9 @@
     const between = blendFor(seg, n);
     const lerp = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
     const cols = m.graded ? m.grades : m.hues;
-    const TH = m.thick.map((t) => Math.max(5, Math.min(8, t * 0.5))); // (about the grade ring's 6 on average, as in the big ring a slice thicker the more it carries)
-    const GO = m.bend.map((b) => Math.max(-3, Math.min(2.5, b * 0.25)));
+    const zk = size / 56; // (sized from a 56px ring)
+    const TH = m.thick.map((t) => zk * Math.max(5, Math.min(8, t * 0.5))); // (about the grade ring's 6 on average, as in the big ring a slice thicker the more it carries)
+    const GO = m.bend.map((b) => zk * Math.max(-1.8, Math.min(1.5, b * 0.15))); // (the big ring's bends, gentler at this size: a hint, not a wobble)
     const svg = document.createElementNS(SVG, 'svg');
     for (const [k, v] of Object.entries({ viewBox: `0 0 ${size} ${size}`, width: size, height: size, class: 'bcv-rubring', 'aria-hidden': 'true' })) svg.setAttribute(k, String(v));
     const g = document.createElementNS(SVG, 'g');
@@ -1165,7 +1166,11 @@
       const o0 = RO + lerp(GO, b0), o1 = RO + lerp(GO, b1);
       const path = document.createElementNS(SVG, 'path');
       path.setAttribute('d', `M${P(o0, t0)} L${P(o1, t1)} L${P(o1 - lerp(TH, b1), t1)} L${P(o0 - lerp(TH, b0), t0)} Z`);
-      path.setAttribute('fill', css(mix(cols[bm[0]], cols[bm[1]], bm[2])));
+      const col = css(mix(cols[bm[0]], cols[bm[1]], bm[2]));
+      path.setAttribute('fill', col);
+      path.setAttribute('stroke', col); // (a hair of its own colour round each piece: no seam of the ground shows between them)
+      path.setAttribute('stroke-width', '0.5');
+      path.setAttribute('stroke-linejoin', 'round');
       g.append(path);
     }
     if (sweep !== null) {
@@ -1174,9 +1179,9 @@
       const defs = document.createElementNS(SVG, 'defs');
       const mask = document.createElementNS(SVG, 'mask');
       mask.setAttribute('id', id);
-      const r = RO - 3, c = 2 * Math.PI * r;
+      const r = RO - 3 * zk, c = 2 * Math.PI * r;
       const stroke = document.createElementNS(SVG, 'circle');
-      for (const [k, v] of Object.entries({ cx: C, cy: C, r: f(r), fill: 'none', stroke: '#fff', 'stroke-width': 14, 'stroke-dasharray': `${f(c + 1)} 0`, transform: `rotate(-90 ${C} ${C})`, class: 'bcv-ring--fill', style: `--bcv-delay: ${sweep}ms` })) stroke.setAttribute(k, String(v));
+      for (const [k, v] of Object.entries({ cx: C, cy: C, r: f(r), fill: 'none', stroke: '#fff', 'stroke-width': f(14 * zk), 'stroke-dasharray': `${f(c + 1)} 0`, transform: `rotate(-90 ${C} ${C})`, class: 'bcv-ring--fill', style: `--bcv-delay: ${sweep}ms` })) stroke.setAttribute(k, String(v));
       mask.append(stroke);
       defs.append(mask);
       svg.append(defs);
