@@ -96,7 +96,7 @@
       box.fold(); // (from wherever it is drawn — mid-growth too — back into the button, its word back to the button's)
       from.setAttribute?.('aria-expanded', 'false');
       clearTimeout(ov._bcvFoldT);
-      ov._bcvFoldT = setTimeout(() => { ov.remove(); onClosed?.(); }, U.reducedMotion() ? 0 : 560);
+      ov._bcvFoldT = setTimeout(() => { ov.remove(); from.classList.remove('bcv-grow-src'); onClosed?.(); }, U.reducedMotion() ? 0 : 560);
       if (from.isConnected) from.focus?.({ preventScroll: true }); // (keyboard users land back on what opened it)
     };
     // pressed again as it folds: the fold is called off and it opens again from where it has got to
@@ -107,6 +107,7 @@
       ov.classList.remove('is-folding', 'is-far');
       document.addEventListener('keydown', onKey);
       box.reopen();
+      from.classList.add('bcv-grow-src');
       from.setAttribute?.('aria-expanded', 'true');
       ov.focus();
     };
@@ -146,7 +147,23 @@
     // the copy fades as the box grows (the box's own words fade in), all but the one word that glides, left out of the copy
     // (a fill that is a tint over the card it sits on is flattened onto that card here, or the box would be see-through
     // while it is the button, the page and the button itself showing through it)
-    const rgba = (str) => { const m = /rgba?\(([^)]+)\)/.exec(str || ''); if (!m) return null; const [r, g, b, a = 1] = m[1].split(',').map((x) => parseFloat(x)); return { r, g, b, a: Number.isFinite(a) ? a : 1 }; };
+    // (2.99.14) any CSS colour, read by painting it: a button's fill written as color-mix() comes back from
+    // getComputedStyle as color(srgb …) or oklab(…), which no rgba() pattern reads — and the box lost the button's colour)
+    const rgba = (str) => {
+      if (!str || str === 'transparent') return null;
+      const m = /^rgba?\(([^)]+)\)$/.exec(str);
+      if (m) { const [r, g, b, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map((x) => parseFloat(x)); return { r, g, b, a: Number.isFinite(a) ? a : 1 }; }
+      try {
+        const cv = (rgba.cv ||= Object.assign(document.createElement('canvas'), { width: 1, height: 1 }));
+        const cx = cv.getContext('2d', { willReadFrequently: true });
+        cx.clearRect(0, 0, 1, 1);
+        cx.fillStyle = '#000';
+        cx.fillStyle = str;
+        cx.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = cx.getImageData(0, 0, 1, 1).data;
+        return { r, g, b, a: a / 255 };
+      } catch { return null; }
+    };
     const under = (el) => { for (let e = el.parentElement; e; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c && c.a > 0) return c; } return { r: 255, g: 255, b: 255, a: 1 }; };
     const flat = (top, base) => `rgb(${Math.round(top.r * top.a + base.r * (1 - top.a))}, ${Math.round(top.g * top.a + base.g * (1 - top.a))}, ${Math.round(top.b * top.a + base.b * (1 - top.a))})`;
     const cs = getComputedStyle(from), r0 = from.getBoundingClientRect(), base = under(from);
@@ -171,6 +188,9 @@
     if (anchor === 'left') Object.assign(copy.style, { left: `${Math.round(r0.left - g0.x)}px`, right: 'auto', top: `${Math.round(r0.top - g0.y)}px` });
     else Object.assign(copy.style, { right: `${Math.round(g0.x + g0.w - r0.right)}px`, top: `${Math.round(r0.top - g0.y)}px` });
     box.open(glide);
+    // the button is what grows: the real one steps out while its box is up (the box's first and last frames are it
+    // exactly), so nothing of it shows round the panel's edge — back as the box lands on it again
+    from.classList.add('bcv-grow-src');
     from.setAttribute?.('aria-expanded', 'true');
     const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) box.relayout(); };
     addEventListener('resize', onResize);

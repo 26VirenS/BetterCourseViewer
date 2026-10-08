@@ -109,14 +109,16 @@
   }
   /** Opens `file` — an API File object, or just `{ id }`, fetched here — over the page. `context`
    *  is the course or group it belongs to (its Canvas addresses hang off that); `from` is the
-   *  control that was pressed, which the sheet grows out of and hands focus back to. */
-  async function open(file, { context = null, from = null } = {}) {
+   *  control that was pressed, which the sheet grows out of and hands focus back to. `canvas` (2.99.14): a file handed
+   *  in — Canvas's own document viewer first (its DocViewer, where the instructor's marks and comments on the work are,
+   *  and a reply can be added), drawn here only where Canvas has no viewer for it. */
+  async function open(file, { context = null, from = null, canvas = false } = {}) {
     close({ now: true });
     // In the iPhone app a file opens in the phone's own viewer (Quick Look), in a sheet of its own —
     // pinch, page, share and mark up as with any file on the phone. The app fetches it with the Canvas
     // session; this sheet stays the way where it cannot (an older app, a browser).
     const nat = self.BCVBridge?.native;
-    if (nat?.previewFile) {
+    if (nat?.previewFile && !canvas) {
       let f = file && (file.display_name || file.url) ? file : null;
       if (!f && file?.id) { try { f = await store().file(file.id); } catch { f = null; } }
       let url = '';
@@ -182,7 +184,9 @@
     // Canvas's own preview, for what is not drawn here (its document service's, else its file page's preview), or the browser's own for a PDF still on this device
     const canvasView = () => (f.preview_url ? frame(f.preview_url) : f.local ? (k.kind === 'pdf' ? frame(f.url) : null) : (k.kind === 'pdf' || k.kind === 'doc') ? frame(canvasPreview(f, context)) : null);
     const fallback = (why) => { if (mine()) body.replaceChildren(canvasView() || none(why)); };
-    if (k.kind === 'video') body.replaceChildren(h('video', { class: 'bcv-viewer__media', src: f.url, controls: 'controls', preload: 'metadata' }));
+    const canvasFirst = canvas && !f.local ? canvasView() : null; // (a handed-in file: Canvas's viewer, with the marks on it)
+    if (canvasFirst) body.replaceChildren(canvasFirst);
+    else if (k.kind === 'video') body.replaceChildren(h('video', { class: 'bcv-viewer__media', src: f.url, controls: 'controls', preload: 'metadata' }));
     else if (k.kind === 'audio') body.replaceChildren(h('audio', { class: 'bcv-viewer__media bcv-viewer__media--audio', src: f.url, controls: 'controls', preload: 'metadata' }));
     else if (k.kind === 'image') {
       docview().then((dv) => (mine() ? dv.image(body, f.url, { keys: ov, name }) : null)).then(show).catch(() => {

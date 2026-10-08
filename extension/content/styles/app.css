@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.13"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.14"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -888,11 +888,18 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 /* (2.98.56) the first frame of the box is the chip exactly, and the last of the fold too: while it is the chip's size the
    box wears the chip's own fill, edge and corners (read off the chip into --bcv-mark-*), and a copy of the chip's words sits
    over its header — the one word that glides left out of the copy — fading as the box grows and back in as it folds */
-.bcv-grow { transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle), background-color .32s ease, border-color .32s ease, border-radius var(--bcv-t-gentle) var(--bcv-spring-gentle); }
+/* (2.99.14) it reads as the button growing: the button's own colour and words hold for the first beat of the stretch
+   (100ms), then cross-fade into the panel's ground as it reaches its size (ease-out, 240ms); folding, the colour comes
+   back late, as the box lands on the button. The real button steps out while its box is up (.bcv-grow-src). */
+.bcv-grow { transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle), background-color .24s cubic-bezier(.23,1,.32,1) .1s, border-color .24s cubic-bezier(.23,1,.32,1) .1s, border-radius var(--bcv-t-gentle) var(--bcv-spring-gentle); }
+.bcv-sheet-ov.is-folding .bcv-grow { transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle), background-color .2s cubic-bezier(.23,1,.32,1) .08s, border-color .2s cubic-bezier(.23,1,.32,1) .08s, border-radius var(--bcv-t-gentle) var(--bcv-spring-gentle); }
+.bcv-grow-src { opacity: 0 !important; transition: none !important; }
+.bcv-grow > .bcv-sb--pop, .bcv-grow .bcv-mark__cols { transition: opacity .2s cubic-bezier(.23,1,.32,1) .22s; } /* (what the box holds comes in once the button's words have gone: no two sets of words at once) */
+@media (prefers-reduced-motion: reduce) { .bcv-grow, .bcv-sheet-ov.is-folding .bcv-grow { transition: background-color .15s ease, border-color .15s ease; } } /* (no stretch: the panel is there, the colour cross-fading) */
 .bcv-grow.is-at-card, .bcv-sheet-ov.is-folding .bcv-grow { background: var(--bcv-mark-bg, var(--bcv-card)); border-color: var(--bcv-mark-edge, var(--bcv-edge)); border-radius: var(--bcv-mark-r, 16px); box-shadow: none; }
-.bcv-mark__ghost { position: absolute; right: 0; top: 0; z-index: 2; /* (the box hangs from the chip's right edge, so its top-right corner is the one that stays put) */ display: flex; align-items: center; box-sizing: border-box; pointer-events: none; white-space: nowrap; color: var(--bcv-ink); opacity: 0; transition: opacity .16s ease; }
+.bcv-mark__ghost { position: absolute; right: 0; top: 0; z-index: 2; /* (the box hangs from the chip's right edge, so its top-right corner is the one that stays put) */ display: flex; align-items: center; box-sizing: border-box; pointer-events: none; white-space: nowrap; color: var(--bcv-ink); opacity: 0; transition: opacity .12s cubic-bezier(.23,1,.32,1) .06s; } /* (the button's words held a beat with its colour, then gone) */
 .bcv-grow.is-at-card .bcv-mark__ghost { opacity: 1; transition: none; }
-.bcv-sheet-ov.is-folding .bcv-grow .bcv-mark__ghost { opacity: 1; transition: opacity .2s ease .24s; }
+.bcv-sheet-ov.is-folding .bcv-grow .bcv-mark__ghost { opacity: 1; transition: opacity .16s cubic-bezier(.23,1,.32,1) .12s; }
 .bcv-mark .bcv-sheet__label { transition: opacity .22s ease .14s; }
 .bcv-mark.is-at-card .bcv-sheet__label, .bcv-sheet-ov.is-folding .bcv-mark .bcv-sheet__label { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
 @media (max-width: 1100px) {

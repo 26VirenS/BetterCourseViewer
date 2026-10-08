@@ -87,7 +87,7 @@
         U.text('bcv-fb__filename bcv-ellip', f.display_name || f.filename || 'File', 'span'),
         size ? U.text('bcv-fb__filesize', size, 'span') : null,
       ]),
-      h('button', { type: 'button', class: 'bcv-fb__fileact', text: 'Preview', onclick: () => BCV.viewer?.open(f) }),
+      h('button', { type: 'button', class: 'bcv-fb__fileact', text: 'Preview', onclick: () => BCV.viewer?.open(f, { canvas: true }) }),
       f.url ? h('a', { class: 'bcv-fb__fileact bcv-fb__fileact--dl', href: f.url, download: f.filename || f.display_name || '', text: 'Download' }) : null,
     ]);
   }
@@ -363,7 +363,7 @@
       if (!cur) return null;
       const bits = [];
       for (const f of cur.attachments || []) {
-        bits.push(h('button', { type: 'button', class: 'bcv-mcard__chip', title: `Preview ${f.display_name || f.filename || 'the file'}`, onclick: () => BCV.viewer?.open(f) }, [
+        bits.push(h('button', { type: 'button', class: 'bcv-mcard__chip', title: `Preview ${f.display_name || f.filename || 'the file'}`, onclick: () => BCV.viewer?.open(f, { canvas: true }) }, [
           U.text('bcv-mcard__chipk', fileKind(f), 'span'), U.text('bcv-mcard__chipn bcv-ellip', f.display_name || f.filename || 'File', 'span'),
         ]));
       }
@@ -381,7 +381,7 @@
         U.el('bcv-mcard__btext', [
           cm.comment ? h('p', { class: 'bcv-pretty', text: cm.comment }) : null,
           media?.url ? h('a', { href: media.url, target: '_blank', rel: 'noopener', text: `${media.media_type === 'video' ? 'Video' : 'Voice'} comment` }) : null,
-          ...(cm.attachments || []).map((f) => h('button', { type: 'button', class: 'bcv-mcard__blink', text: f.display_name || f.filename || 'Attachment', onclick: () => BCV.viewer?.open(f) })),
+          ...(cm.attachments || []).map((f) => h('button', { type: 'button', class: 'bcv-mcard__blink', text: f.display_name || f.filename || 'Attachment', onclick: () => BCV.viewer?.open(f, { canvas: true }) })),
         ]),
         U.text('bcv-mcard__bwho', [who, cm.created_at ? stamp(cm.created_at) : null].filter(Boolean).join(' · ')),
       ]);
