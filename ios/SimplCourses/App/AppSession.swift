@@ -16,6 +16,8 @@ extension Notification.Name {
     /// Posted when the interface was switched on or off in Settings: the page reloads with Canvas's
     /// bundles allowed or blocked accordingly (see ContentRules).
     static let simplInterfaceToggled = Notification.Name("SimplCourses.interfaceToggled")
+    /// Posted by the engine when the page says which platform the school's site is; userInfo["lms"] is "canvas" or "d2l".
+    static let simplLMSKnown = Notification.Name("SimplCourses.lmsKnown")
 }
 
 /// App-level state: which Canvas host the student uses and the settings sheet. Light or dark is the
@@ -35,10 +37,22 @@ final class AppSession: ObservableObject {
     }
 
     @Published var showSettings = false
+    /// (2.99.22) The school's site: "canvas" or "d2l" (Brightspace), as its page last said — kept per school, so it is known
+    /// at the next launch before the page has loaded. Nil for a school whose page has not said yet.
+    @Published private(set) var lms: String?
     private var interfaceOn = Bridge.shared.interfaceOn
     private var bag = Set<AnyCancellable>()
 
     init() {
+        lms = host.flatMap { UserDefaults.standard.string(forKey: AppSession.lmsKey($0)) }
+        NotificationCenter.default.publisher(for: .simplLMSKnown)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                guard let self, let kind = note.userInfo?["lms"] as? String, let h = self.host else { return }
+                UserDefaults.standard.set(kind, forKey: AppSession.lmsKey(h))
+                if self.lms != kind { self.lms = kind }
+            }
+            .store(in: &bag)
         // the simulator suite (-SimplDemo YES): the guided setup and the first-run notes marked done, as for a
         // student who has used the app, before the first page reads them
         if UserDefaults.standard.bool(forKey: "SimplDemo") { Bridge.shared.seed(AppSession.demoSeed()) }
@@ -66,6 +80,17 @@ final class AppSession: ObservableObject {
             .store(in: &bag)
     }
 
+    private static func lmsKey(_ host: String) -> String { "lms:\(host.lowercased())" }
+
+    /// The school's site is Brightspace: its page has said so, or before it has, the host is one of Brightspace's own.
+    var onBrightspace: Bool {
+        if let lms { return lms == "d2l" }
+        let h = host?.lowercased() ?? ""
+        return h.hasSuffix(".brightspace.com") || h.hasSuffix(".d2l.com") || h.hasSuffix(".desire2learn.com")
+    }
+    /// The name the school's site goes by, for the words that say it ("Sign out of Brightspace on this device?").
+    var lmsName: String { onBrightspace ? "Brightspace" : "Canvas" }
+
     /// "catcourses.ucmerced.edu", "https://school.instructure.com/login" … → the bare host.
     static func normalizeHost(_ raw: String) -> String? {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -80,6 +105,7 @@ final class AppSession: ObservableObject {
         guard let h = AppSession.normalizeHost(raw) else { return false }
         UserDefaults.standard.set(h, forKey: AppSession.hostKey)
         host = h
+        lms = UserDefaults.standard.string(forKey: AppSession.lmsKey(h))
         return true
     }
 
@@ -88,6 +114,7 @@ final class AppSession: ObservableObject {
         Task { await Activity.shared.reset() }
         UserDefaults.standard.removeObject(forKey: AppSession.hostKey)
         host = nil
+        lms = nil
     }
 
     /// Clears the Canvas session (cookies and site data), like signing out of a browser, and forgets the

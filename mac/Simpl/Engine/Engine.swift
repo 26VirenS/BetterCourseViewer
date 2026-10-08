@@ -119,7 +119,7 @@ final class Engine: ObservableObject, ShellListener {
     func shellMessage(_ op: String, _ body: [String: Any]) {
         switch op {
         case "shell.state":
-            if let k = body["lms"] as? String, k != lms { lms = k }
+            if let k = body["lms"] as? String, k != lms { lms = k; NotificationCenter.default.post(name: .simplLMSKnown, object: nil, userInfo: ["lms": k]) }
             let on = body["shell"] as? Bool ?? false
             web.shellOn = on
             if on {
@@ -261,7 +261,7 @@ final class Engine: ObservableObject, ShellListener {
     func refreshSnapshot() async {
         if let s = try? await call("snapshot", as: Snapshot.self) {
             snapshot = s
-            if let k = s.lms, k != lms { lms = k }
+            if let k = s.lms, k != lms { lms = k; NotificationCenter.default.post(name: .simplLMSKnown, object: nil, userInfo: ["lms": k]) }
         }
     }
 
