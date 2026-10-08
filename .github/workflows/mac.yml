@@ -28,7 +28,7 @@ permissions:
 
 concurrency:
   group: mac-app
-  cancel-in-progress: true
+  cancel-in-progress: false # (a run under way finishes its pictures; the newest push waits its turn)
 
 jobs:
   mac:

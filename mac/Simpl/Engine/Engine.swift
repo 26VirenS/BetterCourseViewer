@@ -159,7 +159,10 @@ final class Engine: ObservableObject, ShellListener {
 
     private func firstNative() async {
         // (the screenshot suite: -SimplPlace todo, course:101, section:courses/101:assignments; -SimplPush /courses/101/assignments/1001)
-        if let p = UserDefaults.standard.string(forKey: "SimplPlace"), let place = Engine.place(named: p) { nav = Navigator(); go(place, animated: false) }
+        if let p = UserDefaults.standard.string(forKey: "SimplPlace"), let place = Engine.place(named: p) {
+            nav.replace(place) // (where the window opens: nothing behind it to go Back to)
+            if let ctx = place.ctx { Task { await loadSections(ctx) } }
+        }
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty { openWeb(push, title: "") }
         if let q = LaunchOpen.take("quiz:") {
             let parts = q.split(separator: ":").map(String.init)
