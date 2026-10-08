@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.18', date: '2026-10-08', notes: [
+      { kind: 'improved', title: 'Links open in the app', body: 'On iPhone, every Canvas link opens its own screen.', icon: P.arrows },
+    ] },
     { version: '2.99.17', date: '2026-10-08', notes: [
       { kind: 'new', title: 'Previous and Next', body: 'On every quiz, page and discussion, not just work.', icon: P.arrows },
       { kind: 'improved', title: 'Walks your modules', body: 'Opened from Modules, Next goes to the next item.', icon: P.list },

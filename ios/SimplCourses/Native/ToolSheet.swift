@@ -3,7 +3,8 @@ import UIKit
 import WebKit
 
 /// An external tool to open: an assignment's (or a New Quizzes quiz's), a module item's, a course's own, or a
-/// launch URL. The page answers the launch (`toolLaunch`).
+/// launch URL. The page answers the launch (`toolLaunch`). (1.6) Or, with `page`, a page of Canvas's own the app
+/// has no screen for, opened as it is (Engine.openWebScreen).
 struct ToolLaunch: Identifiable {
     let id = UUID()
     let title: String
@@ -91,6 +92,10 @@ struct ToolSheet: View {
 
     private func start() async {
         error = nil
+        if let p = launch.args["page"] {
+            url = URL(string: p)
+            return
+        }
         do {
             let a = try await engine.call("toolLaunch", launch.args, as: LaunchAnswer.self)
             guard let u = URL(string: a.url) else { throw EngineError.unreadable }

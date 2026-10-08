@@ -441,8 +441,9 @@ const modules = {
 /** Canvas's module_item_sequence: the module item an asset is, and the items either side of it. */
 function moduleItemSequence(courseId, assetType, assetId) {
   const flat = (modules[courseId] || []).flatMap((mod) => (mod.items || []).filter((it) => it.type !== 'SubHeader').map((it) => ({ ...it, module_id: mod.id })));
+  // (asked for a module item itself, asset_type=ModuleItem, as Canvas answers it: the item, by its own id)
   const re = new RegExp(`/${{ Assignment: 'assignments', Quiz: 'quizzes', Page: 'pages', Discussion: 'discussion_topics', File: 'files' }[assetType] || assetType}/${assetId}$`);
-  const i = flat.findIndex((it) => it.type === assetType && re.test(it.html_url || ''));
+  const i = assetType === 'ModuleItem' ? flat.findIndex((it) => String(it.id) === String(assetId)) : flat.findIndex((it) => it.type === assetType && re.test(it.html_url || ''));
   if (i < 0) return { items: [], modules: [] };
   // test-only: a live Canvas can answer the sequence with the items bare of their completion requirement
   const bare = (it) => { if (!it || !mockConfig.bareSequence) return it || null; const { completion_requirement, ...rest } = it; return rest; };

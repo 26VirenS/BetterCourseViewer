@@ -87,7 +87,6 @@ struct ContextHome: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { engine.openWebScreen("/\(ctx)", title: model.data?.title ?? "") } label: { Label("Open in Simpl’s Web View", systemImage: "safari") }
                     Button { engine.openWebScreen("/\(ctx)?bcv=native", title: model.data?.title ?? "") } label: { Label("Open Canvas’s Page", systemImage: "globe") }
                 } label: {
                     Image(systemName: "ellipsis.circle")

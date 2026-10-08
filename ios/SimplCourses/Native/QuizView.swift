@@ -903,8 +903,7 @@ private struct QuestionView: View {
             Button {
                 Task {
                     await run.flush()
-                    engine.quiz = nil
-                    engine.openWebScreen(run.attempt?.takeUrl ?? "", title: run.attempt?.title ?? "Quiz")
+                    engine.openWebScreen(run.attempt?.takeUrl ?? "", title: run.attempt?.title ?? "Quiz") // (it closes the quiz first)
                 }
             } label: {
                 Label("Answer on Canvas", systemImage: "globe").frame(maxWidth: .infinity, minHeight: 44)

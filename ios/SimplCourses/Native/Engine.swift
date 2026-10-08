@@ -316,8 +316,9 @@ final class Engine: ObservableObject, ShellListener {
 
     // MARK: - Navigation
 
-    /// A Canvas address on the stack showing: its native screen when the app has one (a course and
-    /// everything in it, Groups, the Inbox — Router.swift), else the web interface's screen for it.
+    /// A Canvas address on the stack showing: its native screen (a course and everything in it, Groups, the
+    /// Inbox — Router.swift), a tool or a quiz over everything, a file in the phone's viewer, a tab; else where
+    /// Canvas sends it (1.6: never the web interface's screen).
     func openWeb(_ url: String, title: String) {
         if let t = toolLaunch(for: url, title: title) {
             openTool(t)
@@ -327,20 +328,70 @@ final class Engine: ObservableObject, ShellListener {
             openQuiz(q)
             return
         }
+        if let file = fileDownload(for: url) {
+            FilePreview.shared.open(file, name: title.isEmpty ? file.lastPathComponent : title, in: web.webView)
+            return
+        }
         if let route = nativeRoute(for: url, title: title) {
+            if case .assignment(_, let id) = route, let u = absolute(url), Engine.isSubmission(u) { arrival = Arrival(id: id, feedback: true) }
             push(route)
             return
         }
-        openWebScreen(url, title: title)
+        if let t = tabName(for: url) {
+            switchTab(t)
+            return
+        }
+        resolveThenOpen(url, title: title)
     }
 
-    /// The web interface's own screen for an address, even where a native one exists ("Open in Canvas").
-    func openWebScreen(_ url: String, title: String) {
-        var path = paths[tab]
-        if case .web(let top, _)? = path.last, same(top, url) { return }
-        path.append(.web(url: url, title: title))
-        paths[tab] = path
+    /// (1.6) An address with a native screen of some kind: a tool, a quiz, a file, a screen, a tab.
+    private func opensNatively(_ url: String) -> Bool {
+        toolLaunch(for: url, title: "") != nil || quizLaunch(for: url, title: "") != nil || fileDownload(for: url) != nil
+            || nativeRoute(for: url, title: "") != nil || tabName(for: url) != nil
     }
+
+    private struct Resolved: Decodable { var url: String }
+
+    /// (1.6) An address with no screen as it stands — a module item's, or one Canvas redirects — opened where Canvas
+    /// sends it: a module item is the item it names. Only what has no screen anywhere (a Canvas page the app does
+    /// not draw: Collaborations, Outcomes…) shows Canvas's own page, in a sheet over the app; never the web interface.
+    private func resolveThenOpen(_ raw: String, title: String) {
+        guard let from = absolute(raw), isCanvasHost(from) else {
+            if let u = absolute(raw) { web.openExternally(u) }
+            return
+        }
+        Task {
+            let to = try? await call("resolveUrl", ["url": from.absoluteString], as: Resolved.self)
+            if let to, !same(to.url, from.absoluteString), let u = absolute(to.url) {
+                if !isCanvasHost(u) { web.openExternally(u); return }
+                if opensNatively(to.url) { openWeb(to.url, title: title); return }
+            }
+            openCanvasPage(from.absoluteString, title: title)
+        }
+    }
+
+    private func isCanvasHost(_ u: URL) -> Bool {
+        let s = u.scheme?.lowercased() ?? ""
+        return (s == "http" || s == "https") && u.host?.lowercased() == web.baseURL.host?.lowercased()
+    }
+
+    /// Canvas's own page for an address ("Open Canvas's Page", a kind of quiz question the app does not answer, a part of
+    /// Canvas with no screen in the app), in a sheet over the app with the Canvas session (1.6: no longer the web interface's
+    /// screen pushed on the stack). Over a quiz or another sheet, it waits for that one to go first.
+    func openWebScreen(_ url: String, title: String) {
+        guard let u = absolute(url) else { return }
+        let show = { [weak self] in self?.tool = ToolLaunch(title: title.isEmpty ? "Canvas" : title, args: ["page": u.absoluteString]) }
+        if quiz != nil || tool != nil {
+            quiz = nil
+            tool = nil
+            Task { try? await Task.sleep(nanoseconds: 450_000_000); show() }
+        } else {
+            Haptics.tap()
+            show()
+        }
+    }
+
+    func openCanvasPage(_ url: String, title: String) { openWebScreen(url, title: title) }
 
     /// A native screen on the stack showing (not twice in a row).
     func push(_ route: Route) {

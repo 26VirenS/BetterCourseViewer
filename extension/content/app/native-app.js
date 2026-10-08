@@ -1187,6 +1187,27 @@
    *  opens at the top of its own page (no Canvas frame around it, no third-party cookie to lose) — for an assignment
    *  (and a New Quizzes quiz), a module item, a course's own tool, or a launch URL; else the page Canvas launches
    *  it from. */
+  /** (iPhone 1.6) Where a Canvas address leads, for an address the app has no screen for as it stands: a module
+   *  item's (…/modules/items/5) is the item it names, through Canvas's module_item_sequence (no page fetched);
+   *  anything else, where Canvas's own redirect lands. The app then opens that in its own screen. */
+  async function resolveUrl({ url = '' } = {}) {
+    const at = new URL(String(url || ''), location.origin);
+    if (at.origin !== location.origin) return { url: at.href };
+    const mi = /^\/(courses)\/(\d+)\/modules\/items\/([^/]+)\/?$/.exec(at.pathname);
+    if (mi) {
+      try {
+        const seq = await BCV.canvas.get(`/api/v1/courses/${mi[2]}/module_item_sequence`, { params: { asset_type: 'ModuleItem', asset_id: mi[3] } });
+        const cur = (seq?.items || []).map((x) => x.current).find((x) => x && String(x.id) === mi[3]);
+        const to = cur && itemUrl(cur, `/courses/${mi[2]}`);
+        if (to) return { url: to, type: cur.type, item: String(cur.id) };
+      } catch { /* Canvas's redirect below */ }
+    }
+    try {
+      const r = await fetch(at.href, { credentials: 'include', redirect: 'follow' });
+      return { url: local(r.url || at.href) };
+    } catch { return { url: local(at.href) }; }
+  }
+
   async function toolLaunch({ course, assignment = null, moduleItem = null, tool = null, url = null } = {}) {
     const cid = String(course || '');
     if (!/^\d+$/.test(cid)) throw new Error('That tool could not be found.');
@@ -1797,7 +1818,7 @@
 
   const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
+    toolLaunch, resolveUrl, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];

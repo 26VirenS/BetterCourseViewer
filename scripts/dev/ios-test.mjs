@@ -308,6 +308,10 @@ try {
   check(!found.error && found.groups.length > 0 && found.groups.every((g) => g.rows.every((r) => r.url && r.title)), `search for the app's own field: the box's groups, every row with somewhere to go: ${JSON.stringify(found.groups.map((g) => `${g.title}:${g.rows.length}`))}`);
   const snap = await nc('snapshot');
   check(snap.me?.name && Number.isInteger(snap.notifUnread) && snap.version === manifest.version, `the account and the badges for the app's bar: ${JSON.stringify(snap)}`);
+  // (iPhone 1.6) an address the app has no screen for as it stands is opened where it leads: a module item is the item it names
+  const viaItem = await nc('resolveUrl', { url: '/courses/102/modules/items/i2' });
+  const viaPage = await nc('resolveUrl', { url: '/courses/102/modules/items/i1' });
+  check(viaItem.url === '/courses/102/assignments/2001' && viaItem.type === 'Assignment' && viaPage.url === '/courses/102/pages/big-picture', `a module item's address resolves to the item it names, for the app's own screen: ${JSON.stringify({ viaItem, viaPage })}`);
   check((await nc('nope')).error === 'No such call: nope', 'an unknown call is an answer with an error, never a throw across the bridge');
   // (1.2) a course and everything in it, a group, the Inbox — the app draws them itself from these answers
   const ctx = 'courses/101';
