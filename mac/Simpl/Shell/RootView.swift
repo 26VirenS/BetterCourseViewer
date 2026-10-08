@@ -68,6 +68,7 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .simplOpenSetup)) { _ in engine.setup = true }
         .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
+            engine.answers.clear() // (what was kept is this account's: none of it for the next)
             engine.web.login.forget()
             engine.web.load() // back to the sign-in page
         }

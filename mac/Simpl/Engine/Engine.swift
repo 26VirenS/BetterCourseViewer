@@ -53,6 +53,11 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var lms: String?
     /// Bumps when what the screens show may have changed (a tick, a hand-in, a refresh): they read again.
     @Published private(set) var dataVersion = 0
+    /// The counts (the sidebar's badges, a course's unread) are Canvas's word now, not what was kept from before (1.2):
+    /// until they are, they are not shown.
+    @Published private(set) var countsLive = false
+    /// The sidebar's courses (their unread counts) are Canvas's word now.
+    @Published private(set) var coursesLive = false
     /// The sidebar's courses (those chosen in the setup) and groups.
     @Published private(set) var courses: [CourseRow] = []
     @Published private(set) var groups: [GroupRow] = []
@@ -87,13 +92,21 @@ final class Engine: ObservableObject, ShellListener {
 
     private var ready = false
     private var shownNative = false
+    /// The window went straight to the app's screens on what was kept (1.2), before the page has said it is signed in:
+    /// if it turns out not to be, the sign-in is shown after all.
+    private var openedOnKept = false
+    private var launchPlaceTaken = false
+    /// What the screens were last told, for this school (AnswerCache).
+    let answers: AnswerCache
     private var queuedPopups: [Popup] = []
     private var popupCheck: DispatchWorkItem?
     private var loginWatch: AnyCancellable?
 
     init(host: String) {
         self.host = host
-        web = WebController(mode: .canvas(host: host))
+        let page = WebController(mode: .canvas(host: host))
+        web = page
+        answers = AnswerCache(key: page.baseURL.port.map { "\(page.baseURL.host ?? host)_\($0)" } ?? (page.baseURL.host ?? host))
         Bridge.shared.shell = self
         hostView.take(web.webView)
         web.onFinish = { [weak self] url in self?.pageFinished(url) }
@@ -107,11 +120,33 @@ final class Engine: ObservableObject, ShellListener {
 
     func start() {
         web.loadIfNeeded()
+        openOnKept()
         // a page that never says (a school's sign-in on another host, a page that failed): shown as it is
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             if self?.phase == .starting { self?.setPhase(.web) }
         }
+    }
+
+    /// (1.2) Signed in here before, the setup done: the app's own screens at once, on what they showed last time (the
+    /// sidebar, who is signed in, each screen's last answer), while the page loads underneath; the live answers replace
+    /// them as they come. If the page turns out to want a sign-in, the sign-in is shown then.
+    private func openOnKept() {
+        guard phase == .starting, !UserDefaults.standard.bool(forKey: "SimplNoKept"),
+              let s = kept("snapshot", as: Snapshot.self), s.setupDone == true, s.me != nil else { return }
+        snapshot = s
+        if let k = s.lms { lms = k }
+        if let c = kept("courses", as: CoursesData.self) { courses = c.rows }
+        if let g = kept("groups", as: GroupsData.self) { groups = g.current }
+        openedOnKept = true
+        takeLaunchPlace()
+        setPhase(.native)
+    }
+
+    /// What a read answered last time, if it was kept (AnswerCache).
+    func kept<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) -> T? {
+        guard let d = answers.data(name, args) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: d)
     }
 
     // MARK: - What the page says
@@ -124,6 +159,7 @@ final class Engine: ObservableObject, ShellListener {
             web.shellOn = on
             if on {
                 ready = true
+                openedOnKept = false
                 setPhase(.native)
                 if !shownNative {
                     shownNative = true
@@ -131,6 +167,7 @@ final class Engine: ObservableObject, ShellListener {
                 }
             } else {
                 ready = false
+                openedOnKept = false
                 setPhase(.web)
             }
         case "shell.open":
@@ -157,16 +194,29 @@ final class Engine: ObservableObject, ShellListener {
 
     private func pageFinished(_ url: URL?) {
         // the school's sign-in, on its own host: nothing of ours runs there to say so
-        if phase == .starting, let h = url?.host?.lowercased(), h != host.lowercased() { setPhase(.web) }
+        if phase == .starting || (openedOnKept && !ready), let h = url?.host?.lowercased(), h != host.lowercased() {
+            openedOnKept = false
+            setPhase(.web)
+        }
+    }
+
+    /// Where the window opens, as the screenshot suite asks (-SimplPlace todo, course:101, section:courses/101:assignments).
+    private func takeLaunchPlace() {
+        guard !launchPlaceTaken else { return }
+        launchPlaceTaken = true
+        if let p = UserDefaults.standard.string(forKey: "SimplPlace"), let place = Engine.place(named: p) {
+            nav.replace(place) // (where the window opens: nothing behind it to go Back to)
+            if let ctx = place.ctx {
+                if let h = kept("home", ["ctx": ctx], as: HomeData.self) { sections[ctx] = h.sections }
+                Task { await loadSections(ctx) }
+            }
+            if case .search(let q) = place { query = q } // (the toolbar's field says what was searched)
+        }
     }
 
     private func firstNative() async {
-        // (the screenshot suite: -SimplPlace todo, course:101, section:courses/101:assignments; -SimplPush /courses/101/assignments/1001)
-        if let p = UserDefaults.standard.string(forKey: "SimplPlace"), let place = Engine.place(named: p) {
-            nav.replace(place) // (where the window opens: nothing behind it to go Back to)
-            if let ctx = place.ctx { Task { await loadSections(ctx) } }
-            if case .search(let q) = place { query = q } // (the toolbar's field says what was searched)
-        }
+        // (the screenshot suite: -SimplPush /courses/101/assignments/1001)
+        takeLaunchPlace()
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty { openWeb(push, title: "") }
         if let q = LaunchOpen.take("quiz:") {
             let parts = q.split(separator: ":").map(String.init)
@@ -263,6 +313,7 @@ final class Engine: ObservableObject, ShellListener {
     func refreshSnapshot() async {
         if let s = try? await call("snapshot", as: Snapshot.self) {
             snapshot = s
+            if !countsLive { withAnimation(Motion.gentle) { countsLive = true } }
             if let k = s.lms, k != lms { lms = k; NotificationCenter.default.post(name: .simplLMSKnown, object: nil, userInfo: ["lms": k]) }
         }
     }
@@ -270,20 +321,27 @@ final class Engine: ObservableObject, ShellListener {
     /// The sidebar's courses and groups, read again.
     func loadSidebar() async {
         if let c = try? await call("courses", as: CoursesData.self) {
-            withAnimation(Motion.gentle) { courses = c.rows }
+            withAnimation(Motion.gentle) {
+                courses = c.rows
+                coursesLive = true
+            }
         }
         if let g = try? await call("groups", as: GroupsData.self) {
             withAnimation(Motion.gentle) { groups = g.current }
         }
     }
 
-    /// A course's sections, as its home lists them (looked up once, when its row in the sidebar is opened).
+    /// A course's sections, as its home lists them (looked up once, when its row in the sidebar is opened; what was kept
+    /// from last time shown meanwhile).
     func loadSections(_ ctx: String) async {
-        guard sections[ctx] == nil else { return }
+        guard !sectionsRead.contains(ctx) else { return }
+        if sections[ctx] == nil, let h = kept("home", ["ctx": ctx], as: HomeData.self) { sections[ctx] = h.sections }
         if let h = try? await call("home", ["ctx": ctx], as: HomeData.self) {
+            sectionsRead.insert(ctx)
             withAnimation(Motion.gentle) { sections[ctx] = h.sections }
         }
     }
+    private var sectionsRead: Set<String> = []
 
     /// Something changed under the screens (a tick, a hand-in): they read again, and so do the counts and reminders.
     func changed() {
@@ -318,7 +376,9 @@ final class Engine: ObservableObject, ShellListener {
                 let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
                 guard let text = raw as? String, let data = text.data(using: .utf8) else { throw EngineError.unreadable }
                 if let box = try? JSONDecoder().decode(ErrorBox.self, from: data), let message = box.error { throw EngineError.page(message) }
-                return try JSONDecoder().decode(T.self, from: data)
+                let answer = try JSONDecoder().decode(T.self, from: data)
+                answers.keep(data, name, args) // (a read: kept for next time, AnswerCache)
+                return answer
             } catch let e as EngineError {
                 throw e
             } catch let e as DecodingError {

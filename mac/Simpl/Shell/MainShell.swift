@@ -176,11 +176,11 @@ struct Sidebar: View {
                 Label("Calendar", systemImage: "calendar").tag(Place.calendar)
                 Label("Grades", systemImage: "chart.bar.xaxis").tag(Place.grades)
                 Label("Notifications", systemImage: "bell")
-                    .badge(engine.snapshot?.notifUnread ?? 0)
+                    .badge(engine.countsLive ? (engine.snapshot?.notifUnread ?? 0) : 0) // (1.2: never a count from before)
                     .tag(Place.notifications)
                 if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
                     Label("Inbox", systemImage: "tray")
-                        .badge(engine.snapshot?.inboxUnread ?? 0)
+                        .badge(engine.countsLive ? (engine.snapshot?.inboxUnread ?? 0) : 0)
                         .tag(Place.inbox)
                 }
             }
@@ -255,7 +255,7 @@ struct Sidebar: View {
             Text(c.code)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            if let n = c.unread, n > 0 {
+            if engine.coursesLive, let n = c.unread, n > 0 {
                 Text("\(n)")
                     .font(.sCaption2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -307,10 +307,21 @@ struct AccountBar: View {
                 Text(me?.name ?? "Account")
                     .font(.sCallout.weight(.semibold))
                     .lineLimit(1)
-                Text(engine.snapshot?.site ?? engine.host)
+                if engine.countsLive {
+                    Text(engine.snapshot?.site ?? engine.host)
+                        .font(.sCaption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    // (1.2) the screens are showing what was kept from last time while the live answers come in
+                    HStack(spacing: 5) {
+                        ProgressView().controlSize(.mini)
+                        Text("Updating…")
+                    }
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                }
             }
             Spacer(minLength: 4)
             Menu {

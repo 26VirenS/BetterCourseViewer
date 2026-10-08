@@ -470,19 +470,33 @@ struct LoadState: View {
 }
 
 /// A screen's data, read through the engine: its answer, its error, and a reload that keeps what is shown until the new
-/// answer is in (a redraw is not an arrival; an answer to something just done arrives on the house spring).
+/// answer is in (a redraw is not an arrival; an answer to something just done arrives on the house spring). (1.2) A
+/// screen opens on what it was told last time (AnswerCache) while the live answer is on its way: `kept` says so, and
+/// its counts wait for the live one (`liveCount()`).
 @MainActor
 final class Loader<T: Decodable>: ObservableObject {
     @Published var data: T?
     @Published var error: String?
+    /// What is shown is what was kept from last time; the live answer is still on its way.
+    @Published private(set) var kept = false
 
     func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
+        if data == nil, let k = engine.kept(name, args, as: T.self) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                data = k
+                kept = true
+            }
+        }
         do {
             let d = try await engine.call(name, args, as: T.self)
-            if animated {
+            if animated || kept {
+                // (the live answer over the kept one: what changed moves to where it is now)
                 withAnimation(Motion.gentle) {
                     data = d
                     error = nil
+                    kept = false
                 }
                 return
             }
@@ -495,6 +509,39 @@ final class Loader<T: Decodable>: ObservableObject {
         } catch {
             if data == nil { self.error = error.localizedDescription }
         }
+    }
+}
+
+private struct ShowingKeptKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The screen shows what was kept from last time (Loader.kept): its counts are not shown until they are live.
+    var showingKept: Bool {
+        get { self[ShowingKeptKey.self] }
+        set { self[ShowingKeptKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// (1.2) The screen below shows what was kept from last time (its counts wait for the live answer).
+    func showingKept(_ on: Bool) -> some View { environment(\.showingKept, on) }
+
+    /// (1.2) A count that is never shown from before (how many are due, unread, missing): a placeholder until the live
+    /// answer is in. `live` says so where the screen knows better than its environment.
+    func liveCount(_ live: Bool? = nil) -> some View { modifier(LiveCount(live: live)) }
+}
+
+private struct LiveCount: ViewModifier {
+    let live: Bool?
+    @Environment(\.showingKept) private var showingKept
+
+    func body(content: Content) -> some View {
+        let shown = live ?? !showingKept
+        content
+            .redacted(reason: shown ? [] : .placeholder)
+            .animation(Motion.gentle, value: shown)
     }
 }
 
