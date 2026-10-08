@@ -1,566 +1,712 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Simpl Courses — Canvas, made simple.</title>
-<meta name="description" content="A free extension that makes Canvas simple. Nothing leaves your browser.">
-<meta name="theme-color" content="#f2f2f6">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20120%20120%22%3E%3Crect%20width%3D%22120%22%20height%3D%22120%22%20rx%3D%2226%22%20fill%3D%22%230a5fd8%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%2218%22%20width%3D%2253%22%20height%3D%2284%22%20rx%3D%2214%22%20fill%3D%22rgba(255%2C255%2C255%2C.35)%22%2F%3E%3Cpath%20d%3D%22M28%2030%20H69%20A30%2030%200%200%201%2069%2090%20H28%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M35%2042%20H69%20A18%2018%200%200%201%2069%2078%20H35%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C.72)%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M42%2054%20H69%20A6%206%200%200%201%2069%2066%20H42%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C.46)%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
-<link rel="canonical" href="https://simplcourses.com/">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simpl Courses — Learning made Simpl.</title>
+<meta name="description" content="Canvas and Brightspace, rebuilt around what’s due, what’s graded and what’s next. Free for Safari, Chrome and Mac.">
+<meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Simpl Courses — Canvas, made simple.">
-<meta property="og:description" content="A free extension that makes Canvas simple. Nothing leaves your browser.">
 <meta property="og:url" content="https://simplcourses.com/">
-<meta name="twitter:card" content="summary">
+<meta property="og:title" content="Simpl Courses — Learning made Simpl.">
+<meta property="og:description" content="Canvas and Brightspace, rebuilt around what’s due, what’s graded and what’s next.">
+<meta property="og:image" content="https://simplcourses.com/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://simplcourses.com/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20120%20120%22%3E%3Crect%20width%3D%22120%22%20height%3D%22120%22%20rx%3D%2226%22%20fill%3D%22%230a5fd8%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%2218%22%20width%3D%2253%22%20height%3D%2284%22%20rx%3D%2214%22%20fill%3D%22rgba(255%2C255%2C255%2C.35)%22%2F%3E%3Cpath%20d%3D%22M28%2030%20H69%20A30%2030%200%200%201%2069%2090%20H28%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M35%2042%20H69%20A18%2018%200%200%201%2069%2078%20H35%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C.72)%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M42%2054%20H69%20A6%206%200%200%201%2069%2066%20H42%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C.46)%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<script>document.documentElement.classList.add('js')</script>
 <style>
-html,body{min-height:100%}
-body{margin:0;background:#f2f2f6;-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif;color:#1c1c1e}
-a{color:#0a5dc2;text-decoration:none}a:hover{opacity:.72}
-@keyframes omFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-/* the mark draws itself in, the way it does on the extension's setup screen: the tile springs
-   up, the three arcs are stroked on one after the other, and the sheet behind them fades in */
-@keyframes omFade{from{opacity:0}to{opacity:1}}
-@keyframes omPop{0%{opacity:0;transform:scale(.6)}70%{transform:scale(1.08)}100%{opacity:1;transform:none}}
-@keyframes omDraw{to{stroke-dashoffset:0}}
-.om-mark{animation:omPop .6s cubic-bezier(.34,1.3,.42,1) both}
-.om-mark .om-sheet{animation:omFade .5s ease .45s both}
-.om-mark .om-arc{stroke-dashoffset:var(--len);animation:omDraw 1s cubic-bezier(.32,.72,0,1) both}
-.om-mark .om-arc--2{animation-duration:.9s;animation-delay:.14s}
-.om-mark .om-arc--3{animation-duration:.8s;animation-delay:.26s}
-/* nothing moves for anyone who has asked for that; the arcs have to be put back by hand,
-   because without their animation they would sit at their starting offset and stay invisible */
-@media (prefers-reduced-motion:reduce){
-  *{animation:none !important}
-  .om-mark .om-arc{stroke-dashoffset:0}
+/* ---- tokens --------------------------------------------------------------------------------------------- */
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --bg: #fbfbfd; --bg-2: #f2f2f6; --card: #fff; --text: #1d1d1f; --text-2: #515154; --text-3: #86868b;
+  --hair: rgba(0, 0, 0, .08); --hair-2: rgba(0, 0, 0, .13);
+  --ink: #1d1d1f; --ink-text: #fff; --ink-hover: #333336; --ink-sub: rgba(255, 255, 255, .6); --ink-row: rgba(255, 255, 255, .1); --ink-line: rgba(255, 255, 255, .12);
+  --blue: #0a72ff; --violet: #5e5ce6;
+  --grad: linear-gradient(105deg, #0a84ff 0%, #4d5ef0 45%, #a35ff0 100%);
+  --toolbar: #ececee; --toolbar-line: rgba(0, 0, 0, .1); --url: #fff; --url-text: #3c3c43;
+  --shadow-win: 0 0 0 .5px rgba(0, 0, 0, .16), 0 60px 120px -40px rgba(20, 32, 70, .38), 0 30px 60px -38px rgba(20, 32, 70, .32);
+  --glow-1: rgba(10, 132, 255, .22); --glow-2: rgba(163, 95, 240, .18); --glow-3: rgba(48, 209, 88, .14);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --wrap: 1140px;
 }
-@keyframes omDriftA{0%{transform:translate(0,0) scale(1)}50%{transform:translate(70px,-40px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
-@keyframes omDriftB{0%{transform:translate(0,0) scale(1.06)}50%{transform:translate(-60px,50px) scale(.94)}100%{transform:translate(0,0) scale(1.06)}}
-@media (max-width:700px){
-  .snap-side,.snap-rail{display:none !important}
-  .snap-stats{grid-template-columns:repeat(auto-fit,minmax(122px,1fr)) !important}
-  .snap-body{padding:16px 16px 20px !important}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000; --bg-2: #0b0b0d; --card: #141416; --text: #f5f5f7; --text-2: #c2c2c7; --text-3: #8e8e93;
+    --hair: rgba(255, 255, 255, .1); --hair-2: rgba(255, 255, 255, .16);
+    --ink: #f5f5f7; --ink-text: #000; --ink-hover: #fff; --ink-sub: rgba(0, 0, 0, .55); --ink-row: rgba(0, 0, 0, .07); --ink-line: rgba(0, 0, 0, .1);
+    --grad: linear-gradient(105deg, #3d9bff 0%, #7a83ff 45%, #c98cff 100%);
+    --toolbar: #2b2b2e; --toolbar-line: rgba(255, 255, 255, .07); --url: #3b3b3f; --url-text: #d1d1d6;
+    --shadow-win: 0 0 0 .5px rgba(255, 255, 255, .16), 0 60px 120px -40px rgba(0, 0, 0, .9), 0 30px 60px -38px rgba(0, 0, 0, .7);
+    --glow-1: rgba(10, 132, 255, .28); --glow-2: rgba(163, 95, 240, .22); --glow-3: rgba(48, 209, 88, .1);
+  }
+}
+
+/* ---- base ----------------------------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.55 var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: clip; }
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+svg { flex: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 60%, transparent); outline-offset: 3px; }
+.wrap { width: min(var(--wrap), 100% - 40px); margin-inline: auto; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 100; padding: 10px 16px; border-radius: 12px; background: var(--ink); color: var(--ink-text); text-decoration: none; font-weight: 600; transition: top 200ms var(--ease-out); }
+.skip:focus { top: 12px; }
+.grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-box-decoration-break: clone; }
+
+/* ---- nav ------------------------------------------------------------------------------------------------ */
+.nav { position: fixed; inset: 0 0 auto; z-index: 50; height: 60px; padding-top: env(safe-area-inset-top); border-bottom: 1px solid transparent; transition: background-color 240ms ease, border-color 240ms ease; }
+.nav[data-scrolled] { background: color-mix(in srgb, var(--bg) 72%, transparent); border-bottom-color: var(--hair); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+.nav__in { height: 60px; display: flex; align-items: center; gap: 28px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 650 17px/1 var(--font-display); letter-spacing: -.02em; }
+.brand img { width: 30px; height: 30px; border-radius: 8px; box-shadow: 0 2px 6px -2px rgba(10, 80, 220, .5); }
+.nav__links { display: flex; gap: 26px; margin-left: auto; }
+.nav__links a { font-size: 14.5px; color: var(--text-2); text-decoration: none; transition: color 160ms ease; }
+@media (hover: hover) and (pointer: fine) { .nav__links a:hover { color: var(--text); } }
+.btn.nav__get { --h: 36px; padding: 0 16px; font-size: 14px; box-shadow: none; }
+@media (max-width: 760px) { .nav__links { display: none; } .nav__get { margin-left: auto; } }
+
+/* ---- buttons -------------------------------------------------------------------------------------------- */
+.btn { --h: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: var(--h); padding: 0 26px; border: 0; border-radius: 999px; font: 600 16px/1 var(--font); letter-spacing: -.01em; text-decoration: none; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  transition: transform 160ms var(--ease-out), background-color 200ms ease, box-shadow 200ms ease; }
+.btn:active { transform: scale(.97); }
+.btn svg { width: 20px; height: 20px; }
+.btn--ink { background: var(--ink); color: var(--ink-text); box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .5); }
+@media (hover: hover) and (pointer: fine) { .btn--ink:hover { background: var(--ink-hover); } }
+.cta { position: relative; z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.cta > .btn, .cta > .macdl { width: 254px; }
+@media (max-width: 560px) { .cta { flex-direction: column; align-items: stretch; width: 100%; max-width: 340px; margin-inline: auto; } .cta > .btn, .cta > .macdl { width: 100%; } }
+
+/* ---- Download for Mac: the button opens into its two choices, up or down as there is room --------------- */
+.macdl { position: relative; display: inline-block; }
+.macdl__btn { width: 100%; }
+.macdl__chev { width: 16px !important; height: 16px !important; margin-left: 2px; opacity: .7; transition: transform 260ms var(--ease-out); }
+.macdl[data-open] .macdl__chev { transform: rotate(180deg); }
+/* the panel lies over the button and is clipped to it; opening unclips it toward the room the page has */
+.macdl__float { position: absolute; left: 0; right: 0; top: 0; z-index: 40; pointer-events: none; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .28)) drop-shadow(0 2px 6px rgba(0, 0, 0, .12)); }
+.macdl[data-dir="up"] .macdl__float { top: auto; bottom: 0; }
+.macdl__panel { display: flex; flex-direction: column; background: var(--ink); color: var(--ink-text); border-radius: 26px; padding: 0 6px 6px; visibility: hidden;
+  clip-path: inset(0 0 calc(100% - var(--h, 54px)) 0 round calc(var(--h, 54px) / 2));
+  transition: clip-path 240ms var(--ease-out), visibility 0s linear 240ms; }
+.macdl[data-dir="up"] .macdl__panel { flex-direction: column-reverse; padding: 6px 6px 0; clip-path: inset(calc(100% - var(--h, 54px)) 0 0 0 round calc(var(--h, 54px) / 2)); }
+.macdl[data-open] .macdl__panel { visibility: visible; pointer-events: auto; clip-path: inset(0 0 0 0 round 26px); transition: clip-path 300ms var(--ease-out), visibility 0s; }
+.macdl__head { height: var(--h, 54px); display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 -6px; font: 600 16px/1 var(--font); letter-spacing: -.01em; cursor: pointer; }
+.macdl__head svg { width: 20px; height: 20px; }
+.macdl__opts { display: grid; gap: 4px; padding-top: 2px; border-top: 1px solid var(--ink-line); margin: 0 6px; padding: 6px 0 0; }
+.macdl[data-dir="up"] .macdl__opts { border-top: 0; border-bottom: 1px solid var(--ink-line); padding: 0 0 6px; }
+.macdl__opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 -6px; border-radius: 18px; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent;
+  opacity: 0; transform: translateY(-6px); transition: opacity 120ms ease, transform 160ms var(--ease-out), background-color 160ms ease; }
+.macdl[data-dir="up"] .macdl__opt { transform: translateY(6px); }
+.macdl[data-open] .macdl__opt { opacity: 1; transform: none; transition: opacity 200ms var(--ease-out), transform 260ms var(--ease-out), background-color 160ms ease; transition-delay: calc(70ms + var(--i, 0) * 45ms), calc(70ms + var(--i, 0) * 45ms), 0s; }
+.macdl__opt:active { background: var(--ink-row); }
+@media (hover: hover) and (pointer: fine) { .macdl__opt:hover { background: var(--ink-row); } }
+.macdl__opt:focus-visible { outline: 2px solid color-mix(in srgb, var(--blue) 80%, transparent); outline-offset: -2px; background: var(--ink-row); }
+.macdl__ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.macdl__ic--safari { background: linear-gradient(160deg, #1fb6ff, #0a6cff); color: #fff; }
+.macdl__ic--safari svg { width: 24px; height: 24px; }
+.macdl__ic img { width: 36px; height: 36px; border-radius: 9px; }
+.macdl__t { display: grid; gap: 3px; text-align: left; }
+.macdl__t b { font: 600 15px/1.15 var(--font); letter-spacing: -.01em; }
+.macdl__t small { font: 400 12.5px/1.2 var(--font); color: var(--ink-sub); }
+.macdl__go { margin-left: auto; width: 16px; height: 16px; opacity: .5; }
+
+/* ---- hero ----------------------------------------------------------------------------------------------- */
+.hero { position: relative; padding: calc(124px + env(safe-area-inset-top)) 0 0; text-align: center; isolation: isolate; overflow-x: clip; }
+.hero::before { content: ""; position: absolute; inset: -10% -10% auto; height: 1100px; z-index: -1; pointer-events: none;
+  background: radial-gradient(40% 32% at 18% 22%, var(--glow-3), transparent 70%), radial-gradient(42% 36% at 82% 18%, var(--glow-2), transparent 70%), radial-gradient(50% 40% at 50% 70%, var(--glow-1), transparent 72%); }
+.eyebrow { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--hair-2) inset, 0 6px 16px -10px rgba(0, 0, 0, .3); font-size: 14px; color: var(--text-2); text-decoration: none; transition: transform 160ms var(--ease-out), box-shadow 200ms ease; }
+.eyebrow:active { transform: scale(.97); }
+.eyebrow__tag { padding: 4px 9px; border-radius: 999px; background: var(--grad); color: #fff; font: 650 12px/1 var(--font); letter-spacing: .02em; text-transform: uppercase; }
+.eyebrow svg { width: 14px; height: 14px; opacity: .55; transition: transform 200ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .eyebrow:hover svg { transform: translateX(2px); } }
+.hero__title { margin: 26px auto 0; font: 700 clamp(52px, 10.4vw, 118px)/.98 var(--font-display); letter-spacing: -.055em; text-wrap: balance; }
+.hero__title .w { display: inline-block; }
+.hero__title .w + .w { margin-left: .22em; }
+.hero__lede { margin: 26px auto 0; max-width: 600px; font-size: clamp(18px, 2.1vw, 21px); line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+.hero .cta { margin-top: 36px; }
+.hero__fine { margin: 18px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 14px; color: var(--text-3); }
+.hero__fine span { display: inline-flex; align-items: center; gap: 6px; }
+.hero__fine svg { width: 14px; height: 14px; color: #30b45a; }
+
+/* the stage: the window rises in, and tilts flat as the page scrolls (where the browser can tie motion to scroll) */
+.stage { position: relative; margin-top: 72px; perspective: 2000px; }
+.stage__enter { position: relative; }
+.stage__tilt { transform-origin: 50% 0; }
+.stage__glow { position: absolute; inset: 8% 6% -6%; z-index: -1; border-radius: 40px; background: var(--grad); opacity: .28; filter: blur(70px); }
+
+/* ---- device frames -------------------------------------------------------------------------------------- */
+.win { position: relative; margin: 0; border-radius: 14px; overflow: hidden; background: var(--card); box-shadow: var(--shadow-win); }
+.win__bar { height: 46px; display: grid; grid-template-columns: 1fr minmax(0, 2.2fr) 1fr; align-items: center; gap: 12px; padding: 0 14px; background: var(--toolbar); border-bottom: 1px solid var(--toolbar-line); }
+.win__left, .win__right { display: flex; align-items: center; gap: 14px; color: var(--text-3); }
+.win__right { justify-content: flex-end; }
+.lights { display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .18); }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.win__nav { display: flex; gap: 10px; }
+.win__nav svg, .win__right svg { width: 15px; height: 15px; }
+.win__url { justify-self: center; width: min(100%, 420px); height: 30px; border-radius: 9px; background: var(--url); color: var(--url-text); display: flex; align-items: center; justify-content: center; gap: 6px; font: 500 13px/1 var(--font); box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
+.win__url svg { width: 11px; height: 11px; opacity: .7; }
+.win__ext { width: 22px; height: 22px; border-radius: 6px; box-shadow: 0 0 0 1px var(--hair-2); overflow: hidden; }
+.win__ext img { width: 22px; height: 22px; }
+.win picture, .win > img { display: block; }
+.win picture img { width: 100%; }
+.win--app { border-radius: 12px; }
+.win--app picture { -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+@media (max-width: 640px) { .win__bar { height: 34px; padding: 0 10px; } .lights i { width: 9px; height: 9px; } .lights { gap: 6px; } .win__nav, .win__right > :not(.win__ext) { display: none; } .win__url { height: 22px; font-size: 10.5px; } .win__ext { width: 18px; height: 18px; } .win__ext img { width: 18px; height: 18px; } }
+
+.phone { position: relative; width: 290px; padding: 10px; border-radius: 54px; background: #0d0d0f; box-shadow: inset 0 0 0 1.5px #3c3c40, 0 0 0 1px #1a1a1c, 0 50px 90px -40px rgba(10, 20, 50, .55), 0 26px 50px -30px rgba(10, 20, 50, .45); }
+.phone::before, .phone::after { content: ""; position: absolute; width: 3px; border-radius: 3px; background: #2a2a2e; }
+.phone::before { left: -3px; top: 120px; height: 56px; box-shadow: 0 72px 0 #2a2a2e; }
+.phone::after { right: -3px; top: 160px; height: 84px; }
+.phone img { width: 100%; border-radius: 44px; }
+
+/* ---- sections ------------------------------------------------------------------------------------------- */
+section { position: relative; }
+.works { padding: 112px 0 24px; }
+.works__row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
+.works__k { font-size: 15px; color: var(--text-3); margin: 0 4px; }
+.chip { display: inline-flex; align-items: center; gap: 9px; height: 44px; padding: 0 18px; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--hair) inset; font: 600 15px/1 var(--font); letter-spacing: -.01em; }
+.chip i { width: 10px; height: 10px; border-radius: 50%; }
+
+.feature { padding: 110px 0; }
+.feature__grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: center; }
+.feature--flip .feature__text { order: 2; }
+.kicker { display: inline-flex; align-items: center; gap: 8px; font: 650 14px/1 var(--font); letter-spacing: .01em; color: var(--k, var(--blue)); }
+.kicker::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.h2 { margin: 16px 0 0; font: 700 clamp(36px, 5vw, 58px)/1.02 var(--font-display); letter-spacing: -.045em; text-wrap: balance; }
+.lede { margin: 20px 0 0; font-size: 18.5px; line-height: 1.55; color: var(--text-2); text-wrap: pretty; }
+.ticks { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 12px; }
+.ticks li { display: flex; gap: 12px; align-items: flex-start; font-size: 16px; color: var(--text); }
+.ticks svg { width: 20px; height: 20px; margin-top: 2px; color: var(--k, var(--blue)); }
+.feature__shot { position: relative; }
+@media (max-width: 900px) {
+  .feature { padding: 80px 0; }
+  .feature__grid { grid-template-columns: 1fr; gap: 44px; }
+  .feature--flip .feature__text { order: 0; }
+}
+
+/* callouts: what to notice in a picture, after it has arrived */
+.callout { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 14px; background: color-mix(in srgb, var(--card) 86%, transparent); -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); box-shadow: 0 0 0 .5px var(--hair-2), 0 14px 30px -14px rgba(0, 0, 0, .35); font: 600 13.5px/1.2 var(--font); letter-spacing: -.01em; white-space: nowrap; }
+.callout b { color: var(--k, var(--blue)); }
+.callout svg { width: 16px; height: 16px; color: var(--k, var(--blue)); }
+@media (max-width: 640px) { .callout { display: none; } }
+
+/* Simpl for Mac: a dark band */
+.mac { margin-top: 40px; padding: 120px 0 0; background: #050507; color: #f5f5f7; overflow: hidden; --text-2: #b8b8bf; --text-3: #8a8a92; --ink: #f5f5f7; --ink-text: #000; --ink-hover: #fff; --ink-sub: rgba(0, 0, 0, .55); --ink-row: rgba(0, 0, 0, .07); --ink-line: rgba(0, 0, 0, .1); }
+.mac::before { content: ""; position: absolute; inset: auto -20% -30% -20%; height: 80%; background: radial-gradient(50% 50% at 50% 50%, rgba(10, 132, 255, .32), transparent 70%); pointer-events: none; }
+.mac__text { max-width: 720px; margin: 0 auto; text-align: center; }
+.mac .lede { margin-inline: auto; max-width: 620px; }
+.mac .cta { margin-top: 34px; }
+.mac__req { margin: 16px 0 0; font-size: 14px; color: var(--text-3); }
+.mac__shot { position: relative; margin: 72px auto 0; width: min(920px, 100%); }
+.mac__shot .win { box-shadow: 0 0 0 .5px rgba(255, 255, 255, .18), 0 -10px 80px -20px rgba(10, 132, 255, .35); border-radius: 12px 12px 0 0; }
+
+/* iPhone */
+.iphone { padding: 130px 0 120px; overflow: hidden; }
+.iphone__grid { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 60px; align-items: center; }
+.iphone__phones { position: relative; height: 640px; }
+.iphone__phones .phone { position: absolute; top: 0; }
+.iphone__phones .phone:first-child { left: 2%; z-index: 2; }
+.iphone__phones .phone:last-child { left: 40%; top: 70px; }
+@media (max-width: 900px) {
+  .iphone__grid { grid-template-columns: 1fr; }
+  .iphone__phones { order: 2; height: 560px; max-width: 520px; width: 100%; margin: 0 auto; }
+  .iphone__phones .phone { width: 250px; }
+  .iphone__phones .phone:last-child { left: auto; right: 2%; }
+}
+@media (max-width: 480px) { .iphone__phones { height: 470px; } .iphone__phones .phone { width: 205px; padding: 8px; border-radius: 42px; } .iphone__phones .phone img { border-radius: 35px; } }
+
+/* the little things */
+.things { padding: 110px 0; background: var(--bg-2); }
+.things__head { text-align: center; max-width: 640px; margin: 0 auto; }
+.cards { margin-top: 56px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.card { padding: 24px 22px 26px; border-radius: 22px; background: var(--card); box-shadow: 0 0 0 1px var(--hair) inset; }
+.card__ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.card__ic svg { width: 22px; height: 22px; }
+.card h3 { margin: 18px 0 0; font: 650 17px/1.25 var(--font); letter-spacing: -.015em; }
+.card p { margin: 6px 0 0; font-size: 15px; line-height: 1.45; color: var(--text-2); }
+@media (max-width: 1000px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .cards { grid-template-columns: 1fr; } }
+
+/* privacy */
+.privacy { padding: 130px 0; text-align: center; }
+.privacy__mark { width: 84px; height: 84px; margin: 0 auto; border-radius: 26px; display: grid; place-items: center; background: var(--grad); color: #fff; box-shadow: 0 20px 40px -18px rgba(70, 90, 240, .7); }
+.privacy__mark svg { width: 44px; height: 44px; }
+.privacy__mark path { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.privacy .lede { max-width: 600px; margin-inline: auto; }
+.link { display: inline-flex; align-items: center; gap: 6px; margin-top: 22px; font-weight: 600; color: var(--blue); text-decoration: none; }
+.link svg { width: 15px; height: 15px; transition: transform 200ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .link:hover svg { transform: translateX(3px); } }
+
+/* get it */
+.get { padding: 40px 0 150px; text-align: center; }
+.get__box { position: relative; padding: 90px 24px 96px; border-radius: 40px; background: var(--card); box-shadow: 0 0 0 1px var(--hair) inset; overflow: clip; }
+.get__box::before { content: ""; position: absolute; inset: -40% -10% auto; height: 120%; background: radial-gradient(40% 50% at 30% 30%, var(--glow-1), transparent 70%), radial-gradient(40% 50% at 70% 40%, var(--glow-2), transparent 70%); pointer-events: none; }
+.get__icon { position: relative; width: 96px; height: 96px; margin: 0 auto; border-radius: 22px; box-shadow: 0 22px 40px -18px rgba(10, 80, 220, .7); }
+.get .h2 { position: relative; margin-top: 30px; }
+.get .lede { position: relative; max-width: 520px; margin-inline: auto; }
+.get .cta { position: relative; margin-top: 34px; }
+.get__req { position: relative; margin: 22px 0 0; font-size: 13.5px; color: var(--text-3); }
+
+footer { padding: 30px 0 calc(40px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hair); font-size: 14px; color: var(--text-3); }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 26px; }
+.foot nav { display: flex; gap: 22px; margin-left: auto; }
+.foot a { text-decoration: none; color: var(--text-2); }
+@media (hover: hover) and (pointer: fine) { .foot a:hover { color: var(--text); } }
+
+/* ---- motion --------------------------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* the hero arrives once: the words, then what they offer, then the window */
+  .hero .eyebrow, .hero__title .w, .hero__lede, .hero .cta, .hero__fine { animation: rise 900ms var(--ease-out) both; }
+  .hero .eyebrow { animation-delay: 60ms; }
+  .hero__title .w { animation-delay: calc(140ms + var(--i) * 80ms); }
+  .hero__lede { animation-delay: 420ms; }
+  .hero .cta { animation-delay: 500ms; }
+  .hero__fine { animation-delay: 580ms; }
+  .stage__enter { animation: stage-in 1300ms var(--ease-out) 520ms both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px); } }
+  @keyframes stage-in { from { opacity: 0; transform: translateY(70px); } }
+
+  /* the window lies back and comes flat as the page scrolls toward it */
+  @supports (animation-timeline: scroll()) {
+    .stage__tilt { animation: flatten linear both; animation-timeline: scroll(root); animation-range: 0 62vh; }
+    @keyframes flatten { from { transform: rotateX(20deg) scale(.92); } to { transform: none; } }
+  }
+
+  /* everything else arrives as it is scrolled to, once */
+  .js .reveal { opacity: 0; transform: translateY(32px); transition: opacity 900ms var(--ease-out), transform 1100ms var(--ease-out); transition-delay: var(--d, 0ms); }
+  .js .reveal.is-in { opacity: 1; transform: none; }
+  .js .reveal--shot { transform: translateY(56px) scale(.96); }
+  .js .reveal--shot.is-in { transform: none; }
+  .js .callout { opacity: 0; transform: translateY(10px) scale(.96); transition: opacity 500ms var(--ease-out), transform 700ms var(--ease-out); transition-delay: calc(650ms + var(--i, 0) * 140ms); }
+  .js .is-in .callout { opacity: 1; transform: none; }
+  .js .privacy__mark.is-in path { animation: draw 1200ms var(--ease-in-out) 200ms both; }
+  @keyframes draw { from { stroke-dashoffset: 1; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal { opacity: 0; transition: opacity 400ms ease; }
+  .js .reveal.is-in { opacity: 1; }
+  .macdl__panel, .macdl[data-dir="up"] .macdl__panel { clip-path: inset(0 0 0 0 round 26px); opacity: 0; transition: opacity 160ms ease, visibility 0s linear 160ms; }
+  .macdl[data-open] .macdl__panel { opacity: 1; transition: opacity 160ms ease, visibility 0s; }
+  .macdl__opt, .macdl[data-dir="up"] .macdl__opt { transform: none; transition: opacity 160ms ease, background-color 160ms ease; }
+  .macdl[data-open] .macdl__opt { transition-delay: 0s; }
+  .macdl__chev, .btn, .eyebrow, .link svg, .eyebrow svg { transition: none; }
 }
 </style>
 </head>
 <body>
-<div style="position:relative;overflow:hidden">
+<a class="skip" href="#main">Skip to content</a>
 
-  <div style="position:absolute;top:0;left:0;right:0;height:1100px;overflow:hidden;pointer-events:none">
-    <div style="position:absolute;top:-220px;left:-140px;width:560px;height:560px;border-radius:50%;filter:blur(110px);opacity:.3;background:#34c759;animation:omDriftA 28s ease-in-out infinite"></div>
-    <div style="position:absolute;top:60px;right:-180px;width:600px;height:600px;border-radius:50%;filter:blur(120px);opacity:.26;background:#5856d6;animation:omDriftB 34s ease-in-out infinite"></div>
+<!-- the icons, drawn once -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M4.5 16V6.8c0-.99.81-1.8 1.8-1.8h11.4c.99 0 1.8.81 1.8 1.8V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M2 17.6h20l-.6 1.2c-.23.45-.69.7-1.19.7H3.79c-.5 0-.96-.25-1.19-.7z" fill="currentColor"/></symbol>
+  <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M9.5 3.8a2 2 0 0 1 4 0V5h3.3c.66 0 1.2.54 1.2 1.2v3.3h1.2a2 2 0 0 1 0 4H18v3.3c0 .66-.54 1.2-1.2 1.2h-3.3v-1.2a2 2 0 0 0-4 0V18H6.2c-.66 0-1.2-.54-1.2-1.2v-3.3H6.2a2 2 0 0 0 0-4H5V6.2C5 5.54 5.54 5 6.2 5h3.3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M3.5 6l4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M3 8h9.5M8.5 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 16 16"><path d="M8 2.5v9M4 7.8l4 4 4-4M3 14h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.2 8.4l3 3 6.6-6.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-tick" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".16"/><path d="M6 10.3l2.7 2.7L14 7.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15.9 8.1l-2.4 5.4-5.4 2.4 2.4-5.4z" fill="currentColor"/><circle cx="12" cy="12" r="1.1" fill="#0a6cff"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 12 12"><rect x="2" y="5.2" width="8" height="5.8" rx="1.4" fill="currentColor"/><path d="M3.8 5.4V4a2.2 2.2 0 0 1 4.4 0v1.4" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 1.8v8.4M5 4.6l3-3 3 3M4.5 7H3.7c-.66 0-1.2.54-1.2 1.2v5c0 .66.54 1.2 1.2 1.2h8.6c.66 0 1.2-.54 1.2-1.2v-5c0-.66-.54-1.2-1.2-1.2h-.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5a2.2 2.2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M20 11.5l-7.6 7.6a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.3-7.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><rect x="3.5" y="6.5" width="12.5" height="14" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 3.5h10.1c1.33 0 2.4 1.07 2.4 2.4V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M10 6.5h10M10 12h10M10 17.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3.8 6.6l1.4 1.4 2.4-2.6M3.8 12.1l1.4 1.4 2.4-2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="5.4" cy="17.6" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><path d="M4.5 19.5l10-10M13 6l1-2.5L15 6l2.5 1L15 8l-1 2.5L13 8l-2.5-1zM18.5 12.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8.5v4.3l2.8 1.8M9.5 2.8h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2.4" opacity=".25"/><path d="M8 2a6 6 0 1 1-5.6 8.1" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 16 16"><path d="M2 11.5l3.6-3.6 2.6 2.4L14 4.6M10.2 4.4H14v3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 16 16"><path d="M3.5 14V2.6M3.5 3h8.3l-1.6 3 1.6 3H3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="nav" id="nav">
+  <div class="wrap nav__in">
+    <a class="brand" href="/" aria-label="Simpl Courses, home"><img src="/img/icon-128.png" alt="" width="30" height="30"> Simpl Courses</a>
+    <nav class="nav__links" aria-label="Sections">
+      <a href="#grades">Grades</a>
+      <a href="#quizzes">Quizzes</a>
+      <a href="#brightspace">Brightspace</a>
+      <a href="#mac">Mac</a>
+    </nav>
+    <a class="btn btn--ink nav__get" href="#get">Get Simpl</a>
   </div>
+</header>
 
-  <header style="position:relative;max-width:1080px;margin:0 auto;box-sizing:border-box;padding:24px 28px;display:flex;align-items:center;gap:12px">
-    <span style="flex:none;width:34px;height:34px;border-radius:10px;background:linear-gradient(158deg,#0a84ff,#0a4fd6);box-shadow:0 3px 10px rgba(10,79,214,.26);display:flex;align-items:center;justify-content:center">
-      <svg viewBox="0 0 120 120" width="26" height="26" style="display:block">
-        <defs><linearGradient id="navMk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs>
-        <rect x="16" y="18" width="53" height="84" rx="14" fill="url(#navMk)"></rect>
-        <path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-        <path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-        <path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-      </svg>
-    </span>
-    <span style="flex:1;min-width:0;font:600 15px/1.2 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Simpl Courses</span>
-    <a href="#tour" style="font:500 13.5px/1.2 -apple-system,Helvetica,sans-serif;color:#5c5c60">Tour</a>
-    <a href="#features" style="font:500 13.5px/1.2 -apple-system,Helvetica,sans-serif;color:#5c5c60">Features</a>
-  </header>
-
-  <section style="position:relative;max-width:1080px;margin:0 auto;box-sizing:border-box;padding:40px 28px 44px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px;animation:omFadeUp .4s cubic-bezier(.32,.72,0,1) both">
-    <span class="om-mark" style="width:100px;height:100px;border-radius:25px;background:linear-gradient(158deg,#0a84ff,#0a4fd6);box-shadow:0 14px 34px rgba(10,79,214,.3);display:flex;align-items:center;justify-content:center">
-      <svg viewBox="0 0 120 120" width="80" height="80" style="display:block">
-        <defs><linearGradient id="heroMk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs>
-        <rect class="om-sheet" x="16" y="18" width="53" height="84" rx="14" fill="url(#heroMk)"></rect>
-        <path class="om-arc om-arc--1" style="--len:178" d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="178"></path>
-        <path class="om-arc om-arc--2" style="--len:126" d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="126"></path>
-        <path class="om-arc om-arc--3" style="--len:74" d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="74"></path>
-      </svg>
-    </span>
-
-    <h1 style="margin:0;max-width:680px;font:700 clamp(38px,6.4vw,62px)/1.05 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.04em;text-wrap:balance">Canvas, made simple.</h1>
-    <p style="margin:0;max-width:380px;font:400 clamp(16px,2.2vw,19px)/1.45 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.015em;color:#5c5c60">Your Canvas, rebuilt.</p>
-
-    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding-top:8px">
-      <a href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp" style="display:flex;align-items:center;gap:12px;padding:0 24px;height:58px;border-radius:14px;background:#1c1c1e;color:#fff;box-sizing:border-box;box-shadow:0 6px 18px rgba(28,28,30,.22)">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5v11M7.5 10.5l4.5 4.5 4.5-4.5M4.5 19.5h15"></path></svg>
-        <span style="text-align:left">
-          <span style="display:block;font:400 10.5px/1.2 -apple-system,Helvetica,sans-serif;color:rgba(255,255,255,.8);letter-spacing:.04em">GET IT ON THE</span>
-          <span style="display:block;margin-top:3px;font:600 17px/1.1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Chrome Web Store</span>
-        </span>
-      </a>
-      <a href="/download/mac" style="display:flex;align-items:center;gap:12px;padding:0 24px;height:58px;border-radius:14px;background:#1c1c1e;color:#fff;box-sizing:border-box;box-shadow:0 6px 18px rgba(28,28,30,.22)">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 5h16v11H4zM8 20h8M12 16v4"></path></svg>
-        <span style="text-align:left">
-          <span style="display:block;font:400 10.5px/1.2 -apple-system,Helvetica,sans-serif;color:rgba(255,255,255,.8);letter-spacing:.04em">DOWNLOAD FOR</span>
-          <span style="display:block;margin-top:3px;font:600 17px/1.1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Mac · Safari</span>
-        </span>
-      </a>
-
+<main id="main">
+  <!-- ---- hero ---------------------------------------------------------------------------------------- -->
+  <section class="hero">
+    <div class="wrap">
+      <a class="eyebrow" href="#brightspace"><span class="eyebrow__tag">New</span> Simpl now works on Brightspace <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      <h1 class="hero__title"><span class="w" style="--i:0">Learning</span> <span class="w" style="--i:1">made</span> <span class="w" style="--i:2"><span class="grad-text">Simpl.</span></span></h1>
+      <p class="hero__lede">Canvas and Brightspace, rebuilt around what’s due, what’s graded and what’s next. Free, private, and ready in a minute.</p>
+      <div class="cta">
+        <a class="btn btn--ink" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
+        <div class="macdl" data-macdl>
+          <button class="btn btn--ink macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-hero"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+          <div class="macdl__float">
+            <div class="macdl__panel" id="macdl-hero">
+              <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
+              <div class="macdl__opts">
+                <a class="macdl__opt" href="/download/mac" style="--i:0"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13 or later</small></span></a>
+                <a class="macdl__opt" href="/download/mac-app" style="--i:1"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="36" height="36"></span><span class="macdl__t"><b>Mac App</b><small>macOS 14 or later</small></span></a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="hero__fine"><span><svg aria-hidden="true"><use href="#i-check"/></svg>Free</span><span><svg aria-hidden="true"><use href="#i-check"/></svg>No account</span><span><svg aria-hidden="true"><use href="#i-check"/></svg>Any Canvas or Brightspace school</span></p>
     </div>
-
-    <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;padding-top:6px">
-      
-        <span style="display:flex;align-items:center;gap:6px">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#1a6b30" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6L9 17l-5-5"></path></svg>
-          <span style="font:500 12.5px/1.2 -apple-system,Helvetica,sans-serif;color:#5c5c60">Free</span>
-        </span>
-      
-        <span style="display:flex;align-items:center;gap:6px">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#1a6b30" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6L9 17l-5-5"></path></svg>
-          <span style="font:500 12.5px/1.2 -apple-system,Helvetica,sans-serif;color:#5c5c60">No sign-in</span>
-        </span>
-      
-        <span style="display:flex;align-items:center;gap:6px">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#1a6b30" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6L9 17l-5-5"></path></svg>
-          <span style="font:500 12.5px/1.2 -apple-system,Helvetica,sans-serif;color:#5c5c60">Any Canvas school</span>
-        </span>
-      
-    </div>
-  </section>
-
-  <section id="tour" style="position:relative;max-width:1080px;margin:0 auto;box-sizing:border-box;padding:0 28px 60px;display:flex;flex-direction:column;gap:34px">
-
-    <div>
-      <div style="display:flex;align-items:baseline;gap:10px;padding:0 2px 12px;flex-wrap:wrap">
-        <span style="font:700 clamp(22px,3.2vw,28px)/1.15 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.03em">One clear today</span>
-      </div>
-
-      <div style="border-radius:16px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.13);background:#fff">
-        <div style="display:flex;align-items:center;gap:7px;padding:11px 14px;background:#e8e8ed;border-bottom:1px solid rgba(60,60,67,.1)">
-          <span style="width:10px;height:10px;border-radius:5px;background:#ff5f57"></span>
-          <span style="width:10px;height:10px;border-radius:5px;background:#febc2e"></span>
-          <span style="width:10px;height:10px;border-radius:5px;background:#28c840"></span>
-          <span style="margin-left:12px;flex:1;min-width:0;max-width:320px;height:22px;border-radius:11px;background:#f7f7f9;display:flex;align-items:center;padding:0 11px;box-sizing:border-box;font:400 11px/1 ui-monospace,Menlo,monospace;color:#6c6c70">canvas.school.edu</span>
-        </div>
-
-        <div style="display:flex;min-height:0">
-          <div class="snap-side" style="flex:none;width:190px;box-sizing:border-box;padding:14px 10px;background:#fafafc;border-right:1px solid rgba(60,60,67,.09);display:flex;flex-direction:column;gap:2px">
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:rgba(10,132,255,.1)">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#0a84ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:1"><path d="M4 11l8-7 8 7v9H4z"></path></svg>
-                <span style="flex:1;min-width:0;font:600 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#0a5dc2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Dashboard</span>
-                
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:transparent">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#ff9500" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:.62"><path d="M5 4h13v16H5zM5 17h13M9 8h5"></path></svg>
-                <span style="flex:1;min-width:0;font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Courses</span>
-                
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:transparent">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#34c759" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:.62"><path d="M5 6h14M5 12h14M5 18h9"></path></svg>
-                <span style="flex:1;min-width:0;font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">To Do</span>
-                
-                  <span style="flex:none;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">12</span>
-                
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:transparent">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#5856d6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:.62"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"></path></svg>
-                <span style="flex:1;min-width:0;font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Grades</span>
-                
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:transparent">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#5856d6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:.62"><path d="M5 5h14v15H5zM5 10h14M9 3v4M15 3v4"></path></svg>
-                <span style="flex:1;min-width:0;font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Calendar</span>
-                
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:transparent">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#ff453a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:.62"><path d="M12 4a5 5 0 015 5v4l2 3H5l2-3V9a5 5 0 015-5zM10 19a2 2 0 004 0"></path></svg>
-                <span style="flex:1;min-width:0;font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Notifications</span>
-                
-                  <span style="flex:none;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">8</span>
-                
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:transparent">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#0a84ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;opacity:.62"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg>
-                <span style="flex:1;min-width:0;font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Inbox</span>
-                
-                  <span style="flex:none;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">2</span>
-                
-              </span>
-            
-          </div>
-
-          <div class="snap-body" style="flex:1;min-width:0;padding:20px 22px 24px;box-sizing:border-box">
-            <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
-              <span style="font:700 clamp(24px,3.4vw,30px)/1.1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.03em">Dashboard</span>
-              <span style="margin-left:auto;display:flex;padding:2px;border-radius:9px;background:rgba(118,118,128,.13);gap:2px">
-                
-                  <span style="padding:5px 11px;border-radius:7px;font:600 11.5px/1 -apple-system,Helvetica,sans-serif;background:transparent;color:#5c5c60;box-shadow:none">Cards</span>
-                
-                  <span style="padding:5px 11px;border-radius:7px;font:600 11.5px/1 -apple-system,Helvetica,sans-serif;background:#fff;color:#1c1c1e;box-shadow:0 1px 2px rgba(0,0,0,.1)">List</span>
-                
-                  <span style="padding:5px 11px;border-radius:7px;font:600 11.5px/1 -apple-system,Helvetica,sans-serif;background:transparent;color:#5c5c60;box-shadow:none">Activity</span>
-                
-              </span>
+    <div class="wrap stage">
+      <div class="stage__enter">
+        <div class="stage__tilt">
+          <div class="stage__glow" aria-hidden="true"></div>
+          <figure class="win">
+            <div class="win__bar" aria-hidden="true">
+              <div class="win__left"><span class="lights"><i></i><i></i><i></i></span><span class="win__nav"><svg><use href="#i-back"/></svg><svg><use href="#i-fwd"/></svg></span></div>
+              <div class="win__url"><svg><use href="#i-lock"/></svg>canvas.lakeside.edu</div>
+              <div class="win__right"><span class="win__ext"><img src="/img/icon-128.png" alt="" width="22" height="22"></span><svg><use href="#i-share"/></svg><svg><use href="#i-plus"/></svg></div>
             </div>
-
-            <div class="snap-stats" style="margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
-              
-                <div style="background:#f7f7f9;border-radius:16px;padding:12px 13px;min-width:0">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ff453a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2"></path></svg>
-                    <span style="flex:1;min-width:0;font:600 9.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.015em;overflow-wrap:normal">Due today</span>
-                    <span style="flex:none;min-width:26px;text-align:right;font:700 clamp(24px,3vw,34px)/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.035em">4</span>
-                  </div>
-                  <div style="margin-top:5px;font:400 11px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">35 points</div>
-                </div>
-              
-                <div style="background:#f7f7f9;border-radius:16px;padding:12px 13px;min-width:0">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#34c759" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M5 5h14v15H5zM5 10h14M9 3v4M15 3v4"></path></svg>
-                    <span style="flex:1;min-width:0;font:600 9.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.015em;overflow-wrap:normal">This week</span>
-                    <span style="flex:none;min-width:26px;text-align:right;font:700 clamp(24px,3vw,34px)/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.035em">9</span>
-                  </div>
-                  <div style="margin-top:5px;font:400 11px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">4 courses</div>
-                </div>
-              
-                <div style="background:#f7f7f9;border-radius:16px;padding:12px 13px;min-width:0">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ff9500" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 4a5 5 0 015 5v4l2 3H5l2-3V9a5 5 0 015-5zM10 19a2 2 0 004 0"></path></svg>
-                    <span style="flex:1;min-width:0;font:600 9.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.015em;overflow-wrap:normal">Unread</span>
-                    <span style="flex:none;min-width:26px;text-align:right;font:700 clamp(24px,3vw,34px)/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.035em">2</span>
-                  </div>
-                  <div style="margin-top:5px;font:400 11px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">MATH 021</div>
-                </div>
-              
-                <div style="background:#f7f7f9;border-radius:16px;padding:12px 13px;min-width:0">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ff453a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 4l9 16H3zM12 10v4M12 17h.01"></path></svg>
-                    <span style="flex:1;min-width:0;font:600 9.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.015em;overflow-wrap:normal">Overdue</span>
-                    <span style="flex:none;min-width:26px;text-align:right;font:700 clamp(24px,3vw,34px)/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.035em">1</span>
-                  </div>
-                  <div style="margin-top:5px;font:400 11px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Still open</div>
-                </div>
-              
-                <div style="background:#f7f7f9;border-radius:16px;padding:12px 13px;min-width:0">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#5856d6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"></path></svg>
-                    <span style="flex:1;min-width:0;font:600 9.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.015em;overflow-wrap:normal">Graded</span>
-                    <span style="flex:none;min-width:26px;text-align:right;font:700 clamp(24px,3vw,34px)/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.035em">5</span>
-                  </div>
-                  <div style="margin-top:5px;font:400 11px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">96 / 100</div>
-                </div>
-              
-                <div style="background:#f7f7f9;border-radius:16px;padding:12px 13px;min-width:0">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#30b0c7" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M5 4h13v16H5zM5 17h13M9 8h5"></path></svg>
-                    <span style="flex:1;min-width:0;font:600 9.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.015em;overflow-wrap:normal">Classes</span>
-                    <span style="flex:none;min-width:26px;text-align:right;font:700 clamp(24px,3vw,34px)/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.035em">3</span>
-                  </div>
-                  <div style="margin-top:5px;font:400 11px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Next 10:30</div>
-                </div>
-              
-            </div>
-
-            <div style="margin-top:14px;background:#f7f7f9;border-radius:18px;padding:15px 17px;display:flex;flex-direction:column;gap:11px">
-              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-                <span style="font:600 10.5px/1.2 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.05em">Week of Sep 7 · workload</span>
-                <span style="margin-left:auto;font:400 11px/1.2 -apple-system,Helvetica,sans-serif;color:#6c6c70">Submitted / assigned</span>
-              </div>
-              
-                <div style="display:flex;align-items:center;gap:11px">
-                  <span style="flex:none;width:8px;height:8px;border-radius:4px;background:#34c759"></span>
-                  <span style="flex:none;width:126px;font:500 11.5px/1.3 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-MATH 021 20</span>
-                  <span style="flex:1;min-width:40px;height:7px;border-radius:4px;background:rgba(118,118,128,.15);overflow:hidden;display:block">
-                    <span style="display:block;height:100%;border-radius:4px;width:43%;background:#34c759"></span>
-                  </span>
-                  <span style="flex:none;width:40px;text-align:right;font:600 11px/1.2 ui-monospace,Menlo,monospace;color:#3c3c43">3 / 7</span>
-                </div>
-              
-                <div style="display:flex;align-items:center;gap:11px">
-                  <span style="flex:none;width:8px;height:8px;border-radius:4px;background:#30b0c7"></span>
-                  <span style="flex:none;width:126px;font:500 11.5px/1.3 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-PHYS 008 01</span>
-                  <span style="flex:1;min-width:40px;height:7px;border-radius:4px;background:rgba(118,118,128,.15);overflow:hidden;display:block">
-                    <span style="display:block;height:100%;border-radius:4px;width:33%;background:#30b0c7"></span>
-                  </span>
-                  <span style="flex:none;width:40px;text-align:right;font:600 11px/1.2 ui-monospace,Menlo,monospace;color:#3c3c43">1 / 3</span>
-                </div>
-              
-                <div style="display:flex;align-items:center;gap:11px">
-                  <span style="flex:none;width:8px;height:8px;border-radius:4px;background:#ff2d55"></span>
-                  <span style="flex:none;width:126px;font:500 11.5px/1.3 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-PHYS 008HL 01</span>
-                  <span style="flex:1;min-width:40px;height:7px;border-radius:4px;background:rgba(118,118,128,.15);overflow:hidden;display:block">
-                    <span style="display:block;height:100%;border-radius:4px;width:50%;background:#ff2d55"></span>
-                  </span>
-                  <span style="flex:none;width:40px;text-align:right;font:600 11px/1.2 ui-monospace,Menlo,monospace;color:#3c3c43">1 / 2</span>
-                </div>
-              
-                <div style="display:flex;align-items:center;gap:11px">
-                  <span style="flex:none;width:8px;height:8px;border-radius:4px;background:#c8901c"></span>
-                  <span style="flex:none;width:126px;font:500 11.5px/1.3 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-WRI 010 20</span>
-                  <span style="flex:1;min-width:40px;height:7px;border-radius:4px;background:rgba(118,118,128,.15);overflow:hidden;display:block">
-                    <span style="display:block;height:100%;border-radius:4px;width:67%;background:#c8901c"></span>
-                  </span>
-                  <span style="flex:none;width:40px;text-align:right;font:600 11px/1.2 ui-monospace,Menlo,monospace;color:#3c3c43">2 / 3</span>
-                </div>
-              
-                <div style="display:flex;align-items:center;gap:11px">
-                  <span style="flex:none;width:8px;height:8px;border-radius:4px;background:#ff9500"></span>
-                  <span style="flex:none;width:126px;font:500 11.5px/1.3 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-SPRK 010 103</span>
-                  <span style="flex:1;min-width:40px;height:7px;border-radius:4px;background:rgba(118,118,128,.15);overflow:hidden;display:block">
-                    <span style="display:block;height:100%;border-radius:4px;width:0%;background:#ff9500"></span>
-                  </span>
-                  <span style="flex:none;width:40px;text-align:right;font:600 11px/1.2 ui-monospace,Menlo,monospace;color:#3c3c43">0 / 2</span>
-                </div>
-              
-            </div>
-
-            <div style="margin-top:14px">
-              <div style="display:flex;align-items:baseline;gap:8px;padding:0 3px 7px">
-                <span style="font:700 13px/1.2 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Today</span>
-                <span style="font:400 11px/1.2 -apple-system,Helvetica,sans-serif;color:#6c6c70">4 items</span>
-              </div>
-              <div style="background:#f7f7f9;border-radius:16px;overflow:hidden">
-                
-                  <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid rgba(60,60,67,.08)">
-                    <span style="flex:none;width:18px;height:18px;border-radius:9px;box-sizing:border-box;background:transparent;border:1.6px solid rgba(60,60,67,.26);display:flex;align-items:center;justify-content:center">
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0"><path d="M20 6L9 17l-5-5"></path></svg>
-                    </span>
-                    <span style="flex:1;min-width:0;font:600 13px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Dis01</span>
-                    <span style="flex:none;padding:3px 8px;border-radius:8px;background:rgba(52,199,89,.14);font:600 10px/1.3 -apple-system,Helvetica,sans-serif;color:#1e7a37">MATH 021</span>
-                  </div>
-                
-                  <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid rgba(60,60,67,.08)">
-                    <span style="flex:none;width:18px;height:18px;border-radius:9px;box-sizing:border-box;background:transparent;border:1.6px solid rgba(60,60,67,.26);display:flex;align-items:center;justify-content:center">
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0"><path d="M20 6L9 17l-5-5"></path></svg>
-                    </span>
-                    <span style="flex:1;min-width:0;font:600 13px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Qz01</span>
-                    <span style="flex:none;padding:3px 8px;border-radius:8px;background:rgba(52,199,89,.14);font:600 10px/1.3 -apple-system,Helvetica,sans-serif;color:#1e7a37">MATH 021</span>
-                  </div>
-                
-                  <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid rgba(60,60,67,.08)">
-                    <span style="flex:none;width:18px;height:18px;border-radius:9px;box-sizing:border-box;background:transparent;border:1.6px solid rgba(60,60,67,.26);display:flex;align-items:center;justify-content:center">
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:0"><path d="M20 6L9 17l-5-5"></path></svg>
-                    </span>
-                    <span style="flex:1;min-width:0;font:600 13px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">GC articles post-class</span>
-                    <span style="flex:none;padding:3px 8px;border-radius:8px;background:rgba(255,149,0,.16);font:600 10px/1.3 -apple-system,Helvetica,sans-serif;color:#9a5a00">SPRK 010</span>
-                  </div>
-                
-                  <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid rgba(60,60,67,.08)">
-                    <span style="flex:none;width:18px;height:18px;border-radius:9px;box-sizing:border-box;background:#34c759;border:0;display:flex;align-items:center;justify-content:center">
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:1"><path d="M20 6L9 17l-5-5"></path></svg>
-                    </span>
-                    <span style="flex:1;min-width:0;font:600 13px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-decoration:line-through;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Choosing a Field Site</span>
-                    <span style="flex:none;padding:3px 8px;border-radius:8px;background:rgba(200,144,28,.16);font:600 10px/1.3 -apple-system,Helvetica,sans-serif;color:#8a6212">WRI 010</span>
-                  </div>
-                
-              </div>
-            </div>
-          </div>
+            <picture>
+              <source media="(prefers-color-scheme: dark)" srcset="/img/web-dashboard-dark.webp 1440w, /img/web-dashboard-dark@2x.webp 2880w" sizes="(min-width: 1180px) 1140px, calc(100vw - 40px)">
+              <img src="/img/web-dashboard.webp" srcset="/img/web-dashboard.webp 1440w, /img/web-dashboard@2x.webp 2880w" sizes="(min-width: 1180px) 1140px, calc(100vw - 40px)" width="1440" height="900" alt="The Simpl dashboard in Safari: what’s due today, the next seven days, what’s overdue and what was graded, each course’s grade and the week’s workload, and today’s work in one list." fetchpriority="high">
+            </picture>
+          </figure>
         </div>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(288px,1fr));gap:20px">
-
-      <div>
-        <div style="padding:0 2px 12px">
-          <div style="font:700 clamp(19px,2.4vw,23px)/1.2 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.025em">Grades that add up</div>
-        </div>
-        <div style="border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(0,0,0,.11);background:#fff;padding:18px;box-sizing:border-box">
-          <div style="border-radius:16px;padding:15px 16px;background:linear-gradient(158deg,#5856d6,#3f3ea8);color:#fff">
-            <div style="display:flex;align-items:baseline;gap:9px">
-              <span style="font:700 32px/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.04em">3.49</span>
-              <span style="font:600 12px/1.2 -apple-system,Helvetica,sans-serif;color:rgba(255,255,255,.84)">term GPA</span>
-              <span style="margin-left:auto;font:500 11px/1.2 -apple-system,Helvetica,sans-serif;color:rgba(255,255,255,.84)">goal 3.70</span>
-            </div>
-            <div style="margin-top:10px;height:6px;border-radius:3px;background:rgba(255,255,255,.24);overflow:hidden">
-              <span style="display:block;height:6px;width:87%;border-radius:3px;background:#fff"></span>
-            </div>
-            <div style="margin-top:7px;font:600 11.5px/1.2 -apple-system,Helvetica,sans-serif;color:#fff">0.21 below goal</div>
-          </div>
-
-          <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
-            
-              <div style="display:flex;align-items:center;gap:12px;background:#f7f7f9;border-radius:14px;padding:11px 13px">
-                <span style="flex:none;width:44px;height:44px;position:relative">
-                  <svg viewBox="0 0 44 44" style="display:block;width:44px;height:44px;transform:rotate(-90deg)">
-                    <circle cx="22" cy="22" r="17" fill="none" stroke="rgba(120,120,128,.18)" stroke-width="5"></circle>
-                    <circle cx="22" cy="22" r="17" fill="none" stroke="#34c759" stroke-width="5" stroke-linecap="round" stroke-dasharray="106.8 0.0"></circle>
-                  </svg>
-                </span>
-                <span style="flex:1;min-width:0">
-                  <span style="display:block;font:600 12.5px/1.25 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-MATH 021 20</span>
-                  <span style="display:block;margin-top:2px;font:400 10.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70">Target A</span>
-                </span>
-                <span style="flex:none;font:700 17px/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.03em">100%</span>
-              </div>
-            
-              <div style="display:flex;align-items:center;gap:12px;background:#f7f7f9;border-radius:14px;padding:11px 13px">
-                <span style="flex:none;width:44px;height:44px;position:relative">
-                  <svg viewBox="0 0 44 44" style="display:block;width:44px;height:44px;transform:rotate(-90deg)">
-                    <circle cx="22" cy="22" r="17" fill="none" stroke="rgba(120,120,128,.18)" stroke-width="5"></circle>
-                    <circle cx="22" cy="22" r="17" fill="none" stroke="#30b0c7" stroke-width="5" stroke-linecap="round" stroke-dasharray="94.0 12.8"></circle>
-                  </svg>
-                </span>
-                <span style="flex:1;min-width:0">
-                  <span style="display:block;font:600 12.5px/1.25 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-PHYS 008 01</span>
-                  <span style="display:block;margin-top:2px;font:400 10.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70">Target A−</span>
-                </span>
-                <span style="flex:none;font:700 17px/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.03em">88%</span>
-              </div>
-            
-              <div style="display:flex;align-items:center;gap:12px;background:#f7f7f9;border-radius:14px;padding:11px 13px">
-                <span style="flex:none;width:44px;height:44px;position:relative">
-                  <svg viewBox="0 0 44 44" style="display:block;width:44px;height:44px;transform:rotate(-90deg)">
-                    <circle cx="22" cy="22" r="17" fill="none" stroke="rgba(120,120,128,.18)" stroke-width="5"></circle>
-                    <circle cx="22" cy="22" r="17" fill="none" stroke="#c8901c" stroke-width="5" stroke-linecap="round" stroke-dasharray="98.3 8.5"></circle>
-                  </svg>
-                </span>
-                <span style="flex:1;min-width:0">
-                  <span style="display:block;font:600 12.5px/1.25 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">F26-WRI 010 20</span>
-                  <span style="display:block;margin-top:2px;font:400 10.5px/1.25 -apple-system,Helvetica,sans-serif;color:#6c6c70">Target A</span>
-                </span>
-                <span style="flex:none;font:700 17px/1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.03em">92%</span>
-              </div>
-            
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div style="padding:0 2px 12px">
-          <div style="font:700 clamp(19px,2.4vw,23px)/1.2 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.025em">Quizzes, nothing else</div>
-        </div>
-        <div style="border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(0,0,0,.11);background:#fff;padding:18px;box-sizing:border-box">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="flex:1;min-width:0;font:600 12px/1.25 -apple-system,Helvetica,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Week 3: In Lecture Questions</span>
-            <span style="flex:none;padding:4px 9px;border-radius:9px;background:rgba(118,118,128,.13);font:600 11px/1.2 ui-monospace,Menlo,monospace;color:#3c3c43">21:30</span>
-          </div>
-          <div style="margin-top:11px;display:flex;gap:4px">
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(10,132,255,.18);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#0a5dc2">1</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(10,132,255,.18);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#0a5dc2">2</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:#0a84ff;display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#fff">3</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">4</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">5</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">6</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">7</span>
-            
-              <span style="flex:1;height:22px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:600 10.5px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">8</span>
-            
-          </div>
-          <div style="margin-top:14px;font:600 15px/1.35 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em;text-wrap:pretty">What is the displacement between t = 0 and t = 8?</div>
-          <div style="margin-top:11px;display:flex;flex-direction:column;gap:6px">
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:12px;background:#fff;border:1.5px solid rgba(60,60,67,.14);box-sizing:border-box">
-                <span style="flex:none;width:20px;height:20px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:700 10px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">A</span>
-                <span style="flex:1;min-width:0;font:500 13px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e">17.68 m</span>
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:12px;background:rgba(10,132,255,.1);border:1.5px solid #0a84ff;box-sizing:border-box">
-                <span style="flex:none;width:20px;height:20px;border-radius:7px;background:#0a84ff;display:flex;align-items:center;justify-content:center;font:700 10px/1 -apple-system,Helvetica,sans-serif;color:#fff">B</span>
-                <span style="flex:1;min-width:0;font:500 13px/1.3 -apple-system,Helvetica,sans-serif;color:#0a5dc2">23.98 m</span>
-              </span>
-            
-              <span style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:12px;background:#fff;border:1.5px solid rgba(60,60,67,.14);box-sizing:border-box">
-                <span style="flex:none;width:20px;height:20px;border-radius:7px;background:rgba(118,118,128,.13);display:flex;align-items:center;justify-content:center;font:700 10px/1 -apple-system,Helvetica,sans-serif;color:#6c6c70">C</span>
-                <span style="flex:1;min-width:0;font:500 13px/1.3 -apple-system,Helvetica,sans-serif;color:#1c1c1e">20.83 m</span>
-              </span>
-            
-          </div>
-          <div style="margin-top:12px;padding:11px 13px;border-radius:12px;background:#f7f7f9">
-            <div style="font:600 9.5px/1.2 -apple-system,Helvetica,sans-serif;color:#6c6c70;text-transform:uppercase;letter-spacing:.06em">Worked solution</div>
-            <div style="margin-top:6px;font:400 14px/1.4 ui-serif,Georgia,serif;color:#1c1c1e">Δx = ∫₀⁸ v dt = 23.98 m</div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <section id="features" style="position:relative;background:#fff;padding:58px 0 62px">
-    <div style="max-width:1080px;margin:0 auto;box-sizing:border-box;padding:0 28px">
-      <div style="max-width:520px">
-        <h2 style="margin:0;font:700 clamp(26px,4vw,36px)/1.1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.035em;text-wrap:balance">Everything Canvas left out.</h2>
-      </div>
-      <div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
-        
-          <div style="background:#f7f7f9;border-radius:16px;padding:14px 15px;display:flex;align-items:center;gap:11px;box-sizing:border-box">
-            <span style="width:30px;height:30px;border-radius:10px;flex:none;background:rgba(255,69,58,.12);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff453a" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a5 5 0 015 5v4l2 3H5l2-3V9a5 5 0 015-5zM10 19a2 2 0 004 0"></path></svg>
-            </span>
-            <span>
-              <span style="display:block;font:600 15.5px/1.3 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Notifications, one page</span>
-            </span>
-          </div>
-        
-          <div style="background:#f7f7f9;border-radius:16px;padding:14px 15px;display:flex;align-items:center;gap:11px;box-sizing:border-box">
-            <span style="width:30px;height:30px;border-radius:10px;flex:none;background:rgba(88,86,214,.12);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#5856d6" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"></path></svg>
-            </span>
-            <span>
-              <span style="display:block;font:600 15.5px/1.3 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">GPA that tracks</span>
-            </span>
-          </div>
-        
-          <div style="background:#f7f7f9;border-radius:16px;padding:14px 15px;display:flex;align-items:center;gap:11px;box-sizing:border-box">
-            <span style="width:30px;height:30px;border-radius:10px;flex:none;background:rgba(255,69,58,.12);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff453a" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9z"></path></svg>
-            </span>
-            <span>
-              <span style="display:block;font:600 15.5px/1.3 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">What-if scores</span>
-            </span>
-          </div>
-        
-          <div style="background:#f7f7f9;border-radius:16px;padding:14px 15px;display:flex;align-items:center;gap:11px;box-sizing:border-box">
-            <span style="width:30px;height:30px;border-radius:10px;flex:none;background:rgba(255,149,0,.14);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff9500" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8 4.5 4 5v13c4-.5 6.5 0 8 1.5 1.5-1.5 4-2 8-1.5V5c-4-.5-6.5 0-8 1.5zM12 6.5V20"></path></svg>
-            </span>
-            <span>
-              <span style="display:block;font:600 15.5px/1.3 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Immersive Reader</span>
-            </span>
-          </div>
-        
-          <div style="background:#f7f7f9;border-radius:16px;padding:14px 15px;display:flex;align-items:center;gap:11px;box-sizing:border-box">
-            <span style="width:30px;height:30px;border-radius:10px;flex:none;background:rgba(52,199,89,.14);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#34c759" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h9"></path></svg>
-            </span>
-            <span>
-              <span style="display:block;font:600 15.5px/1.3 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Your own tasks</span>
-            </span>
-          </div>
-        
-          <div style="background:#f7f7f9;border-radius:16px;padding:14px 15px;display:flex;align-items:center;gap:11px;box-sizing:border-box">
-            <span style="width:30px;height:30px;border-radius:10px;flex:none;background:rgba(48,176,199,.14);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#30b0c7" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M4 18v2h16v-2"></path></svg>
-            </span>
-            <span>
-              <span style="display:block;font:600 15.5px/1.3 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em">Hand work in</span>
-            </span>
-          </div>
-        
       </div>
     </div>
   </section>
 
-  <section style="position:relative;max-width:1080px;margin:0 auto;box-sizing:border-box;padding:58px 28px 66px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:18px">
-    <h2 style="margin:0;font:700 clamp(28px,4.4vw,40px)/1.1 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.035em;text-wrap:balance">Try it this term.</h2>
-    <p style="margin:0;max-width:320px;font:400 15px/1.45 -apple-system,Helvetica,sans-serif;color:#5c5c60">No account. Nothing leaves your browser.</p>
-    <a href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp" style="display:flex;align-items:center;gap:10px;padding:0 26px;height:56px;border-radius:28px;background:#0a84ff;color:#fff;box-sizing:border-box;font:600 16px/1.2 -apple-system,'SF Pro Display',Helvetica,sans-serif;letter-spacing:-.02em;box-shadow:0 8px 22px rgba(10,132,255,.32)">Add to Chrome</a>
+  <section class="works" aria-label="Where Simpl works">
+    <div class="wrap works__row reveal">
+      <span class="works__k">Works with</span><span class="chip"><i style="background:#e4572e"></i>Canvas</span><span class="chip"><i style="background:#1cb0d9"></i>Brightspace</span>
+      <span class="works__k">in</span><span class="chip"><svg width="18" height="18" aria-hidden="true" style="color:#0a84ff"><use href="#i-compass"/></svg>Safari</span><span class="chip"><svg width="18" height="18" aria-hidden="true" style="color:#34a853"><use href="#i-puzzle"/></svg>Chrome</span><span class="chip"><svg width="18" height="18" aria-hidden="true"><use href="#i-laptop"/></svg>Simpl for Mac</span>
+    </div>
   </section>
 
-  <footer style="position:relative;border-top:1px solid rgba(60,60,67,.09);padding:22px 0 34px">
-    <div style="max-width:1080px;margin:0 auto;box-sizing:border-box;padding:0 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-      <span style="font:400 12.5px/1.3 -apple-system,Helvetica,sans-serif;color:#6c6c70">Simpl Courses · not affiliated with Instructure</span>
-      <span style="margin-left:auto;display:flex;gap:18px">
-        <a href="/privacy" style="font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif">Privacy</a>
-        <a href="https://github.com/26VirenS/BetterCourseViewer/issues" style="font:500 12.5px/1.3 -apple-system,Helvetica,sans-serif">Support</a>
-      </span>
+  <!-- ---- grades -------------------------------------------------------------------------------------- -->
+  <section class="feature" id="grades" style="--k:#8e44ec">
+    <div class="wrap feature__grid">
+      <div class="feature__text reveal">
+        <span class="kicker">Grades</span>
+        <h2 class="h2">Grades that add up.</h2>
+        <p class="lede">Your term GPA, a ring for every course, and what each one needs from here — with the history your school doesn’t keep.</p>
+        <ul class="ticks">
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>What-if scores that never touch your real grade</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>A target for each course, and what it takes to get there</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>A GPA trend, kept on your own device</li>
+        </ul>
+      </div>
+      <div class="feature__shot reveal reveal--shot" style="--d:120ms">
+        <figure class="win">
+          <div class="win__bar" aria-hidden="true">
+            <div class="win__left"><span class="lights"><i></i><i></i><i></i></span><span class="win__nav"><svg><use href="#i-back"/></svg><svg><use href="#i-fwd"/></svg></span></div>
+            <div class="win__url"><svg><use href="#i-lock"/></svg>canvas.lakeside.edu</div>
+            <div class="win__right"><span class="win__ext"><img src="/img/icon-128.png" alt="" width="22" height="22" loading="lazy"></span></div>
+          </div>
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="/img/web-grades-dark.webp 1440w, /img/web-grades-dark@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)">
+            <img src="/img/web-grades.webp" srcset="/img/web-grades.webp 1440w, /img/web-grades@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl’s Grades page: a 3.42 term GPA against a 3.50 goal, a trend since August, and a ring for each course with its letter and what it needs from here.">
+          </picture>
+        </figure>
+        <span class="callout" style="--i:0; left:3%; top:44%"><svg aria-hidden="true"><use href="#i-trend"/></svg>A trend since <b>August</b></span>
+        <span class="callout" style="--i:1; right:3%; bottom:9%"><svg aria-hidden="true"><use href="#i-ring"/></svg><b>92.4%</b> · needs 89% of the rest</span>
+      </div>
     </div>
-  </footer>
-</div>
+  </section>
+
+  <!-- ---- quizzes ------------------------------------------------------------------------------------- -->
+  <section class="feature feature--flip" id="quizzes" style="--k:#0a84ff">
+    <div class="wrap feature__grid">
+      <div class="feature__text reveal">
+        <span class="kicker">Quizzes</span>
+        <h2 class="h2">Quizzes, without the clutter.</h2>
+        <p class="lede">One question at a time, with the clock in view. Answers save as you go, and anything you flag waits for you on the review.</p>
+        <ul class="ticks">
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Every Classic Quizzes question type</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Flag, review, then hand in</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Feedback laid out question by question</li>
+        </ul>
+      </div>
+      <div class="feature__shot reveal reveal--shot" style="--d:120ms">
+        <figure class="win">
+          <div class="win__bar" aria-hidden="true">
+            <div class="win__left"><span class="lights"><i></i><i></i><i></i></span><span class="win__nav"><svg><use href="#i-back"/></svg><svg><use href="#i-fwd"/></svg></span></div>
+            <div class="win__url"><svg><use href="#i-lock"/></svg>canvas.lakeside.edu</div>
+            <div class="win__right"><span class="win__ext"><img src="/img/icon-128.png" alt="" width="22" height="22" loading="lazy"></span></div>
+          </div>
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="/img/web-quiz-dark.webp 1440w, /img/web-quiz-dark@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)">
+            <img src="/img/web-quiz.webp" srcset="/img/web-quiz.webp 1440w, /img/web-quiz@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)" width="1440" height="900" loading="lazy" decoding="async" alt="A quiz in Simpl: question 1 of 7 with five lettered answers, one picked and saved, the question list on the left and Next, Back and Flag for review on the right.">
+          </picture>
+        </figure>
+        <span class="callout" style="--i:0; right:4%; top:30%"><svg aria-hidden="true"><use href="#i-check"/></svg>Saved as you go</span>
+        <span class="callout" style="--i:1; left:4%; bottom:14%"><svg aria-hidden="true"><use href="#i-flag"/></svg>Flag it, <b>come back later</b></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- calendar ------------------------------------------------------------------------------------ -->
+  <section class="feature" id="calendar" style="--k:#f08c00">
+    <div class="wrap feature__grid">
+      <div class="feature__text reveal">
+        <span class="kicker">Calendar &amp; To Do</span>
+        <h2 class="h2">Your whole week, planned.</h2>
+        <p class="lede">Every due date from every course on one calendar — month, week or agenda — beside a To Do list you can add your own tasks to.</p>
+        <ul class="ticks">
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Colour by course, done work crossed off</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Tick things off as you finish them</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Your own tasks next to your coursework</li>
+        </ul>
+      </div>
+      <div class="feature__shot reveal reveal--shot" style="--d:120ms">
+        <figure class="win">
+          <div class="win__bar" aria-hidden="true">
+            <div class="win__left"><span class="lights"><i></i><i></i><i></i></span><span class="win__nav"><svg><use href="#i-back"/></svg><svg><use href="#i-fwd"/></svg></span></div>
+            <div class="win__url"><svg><use href="#i-lock"/></svg>canvas.lakeside.edu</div>
+            <div class="win__right"><span class="win__ext"><img src="/img/icon-128.png" alt="" width="22" height="22" loading="lazy"></span></div>
+          </div>
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="/img/web-calendar-dark.webp 1440w, /img/web-calendar-dark@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)">
+            <img src="/img/web-calendar.webp" srcset="/img/web-calendar.webp 1440w, /img/web-calendar@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl’s calendar for October: each day’s assignments and quizzes, coloured by course, with finished work crossed off.">
+          </picture>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- Brightspace --------------------------------------------------------------------------------- -->
+  <section class="feature feature--flip" id="brightspace" style="--k:#12a4c9">
+    <div class="wrap feature__grid">
+      <div class="feature__text reveal">
+        <span class="kicker">New · Brightspace</span>
+        <h2 class="h2">Now on Brightspace.</h2>
+        <p class="lede">The same Simpl on Brightspace (D2L): your dashboard, grades, content, discussions and hand-ins, at any school that uses it.</p>
+        <ul class="ticks">
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Dashboard, grades and content</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Hand in files and text without leaving</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>In Safari, in Chrome and in Simpl for Mac</li>
+        </ul>
+      </div>
+      <div class="feature__shot reveal reveal--shot" style="--d:120ms">
+        <figure class="win">
+          <div class="win__bar" aria-hidden="true">
+            <div class="win__left"><span class="lights"><i></i><i></i><i></i></span><span class="win__nav"><svg><use href="#i-back"/></svg><svg><use href="#i-fwd"/></svg></span></div>
+            <div class="win__url"><svg><use href="#i-lock"/></svg>lakeside.brightspace.com</div>
+            <div class="win__right"><span class="win__ext"><img src="/img/icon-128.png" alt="" width="22" height="22" loading="lazy"></span></div>
+          </div>
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="/img/web-brightspace-dark.webp 1440w, /img/web-brightspace-dark@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)">
+            <img src="/img/web-brightspace.webp" srcset="/img/web-brightspace.webp 1440w, /img/web-brightspace@2x.webp 2880w" sizes="(min-width: 1180px) 650px, (min-width: 900px) 56vw, calc(100vw - 40px)" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl on a Brightspace site: the same dashboard, with each course’s grade, the week’s workload and the work coming up.">
+          </picture>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- Simpl for Mac ------------------------------------------------------------------------------- -->
+  <section class="mac" id="mac">
+    <div class="wrap">
+      <div class="mac__text reveal">
+        <span class="kicker" style="--k:#5ac8fa">Simpl for Mac</span>
+        <h2 class="h2">A real Mac app.</h2>
+        <p class="lede">Your courses in a window of their own — a native sidebar, keyboard shortcuts, and alerts for new grades and due dates, even with the window closed.</p>
+        <div class="cta">
+          <div class="macdl" data-macdl>
+            <button class="btn btn--ink macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-mac"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+            <div class="macdl__float">
+              <div class="macdl__panel" id="macdl-mac">
+                <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
+                <div class="macdl__opts">
+                  <a class="macdl__opt" href="/download/mac" style="--i:0"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13 or later</small></span></a>
+                  <a class="macdl__opt" href="/download/mac-app" style="--i:1"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="36" height="36" loading="lazy"></span><span class="macdl__t"><b>Mac App</b><small>macOS 14 or later</small></span></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mac__shot reveal reveal--shot" style="--d:100ms">
+        <figure class="win win--app">
+          <picture>
+            <img src="/img/mac-dark-01-dashboard.webp" width="1024" height="630" loading="lazy" decoding="async" alt="Simpl for Mac in dark mode: a sidebar of places and courses, and the dashboard’s counters and tonight’s work.">
+          </picture>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- iPhone -------------------------------------------------------------------------------------- -->
+  <section class="iphone" id="iphone">
+    <div class="wrap iphone__grid">
+      <div class="iphone__phones">
+        <div class="phone reveal reveal--shot" style="--d:80ms">
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="/img/iphone-dark-01-today.webp">
+            <img src="/img/iphone-light-01-today.webp" width="644" height="1400" loading="lazy" decoding="async" alt="Simpl for iPhone’s Today screen: counters for what’s due and what’s new, and the work coming up next.">
+          </picture>
+        </div>
+        <div class="phone reveal reveal--shot" style="--d:220ms">
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="/img/iphone-dark-04-grades.webp">
+            <img src="/img/iphone-light-04-grades.webp" width="644" height="1400" loading="lazy" decoding="async" alt="Simpl for iPhone’s Grades screen: the term GPA against a goal, and a ring for each course.">
+          </picture>
+        </div>
+      </div>
+      <div class="feature__text reveal" style="--k:#30b45a">
+        <span class="kicker">Simpl for iPhone</span>
+        <h2 class="h2">Simpl, in your pocket.</h2>
+        <p class="lede">Today, your courses, your grades and your quizzes as a real iPhone app — with the phone’s own tab bar, sheets and haptics.</p>
+        <ul class="ticks">
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Hand in from Files and Photos</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Quizzes, a question at a time</li>
+          <li><svg aria-hidden="true"><use href="#i-tick"/></svg>Reminders before work is due</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- the little things --------------------------------------------------------------------------- -->
+  <section class="things">
+    <div class="wrap">
+      <div class="things__head reveal">
+        <h2 class="h2">And every little thing.</h2>
+        <p class="lede">The parts of school software nobody gets around to fixing — fixed.</p>
+      </div>
+      <div class="cards">
+        <article class="card reveal" style="--c:#ff453a; --d:0ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></div><h3>Notifications, one page</h3><p>Announcements, grades and replies, together and in order.</p></article>
+        <article class="card reveal" style="--c:#0a84ff; --d:60ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-clip"/></svg></div><h3>Hand in, done</h3><p>Files, links or text, right from the assignment.</p></article>
+        <article class="card reveal" style="--c:#5e5ce6; --d:120ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-search"/></svg></div><h3>Search everything</h3><p>Courses, files, pages and people from one box.</p></article>
+        <article class="card reveal" style="--c:#ff9f0a; --d:180ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-cards"/></svg></div><h3>Study tools</h3><p>Flashcards, a calculator, a timer and more.</p></article>
+        <article class="card reveal" style="--c:#af52de; --d:0ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-wand"/></svg></div><h3>What-if scores</h3><p>See where a grade would land before it does.</p></article>
+        <article class="card reveal" style="--c:#30b45a; --d:60ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-list"/></svg></div><h3>Your own tasks</h3><p>To-dos of your own, next to your coursework.</p></article>
+        <article class="card reveal" style="--c:#64d2ff; --d:120ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-moon"/></svg></div><h3>Dark mode</h3><p>Easy on the eyes, everywhere Simpl runs.</p></article>
+        <article class="card reveal" style="--c:#ff375f; --d:180ms"><div class="card__ic"><svg aria-hidden="true"><use href="#i-clock"/></svg></div><h3>Reminders</h3><p>A nudge before work is due, from the apps.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- privacy ------------------------------------------------------------------------------------- -->
+  <section class="privacy">
+    <div class="wrap">
+      <div class="privacy__mark reveal" aria-hidden="true"><svg viewBox="0 0 48 48"><path pathLength="1" d="M24 5l15 5.6v11.2c0 9.7-6.3 17.2-15 20.7-8.7-3.5-15-11-15-20.7V10.6z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path pathLength="1" d="M17 24.5l4.8 4.8 9.4-9.6" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="reveal" style="--d:80ms">
+        <h2 class="h2">Private by design.</h2>
+        <p class="lede">No account and no tracking. Your courses and grades go straight from your school’s site to your screen — never through a server of ours.</p>
+        <a class="link" href="/privacy">Read the privacy policy <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- get it -------------------------------------------------------------------------------------- -->
+  <section class="get" id="get">
+    <div class="wrap">
+      <div class="get__box reveal">
+        <img class="get__icon" src="/img/icon-512.png" alt="" width="96" height="96" loading="lazy">
+        <h2 class="h2">Try it this term.</h2>
+        <p class="lede">Free for any school on Canvas or Brightspace.</p>
+        <div class="cta">
+          <a class="btn btn--ink" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
+          <div class="macdl" data-macdl>
+            <button class="btn btn--ink macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-get"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+            <div class="macdl__float">
+              <div class="macdl__panel" id="macdl-get">
+                <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
+                <div class="macdl__opts">
+                  <a class="macdl__opt" href="/download/mac" style="--i:0"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13 or later</small></span></a>
+                  <a class="macdl__opt" href="/download/mac-app" style="--i:1"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="36" height="36" loading="lazy"></span><span class="macdl__t"><b>Mac App</b><small>macOS 14 or later</small></span></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="get__req">Safari extension: macOS 13 or later, Safari 16.4 or later · Mac app: macOS 14 or later · Chrome on any computer</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="/" aria-label="Simpl Courses, home"><img src="/img/icon-128.png" alt="" width="30" height="30" loading="lazy"> Simpl Courses</a>
+    <span>Not affiliated with Instructure or D2L.</span>
+    <nav aria-label="More">
+      <a href="/privacy">Privacy</a>
+      <a href="/report/">Report a bug</a>
+      <a href="https://github.com/26VirenS/BetterCourseViewer">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // the bar gets its material once the page has moved under it
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.toggleAttribute('data-scrolled', scrollY > 8);
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // each section arrives once, as it is scrolled to
+  const reveals = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.15 });
+    reveals.forEach((el) => io.observe(el));
+  } else reveals.forEach((el) => el.classList.add('is-in'));
+
+  // Download for Mac: the button opens into its two choices — downward when the page has room below it, else upward
+  const choosers = [...document.querySelectorAll('[data-macdl]')];
+  const close = (root, { focus = false } = {}) => {
+    if (!root.hasAttribute('data-open')) return;
+    root.removeAttribute('data-open');
+    root.querySelector('.macdl__btn').setAttribute('aria-expanded', 'false');
+    if (focus) root.querySelector('.macdl__btn').focus({ preventScroll: true });
+  };
+  const open = (root, viaKeyboard) => {
+    choosers.forEach((r) => r !== root && close(r));
+    const btn = root.querySelector('.macdl__btn');
+    const panel = root.querySelector('.macdl__panel');
+    const r = btn.getBoundingClientRect();
+    root.style.setProperty('--h', `${r.height}px`);
+    const need = panel.offsetHeight + 12;
+    const below = innerHeight - r.top, above = r.bottom;
+    root.dataset.dir = below >= need || below >= above ? 'down' : 'up';
+    root.setAttribute('data-open', '');
+    btn.setAttribute('aria-expanded', 'true');
+    if (viaKeyboard) root.querySelector('.macdl__opt').focus({ preventScroll: true });
+  };
+  for (const root of choosers) {
+    const btn = root.querySelector('.macdl__btn');
+    const opts = [...root.querySelectorAll('.macdl__opt')];
+    btn.addEventListener('click', (e) => (root.hasAttribute('data-open') ? close(root) : open(root, e.detail === 0)));
+    root.querySelector('.macdl__head').addEventListener('click', () => close(root, { focus: true }));
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && root.hasAttribute('data-open')) { e.preventDefault(); close(root, { focus: true }); return; }
+      const i = opts.indexOf(document.activeElement);
+      if (i < 0 || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+      e.preventDefault();
+      opts[(i + (e.key === 'ArrowDown' ? 1 : opts.length - 1)) % opts.length].focus();
+    });
+    root.addEventListener('focusout', (e) => { if (!root.contains(e.relatedTarget)) close(root); });
+    // a choice is taken: the download starts, and the panel closes once the press has shown
+    opts.forEach((a) => a.addEventListener('click', () => setTimeout(() => close(root), 180)));
+  }
+  document.addEventListener('pointerdown', (e) => choosers.forEach((root) => { if (!root.contains(e.target)) close(root); }));
+})();
+</script>
 </body>
 </html>
