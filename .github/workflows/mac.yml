@@ -20,6 +20,7 @@ on:
       - 'extension/content/app/native-app.js'
       - 'scripts/dev/make-mac-project.py'
       - 'scripts/dev/mac-shots.sh'
+      - 'scripts/dev/mock-brightspace.mjs'
       - '.github/workflows/mac.yml'
   workflow_dispatch:
 
@@ -55,8 +56,10 @@ jobs:
         if: hashFiles('shots/FAILED') == ''
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          node scripts/dev/mock-brightspace.mjs 8860 --open > mock-d2l.log 2>&1 &
           sleep 2
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+          curl -s -o /dev/null -w "mock brightspace %{http_code}\n" http://localhost:8860/d2l/home
           system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
       - name: Screens
         if: hashFiles('shots/FAILED') == ''

@@ -100,6 +100,7 @@ console.log('\naddresses, either way');
     ['/courses/31001/discussion_topics/2000000902?bcv=native', '/d2l/le/31001/discussions/topics/902/View?bcv=native'],
     ['/courses/31001/modules?bcv=native', '/d2l/le/content/31001/Home?bcv=native'],
   ];
+  nat.push(['/courses/31001?bcv=native', '/d2l/home/31001?bcv=native'], ['/?bcv=native', '/d2l/home?bcv=native']); // (the pages the interface draws over: asked for as Brightspace's own, they say so)
   const natBad = nat.filter(([c, d]) => L.toPage(c) !== d || L.fromPage(d) !== c);
   check(!natBad.length && L.toPage('/courses/31001/files/1302?bcv=native') === '/d2l/le/content/31001/viewContent/1302/View', `Brightspace’s own page for a screen, when its own is asked for (“Open in Brightspace”), carries ?bcv=native so the interface leaves it be — and back: ${natBad.map(([c, d]) => `${c} → ${L.toPage(c)} → ${L.fromPage(L.toPage(c))}`).join('; ') || nat.length + ' pairs'}`);
   check(L.toPage('/profile') === '/d2l/lp/profile/profile_edit.d2l?ou=6606' && L.toPage('/profile/settings') === '/d2l/lp/preferences/preferences_main/preferences_main.d2l?ou=6606' && L.toPage('/profile/communication') === '/d2l/Notifications/Settings?ou=6606' && L.toPage('/logout') === '/d2l/logout', 'the account’s pages — profile, settings, notifications — and signing out are Brightspace’s own, as its personal menu links them');

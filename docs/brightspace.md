@@ -89,8 +89,25 @@ On a real Brightspace (a trial is free from D2L), sign in with a form post to `/
 environment, never in a file. An instructor's account sees no grades or submissions of its own: a student's shows
 the rest.
 
+## The apps
+
+The iPhone app and Simpl for Mac load the same scripts (`ios/SimplCourses/Web/ScriptBundle.swift` reads the manifest),
+the Brightspace layer among them, so their native screens' data comes through it unchanged. What they decide for
+themselves knows Brightspace too:
+
+- **Signing in.** Brightspace's own sign-in page (`/d2l/login`, and the `/d2l/lp/auth/login…` its form posts to) is the
+  school's sign-in for the reader (`Web/login.js`) and `LoginAssist`: the native form goes over it, as over Canvas's.
+- **Addresses.** The router (`Native/Router.swift`, both apps) reads a Brightspace page's address as the interface's
+  (`interfaceAddress`: `?simpl=`, a course's homepage, the homepage, a quiz's page), so a link or the page's own move
+  opens the same native screen. A quiz is taken on Brightspace's own page, in the sheet of the school's pages; a file
+  is fetched from its content topic (`…/topics/files/download/<id>/DirectFileTopicDownload`); that sheet loads the
+  Brightspace page for an address, as the page has it (`native-app.js` `pageFor`).
+- **The platform.** The page says which it is (`shell.state`, the snapshot: `lms`); `AppSession` keeps it per school,
+  for the words that name it (`lmsName`) and for what Brightspace has none of here (no Inbox, no Groups).
+- **Pictures.** `scripts/dev/mac-shots.sh` and `ios-shots.sh` picture the apps on the mock Brightspace too
+  (`mock-brightspace.mjs --open`: signed in, as nobody is there to type).
+
 ## Not yet
 
-- The iPhone and Mac apps load the same scripts, but their own sign-in handling and address routing are Canvas's.
 - Quizzes are taken on Brightspace's own pages; the interface does not draw them.
 - Brightspace gives a student no question count for a quiz and no list of quiz attempts.

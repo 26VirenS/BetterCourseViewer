@@ -9,6 +9,7 @@ on:
       - 'ios/**'
       - 'extension/content/app/native-app.js'
       - 'scripts/dev/ios-shots.sh'
+      - 'scripts/dev/mock-brightspace.mjs'
       - '.github/workflows/ios-shots.yml'
   workflow_dispatch:
 
@@ -39,6 +40,7 @@ jobs:
       - name: Simulator and mock Canvas
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          node scripts/dev/mock-brightspace.mjs 8860 --open > mock-d2l.log 2>&1 &
           DEV=$(xcrun simctl list devices available | grep -E "iPhone 17 Pro \(" | head -1 | grep -oE "[0-9A-F-]{36}")
           echo "device $DEV"
           xcrun simctl boot "$DEV"

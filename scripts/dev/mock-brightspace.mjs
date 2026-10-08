@@ -8,10 +8,13 @@
 // a course pinned or unpinned. Each must carry the X-Csrf-Token the page's /d2l/lp/auth/xsrf-tokens gives,
 // as Brightspace's own do, or it is refused (403).
 //
-// Usage: node scripts/dev/mock-brightspace.mjs [port]
+// Usage: node scripts/dev/mock-brightspace.mjs [port] [--open]
+//   --open: every request is signed in, as after a sign-in — for the apps' pictures (.github/workflows/mac.yml), where
+//   nobody is there to type at the sign-in page
 import http from 'node:http';
 
 const port = Number(process.argv[2] || process.env.PORT || 8860);
+const OPEN = process.argv.includes('--open');
 const now = new Date();
 const H = 3600e3;
 const D = 24 * H;
@@ -217,7 +220,7 @@ const loginPage = (target = '') => `<!DOCTYPE html><html lang="en"><head><meta c
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
 const html = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...headers }); res.end(body); };
 const redirect = (res, to, headers = {}) => { res.writeHead(302, { location: to, ...headers }); res.end(); };
-const signedIn = (req) => new RegExp(`(?:^|;\\s*)${SESSION}=ok`).test(req.headers.cookie || '');
+const signedIn = (req) => OPEN || new RegExp(`(?:^|;\\s*)${SESSION}=ok`).test(req.headers.cookie || '');
 
 function api(req, res, path, q, body) {
   const m = (re) => path.match(re);
@@ -356,6 +359,7 @@ const server = http.createServer((req, res) => {
       if ((r = path.match(/^\/d2l\/le\/content\/(\d+)\/fullscreen\/(\d+)\/View$/))) return html(res, 200, `<!DOCTYPE html><html><body><p id="d2l-fullscreen-viewer">Topic ${esc(r[2])}, without the header</p></body></html>`);
       if (path === '/d2l/error/404/log') return html(res, 404, page('Page Not Found', null, `<p id="d2l-404">The page ${esc(q.get('targetUrl') || '')} could not be found.</p>`));
       if (path === '/favicon.ico') { res.writeHead(204); return res.end(); }
+      if (path === '/') return redirect(res, '/d2l/home'); // (Brightspace's root, signed in: the homepage)
       // anything else — a Canvas-style address among them — is Brightspace's 404, which names it
       return redirect(res, `/d2l/error/404/log?targetUrl=${encodeURIComponent(path + url.search)}`);
     } catch (e) {

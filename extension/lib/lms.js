@@ -98,7 +98,8 @@
       for (const [re, to] of TO_PAGE) {
         const m = path.match(re);
         const page = m && to(m);
-        if (page) return page + hash;
+        // (a page the interface draws over — the homepage, a course's — asked for as Brightspace's own keeps saying so)
+        if (page) return (native && /^\/d2l\/home(\/|\?|$)/.test(page) ? withNative(page) : page) + hash;
       }
       if (native) {
         for (const [re, to] of NATIVE) {

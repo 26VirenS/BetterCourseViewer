@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # The iPhone app's screens on the iOS Simulator, against the mock Canvas: each tab, a counter's sheet,
 # Notifications, a course and an assignment pushed from the native screens, a course's grades sheet,
-# Hand In, a discussion, modules, files, Groups and the Inbox, a quiz and a tool — in light and in dark.
+# Hand In, a discussion, modules, files, Groups and the Inbox, a quiz and a tool — in light and in dark; then against
+# the mock Brightspace (2.99.22): Today, a course, an assignment, its grades, a discussion, its content, in light.
 # Run by .github/workflows/ios-shots.yml after the app is built and installed on a booted simulator and
-# the mock is serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801). Pictures in ./shots.
+# the mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860
+# (node scripts/dev/mock-brightspace.mjs 8860 --open). Pictures in ./shots.
 set -u
 OUT="${OUT:-shots}"
 mkdir -p "$OUT"
@@ -19,7 +21,7 @@ launch() {
   shift 2
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   sleep 1
-  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL http://localhost:8800 -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
+  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL "${BASE:-http://localhost:8800}" -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
   sleep "$wait"
   xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
 }
@@ -75,6 +77,18 @@ for mode in light dark; do
   # (1.6.1) the first run: the school searched for by name
   launch "$mode-23-school" 12 -SimplPicker merced
 done
+# (2.99.22) Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the menu
+xcrun simctl ui booted appearance light || true
+export BASE=http://localhost:8860
+launch d2l-settle 16
+rm -f "$OUT/d2l-settle.png" "$OUT/console-d2l-settle.txt"
+launch d2l-01-today 22
+launch d2l-02-course 20 -SimplTab courses -SimplPush /courses/31001
+launch d2l-03-assignment 20 -SimplTab todo -SimplPush /courses/31001/assignments/702
+launch d2l-04-grades-sheet 18 -SimplTab grades -SimplOpen grades:31001
+launch d2l-05-discussion 20 -SimplTab courses -SimplPush /courses/31001/discussion_topics/2000000902
+launch d2l-06-modules 18 -SimplTab courses -SimplPush /courses/31001/modules
+unset BASE
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 collect end
 

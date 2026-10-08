@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Simpl for Mac's screens against the mock Canvas: the Dashboard, each place in the sidebar, a course and its
 # sections, an assignment, Hand In, a discussion, the Inbox, a quiz, a tool's window, the setup and Settings — in
-# light and in dark. Run by .github/workflows/mac.yml once the app is built and the mock is serving on :8800
-# (node scripts/dev/mock-canvas.mjs 8800 8801). Pictures in ./shots: <name>.png from screencapture (the screen as
+# light and in dark; then against the mock Brightspace (2.99.22), its own: the Dashboard, a course, its work, an
+# assignment, its grades, its content, a discussion. Run by .github/workflows/mac.yml once the app is built and the
+# mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860 (mock-brightspace.mjs 8860 --open). Pictures in ./shots: <name>.png from screencapture (the screen as
 # shown) and <name>-app.png from inside the app (Shot.swift), in case the runner may not record the screen.
 set -u
 OUT="${OUT:-shots}"
@@ -22,7 +23,7 @@ shoot() {
   pkill -x Simpl >/dev/null 2>&1 || true
   sleep 0.6
   rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
-  "$BIN" -SimplBaseURL http://localhost:8800 -SimplDemo YES -SimplAppearance "$MODE" \
+  "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
     -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplWindowSize 1280x820 \
     -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
   local pid=$!
@@ -75,6 +76,18 @@ for MODE in light dark; do
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
   shoot "$MODE-26-school" 8 -SimplPicker merced
 done
+# Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
+export BASE=http://localhost:8860
+MODE=light
+shoot d2l-01-dashboard 16
+shoot d2l-02-course 14 -SimplPlace course:31001
+shoot d2l-03-assignments 12 -SimplPlace section:courses/31001:assignments
+shoot d2l-04-assignment 14 -SimplPlace course:31001 -SimplPush /courses/31001/assignments/702
+shoot d2l-05-grades 14 -SimplPlace section:courses/31001:grades
+shoot d2l-06-content 12 -SimplPlace section:courses/31001:modules
+shoot d2l-07-discussion 14 -SimplPlace course:31001 -SimplPush /courses/31001/discussion_topics/2000000902
+shoot d2l-08-todo 12 -SimplPlace todo
+unset BASE
 pkill -x Simpl >/dev/null 2>&1 || true
 # the app's crash reports, kept with the pictures (a missing picture is an app that did not stay up: these say why)
 for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl*; do
