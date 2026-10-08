@@ -1019,18 +1019,23 @@
         // text or options hold a formula would otherwise rebuild every equation image Canvas serves,
         // and the formulas visibly blink away and back on each press. save() repaints the count and
         // the pills itself, so nothing else here has to move.
+        // (2.99.24) One answer or several, told apart at a glance: one answer's options are round, with a radio
+        // ring at the end; several answers' are square, with a checkbox, under "Select all that apply" and how many
+        // are picked — as a form's radios and checkboxes are.
         const btns = [];
+        const count = multi ? h('span', { class: 'bcv-qz__multicount' }) : null;
         const marks = () => {
           const on = chosen();
           for (const [a, b] of btns) {
             const sel = on.has(String(a.id));
             b.classList.toggle('is-selected', sel);
-            b.setAttribute('aria-pressed', sel ? 'true' : 'false');
+            b.setAttribute('aria-checked', sel ? 'true' : 'false');
           }
+          if (count) count.textContent = on.size ? `${on.size} selected` : '';
         };
-        const wrap = U.el('bcv-qz__opts', opts.map((a, j) => {
+        const wrap = h('div', { class: `bcv-qz__opts ${multi ? 'bcv-qz__opts--many' : 'bcv-qz__opts--one'}`, role: multi ? 'group' : 'radiogroup', 'aria-label': multi ? 'Select all that apply' : 'Choose one' }, opts.map((a, j) => {
           const label = a.html ? BCV.screens.course.prose(a.html, { cls: 'bcv-qz__optlabel' }) : h('span', { class: 'bcv-qz__optlabel', text: a.text || `Option ${LETTERS[j]}` });
-          const b = h('button', { type: 'button', class: `bcv-qz__opt ${compact ? 'bcv-qz__opt--compact' : ''}${hinted.has(String(a.id)) ? ' is-hinted' : ''}`, dataset: { aid: String(a.id) }, onclick: () => {
+          const b = h('button', { type: 'button', role: multi ? 'checkbox' : 'radio', class: `bcv-qz__opt ${compact ? 'bcv-qz__opt--compact' : ''}${hinted.has(String(a.id)) ? ' is-hinted' : ''}`, dataset: { aid: String(a.id) }, onclick: () => {
             if (multi) {
               const next = chosen();
               if (next.has(String(a.id))) next.delete(String(a.id)); else next.add(String(a.id));
@@ -1040,13 +1045,21 @@
           } }, [
             h('span', { class: 'bcv-qz__letter', text: LETTERS[j] || String(j + 1) }),
             label,
-            U.svg(CHECK, { size: compact ? 18 : 19, stroke: '#0a84ff', width: 2.6, cls: 'bcv-qz__tick' }),
+            multi
+              ? h('span', { class: 'bcv-qz__mark bcv-qz__mark--box', 'aria-hidden': 'true' }, [U.svg(CHECK, { size: 14, stroke: '#fff', width: 3.2, cls: 'bcv-qz__markcheck' })])
+              : h('span', { class: 'bcv-qz__mark bcv-qz__mark--ring', 'aria-hidden': 'true' }),
           ]);
           btns.push([a, b]);
           return b;
         }));
         marks();
-        return wrap;
+        if (!multi) return wrap;
+        const note = h('div', { class: 'bcv-qz__multi' }, [
+          U.svg('M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9', { size: 16, width: 2.2, cls: 'bcv-qz__multiicon' }),
+          h('span', { class: 'bcv-qz__multitext', text: 'Select all that apply' }),
+          count,
+        ]);
+        return U.el('bcv-qz__choice', [note, wrap]);
       }
       if (TEXT.has(type)) {
         const isEssay = type === 'essay_question';

@@ -2683,6 +2683,25 @@ html[data-bcv-theme="dark"] .bcv-qz__opt.is-selected { background: rgba(10,132,2
 .bcv-qz__optlabel p { margin: 0; }
 .bcv-qz__tick { flex: none; opacity: 0; }
 .bcv-qz__opt.is-selected .bcv-qz__tick { opacity: 1; }
+/* (2.99.24) one answer or several, told apart: one answer's letters are round and end in a radio ring; several
+   answers' are square and end in a checkbox, under "Select all that apply" with how many are picked */
+.bcv-qz__opts--one .bcv-qz__opt .bcv-qz__letter { border-radius: 50%; }
+.bcv-qz__opts--many .bcv-qz__opt .bcv-qz__letter { border-radius: 6px; }
+.bcv-qz__mark { flex: none; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 2px solid var(--bcv-edge2, rgba(127,127,127,.45)); background: transparent; transition: background-color 160ms ease, border-color 160ms ease; }
+.bcv-qz__mark--ring { border-radius: 50%; }
+.bcv-qz__mark--ring::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #fff; transform: scale(0); transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.bcv-qz__mark--box { border-radius: 6px; }
+.bcv-qz__markcheck { opacity: 0; transform: scale(.6); transition: opacity 140ms ease, transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.bcv-qz__opt.is-selected .bcv-qz__mark { background: #0a84ff; border-color: #0a84ff; }
+.bcv-qz__opt.is-selected .bcv-qz__mark--ring::after { transform: scale(1); }
+.bcv-qz__opt.is-selected .bcv-qz__markcheck { opacity: 1; transform: none; }
+.bcv-qz__opt.is-hinted:not(.is-selected) .bcv-qz__mark { border-color: #af52de; }
+.bcv-qz__opt--compact .bcv-qz__mark { width: 20px; height: 20px; }
+.bcv-qz__multi { display: flex; align-items: center; gap: 7px; margin: -8px 4px 12px; font: 600 14px/1.2 var(--bcv-font); color: #0a6cd6; }
+html[data-bcv-theme="dark"] .bcv-qz__multi { color: #6cb2ff; }
+.bcv-qz__multiicon { flex: none; }
+.bcv-qz__multicount { margin-left: auto; font-weight: 500; color: var(--bcv-ink3); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .bcv-qz__mark, .bcv-qz__mark--ring::after, .bcv-qz__markcheck { transition: none; } }
 .bcv-qz__opt--compact { min-height: 50px; padding: 11px 16px; border-radius: 15px; }
 .bcv-qz__opt--compact .bcv-qz__letter { width: 24px; height: 24px; border-radius: 8px; font-size: 11.5px; }
 .bcv-qz__opt--compact .bcv-qz__optlabel { font-size: 16px; }
