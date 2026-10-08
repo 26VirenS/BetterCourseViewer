@@ -1015,7 +1015,7 @@
           return {
             id: String(it.id), title: it.title || 'Item', type: it.type, indent: Math.min(Number(it.indent) || 0, 3), url: itemUrl(it, c.base),
             file: it.type === 'File', external: it.type === 'ExternalUrl', header: it.type === 'SubHeader',
-            requirement: reqWord(cr), done: !!cr?.completed, markable: cr?.type === 'must_mark_done',
+            requirement: reqWord(cr), done: !!cr?.completed, markable: cr?.type === 'must_mark_done' && !BCV.lms?.d2l, // (Brightspace takes that mark on its own page only)
             locked: !!cd.locked_for_user, lockText: cd.locked_for_user ? textOf(cd.lock_explanation || '', 160) : '',
             sub: [cd.points_possible !== undefined && cd.points_possible !== null ? ptsOf(cd.points_possible) : '', cd.due_at ? `Due ${U.fmtAt(cd.due_at)}` : ''].filter(Boolean).join(' · '),
           };

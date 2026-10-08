@@ -961,8 +961,8 @@
 
   on('GET', rx(`${C}/courses/${ID}/modules`), (m) => modules(m[1]));
   on('GET', rx(`${C}/courses/${ID}/module_item_sequence`), (m, p) => itemSequence(m[1], p));
-  on('POST', rx(`${C}/courses/${ID}/modules/${ID}/items/${ID}/done`), () => { throw err('Brightspace marks this done as you open it.', 400); });
-  on('PUT', rx(`${C}/courses/${ID}/modules/${ID}/items/${ID}/done`), () => { throw err('Brightspace marks this done as you open it.', 400); });
+  on('POST', rx(`${C}/courses/${ID}/modules/${ID}/items/${ID}/done`), () => { throw err('Brightspace takes this mark on its own page for the topic.', 400); });
+  on('PUT', rx(`${C}/courses/${ID}/modules/${ID}/items/${ID}/done`), () => { throw err('Brightspace takes this mark on its own page for the topic.', 400); });
   on('GET', rx(`${C}/${KIND}/${ID}/pages`), (m) => pagesList(m[2]));
   on('GET', rx(`${C}/${KIND}/${ID}/pages/([^/]+)`), (m) => pageOf(m[2], decodeURIComponent(m[3])));
   on('GET', rx(`${C}/courses/${ID}/files`), (m) => filesList(m[1]));

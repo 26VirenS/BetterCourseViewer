@@ -256,7 +256,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         h1{font-size:22px;margin:0 0 8px}p{color:#6e6e73;line-height:1.45}
         button{margin-top:18px;height:46px;padding:0 22px;border:0;border-radius:23px;background:#0a84ff;color:#fff;font:600 15px -apple-system,system-ui}
         @media(prefers-color-scheme:dark){body{background:#000;color:#fff}p{color:#98989d}}</style>
-        <h1>Canvas could not be reached</h1><p>\(message)</p>
+        <h1>\(AppSession.lmsName(host: baseURL.host ?? "")) could not be reached</h1><p>\(message)</p>
         <button onclick="location.href='\(baseURL.absoluteString)'">Try again</button>
         """
         webView.loadHTMLString(html, baseURL: nil)

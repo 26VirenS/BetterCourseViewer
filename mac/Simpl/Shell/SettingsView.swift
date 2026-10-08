@@ -555,7 +555,7 @@ private struct DataPane: View {
                             .disabled(settings.busy)
                     } label: {
                         Text("Reset")
-                        Text("Your preferences, grade history and goals are cleared and the setup runs again.")
+                        Text(session.onBrightspace ? "Your preferences, grade history, goals, nicknames, colours and your own tasks are cleared and the setup runs again." : "Your preferences, grade history and goals are cleared and the setup runs again.")
                     }
                 }
             } else {

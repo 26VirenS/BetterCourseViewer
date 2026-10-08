@@ -82,14 +82,25 @@ final class AppSession: ObservableObject {
 
     private static func lmsKey(_ host: String) -> String { "lms:\(host.lowercased())" }
 
+    private static func brightspaceDomain(_ host: String) -> Bool {
+        let h = host.lowercased()
+        return h.hasSuffix(".brightspace.com") || h.hasSuffix(".d2l.com") || h.hasSuffix(".desire2learn.com")
+    }
+
     /// The school's site is Brightspace: its page has said so, or before it has, the host is one of Brightspace's own.
     var onBrightspace: Bool {
         if let lms { return lms == "d2l" }
-        let h = host?.lowercased() ?? ""
-        return h.hasSuffix(".brightspace.com") || h.hasSuffix(".d2l.com") || h.hasSuffix(".desire2learn.com")
+        return AppSession.brightspaceDomain(host ?? "")
     }
     /// The name the school's site goes by, for the words that say it ("Sign out of Brightspace on this device?").
     var lmsName: String { onBrightspace ? "Brightspace" : "Canvas" }
+
+    /// The same for a host, where no session is at hand (the page shown when the site cannot be reached): what its page
+    /// last said, or before it has, its domain.
+    static func lmsName(host: String) -> String {
+        if let lms = UserDefaults.standard.string(forKey: lmsKey(host)) { return lms == "d2l" ? "Brightspace" : "Canvas" }
+        return brightspaceDomain(host) ? "Brightspace" : "Canvas"
+    }
 
     /// "catcourses.ucmerced.edu", "https://school.instructure.com/login" … → the bare host.
     static func normalizeHost(_ raw: String) -> String? {

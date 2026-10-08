@@ -114,7 +114,7 @@ const T = {
             { TopicId: 1304, Title: 'Cell Biology Primer', SortOrder: 6, TypeIdentifier: 'Link', ActivityType: 2, Url: 'https://example.org/primer', ToolItemId: null, CompletionType: 2, IsHidden: false, IsLocked: false, LastModifiedDate: at(-30, 9, 0) },
           ] },
         ], Topics: [
-          { TopicId: 1301, Title: 'Syllabus', SortOrder: 2, TypeIdentifier: 'File', ActivityType: 1, Url: '/content/enforced/31001-BIO-110-F26/Syllabus.html', ToolItemId: null, CompletionType: 2, IsHidden: false, IsLocked: false, LastModifiedDate: at(-30, 9, 0) },
+          { TopicId: 1301, Title: 'Syllabus', SortOrder: 2, TypeIdentifier: 'File', ActivityType: 1, Url: '/content/enforced/31001-BIO-110-F26/Syllabus.html', ToolItemId: null, CompletionType: 1, IsHidden: false, IsLocked: false, LastModifiedDate: at(-30, 9, 0) },
           { TopicId: 1302, Title: 'Cell Diagram', SortOrder: 3, TypeIdentifier: 'File', ActivityType: 1, Url: '/content/enforced/31001-BIO-110-F26/Cell%20Diagram.pdf', ToolItemId: null, CompletionType: 2, IsHidden: false, IsLocked: false, LastModifiedDate: at(-30, 9, 0) },
           { TopicId: 1303, Title: 'Lab 1: Microscopy', SortOrder: 4, TypeIdentifier: 'Link', ActivityType: 3, Url: '/d2l/common/dialogs/quickLink/quickLink.d2l?ou=31001&type=dropbox&rcode=x-701', ToolItemId: 701, CompletionType: 2, IsHidden: false, IsLocked: false, LastModifiedDate: at(-30, 9, 0) },
           { TopicId: 1305, Title: 'Introduce Yourself', SortOrder: 9, TypeIdentifier: 'Link', ActivityType: 6, Url: '/d2l/common/dialogs/quickLink/quickLink.d2l?ou=31001&type=discuss&rcode=x-901', ToolItemId: 901, CompletionType: 2, IsHidden: false, IsLocked: false, LastModifiedDate: at(-30, 9, 0) },

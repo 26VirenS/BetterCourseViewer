@@ -177,6 +177,9 @@ console.log('\ncontent');
   check(lab.content_id === '701' && intro.content_id === '2000000901' && primer.external_url === 'https://example.org/primer' && diagram.content_id === '1302' && mods[0].items[0].page_url === '1301', 'each topic leads to its own: the folder, the discussion, the link, the file, the page');
   const w2 = mods[1].items;
   check(w2[1].type === 'Quiz' && w2[1].content_id === '802' && w2[2].type === 'ExternalUrl' && w2[2].external_url === `${BASE}/d2l/le/content/31001/viewContent/1308/View` && !w2[2].completion_requirement && w2[0].completion_requirement?.type === 'must_view', 'a quiz; a checklist (Brightspace’s to show) opens in its content viewer; view-to-complete, and nothing asked of a topic that asks nothing');
+  let refusedMark = null;
+  try { await BCV.canvas.post('/api/v1/courses/31001/modules/1201/items/1301/done'); } catch (e) { refusedMark = e; }
+  check(mods[0].items[0].completion_requirement?.type === 'must_mark_done' && refusedMark?.status === 400 && /own page/.test(refusedMark.message), `a topic done by hand asks for the mark, which Brightspace takes on its own page only: ${refusedMark?.message}`);
   const page = await get('/api/v1/courses/31001/pages/1301');
   check(page.title === 'Syllabus' && /BIO 110 Syllabus/.test(page.body) && !/<html|<body/i.test(page.body), 'an HTML topic is a page: its body, read with the session');
   const file = await get('/api/v1/files/1302');
@@ -320,6 +323,13 @@ try {
   const navText = await page.evaluate(() => (document.querySelector('#bcv-side, .bcv-side, nav')?.innerText || '').replace(/\s+/g, ' '));
   check(!/\bInbox\b/.test(navText) && !/\bGroups\b/.test(navText) && /To Do/.test(navText) && /Calendar/.test(navText), `the sidebar has no Inbox and no Groups (Brightspace has neither here): ${navText.slice(0, 160)}${nav.length ? '' : ''}`);
   await shot('dashboard');
+
+  // a page done by hand: the mark is Brightspace's to take, on its own page for the topic
+  await page.goto(`${BASE}/d2l/home/31001?simpl=${encodeURIComponent('/courses/31001/pages/1301')}`);
+  await drawn();
+  await page.waitForSelector('a:has-text("Mark done on Brightspace")', { timeout: 8000 }).catch(() => {});
+  const markLink = await page.$eval('a:has-text("Mark done on Brightspace")', (a) => a.getAttribute('href')).catch(() => null);
+  check(markLink === '/d2l/le/content/31001/viewContent/1301/View' && !(await page.$('button:has-text("Mark as done")')), `a page done by hand offers Brightspace’s own page for the mark, not a button it would refuse: ${markLink}`);
 
   await page.goto(`${BASE}/d2l/home/31001`);
   await drawn();
@@ -549,6 +559,8 @@ try {
   check(rp.ok && posted?.topic === 902 && /needs a host/.test(posted.html), `a reply from the app is posted to the topic: ${JSON.stringify(posted)}`);
   const md = await nc('modules', { ctx: 'courses/31001' });
   const items = md.modules?.flatMap((m) => m.items) || [];
+  const syl = items.find((i) => i.title === 'Syllabus');
+  check(syl?.requirement === 'Mark done' && syl.markable === false, `a topic done by hand says so, with no Mark Done the app’s screen would offer and Brightspace refuse: ${JSON.stringify(syl && { requirement: syl.requirement, markable: syl.markable })}`);
   check(!md.error && md.modules.length > 0 && items.some((i) => i.header) && items.some((i) => i.indent > 0) && items.filter((i) => !i.header).every((i) => i.url), `Content: each module, a module inside one as a heading with its topics a step in, every topic somewhere to go: ${JSON.stringify(md.modules?.map((m) => `${m.name}[${m.items.map((i) => `${i.header ? '#' : ''}${'>'.repeat(i.indent)}${i.title}`).join(', ')}]`))}`);
   const qz = await nc('quizzes', { ctx: 'courses/31001' });
   check(!qz.error && qz.rows.some((r) => r.title === 'Midterm Quiz') && qz.rows.some((r) => r.title === 'Chapter 4 Check'), `Quizzes: the course’s quizzes: ${JSON.stringify(qz.rows?.map((r) => `${r.title} → ${r.url}`))}`);

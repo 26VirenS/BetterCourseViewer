@@ -354,6 +354,13 @@
   function doneButton(ctx, c, a, item, { cls = 'bcv-btn', primary = false, type = 'Assignment', noun = 'assignment' } = {}) {
     const req = item?.completion_requirement;
     if (!item || req?.type !== 'must_mark_done') return null;
+    // (Brightspace: a topic done by hand is marked on its own page — its API takes no such mark from the student — so
+    // the button goes there, and once Brightspace has the mark it says Done)
+    if (BCV.lms?.d2l) {
+      const tick = U.svg(req.completed ? 'M20 6L9 17l-5-5' : 'M12 4a8 8 0 100 16 8 8 0 000-16z', { size: 14, stroke: 'currentColor', width: 2.2 });
+      if (req.completed) return h('span', { class: `${cls} is-done`, title: `Marked as done on ${BCV.lms.name}` }, [tick, 'Done']);
+      return h('a', { class: `${cls}${primary && cls === 'bcv-btn' ? ' bcv-btn--primary' : primary ? ' is-primary' : ''}`, href: BCV.lms.toPage(`/courses/${c.id}/modules/items/${item.id}?bcv=native`), title: `${BCV.lms.name} takes this mark on its own page for the ${noun}` }, [tick, `Mark done on ${BCV.lms.name}`]);
+    }
     let done = !!req.completed;
     let busy = false;
     const btn = h('button', { type: 'button', class: cls, 'aria-pressed': String(done) });
