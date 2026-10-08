@@ -202,7 +202,7 @@ struct ModulesList: View {
     @State private var marking: [String: Bool] = [:]
 
     var body: some View {
-        Loaded(model: model, title: "Modules", load: load) { d in
+        Loaded(model: model, title: model.data?.title ?? (engine.onBrightspace ? "Content" : "Modules"), load: load) { d in // (Brightspace's own name there, as the course's sections say it)
             List {
                 ForEach(d.modules) { m in
                     Section {
@@ -485,7 +485,7 @@ struct PeopleList: View {
     @State private var writeTo: Recipient?
 
     var body: some View {
-        Loaded(model: model, title: "People", load: load) { d in
+        Loaded(model: model, title: model.data?.title ?? (engine.onBrightspace && ctx.hasPrefix("courses/") ? "Classlist" : "People"), load: load) { d in
             List {
                 ForEach(d.sections) { s in
                     Section {
