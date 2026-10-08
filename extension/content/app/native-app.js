@@ -1266,9 +1266,15 @@
     const pct = scored && Number(a.points_possible) > 0 ? (Number(sub.score) / Number(a.points_possible)) * 100 : null;
     const assess = sub.rubric_assessment || {};
     const R = BCV.screens?.course;
+    // (the Mac's rubric ring) the numbers under the words: what a criterion is worth and was given, its long
+    // description and the marker's note as written, and each level's points and its own description
+    const numOf = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
     const rubric = (a.rubric || []).map((cr) => {
       const p = R?.rubricParts ? R.rubricParts(cr, held ? null : assess[cr.id]) : { name: textOf(cr.description, 300), ratings: [], pts: ptsOf(cr.points), comment: null };
-      return { id: String(cr.id), name: p.name, pts: p.pts, comment: held ? null : p.comment, ratings: (p.ratings || []).map((r) => ({ text: r.text, pts: r.pts, got: !held && !!r.got })) };
+      const levels = (cr.ratings || []).filter((r) => r && (r.description || r.points !== null)); // (rubricParts' own list: the same order)
+      const got = held ? null : assess[cr.id] || null;
+      return { id: String(cr.id), name: p.name, pts: p.pts, comment: held ? null : p.comment, ratings: (p.ratings || []).map((r, i) => ({ text: r.text, pts: r.pts, got: !held && !!r.got, value: numOf(levels[i]?.points), long: textOf(levels[i]?.long_description || '', 320) })),
+        worth: numOf(cr.points), score: got ? numOf(got.points) : null, desc: textOf(cr.long_description || '', 900), note: got?.comments ? String(got.comments).trim() : null };
     });
     const stats = scored && a.score_statistics ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : '';
     const attemptsText = a.allowed_attempts > 0 ? `${sub.attempt || 0} of ${a.allowed_attempts + (sub.extra_attempts || 0)} attempts used` : (sub.attempt > 1 ? `Attempt ${sub.attempt}` : '');

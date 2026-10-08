@@ -550,93 +550,16 @@ struct PageView: View {
 // MARK: - Files
 
 /// A folder of a course's or a group's files (its root is Files): the folders in it, each opening its own list, then
-/// its files with their kind, size and date — a click shows one in Quick Look. A locked file is listed, not opened.
+/// its files — on a wide window with the one picked previewed beside the list, else a click opens one in Quick Look
+/// (FilesBrowser.swift, 1.2).
 struct FilesView: View {
     let ctx: String
     let folder: String
     let name: String
-    @EnvironmentObject private var engine: Engine
-    @StateObject private var model = Loader<FilesData>()
 
     var body: some View {
-        SectionLoaded(model: model, title: name, subtitle: model.data?.context,
-                      canvasURL: "/\(ctx)/files", load: load) { d in
-            Page {
-                ScreenHeading(title: name, sub: d.context, color: Color(hex: d.color))
-                if d.folders.isEmpty && d.files.isEmpty {
-                    EmptyCard(text: d.empty ?? "This folder is empty", symbol: "folder")
-                }
-                if !d.folders.isEmpty {
-                    CardSection(title: "Folders", trailing: "\(d.folders.count)") {
-                        DividedRows(data: d.folders) { f in folderRow(f, Color(hex: d.color)) }
-                    }
-                }
-                if !d.files.isEmpty {
-                    CardSection(title: "Files", trailing: "\(d.files.count)") {
-                        DividedRows(data: d.files) { f in fileRow(f) }
-                    }
-                }
-            }
-        }
+        FilesBrowser(ctx: ctx, folder: folder, name: name)
     }
-
-    private func folderRow(_ f: FolderRow, _ color: Color) -> some View {
-        RowLink {
-            engine.push(.folder(ctx: ctx, id: f.id, name: f.name))
-        } label: {
-            InfoRow(title: f.name, sub: f.sub, symbol: f.locked == true ? "lock.fill" : "folder.fill", tint: color) {
-                Image(systemName: "chevron.right")
-                    .font(.sFootnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .contextMenu {
-            Button("Open") { engine.push(.folder(ctx: ctx, id: f.id, name: f.name)) }
-        }
-    }
-
-    private func fileRow(_ f: FileRow) -> some View {
-        let locked = f.locked == true
-        let kind = FilesView.kind(of: f)
-        let page = "/\(ctx)/files/\(f.id)" // (the file's page on Canvas: its download address carries a one-time key)
-        return OptionalRowLink(enabled: !locked && f.url != nil) {
-            if let u = f.url { engine.openFile(u, name: f.name) }
-        } label: {
-            InfoRow(title: f.name, sub: f.sub, symbol: locked ? "lock.fill" : kind.symbol, tint: locked ? .gray : kind.tint) {
-                Text(kind.word)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(minWidth: 100, alignment: .trailing)
-            }
-        }
-        .contextMenu {
-            if let u = f.url, !locked {
-                Button("Quick Look") { engine.openFile(u, name: f.name) }
-                Divider()
-            }
-            Button("Open in \(engine.lmsName)") { engine.openWebScreen(page, title: f.name) }
-            Button("Copy Link") { if let u = engine.absolute(page) { copyToPasteboard(u.absoluteString) } }
-        }
-    }
-
-    /// What a file is, as Finder would put it: its symbol, its kind in a word, its colour.
-    private static func kind(of f: FileRow) -> (symbol: String, word: String, tint: Color) {
-        let ext = (f.name as NSString).pathExtension.lowercased()
-        switch true {
-        case f.kind == "pdf" || ext == "pdf": return ("doc.richtext.fill", "PDF", .red)
-        case f.kind == "image": return ("photo", "Image", .teal)
-        case f.kind == "video": return ("film", "Video", .purple)
-        case f.kind == "audio": return ("waveform", "Audio", .pink)
-        case ["doc", "docx", "pages", "txt", "rtf"].contains(ext): return ("doc.text.fill", "Document", .blue)
-        case ["ppt", "pptx", "key"].contains(ext): return ("rectangle.on.rectangle", "Presentation", .orange)
-        case ["xls", "xlsx", "csv", "numbers"].contains(ext): return ("tablecells", "Spreadsheet", .green)
-        case ["zip", "gz", "tar", "7z", "rar"].contains(ext): return ("doc.zipper", "Archive", .brown)
-        default: return ("doc.fill", ext.isEmpty ? "File" : ext.uppercased(), .blue)
-        }
-    }
-
-    private func load() async { await model.load(engine, "files", folder.isEmpty ? ["ctx": ctx] : ["ctx": ctx, "folder": folder]) }
 }
 
 // MARK: - People

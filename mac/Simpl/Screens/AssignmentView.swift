@@ -3,12 +3,14 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// One assignment, as a page of its own: its kind, its course and where your work stands over its name; then the
-/// instructions, what you handed in and the comments on the left, and on the right the one thing to do next — Hand In,
-/// Take Quiz, Open Discussion, Open Tool — with the grade (its rubric a click away) and the facts: due, points, when it
-/// is open, how it is handed in, the attempts. A narrow window shows the right's cards first, in one column. Files
-/// dropped on the page open Hand In with them already in it; arriving from a piece of work's Hand In or See Feedback
-/// does that at once.
+/// One assignment, as a page of its own (1.2: sections on the page itself, one card deep): its kind, its course and
+/// where your work stands over its name; then the instructions, what you handed in and the comments on the left, and on
+/// the right the one thing to do next — Hand In, Take Quiz, Open Discussion, Open Tool — in glass, with the grade and
+/// the facts: due, points, when it is open, how it is handed in, the attempts. The rubric is the ring (RubricRing.swift)
+/// across the page: under the name once it is marked, after everything else before. A narrow window shows the right's
+/// cards first, in one column. A file handed in or attached opens in Quick Look with a click (or previews in the page);
+/// files dropped on the page open Hand In with them already in it; arriving from a piece of work's Hand In or See
+/// Feedback does that at once.
 struct AssignmentView: View {
     let course: String
     let id: String
@@ -16,17 +18,18 @@ struct AssignmentView: View {
     @StateObject private var model = Loader<AssignmentData>()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var handIn = false
-    @State private var rubric = false
     @State private var commenting = false
     /// What was dropped on the page (files, or a web address): Hand In opens with it in.
     @State private var dropped: [URL] = []
     @State private var dropTargeted = false
-    /// A part of the page to bring into view ("work" after a hand-in; "grade" or "comments" for feedback), and the one
-    /// lit up for a moment once it is there.
+    /// A part of the page to bring into view ("work" after a hand-in; "grade", "rubric" or "comments" for feedback), and
+    /// the one lit up for a moment once it is there.
     @State private var jump: String?
     @State private var lit: String?
     /// Counts the hand-ins made here: each one bounces the Submitted seal once it is in view.
     @State private var handedIn = 0
+    /// The screenshot suite's way to the rubric (-SimplOpen rubric, rubric:2, rubric:grid).
+    @State private var rubricShot: String?
 
     var body: some View {
         Group {
@@ -68,12 +71,15 @@ struct AssignmentView: View {
 
     private func page(_ d: AssignmentData) -> some View {
         let columns = AssignmentColumns()
-        return Page {
+        let ringFirst = rubricFirst(d)
+        return Page(spacing: 32) {
             header(d)
+            if ringFirst { rubricSection(d) }
             columns {
                 mainColumn(d)
                 sideColumn(d)
             }
+            if !ringFirst && !d.rubric.isEmpty { rubricSection(d) }
         }
         .overlay { dropOverlay(d) }
         .dropDestination(for: URL.self) { urls, _ in
@@ -86,10 +92,10 @@ struct AssignmentView: View {
     private func header(_ d: AssignmentData) -> some View {
         let color = courseTint(d)
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                IconTile(symbol: Glyph.item(d.kind ?? "assignment"), color: color, size: 22)
+            HStack(spacing: 10) {
+                IconTile(symbol: Glyph.item(d.kind ?? "assignment"), color: color, size: 28)
                 Text(d.kind ?? "Assignment")
-                    .font(.sCallout.weight(.semibold))
+                    .font(.sHeadline)
                     .foregroundStyle(color)
                 if let c = d.context, !c.isEmpty {
                     Button {
@@ -109,116 +115,140 @@ struct AssignmentView: View {
         }
     }
 
+    // MARK: - The rubric
+
+    /// Marked and posted, the rubric is the feedback: it comes first, under the name.
+    private func rubricFirst(_ d: AssignmentData) -> Bool {
+        !d.rubric.isEmpty && RubricModel(rows: d.rubric).graded
+    }
+
+    private func rubricSection(_ d: AssignmentData) -> some View {
+        RubricSection(data: d, shot: rubricShot)
+            .overlay { litFrame("rubric", d).padding(-12) }
+            .id("rubric")
+    }
+
     // MARK: - The left: what to read, what was handed in, what was said
 
     private func mainColumn(_ d: AssignmentData) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 32) {
             if !d.html.isEmpty {
-                CardSection(title: "Instructions") {
-                    RichText(html: d.html)
-                        .padding(.horizontal, 6)
-                        .padding(.top, 2)
+                PageSection(title: "Instructions") {
+                    RichText(html: d.html, size: 15)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .card()
                 }
             }
-            workCard(d)
-            commentsCard(d)
+            workSection(d)
+            commentsSection(d)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// What you handed in: when, the text, the web address, the files (each opens in Quick Look).
+    /// What you handed in: when, the text, the web address, the files (a click opens one in Quick Look; Preview shows
+    /// it here).
     @ViewBuilder
-    private func workCard(_ d: AssignmentData) -> some View {
+    private func workSection(_ d: AssignmentData) -> some View {
         let files = d.submission?.files ?? []
         let link = d.submission?.url ?? ""
         let text = d.submission?.text ?? ""
         let submitted = d.submitted ?? ""
         if !submitted.isEmpty || !files.isEmpty || !link.isEmpty || !text.isEmpty {
-            CardSection(title: "Your Work") {
-                if !submitted.isEmpty {
-                    Label(submitted, systemImage: "checkmark.seal.fill")
-                        .font(.sCallout.weight(.semibold))
-                        .foregroundStyle(.green)
-                        .symbolEffect(.bounce, value: handedIn)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                }
-                if !text.isEmpty {
-                    Text(text)
-                        .font(.sCallout)
-                        .textSelection(.enabled)
-                        .lineLimit(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                }
-                if !link.isEmpty {
-                    RowLink { visit(link) } label: {
-                        InfoRow(title: link, sub: "Website", symbol: "link", tint: .blue)
+            PageSection(title: "Your Work") {
+                VStack(alignment: .leading, spacing: 0) {
+                    if !submitted.isEmpty {
+                        Label(submitted, systemImage: "checkmark.seal.fill")
+                            .font(.sBody.weight(.semibold))
+                            .foregroundStyle(.green)
+                            .symbolEffect(.bounce, value: handedIn)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
                     }
-                    .help("Open \(link)")
-                    .contextMenu {
-                        Button("Open") { visit(link) }
-                        Button("Copy Link") { copyToPasteboard(link) }
+                    if !text.isEmpty {
+                        if !submitted.isEmpty { RowDivider(inset: 10) }
+                        Text(text)
+                            .font(.sBody)
+                            .textSelection(.enabled)
+                            .lineLimit(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 10)
+                    }
+                    if !link.isEmpty {
+                        if !submitted.isEmpty || !text.isEmpty { RowDivider(inset: 54) }
+                        RowLink { visit(link) } label: {
+                            InfoRow(title: link, sub: "Website", symbol: "link", tint: .blue)
+                        }
+                        .help("Open \(link)")
+                        .contextMenu {
+                            Button("Open") { visit(link) }
+                            Button("Copy Link") { copyToPasteboard(link) }
+                        }
+                    }
+                    ForEach(Array(files.enumerated()), id: \.element.id) { i, f in
+                        if i > 0 || !submitted.isEmpty || !text.isEmpty || !link.isEmpty { RowDivider(inset: 54) }
+                        AttachmentRow(file: f)
                     }
                 }
-                ForEach(files) { f in
-                    RowLink { engine.openFile(f.url, name: f.name) } label: {
-                        InfoRow(title: f.name, symbol: "doc.fill", tint: .blue)
-                    }
-                    .help("Open \(f.name) in Quick Look")
-                    .contextMenu { fileMenu(f) }
-                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .card()
             }
             .id("work")
         }
     }
 
     /// The comments on your work, each with its files, and a box to write one.
-    private func commentsCard(_ d: AssignmentData) -> some View {
-        CardSection(title: "Comments", trailing: d.comments.isEmpty ? nil : "\(d.comments.count)") {
-            if d.comments.isEmpty && !commenting {
-                EmptyNote(text: "No comments.", symbol: "text.bubble")
-                    .padding(.horizontal, 8)
-            }
-            ForEach(Array(d.comments.enumerated()), id: \.element.id) { i, c in
-                if i > 0 { RowDivider(inset: 48) }
-                commentRow(c)
-            }
-            if commenting {
-                CommentComposer { text in
-                    try await sendComment(text)
-                } cancel: {
-                    withAnimation(Motion.gentle) { commenting = false }
-                }
-                .padding(.horizontal, 6)
-                .padding(.top, d.comments.isEmpty ? 0 : 8)
-                .transition(entering)
-            } else {
+    private func commentsSection(_ d: AssignmentData) -> some View {
+        PageSection(title: "Comments", trailing: d.comments.isEmpty ? nil : "\(d.comments.count)", accessory: {
+            if !commenting {
                 Button {
                     withAnimation(Motion.gentle) { commenting = true }
                 } label: {
                     Label("Add a Comment", systemImage: "text.bubble")
                 }
-                .buttonStyle(.borderless)
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
+                .glassButton()
                 .help("Write a comment for your teacher")
             }
+        }) {
+            VStack(alignment: .leading, spacing: 0) {
+                if d.comments.isEmpty && !commenting {
+                    EmptyNote(text: "No comments yet.", symbol: "text.bubble")
+                        .padding(.horizontal, 10)
+                }
+                ForEach(Array(d.comments.enumerated()), id: \.element.id) { i, c in
+                    if i > 0 { RowDivider(inset: 56) }
+                    commentRow(c)
+                }
+                if commenting {
+                    CommentComposer { text in
+                        try await sendComment(text)
+                    } cancel: {
+                        withAnimation(Motion.gentle) { commenting = false }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, d.comments.isEmpty ? 4 : 12)
+                    .padding(.bottom, 4)
+                    .transition(entering)
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
         }
-        .overlay { litFrame("comments", d) }
+        .overlay { litFrame("comments", d).padding(-10) }
         .id("comments")
     }
 
     private func commentRow(_ c: CommentRow) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            PersonAvatar(name: c.author, avatar: c.avatar, size: 30)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .top, spacing: 12) {
+            PersonAvatar(name: c.author, avatar: c.avatar, size: 34)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(c.author)
-                        .font(.sCallout.weight(.semibold))
+                        .font(.sBody.weight(.semibold))
                         .lineLimit(1)
                     if let a = c.attempt, a > 0 {
                         Text("Attempt \(a)")
@@ -235,24 +265,26 @@ struct AssignmentView: View {
                 }
                 if !c.text.isEmpty {
                     Text(c.text)
-                        .font(.sCallout)
+                        .font(.sBody)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(c.attachments ?? []) { f in
                     Button { engine.openFile(f.url, name: f.name) } label: {
-                        Label(f.name, systemImage: "paperclip")
-                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            FileIcon(name: f.name, size: 18)
+                            Text(f.name).lineLimit(1).truncationMode(.middle)
+                        }
                     }
                     .buttonStyle(.link)
                     .font(.sCallout)
                     .help("Open \(f.name) in Quick Look")
-                    .contextMenu { fileMenu(f) }
+                    .contextMenu { FileMenuItems(engine: engine, url: f.url, name: f.name) }
                 }
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
         .contextMenu {
             if !c.text.isEmpty {
                 Button("Copy Comment") { copyToPasteboard(c.text) }
@@ -260,18 +292,10 @@ struct AssignmentView: View {
         }
     }
 
-    @ViewBuilder
-    private func fileMenu(_ f: Attachment) -> some View {
-        Button("Quick Look") { engine.openFile(f.url, name: f.name) }
-        Button("Copy Link") {
-            if let u = engine.absolute(f.url) { copyToPasteboard(u.absoluteString) }
-        }
-    }
-
     // MARK: - The right: the next step, the grade, the facts
 
     private func sideColumn(_ d: AssignmentData) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             actionPanel(d)
             if let g = d.grade {
                 gradeCard(g, d)
@@ -286,25 +310,25 @@ struct AssignmentView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// The one thing to do next, in the course's colour and as wide as the column, with why it cannot be handed in here
-    /// when it cannot; with nothing to do here, that reason and Canvas's own page.
+    /// The one thing to do next, in glass in the course's colour and as wide as the column, with why it cannot be
+    /// handed in here when it cannot; with nothing to do here, that reason and Canvas's own page.
     @ViewBuilder
     private func actionPanel(_ d: AssignmentData) -> some View {
         let why = d.why ?? ""
         if let next = nextStep(d) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Button { act(d) } label: {
                     Label(next.title, systemImage: next.symbol)
                         .font(.sHeadline)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .glassButton(prominent: true)
+                .controlSize(.extraLarge)
                 .tint(courseTint(d))
                 .help(next.help)
                 if takesDrops(d) {
                     Text(d.types.contains("online_upload") ? "Or drop files on this page." : "Or drop a link on this page.")
-                        .font(.sCaption)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
@@ -319,11 +343,11 @@ struct AssignmentView: View {
                     Label("Open in \(engine.lmsName)", systemImage: "globe")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .glassButton()
                 .controlSize(.large)
                 .help("Open \(engine.lmsName)’s own page for this assignment")
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
@@ -336,31 +360,34 @@ struct AssignmentView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// The grade: its ring and letter, the points, the percentage, what lateness took, the class's numbers, the rubric.
+    /// The grade: its ring and letter, the points, the percentage, what lateness took, the class's numbers, and the way
+    /// to the rubric.
     private func gradeCard(_ g: GradeInfo, _ d: AssignmentData) -> some View {
         let color = courseTint(d)
-        return VStack(alignment: .leading, spacing: 12) {
-            CardHeading(text: "Grade")
-            HStack(spacing: 14) {
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Grade")
+                .font(.sHeadline)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 16) {
                 ZStack {
-                    Ring(value: g.pct, color: color, lineWidth: 6, key: "assignment:\(course)/\(id)")
+                    Ring(value: g.pct, color: color, lineWidth: 7, key: "assignment:\(course)/\(id)")
                     Text(g.letter ?? g.pct.map { "\(Int($0.rounded()))%" } ?? "")
-                        .font(.sHeadline.weight(.bold))
+                        .font(.sTitle3.weight(.bold))
                         .foregroundStyle(color)
                         .minimumScaleFactor(0.6)
-                        .padding(8)
+                        .padding(9)
                 }
-                .frame(width: 64, height: 64)
+                .frame(width: 76, height: 76)
                 VStack(alignment: .leading, spacing: 3) {
                     scoreText(g)
                     if let pct = g.pct {
                         Text(String(format: "%.1f%%", pct))
-                            .font(.sCallout)
+                            .font(.sBody)
                             .foregroundStyle(.secondary)
                     }
                     if let late = g.late, !late.isEmpty {
                         Text(late)
-                            .font(.sCaption.weight(.semibold))
+                            .font(.sCallout.weight(.semibold))
                             .foregroundStyle(.orange)
                     }
                 }
@@ -369,13 +396,13 @@ struct AssignmentView: View {
             .accessibilityElement(children: .combine)
             if let st = d.stats, !st.isEmpty {
                 Label(st, systemImage: "person.3")
-                    .font(.sCaption)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if !d.rubric.isEmpty { rubricButton(d) }
+            if !d.rubric.isEmpty { rubricJump(d) }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
         .overlay { litFrame("grade", d) }
@@ -386,19 +413,19 @@ struct AssignmentView: View {
     private func scoreText(_ g: GradeInfo) -> some View {
         if let s = g.score, let p = g.possible, p > 0 {
             Text("\(AssignmentView.num(s)) / \(AssignmentView.num(p))")
-                .font(.sTitle3.weight(.semibold).monospacedDigit())
+                .font(.sTitle2.monospacedDigit())
                 .contentTransition(.numericText(value: s))
         } else {
             Text(g.text)
-                .font(.sTitle3.weight(.semibold))
+                .font(.sTitle2)
         }
     }
 
-    /// The rubric beside the grade it explains, in a popover.
-    private func rubricButton(_ d: AssignmentData) -> some View {
-        Button { rubric.toggle() } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "list.bullet.clipboard")
+    /// The grade's way to the rubric that explains it: the ring in miniature, its score; the page goes to it.
+    private func rubricJump(_ d: AssignmentData) -> some View {
+        Button { jump = "rubric" } label: {
+            HStack(spacing: 10) {
+                RubricMiniRing(model: RubricModel(rows: d.rubric), size: 26)
                 Text(d.rubricTitle ?? "Rubric")
                     .lineLimit(1)
                 Spacer(minLength: 6)
@@ -407,37 +434,50 @@ struct AssignmentView: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
+                Image(systemName: rubricFirst(d) ? "chevron.up" : "chevron.down")
+                    .font(.sCaption.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
+            .font(.sCallout.weight(.semibold))
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
-        .help("See how this was marked")
-        .popover(isPresented: $rubric, arrowEdge: .leading) { RubricPanel(data: d) }
+        .glassButton()
+        .controlSize(.large)
+        .help("See how this was marked, criterion by criterion")
     }
 
-    /// No grade yet, but a rubric: how it will be marked.
+    /// No grade yet, but a rubric: how it will be marked, a click away down the page.
     private func rubricRow(_ d: AssignmentData) -> some View {
         let n = d.rubric.count
-        return Button { rubric.toggle() } label: {
-            InfoRow(title: d.rubricTitle ?? "Rubric", sub: "\(n) \(n == 1 ? "criterion" : "criteria") · how this is marked",
-                    symbol: "list.bullet.clipboard", tint: courseTint(d)) {
-                Image(systemName: "chevron.right")
+        return Button { jump = "rubric" } label: {
+            HStack(spacing: 12) {
+                RubricMiniRing(model: RubricModel(rows: d.rubric), size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(d.rubricTitle ?? "Rubric")
+                        .font(.sBody.weight(.semibold))
+                        .lineLimit(1)
+                    Text("\(n) \(n == 1 ? "criterion" : "criteria") · how this is marked")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.down")
                     .font(.sCaption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
-            .padding(12)
+            .padding(14)
         }
         .buttonStyle(CardButtonStyle())
         .help("See how this will be marked")
-        .popover(isPresented: $rubric, arrowEdge: .leading) { RubricPanel(data: d) }
     }
 
     private var heldNote: some View {
         Label("Graded, but your teacher has not released the grade yet.", systemImage: "eye.slash")
-            .font(.sCallout)
+            .font(.sBody)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
     }
@@ -449,7 +489,7 @@ struct AssignmentView: View {
         let lines = facts(d)
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { i, f in
-                if i > 0 { RowDivider(inset: 52) }
+                if i > 0 { RowDivider(inset: 56) }
                 factLine(f.symbol, f.label, f.value, color)
             }
         }
@@ -471,21 +511,21 @@ struct AssignmentView: View {
 
     private func factLine(_ symbol: String, _ label: String, _ value: String, _ color: Color) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            IconTile(symbol: symbol, color: color, size: 26)
+            IconTile(symbol: symbol, color: color, size: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label.uppercased())
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.sCaption.weight(.semibold))
                     .tracking(0.6)
                     .foregroundStyle(.secondary)
                 Text(value)
-                    .font(.sCallout)
+                    .font(.sBody)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .accessibilityElement(children: .combine)
     }
 
@@ -503,10 +543,10 @@ struct AssignmentView: View {
                     .strokeBorder(color, style: StrokeStyle(lineWidth: 2.5, dash: [9, 6]))
                 VStack(spacing: 8) {
                     Image(systemName: "tray.and.arrow.up.fill")
-                        .font(.system(size: 30, weight: .semibold))
+                        .font(.system(size: 32, weight: .semibold))
                         .foregroundStyle(color)
                     Text(d.resubmit == true ? "Drop to Hand In Again" : "Drop to Hand In")
-                        .font(.sTitle3.weight(.semibold))
+                        .font(.sTitle3)
                     Text(d.title)
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
@@ -514,7 +554,7 @@ struct AssignmentView: View {
                 }
                 .padding(.horizontal, 30)
                 .padding(.vertical, 22)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .glassCard(radius: 18)
             }
             .padding(14)
             .allowsHitTesting(false)
@@ -522,7 +562,7 @@ struct AssignmentView: View {
         }
     }
 
-    /// A card's edge in the course's colour, for a moment, when the page has just gone to it (the feedback asked for).
+    /// A part's edge in the course's colour, for a moment, when the page has just gone to it (the feedback asked for).
     private func litFrame(_ part: String, _ d: AssignmentData) -> some View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
             .strokeBorder(courseTint(d), lineWidth: 2)
@@ -581,7 +621,7 @@ struct AssignmentView: View {
     }
 
     /// Arrived from a piece of work's own action: its Hand In done at once, or its feedback shown (a quiz's in the quiz
-    /// screen; else the page goes to the grade, or to the comments, and lights it).
+    /// screen; else the page goes to the marked rubric, the grade, or the comments, and lights it).
     private func arrived(_ d: AssignmentData) {
         guard let a = engine.arrival, a.id == id else { return }
         engine.arrival = nil
@@ -589,7 +629,7 @@ struct AssignmentView: View {
             if let q = d.quizId {
                 engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title, feedback: true))
             } else if d.grade != nil {
-                jump = "grade"
+                jump = rubricFirst(d) ? "rubric" : "grade"
             } else if !d.comments.isEmpty {
                 jump = "comments"
             }
@@ -647,6 +687,10 @@ struct AssignmentView: View {
     private func load() async {
         await model.load(engine, "assignment", ["course": course, "id": id])
         if model.data?.canSubmit == true, LaunchOpen.take("handin") != nil { handIn = true }
+        if model.data?.rubric.isEmpty == false, let shot = LaunchOpen.take("rubric") {
+            rubricShot = shot
+            jump = "rubric"
+        }
         if let d = model.data { arrived(d) }
     }
 
@@ -663,11 +707,12 @@ private struct NextStep {
 }
 
 /// The assignment's page in two columns on a wide window — what to read and what was said on the left, the next step,
-/// the grade and the facts on the right — and in one column on a narrow one, the right's cards first.
+/// the grade and the facts on the right (a little wider as the window grows) — and in one column on a narrow one, the
+/// right's cards first.
 private struct AssignmentColumns: Layout {
-    private static let gap: CGFloat = 18
+    private static let gap: CGFloat = 28
     /// The narrowest the page's column may be and still hold the two side by side.
-    private static let twoFrom: CGFloat = 760
+    private static let twoFrom: CGFloat = 780
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard subviews.count == 2 else { return .zero }
@@ -687,7 +732,7 @@ private struct AssignmentColumns: Layout {
     /// Where each column goes, and how tall the two are together.
     private func frames(_ width: CGFloat, _ subviews: Subviews) -> (main: CGRect, side: CGRect, height: CGFloat) {
         if width >= AssignmentColumns.twoFrom {
-            let sideWidth = min(340, max(270, ((width - AssignmentColumns.gap) * 0.34).rounded()))
+            let sideWidth = min(400, max(290, ((width - AssignmentColumns.gap) * 0.32).rounded()))
             let mainWidth = width - AssignmentColumns.gap - sideWidth
             let mainHeight = subviews[0].sizeThatFits(ProposedViewSize(width: mainWidth, height: nil)).height
             let sideHeight = subviews[1].sizeThatFits(ProposedViewSize(width: sideWidth, height: nil)).height
@@ -704,89 +749,87 @@ private struct AssignmentColumns: Layout {
     }
 }
 
-/// The rubric over the grade it explains: each criterion with its ratings (the one given marked), its points and the
-/// teacher's comment, and the score — in a popover from the grade card, scrolling when it is long.
-private struct RubricPanel: View {
-    let data: AssignmentData
-    @State private var height: CGFloat = 320
+/// A file handed in, as a row of Your Work: a click opens it in Quick Look; Preview shows it here, in the page, as
+/// Quick Look draws it (fetched the first time it is asked for); its menu has the rest (its app, Download, Copy Link).
+private struct AttachmentRow: View {
+    let file: Attachment
+    @EnvironmentObject private var engine: Engine
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var open = false
+    @State private var local: URL?
+    @State private var problem: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(data.rubricTitle ?? "Rubric")
-                    .font(.sHeadline)
-                Spacer(minLength: 12)
-                if let s = data.rubricScore, !s.isEmpty {
-                    Text(s)
-                        .font(.sTitle3.weight(.bold).monospacedDigit())
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(data.rubric) { r in criterion(r) }
-                }
-                .padding(16)
-                .background {
-                    // (the popover as tall as the rubric, up to a point; past it, the rubric scrolls)
-                    GeometryReader { g in
-                        Color.clear
-                            .onAppear { height = g.size.height }
-                            .onChange(of: g.size.height) { _, h in height = h }
+            HStack(spacing: 8) {
+                RowLink { engine.openFile(file.url, name: file.name) } label: {
+                    HStack(spacing: 12) {
+                        FileIcon(name: file.name, size: 32)
+                        Text(file.name)
+                            .font(.sBody)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 6)
                     }
                 }
+                .help("Open \(file.name) in Quick Look")
+                Button {
+                    withAnimation(reduceMotion ? nil : Motion.gentle) { open.toggle() }
+                } label: {
+                    Label(open ? "Hide" : "Preview", systemImage: open ? "chevron.up" : "eye")
+                }
+                .glassButton()
+                .help(open ? "Hide the preview" : "Show \(file.name) here")
+                .padding(.trailing, 4)
             }
-            .frame(height: min(max(height, 80), 460))
+            .contextMenu { FileMenuItems(engine: engine, url: file.url, name: file.name) }
+            if open {
+                preview
+                    .frame(height: 520)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
+            }
         }
-        .frame(width: 440)
+        .task(id: open) {
+            guard open, local == nil else { return }
+            await fetch()
+        }
     }
 
-    private func criterion(_ r: RubricRow) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(r.name)
-                    .font(.sCallout.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                if let p = r.pts {
-                    Text(p)
-                        .font(.sCallout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
+    @ViewBuilder
+    private var preview: some View {
+        if let local {
+            QuickLookView(file: local)
+                .accessibilityLabel("Preview of \(file.name)")
+        } else if let problem {
+            ContentUnavailableView {
+                Label("No Preview", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(problem)
+            } actions: {
+                Button("Try Again") { Task { await fetch() } }
             }
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(r.ratings.enumerated()), id: \.offset) { _, rating in
-                    let got = rating.got == true
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: got ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(got ? Color.green : Color.secondary.opacity(0.5))
-                            .accessibilityHidden(true)
-                        Text(rating.text)
-                            .font(.sCallout)
-                            .foregroundStyle(got ? .primary : .secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 6)
-                        if let p = rating.pts {
-                            Text(p)
-                                .font(.sCallout.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(got ? Color.green.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(got ? .isSelected : [])
-                }
-            }
-            if let c = r.comment, !c.isEmpty {
-                Label(c, systemImage: "text.bubble")
+        } else {
+            VStack(spacing: 10) {
+                ProgressView()
+                Text("Loading \(file.name)…")
                     .font(.sCallout)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
+                    .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func fetch() async {
+        problem = nil
+        do {
+            local = try await engine.fetchFile(file.url, name: file.name)
+        } catch is CancellationError {
+            return
+        } catch {
+            problem = error.localizedDescription
         }
     }
 }
@@ -813,17 +856,18 @@ private struct CommentComposer: View {
                     .disabled(sending)
                 if text.isEmpty {
                     Text("Write a comment for your teacher")
+                        .font(.sBody)
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 5)
                         .allowsHitTesting(false)
                 }
             }
-            .frame(height: 96)
-            .padding(8)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .frame(height: 110)
+            .padding(10)
+            .background(Theme.well, in: RoundedRectangle(cornerRadius: 12, style: .continuous)) // (1.2: a well, not a box in the card)
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.3), lineWidth: focused ? 2 : 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.accentColor.opacity(focused ? 0.6 : 0), lineWidth: 2)
             }
             .animation(Motion.hover, value: focused)
             if let error {
@@ -837,6 +881,7 @@ private struct CommentComposer: View {
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 8)
                 Button("Cancel", action: cancel)
+                    .glassButton()
                     .keyboardShortcut(.cancelAction)
                     .disabled(sending)
                 Button(action: go) {
@@ -846,7 +891,7 @@ private struct CommentComposer: View {
                         Text("Send")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .glassButton(prominent: true)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(sending || empty)
             }
@@ -1089,13 +1134,15 @@ private struct HandInSheet: View {
             }
             Spacer(minLength: 8)
             Button("Cancel") { dismiss() }
+                .glassButton()
                 .keyboardShortcut(.cancelAction)
                 .disabled(sending)
             Button("Submit") { submit() }
-                .buttonStyle(.borderedProminent)
+                .glassButton(prominent: true)
                 .keyboardShortcut(submitKey)
                 .disabled(!ready || sending)
         }
+        .controlSize(.large)
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
     }

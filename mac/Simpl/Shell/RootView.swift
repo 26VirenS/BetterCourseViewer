@@ -34,7 +34,6 @@ struct RootView: View {
         .overlay(alignment: .bottom) { FileToast(files: files) }
         .environmentObject(engine)
         .focusedSceneObject(engine)
-        .quickLookPreview($files.url)
         .sheet(item: $engine.whatsNew) { item in
             WhatsNewSheet(data: item.data) {
                 Task { _ = try? await engine.call("whatsNewSeen", ["version": item.data.version ?? ""], as: OK.self) }
@@ -80,7 +79,6 @@ struct RootView: View {
         }
         .onChange(of: reminders.opening) { _, _ in openReminder() }
         .onChange(of: engine.phase) { _, _ in openReminder() }
-        .onChange(of: files.url) { _, url in if url == nil { files.close() } }
         .onAppear {
             AppModel.shared.engine = engine
             engine.start()
@@ -119,40 +117,12 @@ struct Splash: View {
     }
 }
 
-/// A file on its way to Quick Look ("Opening …"), or why it could not be opened: a small capsule at the window's foot.
+/// A file on its way to Quick Look (how far it has come, and × to stop it), a copy just kept in Downloads, or why one
+/// could not be opened: a small glass capsule at the window's foot (FileToastContent, FileViews.swift).
 struct FileToast: View {
     @ObservedObject var files: FilePreview
 
     var body: some View {
-        Group {
-            if let name = files.opening {
-                HStack(spacing: 10) {
-                    ProgressView().controlSize(.small)
-                    Text("Opening \(name)…").font(.sCallout).lineLimit(1)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.edge))
-                .shadow(color: Theme.shadow, radius: 12, y: 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else if let why = files.failed {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    Text(why).font(.sCallout).lineLimit(2)
-                    Button("OK") { files.failed = nil }
-                        .controlSize(.small)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.edge))
-                .shadow(color: Theme.shadow, radius: 12, y: 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .padding(.bottom, 22)
-        .animation(Motion.gentle, value: files.opening)
-        .animation(Motion.gentle, value: files.failed)
+        FileToastContent(files: files)
     }
 }

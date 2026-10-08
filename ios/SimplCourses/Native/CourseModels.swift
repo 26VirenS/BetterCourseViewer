@@ -200,6 +200,9 @@ struct RubricRating: Codable, Hashable {
     var text: String
     var pts: String?
     var got: Bool?
+    /// The level's points as a number, and its own longer description (the Mac's rubric ring).
+    var value: Double?
+    var long: String?
 }
 
 struct RubricRow: Codable, Identifiable, Hashable {
@@ -208,6 +211,12 @@ struct RubricRow: Codable, Identifiable, Hashable {
     var pts: String?
     var comment: String?
     var ratings: [RubricRating]
+    /// What the criterion is worth and was given, its long description, and the marker's note as written (the Mac's
+    /// rubric ring).
+    var worth: Double?
+    var score: Double?
+    var desc: String?
+    var note: String?
 }
 
 struct CommentRow: Codable, Identifiable, Hashable {
