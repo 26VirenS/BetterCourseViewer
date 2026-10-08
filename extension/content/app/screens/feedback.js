@@ -289,7 +289,6 @@
   // marked; the instructor's words as bubbles; the attempts as tiles, the one that counts lit; and a comment, in
   // one pill with its send button. The feedback screen (build, above) stays the page's own, for a link or a phone.
   const NS = 'http://www.w3.org/2000/svg';
-  const RUB = ['#5e5ce6', '#0a84ff', '#30b0c7', '#30d158', '#ff9f0a', '#ff375f']; // (the rubric ring's own palette, rubric-ring.js)
   /** The colour a share of the points wears: green from 80%, orange from 60%, red under. */
   const tone = (pct) => (pct === null ? 'var(--bcv-ink3)' : pct >= 80 ? 'var(--bcv-green)' : pct >= 60 ? 'var(--bcv-orange)' : 'var(--bcv-red)');
   const stamp = (v) => { const d = U.parse ? U.parse(v) : (v ? new Date(v) : null); return d && !Number.isNaN(+d) ? `${U.fmtShort(d)}, ${U.fmtTime(d)}` : ''; };
@@ -304,58 +303,33 @@
     return { graded, posted, held: graded && !posted, possible, pct, score: posted ? Number(s.score) : null };
   }
 
-  function arc(cx, cy, r, from, to) { // (fractions of a turn, from twelve o'clock, clockwise)
-    const pt = (f) => [cx + r * Math.sin(f * 2 * Math.PI), cy - r * Math.cos(f * 2 * Math.PI)];
-    const [x0, y0] = pt(from), [x1, y1] = pt(to);
-    return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${to - from > 0.5 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
-  }
-  function path(d, stroke, width, cls = '') {
-    const p = document.createElementNS(NS, 'path');
-    p.setAttribute('d', d);
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', stroke);
-    p.setAttribute('stroke-width', String(width));
-    p.setAttribute('stroke-linecap', 'round');
-    if (cls) p.setAttribute('class', cls);
-    return p;
+  /** The course grade ring's own drawing (gpa.js): a 6-wide stroke round a 22 circle in a 56 box, its round-ended arc
+   *  sweeping in from empty (bcv-ring--fill) after `sweep` ms. */
+  function gradeRing(pct, color, sweep) {
+    const svg = document.createElementNS(NS, 'svg');
+    for (const [k, v] of Object.entries({ viewBox: '0 0 56 56', width: 56, height: 56, class: 'bcv-mring__svg', 'aria-hidden': 'true' })) svg.setAttribute(k, String(v));
+    const circle = (attrs) => { const el = document.createElementNS(NS, 'circle'); for (const [k, v] of Object.entries({ cx: 28, cy: 28, r: 22, fill: 'none', 'stroke-width': 6, ...attrs })) el.setAttribute(k, String(v)); return el; };
+    svg.append(circle({ class: 'bcv-mring__track' }));
+    if (pct !== null && pct > 0) {
+      const c = 2 * Math.PI * 22, len = (Math.min(100, pct) / 100) * c;
+      svg.append(circle({ stroke: color, 'stroke-linecap': 'round', 'stroke-dasharray': `${len.toFixed(1)} ${(c - len).toFixed(1)}`, class: 'bcv-ring--fill', style: `--bcv-delay: ${sweep}ms` }));
+    }
+    return svg;
   }
 
-  /** The card's ring. With a rubric: one slice per criterion, as long as its share of the points, lit as far as
-   *  it was marked, in the rubric ring's colours — and a press on it opens the rubric. Without: the score's
-   *  share, in its tone. The share in the middle either way (— before a mark is posted). */
+  /** The card's ring. With a rubric: the rubric's own ring in miniature (rubric-ring.js) — its smooth band, a slice a
+   *  criterion — and a press on it opens the rubric. Without: the course grade ring's drawing, the score's share in its
+   *  tone. Either sweeps in as the card opens; the share in the middle (— before a mark is posted). */
   function ring(a, s, { onRubric = null } = {}) {
     const st = standing(a, s);
-    const S = 56, C = S / 2, R = 23.5, Wd = 5.5;
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${S} ${S}`);
-    svg.setAttribute('width', String(S));
-    svg.setAttribute('height', String(S));
-    svg.setAttribute('aria-hidden', 'true');
-    svg.append(path(arc(C, C, R, 0, 0.9999), 'var(--bcv-fill2, rgba(120,120,128,.2))', Wd, 'bcv-mring__track'));
-    const crit = (a.rubric || []).filter((cr) => num(cr.points) > 0);
-    const assess = s.rubric_assessment || {};
-    if (crit.length && st.posted) {
-      const total = crit.reduce((n, cr) => n + Number(cr.points), 0);
-      const gap = crit.length > 1 ? 0.035 : 0;
-      let at = 0;
-      crit.forEach((cr, i) => {
-        const share = Number(cr.points) / total;
-        const from = at + gap / 2, to = at + share - gap / 2;
-        const got = num(assess[cr.id]?.points);
-        const lit = got === null ? 0 : Math.max(0, Math.min(1, got / Number(cr.points)));
-        svg.append(path(arc(C, C, R, from, to), RUB[i % RUB.length], Wd, 'bcv-mring__dim'));
-        if (lit > 0) svg.append(path(arc(C, C, R, from, from + (to - from) * lit), RUB[i % RUB.length], Wd));
-        at += share;
-      });
-    } else if (st.pct !== null && st.pct > 0) {
-      svg.append(path(arc(C, C, R, 0, Math.min(0.9999, st.pct / 100)), tone(st.pct), Wd, 'bcv-mring__fill'));
+    const SWEEP = 200; // ms: the card is most of the way open
+    const rubric = (a.rubric || []).length ? BCV.rubricRing?.miniRing?.(a, s, { size: 56, sweep: SWEEP }) : null;
+    const svg = rubric || gradeRing(st.pct, tone(st.pct), SWEEP);
+    const mid = h('span', { class: 'bcv-mring__pct', style: { color: rubric ? 'var(--bcv-ink)' : tone(st.pct) }, text: st.pct === null ? '—' : `${st.pct}%` });
+    if ((a.rubric || []).length && onRubric) {
+      return h('button', { type: 'button', class: 'bcv-mring bcv-mring--rubric', title: 'Open the rubric', 'aria-label': `Rubric${st.pct !== null ? `, ${st.pct}%` : ''}`, onclick: (e) => { e.stopPropagation(); onRubric(); } }, [svg, mid]);
     }
-    const mid = h('span', { class: 'bcv-mring__pct', style: { color: crit.length && st.posted ? 'var(--bcv-ink)' : tone(st.pct) }, text: st.pct === null ? '—' : `${st.pct}%` });
-    const kids = [svg, mid];
-    if (crit.length && onRubric) {
-      return h('button', { type: 'button', class: 'bcv-mring bcv-mring--rubric', title: 'Open the rubric', 'aria-label': `Rubric${st.pct !== null ? `, ${st.pct}%` : ''}`, onclick: (e) => { e.stopPropagation(); onRubric(); } }, kids);
-    }
-    return h('span', { class: 'bcv-mring' }, kids);
+    return h('span', { class: 'bcv-mring' }, [svg, mid]);
   }
 
   /** The card's body: when, the words, the attempts, what was handed in, and a comment. */

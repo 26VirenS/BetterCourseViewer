@@ -37,12 +37,14 @@
   const openMark = (ctx, c, a, x = null, from = null, opts = {}) => {
     const page = () => ctx.app.go(`${c.url}/assignments/${a.id}?bcv=feedback`);
     if (x && from?.isConnected && !BCV.phone?.active?.()) {
-      if (BCV.screens.feedback?.build) { openMarkBox(ctx, c, a, x, from, opts); return; }
+      const ringReady = !a.rubric?.length || !!BCV.rubricRing; // (a rubric's card wears the rubric's own ring: its code first)
+      if (BCV.screens.feedback?.build && ringReady) { openMarkBox(ctx, c, a, x, from, opts); return; }
       // (2.99.10) the box's insides are the feedback screen, which is code on demand (lazy.js, with the hand-in
       // block): an assignment with no hand-in block — a tool's, a quiz's — had not loaded it, and the box fell
       // through to the page. It is loaded here first, then the box opens; the page only if it cannot be had.
+      // (A rubric ring that cannot be had is no reason not to open: the grade ring stands in for it.)
       if (BCV.lazy?.load) {
-        BCV.lazy.load('submit').then(() => {
+        Promise.all([BCV.lazy.load('submit'), ringReady ? null : BCV.lazy.load('rubric').catch(() => null)]).then(() => {
           if (!from.isConnected) return;
           if (BCV.screens.feedback?.build) openMarkBox(ctx, c, a, x, from, opts); else if (!opts.hover) page();
         }).catch(() => { if (!opts.hover) page(); });
@@ -116,8 +118,7 @@
     const F = BCV.screens.feedback;
     const built = F.card(ctx, c, a, s);
     // the ring pressed: the rubric takes the stage, the card stepping back under it, and comes back as the rubric goes
-    // (onto the ring it was opened from). The rubric's own code is loaded ahead, so the press opens it at once.
-    if (a.rubric?.length) BCV.lazy?.load?.('rubric').catch(() => {});
+    // (onto the ring it was opened from). The rubric's own code was loaded before the card was built (openMark).
     const toRubric = () => {
       ov.classList.add('is-under');
       CS().openRubric(a, s);
@@ -343,7 +344,10 @@
     const standing = (() => { if (gradeChip(s)) return null; const st = store.workStatus(a, s); return st.kind ? U.statusBadge(st, '') : null; })();
     const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s) || standing]);
     // a mark to open: what its box holds is fetched now, so the first hover opens the box at once (lazy.js)
-    if (!standing && !BCV.phone?.active?.()) BCV.lazy?.load?.('submit').catch(() => {});
+    if (!standing && !BCV.phone?.active?.()) {
+      BCV.lazy?.load?.('submit').catch(() => {});
+      if (a.rubric?.length) BCV.lazy?.load?.('rubric').catch(() => {}); // (the card's ring is the rubric's own)
+    }
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
       backBtn(app, back.href, back.label),

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.10"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.11"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -823,7 +823,9 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-mark .bcv-mark__dot { flex: none; width: 10px; height: 10px; border-radius: 2.5px; }
 .bcv-mring { position: relative; flex: none; display: grid; place-items: center; width: 56px; height: 56px; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; }
 .bcv-mring > svg { position: absolute; inset: 0; }
-.bcv-mring__dim { opacity: .26; }
+.bcv-mring__svg { transform: rotate(-90deg); } /* (the course grade ring's drawing: its arc from twelve o'clock) */
+.bcv-mring__track { stroke: rgba(120,120,128,.16); }
+html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-mring__pct { position: relative; font: 700 13px/1 var(--bcv-font); letter-spacing: -.02em; }
 .bcv-mring--rubric { cursor: pointer; transition: scale .16s var(--bcv-spring-snappy); }
 @media (hover: hover) and (pointer: fine) { .bcv-mring--rubric:hover { scale: 1.06; } }

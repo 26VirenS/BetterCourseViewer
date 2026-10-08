@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.11', date: '2026-10-08', notes: [
+      { kind: 'improved', title: 'Smooth grade rings', body: 'The grade card uses the app’s own grade and rubric rings.', icon: P.steps },
+    ] },
     { version: '2.99.10', date: '2026-10-08', notes: [
       { kind: 'fixed', title: 'Tool grades open here', body: 'Hovering a tool or quiz grade opens its card, not a page.', icon: P.check },
       { kind: 'improved', title: 'A new grade card', body: 'A score ring, dates and attempts; the ring opens the rubric.', icon: P.layers },

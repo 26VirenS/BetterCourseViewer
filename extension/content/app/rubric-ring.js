@@ -1125,6 +1125,66 @@
    *  Thicker the more of the rubric a criterion carries (inward, its outer edge on the pill's); marked and posted,
    *  out where the work did well and in where it lost points, in the grades' colours. All of it comes in at once
    *  (paintMorph floats it in from just outside the pill, 2.98.103), not drawn round from its start. */
+  /** Between which two criteria's middles a place round the ring falls, and how far (eased): how the ring's
+   *  colours, thicknesses and bends run smoothly from one slice into the next. */
+  function blendFor(seg, n) {
+    const mids = seg.map(([a0, a1]) => (a0 + a1) / 2);
+    return (th) => {
+      if (n === 1) return [0, 0, 0];
+      let x = th - mids[0];
+      x -= Math.floor(x / TAU) * TAU;
+      let j = n - 1;
+      while (j > 0 && mids[j] - mids[0] > x) j--;
+      const lo = mids[j] - mids[0], hi = j + 1 < n ? mids[j + 1] - mids[0] : TAU;
+      return [j, (j + 1) % n, (1 - Math.cos((Math.PI * (x - lo)) / (hi - lo))) / 2];
+    };
+  }
+  let ringSeq = 0;
+  /** (2.99.10) The ring itself in miniature, for a mark's card: the big ring's own band — each criterion's slice as
+   *  long as its points, as thick as its share, bent out where it did well and in where it lost points, its colours
+   *  running into each other — round a circle `size` px across. With `sweep` (ms), it sweeps in from twelve o'clock
+   *  after that long, the way a course's grade ring fills. */
+  function miniRing(a, sub, { size = 56, sweep = null } = {}) {
+    const m = model(a, sub);
+    if (!m.n) return null;
+    const { seg, n } = m;
+    const C = size / 2, RO = C - 3; // (the band's outer edge, unbent: room round it for what bends out)
+    const between = blendFor(seg, n);
+    const lerp = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
+    const cols = m.graded ? m.grades : m.hues;
+    const TH = m.thick.map((t) => Math.max(5, Math.min(8, t * 0.5))); // (about the grade ring's 6 on average, as in the big ring a slice thicker the more it carries)
+    const GO = m.bend.map((b) => Math.max(-3, Math.min(2.5, b * 0.25)));
+    const svg = document.createElementNS(SVG, 'svg');
+    for (const [k, v] of Object.entries({ viewBox: `0 0 ${size} ${size}`, width: size, height: size, class: 'bcv-rubring', 'aria-hidden': 'true' })) svg.setAttribute(k, String(v));
+    const g = document.createElementNS(SVG, 'g');
+    const P = (r, th) => `${f(C + r * Math.sin(th))} ${f(C - r * Math.cos(th))}`;
+    const STEPS = 144; // (a piece every 2.5°: no corner shows at this size)
+    for (let k = 0; k < STEPS; k++) {
+      const t0 = (k / STEPS) * TAU, t1 = ((k + 1) / STEPS) * TAU + 0.006; // (a hair's overlap: no seam between pieces)
+      const b0 = between(t0), b1 = between(t1), bm = between((t0 + t1) / 2);
+      const o0 = RO + lerp(GO, b0), o1 = RO + lerp(GO, b1);
+      const path = document.createElementNS(SVG, 'path');
+      path.setAttribute('d', `M${P(o0, t0)} L${P(o1, t1)} L${P(o1 - lerp(TH, b1), t1)} L${P(o0 - lerp(TH, b0), t0)} Z`);
+      path.setAttribute('fill', css(mix(cols[bm[0]], cols[bm[1]], bm[2])));
+      g.append(path);
+    }
+    if (sweep !== null) {
+      // swept in through a mask: a stroke round the band's middle drawn from nothing to the full circle
+      const id = `bcv-rubring-${++ringSeq}`;
+      const defs = document.createElementNS(SVG, 'defs');
+      const mask = document.createElementNS(SVG, 'mask');
+      mask.setAttribute('id', id);
+      const r = RO - 3, c = 2 * Math.PI * r;
+      const stroke = document.createElementNS(SVG, 'circle');
+      for (const [k, v] of Object.entries({ cx: C, cy: C, r: f(r), fill: 'none', stroke: '#fff', 'stroke-width': 14, 'stroke-dasharray': `${f(c + 1)} 0`, transform: `rotate(-90 ${C} ${C})`, class: 'bcv-ring--fill', style: `--bcv-delay: ${sweep}ms` })) stroke.setAttribute(k, String(v));
+      mask.append(stroke);
+      defs.append(mask);
+      svg.append(defs);
+      g.setAttribute('mask', `url(#${id})`);
+    }
+    svg.append(g);
+    return svg;
+  }
   function miniPill(m, W, H) {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('viewBox', `${-PAD} ${-PAD} ${W + 2 * PAD} ${H + 2 * PAD}`); // (room round the pill for what bends out past its edge: nothing is drawn outside the band's own box)
@@ -1144,16 +1204,7 @@
       return [r + (s - Math.PI * r), d];
     };
     // between which two criteria's middles a place along the edge falls, and how far (eased), as the ring blends them
-    const mids = seg.map(([a0, a1]) => (a0 + a1) / 2);
-    const between = (th) => {
-      if (n === 1) return [0, 0, 0];
-      let x = th - mids[0];
-      x -= Math.floor(x / TAU) * TAU;
-      let j = n - 1;
-      while (j > 0 && mids[j] - mids[0] > x) j--;
-      const lo = mids[j] - mids[0], hi = j + 1 < n ? mids[j + 1] - mids[0] : TAU;
-      return [j, (j + 1) % n, (1 - Math.cos((Math.PI * (x - lo)) / (hi - lo))) / 2];
-    };
+    const between = blendFor(seg, n);
     const lerp = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
     const cols = m.graded ? m.grades : m.hues;
     const TH = m.thick.map((t) => Math.max(3.5, Math.min(7, t * 0.3)));
@@ -1345,5 +1396,5 @@
     return { a, sub };
   }
 
-  BCV.rubricRing = { open, model, shortOf, sample, morph, unmorph, get live() { return live; } };
+  BCV.rubricRing = { open, model, shortOf, sample, morph, unmorph, miniRing, get live() { return live; } };
 })();
