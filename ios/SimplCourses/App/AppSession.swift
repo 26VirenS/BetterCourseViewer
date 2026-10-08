@@ -23,7 +23,10 @@ extension Notification.Name {
 final class AppSession: ObservableObject {
     private static let hostKey = "canvasHost"
 
-    @Published private(set) var host: String? = AppSession.devBaseURL?.host ?? UserDefaults.standard.string(forKey: AppSession.hostKey)
+    @Published private(set) var host: String? = AppSession.pickerQuery != nil ? nil : (AppSession.devBaseURL?.host ?? UserDefaults.standard.string(forKey: AppSession.hostKey))
+
+    /// The simulator suite's picture of the school search (`-SimplPicker merced`): the picker, that typed.
+    static var pickerQuery: String? { UserDefaults.standard.string(forKey: "SimplPicker") }
 
     /// The simulator suite's Canvas (.github/workflows/ios-shots.yml): `-SimplBaseURL http://localhost:8800` at launch.
     static var devBaseURL: URL? {

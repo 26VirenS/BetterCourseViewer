@@ -308,6 +308,10 @@ try {
   check(!found.error && found.groups.length > 0 && found.groups.every((g) => g.rows.every((r) => r.url && r.title)), `search for the app's own field: the box's groups, every row with somewhere to go: ${JSON.stringify(found.groups.map((g) => `${g.title}:${g.rows.length}`))}`);
   const snap = await nc('snapshot');
   check(snap.me?.name && Number.isInteger(snap.notifUnread) && snap.version === manifest.version, `the account and the badges for the app's bar: ${JSON.stringify(snap)}`);
+  // (iPhone 1.6.1) the schools the first run's search finds: Instructure's listings, each a name and a Canvas host
+  const schools = JSON.parse(readFileSync(join(root, 'extension', 'data', 'schools.json'), 'utf8')).schools;
+  const hostOk = (d) => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d);
+  check(schools.length > 10000 && schools.every((s) => Array.isArray(s) && s.length === 2 && s[0].trim() && hostOk(s[1])) && schools.some(([n, d]) => /Merced/.test(n) && d === 'catcourses.ucmerced.edu') && new Set(schools.map((s) => `${s[0]}|${s[1]}`)).size === schools.length, `the school search carries ${schools.length} listings, each a name and a Canvas address, none twice`);
   // (iPhone 1.6) an address the app has no screen for as it stands is opened where it leads: a module item is the item it names
   const viaItem = await nc('resolveUrl', { url: '/courses/102/modules/items/i2' });
   const viaPage = await nc('resolveUrl', { url: '/courses/102/modules/items/i1' });

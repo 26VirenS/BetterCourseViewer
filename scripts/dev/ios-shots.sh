@@ -72,6 +72,8 @@ for mode in light dark; do
   launch "$mode-21-setup" 18 -SimplOpen setup
   # (1.4.3) Settings, all of it the phone's own rows: the look, grades, the record, data
   launch "$mode-22-settings" 18 -SimplOpen settings
+  # (1.6.1) the first run: the school searched for by name
+  launch "$mode-23-school" 12 -SimplPicker merced
 done
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 collect end
