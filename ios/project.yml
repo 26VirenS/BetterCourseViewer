@@ -12,8 +12,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.5.4" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
-    CURRENT_PROJECT_VERSION: "19"
+    MARKETING_VERSION: "1.5.5" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
+    CURRENT_PROJECT_VERSION: "20"
     CODE_SIGN_STYLE: Automatic
 targets:
   SimplCourses:

@@ -268,7 +268,7 @@
         : null;
       const cards = all.length
         ? all.slice().reverse().map((cur, i) => attemptCard(ctx, c, a, s, cur, { isLatest: cur === latest, graded: posted, me }, i + 1))
-        : [U.emptyCard('Nothing has been handed in for this assignment yet.')];
+        : [U.emptyCard((a.submission_types || []).includes('external_tool') && graded ? 'Graded through the assignment’s tool: nothing was handed in here.' : 'Nothing has been handed in for this assignment yet.')];
 
       wrap.replaceChildren(...[
         scoreCard ? U.enter(scoreCard, 0, 45) : null,

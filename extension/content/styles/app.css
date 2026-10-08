@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.9"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.10"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -800,11 +800,23 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-mark .bcv-sheet__tile > svg { transition: opacity .22s ease .14s; }
 .bcv-mark.is-at-card .bcv-sheet__tile > svg, .bcv-sheet-ov.is-folding .bcv-mark .bcv-sheet__tile > svg { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
 .bcv-mark > .bcv-sheet__list { padding: 0; background: var(--bcv-bg); }
-.bcv-fb--box { max-width: none; margin: 0; padding: 14px 16px 18px; gap: 12px; }
-.bcv-fb--box .bcv-fb__card, .bcv-fb--box .bcv-fb__scorecard { padding: 16px 18px; border-radius: 18px; box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); }
-.bcv-fb--box .bcv-fb__q { padding: 14px 16px; border-radius: 16px; box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); }
-.bcv-fb--box .bcv-fb__big { font-size: 30px; }
-.bcv-fb--box .bcv-fb__btns .bcv-qz__big { flex: 0 0 auto; height: 44px; padding: 0 22px; border-radius: 22px; font-size: 15px; } /* (a button, not a slab across the box) */
+.bcv-fb.bcv-fb--box { flex: none; max-width: none; margin: 0; padding: 10px; gap: 8px; } /* (flex: none: as tall as what it holds, so the box can be measured to fit it; two classes, or the page's own .bcv-fb further down — 28 px in, 70 px under — wins) */
+.bcv-fb--box .bcv-fb__card, .bcv-fb--box .bcv-fb__scorecard { padding: 12px 14px; border-radius: 14px; box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); }
+.bcv-fb--box .bcv-fb__q { padding: 11px 13px; border-radius: 14px; box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); gap: 8px; }
+.bcv-fb--box .bcv-fb__big { font-size: 26px; }
+.bcv-fb--box .bcv-fb__facts { gap: 4px 16px; }
+.bcv-fb--box .bcv-card--empty { padding: 14px 16px; font-size: 13px; }
+.bcv-fb--box .bcv-fb__btns .bcv-qz__big { flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 17px; font-size: 13.5px; } /* (a button, not a slab across the box) */
+/* (2.99.10) a compact card: the header tighter, the reply a single slim row — its heading gone (the field says it), its note small */
+.bcv-mark > .bcv-sheet__head { padding: 12px 14px 11px; gap: 11px; }
+.bcv-mark .bcv-sheet__tile { width: 32px; height: 32px; border-radius: 10px; }
+.bcv-mark .bcv-sheet__value { font-size: 21px; }
+.bcv-fb--box .bcv-fb__composer { gap: 6px; }
+.bcv-fb--box .bcv-fb__composer > .bcv-fb__kicker { display: none; }
+.bcv-fb--box .bcv-fb__compose { gap: 6px; }
+.bcv-mark .bcv-fb--box .bcv-fb__input { height: 34px; padding: 0 13px; border-radius: 17px; font-size: 13.5px; }
+.bcv-mark .bcv-fb--box .bcv-fb__send { height: 34px; padding: 0 15px; border-radius: 17px; font-size: 13px; }
+.bcv-fb--box .bcv-fb__perm { font-size: 11px; padding: 0 4px; }
 /* (2.98.56) the first frame of the box is the chip exactly, and the last of the fold too: while it is the chip's size the
    box wears the chip's own fill, edge and corners (read off the chip into --bcv-mark-*), and a copy of the chip's words sits
    over its header — the one word that glides left out of the copy — fading as the box grows and back in as it folds */

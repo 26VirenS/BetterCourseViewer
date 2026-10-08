@@ -35,8 +35,21 @@
    *  opened or downloaded rather than framed (Canvas's own document preview answers "service
    *  unavailable" often enough that a sheet built around it read as broken). */
   const openMark = (ctx, c, a, x = null, from = null, opts = {}) => {
-    if (x && from?.isConnected && !BCV.phone?.active?.() && BCV.screens.feedback?.build) { openMarkBox(ctx, c, a, x, from, opts); return; }
-    ctx.app.go(`${c.url}/assignments/${a.id}?bcv=feedback`);
+    const page = () => ctx.app.go(`${c.url}/assignments/${a.id}?bcv=feedback`);
+    if (x && from?.isConnected && !BCV.phone?.active?.()) {
+      if (BCV.screens.feedback?.build) { openMarkBox(ctx, c, a, x, from, opts); return; }
+      // (2.99.10) the box's insides are the feedback screen, which is code on demand (lazy.js, with the hand-in
+      // block): an assignment with no hand-in block — a tool's, a quiz's — had not loaded it, and the box fell
+      // through to the page. It is loaded here first, then the box opens; the page only if it cannot be had.
+      if (BCV.lazy?.load) {
+        BCV.lazy.load('submit').then(() => {
+          if (!from.isConnected) return;
+          if (BCV.screens.feedback?.build) openMarkBox(ctx, c, a, x, from, opts); else if (!opts.hover) page();
+        }).catch(() => { if (!opts.hover) page(); });
+        return;
+      }
+    }
+    page();
   };
   /** (2.98.64) The chip opens its box on a hover too, where there is a mouse (U.hoverOpens: after a
    *  moment's rest on it, not again under a pointer that has not moved since the box folded back into
@@ -57,8 +70,9 @@
     const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': `${a.name}: ${posted ? 'your mark' : 'what you handed in'}` }); // (is-far: the dim and blur start out wide, to close in on the box)
     let folding = false;
     let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the chip)
-    // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 560×640 or what the window allows, pushed back inside it
-    const M = 16, W = 560, H = 640;
+    // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 420 wide,
+    // as tall as what it holds up to 560 (2.99.10: a compact card, not a panel), or what the window allows, pushed back inside it
+    const M = 16, W = 420, H = 560;
     let boxH = H; // (as tall as its content wants, up to H: measured once built)
     function geometry(back) {
       const r = from.getBoundingClientRect();
@@ -134,7 +148,8 @@
     box = U.cardBox({ ov, sheet, card: from, geometry: () => geometry(false), cardRadius: cs.borderTopLeftRadius });
     box.layout(); // (full size, unpainted: the content measured at the width it will have)
     document.body.append(ov);
-    boxH = Math.min(H, Math.max(300, sheet.querySelector('.bcv-sheet__head').offsetHeight + sheet.querySelector('.bcv-sheet__list').scrollHeight + 2));
+    // (what it holds, measured — not the list, which stretches to the box and read as the whole 640 every time)
+    boxH = Math.min(H, Math.max(140, sheet.querySelector('.bcv-sheet__head').offsetHeight + built.el.offsetHeight + 2));
     // laid out where it goes, at its measured height, and drawn only where the chip is — the copy of the chip's words
     // set over the chip's own place in it — before anything is painted: the first frame is the chip
     const g0 = box.start();
@@ -307,6 +322,8 @@
     // nothing handed in: where it stands beside the title — Missing (past due), Opens …, Closed — in the same words as every list
     const standing = (() => { if (gradeChip(s)) return null; const st = store.workStatus(a, s); return st.kind ? U.statusBadge(st, '') : null; })();
     const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s) || standing]);
+    // a mark to open: what its box holds is fetched now, so the first hover opens the box at once (lazy.js)
+    if (!standing && !BCV.phone?.active?.()) BCV.lazy?.load?.('submit').catch(() => {});
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
       backBtn(app, back.href, back.label),

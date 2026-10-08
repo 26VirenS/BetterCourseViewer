@@ -189,10 +189,11 @@ struct ShellToolbar: ViewModifier {
     var menu: AnyView? = nil
     @EnvironmentObject private var engine: Engine
 
-    /// The capsule's height (the bar's own glass buttons are 44 pt) and the glass left round the picture: none
-    /// (1.5.3) — the picture is the capsule's rounded end, its edge the capsule's own edge.
+    /// The capsule's height (the bar's own glass buttons are 44 pt) and the glass left round the picture: 1 pt
+    /// (1.5.5) — the picture meets the inside of the glass's rim, so it fills the end without bulging past it
+    /// (3 pt read as a gap, none as a picture too big for its pill).
     static let height: CGFloat = 44
-    static let ring: CGFloat = 0
+    static let ring: CGFloat = 1
 
     func body(content: Content) -> some View {
         // the buttons and the picture share one glass capsule, drawn here rather than by the bar's own grouping (1.5.1):
