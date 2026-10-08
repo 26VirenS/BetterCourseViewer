@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.24', date: '2026-10-08', notes: [
+      { kind: 'improved', title: 'One answer or many', body: 'Quizzes show round options for one answer, boxes for many.', icon: P.check },
+    ] },
     { version: '2.99.23', date: '2026-10-08', notes: [
       { kind: 'new', title: 'Brightspace in apps', body: 'The iPhone and Mac apps now work on Brightspace too.', icon: P.sparkle },
       { kind: 'new', title: 'Brightspace alerts', body: 'New-activity alerts read Brightspace news and grades.', icon: P.clock },
