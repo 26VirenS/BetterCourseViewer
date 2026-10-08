@@ -1812,34 +1812,39 @@ try {
 
   // ---- handing work in (assignment submission flow) -------------------------------------
   console.log('submission');
-  // The mark is a chip in the title's own row, and it opens the submission sheet (handoff surface 1)
+  // (2.99.13) The assignment page is the mockup's: the way back and the assignments either side; the title and
+  // one pill saying where it stands; the facts in boxes (a rubric's among them); the one big pill — once marked, the
+  // grade — and the instructions. The mark is that pill, and it opens the mark's card (handoff surface 1)
   await page.goto(`${BASE}/courses/104/assignments/4001`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  const markBox = await page.evaluate(() => {
-    const g = document.querySelector('.bcv-detail__grade'), t = document.querySelector('.bcv-detail__title');
-    const gr = g.getBoundingClientRect(), tr = t.getBoundingClientRect(), hr = g.parentElement.getBoundingClientRect();
-    return { tag: g.tagName, inHead: g.parentElement === t.parentElement, rightOfTitle: Math.round(gr.left - tr.right) >= 8, insetRight: Math.round(hr.right - gr.right) <= 1, size: Math.round(parseFloat(getComputedStyle(g.querySelector('.bcv-detail__gradescore')).fontSize)) };
-  });
-  check(markBox.tag === 'BUTTON' && markBox.inHead && markBox.rightOfTitle && markBox.insetRight && markBox.size === 28, `the mark is a chip in the title's own row, at its end: ${JSON.stringify(markBox)}`);
+  await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
+  const asgTop = await page.evaluate(() => ({
+    back: document.querySelector('.bcv-asg__back')?.textContent.trim(), title: document.querySelector('.bcv-asg__title')?.textContent,
+    status: document.querySelector('.bcv-asg__status')?.textContent, facts: [...document.querySelectorAll('.bcv-asg__fact')].map((f) => f.innerText.replace(/\s+/g, ' ').trim()),
+    rubricBox: document.querySelector('.bcv-asg__fact--rubric')?.tagName, oldMeta: !!document.querySelector('.bcv-detail__meta, .bcv-detail__grade, .bcv-rubbtn, #bcv-submit.bcv-sb--embed'),
+    accent: getComputedStyle(document.querySelector('.bcv-asg')).getPropertyValue('--bcv-cc').trim(),
+  }));
+  check(asgTop.title === 'Week 1 reflection' && /^Graded · [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(asgTop.status || '') && asgTop.facts.length === 4 && /^Due /.test(asgTop.facts[0]) && asgTop.facts[1] === 'Points 10 Graded' && /^Submit as Text or file /.test(asgTop.facts[2]) && asgTop.facts[3] === 'Rubric 2 criteria 10 pts' && asgTop.rubricBox === 'BUTTON' && !asgTop.oldMeta && /^#/.test(asgTop.accent), `the page heads with the title and where it stands, the facts in four boxes (the rubric one of them, to press), nothing of the old meta line, chip or hand-in block, the course's colour its accent: ${JSON.stringify(asgTop)}`);
+  const markBox = await page.$eval('.bcv-asg__pill', (g) => ({ tag: g.tagName, graded: g.classList.contains('is-graded'), green: g.classList.contains('is-green'), text: g.innerText.replace(/\s+/g, ' ').trim(), h: Math.round(g.getBoundingClientRect().height), expanded: g.getAttribute('aria-expanded') }));
+  check(markBox.tag === 'BUTTON' && markBox.graded && markBox.green && markBox.text === '10 / 10 100%' && markBox.h === 44 && markBox.expanded === 'false', `once marked, the big pill is the grade, in its tone: ${JSON.stringify(markBox)}`);
   // a grade Canvas has not released carries no number at all — an unposted 0 reads like a real one
   await page.goto(`${BASE}/courses/101/assignments/1006`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  const heldChip = await page.$eval('.bcv-detail__grade', (e) => ({ held: e.classList.contains('bcv-detail__grade--held'), text: e.innerText.replace(/\s+/g, ' ').trim(), digits: /\d/.test(e.innerText) }));
-  check(heldChip.held && /^Not yet posted/.test(heldChip.text) && !heldChip.digits, `a held grade says so and shows no number: ${JSON.stringify(heldChip)}`);
+  await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
+  const heldChip = await page.evaluate(() => { const e = document.querySelector('.bcv-asg__pill'); return { done: e.classList.contains('is-done'), text: e.innerText.replace(/\s+/g, ' ').trim(), digits: /\d/.test(e.innerText), status: document.querySelector('.bcv-asg__status')?.textContent, note: document.querySelector('.bcv-asg__note')?.innerText.replace(/\s+/g, ' ') }; });
+  check(heldChip.done && heldChip.text === 'Submitted' && !heldChip.digits && heldChip.status === 'Submitted · grade not released yet' && /Grade not released yet/.test(heldChip.note || ''), `a held grade says so and shows no number: ${JSON.stringify(heldChip)}`);
   // (2.98.55) The mark opens where it is: the chip grows into a box the way a Dashboard counter does — the
   // page dimmed and blurred round it, the score gliding into the box's header — holding the feedback screen's
   // content, the page (and its address) staying put under it. The screen of its own is still there for a link.
   // (the sheet the screen replaced is gone from the build: the preview it framed was Canvas's own document
   // service, which answers "service unavailable" often enough that a sheet built around it read as broken)
   await page.goto(`${BASE}/courses/104/assignments/4001`);
-  await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
-  const chipRect = await page.$eval('.bcv-detail__grade', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; });
-  await page.click('.bcv-detail__grade');
+  await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
+  const chipRect = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; });
+  await page.click('.bcv-asg__pill');
   await page.waitForSelector('.bcv-mark .bcv-mcard', { timeout: 10000 });
   check(!(await pageHeld(page, 300, 700)).moved, 'the page behind the mark box is held still while it is open');
   await page.waitForTimeout(650);
-  const asBox = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); const box = document.querySelector('.bcv-sheet.bcv-mark'); const r = box.getBoundingClientRect(); return { ov: !!ov, far: ov?.classList.contains('is-far'), atCard: box.classList.contains('is-at-card'), l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, value: box.querySelector('.bcv-sheet__value')?.textContent, label: box.querySelector('.bcv-sheet__label')?.textContent, title: box.querySelector('.bcv-mark__title')?.textContent, note: box.querySelector('.bcv-sheet__note')?.textContent, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), pageTitle: !!document.querySelector('.bcv-detail__title'), focus: document.activeElement === ov }; });
-  check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w === 400 && asBox.h >= 140 && asBox.h <= 560 && Math.abs(asBox.r - chipRect.r) <= 1 && asBox.t <= chipRect.t + 1 && asBox.value === '10' && asBox.label === '/ 10' && asBox.title === 'Week 1 reflection' && asBox.note === 'F26-SPRK 010 103 · File upload' && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the chip grows into a card hung from its own corner over the dimmed page (2.99.10: the score, the work's name, its course and kind in its header), the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
+  const asBox = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); const box = document.querySelector('.bcv-sheet.bcv-mark'); const r = box.getBoundingClientRect(); return { ov: !!ov, far: ov?.classList.contains('is-far'), atCard: box.classList.contains('is-at-card'), l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, value: box.querySelector('.bcv-sheet__value')?.textContent, label: box.querySelector('.bcv-sheet__label')?.textContent, title: box.querySelector('.bcv-mark__title')?.textContent, side: box.classList.contains('bcv-mark--side') && !!box.querySelector('.bcv-mark__right .bcv-mcard__thread .bcv-mcard__bubble') && !!box.querySelector('.bcv-mark__right .bcv-mcard__pill'), note: box.querySelector('.bcv-sheet__note')?.textContent, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), pageTitle: !!document.querySelector('.bcv-detail__title'), focus: document.activeElement === ov }; });
+  check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w === 720 && asBox.side && asBox.h >= 140 && asBox.h <= 560 && Math.abs(asBox.l - chipRect.l) <= 1 && asBox.t <= chipRect.t + 1 && asBox.value === '10' && asBox.label === '/ 10' && asBox.title === 'Week 1 reflection' && asBox.note === 'F26-SPRK 010 103 · File upload' && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the pill grows into a card hung from its own top-left corner over the dimmed page (2.99.10: the score, the work's name, its course and kind in its header; 2.99.13: sideways, the comments a column to the right), the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
   await shot(page, '09i-mark-box');
   // (2.98.57) the box lives in the page body, outside the app's root: its controls still wear the app's own look, not Canvas's
   const boxCtl = await page.evaluate(() => { const q = (s) => document.querySelector(`.bcv-mark ${s}`); const g = (s) => getComputedStyle(q(s)); return { chip: g('.bcv-mcard__chip').borderRadius, chipBg: g('.bcv-mcard__chip').backgroundColor, pill: g('.bcv-mcard__pill').borderRadius, pillH: g('.bcv-mcard__pill').height, inputH: g('.bcv-mcard__input').height, inputB: g('.bcv-mcard__input').borderTopWidth, inputBg: g('.bcv-mcard__input').backgroundColor, sendW: g('.bcv-mcard__send').width, sendR: g('.bcv-mcard__send').borderRadius, sendOff: q('.bcv-mcard__send').disabled, tile: q('.bcv-mcard__tile')?.tagName, ring: q('.bcv-mark__ringslot .bcv-mring--rubric')?.tagName, rubBtn: !!q('.bcv-rubbtn, .bcv-fb__btns'), old: !!q('.bcv-fb__scorecard, .bcv-fb__q') }; });
@@ -1907,7 +1912,7 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(80);
   const folding = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return { there: !!ov, folding: ov?.classList.contains('is-folding'), far: ov?.classList.contains('is-far') }; });
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov') && !!document.querySelector('.bcv-detail__grade')), 3000) && folding.there && folding.folding && folding.far && !page.url().includes('bcv=feedback'), `Escape folds the box back into the chip, the assignment page still there: ${JSON.stringify(folding)}`);
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov') && !!document.querySelector('.bcv-asg__pill')), 3000) && folding.there && folding.folding && folding.far && !page.url().includes('bcv=feedback'), `Escape folds the box back into the chip, the assignment page still there: ${JSON.stringify(folding)}`);
   // the screen of its own is still there for a link (and the phone): the same content, the way back out at its end
   await page.goto(`${BASE}/courses/104/assignments/4001?bcv=feedback`);
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
@@ -1945,7 +1950,7 @@ try {
   // (2.98.64) the chip opens its box on a hover too: after a moment's rest (not a pass over it), and a box opened so goes
   // again when the pointer leaves it — unless it was taken up — and does not come back under a pointer that has not moved
   await page.mouse.move(5, 5);
-  const chipAt = await page.$eval('.bcv-detail__grade', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+  const chipAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
   const boxUp = () => page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return ov && !ov.classList.contains('is-folding') ? { hover: ov.hasAttribute('data-hover') } : null; });
   const boxGone = () => page.evaluate(() => !document.querySelector('.bcv-sheet-ov'));
   await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
@@ -1986,7 +1991,7 @@ try {
   await page.waitForTimeout(800);
   check(new URL(page.url()).searchParams.getAll('bcv').length === 1 && new URL(page.url()).pathname === '/courses/104/assignments/4001/submissions/99', `handed to Canvas once, and it stays there (no loop): ${page.url()}`);
   await page.goto(`${BASE}/courses/104/assignments/4001`);
-  await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
+  await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
   // (2.98.60) an attempt handed in through a tool (New Quizzes) carries the tool's launch point as its url,
   // which answers "Invalid launch." opened on its own: the attempt opens through Canvas's launch instead
   await mockConfig({ ltiAttempts: ['4003'] });
@@ -2006,34 +2011,34 @@ try {
   // Mark as done is offered only where Canvas asks for it: a module item with a must_mark_done
   // requirement. The button is the requirement's own state, and pressing it makes Canvas's call.
   const seq = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/module_item_sequence?asset_type=Assignment&asset_id=${aid}`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
-  check(!(await page.$('.bcv-detail__actions [aria-pressed]')), 'an assignment no module asks a mark for has no Mark as done');
+  check(!(await page.$('.bcv-asg__action [aria-pressed]')), 'an assignment no module asks a mark for has no Mark as done');
   await page.goto(`${BASE}/courses/101/assignments/1003`);
-  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
-  const doneBtn = await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => ({ text: e.textContent.trim(), pressed: e.getAttribute('aria-pressed'), done: e.classList.contains('is-done') }));
+  await page.waitForSelector('.bcv-asg__action [aria-pressed]', { timeout: 10000 });
+  const doneBtn = await page.$eval('.bcv-asg__action [aria-pressed]', (e) => ({ text: e.textContent.trim(), pressed: e.getAttribute('aria-pressed'), done: e.classList.contains('is-done') }));
   check(doneBtn.text === 'Mark as done' && doneBtn.pressed === 'false' && !doneBtn.done && (await seq('101', '1003')).items[0].current.completion_requirement.completed === false, `a must_mark_done assignment offers Mark as done, unmarked: ${JSON.stringify(doneBtn)}`);
-  await page.click('.bcv-detail__actions [aria-pressed]');
-  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true'), 'pressing it marks the item done');
-  const afterDone = await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => ({ text: e.textContent.trim(), done: e.classList.contains('is-done') }));
+  await page.click('.bcv-asg__action [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-asg__action [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true'), 'pressing it marks the item done');
+  const afterDone = await page.$eval('.bcv-asg__action [aria-pressed]', (e) => ({ text: e.textContent.trim(), done: e.classList.contains('is-done') }));
   check(afterDone.text === 'Done' && afterDone.done && (await seq('101', '1003')).items[0].current.completion_requirement.completed === true, `the button says Done, green, and Canvas has the mark: ${JSON.stringify(afterDone)}`);
-  await page.click('.bcv-detail__actions [aria-pressed]');
+  await page.click('.bcv-asg__action [aria-pressed]');
   // the button repaints once Canvas has answered and the caches are cleared: wait for it, not for the mock
-  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await seq('101', '1003')).items[0].current.completion_requirement.completed === false, 'pressing Done takes the mark back');
+  check(await eventually(async () => (await page.$eval('.bcv-asg__action [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await seq('101', '1003')).items[0].current.completion_requirement.completed === false, 'pressing Done takes the mark back');
   // A live Canvas can answer the sequence with the item bare of its requirement, or name no item at
   // all for an assignment that sits in its module as a discussion or a quiz: the modules themselves
   // say then, and the button is there all the same.
   const modulesOf = (cid) => fetch(`${BASE}/api/v1/courses/${cid}/modules?include[]=items`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
   await fetch(`${BASE}/__mock/config`, { method: 'POST', body: JSON.stringify({ bareSequence: true }) });
   await page.goto(`${BASE}/courses/101/assignments/1003`);
-  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
-  check((await seq('101', '1003')).items[0].current.completion_requirement === undefined && (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'the sequence without its requirement: the modules say, and Mark as done is there');
+  await page.waitForSelector('.bcv-asg__action [aria-pressed]', { timeout: 10000 });
+  check((await seq('101', '1003')).items[0].current.completion_requirement === undefined && (await page.$eval('.bcv-asg__action [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'the sequence without its requirement: the modules say, and Mark as done is there');
   await fetch(`${BASE}/__mock/config`, { method: 'POST', body: JSON.stringify({ bareSequence: false }) });
   await page.goto(`${BASE}/courses/105/assignments/5003`);
-  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
-  check((await seq('105', '5003')).items.length === 0 && (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'a graded discussion sits in its module as the topic: the sequence names nothing, the modules do, and Mark as done is there');
-  await page.click('.bcv-detail__actions [aria-pressed]');
-  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === true, 'and pressing it marks the topic\'s item done in Canvas');
-  await page.click('.bcv-detail__actions [aria-pressed]');
-  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === false, 'and takes it back');
+  await page.waitForSelector('.bcv-asg__action [aria-pressed]', { timeout: 10000 });
+  check((await seq('105', '5003')).items.length === 0 && (await page.$eval('.bcv-asg__action [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'a graded discussion sits in its module as the topic: the sequence names nothing, the modules do, and Mark as done is there');
+  await page.click('.bcv-asg__action [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-asg__action [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === true, 'and pressing it marks the topic\'s item done in Canvas');
+  await page.click('.bcv-asg__action [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-asg__action [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === false, 'and takes it back');
   // A page in a module that asks for a mark (a page of lecture videos, a reading) has the button too, at its foot
   const pageSeq = () => fetch(`${BASE}/api/v1/courses/101/module_item_sequence?asset_type=Page&asset_id=chapter-4-notes`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
   await page.goto(`${BASE}/courses/101/pages/chapter-4-notes?module_item_id=i14`);
@@ -2054,70 +2059,39 @@ try {
   await page.waitForTimeout(700);
   check(!(await page.$('.bcv-detail__actions--foot [aria-pressed]')), 'a page no module asks a mark for has no button');
   await page.goto(`${BASE}/courses/101/assignments/1003`); // where the checks below carry on
-  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
+  await page.waitForSelector('.bcv-asg__action [aria-pressed]', { timeout: 10000 });
   // Previous / Next go through the assignments in the order the Assignments tab lists them
   const groups = await fetch(`${BASE}/api/v1/courses/101/assignment_groups?include[]=assignments`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
   const ordered = groups.flatMap((g) => g.assignments || []).filter((a) => a.published !== false).sort((x, y) => ((Date.parse(x.due_at) || Infinity) - (Date.parse(y.due_at) || Infinity)) || String(x.name).localeCompare(String(y.name)));
   const at1003 = ordered.findIndex((a) => String(a.id) === '1003');
-  const navBtns = await page.$$eval('.bcv-detail__nav .bcv-detail__navbtn', (els) => els.map((e) => ({ dir: e.classList.contains('bcv-detail__navbtn--prev') ? 'prev' : 'next', kicker: e.querySelector('.bcv-detail__navkicker').textContent, name: e.querySelector('.bcv-detail__navname').textContent })));
+  // (2.99.13: one pill at the top, beside the way back — each half names where it goes)
+  await page.waitForSelector('.bcv-asg__nav .bcv-asg__navbtn', { timeout: 10000 });
+  const navBtns = await page.$$eval('.bcv-asg__nav .bcv-asg__navbtn', (els) => els.map((e) => ({ dir: e.classList.contains('bcv-asg__navbtn--prev') ? 'prev' : 'next', kicker: e.title.split(':')[0], name: e.textContent.trim() })));
   const want = [ordered[at1003 - 1] && { dir: 'prev', kicker: 'Previous', name: ordered[at1003 - 1].name }, ordered[at1003 + 1] && { dir: 'next', kicker: 'Next', name: ordered[at1003 + 1].name }].filter(Boolean);
-  check(JSON.stringify(navBtns) === JSON.stringify(want), `Previous and Next name the assignments either side, in the tab's order: ${navBtns.map((b) => `${b.kicker}: ${b.name}`).join(' | ')}`);
-  await page.click('.bcv-detail__nav .bcv-detail__navbtn--next');
+  const navAt = await page.evaluate(() => { const n = document.querySelector('.bcv-asg__nav').getBoundingClientRect(), b = document.querySelector('.bcv-asg__back').getBoundingClientRect(); return { sameRow: Math.abs((n.top + n.bottom) / 2 - (b.top + b.bottom) / 2) < 3, aboveTitle: n.bottom <= document.querySelector('.bcv-asg__title').getBoundingClientRect().top }; });
+  check(JSON.stringify(navBtns) === JSON.stringify(want) && navAt.sameRow && navAt.aboveTitle, `Previous and Next name the assignments either side, in the tab's order, on the way back's own row: ${navBtns.map((b) => `${b.kicker}: ${b.name}`).join(' | ')} ${JSON.stringify(navAt)}`);
+  await page.click('.bcv-asg__nav .bcv-asg__navbtn--next');
   // the old title is still on screen while the next page comes: wait for the new one, not for a title
   const nextOpened = await page.waitForFunction((x) => location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name, ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
   check(nextOpened, `Next opens the next assignment: ${(await texts('.bcv-detail__title'))[0]}`);
-  await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric checks below read this page
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(!(await page.$('.bcv-rr-ov, .bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
-  // (2.98.100) the pointer resting on the Rubric button grows the button itself into a larger pill — to its right, from
-  // its own left edge, so the button before it is not covered (2.98.101) — its words gone, the ring's band traced round
-  // the pill's edge, its colours, thickness and bend carried smoothly from criterion to criterion as the ring's are, and
-  // the points in the middle; the button's own place on the page kept; back to the button as the pointer leaves
-  const rubBtn = await page.$eval('.bcv-detail__actions .bcv-rubbtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: Math.round(r.width), h: Math.round(r.height) }; });
-  // (2.98.103) the band comes in all at once, every colour together, floating in from just outside the pill to its edge:
-  // each frame of the morph is read as it is drawn (the morph runs on its own frames, at real speed in the suite)
-  await page.evaluate(() => { const fr = (self.bcvBandFrames = []); const tick = () => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__band'); if (b) { const m = /scale\(([\d.]+), ([\d.]+)\)/.exec(b.style.transform); fr.push({ op: parseFloat(b.style.opacity) || 0, sx: m ? +m[1] : 1, sy: m ? +m[2] : 1, w: b.getBoundingClientRect().width, wc: b.style.willChange }); } if (fr.length < 400 && !(fr.length && fr[fr.length - 1].op === 1 && fr[fr.length - 1].sx === 1)) requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
-  await page.mouse.move(rubBtn.x, rubBtn.y);
-  const morphed = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__band'); const mid = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__mid'); return !!b && parseFloat(b.style.opacity) === 1 && parseFloat(mid.style.opacity) === 1; }), 5000);
-  const morphAt = morphed ? await page.evaluate(() => {
-    const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'), br = b.getBoundingClientRect(), layer = b.querySelector('.bcv-rubmorph');
-    const pill = layer.querySelector('.bcv-rubmorph__pill'), d = pill.getBoundingClientRect(), band = layer.querySelector('.bcv-rubmorph__band').getBoundingClientRect(), mid = layer.querySelector('.bcv-rubmorph__mid').getBoundingClientRect();
-    const paths = [...layer.querySelectorAll('.bcv-rubmorph__band g path')];
-    const rgb = paths.map((x) => x.getAttribute('fill').match(/\d+/g).map(Number));
-    const step = rgb.slice(1).reduce((mx, c, k) => Math.max(mx, ...c.map((v, q) => Math.abs(v - rgb[k][q]))), 0); // (the most a colour changes from one piece to the next)
-    const prev = b.previousElementSibling?.getBoundingClientRect();
-    return { morph: b.classList.contains('is-morph'), mid: layer.querySelector('.bcv-rubmorph__mid').innerText.replace(/\s+/g, ' ').trim(), words: getComputedStyle(b).color, ground: getComputedStyle(b).backgroundColor, hidden: layer.getAttribute('aria-hidden'), presses: getComputedStyle(layer).pointerEvents,
-      w: Math.round(br.width), h: Math.round(br.height), pill: [Math.round(d.width), Math.round(d.height)], round: getComputedStyle(pill).borderRadius, band: [Math.round(band.width), Math.round(band.height)],
-      bigPx: getComputedStyle(layer.querySelector('.bcv-rubmorph__big')).fontSize,
-      solid: /linear-gradient/.test(getComputedStyle(pill).backgroundImage) && !/rgba\(.*, 0\)$/.test(getComputedStyle(pill).backgroundColor), // (over the ground it stands on: what it covers is not seen through)
-      rightward: Math.abs(d.left - br.left) < 1 && d.right > br.right + 30 && Math.abs((d.top + d.bottom) / 2 - (br.top + br.bottom) / 2) < 1 && Math.abs(band.left + 4 - d.left) < 1 && Math.abs((mid.left + mid.right) / 2 - (d.left + d.right) / 2) < 1.5 && Math.abs((mid.top + mid.bottom) / 2 - (br.top + br.bottom) / 2) < 1.5,
-      clear: !prev || prev.right <= d.left + 0.5, // (the button before it, uncovered)
-      pieces: paths.length, step, whole: !layer.querySelector('.bcv-rubmorph__band mask, .bcv-rubmorph__band [mask]'), settled: layer.querySelector('.bcv-rubmorph__band').style.transform === '' && layer.querySelector('.bcv-rubmorph__band').style.willChange === '', green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, bl]) => r > 200 && g > 140 && bl < 100 && r > g + 25) };
-  }) : {};
-  const pillH = Math.round(Math.max(42, Math.min(56, rubBtn.h + 14))), pillW = Math.round(Math.max(pillH * 2.6, Math.min(200, rubBtn.w + 44)));
-  check(morphed && morphAt.morph && morphAt.mid === '8 of 10' && morphAt.words === 'rgba(0, 0, 0, 0)' && morphAt.ground === 'rgba(0, 0, 0, 0)' && morphAt.pill.join() === `${pillW},${pillH}` && morphAt.round === `${pillH / 2}px` && morphAt.band.join() === `${pillW + 8},${pillH + 8}` && morphAt.bigPx === `${+(pillH * 0.36).toFixed(2)}px` && morphAt.solid && morphAt.rightward && morphAt.clear
-    && morphAt.w === rubBtn.w && morphAt.h === rubBtn.h && morphAt.pieces > 100 && morphAt.step <= 12 && morphAt.whole && morphAt.settled && morphAt.green && morphAt.amber && morphAt.hidden === 'true' && morphAt.presses === 'none',
-    `the pointer on the Rubric button grows it into a larger pill to its right — ${pillW} × ${pillH} from the ${rubBtn.w} × ${rubBtn.h} button's left edge, the button before it uncovered, solid — its band round its edge in short pieces (in a box 4px bigger all round, for its bends out), all there at once, settled on the page, green turning smoothly into amber, "8 of 10" in the middle, its words gone, its place kept: ${JSON.stringify({ ...morphAt, btn: [rubBtn.w, rubBtn.h] })}`);
-  const floatIn = await page.evaluate(() => { const fr = self.bcvBandFrames || []; const mid = fr.filter((x) => x.op > 0.05 && x.op < 1); const pw = Math.max(...fr.map((x) => x.w)); return { frames: fr.length, mid: mid.length, startOut: mid.length ? +(mid[0].sx - 1).toFixed(3) : null, shrinking: fr.every((x, i) => i === 0 || x.sx <= fr[i - 1].sx + 1e-6), outside: mid.some((x) => x.sx > 1.03 && x.sy > 1.1), layered: mid.every((x) => x.sx === 1 || x.wc === 'transform, opacity'), wider: pw > fr[fr.length - 1].w + 6, ends: fr.length ? fr[fr.length - 1] : null }; });
-  check(floatIn.mid >= 1 && floatIn.outside && floatIn.layered && floatIn.shrinking && floatIn.wider && floatIn.ends?.op === 1 && floatIn.ends?.sx === 1 && floatIn.ends?.sy === 1, `the band comes in all at once, no mask drawing it round: every colour fading in together from just outside the pill and floating in to its edge, only ever moving inwards, on its own layer while it moves (${JSON.stringify(floatIn)})`);
-  check((await page.locator('.bcv-detail__actions').getByRole('button', { name: 'Rubric', exact: true }).count()) === 1, 'it is still the Rubric button to a screen reader (the pill is drawn, not said)');
-  await shot(page, '14q-rubric-morph');
-  await page.mouse.move(8, 8);
-  const unmorphed = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'); return !b.querySelector('.bcv-rubmorph') && !b.classList.contains('is-morph') && getComputedStyle(b).color !== 'rgba(0, 0, 0, 0)'; }), 3000);
-  check(unmorphed && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'and back to the Rubric button as the pointer leaves');
-  // (2.99.1) never left standing: a leave at any point of the grow, a quick return while it folds and a second leave —
-  // each time the pill folds all the way and goes, the button's words back, nothing of it left on the page
-  const leftovers = [];
-  for (const [inMs, outMs, again] of [[60, 0, 0], [150, 0, 0], [260, 0, 0], [300, 60, 200], [500, 140, 120]]) {
-    await page.mouse.move(rubBtn.x, rubBtn.y);
-    await page.waitForTimeout(inMs);
-    await page.mouse.move(8, 8);
-    if (again) { await page.waitForTimeout(outMs); await page.mouse.move(rubBtn.x, rubBtn.y); await page.waitForTimeout(again); await page.mouse.move(8, 8); }
-    const gone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-rubmorph') && !document.querySelector('.bcv-rubbtn.is-morph') && getComputedStyle(document.querySelector('.bcv-detail__actions .bcv-rubbtn')).color !== 'rgba(0, 0, 0, 0)'), 2500);
-    if (!gone) leftovers.push(`in ${inMs} ms, out${again ? ` ${outMs} ms, in ${again} ms, out` : ''}`);
-  }
-  check(!leftovers.length, `the pill never stays behind: left at any point of its grow, or come back to while it folds and left again, it folds all the way and goes (${leftovers.join(' · ') || 'every time'})`);
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  // (2.99.13) on the assignment page the rubric is a box among the facts, with the ring in miniature, pressed to open it
+  await page.goto(`${BASE}/courses/104/assignments/4001`);
+  await page.waitForSelector('.bcv-asg__fact--rubric', { timeout: 10000 });
+  const rubFact = await eventually(() => page.$$eval('.bcv-asg__fact--rubric svg.bcv-rubring path[fill]', (p) => p.length > 100), 4000);
+  check(rubFact && !(await page.$('.bcv-rr-ov, .bcv-rubg, .bcv-asg .bcv-rubbtn')), 'the rubric is a box among the facts, wearing the ring in miniature, and not on the page until it is asked for');
+  await page.click('.bcv-asg__fact--rubric');
+  check(await eventually(() => page.$('.bcv-rr-ov').then((e) => !!e), 6000), 'pressing the rubric box opens the rubric');
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  // the feedback screen of its own (a link, the phone) keeps its See the rubric button: the checks below read it there
+  await page.goto(`${BASE}/courses/104/assignments/4001?bcv=feedback`);
+  await page.waitForSelector('.bcv-fb__btns .bcv-rubbtn', { timeout: 10000 });
+  check(!(await page.$('.bcv-rr-ov, .bcv-rubg')) && (await texts('.bcv-fb__btns .bcv-rubbtn'))[0] === 'See the rubric', 'the feedback screen keeps the rubric its own button, and it is not on the page until it is asked for');
+  await page.goto(`${BASE}/courses/104/assignments/4001`); // the ring's own checks below open it from the assignment page's rubric box
+  await page.waitForSelector('.bcv-asg__fact--rubric', { timeout: 10000 });
+  // (2.99.13) the Rubric button's morph into the ring in miniature retired with the button: on the assignment page the
+  // rubric's box wears the ring itself (checked above)
+  await page.click('.bcv-asg__fact--rubric');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   // the rubric is the ring itself, over the page: no card round it — the page dims, a little blur right
   // behind the ring and more around it; one slice per criterion, named for a screen reader, the score in the middle
@@ -2183,7 +2157,7 @@ try {
   check(escRound, 'Escape rolls the bar back up too');
   await page.keyboard.press('Escape');
   const ringGone = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(ringGone && await page.evaluate(() => document.activeElement?.classList.contains('bcv-rubbtn')), 'a second Escape closes the ring, and focus goes back to the Rubric button');
+  check(ringGone && await page.evaluate(() => document.activeElement?.classList.contains('bcv-asg__fact--rubric')), 'a second Escape closes the ring, and focus goes back to the rubric box');
   const freed = await pageHeld(page, 760, 420);
   check(freed.moved || !freed.scrollable, `with the ring gone the page scrolls again: ${JSON.stringify(freed)}`);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -2191,7 +2165,7 @@ try {
   // steps): the ring explained, then a color hovered, one opened, its levels, a dot pressed, the little ring pressed —
   // each step waiting for it, a press anywhere else held; Escape ends it; once
   await sw.evaluate(() => self.BCV.api.storage.local.remove('tips:rubricRing'));
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.click('.bcv-asg__fact--rubric');
   await tourStep('ring', 8000);
   const box = (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }, sel);
   const holds = (o, i) => !!o && o.x <= i.x + 1 && o.y <= i.y + 1 && o.x + o.w >= i.x + i.w - 1 && o.y + o.h >= i.y + i.h - 1; // (the tour's ring round a thing: the thing inside it)
@@ -2239,7 +2213,7 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   await page.evaluate(() => localStorage.setItem('bcv:rubricView', 'grid')); // (2.98.98: the grid kept by 2.98.95–2.98.97 is let go: the ring opens)
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.click('.bcv-asg__fact--rubric');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(2300); // (past where the tour would start on a marked ring)
   check(!(await page.$('#bcv-tour')) && !(await page.$('.bcv-rr__dev')), 'the tour comes once: the next ring opens without it (and without Try scores, which is the developer\'s)');
@@ -2272,7 +2246,7 @@ try {
   check(g2.marks === '' && g2.mine === 0 && g2.dash && g2.score === null && g2.seg === 'Before grading:true,Graded:false' && g2.foot === 'How each criterion will be graded', `Before grading shows the rubric as it reads before any marks: ${JSON.stringify(g2)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.click('.bcv-asg__fact--rubric');
   const gridAgain = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov.is-grid .bcv-rg__crit'), null, { timeout: 8000 }).then(() => true).catch(() => false);
   await page.click('.bcv-rr__vbtn[data-view="ring"]');
   const ringAgain = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov').classList.contains('is-grid') && localStorage.getItem('bcv:rubricLast') === 'ring' && !document.querySelector('.bcv-rr__field').inert && document.querySelector('.bcv-rg').inert, null, { timeout: 4000 }).then(() => true).catch(() => false);
@@ -2281,7 +2255,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   // Escape ends the tour and leaves the ring; a second closes the ring
   await sw.evaluate(() => self.BCV.api.storage.local.remove('tips:rubricRing'));
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.click('.bcv-asg__fact--rubric');
   await tourStep('ring', 8000);
   await page.keyboard.press('Escape');
   const escEnds = await tourGone(4000).then(() => true).catch(() => false);
@@ -2295,7 +2269,7 @@ try {
   const sent = [];
   const onSent = (r) => { if (r.method() !== 'GET' && /\/api\/v1\//.test(r.url())) sent.push(`${r.method()} ${r.url()}`); };
   page.on('request', onSent);
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.click('.bcv-asg__fact--rubric');
   const devUp = await page.waitForSelector('.bcv-rr__dev', { timeout: 6000 }).then(() => true).catch(() => false);
   const devAt = () => page.evaluate(() => ({
     rows: [...document.querySelectorAll('.bcv-rr__dcrit')].map((r) => `${r.querySelector('.bcv-rr__dname').textContent} ${r.querySelector('.bcv-rr__dscore').textContent} [${[...r.querySelectorAll('.bcv-rr__dlv')].map((b) => (b.classList.contains('is-on') ? `*${b.textContent}` : b.textContent)).join(' ')}]`).join(' | '),
@@ -2337,8 +2311,8 @@ try {
   await sw.evaluate(() => self.BCV.settings.update({ developer: { rubricScores: false } }));
   await page.evaluate(() => { try { localStorage.removeItem('bcv:rrDev'); } catch { /* */ } });
   await page.goto(`${BASE}/courses/104/assignments/4002`);
-  await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
+  await page.waitForSelector('.bcv-asg__pill.is-go', { timeout: 10000 });
+  check((await texts('.bcv-asg__pill'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
   // the colours the page sets on its own text are its own in the light appearance: nothing is flipped
   check((await page.$eval('.bcv-prose span[style*="color"]', (e) => getComputedStyle(e).color)) === 'rgb(45, 59, 69)', 'the light appearance leaves the page\'s own text colours exactly as Canvas set them');
   // a link to a file in the assignment's own text opens the viewer over the page, not a new tab or Canvas's file page
@@ -2351,53 +2325,58 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   context.off('page', onProseTab);
-  // mockup 11: the flow is a block at the end of the assignment page itself, not a destination of its own
-  const inView = (sel) => page.$eval(sel, (el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight; });
-  check(!!(await page.$('#bcv-main .bcv-detail + .bcv-sb--embed, #bcv-main .bcv-sb--embed')) && (await page.$$('.bcv-sb__foot')).length === 1 && !(await page.$('.bcv-sb__h1')) && (await page.$eval('.bcv-sb__foot', (el) => getComputedStyle(el).position)) === 'static', 'handing in is a block under the instructions in the same scroll, with a plain (not sticky) submit row');
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
-  check(await eventually(() => inView('#bcv-submit')) && page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__title'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await visible('#bcv-side')), 'Submit assignment brings the block into view on the same page (sidebar kept, no navigation)');
-  const subChips = await texts('.bcv-sb__chip');
-  check(subChips.length === 3 && /^[A-Z][a-z]+ by 11:59 PM$/.test(subChips[0]) && subChips[1] === '10 points' && subChips[2] === 'Attempt 1 of unlimited' && (await texts('.bcv-sb__kicker'))[0].toLowerCase() === 'hand in', `block chips: ${subChips.join(' | ')}`);
-  check(/^Open [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · accepts a file upload, a text entry or a website URL$/.test((await texts('.bcv-sb__note'))[0]), `availability + accepted types: ${(await texts('.bcv-sb__note'))[0]}`);
-  check((await texts('.bcv-sb__dropsub'))[0] === 'PDF, DOCX, PNG or JPG only · as many files as you need' && (await texts('.bcv-sb__dropconv'))[0] === 'text and pictures are converted for you' && (await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')) === '.pdf,.docx,.png,.jpg,.txt,.md,.markdown,.jpeg,.webp,.gif,.bmp,.avif', `allowed file types are read from the assignment; the picker's accept takes them and the types that convert into them, and a line under the types says which are converted (${(await texts('.bcv-sb__dropconv'))[0]} | ${await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')})`);
-  check((await texts('.bcv-sb__footnote'))[0] === 'Attach at least one file to submit.' && !!(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit stays blocked until a file is attached');
-  // where only PDF is allowed (the usual case), the picker takes Word, text and pictures too, and the box says they are converted to PDF
-  const handIn = async () => { await page.reload(); await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 20000 }); await page.click('.bcv-detail__actions .bcv-btn--primary'); await page.waitForSelector('.bcv-sb__pane input[type=file]', { state: 'attached', timeout: 10000 }); };
+  // (2.99.13, the mockup) handing in is a panel that grows out of the pill: tabs and × on one row, a compact drop, the
+  // comment behind a bubble, the attempt in the footer's line; the page dims and blurs round it and stays where it is
+  const facts4002 = await texts('.bcv-asg__fact');
+  check(/^Due [A-Z][a-z]{2} \d+, \d+:\d\d [AP]M Closes when due$/.test(facts4002[0].replace(/\s+/g, ' ')) && facts4002[2].replace(/\s+/g, ' ') === 'Submit as Text, file or link Unlimited attempts' && (await texts('.bcv-asg__note'))[0] === 'Text, file or link · unlimited attempts', `the facts say when it closes and how it is handed in: ${facts4002.map((f) => f.replace(/\s+/g, ' ')).join(' | ')}`);
+  const pillAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top) }; });
+  await page.click('.bcv-asg__pill');
+  await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand #bcv-submit .bcv-sb__pane input[type=file]', { state: 'attached', timeout: 10000 });
+  await page.waitForTimeout(600);
+  const pop = await page.evaluate(() => { const b = document.querySelector('.bcv-sheet-ov--card .bcv-hand'), r = b.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), w: Math.round(r.width), tabs: [...b.querySelectorAll('.bcv-sb__tab')].map((t) => t.textContent).join(' | '), close: !!b.querySelector('.bcv-sb__poptop .bcv-sb__close'), foot: b.querySelector('.bcv-sb__footnote')?.textContent, off: b.querySelector('.bcv-sb__go')?.disabled, bubble: !!b.querySelector('.bcv-sb__bubble'), comment: !!b.querySelector('.bcv-sb__comment'), expanded: document.querySelector('.bcv-asg__pill').getAttribute('aria-expanded'), url: location.href }; });
+  check(Math.abs(pop.l - pillAt.l) <= 1 && Math.abs(pop.t - pillAt.t) <= 1 && pop.w === 380 && pop.tabs === 'File upload | Text entry | Other' && pop.close && pop.foot === 'Attempt 1 · attach a file' && pop.off && pop.bubble && !pop.comment && pop.expanded === 'true' && pop.url === `${BASE}/courses/104/assignments/4002` && (await visible('#bcv-side')), `Submit assignment grows the panel out of its own corner — tabs and × on a row, Submit off until there is something to send, the comment behind its bubble — the page staying put: ${JSON.stringify(pop)}`);
+  await shot(page, '17a-handin-panel');
+  const dropTo = async () => ({ sub: (await texts('.bcv-sb__dropsub'))[0], title: await page.getAttribute('.bcv-sb__drop', 'title'), accept: await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept') });
+  const drop0 = await dropTo();
+  check(drop0.sub === 'PDF, DOCX, PNG or JPG only · others converted' && drop0.title === 'Text and pictures are converted for you' && drop0.accept === '.pdf,.docx,.png,.jpg,.txt,.md,.markdown,.jpeg,.webp,.gif,.bmp,.avif', `allowed file types are read from the assignment; the picker's accept takes them and the types that convert into them, and the drop says others are converted (${JSON.stringify(drop0)})`);
+  // where only PDF is allowed (the usual case), the picker takes Word, text and pictures too, and the drop says they are converted
+  const handIn = async () => { await page.reload(); await page.waitForSelector('.bcv-asg__pill', { timeout: 20000 }); await page.click('.bcv-asg__pill.is-go, .bcv-asg__again'); await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand .bcv-sb__tabs', { timeout: 10000 }); await page.waitForTimeout(450); };
   await mockConfig({ ext: { 4002: ['pdf'] } });
   await handIn();
-  const pdfOnly = { sub: (await texts('.bcv-sb__dropsub'))[0], conv: (await texts('.bcv-sb__dropconv'))[0], accept: await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept'), color: await page.$eval('.bcv-sb__dropconv', (e) => getComputedStyle(e).color) };
-  check(pdfOnly.sub === 'PDF only · as many files as you need' && pdfOnly.conv === 'Word, text and pictures are converted to PDF for you' && pdfOnly.accept === '.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif' && pdfOnly.color !== (await page.$eval('.bcv-sb__dropsub', (e) => getComputedStyle(e).color)), `where only PDF is allowed, the box says Word, text and pictures are converted to PDF, in its own colour, and the picker does not grey a Word file out (${JSON.stringify(pdfOnly)})`);
+  const pdfOnly = await dropTo();
+  check(pdfOnly.sub === 'PDF only · others converted' && pdfOnly.title === 'Word, text and pictures are converted to PDF for you' && pdfOnly.accept === '.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif', `where only PDF is allowed, the drop says the others are converted (its title which), and the picker does not grey a Word file out (${JSON.stringify(pdfOnly)})`);
   await shot(page, '17b-handin-pdf-only');
   await mockConfig({ ext: {} });
   await handIn();
+  const footIs = (re) => eventually(async () => re.test((await texts('.bcv-sb__footnote'))[0] || ''), 8000);
   // a file of another type is offered as what it can become — a text file as a PDF — converted here and attached under its new name
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Notes\n\nhello there') });
   await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
   const askConv = { title: (await texts('.bcv-sheet--ask .bcv-sheet__title'))[0], note: (await texts('.bcv-ask__note'))[0], ok: (await texts('.bcv-ask__ok'))[0] };
   await page.click('.bcv-ask__cancel');
-  check(askConv.title === 'Convert to PDF?' && askConv.note === 'This assignment only takes PDF, DOCX, PNG or JPG. “notes.txt” can be converted on this device and attached as “notes.pdf”.' && askConv.ok === 'Convert to PDF' && (await eventually(async () => !(await page.$('.bcv-sheet--ask')))) && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a type the assignment refuses that can become one it takes is offered as that, and Cancel attaches nothing (${JSON.stringify(askConv)})`); // innerText carries the CSS uppercase
+  check(askConv.title === 'Convert to PDF?' && askConv.note === 'This assignment only takes PDF, DOCX, PNG or JPG. “notes.txt” can be converted on this device and attached as “notes.pdf”.' && askConv.ok === 'Convert to PDF' && (await eventually(async () => !(await page.$('.bcv-sheet--ask')))) && await footIs(/attach a file$/) && !!(await page.$('.bcv-sheet-ov--card .bcv-hand')), `a type the assignment refuses that can become one it takes is offered as that, and Cancel attaches nothing, the panel still open (${JSON.stringify(askConv)})`);
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Notes\n\nhello there') });
   await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
   await page.click('.bcv-ask__ok');
-  await waitText('.bcv-sb__count', /^1 file attached$/);
+  await footIs(/· 1 file$/);
   await page.waitForFunction(() => /ready to submit/.test(document.querySelector('.bcv-sb__fsub')?.textContent || ''), null, { timeout: 20000 });
   const convRow = (await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ');
   check(/^PDF notes\.pdf \d+ (KB|B) · ready to submit Preview$/.test(convRow), `Convert makes the PDF here and attaches it under its new name, ready to submit: ${convRow}`);
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(1) .bcv-sb__x');
-  await waitText('.bcv-sb__count', /^Nothing attached yet$/);
+  await footIs(/attach a file$/);
   // and a type nothing here can turn into one the assignment takes is refused, in words, with one button
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'lab.zip', mimeType: 'application/zip', buffer: Buffer.from('PK\u0003\u0004zip') });
   await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
   const askNo = { title: (await texts('.bcv-sheet--ask .bcv-sheet__title'))[0], note: (await texts('.bcv-ask__note'))[0], cancel: !!(await page.$('.bcv-ask__cancel')) };
   await page.click('.bcv-ask__ok');
-  check(askNo.title === '“lab.zip” can’t be attached' && askNo.note === 'This assignment only takes PDF, DOCX, PNG or JPG. A ZIP file can’t be turned into any of those here.' && !askNo.cancel && (await eventually(async () => !(await page.$('.bcv-sheet--ask')))) && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a type nothing here can convert is refused before any upload, with the reason (${JSON.stringify(askNo)})`);
+  check(askNo.title === '“lab.zip” can’t be attached' && askNo.note === 'This assignment only takes PDF, DOCX, PNG or JPG. A ZIP file can’t be turned into any of those here.' && !askNo.cancel && (await eventually(async () => !(await page.$('.bcv-sheet--ask')))) && await footIs(/attach a file$/), `a type nothing here can convert is refused before any upload, with the reason (${JSON.stringify(askNo)})`);
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'grand-challenge-notes.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.alloc(38912, 'a') });
-  await waitText('.bcv-sb__count', /^1 file attached$/);
+  await footIs(/^Attempt 1 · 1 file$/);
   check((await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ') === 'DOCX grand-challenge-notes.docx 38 KB · ready to submit Preview', `file row, with a Preview button: ${(await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ')}`);
-  check(/anything after 11:59 PM is marked late/.test((await texts('.bcv-sb__footnote'))[0]) && !(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit unlocks with a file and the note says when late starts');
+  check(/anything after 11:59 PM is marked late/.test((await page.getAttribute('.bcv-sb__go', 'title')) || '') && !(await page.$('.bcv-sb__go[disabled]')), 'Submit turns on with a file, and says when late starts');
   // Preview opens the attached file in the viewer, from this device, before anything is handed in
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'figure.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') });
-  await waitText('.bcv-sb__count', /^2 files attached$/);
+  await footIs(/· 2 files$/);
   check((await page.$$('.bcv-sb__file .bcv-sb__preview')).length === 2, 'each attached file has a Preview button');
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__preview');
   await page.waitForFunction(() => document.querySelector('.bcv-viewer img.bcv-viewer__img')?.naturalWidth === 1, null, { timeout: 5000 });
@@ -2406,81 +2385,95 @@ try {
   await shot(page, '20b-preview-before-submit');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
+  check(!!(await page.$('.bcv-sheet-ov--card .bcv-hand')), 'closing the preview leaves the panel open (the viewer took its own Escape)');
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(1) .bcv-sb__preview');
   await page.waitForSelector('.bcv-viewer .bcv-viewer__none', { timeout: 10000 });
   check(/This document could not be opened here\./.test((await texts('.bcv-viewer__none'))[0]) && !(await page.$('.bcv-viewer__none a')) && !(await page.$('.bcv-viewer__acts .bcv-btn')), 'a Word file that is no Word document inside says it could not be opened — and no Download or Open in Canvas for a file that is not there yet');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__x');
-  await waitText('.bcv-sb__count', /^1 file attached$/);
-  // Other: the tool's own picker, punched through in a sheet; what it hands back joins the list
+  await footIs(/· 1 file$/);
+  // closing the panel keeps what was attached: it opens again as it was left
+  await page.click('.bcv-sb__poptop .bcv-sb__close');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 3000 });
+  check(await page.evaluate(() => document.activeElement?.classList.contains('bcv-asg__pill')), 'the × folds the panel back into the pill, focus back on it');
+  await page.click('.bcv-asg__pill');
+  await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand .bcv-sb__file', { timeout: 5000 });
+  check(await footIs(/^Attempt 1 · 1 file$/), 'opened again, the panel still holds the file attached before it was closed');
+  // Other: the tool's own picker, punched through in a sheet over the panel; what it hands back joins the list
   await page.click('.bcv-sb__tab[data-tab=other]');
   check((await texts('.bcv-sb__toolname')).join(' | ') === 'Box | Office 365 | Website URL', `Other rows: ${(await texts('.bcv-sb__toolname')).join(' | ')}`);
   await page.click('.bcv-sb__tool');
   await page.waitForSelector('.bcv-sheet--tool .bcv-sb__frame', { timeout: 5000 });
   check((await page.frameLocator('.bcv-sb__frame').locator('#tool-title').innerText()) === "Box picker (the tool's own page)" && !(await page.frameLocator('.bcv-sb__frame').locator('#bcv-app').count()), 'the tool\'s page is framed untouched (no skin inside the frame)');
   await page.frameLocator('.bcv-sb__frame').locator('#pick').click();
-  await waitText('.bcv-sb__count', /^2 files attached$/);
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet--tool'), null, { timeout: 3000 }); // (the sheet eases out)
+  await footIs(/· 2 files$/);
   check(!(await page.$('.bcv-sheet--tool')) && (await texts('.bcv-sb__file'))[1].replace(/\s+/g, ' ') === 'PDF GC-articles-Sharma.pdf from Box · ready to submit', `the file the tool handed back joins the list: ${(await texts('.bcv-sb__file'))[1].replace(/\s+/g, ' ')}`);
+  // the comment hides behind its bubble: pressed, the field opens; a word in it keeps the bubble lit
+  await page.click('.bcv-sb__bubble');
+  await page.waitForSelector('.bcv-sb__comment', { timeout: 3000 });
   await page.fill('.bcv-sb__comment', 'Three sources, APA.');
-  await page.click('.bcv-sb__btn--primary');
+  check(await page.$eval('.bcv-sb__bubble', (e) => e.classList.contains('is-on')), 'the bubble opens the comment, lit while it holds words');
+  await page.click('.bcv-sb__go');
   await page.waitForSelector('.bcv-sb__done', { timeout: 15000 });
   // a rare moment, allowed its delight: the tick's disc settles in and its stroke draws itself (pathLength 1, a 400ms dash)
   const tickOf = (sel) => page.evaluate((sel) => { const c = document.querySelector(sel), p = c?.querySelector('path'); return { draw: !!c?.classList.contains('bcv-check--draw'), len: p?.getAttribute('pathLength'), anim: p ? getComputedStyle(p).animationName : '', dur: p ? getComputedStyle(p).animationDuration : '' }; }, sel);
   const sbTick = await tickOf('.bcv-sb__check');
   check(sbTick.draw && sbTick.len === '1' && sbTick.anim === 'bcv-check-draw' && sbTick.dur === '0.4s', `handed in: the tick draws itself in (${JSON.stringify(sbTick)})`);
-  const receipt = (await texts('.bcv-sb__rrow')).map((t) => t.replace(/\s+/g, ' '));
-  check(/^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(receipt[0]) && receipt[1] === 'Submission grand-challenge-notes.docx, GC-articles-Sharma.pdf' && /^Turned in \d+ (minutes?|hours?) before the deadline$/.test(receipt[2]) && receipt[3] === 'Attempt 1' && receipt[4] === 'Grade Not graded yet', `receipt: ${receipt.join(' | ')}`);
+  check(/^Received [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test((await texts('.bcv-sb__done .bcv-sb__lead'))[0] || ''), `the panel says when Canvas received it: ${(await texts('.bcv-sb__done .bcv-sb__lead'))[0]}`);
   const sub1 = await readSub('104', '4002');
   check(sub1.workflow_state === 'submitted' && sub1.attempt === 1 && sub1.submission_type === 'online_upload' && sub1.attachments.length === 2 && sub1.attachments[0].display_name === 'grand-challenge-notes.docx' && sub1.attachments[0].size === 38912 && sub1.attachments[1].from_url === `${BASE}/files/box1/download` && sub1.submission_comments.some((c) => c.comment === 'Three sources, APA.'), `Canvas holds the upload, the tool's file and the comment: ${JSON.stringify(sub1.attachments.map((f) => [f.display_name, f.size]))}`);
+  // a moment later the panel folds itself away and the page says Submitted, with Submit again beside it
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov') && document.querySelector('.bcv-asg__pill')?.textContent.trim() === 'Submitted'), 8000), 'the panel folds away on its own and the page redraws, Submitted');
+  const sent1 = await page.evaluate(() => ({ status: document.querySelector('.bcv-asg__status')?.textContent, note: document.querySelector('.bcv-asg__note')?.innerText.replace(/\s+/g, ' '), facts: document.querySelectorAll('.bcv-asg__fact')[2]?.innerText.replace(/\s+/g, ' ') }));
+  check(/^Submitted · [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(sent1.status || '') && /^Submit again [A-Z][a-z]{2}, /.test(sent1.note || '') && /1 comment$/.test(sent1.note || '') && /1 attempt used$/.test(sent1.facts || ''), `Submitted, when, with Submit again and the comment beside it, the attempt counted: ${JSON.stringify(sent1)}`);
   // resubmit as a text entry; the draft lives on this device until it is sent
-  await page.click('.bcv-sb__donebtns .bcv-sb__btn:not(.bcv-sb__btn--primary)');
-  await page.waitForSelector('.bcv-sb__tabs', { timeout: 5000 });
-  check((await texts('.bcv-sb__chip'))[2] === 'Attempt 2 of unlimited' && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `Resubmit starts the next attempt with an empty list: ${(await texts('.bcv-sb__chip'))[2]} · ${(await texts('.bcv-sb__count'))[0]}`);
+  await page.click('.bcv-asg__again');
+  await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand .bcv-sb__tabs', { timeout: 5000 });
+  await page.waitForTimeout(450);
+  check(await footIs(/^Attempt 2 · /) && !(await page.$('.bcv-sb__file')) && !!(await page.$('.bcv-sb__tab[data-tab=other].is-active')), `Submit again starts the next attempt with an empty list, on the tab last used: ${(await texts('.bcv-sb__footnote'))[0]}`);
   await page.click('.bcv-sb__tab[data-tab=text]');
   await page.fill('.bcv-sb__ta', 'Clean water for all.\n\nThree sources follow.');
+  check(await footIs(/^Attempt 2 · 7 words$/) && (await texts('.bcv-sb__words'))[0] === '7 words', 'the text tab counts its words, in the field\'s corner and in the footer');
   await page.waitForTimeout(700);
-  await page.reload();
-  await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
+  await handIn();
   check(!!(await page.$('.bcv-sb__tab[data-tab=text].is-active')) && !!(await page.$('.bcv-sb__ta')), 'the tab chosen is remembered for this assignment (a text-entry assignment never reopens on the file tab)');
-  check((await page.inputValue('.bcv-sb__ta')) === 'Clean water for all.\n\nThree sources follow.' && /Draft restored/.test((await texts('.bcv-sb__note'))[1]), 'the text entry survives a reload as a draft on this device');
-  await page.click('.bcv-sb__btn--primary');
+  check((await page.inputValue('.bcv-sb__ta')) === 'Clean water for all.\n\nThree sources follow.', 'the text entry survives a reload as a draft on this device');
+  await page.click('.bcv-sb__go');
   await page.waitForSelector('.bcv-sb__done', { timeout: 15000 });
   const sub2 = await readSub('104', '4002');
-  check(sub2.attempt === 2 && sub2.submission_type === 'online_text_entry' && sub2.body === '<p>Clean water for all.</p><p>Three sources follow.</p>' && (await texts('.bcv-sb__rrow'))[1].replace(/\s+/g, ' ') === 'Submission Text entry', `the text entry is recorded as HTML paragraphs: ${sub2.body}`);
+  check(sub2.attempt === 2 && sub2.submission_type === 'online_text_entry' && sub2.body === '<p>Clean water for all.</p><p>Three sources follow.</p>', `the text entry is recorded as HTML paragraphs: ${sub2.body}`);
   await shot(page, '09f-submitted');
-  check((await texts('.bcv-sb__donebtns .bcv-sb__btn--primary'))[0] === 'Done', 'the receipt on the assignment page ends with Done (nowhere else to go back to)');
-  await page.click('.bcv-sb__donebtns .bcv-sb__btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sb__done'), null, { timeout: 10000 });
-  await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
-  // Handed in and waiting: the chip beside the title is there before a mark is, in the plain fill,
-  // and it opens what was handed in — attempt by attempt — the way a graded one opens the mark. The
-  // side card that used to repeat the facts (and showed nothing of the work) is gone.
-  const subChip = await page.$eval('.bcv-detail__grade', (e) => ({ sub: e.classList.contains('bcv-detail__grade--sub'), text: e.innerText.replace(/\s+/g, ' ').trim(), sideCards: document.querySelectorAll('.bcv-body--course-cols > .bcv-col').length }));
-  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && subChip.sub && /^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d ?(am|pm|AM|PM) · Attempt 2 · 1 comment$/.test(subChip.text) && subChip.sideCards === 1, `Done reloads the assignment page: a Submitted chip with the time, the attempt and the comment left with attempt 1, Resubmit, and no side card: ${JSON.stringify(subChip)}`);
-  await page.click('.bcv-detail__grade');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelector('.bcv-asg__pill')?.textContent.trim() === 'Submitted', null, { timeout: 10000 });
+  // Handed in and waiting: the pill opens what was handed in — attempt by attempt — the way a graded one opens the mark
+  const subChip = await page.evaluate(() => ({ text: document.querySelector('.bcv-asg__pill').innerText.trim(), done: document.querySelector('.bcv-asg__pill').classList.contains('is-done'), sideCards: document.querySelectorAll('.bcv-body--course-cols > .bcv-col').length }));
+  check(page.url() === `${BASE}/courses/104/assignments/4002` && subChip.done && subChip.text === 'Submitted' && subChip.sideCards === 1, `handed in, the page redraws with the Submitted pill, and no side card: ${JSON.stringify(subChip)}`);
+  await page.click('.bcv-asg__pill');
   await page.waitForSelector('.bcv-mark .bcv-mcard', { timeout: 10000 });
   const subCard = () => page.evaluate(() => { const b = document.querySelector('.bcv-mark'); const t = (s) => [...b.querySelectorAll(s)].map((e) => e.innerText.replace(/\s+/g, ' ').trim()); return {
     url: location.search, value: b.querySelector('.bcv-sheet__value')?.textContent, label: b.querySelector('.bcv-sheet__label')?.textContent || '', note: b.querySelector('.bcv-sheet__note')?.textContent, pct: b.querySelector('.bcv-mring__pct')?.textContent, rubric: !!b.querySelector('.bcv-mring--rubric'), track: !!b.querySelector('.bcv-mring .bcv-mring__track'),
     times: t('.bcv-mcard__when'), quote: t('.bcv-mcard__quote'), chips: t('.bcv-mcard__chip'), bubbles: t('.bcv-mcard__btext'), head: t('.bcv-mcard__attempts .bcv-mcard__head .bcv-mcard__k'), tiles: t('.bcv-mcard__tile'), kept: b.querySelectorAll('.bcv-mcard__tile.is-kept').length,
   }; });
   const subFb = await subCard();
-  check(!/bcv=feedback/.test(subFb.url) && subFb.value === 'Submitted' && !subFb.label && /^F26-SPRK 010 103 · Text entry · .* · Attempt 2 · 1 comment$/.test(subFb.note || '') && subFb.pct === '—' && !subFb.rubric && subFb.track && /^Submitted [A-Z]/.test(subFb.times[0] || '') && subFb.times[1] === 'Graded Waiting' && subFb.quote.join() === 'Clean water for all. Three sources follow.' && subFb.chips.length === 0 && subFb.bubbles.join() === 'Three sources, APA.' && subFb.head.join() === 'Attempts' && subFb.tiles.join(' | ') === 'Attempt 1 — | Attempt 2 —' && subFb.kept === 0, `an ungraded submission opens the same card: Submitted, Waiting, the latest attempt's words and the comment left with it on show, both attempts as tiles with none kept: ${JSON.stringify(subFb)}`);
+  check(!/bcv=feedback/.test(subFb.url) && subFb.value === 'Submitted' && !subFb.label && /^F26-SPRK 010 103 · Text entry · [A-Z][a-z]{2} \d+ at \d+:\d\d ?(am|pm)$/.test(subFb.note || '') && subFb.pct === '—' && !subFb.rubric && subFb.track && /^Submitted [A-Z]/.test(subFb.times[0] || '') && subFb.times[1] === 'Graded Waiting' && subFb.quote.join() === 'Clean water for all. Three sources follow.' && subFb.chips.length === 0 && subFb.bubbles.join() === 'Three sources, APA.' && subFb.head.join() === 'Attempts' && subFb.tiles.join(' | ') === 'Attempt 1 — | Attempt 2 —' && subFb.kept === 0, `an ungraded submission opens the same card: Submitted, Waiting, the latest attempt's words and the comment left with it on show, both attempts as tiles with none kept: ${JSON.stringify(subFb)}`);
   await page.click('.bcv-mark .bcv-mcard__tile:nth-child(1)');
   const subFb1 = await subCard();
   check(subFb1.chips.length === 2 && /grand-challenge-notes\.docx/.test(subFb1.chips[0]) && /GC-articles-Sharma\.pdf/.test(subFb1.chips[1]) && subFb1.quote.length === 0 && subFb1.bubbles.length === 0, `and the first attempt's tile its own files (and none of the latest's comment): ${JSON.stringify({ chips: subFb1.chips, bubbles: subFb1.bubbles })}`);
   await shot(page, '09h-submitted-ungraded');
-  await page.goto(`${BASE}/courses/104/assignments/4002`);
-  await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
-  // To Do rows land on the block and the page's back link returns there
+  await page.keyboard.press('Escape');
+  // To Do rows open the assignment with the hand-in panel grown out of its pill, and the page's back link returns there
   await nav('todo');
   await page.waitForSelector('.bcv-row', { timeout: 10000 });
   await page.locator('.bcv-row', { hasText: 'Research Day Activity' }).first().locator('.bcv-btn--xs', { hasText: 'Submit' }).click();
-  await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
-  const fromTodo = { url: page.url(), back: (await texts('.bcv-cmain .bcv-linkbtn'))[0]?.trim(), inView: await eventually(() => inView('#bcv-submit')), drop: (await texts('.bcv-sb__dropsub'))[0], tabs: (await texts('.bcv-sb__tab')).join(' | ') };
-  check(fromTodo.url === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && fromTodo.back === 'To Do' && fromTodo.inView && fromTodo.drop.startsWith('Any file type') && fromTodo.tabs === 'File upload | Text entry', `a To Do row opens the assignment scrolled to the block, with To Do as the way back; no Other tab when the course has no tools: ${JSON.stringify(fromTodo)}`);
+  await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand .bcv-sb__foot', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  const inView = (sel) => page.$eval(sel, (el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth; });
+  const fromTodo = { url: page.url(), back: (await texts('.bcv-asg__back'))[0]?.trim(), inView: await eventually(() => inView('.bcv-sheet-ov--card .bcv-hand')), drop: (await texts('.bcv-sb__dropsub'))[0], tabs: (await texts('.bcv-sb__tab')).join(' | ') };
+  check(fromTodo.url === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && fromTodo.back === 'To Do' && fromTodo.inView && fromTodo.drop.startsWith('Any file type') && fromTodo.tabs === 'File upload | Text entry', `a To Do row opens the assignment with the hand-in panel open, To Do the way back; no Other tab when the course has no tools: ${JSON.stringify(fromTodo)}`);
   await shot(page, '09g-submit-from-todo');
+  await page.keyboard.press('Escape');
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov')), 3000), 'Escape folds the panel back into the pill');
   } // submission
   if (on('groups')) {
 
@@ -2658,10 +2651,11 @@ try {
   const dis01 = (await page.$$('.bcv-body .bcv-row')).filter(async () => true);
   for (const r of dis01) if (/Dis01/.test(await r.textContent())) { await r.click(); break; }
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10'), 'assignment detail loads');
-  // the rubric is the ring, a press away from Submit assignment, not a card down the page
-  check((await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric' && !(await page.$('.bcv-rr-ov, .bcv-rubg')), 'the rubric is a press away from Submit assignment, not spent on the page');
-  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-asg__facts'))[0].replace(/\s+/g, ' ').includes('Points 10'), 'assignment detail loads');
+  // the rubric is the ring, a press away (its box among the facts), not a card down the page
+  await page.waitForSelector('.bcv-asg__fact--rubric', { timeout: 5000 });
+  check(/^Rubric 2 criteria/.test((await texts('.bcv-asg__fact--rubric'))[0].replace(/\s+/g, ' ')) && !(await page.$('.bcv-rr-ov, .bcv-rubg')), 'the rubric is a press away, its box among the facts, not spent on the page');
+  await page.click('.bcv-asg__fact--rubric');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(150);
   // before grading: a clean circle, each colour's stretch its share of the points, nothing marked
@@ -2690,7 +2684,7 @@ try {
   await page.mouse.click(vp.width - 24, Math.round(vp.height / 2));
   const besideRing = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 }).then(() => true).catch(() => false);
   check(besideBar && besideRing, `a press beside the bar rolls it back into the ring, and one beside the ring closes it (${besideBar}/${besideRing})`);
-  check((await texts('.bcv-btn--primary'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
+  check((await texts('.bcv-asg__pill'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
   await shot(page, '14-assignment');
 
   // discussions
@@ -2905,9 +2899,9 @@ try {
   check(/\/courses\/101\/assignments\/\d+$/.test(page.url()) && (await texts('.bcv-detail__title'))[0] === gradeRow.name, `pressing the row lands on that assignment: ${page.url()}`);
   // and the mark is the first thing on it, not something to go looking for in the side column
   const top = await page.evaluate(() => {
-    const g = document.querySelector('.bcv-detail__grade');
+    const g = document.querySelector('.bcv-asg__pill.is-graded');
     const body = document.querySelector('.bcv-prose');
-    return g ? { score: g.querySelector('.bcv-detail__gradescore')?.textContent, of: g.querySelector('.bcv-detail__gradeof')?.textContent, pc: g.querySelector('.bcv-detail__gradepc')?.textContent, aboveText: !!body && g.compareDocumentPosition(body) === Node.DOCUMENT_POSITION_FOLLOWING } : null;
+    return g ? { score: g.querySelector('.bcv-asg__score')?.textContent, of: g.querySelector('.bcv-asg__of')?.textContent, pc: g.querySelector('.bcv-asg__pct')?.textContent, aboveText: !!body && g.compareDocumentPosition(body) === Node.DOCUMENT_POSITION_FOLLOWING } : null;
   });
   // the same numbers the row carried, as a percentage too, and above the assignment's own text
   const [rowEarned, rowPoss] = gradeRow.score.split(' / ');
@@ -2968,8 +2962,10 @@ try {
   check(await mockScore({ assignmentId: '1001', score: 15 }), 'a new mark lands in Canvas for it, behind the page\'s back');
   // a tool's frame on screen in between (Box, in the submit block of another course's assignment), then back to Grades, all in place
   await appGo('/courses/104/assignments/4002');
-  await page.waitForSelector('.bcv-sb--embed', { timeout: 15000 });
-  if (await page.$('.bcv-sb__done')) { await page.click('.bcv-sb__donebtns .bcv-sb__btn:not(.bcv-sb__btn--primary)'); await page.waitForSelector('.bcv-sb__tabs', { timeout: 5000 }); }
+  await page.waitForSelector('.bcv-asg__pill', { timeout: 15000 });
+  await page.click('.bcv-asg__pill.is-go, .bcv-asg__again'); // (the hand-in panel, grown out of the pill)
+  await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand .bcv-sb__tabs', { timeout: 5000 });
+  await page.waitForTimeout(450);
   await page.click('.bcv-sb__tab[data-tab=other]');
   await page.click('.bcv-sb__tool');
   await page.waitForSelector('.bcv-sheet--tool .bcv-sb__frame', { timeout: 5000 });
@@ -4078,9 +4074,10 @@ try {
 
   await page.goto(`${BASE}/courses/104/assignments/4003`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Start assignment' && !(await page.$('.bcv-frame')) && !(await texts('.bcv-detail__actions .bcv-btn')).includes('Open in Canvas'), `an external-tool assignment offers Start assignment, no frame on the page and no Open in Canvas (${(await texts('.bcv-detail__actions .bcv-btn')).join(',')})`);
+  await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
+  check((await texts('.bcv-asg__pill'))[0] === 'Start assignment' && !(await page.$('.bcv-frame')) && !(await texts('.bcv-asg__action')).join(' ').includes('Open in Canvas'), `an external-tool assignment offers Start assignment, no frame on the page and no Open in Canvas (${(await texts('.bcv-asg__action')).join(',')})`);
   const knewtonOpening = context.waitForEvent('page', { timeout: 20000 });
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.click('.bcv-asg__pill');
   const knewton = await knewtonOpening;
   await knewton.waitForLoadState('domcontentloaded');
   await eventually(async () => !!(await barRead(knewton)), 20000);
@@ -4137,10 +4134,10 @@ try {
   check(knewton.isClosed() && page.url().endsWith('/courses/104/assignments/4003'), 'and the X hands the assignment page back');
   // a grade the tool posts after its launch lands on the page by itself: the submission is asked for
   // again once the tool has loaded, and again for a while, and the mark is drawn when it changes
-  check((await page.$('.bcv-detail__grade')) === null, 'the tool assignment starts with no chip: nothing handed in, nothing marked');
+  check((await page.$('.bcv-asg__pill.is-graded')) === null, 'the tool assignment starts with no grade: nothing handed in, nothing marked');
   await mockScore({ assignmentId: 4003, score: 17 });
-  await page.waitForSelector('.bcv-detail__grade', { timeout: 15000 });
-  check((await texts('.bcv-detail__gradescore'))[0] === '17' && (await texts('.bcv-detail__gradeof'))[0] === '/ 20' && !(await page.$('.bcv-detail__grade--sub')) && page.url().endsWith('/courses/104/assignments/4003'), `a grade the tool passes back after the launch shows without a reload: ${(await texts('.bcv-detail__gradescore'))[0]} ${(await texts('.bcv-detail__gradeof'))[0]}`);
+  await page.waitForSelector('.bcv-asg__pill.is-graded', { timeout: 15000 });
+  check((await texts('.bcv-asg__score'))[0] === '17' && (await texts('.bcv-asg__of'))[0] === '/ 20' && /^Graded · /.test((await texts('.bcv-asg__status'))[0]) && page.url().endsWith('/courses/104/assignments/4003'), `a grade the tool passes back after the launch shows without a reload, the pill turning into it: ${(await texts('.bcv-asg__score'))[0]} ${(await texts('.bcv-asg__of'))[0]}`);
   await mockScore({ assignmentId: 4003, score: null });
   await shot(page, '14b-assignment-tool');
 

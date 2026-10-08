@@ -57,29 +57,26 @@
    *  moment's rest on it, not again under a pointer that has not moved since the box folded back into
    *  it). A press still opens at once. */
   const hoverOpens = U.hoverOpens;
-  function openMarkBox(ctx, c, a, s, from, { hover = false } = {}) {
+  /** (2.99.13) A box that grows out of what opened it (U.cardBox): the mark's card from a grade, the hand-in panel from the
+   *  assignment's big pill. `make(api)` fills it — { cls, kids, measure(), glide?: [[box's word, button's word]] } — and
+   *  can call api.swap(make2) to turn it into something else in place (the card's Submit again), api.relayout() when what
+   *  it holds changes height, api.close() to fold it back. `anchor` is the button's corner it hangs from: 'right' (a chip
+   *  at the end of a row) or 'left' (a pill at the start of one). */
+  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null } = {}, make) {
     const prev = document.querySelector('.bcv-sheet-ov');
-    if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return; } // (pressed again as it folds: it opens again from where it is)
+    if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return prev.bcvApi; } // (pressed again as it folds: it opens again from where it is)
     if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
-    const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
-    const posted = scored && s.posted_at !== null, held = scored && s.posted_at === null;
-    const word = (sel) => from.querySelector(sel)?.textContent?.trim() || '';
-    // the header's words are the chip's own, so each glides from where it stands: the score (or the standing) as the value, the percent beside it, the when-line in the note
-    const value = posted ? store.fmtPts(s.score) : word('.bcv-detail__gradepc') || 'Submitted'; // (the chip's own word, exactly, so it glides from where it stands: the score alone, or the standing)
-    const label = posted ? `/ ${a.points_possible ?? '—'}` : ''; // (2.99.10: the share is the ring's, beside it)
-    const when = word('.bcv-detail__gradewhen');
-    const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': `${a.name}: ${posted ? 'your mark' : 'what you handed in'}` }); // (is-far: the dim and blur start out wide, to close in on the box)
+    const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': label }); // (is-far: the dim and blur start out wide, to close in on the box)
     let folding = false;
-    let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the chip)
-    // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 400 wide,
-    // as tall as what it holds up to 560 (2.99.10: a compact card, not a panel), or what the window allows, pushed back inside it
-    const M = 16, W = 400, H = 560;
-    let boxH = H; // (as tall as its content wants, up to H: measured once built)
+    let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the button)
+    let width = W, boxH = H; // (as tall as its content wants, up to H: measured once built)
+    const M = 16;
     function geometry(back) {
       const r = from.getBoundingClientRect();
       if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
-      const vw = innerWidth, vh = innerHeight, w = Math.min(W, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
-      return { x: Math.max(M, Math.min(r.right - w, vw - M - w)), y: Math.max(M, Math.min(r.top, vh - M - hgt)), w, h: hgt };
+      const vw = innerWidth, vh = innerHeight, w = Math.min(width, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
+      const x = anchor === 'left' ? r.left : r.right - w;
+      return { x: Math.max(M, Math.min(x, vw - M - w)), y: Math.max(M, Math.min(r.top, vh - M - hgt)), w, h: hgt };
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
     const onKey = (e) => {
@@ -94,11 +91,13 @@
       if (folding || !ov.isConnected) return;
       folding = true;
       document.removeEventListener('keydown', onKey);
-      U.hoverCool(from, lastPt); // (a pointer still over the chip as the box folds into it does not open it again until it has left)
+      U.hoverCool(from, lastPt); // (a pointer still over the button as the box folds into it does not open it again until it has left)
       ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
-      box.fold(); // (from wherever it is drawn — mid-growth too — back into the chip, its word back to the chip's)
+      box.fold(); // (from wherever it is drawn — mid-growth too — back into the button, its word back to the button's)
+      from.setAttribute?.('aria-expanded', 'false');
       clearTimeout(ov._bcvFoldT);
-      ov._bcvFoldT = setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 560);
+      ov._bcvFoldT = setTimeout(() => { ov.remove(); onClosed?.(); }, U.reducedMotion() ? 0 : 560);
+      if (from.isConnected) from.focus?.({ preventScroll: true }); // (keyboard users land back on what opened it)
     };
     // pressed again as it folds: the fold is called off and it opens again from where it has got to
     ov.bcvCard = from;
@@ -108,49 +107,45 @@
       ov.classList.remove('is-folding', 'is-far');
       document.addEventListener('keydown', onKey);
       box.reopen();
+      from.setAttribute?.('aria-expanded', 'true');
       ov.focus();
     };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey);
     ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
-    // (2.99.10) the card: the ring (the rubric's, where there is one: a press on it opens the rubric), the score, the
-    // work's name, its course and kind; then what feedback.card draws — when, the words, the attempts, a comment
-    const F = BCV.screens.feedback;
-    const built = F.card(ctx, c, a, s);
-    // the ring pressed: the rubric takes the stage, the card stepping back under it, and comes back as the rubric goes
-    // (onto the ring it was opened from). The rubric's own code was loaded before the card was built (openMark).
-    const toRubric = () => {
-      ov.classList.add('is-under');
-      CS().openRubric(a, s);
-      const t0 = Date.now();
-      let seen = false;
-      const back = () => {
-        if (!ov.isConnected) return;
-        const rr = document.querySelector('.bcv-rr-ov');
-        seen = seen || !!rr;
-        if (rr ? !rr.classList.contains('is-leaving') && !rr.classList.contains('is-closing') : !seen && Date.now() - t0 < 4000) { setTimeout(back, 90); return; }
-        ov.classList.remove('is-under');
-      };
-      back();
+    const sheet = U.el('bcv-sheet bcv-sheet--card bcv-grow is-at-card'); // (bcv-grow: the button's own look while it is the button's size)
+    for (const [k, v] of Object.entries(vars || {})) if (v) sheet.style.setProperty(k, v); // (the page's own colours: the box lives outside it)
+    let content = null;
+    const measure = () => Math.min(H, Math.max(120, Math.ceil(content.measure())));
+    const api = {
+      ov, sheet, close, folding: () => folding,
+      /** What it holds changed height: the box takes its new size, the clip growing (or shrinking) to it. */
+      relayout() { if (!ov.isConnected || folding || !box) return; boxH = measure(); box.relayout(); },
+      /** Turn into something else in place (the card's Submit again → the hand-in panel). */
+      swap(make2, { W: w2 = width } = {}) {
+        if (folding) return;
+        for (const k of [...sheet.children]) if (!k.classList.contains('bcv-mark__ghost')) k.remove();
+        if (content?.cls) sheet.classList.remove(...content.cls.split(/\s+/).filter(Boolean));
+        content = make2(api);
+        if (content.cls) sheet.classList.add(...content.cls.split(/\s+/).filter(Boolean));
+        sheet.append(...content.kids.filter(Boolean));
+        width = w2;
+        box.layout();
+        boxH = measure();
+        box.relayout();
+        content.after?.();
+      },
     };
-    const sheet = U.el('bcv-sheet bcv-sheet--card bcv-mark is-at-card', [
-      U.el('bcv-sheet__head bcv-mark__head', [
-        h('span', { class: 'bcv-sheet__tile bcv-mark__ringslot' }, F.ring(a, s, { onRubric: toRubric })),
-        U.el('bcv-sheet__titles', [
-          U.el('bcv-sheet__line', [U.text('bcv-sheet__value', value, 'span'), label ? U.text('bcv-sheet__label', label, 'span') : null]),
-          U.text('bcv-mark__title bcv-pretty', a.name),
-          U.el('bcv-sheet__note bcv-mark__meta', [h('span', { class: 'bcv-mark__dot', style: { background: c.color || 'var(--bcv-ink3)' }, 'aria-hidden': 'true' }), U.text('bcv-ellip', [c.shortName || c.name, F.kindOf(a, s), when && !posted ? when : null].filter(Boolean).join(' · '), 'span')]),
-        ]),
-        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
-      ]),
-      U.el('bcv-sheet__list bcv-mark__body', [built.el]),
-    ]);
+    ov.bcvApi = api;
+    content = make(api);
+    if (content.cls) sheet.classList.add(...content.cls.split(/\s+/).filter(Boolean));
+    sheet.append(...content.kids.filter(Boolean));
     ov.append(sheet, U.el('bcv-card-blur', null, { 'aria-hidden': 'true' })); // (the page blurred round the box: a layer of its own)
-    // the box wears the chip's own look while it is the chip's size — its fill, edge and corners — and a copy of the chip's
-    // words sits over its header, so the first frame is the chip exactly, and the last frame of the fold too; the copy
-    // fades as the box grows (the header's own words fade in), all but the one word that glides, left out of the copy
-    // (the chip's fill is a tint over the card it sits on — flattened onto that card here, or the box would be see-through
-    // while it is the chip, the page and the chip itself showing through it)
+    // the box wears the button's own look while it is the button's size — its fill, edge and corners — and a copy of the
+    // button's words sits over its header, so the first frame is the button exactly, and the last frame of the fold too;
+    // the copy fades as the box grows (the box's own words fade in), all but the one word that glides, left out of the copy
+    // (a fill that is a tint over the card it sits on is flattened onto that card here, or the box would be see-through
+    // while it is the button, the page and the button itself showing through it)
     const rgba = (str) => { const m = /rgba?\(([^)]+)\)/.exec(str || ''); if (!m) return null; const [r, g, b, a = 1] = m[1].split(',').map((x) => parseFloat(x)); return { r, g, b, a: Number.isFinite(a) ? a : 1 }; };
     const under = (el) => { for (let e = el.parentElement; e; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c && c.a > 0) return c; } return { r: 255, g: 255, b: 255, a: 1 }; };
     const flat = (top, base) => `rgb(${Math.round(top.r * top.a + base.r * (1 - top.a))}, ${Math.round(top.g * top.a + base.g * (1 - top.a))}, ${Math.round(top.b * top.a + base.b * (1 - top.a))})`;
@@ -158,38 +153,118 @@
     const bg = rgba(cs.backgroundColor), edge = rgba(cs.borderTopColor);
     const bgFlat = bg && bg.a > 0 ? flat(bg, base) : flat({ ...base, a: 1 }, base);
     sheet.style.setProperty('--bcv-mark-bg', bgFlat);
-    sheet.style.setProperty('--bcv-mark-edge', edge && edge.a > 0 ? flat(edge, rgba(bgFlat)) : bgFlat);
+    sheet.style.setProperty('--bcv-mark-edge', edge && edge.a > 0 && parseFloat(cs.borderTopWidth) > 0 ? flat(edge, rgba(bgFlat)) : bgFlat);
     sheet.style.setProperty('--bcv-mark-r', cs.borderTopLeftRadius);
-    const glideSel = posted ? '.bcv-detail__gradescore' : '.bcv-detail__gradepc';
-    const copy = h('div', { class: 'bcv-mark__ghost', 'aria-hidden': 'true' });
-    Object.assign(copy.style, { width: `${Math.max(0, r0.width - 2)}px`, height: `${Math.max(0, r0.height - 2)}px`, padding: cs.padding, columnGap: cs.columnGap }); // (inside the box's own 1px edge, laid out as the chip lays its words)
+    const glide = (content.glide || []).filter(([el, b]) => el && b);
+    const copy = h('div', { class: 'bcv-mark__ghost', 'aria-hidden': 'true', style: { color: cs.color, justifyContent: cs.justifyContent, alignItems: cs.alignItems, font: cs.font } });
+    Object.assign(copy.style, { width: `${Math.max(0, r0.width - 2)}px`, height: `${Math.max(0, r0.height - 2)}px`, padding: cs.padding, columnGap: cs.columnGap }); // (inside the box's own 1px edge, laid out as the button lays its words)
     for (const n of from.childNodes) copy.append(n.cloneNode(true));
-    copy.querySelector(glideSel)?.style.setProperty('visibility', 'hidden'); // (that word is the header's, gliding)
+    for (const [, b] of glide) { const sel = b.dataset.glide; if (sel) copy.querySelector(`[data-glide="${sel}"]`)?.style.setProperty('visibility', 'hidden'); } // (that word is the box's, gliding)
     sheet.append(copy);
     box = U.cardBox({ ov, sheet, card: from, geometry: () => geometry(false), cardRadius: cs.borderTopLeftRadius });
     box.layout(); // (full size, unpainted: the content measured at the width it will have)
     document.body.append(ov);
-    // (what it holds, measured — not the list, which stretches to the box and read as the whole 640 every time)
-    boxH = Math.min(H, Math.max(140, sheet.querySelector('.bcv-sheet__head').offsetHeight + built.el.offsetHeight + 2));
-    // laid out where it goes, at its measured height, and drawn only where the chip is — the copy of the chip's words
-    // set over the chip's own place in it — before anything is painted: the first frame is the chip
+    boxH = measure();
+    // laid out where it goes, at its measured height, and drawn only where the button is — the copy of its words set over the
+    // button's own place in it — before anything is painted: the first frame is the button
     const g0 = box.start();
-    Object.assign(copy.style, { right: `${Math.round(g0.x + g0.w - r0.right)}px`, top: `${Math.round(r0.top - g0.y)}px` });
-    // it grows out of the chip; the chip's score (or standing) glides into the header's own word
-    box.open([[sheet.querySelector('.bcv-sheet__value'), from.querySelector(glideSel)]].filter(([el, b]) => el && b));
+    if (anchor === 'left') Object.assign(copy.style, { left: `${Math.round(r0.left - g0.x)}px`, right: 'auto', top: `${Math.round(r0.top - g0.y)}px` });
+    else Object.assign(copy.style, { right: `${Math.round(g0.x + g0.w - r0.right)}px`, top: `${Math.round(r0.top - g0.y)}px` });
+    box.open(glide);
+    from.setAttribute?.('aria-expanded', 'true');
     const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) box.relayout(); };
     addEventListener('resize', onResize);
     ov.tabIndex = -1;
     ov.focus();
+    content.after?.();
     // opened by a hover, it folds again once the pointer has been off it a moment — unless it was
     // taken up (a press in it, a key, a field): then it stays, as a pressed one does
     if (hover) U.hoverHold(ov, sheet, close, () => folding);
-    // the page's copy of the submission is what the chip was drawn from; Canvas is asked once more for what came since (a comment, another attempt), and the box redraws still if it answers with more
+    return api;
+  }
+
+  /** The mark's card (2.99.10, the mockups): the ring (the rubric's, where there is one: a press on it opens the rubric),
+   *  the score, the work's name, its course and kind; then what feedback.card draws — when, the words, the attempts, a
+   *  comment. `again` (2.99.13): a Submit again pill at its foot, turning the card into the hand-in panel in place. */
+  function markContent(ctx, c, a, s, api, { value, label = '', when = '', again = null, glideFrom = null, side = false } = {}) {
+    const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
+    const posted = scored && s.posted_at !== null;
+    const F = BCV.screens.feedback;
+    const built = F.card(ctx, c, a, s, { side });
+    // the ring pressed: the rubric takes the stage, the card stepping back under it, and comes back as the rubric goes
+    // (onto the ring it was opened from). The rubric's own code was loaded before the card was built (openMark).
+    const toRubric = () => {
+      api.ov.classList.add('is-under');
+      CS().openRubric(a, s);
+      const t0 = Date.now();
+      let seen = false;
+      const back = () => {
+        if (!api.ov.isConnected) return;
+        const rr = document.querySelector('.bcv-rr-ov');
+        seen = seen || !!rr;
+        if (rr ? !rr.classList.contains('is-leaving') && !rr.classList.contains('is-closing') : !seen && Date.now() - t0 < 4000) { setTimeout(back, 90); return; }
+        api.ov.classList.remove('is-under');
+      };
+      back();
+    };
+    const valueEl = U.text('bcv-sheet__value', value, 'span');
+    const head = U.el('bcv-sheet__head bcv-mark__head', [
+      h('span', { class: 'bcv-sheet__tile bcv-mark__ringslot' }, F.ring(a, s, { onRubric: toRubric })),
+      U.el('bcv-sheet__titles', [
+        U.el('bcv-sheet__line', [valueEl, label ? U.text('bcv-sheet__label', label, 'span') : null]),
+        U.text('bcv-mark__title bcv-pretty', a.name),
+        U.el('bcv-sheet__note bcv-mark__meta', [h('span', { class: 'bcv-mark__dot', style: { background: c.color || 'var(--bcv-ink3)' }, 'aria-hidden': 'true' }), U.text('bcv-ellip', [c.shortName || c.name, F.kindOf(a, s), when && !posted ? when : null].filter(Boolean).join(' · '), 'span')]),
+      ]),
+      side ? null : h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: api.close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+    ]);
+    const againRow = again ? U.el('bcv-mark__again', [h('button', { type: 'button', class: 'bcv-mark__againbtn', onclick: again }, [U.svg('M12 19V5M6 11l6-6 6 6', { size: 14, stroke: 'currentColor', width: 2.4 }), 'Submit again'])]) : null;
+    // (under when it was handed in and marked: in sight as the card opens, not below the attempts)
+    const placeAgain = () => { if (!againRow || againRow.isConnected) return; const t = built.el.querySelector('.bcv-mcard__times'); if (t) t.after(againRow); else built.el.querySelector('.bcv-mcard__body')?.prepend(againRow); };
+    placeAgain();
+    const keepAgain = placeAgain;
+    // the page's copy of the submission is what the button was drawn from; Canvas is asked once more for what came since (a comment, another attempt), and the box redraws still if it answers with more
     store.submission(c.id, a.id, { force: true }).then((fresh) => {
-      if (!fresh || !ov.isConnected || folding || JSON.stringify(fresh) === JSON.stringify(s)) return;
+      if (!fresh || !api.ov.isConnected || api.folding() || JSON.stringify(fresh) === JSON.stringify(s)) return;
       built.setSub(fresh);
-      if (U.still) U.still(() => built.redraw()); else built.redraw();
+      if (U.still) U.still(() => { built.redraw(); keepAgain(); }); else { built.redraw(); keepAgain(); }
     }).catch(() => {});
+    if (side) {
+      // (2.99.13) sideways: the mark and the work on the left, what is said about it on the right — its own column, the
+      // newest words at its foot by the comment pill, the × at its top
+      const left = U.el('bcv-mark__left', [head, U.el('bcv-mark__body', [built.el])]);
+      const right = U.el('bcv-mark__right', [
+        U.el('bcv-mark__chathead', [U.text('bcv-mark__chatk', 'Comments', 'span'), h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: api.close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }))]),
+        built.chat,
+      ]);
+      return {
+        cls: 'bcv-mark bcv-mark--side',
+        kids: [U.el('bcv-mark__cols', [left, right])],
+        measure: () => Math.max(head.offsetHeight + built.el.offsetHeight, 380) + 2,
+        glide: glideFrom ? [[valueEl, glideFrom]] : [],
+      };
+    }
+    return {
+      cls: 'bcv-mark',
+      kids: [head, U.el('bcv-sheet__list bcv-mark__body', [built.el])],
+      // (what it holds, measured — not the list, which stretches to the box and read as the whole box every time)
+      measure: () => head.offsetHeight + built.el.offsetHeight + 2,
+      glide: glideFrom ? [[valueEl, glideFrom]] : [],
+    };
+  }
+
+  const courseVars = (c) => ({ '--bcv-cc': c.color || null, '--bcv-cc-ink': c.palette?.text || c.color || null });
+  function openMarkBox(ctx, c, a, s, from, { hover = false, again = null, anchor = 'right', onClosed = null } = {}) {
+    const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
+    const posted = scored && s.posted_at !== null;
+    const word = (sel) => from.querySelector(sel)?.textContent?.trim() || '';
+    // the header's words are the button's own where it has them, so each glides from where it stands
+    const value = posted ? store.fmtPts(s.score) : word('.bcv-detail__gradepc') || word('[data-glide="word"]') || (s.excused ? 'Excused' : 'Submitted');
+    const label = posted ? `/ ${a.points_possible ?? '—'}` : ''; // (2.99.10: the share is the ring's, beside it)
+    const when = word('.bcv-detail__gradewhen') || (s.submitted_at ? U.fmtAt(s.submitted_at) : '');
+    const glideFrom = from.querySelector(posted ? '.bcv-detail__gradescore, [data-glide="score"]' : '.bcv-detail__gradepc, [data-glide="word"]');
+    if (glideFrom && !glideFrom.dataset.glide) glideFrom.dataset.glide = 'g';
+    const side = innerWidth >= 860; // (sideways where there is room for it: the comments a column to the right)
+    return growBox(ctx, from, { label: `${a.name}: ${posted ? 'your mark' : 'what you handed in'}`, W: side ? 720 : 400, H: 560, anchor, hover, onClosed, vars: courseVars(c) }, (api) => markContent(ctx, c, a, s, api, { value, label, when, again: again ? () => again(api) : null, glideFrom, side }));
   }
 
   const D = {};
@@ -295,98 +370,188 @@
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
     if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill });
-    // Handing in lives inside the assignment (mockup 11): the block sits at the end of the same
-    // scroll as the instructions, built from the assignment already loaded for this page. The
-    // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
+    // (2.99.13) The assignment page, to the mockup: the way back and the assignments either side on one row; the title and
+    // one pill saying where the work stands; the facts in boxes (due, points, how it is handed in, the rubric); then the
+    // one big pill — Submit assignment, which grows into the hand-in panel; once marked, the grade, which grows into the
+    // mark's card (Submit again inside it) — and the instructions. Every fact is said once.
     const fromTodo = route.params.get('from') === 'todo';
     const back = fromTodo ? { href: '/#todo', label: 'To Do' } : app.backTo ? app.backTo({ href: `${c.url}/assignments`, label: 'Assignments' }) : { href: `${c.url}/assignments`, label: 'Assignments' };
     app.nameHere?.(a.name); // the next screen's Back names this assignment
-    const block = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back }) : null;
+    if (a.rubric?.length) BCV.lazy?.load?.('rubric').catch(() => {}); // (the rubric's box wears the rubric's own ring, and so does the mark's card)
+    if (!BCV.phone?.active?.()) BCV.lazy?.load?.('submit').catch(() => {});
+    // the hand-in panel, built once with the page (files attached and a comment written outlive its being closed)
+    const hooks = { close: null, layout: null, done: null };
+    const handScreen = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { pop: hooks, a, sub: s, back }) : null;
     if (!ctx.alive()) return b;
-    const toBlock = (behavior = 'smooth') => block?.scrollIntoView({ behavior, block: 'start' });
-    // The mark beside the title: the way in to what is behind it. Ungraded, no chip at all; a score
-    // Canvas has not posted shows no number, because an unposted 0 reads exactly like a real one.
-    // (the comments on it, a late penalty, and how the class did — Canvas's own mean, high and low
-    // on a marked assignment — are said on the chip, not left in the answer)
-    const commentsN = (x) => (x.submission_comments || []).length;
-    const letterOf = (x) => (a.grading_type && a.grading_type !== 'points' && x.grade !== null && x.grade !== undefined ? String(x.grade) : null);
-    const lateWord = (x) => (x.late ? `late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null);
-    const stats = a.score_statistics && a.score_statistics.mean !== null && a.score_statistics.mean !== undefined ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : null;
-    const hoverMark = (x) => (btn) => (btn ? hoverOpens(btn, (b) => openMark(ctx, c, a, x, b, { hover: true })) : btn);
-    const gradeChip = (x) => hoverMark(x)(postedOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: (e) => openMark(ctx, c, a, x, e.currentTarget) }, [
-      U.el('bcv-detail__gradev', [
-        h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(x.score) }),
-        h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
-      ]),
-      h('div', { class: 'bcv-detail__gradeside' }, [
-        U.text('bcv-detail__gradepc', letterOf(x) || (a.points_possible ? `${Math.round((Number(x.score) / Number(a.points_possible)) * 100)}%` : ''), 'span'),
-        U.text('bcv-detail__gradewhen', [x.graded_at ? U.fmtAt(x.graded_at) : 'Marked', lateWord(x), commentsN(x) ? U.plural(commentsN(x), 'comment') : null].filter(Boolean).join(' · '), 'span'),
-        stats ? U.text('bcv-detail__gradestats', stats, 'span') : null,
-      ]),
-      U.chev(),
-    ]) : heldOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Feedback, attempts and comments', onclick: (e) => openMark(ctx, c, a, x, e.currentTarget) }, [
-      h('div', { class: 'bcv-detail__gradeside' }, [
-        U.text('bcv-detail__gradepc', 'Not yet posted', 'span'),
-        U.text('bcv-detail__gradewhen', 'Your instructor has not released it', 'span'),
-      ]),
-      U.chev(),
-    // handed in and waiting: the same chip, in the plain fill, and the same way in — what was handed
-    // in is there to be looked at before a mark exists, not only after
-    ]) : x.submitted_at || x.excused ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--sub', title: 'What you handed in, and comments', onclick: (e) => openMark(ctx, c, a, x, e.currentTarget) }, [
-      h('div', { class: 'bcv-detail__gradeside' }, [
-        U.text('bcv-detail__gradepc', statusOf(x), 'span'),
-        U.text('bcv-detail__gradewhen', [x.submitted_at ? U.fmtAt(x.submitted_at) : null, x.attempt ? `Attempt ${x.attempt}` : null, commentsN(x) ? U.plural(commentsN(x), 'comment') : null].filter(Boolean).join(' · ') || 'Nothing to hand in', 'span'),
-      ]),
-      U.chev(),
-    ]) : null);
-    const titleEl = h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name });
-    // nothing handed in: where it stands beside the title — Missing (past due), Opens …, Closed — in the same words as every list
-    const standing = (() => { if (gradeChip(s)) return null; const st = store.workStatus(a, s); return st.kind ? U.statusBadge(st, '') : null; })();
-    const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s) || standing]);
-    // a mark to open: what its box holds is fetched now, so the first hover opens the box at once (lazy.js)
-    if (!standing && !BCV.phone?.active?.()) {
-      BCV.lazy?.load?.('submit').catch(() => {});
-      if (a.rubric?.length) BCV.lazy?.load?.('rubric').catch(() => {}); // (the card's ring is the rubric's own)
+    const D0 = (v) => U.parse(v);
+    const longAt = (d) => `${U.DAYS[d.getDay()]}, ${U.fmtShort(d)} at ${U.fmtTime(d)}`;
+    const shortAt = (d) => `${U.fmtShort(d)}, ${U.fmtTime(d)}`;
+    const due = D0(a.due_at), lockAt = D0(a.lock_at), unlockAt = D0(a.unlock_at);
+    const pct = (x) => (postedOf(x) && Number(a.points_possible) > 0 ? Math.round((Number(x.score) / Number(a.points_possible)) * 100) : null);
+    const toneOf = (p) => (p === null ? 'green' : p >= 80 ? 'green' : p >= 60 ? 'orange' : 'red');
+    const used = (x) => Number(x.attempt) || 0;
+    const allowed = a.allowed_attempts > 0 ? a.allowed_attempts + (s.extra_attempts || 0) : 0;
+    const closedNow = () => !!lockAt && lockAt < Date.now();
+    const lockedNow = () => !closedNow() && (!!(unlockAt && unlockAt > Date.now()) || !!a.locked_for_user);
+    const leftOf = (x) => !allowed || used(x) < allowed;
+    const canAgain = (x) => !!handScreen && a.can_submit !== false && !closedNow() && !lockedNow() && leftOf(x);
+    const SHORT = { online_upload: 'file', online_text_entry: 'text', online_url: 'link', media_recording: 'media', student_annotation: 'annotation', external_tool: 'external tool', online_quiz: 'quiz', discussion_topic: 'discussion post', on_paper: 'on paper', none: 'nothing' };
+    const LONE = { online_upload: 'File upload', online_text_entry: 'Text entry', online_url: 'Website URL', media_recording: 'Media recording', student_annotation: 'Annotation', external_tool: 'External tool', online_quiz: 'Online quiz', discussion_topic: 'Discussion', on_paper: 'On paper', none: 'Nothing to hand in' };
+    const typeList = (a.submission_types || []).filter((t) => t !== 'not_graded');
+    const order = ['online_text_entry', 'online_upload', 'online_url', 'media_recording', 'student_annotation', 'external_tool', 'online_quiz', 'discussion_topic', 'on_paper', 'none'];
+    const sortedTypes = typeList.slice().sort((x, y) => order.indexOf(x) - order.indexOf(y));
+    const howWord = sortedTypes.length === 1 ? (LONE[sortedTypes[0]] || sortedTypes[0]) : (() => { const w = sortedTypes.map((t) => SHORT[t] || t); const j = w.length <= 1 ? w.join('') : `${w.slice(0, -1).join(', ')} or ${w[w.length - 1]}`; return j.charAt(0).toUpperCase() + j.slice(1); })() || 'Nothing to hand in';
+    const attemptsWord = (x) => (allowed ? (used(x) ? `${used(x)} of ${U.plural(allowed, 'attempt')} used` : `${U.plural(allowed, 'attempt')} allowed`) : used(x) ? `${U.plural(used(x), 'attempt')} used` : 'Unlimited attempts');
+    const handsIn = nativeSubmit || isTool || canvasOnly || typeList.some((t) => t === 'online_quiz' || t === 'discussion_topic');
+
+    /** Where the work stands, in one pill: { text, tone, icon }. */
+    function standingOf(x) {
+      const CLOCK = 'M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2', LOCK = 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3', TICK = 'M20 6L9 17l-5-5', WARN = 'M12 7v6M12 17h.01M12 3a9 9 0 100 18 9 9 0 000-18z';
+      if (x.excused) return { text: 'Excused', tone: 'grey', icon: TICK };
+      if (postedOf(x)) return { text: `Graded · ${x.graded_at ? longAt(D0(x.graded_at)) : 'marked'}`, tone: 'green', icon: TICK };
+      if (heldOf(x)) return { text: 'Submitted · grade not released yet', tone: 'green', icon: TICK };
+      if (x.submitted_at) return { text: `Submitted${x.late ? ' late' : ''} · ${longAt(D0(x.submitted_at))}`, tone: x.late ? 'orange' : 'green', icon: TICK };
+      if (closedNow()) return { text: `Closed · ${handsIn ? 'no submission' : U.fmtShort(lockAt)}`, tone: handsIn ? 'red' : 'grey', icon: WARN };
+      if (unlockAt && unlockAt > Date.now()) return { text: `Locked · opens ${U.DAYS[unlockAt.getDay()]}, ${U.fmtShort(unlockAt)}`, tone: 'orange', icon: LOCK };
+      if (a.locked_for_user) return { text: `Locked${a.lock_explanation ? ` · ${htmlToText(a.lock_explanation, 90)}` : ''}`, tone: 'orange', icon: LOCK };
+      if (!handsIn) return { text: due ? `${LONE[typeList[0]] || 'Nothing to hand in'} · due ${longAt(due)}` : (LONE[typeList[0]] || 'Nothing to hand in'), tone: 'grey', icon: CLOCK };
+      if (due && due < Date.now()) return { text: `${x.missing ? 'Missing' : 'Past due'} · ${lockAt ? `open until ${shortAt(lockAt)}` : `was due ${shortAt(due)}`}`, tone: x.missing ? 'red' : 'orange', icon: WARN };
+      return { text: due ? `Open · due ${longAt(due)}` : 'Open · no due date', tone: 'blue', icon: CLOCK };
     }
-    // replaceChildren() would print a literal "null" for a missing block, so drop them first
-    main.replaceChildren(...[
-      backBtn(app, back.href, back.label),
-      U.card(U.el('bcv-detail', [
-        // The title and the mark share one wrapping row: the mark is the answer to the question the
-        // page is opened with, and it is the way in to what is behind it — every attempt, what was
-        // handed in, and the thread it came back on. Ungraded, the chip is not there at all and the
-        // title has the row to itself; a score Canvas has not posted shows no number, because an
-        // unposted 0 reads exactly like a real one.
-        headEl,
-        meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', attemptsFact(a, s)]]),
-        U.el('bcv-detail__actions', [
-          // a lock (a prerequisite, a date) holds every kind of hand-in back, and says why in Canvas's words
-          a.locked_for_user && (isTool || nativeSubmit || canvasOnly) ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
-            : isTool ? U.btn(s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', { kind: 'primary', icon: IC.play, iconColor: '#fff', cls: 'bcv-detail__tool', onClick: (e) => { launchTool(e?.currentTarget || null); } })
-              : nativeSubmit ? (a.can_submit === false ? U.badge('Submissions are closed', 'orange')
-                : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => toBlock() })
-                  : U.badge(`No attempts left · ${a.allowed_attempts + (s.extra_attempts || 0)} allowed`, 'orange'))
-                : canvasOnly ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
-          a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
-          a.discussion_topic?.id ? U.btn('Open discussion', { icon: IC.disc, onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
-          // how the marks are decided, beside the decision to hand work in
-          a.rubric?.length ? CS().rubricMorph(U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }), a, s) : null, // (the ring in miniature, on a hover)
-          // where Canvas asks for a mark rather than work, the mark is the page's action
-          (() => { const el = slot('bcv-detail__doneslot'); fill(el, ({ modItem }) => doneButton(ctx, c, a, modItem, { primary: !nativeSubmit && !isTool && !canvasOnly })); return el; })(),
-        ]),
-        a.description ? CS().prose(a.description) : (isTool ? null : U.text('bcv-hint', 'No description.')),
-        (() => { const el = slot('bcv-detail__navslot'); fill(el, ({ nav }) => navRow(app, c, nav)); return el; })(),
-      ]), 'bcv-card--22'),
-      // (an external-tool assignment is done inside the tool, opened full screen from Start assignment)
-      block,
-    ].filter(Boolean));
-    if (block && route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => toBlock('auto'), ms); // opened to hand in: land on the block (again once Canvas's own page has finished loading under us)
+    const statusEl = (x) => { const st = standingOf(x); return h('div', { class: `bcv-asg__status is-${st.tone}` }, [U.svg(st.icon, { size: 14, stroke: 'currentColor', width: 2.2 }), U.text('bcv-asg__statustext', st.text, 'span')]); };
+
+    const GRADING = { points: 'Graded', pass_fail: 'Complete or incomplete', letter_grade: 'Letter grade', gpa_scale: 'GPA scale', percent: 'Percentage', not_graded: 'Not graded' };
+    const fact = (k, v, sub, extra = {}) => h(extra.onclick ? 'button' : 'div', { class: `bcv-asg__fact ${extra.cls || ''}`, type: extra.onclick ? 'button' : null, onclick: extra.onclick || null, title: extra.title || null }, [
+      U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-ellip', v, 'span'), sub ? U.text('bcv-asg__facts bcv-ellip', sub, 'span') : null]),
+      extra.side || null,
+    ]);
+    const dueSub = lockAt && due && lockAt > due ? `Late until ${U.fmtShort(lockAt)}` : lockAt && due && +lockAt === +due ? 'Closes when due' : unlockAt && unlockAt > Date.now() ? `Opens ${U.fmtShort(unlockAt)}` : lockAt && !due ? `Closes ${U.fmtShort(lockAt)}` : due ? 'No late cutoff' : 'Hand in any time';
+    const rubricFact = () => {
+      if (!a.rubric?.length) return null;
+      const ringSlot = h('span', { class: 'bcv-asg__factring', 'aria-hidden': 'true' });
+      const drawRing = () => { const r = BCV.rubricRing?.miniRing?.(a, s, { size: 38 }); if (r) ringSlot.replaceChildren(r); };
+      if (BCV.rubricRing) drawRing(); else BCV.lazy?.load?.('rubric').then(drawRing).catch(() => {});
+      const worth = a.rubric.reduce((n, cr) => n + (Number(cr.points) || 0), 0);
+      return fact('Rubric', U.plural(a.rubric.length, 'criterion', 'criteria'), worth ? `${store.fmtPts(worth)} pts` : null, { cls: 'bcv-asg__fact--rubric', onclick: () => CS().openRubric(a, s), title: 'How it is marked', side: ringSlot });
+    };
+    const factsEl = (x) => U.el(`bcv-asg__facts ${a.rubric?.length ? 'is-four' : ''}`, [
+      fact('Due', due ? shortAt(due) : 'No due date', dueSub),
+      fact('Points', a.points_possible !== null && a.points_possible !== undefined ? store.fmtPts(a.points_possible) : '—', a.omit_from_final_grade ? 'Doesn’t count toward your grade' : (GRADING[a.grading_type] || 'Graded')),
+      fact('Submit as', howWord, handsIn && !typeList.some((t) => t === 'on_paper' || t === 'none') ? attemptsWord(x) : null),
+      rubricFact(),
+    ]);
+
+    // ---- the one big pill ----------------------------------------------------------------------------------------
+    const ICONS = { up: 'M12 19V5M6 11l6-6 6 6', lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3', tick: 'M20 6L9 17l-5-5', x: 'M6 6l12 12M18 6L6 18', play: 'M8 5v14l11-7z', out: 'M9 6h9v9M18 6L7 17' };
+    let current = s; // (the submission as the page knows it: a tool's grade landing, a hand-in sent, redraws from it)
+    let opened = null; // (the box open off the pill, if any)
+    const openHand = (pill, api = null) => {
+      if (!handScreen) return;
+      const content = (bx) => {
+        hooks.close = bx.close;
+        hooks.layout = () => bx.relayout();
+        hooks.done = () => { setTimeout(() => { if (!bx.folding()) bx.close(); }, 1300); sentOff = true; };
+        return { cls: 'bcv-hand', kids: [handScreen], measure: () => handScreen.scrollHeight + 2, after: () => setTimeout(() => (handScreen.querySelector('.bcv-sb__tab.is-active, .bcv-sb__tab, .bcv-sb__drop, .bcv-sb__ta') || handScreen).focus?.({ preventScroll: true }), 60) };
+      };
+      if (api) { api.swap(content, { W: 400 }); return; }
+      opened = growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'left', onClosed: afterClose, vars: courseVars(c) }, content);
+    };
+    let sentOff = false;
+    const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)
+    const openCard = (pill, { hover = false } = {}) => {
+      const run = () => { opened = openMarkBox(ctx, c, a, current, pill, { anchor: 'left', hover, onClosed: afterClose, again: canAgain(current) ? (bx) => openHand(pill, bx) : null }); };
+      const need = [BCV.screens.feedback?.card ? null : BCV.lazy?.load?.('submit'), a.rubric?.length && !BCV.rubricRing ? BCV.lazy?.load?.('rubric')?.catch(() => null) : null].filter(Boolean);
+      if (!need.length) run(); else Promise.all(need).then(() => { if (pill.isConnected) run(); }).catch(() => { if (!hover) app.go(`${c.url}/assignments/${a.id}?bcv=feedback`); });
+    };
+    /** The pill and what sits beside it, for the submission `x`. */
+    function actionEl(x) {
+      const p = pct(x);
+      const pill = (kind, label, icon, { off = false, onClick = null, kids = null, title = null, cls = '' } = {}) => h('button', {
+        type: 'button', class: `bcv-asg__pill is-${kind} ${cls}`, disabled: off || null, 'aria-disabled': off ? 'true' : null, title,
+        'aria-haspopup': onClick && (kind === 'go' || kind === 'graded' || kind === 'done') ? 'dialog' : null, 'aria-expanded': onClick && (kind === 'go' || kind === 'graded' || kind === 'done') ? 'false' : null,
+        onclick: onClick ? (e) => onClick(e.currentTarget) : null,
+      }, kids || [U.svg(icon, { size: 15, stroke: 'currentColor', width: 2.4 }), h('span', { 'data-glide': 'word', text: label })]);
+      const note = (...bits) => { const t = bits.filter(Boolean); return t.length ? U.el('bcv-asg__note', t.map((v) => (typeof v === 'string' ? U.text('bcv-asg__notetext', v, 'span') : v))) : null; };
+      const againLink = canAgain(x) ? h('button', { type: 'button', class: 'bcv-asg__again', text: 'Submit again', onclick: () => openHand(row.querySelector('.bcv-asg__pill')) }) : null;
+      const extras = [
+        a.quiz_id && !typeList.includes('online_quiz') ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
+        (() => { const el = slot('bcv-detail__doneslot'); fill(el, ({ modItem }) => doneButton(ctx, c, a, modItem, { primary: !handsIn })); return el; })(),
+      ];
+      let main = null, aside = null;
+      const comments = (x.submission_comments || []).length;
+      if (postedOf(x)) {
+        const letter = a.grading_type && a.grading_type !== 'points' && x.grade !== null && x.grade !== undefined ? String(x.grade) : null;
+        main = pill('graded', '', null, { cls: `is-${toneOf(p)}`, title: 'Your grade: feedback, attempts and comments', onClick: openCard, kids: [
+          U.svg(ICONS.tick, { size: 15, stroke: 'currentColor', width: 2.5 }),
+          h('span', { class: 'bcv-asg__score', 'data-glide': 'score', text: store.fmtPts(x.score) }),
+          h('span', { class: 'bcv-asg__of', text: `/ ${a.points_possible ?? '—'}` }),
+          letter || p !== null ? h('span', { class: 'bcv-asg__pct', text: letter || `${p}%` }) : null,
+        ] });
+        aside = note(x.late ? `Late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null, comments ? U.plural(comments, 'comment') : null, a.score_statistics?.mean !== null && a.score_statistics?.mean !== undefined ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : null);
+      } else if (heldOf(x) || x.submitted_at || x.excused) {
+        const word = x.excused ? 'Excused' : heldOf(x) ? 'Submitted' : x.late ? 'Submitted late' : 'Submitted';
+        main = pill('done', word, ICONS.tick, { cls: x.excused ? 'is-grey' : '', title: 'What you handed in, and comments', onClick: x.submitted_at || heldOf(x) ? openCard : null, off: !(x.submitted_at || heldOf(x)) });
+        aside = note(againLink, heldOf(x) ? 'Grade not released yet' : x.submitted_at ? longAt(D0(x.submitted_at)) : null, comments ? U.plural(comments, 'comment') : null);
+      } else if (closedNow() && handsIn) {
+        main = pill('off', `Closed ${U.fmtShort(lockAt)}`, ICONS.x, { off: true, title: `Closed ${U.fmtAt(lockAt)}: nothing can be handed in now` });
+      } else if (lockedNow() && handsIn) {
+        main = pill('off', unlockAt && unlockAt > Date.now() ? `Opens ${U.fmtShort(unlockAt)}` : 'Locked', ICONS.lock, { off: true, title: a.lock_explanation ? htmlToText(a.lock_explanation, 160) : 'Locked' });
+      } else if (isTool) {
+        main = pill('go', used(x) > 0 ? 'Continue assignment' : 'Start assignment', ICONS.play, { onClick: (el) => launchTool(el), cls: 'bcv-detail__tool' });
+        aside = note('Opens the assignment’s tool');
+      } else if (nativeSubmit) {
+        main = a.can_submit === false ? pill('off', 'Submissions closed', ICONS.x, { off: true }) : !leftOf(x) ? pill('off', 'No attempts left', ICONS.x, { off: true }) : pill('go', 'Submit assignment', ICONS.up, { onClick: (el) => openHand(el) });
+        aside = note([howWord.toLowerCase().replace(/^./, (m) => m.toUpperCase()), attemptsWord(x).replace(/^U/, 'u')].join(' · '));
+      } else if (typeList.includes('online_quiz') && a.quiz_id) {
+        main = pill('go', 'Open quiz', IC.bolt, { onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) });
+      } else if (typeList.includes('discussion_topic') && a.discussion_topic?.id) {
+        main = pill('go', 'Open discussion', IC.disc, { onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) });
+      } else if (canvasOnly) {
+        main = pill('go', 'Submit in Canvas', ICONS.out, { onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) });
+        aside = note('Media and annotations are handed in on Canvas’s own page');
+      }
+      // the mark (or what was handed in) opens on a moment's rest of the pointer too, as the chip it replaced did (U.hoverOpens)
+      if (main && (main.classList.contains('is-graded') || (main.classList.contains('is-done') && !main.disabled))) hoverOpens(main, (el) => openCard(el, { hover: true }));
+      const row = U.el('bcv-asg__action', [main, aside, ...extras]);
+      return row;
+    }
+
+    // ---- the row along the top: the way back, and the assignments either side --------------------------------------
+    const navEl = (nav) => {
+      if (!nav || (!nav.prev && !nav.next)) return null;
+      const one = (x, dir) => (x ? h('button', { type: 'button', class: `bcv-asg__navbtn bcv-asg__navbtn--${dir}`, title: `${dir === 'prev' ? 'Previous' : 'Next'}: ${x.name}`, onclick: () => app.go(`${c.url}/assignments/${x.id}`) }, [
+        dir === 'prev' ? U.svg('M15 6l-6 6 6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
+        h('span', { class: 'bcv-ellip', text: x.name }),
+        dir === 'next' ? U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
+      ]) : null);
+      return U.el('bcv-asg__nav', [one(nav.prev, 'prev'), one(nav.next, 'next')].filter(Boolean));
+    };
+    const backEl = h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back bcv-asg__back', onclick: () => { app.markBack?.(); app.go(back.href); } }, [U.svg('M15 5l-7 7 7 7', { size: 15, stroke: 'currentColor', width: 2.4 }), back.label]);
+    const top = U.el('bcv-asg__top', [backEl, h('span', { class: 'bcv-asg__spring' }), (() => { const el = slot('bcv-asg__navslot'); fill(el, ({ nav }) => navEl(nav)); return el; })()]);
+    const titleEl = h('h1', { class: 'bcv-detail__title bcv-asg__title bcv-pretty', text: a.name });
+    let statusNow = statusEl(s), factsNow = factsEl(s), actionNow = actionEl(s);
+    const headEl = U.el('bcv-detail__head bcv-asg__head', [titleEl, statusNow]);
+    const desc = a.description && htmlToText(a.description, 40).trim() ? CS().prose(a.description, { cls: 'bcv-asg__prose' }) : (isTool ? null : U.text('bcv-asg__quiet', 'No instructions were given.'));
+    const page = U.el('bcv-asg', [top, headEl, factsNow, actionNow, desc].filter(Boolean), { style: { '--bcv-cc': c.color || 'var(--bcv-blue)', '--bcv-cc-ink': c.palette?.text || c.color || 'var(--bcv-blue)' } });
+    /** Drawn again from a fresher submission (a tool's grade landing): the pill, the status and the facts, in place. */
+    const repaint = (x) => {
+      current = x;
+      const st2 = statusEl(x), f2 = factsEl(x), a2 = actionEl(x);
+      statusNow.replaceWith(st2); factsNow.replaceWith(f2); actionNow.replaceWith(a2);
+      statusNow = st2; factsNow = f2; actionNow = a2;
+    };
+    main.replaceChildren(U.card(page, 'bcv-card--22 bcv-asg__card')); // (the page's one card holds everything: the way back to the instructions)
+    // opened to hand in (a To Do row's Submit, ?bcv=submit): the panel grows out of the pill once the page is up
+    if (handScreen && route.params.get('bcv') === 'submit' && canAgain(s)) {
+      const go = (n = 0) => { const pill = page.querySelector('.bcv-asg__pill.is-go, .bcv-asg__again'); if (pill?.isConnected && pill.getBoundingClientRect().width) { if (pill.classList.contains('bcv-asg__again')) openHand(page.querySelector('.bcv-asg__pill')); else openHand(pill); } else if (n < 40 && ctx.alive()) setTimeout(() => go(n + 1), 50); };
+      setTimeout(go, 120);
+    }
     // A tool's grade lands behind the page's back: the tool passes it back after its launch (some
     // only when the student opens the assignment), and a page drawn a moment earlier would keep
     // showing nothing. So the submission is asked for again once the tool has loaded and then for a
     // while — every few seconds at first, then every quarter minute for three minutes, while the
-    // tab is looked at — and the mark and the side card are drawn again when it changes, in place,
-    // without touching the tool's frame.
+    // tab is looked at — and the pill, the status and the facts are drawn again when it changes, in
+    // place, without touching the tool's frame.
     if (isTool) {
       let shown = s, tries = 0, timer = 0, started = false;
       const changed = (x) => !!x && (x.score !== shown.score || x.workflow_state !== shown.workflow_state || x.posted_at !== shown.posted_at || x.grade !== shown.grade || x.submitted_at !== shown.submitted_at || x.attempt !== shown.attempt);
@@ -398,7 +563,7 @@
           if (!ctx.alive()) return;
           if (changed(fresh)) {
             shown = fresh;
-            headEl.replaceChildren(titleEl, gradeChip(fresh));
+            repaint(fresh);
             store.invalidateGrades().catch(() => {}); // every other screen with a score asks again
           }
           tries++;
@@ -410,10 +575,7 @@
       setTimeout(start, 8000); // a tool never opened still gets its looks: a grade can land from an earlier sitting
       ctx.onLeave?.(() => clearTimeout(timer));
     }
-    // The side card that used to repeat the submission's facts (a status badge, the dates, the
-    // attempt, an unfiltered copy of the comments) is gone: the chip beside the title carries the
-    // state, and what was handed in is behind it, attempt by attempt, whether or not it is marked.
-    side.remove();
+    side.remove(); // (one column: the page is the mockup's, the facts in its own boxes)
     return b;
   };
 

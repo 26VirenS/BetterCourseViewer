@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.13', date: '2026-10-08', notes: [
+      { kind: 'new', title: 'A new assignment page', body: 'Facts at a glance; one button grows into the hand-in.', icon: P.layers },
+      { kind: 'improved', title: 'Sideways grade card', body: 'Your grade on the left, comments on the right.', icon: P.steps },
+    ] },
     { version: '2.99.12', date: '2026-10-08', notes: [
       { kind: 'new', title: 'Modules remember', body: 'Only the module you last opened starts open.', icon: P.list },
       { kind: 'improved', title: 'Bigger, brighter rings', body: 'The grade card’s ring is larger, in the score’s colour.', icon: P.steps },

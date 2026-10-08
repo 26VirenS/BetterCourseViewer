@@ -334,8 +334,12 @@
   }
 
   /** The card's body: when, the words, the attempts, what was handed in, and a comment. */
-  function card(ctx, c, a, sub) {
-    const wrap = U.el('bcv-mcard');
+  /** `side` (2.99.13): sideways — what is said about the work (the bubbles and the comment pill) is a column of its own,
+   *  `chat`, which the box sets to the right of the rest. */
+  function card(ctx, c, a, sub, { side = false } = {}) {
+    const wrap = U.el(`bcv-mcard ${side ? 'is-side' : ''}`);
+    const thread = side ? U.el('bcv-mcard__thread') : null;
+    const chat = side ? U.el('bcv-mcard__chat', [thread]) : null;
     const me = String(store.env?.().current_user_id ?? '');
     const isTool = (a.submission_types || []).includes('external_tool');
     let pick = null; // (the attempt a tile was pressed for: its work and its words shown, a comment pinned to it; the latest by default)
@@ -455,16 +459,20 @@
       const next = U.el('bcv-mcard__body', [
         timeline(s, st),
         handedIn(cur),
-        words.length ? U.el('bcv-mcard__row bcv-mcard__words', words.map(bubble)) : null,
+        !side && words.length ? U.el('bcv-mcard__row bcv-mcard__words', words.map(bubble)) : null,
         attempts(all, s, st, cur),
       ].filter(Boolean));
       if (body) body.replaceWith(next); else wrap.prepend(next);
       body = next;
+      if (side) {
+        thread.replaceChildren(...(words.length ? words.map(bubble) : [U.text('bcv-mcard__empty', all.length > 1 && cur !== latest ? 'No comments on this attempt.' : 'No comments yet. What you send here goes to your instructor.')]));
+        requestAnimationFrame(() => { thread.scrollTop = thread.scrollHeight; }); // (the latest word in sight)
+      }
     }
 
-    wrap.append(compose()); // (built once, so a comment half written outlives a redraw)
+    (side ? chat : wrap).append(compose()); // (built once, so a comment half written outlives a redraw)
     draw();
-    return { el: wrap, redraw: () => { if (ctx.alive()) draw(); }, setSub: (fresh) => { sub = fresh; } };
+    return { el: wrap, chat, redraw: () => { if (ctx.alive()) draw(); }, setSub: (fresh) => { sub = fresh; } };
   }
 
   /** The kind of work in the student's words (the card's second line). */

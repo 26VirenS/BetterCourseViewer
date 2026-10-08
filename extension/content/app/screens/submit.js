@@ -36,18 +36,24 @@
     return U.plural(Math.round(hh / 24), 'day');
   };
   // Canvas stores a text entry as HTML: paragraphs on blank lines, <br> inside them
+  const wordsOf = (t) => (String(t || '').trim() ? String(t).trim().split(/\s+/).length : 0);
   const textToHtml = (t) => t.trim().split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
   let seq = 0;
 
   /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
    *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
    *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
-  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in', aside = null, onDone = null } = {}) {
+  /** (2.99.13) `pop`: the panel that grows out of the assignment page's big pill (the mockup) — tabs and × on one row, a
+   *  compact drop, the comment behind a bubble, the attempt in the footer's line. Built once with the page, so files
+   *  attached and a comment written outlive the panel being closed; `pop.close()` / `pop.layout()` are the box's own,
+   *  set while it is open, and `pop.done(result)` is called once Canvas has the hand-in. */
+  async function render(ctx, course, { embed = false, pop = null, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in', aside = null, onDone = null } = {}) {
     const { app, route } = ctx;
     const cid = course.id, aid = route.arg;
     const fromTodo = route.params.get('from') === 'todo';
     const back = backGiven || (fromTodo ? { href: '/#todo', label: 'To Do' } : { href: `${course.url}/assignments/${aid}`, label: 'Assignment' });
-    const screen = embed ? U.el('bcv-sb bcv-sb--embed', null, { id: 'bcv-submit' }) : U.el('bcv-sb');
+    if (pop) embed = true; // (the page's own copy of the assignment, the instructions above it)
+    const screen = pop ? U.el('bcv-sb bcv-sb--pop', null, { id: 'bcv-submit' }) : embed ? U.el('bcv-sb bcv-sb--embed', null, { id: 'bcv-submit' }) : U.el('bcv-sb');
     screen.append(U.loading('Loading the assignment…'));
     const draftKey = `subDraft:${cid}:${aid}`;
     const modeKey = `subMode:${cid}:${aid}`; // the tab is remembered per assignment, never globally
@@ -86,7 +92,7 @@
     const hasOther = toolRows.length > 0 || toolsFailed || can.url || can.media || can.annot;
 
     const tabAllowed = (k) => ((k === 'file' && can.file) || (k === 'text' && can.text) || (k === 'other' && hasOther) ? k : null);
-    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], text: draft, link: null, urlOpen: false, comment: '', busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
+    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], text: draft, link: null, urlOpen: false, comment: '', commentOpen: false, busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
     const attemptsLeft = () => (unlimited ? Infinity : Math.max(0, a.allowed_attempts - st.attempt));
     const lockedText = () => (a.locked_for_user ? (a.lock_explanation ? htmlToText(a.lock_explanation, 220) : 'This assignment is locked.') : a.lock_at && U.parse(a.lock_at) < Date.now() ? `This assignment closed ${U.fmtAt(a.lock_at)}.` : null);
     const dueChip = () => {
@@ -125,7 +131,7 @@
       h('span', { class: 'bcv-sb__chip', text: st.stage === 'done' ? `Attempt ${st.attempt}${unlimited ? '' : ` of ${a.allowed_attempts}`}` : `Attempt ${st.attempt + 1} of ${unlimited ? 'unlimited' : a.allowed_attempts}` }),
     ].filter(Boolean));
     const rulesNote = () => U.text('bcv-sb__note', [windowLine, acceptsLine].filter(Boolean).join(' · ').replace(/^accepts/, 'Accepts'));
-    const head = embed
+    const head = pop ? null : embed
       ? U.el('bcv-sb__head', U.el('bcv-sb__headin', [U.el('bcv-sb__hrow', [U.text('bcv-sb__kicker', kicker, 'span'), chips]), rulesNote()]))
       : U.el('bcv-sb__head', U.el('bcv-sb__headin', [
         h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(back.href) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), back.label]),
@@ -134,8 +140,8 @@
       ]));
     const body = U.el('bcv-sb__body');
     const foot = U.el('bcv-sb__foot');
-    screen.replaceChildren(head, body, foot);
-    const toTop = () => (embed ? screen.scrollIntoView({ block: 'start', behavior: U.reducedMotion() ? 'auto' : 'smooth' }) : window.scrollTo(0, 0));
+    screen.replaceChildren(...[head, body, foot].filter(Boolean));
+    const toTop = () => (pop ? null : embed ? screen.scrollIntoView({ block: 'start', behavior: U.reducedMotion() ? 'auto' : 'smooth' }) : window.scrollTo(0, 0));
 
     // ---- edit stage -----------------------------------------------------------------
     function edit() {
@@ -147,6 +153,8 @@
           rulesNote(),
         ]));
       }
+      const endRow = pop ? U.el('bcv-sb__poptop bcv-sb__poptop--end', [closeX()]) : null; // (a panel with nothing to hand in still has its ×; taken out again below where the tabs bring their own)
+      if (endRow) page.append(endRow);
       const locked = lockedText();
       if (locked) {
         page.append(U.el('bcv-sb__card bcv-sb__card--warn', [U.text('bcv-sb__kicker', 'Locked', 'span'), U.text('bcv-sb__p', locked)]));
@@ -165,19 +173,22 @@
         return page;
       }
       const tabs = [can.file ? ['file', 'File upload'] : null, can.text ? ['text', 'Text entry'] : null, hasOther ? ['other', 'Other'] : null].filter(Boolean);
-      page.append(U.el('bcv-sb__tabs', tabs.map(([k, lbl]) => h('button', { type: 'button', class: `bcv-sb__tab ${st.tab === k ? 'is-active' : ''}`, dataset: { tab: k }, text: lbl, onclick: () => { st.tab = k; store.setPref(modeKey, k); draw(); } }))));
+      const tabRow = U.el('bcv-sb__tabs', tabs.map(([k, lbl]) => h('button', { type: 'button', class: `bcv-sb__tab ${st.tab === k ? 'is-active' : ''}`, dataset: { tab: k }, text: lbl, onclick: () => { st.tab = k; store.setPref(modeKey, k); draw(); } })));
+      endRow?.remove();
+      page.append(pop ? U.el('bcv-sb__poptop', [tabs.length > 1 ? tabRow : U.text('bcv-sb__poptitle', tabs[0]?.[1] || 'Hand in', 'span'), closeX()]) : tabRow);
       page.append(st.tab === 'file' ? filePane() : st.tab === 'text' ? textPane() : otherPane());
-      page.append(commentCard());
+      if (!pop || st.commentOpen) page.append(commentCard());
       return page;
     }
 
     function filePane() {
       // the picker takes the allowed types and the ones that convert into them: a Word file is not greyed out where only PDF is allowed
       const input = h('input', { type: 'file', multiple: true, hidden: true, accept: allowedExt.length ? [...allowedExt, ...(conv?.exts || [])].map((e) => `.${e}`).join(',') : null, onchange: () => { addFiles(input.files); input.value = ''; } });
-      const drop = h('button', { type: 'button', class: 'bcv-sb__drop', onclick: () => input.click(), ondragover: (e) => { e.preventDefault(); drop.classList.add('is-over'); }, ondragleave: () => drop.classList.remove('is-over'), ondrop: (e) => { e.preventDefault(); drop.classList.remove('is-over'); addFiles(e.dataTransfer?.files); } }, [
+      const drop = h('button', { type: 'button', class: 'bcv-sb__drop', title: pop && conv?.line ? conv.line.replace(/^./, (m) => m.toUpperCase()) : null, onclick: () => input.click(), ondragover: (e) => { e.preventDefault(); drop.classList.add('is-over'); }, ondragleave: () => drop.classList.remove('is-over'), ondrop: (e) => { e.preventDefault(); drop.classList.remove('is-over'); addFiles(e.dataTransfer?.files); } }, [
         h('span', { class: 'bcv-sb__dropicon' }, U.svg(UPLOAD, { size: 22, stroke: 'var(--bcv-blue)', width: 1.9 })),
-        h('span', { class: 'bcv-sb__droptitle', text: 'Drop a file here or choose one' }),
-        h('span', { class: 'bcv-sb__dropsub', text: `${typesLine} · as many files as you need` }),
+        pop ? h('span', { class: 'bcv-sb__droptext' }, [h('span', { class: 'bcv-sb__droptitle' }, ['Drop files, or ', h('span', { class: 'bcv-sb__browse', text: 'browse' })]), h('span', { class: 'bcv-sb__dropsub', text: conv?.line ? `${typesLine} · others converted` : typesLine })])
+          : h('span', { class: 'bcv-sb__droptitle', text: 'Drop a file here or choose one' }),
+        pop ? null : h('span', { class: 'bcv-sb__dropsub', text: `${typesLine} · as many files as you need` }),
         conv?.line ? h('span', { class: 'bcv-sb__dropsub bcv-sb__dropconv', text: conv.line }) : null,
       ]);
       const n = st.files.length;
@@ -275,6 +286,12 @@
         timer = setTimeout(() => store.setPref(draftKey, st.text), 400);
       } });
       ta.value = st.text;
+      if (pop) {
+        const count = U.text('bcv-sb__words', wordsOf(st.text) === 1 ? '1 word' : `${wordsOf(st.text)} words`);
+        ta.addEventListener('input', () => { const n = wordsOf(ta.value); count.textContent = n === 1 ? '1 word' : `${n} words`; });
+        ta.placeholder = 'Write your response…';
+        return U.el('bcv-sb__pane', [ta, count]);
+      }
       return U.el('bcv-sb__card', [
         U.text('bcv-sb__kicker', 'Your response', 'span'),
         ta,
@@ -325,6 +342,11 @@
     function commentCard() {
       const ta = h('textarea', { class: 'bcv-textarea bcv-sb__comment', placeholder: 'Add a note about this submission…', 'aria-label': 'Comment to your instructor', oninput: () => { st.comment = ta.value; } });
       ta.value = st.comment;
+      if (pop) {
+        ta.placeholder = 'Comment for your instructor (optional)';
+        ta.addEventListener('input', () => paintFoot());
+        return ta;
+      }
       return U.el('bcv-sb__card', [U.text('bcv-sb__kicker', 'Comment to your instructor · optional', 'span'), ta]);
     }
 
@@ -421,6 +443,17 @@
       }
       foot.hidden = false;
       const r = readiness();
+      if (pop) {
+        const said = !!st.comment.trim();
+        const what = st.tab === 'file' ? (st.files.length ? U.plural(st.files.length, 'file') : 'attach a file') : st.tab === 'text' ? (wordsOf(st.text) ? U.plural(wordsOf(st.text), 'word') : 'write something') : (st.link?.url ? 'a link' : 'pick a tool or a link');
+        const late = r.ok && U.parse(a.due_at) && Date.now() > U.parse(a.due_at) ? ' · late' : '';
+        foot.replaceChildren(U.el('bcv-sb__footin', [
+          h('button', { type: 'button', class: `bcv-sb__bubble ${st.commentOpen || said ? 'is-on' : ''}`, title: st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor (it can’t be edited or deleted once sent)', 'aria-label': st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor', 'aria-pressed': String(st.commentOpen), onclick: () => { st.commentOpen = !st.commentOpen; draw(); if (st.commentOpen) screen.querySelector('.bcv-sb__comment')?.focus(); } }, U.svg('M5 6.5A2.5 2.5 0 017.5 4h9A2.5 2.5 0 0119 6.5v7a2.5 2.5 0 01-2.5 2.5H11l-4 3.5V16h0A2 2 0 015 14z', { size: 15, stroke: 'currentColor', width: 1.9 })),
+          U.text('bcv-sb__footnote bcv-ellip', st.busy ? 'Sending to Canvas…' : `Attempt ${st.attempt + 1} · ${what}${late}`, 'span'),
+          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary bcv-sb__go', text: st.busy ? 'Submitting…' : 'Submit', title: r.ok ? r.note : r.note, disabled: !r.ok || st.busy || null, onclick: submit }),
+        ]));
+        return;
+      }
       foot.replaceChildren(U.el('bcv-sb__footin', [
         U.text('bcv-sb__footnote bcv-pretty', st.busy ? 'Sending to Canvas…' : r.note, 'span'),
         extra,
@@ -480,6 +513,7 @@
         app.refreshCounts?.();
         draw();
         toTop();
+        if (pop) pop.done?.(st.done);
       } catch (e) {
         U.toast(`Could not submit: ${e.message}`, { error: true, ms: 5000 });
       } finally {
@@ -494,6 +528,15 @@
     // ---- done stage -------------------------------------------------------------------
     function donePane() {
       const s = st.done || {};
+      if (pop) {
+        const at0 = U.parse(s.submitted_at) || new Date();
+        const fresh0 = st.checked !== st.done;
+        st.checked = st.done;
+        return U.el('bcv-sb__done bcv-sb__done--pop', [
+          U.drawCheck(h('span', { class: 'bcv-sb__check' }, U.svg(CHECK, { size: 26, stroke: '#34c759', width: 2.6 })), fresh0),
+          h('div', { class: 'bcv-sb__donetext' }, [h('h2', { class: 'bcv-sb__h2', text: 'Submitted' }), h('p', { class: 'bcv-sb__lead', text: `Received ${U.DAYS[at0.getDay()]}, ${U.fmtShort(at0)} at ${U.fmtTime(at0)}` })]),
+        ]);
+      }
       const d = U.parse(a.due_at), at = U.parse(s.submitted_at) || new Date();
       const turned = !d ? 'No due date' : at <= d ? `${span(d - at)} before the deadline` : `${span(at - d)} late`;
       const what = st.sent.kind === 'file' ? st.sent.names.join(', ') : st.sent.kind === 'text' ? 'Text entry' : st.sent.url;
@@ -531,7 +574,9 @@
       paintChips();
       paintFoot();
       setOpen();
+      if (pop) pop.layout?.();
     }
+    function closeX() { return h('button', { type: 'button', class: 'bcv-sheet__close bcv-sb__close', 'aria-label': 'Close', onclick: () => pop?.close?.() }, U.svg(IC.close, { size: 12, stroke: 'var(--bcv-ink2)', width: 2.3 })); }
     draw();
     return screen;
   }
