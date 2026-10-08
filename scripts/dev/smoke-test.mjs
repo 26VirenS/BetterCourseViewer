@@ -2097,6 +2097,24 @@ try {
   // the old title is still on screen while the next page comes: wait for the new one, not for a title
   const nextOpened = await page.waitForFunction((x) => location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name, ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
   check(nextOpened, `Next opens the next assignment: ${(await texts('.bcv-detail__title'))[0]}`);
+  // (2.99.17) every item has the pill: quizzes, pages and discussions each walk their own tab's order
+  const pillOn = async (path) => {
+    await page.goto(`${BASE}${path}`);
+    await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+    await eventually(() => page.$('.bcv-asg__nav .bcv-asg__navbtn').then((e) => !!e), 6000);
+    return page.$$eval('.bcv-asg__nav .bcv-asg__navbtn', (els) => els.map((e) => e.title));
+  };
+  const quizPill = await pillOn('/courses/101/quizzes/9011');
+  check(JSON.stringify(quizPill) === JSON.stringify(['Previous: Qz01', 'Next: Lec07-PreQuiz']), `a quiz has Previous / Next through the quizzes: ${quizPill.join(' | ')}`);
+  const pagePill = await pillOn('/courses/101/pages/course-information');
+  check(JSON.stringify(pagePill) === JSON.stringify(['Next: Chapter 4 notes']), `a page has Previous / Next through the pages, the front page first: ${pagePill.join(' | ')}`);
+  const discPill = await pillOn('/courses/101/discussion_topics/7001');
+  check(discPill.length === 2 && discPill[0].startsWith('Previous: ') && discPill[1].startsWith('Next: '), `a discussion has Previous / Next through the discussions: ${discPill.join(' | ')}`);
+  // opened from a module, the pill walks the module instead, and Next keeps walking it
+  const modPill = await pillOn('/courses/102/assignments/2001?module_item_id=i2');
+  check(JSON.stringify(modPill) === JSON.stringify(['Previous: Big picture', 'Next: Newton’s laws']), `opened from a module, Previous / Next walk the module: ${modPill.join(' | ')}`);
+  await page.click('.bcv-asg__nav .bcv-asg__navbtn--prev');
+  check(await page.waitForFunction(() => /\/pages\/big-picture$/.test(location.pathname) && /module_item_id=/.test(location.search), null, { timeout: 10000 }).then(() => true).catch(() => false), `Previous from a module item opens the item before it, still in the module: ${await page.evaluate(() => location.pathname + location.search)}`);
   // (2.99.13) on the assignment page the rubric is a box among the facts, with the ring in miniature, pressed to open it
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-asg__fact--rubric', { timeout: 10000 });

@@ -1442,6 +1442,59 @@
     return i < 0 ? { prev: null, next: null } : { prev: list[i - 1] || null, next: list[i + 1] || null };
   }
 
+  /** (2.99.17) The items either side of any item, as { prev, next } of { name, href }. Opened from Modules (`viaModules`),
+   *  or of a kind with no list of its own, the order is the course's own path: Canvas's module_item_sequence (the hrefs
+   *  carry the module item on, so Next keeps walking the modules). Otherwise the order its own tab lists it in —
+   *  assignments by due date; quizzes by due date; discussions pinned first, then by latest activity; announcements newest
+   *  first; pages the front page first, then by title — falling back to the modules where the list has nothing. */
+  async function itemNeighbours(id, type, assetId, { viaModules = false, itemId = null, kind = 'courses', courseUrl = `/courses/${id}` } = {}) {
+    const none = { prev: null, next: null };
+    const around = (list, key) => { const i = list.findIndex((x) => String(key(x)) === String(assetId)); return i < 0 ? null : { prev: list[i - 1] || null, next: list[i + 1] || null }; };
+    const fromModules = async () => {
+      if (kind !== 'courses') return none;
+      const seq = await C.cached(`modseqnav:${id}:${type}:${assetId}:${itemId || ''}`, 2 * MIN, () =>
+        C.get(`/api/v1/courses/${id}/module_item_sequence`, { params: { asset_type: type, asset_id: assetId } }).catch(() => null));
+      const items = seq?.items || [];
+      const it = items.find((x) => itemId && String(x.current?.id) === String(itemId)) || items[0];
+      const href = (m) => {
+        if (!m) return null;
+        const base = { Assignment: `assignments/${m.content_id}`, Quiz: `quizzes/${m.content_id}`, Discussion: `discussion_topics/${m.content_id}`, Page: m.page_url ? `pages/${m.page_url}` : null, File: `files/${m.content_id}` }[m.type];
+        if (base) return `${courseUrl}/${base}?module_item_id=${m.id}`;
+        // (a page item Canvas sends without its page_url, or a kind of item named only by its link: the link, still in the module)
+        const path = m.html_url ? String(m.html_url).replace(/^https?:\/\/[^/]+/, '') : '';
+        return /^\/(courses|groups)\/[^/]+\/(pages|assignments|quizzes|discussion_topics|files)\//.test(path) && !/[?&]module_item_id=/.test(path) ? `${path}${path.includes('?') ? '&' : '?'}module_item_id=${m.id}` : (m.html_url || null);
+      };
+      const one = (m) => (m && href(m) ? { name: m.title || 'Untitled', href: href(m) } : null);
+      return it ? { prev: one(it.prev), next: one(it.next) } : none;
+    };
+    if (viaModules) { const m = await fromModules(); if (m.prev || m.next) return m; }
+    let own = null;
+    const t = (v) => U.parse(v)?.getTime() || Infinity;
+    try {
+      if (type === 'Assignment') {
+        const n = assignmentNeighbours(await assignmentGroups(id), assetId);
+        own = { prev: n.prev && { name: n.prev.name, href: `${courseUrl}/assignments/${n.prev.id}` }, next: n.next && { name: n.next.name, href: `${courseUrl}/assignments/${n.next.id}` } };
+      } else if (type === 'Quiz') {
+        const list = ((await quizzes(id)) || []).filter((q) => q.published !== false).sort((x, y) => (t(x.due_at) - t(y.due_at)) || String(x.title).localeCompare(String(y.title)));
+        const n = around(list, (q) => q.id);
+        own = n && { prev: n.prev && { name: n.prev.title, href: `${courseUrl}/quizzes/${n.prev.id}` }, next: n.next && { name: n.next.title, href: `${courseUrl}/quizzes/${n.next.id}` } };
+      } else if (type === 'Discussion' || type === 'Announcement') {
+        const list = ((await (type === 'Announcement' ? announcements(id, { kind }) : discussions(id, { kind }))) || []);
+        const when = (d) => Math.max(...[d.last_reply_at, d.posted_at, d.created_at].map((s) => U.parse(s)?.getTime() || 0));
+        const ordered = type === 'Announcement' ? list : [...list.filter((d) => d.pinned), ...list.filter((d) => !d.pinned && !d.locked).sort((a, z) => when(z) - when(a)), ...list.filter((d) => !d.pinned && d.locked).sort((a, z) => when(z) - when(a))];
+        const n = around(ordered, (d) => d.id);
+        const path = type === 'Announcement' ? 'announcements' : 'discussion_topics';
+        own = n && { prev: n.prev && { name: n.prev.title, href: `${courseUrl}/${path}/${n.prev.id}` }, next: n.next && { name: n.next.title, href: `${courseUrl}/${path}/${n.next.id}` } };
+      } else if (type === 'Page') {
+        const list = [...((await pages(id, { kind })) || [])].sort((x, y) => (y.front_page ? 1 : 0) - (x.front_page ? 1 : 0) || String(x.title).localeCompare(String(y.title)));
+        const n = around(list, (p) => p.url);
+        own = n && { prev: n.prev && { name: n.prev.title, href: `${courseUrl}/pages/${n.prev.url}` }, next: n.next && { name: n.next.title, href: `${courseUrl}/pages/${n.next.url}` } };
+      }
+    } catch { own = null; }
+    if (own && (own.prev || own.next)) return own;
+    return viaModules ? none : fromModules();
+  }
+
   // ---- grades model -------------------------------------------------------------------------------
   /** Build the grade picture: one ring per group that has graded, counted work. `added`: what-if
    *  assignments made up in the page ({ id, groupId, name, possible }, their scores in whatIf by id),
@@ -1658,7 +1711,7 @@
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
-    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, gradeModel, fmtPts,
+    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
     homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };

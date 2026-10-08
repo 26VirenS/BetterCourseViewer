@@ -390,13 +390,36 @@
     if (!nav || (!nav.prev && !nav.next)) return null;
     const one = (x, dir) => (x ? h('button', {
       type: 'button', class: `${cls}btn ${cls}btn--${dir}`, title: x.name,
-      onclick: () => app.go(`${c.url}/assignments/${x.id}`),
+      onclick: () => app.go(x.href || `${c.url}/assignments/${x.id}`),
     }, [
       dir === 'prev' ? U.svg(IC.back, { size: 14, stroke: 'currentColor', width: 2.1 }) : null,
       U.el(`${cls}body`, [U.text(`${cls}kicker`, dir === 'prev' ? 'Previous' : 'Next', 'span'), U.text(`${cls}name bcv-ellip`, x.name, 'span')]),
       dir === 'next' ? U.svg(IC.chevron, { size: 14, stroke: 'currentColor', width: 2.1 }) : null,
     ]) : h('span', { class: `${cls}gap` }));
     return U.el(cls, [one(nav.prev, 'prev'), one(nav.next, 'next')]);
+  }
+
+  /** (2.99.13, every item from 2.99.17) The items either side, as one pill of two halves — each names where it goes. */
+  function navPill(app, nav) {
+    if (!nav || (!nav.prev && !nav.next)) return null;
+    const one = (x, dir) => (x ? h('button', { type: 'button', class: `bcv-asg__navbtn bcv-asg__navbtn--${dir}`, title: `${dir === 'prev' ? 'Previous' : 'Next'}: ${x.name}`, onclick: () => app.go(x.href) }, [
+      dir === 'prev' ? U.svg('M15 6l-6 6 6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
+      h('span', { class: 'bcv-ellip', text: x.name }),
+      dir === 'next' ? U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
+    ]) : null);
+    return U.el('bcv-asg__nav', [one(nav.prev, 'prev'), one(nav.next, 'next')].filter(Boolean));
+  }
+  /** (2.99.17) The row along the top of any item: the way back, and the items either side (store.itemNeighbours — the
+   *  modules' order when it was opened from them, else its own tab's), drawn when they land: the page never waits. */
+  function itemTop(ctx, c, backEl, type, assetId, { kind = 'courses' } = {}) {
+    const { app, route } = ctx;
+    const itemId = route.params?.get?.('module_item_id') || null;
+    const viaModules = !!itemId || /^\s*Modules\s*$/.test(backEl.textContent || '');
+    const slot = h('span', { class: 'bcv-asg__navslot', hidden: '' });
+    store.itemNeighbours(c.id, type, assetId, { viaModules, itemId, kind, courseUrl: c.url })
+      .then((nav) => { if (!ctx.alive() || !slot.parentNode) return; const el = navPill(app, nav); if (el) slot.replaceWith(el); else slot.remove(); })
+      .catch(() => slot.remove());
+    return U.el('bcv-asg__top bcv-item__top', [backEl, h('span', { class: 'bcv-asg__spring' }), slot]);
   }
 
   D.assignment = async (ctx, shell) => {
@@ -415,8 +438,11 @@
     // assignment list is the slow one — every assignment with its submission — and behind a
     // dashboard's own requests it took the page past its patience, which reads as a page that never
     // comes. Each slot is filled, or taken out, when the answer arrives.
-    const later = Promise.all([store.moduleItemFor(c.id, 'Assignment', route.arg, { asset: a, itemId: route.params.get('module_item_id') }).catch(() => null), store.assignmentGroups(c.id).catch(() => null)])
-      .then(([modItem, groups]) => ({ modItem, nav: store.assignmentNeighbours(groups, a.id) }));
+    // (the phone's Previous / Next row walks the same order as the desktop's pill: the modules when opened from them)
+    const viaModules = !!route.params.get('module_item_id') || /^\s*Modules\s*$/.test(String(app.backTo?.({ label: '' })?.label || ''));
+    const later = Promise.all([store.moduleItemFor(c.id, 'Assignment', route.arg, { asset: a, itemId: route.params.get('module_item_id') }).catch(() => null),
+      store.itemNeighbours(c.id, 'Assignment', a.id, { viaModules, itemId: route.params.get('module_item_id'), courseUrl: c.url }).catch(() => null)])
+      .then(([modItem, nav]) => ({ modItem, nav }));
     const slot = (cls) => h('span', { class: cls, hidden: '' });
     // (the slot has a parent from the moment it is drawn, before the screen is in the document)
     const fill = (el, make) => later.then((x) => { if (!ctx.alive() || !el.parentNode) return; const made = make(x); if (made) el.replaceWith(made); else el.remove(); });
@@ -655,17 +681,8 @@
     }
 
     // ---- the row along the top: the way back, and the assignments either side --------------------------------------
-    const navEl = (nav) => {
-      if (!nav || (!nav.prev && !nav.next)) return null;
-      const one = (x, dir) => (x ? h('button', { type: 'button', class: `bcv-asg__navbtn bcv-asg__navbtn--${dir}`, title: `${dir === 'prev' ? 'Previous' : 'Next'}: ${x.name}`, onclick: () => app.go(`${c.url}/assignments/${x.id}`) }, [
-        dir === 'prev' ? U.svg('M15 6l-6 6 6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
-        h('span', { class: 'bcv-ellip', text: x.name }),
-        dir === 'next' ? U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
-      ]) : null);
-      return U.el('bcv-asg__nav', [one(nav.prev, 'prev'), one(nav.next, 'next')].filter(Boolean));
-    };
     const backEl = h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back bcv-asg__back', onclick: () => { app.markBack?.(); app.go(back.href); } }, [U.svg('M15 5l-7 7 7 7', { size: 15, stroke: 'currentColor', width: 2.4 }), back.label]);
-    const top = U.el('bcv-asg__top', [backEl, h('span', { class: 'bcv-asg__spring' }), (() => { const el = slot('bcv-asg__navslot'); fill(el, ({ nav }) => navEl(nav)); return el; })()]);
+    const top = itemTop(ctx, c, backEl, 'Assignment', a.id);
     const titleEl = h('h1', { class: 'bcv-detail__title bcv-asg__title bcv-pretty', text: a.name });
     let statusNow = statusEl(s), factsNow = factsEl(s), actionNow = actionEl(s);
     const headEl = U.el('bcv-detail__head bcv-asg__head', [titleEl, statusNow]);
@@ -768,7 +785,7 @@
     const flatten = (entries, depth = 0) => entries.flatMap((e) => [entryEl(e, depth), ...flatten(e.replies || [], depth + 1)]);
     const entries = view ? flatten(view.view || []) : [];
     main.replaceChildren(
-      backTo(app, announcement ? `${c.url}/announcements` : `${c.url}/discussion_topics`, announcement ? 'Announcements' : 'Discussions'),
+      itemTop(ctx, c, backTo(app, announcement ? `${c.url}/announcements` : `${c.url}/discussion_topics`, announcement ? 'Announcements' : 'Discussions'), announcement ? 'Announcement' : 'Discussion', t.id, { kind: shell.kind }),
       U.card([
         U.el('bcv-detail', [
           h('h2', { class: 'bcv-detail__title bcv-pretty', text: t.title }),
@@ -813,7 +830,7 @@
     const slug = p.url || route.arg;
     const doneSlot = h('div', { class: 'bcv-detail__actions bcv-detail__actions--foot', hidden: true });
     main.replaceChildren(
-      backTo(app, `${c.url}/pages`, 'Pages'),
+      itemTop(ctx, c, backTo(app, `${c.url}/pages`, 'Pages'), 'Page', p.url || route.arg, { kind: shell.kind }),
       U.card(U.el('bcv-detail', [
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } }, [h('h2', { class: 'bcv-detail__title bcv-pretty', text: p.title }), p.front_page ? U.badge('Front page', 'green', 'bcv-badge--sm') : null]),
         U.text('bcv-entry__date', [
@@ -890,7 +907,7 @@
       return inPlay ? `${used} of ${limit.allowed} used · attempt ${inPlay.n} in progress` : `${used} of ${limit.allowed} used`;
     }
     main.replaceChildren(
-      backTo(app, `${c.url}/quizzes`, 'Quizzes'),
+      itemTop(ctx, c, backTo(app, `${c.url}/quizzes`, 'Quizzes'), 'Quiz', q.id),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
         meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', attemptsLine()], ['Type', TYPE[q.quiz_type] || q.quiz_type], ...(restrictions(q).length ? [['Restrictions', restrictions(q).join(' · ')]] : []), ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),

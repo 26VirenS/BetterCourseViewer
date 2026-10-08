@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.17', date: '2026-10-08', notes: [
+      { kind: 'new', title: 'Previous and Next', body: 'On every quiz, page and discussion, not just work.', icon: P.arrows },
+      { kind: 'improved', title: 'Walks your modules', body: 'Opened from Modules, Next goes to the next item.', icon: P.list },
+    ] },
     { version: '2.99.16', date: '2026-10-08', notes: [
       { kind: 'new', title: 'How the class did', body: 'A box plot by your grade; hover it for the numbers.', icon: P.steps },
       { kind: 'improved', title: 'Comments on a press', body: 'The grade card opens small; Comments widens it.', icon: P.layers },
