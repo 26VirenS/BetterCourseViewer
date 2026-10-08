@@ -433,6 +433,7 @@
           const fresh = await store.submission(c.id, a.id, { force: true }).catch(() => null);
           if (fresh) sub = fresh;
           if (ctx.alive()) draw();
+          if (document.activeElement !== input) setWriting(false); // (sent: back to the button, unless the student is already writing the next)
         } catch (e) {
           input.value = text; // put it back rather than losing it
           U.toast(`The comment was not sent: ${e?.message || e}`, { error: true });
@@ -442,11 +443,28 @@
         }
       };
       send.addEventListener('click', go);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
-      return U.el('bcv-mcard__foot', [
-        U.el('bcv-mcard__pill', [input, send]),
-        U.text('bcv-mcard__perm', 'Sent comments can’t be edited or deleted.'),
+      // (2.99.15) a button first, pressed to write: the field takes the button's own place (the same pill), cross-fading
+      // in with its send button, the warning beneath it; an empty field let go of (Escape, or the cursor gone elsewhere)
+      // turns back into the button. Escape on an empty field closes only the field, not the card.
+      const opener = h('button', { type: 'button', class: 'bcv-mcard__opener', 'aria-expanded': 'false', onclick: () => { setWriting(true); input.focus(); } }, [
+        U.svg('M5 6.5A2.5 2.5 0 017.5 4h9A2.5 2.5 0 0119 6.5v7a2.5 2.5 0 01-2.5 2.5H11l-4 3.5V16h0A2 2 0 015 14z', { size: 15, stroke: 'currentColor', width: 1.9 }),
+        h('span', { text: 'Comment to instructor' }),
       ]);
+      const pill = U.el('bcv-mcard__pill', [input, send]);
+      const foot = U.el('bcv-mcard__foot', [U.el('bcv-mcard__compose', [opener, pill]), U.text('bcv-mcard__perm', 'Sent comments can’t be edited or deleted.')]);
+      function setWriting(on) {
+        foot.classList.toggle('is-writing', on);
+        opener.setAttribute('aria-expanded', String(on));
+        opener.inert = on;
+        pill.inert = !on;
+      }
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); go(); return; }
+        if (e.key === 'Escape' && !input.value.trim() && !busy) { e.preventDefault(); e.stopPropagation(); setWriting(false); opener.focus(); }
+      });
+      input.addEventListener('blur', () => setTimeout(() => { if (!busy && !input.value.trim() && !pill.contains(document.activeElement)) setWriting(false); }, 0));
+      setWriting(false);
+      return foot;
     }
 
     function draw() {

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.14"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.15"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2256,7 +2256,7 @@ html[data-bcv-theme="dark"] .bcv-sb--pop .bcv-sb__tab.is-active { background: #4
 /* (2.99.13) the mark's card sideways: the mark and the work on the left, what is said about it a column on the right —
    the thread scrolling on its own, its newest words at its foot by the comment pill, the × at its top */
 .bcv-mark--side { grid-template-rows: minmax(0, 1fr); }
-.bcv-mark__cols { flex: 1; min-height: 0; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+.bcv-mark__cols { flex: 1; min-height: 0; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 270px; }
 .bcv-mark__left { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .bcv-mark--side .bcv-mark__head { display: flex; padding: 20px 20px 16px; gap: 16px; align-items: center; border-bottom: 0; }
 .bcv-mark--side .bcv-mark__body { background: none; }
@@ -2266,8 +2266,24 @@ html[data-bcv-theme="dark"] .bcv-sb--pop .bcv-sb__tab.is-active { background: #4
 .bcv-mcard__chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .bcv-mcard__thread { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
 .bcv-mcard__thread > .bcv-mcard__bubble { max-width: 92%; }
-.bcv-mcard__empty { margin: auto 0; padding: 24px 10px; text-align: center; font: 400 13px/1.45 var(--bcv-font); color: var(--bcv-ink3); text-wrap: pretty; }
+.bcv-mcard__empty { margin: auto 0; padding: 10px 6px; text-align: center; font: 400 13px/1.45 var(--bcv-font); color: var(--bcv-ink3); text-wrap: pretty; }
 .bcv-mcard__chat > .bcv-mcard__foot { position: static; padding: 12px 14px 14px; background: none; }
+
+/* (2.99.15) the comment is a button first: pressed, the field takes its place — the same pill, cross-fading (180ms,
+   ease-out), the send button settling in from 90% a beat after, the warning fading in beneath */
+.bcv-mcard__compose { display: grid; grid-template-columns: minmax(0, 1fr); } /* (the button and the field stacked in one cell, as wide as the column and no wider) */
+.bcv-mcard__compose > .bcv-mcard__pill { min-width: 0; }
+.bcv-mcard__compose > * { grid-area: 1 / 1; transition: opacity .18s cubic-bezier(.23,1,.32,1); }
+.bcv-mark .bcv-mcard__opener { display: flex; align-items: center; gap: 9px; height: 46px; margin: 0; padding: 0 18px; box-sizing: border-box; border: 1px solid var(--bcv-edge); border-radius: 23px; background: var(--bcv-fill); color: var(--bcv-ink2); font: 500 14.5px/1 var(--bcv-font); text-align: left; cursor: pointer; transition: opacity .18s cubic-bezier(.23,1,.32,1), background-color .15s ease, scale .12s cubic-bezier(.23,1,.32,1); }
+@media (hover: hover) and (pointer: fine) { .bcv-mark .bcv-mcard__opener:hover { background: var(--bcv-fill2); color: var(--bcv-ink); } }
+.bcv-mark .bcv-mcard__opener:active { scale: .98; }
+.bcv-mark .bcv-mcard__opener:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 2px; }
+.bcv-mcard__foot:not(.is-writing) .bcv-mcard__pill, .bcv-mcard__foot.is-writing .bcv-mcard__opener { opacity: 0; pointer-events: none; }
+.bcv-mcard__pill .bcv-mcard__send { transition: scale .18s cubic-bezier(.23,1,.32,1) .06s, opacity .18s cubic-bezier(.23,1,.32,1) .06s, background-color .18s ease, color .18s ease; }
+.bcv-mcard__foot:not(.is-writing) .bcv-mcard__send { scale: .9; opacity: 0; transition-delay: 0s; }
+.bcv-mcard__perm { transition: opacity .18s cubic-bezier(.23,1,.32,1); }
+.bcv-mcard__foot:not(.is-writing) .bcv-mcard__perm { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .bcv-mcard__pill .bcv-mcard__send, .bcv-mcard__foot:not(.is-writing) .bcv-mcard__send { scale: 1; transition: opacity .15s ease; } }
 .bcv-mcard.is-side .bcv-mcard__body { padding-bottom: 12px; }
 .bcv-sheet--tool { width: 960px; height: calc(100vh - 56px); }
 .bcv-sheet--tool .bcv-sheet__head { align-items: center; }

@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.15', date: '2026-10-08', notes: [
+      { kind: 'improved', title: 'A snugger grade card', body: 'Sized to what it holds, over the page; comment on a press.', icon: P.layers },
+    ] },
     { version: '2.99.14', date: '2026-10-08', notes: [
       { kind: 'improved', title: 'The button grows', body: 'Submit grows out of its middle into the panel.', icon: P.sparkle },
       { kind: 'improved', title: 'Marks on your work', body: 'Handed-in files open in Canvas’s viewer, with its notes.', icon: P.pen },

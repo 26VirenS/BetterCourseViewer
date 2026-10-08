@@ -62,7 +62,7 @@
    *  can call api.swap(make2) to turn it into something else in place (the card's Submit again), api.relayout() when what
    *  it holds changes height, api.close() to fold it back. `anchor` is where it grows from: 'right' (hung from a chip's
    *  corner at the end of a row), 'left' (from a button's start), or 'center' (out of the button's middle, every way). */
-  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null } = {}, make) {
+  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null, within = null } = {}, make) {
     const prev = document.querySelector('.bcv-sheet-ov');
     if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return prev.bcvApi; } // (pressed again as it folds: it opens again from where it is)
     if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
@@ -77,7 +77,10 @@
       const vw = innerWidth, vh = innerHeight, w = Math.min(width, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
       const x = anchor === 'center' ? r.left + r.width / 2 - w / 2 : anchor === 'left' ? r.left : r.right - w;
       const y = anchor === 'center' ? r.top + r.height / 2 - hgt / 2 : r.top; // (centre: the box's middle on the button's, growing out of it every way)
-      return { x: Math.max(M, Math.min(x, vw - M - w)), y: Math.max(M, Math.min(y, vh - M - hgt)), w, h: hgt };
+      // (2.99.15) `within`: kept inside the page's own card (over the assignment, not the course's rail beside it)
+      const b = within?.isConnected ? within.getBoundingClientRect() : null;
+      const lo = b ? Math.max(M, b.left + 16) : M, hi = b ? Math.min(vw - M, b.right - 16) : vw - M;
+      return { x: Math.max(lo, Math.min(x, hi - w)), y: Math.max(M, Math.min(y, vh - M - hgt)), w, h: hgt };
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
     const onKey = (e) => {
@@ -98,12 +101,18 @@
       from.setAttribute?.('aria-expanded', 'false');
       clearTimeout(ov._bcvFoldT);
       ov._bcvFoldT = setTimeout(() => { ov.remove(); from.classList.remove('bcv-grow-src'); onClosed?.(); }, U.reducedMotion() ? 0 : 560);
+      // (2.99.15) the layer fades away once the box has all but landed (.bcv-sheet-ov--card: opacity, .3s in): the real
+      // button is back under it from that moment, so the box dissolves onto the button rather than the button fading
+      // out with it and popping back after
+      clearTimeout(ov._bcvSrcT);
+      ov._bcvSrcT = setTimeout(() => from.classList.remove('bcv-grow-src'), U.reducedMotion() ? 0 : 300);
       if (from.isConnected) from.focus?.({ preventScroll: true }); // (keyboard users land back on what opened it)
     };
     // pressed again as it folds: the fold is called off and it opens again from where it has got to
     ov.bcvCard = from;
     ov.bcvReopen = () => {
       clearTimeout(ov._bcvFoldT);
+      clearTimeout(ov._bcvSrcT);
       folding = false;
       ov.classList.remove('is-folding', 'is-far');
       document.addEventListener('keydown', onKey);
@@ -260,7 +269,15 @@
       return {
         cls: 'bcv-mark bcv-mark--side',
         kids: [U.el('bcv-mark__cols', [left, right])],
-        measure: () => Math.max(head.offsetHeight + built.el.offsetHeight, 380) + 2,
+        // (2.99.15) as small as what it holds: the taller of the two columns as they would stand on their own — the
+        // thread measured by its bubbles, not by the column it stretches to fill
+        measure: () => {
+          const th = built.chat.querySelector('.bcv-mcard__thread'), ft = built.chat.querySelector('.bcv-mcard__foot');
+          const kids = th ? [...th.children] : [];
+          const threadH = kids.reduce((n, k) => n + k.offsetHeight, 0) + Math.max(0, kids.length - 1) * 12 + 18;
+          const rightH = right.firstElementChild.offsetHeight + threadH + (ft?.offsetHeight || 0);
+          return Math.max(head.offsetHeight + built.el.offsetHeight, rightH) + 2;
+        },
         glide: glideFrom ? [[valueEl, glideFrom]] : [],
       };
     }
@@ -274,7 +291,7 @@
   }
 
   const courseVars = (c) => ({ '--bcv-cc': c.color || null, '--bcv-cc-ink': c.palette?.text || c.color || null });
-  function openMarkBox(ctx, c, a, s, from, { hover = false, again = null, anchor = 'right', onClosed = null } = {}) {
+  function openMarkBox(ctx, c, a, s, from, { hover = false, again = null, anchor = 'right', onClosed = null, within = null } = {}) {
     const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
     const posted = scored && s.posted_at !== null;
     const word = (sel) => from.querySelector(sel)?.textContent?.trim() || '';
@@ -284,8 +301,9 @@
     const when = word('.bcv-detail__gradewhen') || (s.submitted_at ? U.fmtAt(s.submitted_at) : '');
     const glideFrom = from.querySelector(posted ? '.bcv-detail__gradescore, [data-glide="score"]' : '.bcv-detail__gradepc, [data-glide="word"]');
     if (glideFrom && !glideFrom.dataset.glide) glideFrom.dataset.glide = 'g';
-    const side = innerWidth >= 860; // (sideways where there is room for it: the comments a column to the right)
-    return growBox(ctx, from, { label: `${a.name}: ${posted ? 'your mark' : 'what you handed in'}`, W: side ? 720 : 400, H: 560, anchor, hover, onClosed, vars: courseVars(c) }, (api) => markContent(ctx, c, a, s, api, { value, label, when, again: again ? () => again(api) : null, glideFrom, side }));
+    const room = within?.isConnected ? within.getBoundingClientRect().width - 32 : innerWidth - 32;
+    const side = room >= 640; // (sideways where there is room for it: the comments a column to the right)
+    return growBox(ctx, from, { label: `${a.name}: ${posted ? 'your mark' : 'what you handed in'}`, W: side ? 640 : 400, H: 560, anchor, hover, onClosed, within, vars: courseVars(c) }, (api) => markContent(ctx, c, a, s, api, { value, label, when, again: again ? () => again(api) : null, glideFrom, side }));
   }
 
   const D = {};
@@ -475,12 +493,12 @@
         return { cls: 'bcv-hand', kids: [handScreen], measure: () => handScreen.scrollHeight + 2, after: () => setTimeout(() => (handScreen.querySelector('.bcv-sb__tab.is-active, .bcv-sb__tab, .bcv-sb__drop, .bcv-sb__ta') || handScreen).focus?.({ preventScroll: true }), 60) };
       };
       if (api) { api.swap(content, { W: 400 }); return; }
-      opened = growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', onClosed: afterClose, vars: courseVars(c) }, content);
+      opened = growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), onClosed: afterClose, vars: courseVars(c) }, content);
     };
     let sentOff = false;
     const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)
     const openCard = (pill, { hover = false } = {}) => {
-      const run = () => { opened = openMarkBox(ctx, c, a, current, pill, { anchor: 'center', hover, onClosed: afterClose, again: canAgain(current) ? (bx) => openHand(pill, bx) : null }); };
+      const run = () => { opened = openMarkBox(ctx, c, a, current, pill, { anchor: 'center', within: pill.closest('.bcv-asg__card'), hover, onClosed: afterClose, again: canAgain(current) ? (bx) => openHand(pill, bx) : null }); };
       const need = [BCV.screens.feedback?.card ? null : BCV.lazy?.load?.('submit'), a.rubric?.length && !BCV.rubricRing ? BCV.lazy?.load?.('rubric')?.catch(() => null) : null].filter(Boolean);
       if (!need.length) run(); else Promise.all(need).then(() => { if (pill.isConnected) run(); }).catch(() => { if (!hover) app.go(`${c.url}/assignments/${a.id}?bcv=feedback`); });
     };
