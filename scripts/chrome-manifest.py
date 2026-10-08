@@ -37,7 +37,8 @@ m.setdefault('action', {})['default_icon'] = {s: f'icons/icon-{s}.png' for s in 
 # Permissions with a warning stay out. nativeMessaging is Safari's line to the Mac app (Chrome has no app
 # to talk to). tabs is what lets Safari and Firefox see a tab arrive on a Canvas the extension is not yet
 # allowed on; Chrome reads a tab's address wherever it has the site anyway, and the popup reads the tab it
-# is over from the press itself (activeTab). storage, unlimitedStorage, scripting and activeTab carry none.
+# is over from the press itself (activeTab). storage, unlimitedStorage, scripting, activeTab and
+# alarms (2.99.25: the two-hourly update check) carry none.
 m['permissions'] = [p for p in m.get('permissions', []) if p not in ('nativeMessaging', 'tabs')]
 # The on-demand modules (content/app/lazy.js) sit, in the source manifest, in a content-script group whose
 # match never fires: Safari parses none of them until asked, and the iPhone app injects the group whole.

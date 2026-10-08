@@ -654,7 +654,7 @@ private struct UpdatesPane: View {
         if Updater.isDevelopmentRun {
             return "This is a development run of Simpl (a build from Xcode, the mock Canvas or the screenshot suite): it never looks for updates or replaces itself."
         }
-        var s = "Simpl looks for a new version every four hours. Each one is checked against its published checksum and its signature before it takes this copy’s place, and this copy goes to the Bin."
+        var s = "Simpl looks for a new version every two hours. Each one is checked against its published checksum and its signature before it takes this copy’s place, and this copy goes to the Bin."
         if AppPlacement.isTranslocated {
             s += " This copy is running from a temporary place macOS made for the download, so an update goes into the Applications folder."
         }

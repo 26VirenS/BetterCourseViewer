@@ -1113,5 +1113,17 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   ensureDomains();
   offerSetup();
   noteVersion();
+  // (2.99.25) Updates looked for every two hours. Chrome asks the Web Store for a new version only every few hours on
+  // its own; this asks every two, and a version found goes in as Chrome puts any in, once Simpl is idle. (Safari's come
+  // with its app, which looks every two hours too; a browser without the call skips this.)
+  const UPDATE_ALARM = 'simpl:update-check';
+  const C = typeof chrome !== 'undefined' ? chrome : null;
+  if (C?.runtime?.requestUpdateCheck && C?.alarms?.onAlarm) {
+    C.alarms.onAlarm.addListener((a) => {
+      if (a?.name !== UPDATE_ALARM) return;
+      try { const p = C.runtime.requestUpdateCheck(); if (p?.catch) p.catch(() => {}); } catch { /* nothing to ask */ }
+    });
+    Promise.resolve(C.alarms.get(UPDATE_ALARM)).then((had) => { if (!had) C.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 120 }); }).catch(() => {});
+  }
   BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions, afterUpdate, canvasTabs, toolSitePatterns, updatedPageDue, openUpdated }; // the harness drives these directly
 })();

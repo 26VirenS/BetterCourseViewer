@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
         }
         Shot.armIfAsked()
-        Updater.shared.start() // (1.2: the update feed at launch and every four hours; nothing in a development run)
+        Updater.shared.start() // (1.2: the update feed at launch and every two hours (1.2.1); nothing in a development run)
     }
 
     /// The window closed: the app stays (its reminders and new-activity alerts keep coming); the Dock icon brings the window back.

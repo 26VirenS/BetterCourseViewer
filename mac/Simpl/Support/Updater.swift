@@ -22,7 +22,7 @@ private struct UpdateFailure: LocalizedError {
 }
 
 /// Simpl for Mac keeps itself up to date (1.2), as the Safari extension's app does (`macos/…/Updater.swift`). At launch
-/// when the last look is older than four hours, and every four hours after, it reads the feed on simplcourses.com — one
+/// when the last look is older than two hours, and every two hours after, it reads the feed on simplcourses.com — one
 /// small JSON file naming the newest version, where its zip is and the zip's SHA-256 — and when that version is newer
 /// than this one and runs on this Mac's macOS, Settings ▸ Updates offers it (Update Now). When updates install
 /// themselves (on unless turned off) one waits for a quiet moment: Simpl not in front and no sheet open, so a quiz or a
@@ -54,9 +54,9 @@ final class Updater: ObservableObject {
     }()
     /// Simpl for Mac's releases, for Earlier Versions (each `mac-v<version>`, its zip `Simpl-Mac-<version>.zip`).
     private static let releasesAPI = "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases"
-    let interval: TimeInterval = 4 * 3600 // (a check is one small request; an update rarely waits on the hour)
+    let interval: TimeInterval = 2 * 3600 // (a check is one small request; an update rarely waits on the hour)
     let currentVersion: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
-    private static let lastKey = "lastUpdateCheck" // (kept across launches: a relaunch inside the four hours does not read the feed again)
+    private static let lastKey = "lastUpdateCheck" // (kept across launches: a relaunch inside the two hours does not read the feed again)
 
     @Published private(set) var state: State = .idle
     @Published private(set) var lastCheck: Date? = nil
@@ -103,8 +103,8 @@ final class Updater: ObservableObject {
 
     // MARK: - The schedule
 
-    /// From the app's launch: the feed read now when the last look is older than four hours, and looked at again every
-    /// ten minutes (and whenever Simpl comes to the front) for the four hours being up — a Mac asleep does not count
+    /// From the app's launch: the feed read now when the last look is older than two hours, and looked at again every
+    /// ten minutes (and whenever Simpl comes to the front) for the two hours being up — a Mac asleep does not count
     /// its hours. An update waiting to install itself goes in when Simpl leaves the front.
     func start() {
         guard !started, !Self.isDevelopmentRun else { return }
@@ -131,7 +131,7 @@ final class Updater: ObservableObject {
         installIfQuiet()
     }
 
-    /// The feed read when the last look is four hours old (or was never made, or the clock went back).
+    /// The feed read when the last look is two hours old (or was never made, or the clock went back).
     func checkIfDue() {
         guard started else { return }
         if let last = lastCheck {
