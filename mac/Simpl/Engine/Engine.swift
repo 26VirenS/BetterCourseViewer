@@ -185,6 +185,8 @@ final class Engine: ObservableObject, ShellListener {
         await loadSidebar()
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) }
+        // (the screenshot suite: -SimplActivityProbe YES — one read of the school as the new-activity check makes it, on the console)
+        if UserDefaults.standard.bool(forKey: "SimplActivityProbe") { Task { await Activity.shared.probe(self) } }
         // the first run: the app's own setup (the courses that count, the goals), before anything else
         if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
             queuePopup(.setup)

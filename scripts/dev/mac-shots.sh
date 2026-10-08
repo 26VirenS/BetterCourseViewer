@@ -49,7 +49,7 @@ MODE=light shoot warmup 25
 rm -f "$OUT_ABS"/warmup*
 
 for MODE in light dark; do
-  shoot "$MODE-01-dashboard" 14
+  shoot "$MODE-01-dashboard" 14 -SimplActivityProbe YES
   shoot "$MODE-02-courses" 12 -SimplPlace courses
   shoot "$MODE-03-todo" 12 -SimplPlace todo
   shoot "$MODE-04-grades" 14 -SimplPlace grades
@@ -79,7 +79,7 @@ done
 # Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
 export BASE=http://localhost:8860
 MODE=light
-shoot d2l-01-dashboard 16
+shoot d2l-01-dashboard 16 -SimplActivityProbe YES # (and the new-activity check's read of Brightspace, on the console)
 shoot d2l-02-course 14 -SimplPlace course:31001
 shoot d2l-03-assignments 12 -SimplPlace section:courses/31001:assignments
 shoot d2l-04-assignment 14 -SimplPlace course:31001 -SimplPush /courses/31001/assignments/702

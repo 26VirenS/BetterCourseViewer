@@ -334,7 +334,7 @@
     }
     if (!st.counts) await todayCounts({ kept: false }).catch(() => null);
     const c = st.counts;
-    if (!c) return { title: key === 'overdue' ? 'Overdue' : 'Graded this week', note: 'Could not be read from Canvas.', empty: 'Try again in a moment.', sections: [] };
+    if (!c) return { title: key === 'overdue' ? 'Overdue' : 'Graded this week', note: `Could not be read from ${BCV.lms.name}.`, empty: 'Try again in a moment.', sections: [] };
     if (key === 'overdue') {
       const list = c.od.overdue.filter((o) => !clearedOverdue.has(o.key));
       const recent = W.recentOf('Handed in late', c.od.lateIn);
@@ -409,9 +409,14 @@
   // New activity (1.5): what the phone's own background check (Native/Activity.swift) needs to read Canvas's activity
   // stream by itself while the app is closed — the courses chosen (their ids, and the names the app shows) and the
   // student's own id (a comment of their own is not news). The check itself is the app's, not this page's.
+  // (2.99.23) And which platform: Brightspace has no activity stream, so there the app reads each course's news and
+  // released grades itself, at the API versions this page found the school's Brightspace answering (`lp`, `le`).
   async function watchInfo() {
-    const [sel, me] = await Promise.all([selection(), store.me().catch(() => null)]);
-    return { me: me?.id ? String(me.id) : null, courses: (sel.list || []).map((c) => ({ id: String(c.id), name: c.shortName || c.name || '' })) };
+    const [sel, me, v] = await Promise.all([selection(), store.me().catch(() => null), BCV.lms?.d2l ? BCV.d2l?.versions?.().catch(() => null) : null]);
+    const out = { me: me?.id ? String(me.id) : null, courses: (sel.list || []).map((c) => ({ id: String(c.id), name: c.shortName || c.name || '' })), lms: BCV.lms?.kind || 'canvas' };
+    if (v?.lp) out.lp = String(v.lp);
+    if (v?.le) out.le = String(v.le);
+    return out;
   }
 
   async function todo({ group = null, showDone = null } = {}) {
@@ -1060,7 +1065,7 @@
       : sub.excused ? 'You are excused from this assignment.'
       : !attemptsLeft ? 'No attempts left.'
       : closed ? 'This assignment is closed.'
-      : !here.length && types.some((t) => ['media_recording', 'student_annotation'].includes(t)) ? 'This one is handed in on Canvas’s own page.'
+      : !here.length && types.some((t) => ['media_recording', 'student_annotation'].includes(t)) ? `This one is handed in on ${BCV.lms.name}’s own page.`
       : !here.length ? '' : '';
     const canSubmit = !locked && !sub.excused && attemptsLeft && !closed && here.length > 0;
     const isQuiz = types.includes('online_quiz') || !!a.is_quiz_assignment;
@@ -1095,7 +1100,7 @@
   /** Hand in from the phone: text, a web address, or files the app picked (base64 here, Files again for Canvas's upload). */
   async function submit({ course, id, type = '', text = '', url = '', files = [], comment = '' } = {}) {
     const cid = String(course), aid = String(id);
-    if (!NATIVE_TYPES.includes(type)) throw new Error('That kind of submission is handed in on Canvas’s own page.');
+    if (!NATIVE_TYPES.includes(type)) throw new Error(`That kind of submission is handed in on ${BCV.lms.name}’s own page.`);
     const a = await store.assignment(cid, aid);
     let fileIds = [];
     if (type === 'online_text_entry' && !String(text).trim()) throw new Error('Write something to hand in.');

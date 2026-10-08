@@ -344,7 +344,7 @@
     return [];
   }
   /** Where a piece of work stands, as Canvas says it on its submission. */
-  function shapeSubmission({ aid, due, points, value, subs = null, feedback = null, takenWhenGraded = false, as = 'online_upload' }) {
+  function shapeSubmission({ aid, due, points, value, subs = null, feedback = null, takenWhenGraded = false, as = 'online_upload', ou = null, le = PREFER.le }) {
     const me = String(page.userId || '');
     const last = subs ? subs.flatMap((s) => list(s.Submissions)).filter((s) => s?.SubmissionDate).sort((a, b) => t(b.SubmissionDate) - t(a.SubmissionDate))[0] : null;
     const graded = !!(value && (num(value.PointsNumerator) !== null || (value.DisplayedGrade && String(value.DisplayedGrade).trim())));
@@ -368,7 +368,8 @@
       late, missing, excused: false, attempt: submitted ? Math.max(1, subs ? subs.flatMap((s) => list(s.Submissions)).length : 1) : null,
       seconds_late: late ? Math.round((t(last.SubmissionDate) - t(due)) / 1000) : 0,
       submission_type: submitted ? as : null,
-      attachments: last ? list(last.Files).map((f) => ({ id: String(f.FileId), display_name: f.FileName, filename: f.FileName, size: f.Size, url: null })) : [],
+      // (each file of the hand-in fetched from it, as Brightspace keeps it: the folder's submission, then the file)
+      attachments: last ? list(last.Files).map((f) => ({ id: String(f.FileId), display_name: f.FileName, filename: f.FileName, size: f.Size, url: ou && last.Id !== undefined && last.Id !== null ? `/d2l/api/le/${le}/${ou}/dropbox/folders/${aid}/submissions/${last.Id}/files/${f.FileId}` : null })) : [],
       submission_comments: comments, points_possible: points ?? null,
     };
   }
@@ -384,7 +385,7 @@
       omit_from_final_grade: !!go?.ExcludeFromFinalGradeCalculation, grade_item_id: f.GradeItemId ? String(f.GradeItemId) : null,
       d2l: { kind: 'dropbox', id: String(f.Id) },
     };
-    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null, subs: await mySubs(ou, f.Id) });
+    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null, subs: await mySubs(ou, f.Id), ou, le: (await versions()).le });
     return a;
   }
   function quizAssignment(ou, q, gm, { withSub = false } = {}) {

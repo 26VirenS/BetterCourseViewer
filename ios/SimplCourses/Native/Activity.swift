@@ -11,6 +11,8 @@ import UserNotifications
 /// itself with the sign-in kept on this iPhone (CookieJar) and says what is new. Nothing leaves the phone and no
 /// server is involved. What the student has already seen in the app is not news: whenever the app's screens come up,
 /// everything in the stream is marked seen, so an alert is only ever for what arrived while the app was away.
+/// (1.7) Brightspace has no activity stream: there the app reads each chosen course's news and the grades released in
+/// it, with the teacher's comment on each, the same way (`readBrightspace`).
 @MainActor
 final class Activity: ObservableObject {
     static let shared = Activity()
@@ -31,12 +33,18 @@ final class Activity: ObservableObject {
             }
         }
         static let standard: Set<Kind> = [.announcements, .grades, .comments, .messages] // (a discussion's every reply is noisy: off until asked for)
+        /// (1.7) What Brightspace's courses can say here: no Inbox there, and its discussions are not read
+        static let brightspace: [Kind] = [.announcements, .grades, .comments]
     }
 
-    /// What the page says the check needs (its `watchInfo` call): the student's id and the courses chosen.
+    /// What the page says the check needs (its `watchInfo` call): the student's id and the courses chosen; (1.7) which
+    /// platform, and on Brightspace the API versions its page found the school answering.
     private struct Context: Codable {
         var me: String?
         var courses: [String: String]
+        var lms: String?
+        var lp: String?
+        var le: String?
     }
 
     private struct WatchInfo: Decodable {
@@ -46,6 +54,18 @@ final class Activity: ObservableObject {
         }
         var me: String?
         var courses: [Course]
+        var lms: String?
+        var lp: String?
+        var le: String?
+    }
+
+    /// What a read of the school came to.
+    private enum Read {
+        case events([Event])
+        /// the kept sign-in was refused: it has ended
+        case refused
+        /// no answer, or not one to read
+        case failed
     }
 
     /// Something new, as an alert says it.
@@ -76,6 +96,11 @@ final class Activity: ObservableObject {
     @Published private(set) var refreshOff = false
     /// When Canvas was last read for this (in the background or as the app came up).
     @Published private(set) var lastCheck: Date? = UserDefaults.standard.object(forKey: Activity.lastKey) as? Date
+    /// (1.7) The school is a Brightspace: Settings offers what it can say, and says why the alerts can pause.
+    @Published private(set) var onBrightspace = Activity.context().lms == "d2l"
+
+    /// The kinds of activity Settings offers for this school.
+    var kindsOffered: [Kind] { onBrightspace ? Kind.brightspace : Kind.allCases }
     #if os(macOS)
     /// (the Mac app: it runs while it is open, so a look every 20 minutes is a timer of its own)
     private var timer: Timer?
@@ -114,6 +139,7 @@ final class Activity: ObservableObject {
     func reset() {
         for k in [Activity.seenKey, Activity.contextKey, Activity.lastKey, Activity.staleKey] { UserDefaults.standard.removeObject(forKey: k) }
         lastCheck = nil
+        onBrightspace = false
     }
 
     func checkRefresh() {
@@ -135,12 +161,35 @@ final class Activity: ObservableObject {
     /// in the stream now marked seen (the student is looking at it), and the next check asked for.
     func sync(_ engine: Engine) async {
         guard on else { return }
-        if let w = try? await engine.call("watchInfo", as: WatchInfo.self) {
-            let ctx = Context(me: w.me, courses: Dictionary(w.courses.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a }))
-            if let data = try? JSONEncoder().encode(ctx) { UserDefaults.standard.set(data, forKey: Activity.contextKey) }
-        }
+        await note(engine)
         _ = await check(notify: false)
         schedule()
+    }
+
+    /// What the page says the check needs, kept for when it runs with no page up.
+    private func note(_ engine: Engine) async {
+        guard let w = try? await engine.call("watchInfo", as: WatchInfo.self) else { return }
+        let ctx = Context(me: w.me, courses: Dictionary(w.courses.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a }), lms: w.lms, lp: w.lp, le: w.le)
+        if let data = try? JSONEncoder().encode(ctx) { UserDefaults.standard.set(data, forKey: Activity.contextKey) }
+        onBrightspace = w.lms == "d2l"
+    }
+
+    /// (the screenshot suite, scripts/dev/mac-shots.sh: -SimplActivityProbe YES) One read of the school as the check
+    /// makes it, the switch on or off, said on the console: the platform, and what an alert would say. Nothing is
+    /// marked seen and nothing is posted.
+    func probe(_ engine: Engine) async {
+        await note(engine)
+        let ctx = Activity.context()
+        var line = "activity-probe lms=\(ctx.lms ?? "?") courses=\(ctx.courses.count)"
+        switch await read(ctx) {
+        case .events(let list):
+            line += " events=\(list.count) " + list.sorted { $0.when > $1.when }.prefix(10).map { "[\($0.kind.rawValue)] \($0.title) / \($0.subtitle) / \($0.body) -> \($0.url ?? "")" }.joined(separator: " | ")
+        case .refused:
+            line += " refused"
+        case .failed:
+            line += " failed"
+        }
+        FileHandle.standardError.write(Data((line + "\n").utf8))
     }
 
     /// The next background check, no sooner than 20 minutes from now (iOS picks the moment).
@@ -171,38 +220,35 @@ final class Activity: ObservableObject {
         _ = await check(notify: true)
     }
 
-    /// Reads Canvas's activity stream; `notify`: says what is new (otherwise only marks it seen). The number said.
+    /// Reads Canvas's activity stream (on Brightspace, its courses' news and grades); `notify`: says what is new
+    /// (otherwise only marks it seen). The number said.
     @discardableResult
     func check(notify: Bool) async -> Int {
-        guard let base = Activity.baseURL(), var comps = URLComponents(url: base.appendingPathComponent("api/v1/users/self/activity_stream"), resolvingAgainstBaseURL: false) else { return 0 }
-        comps.queryItems = [URLQueryItem(name: "per_page", value: "40"), URLQueryItem(name: "only_active_courses", value: "true")]
-        guard let url = comps.url else { return 0 }
-        var req = URLRequest(url: url, timeoutInterval: 20)
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.httpShouldHandleCookies = false
-        let host = base.host?.lowercased() ?? ""
-        let cookies = CookieJar.shared.cookies().filter { Activity.cookie($0, fits: host) }
-        for (k, v) in HTTPCookie.requestHeaderFields(with: cookies) { req.setValue(v, forHTTPHeaderField: k) }
-        guard let answer = try? await URLSession.shared.data(for: req), let http = answer.1 as? HTTPURLResponse else { return 0 }
-        let data = answer.0
-        if http.statusCode == 401 || http.statusCode == 403 {
-            if notify { await sayStale() }
+        let ctx = Activity.context()
+        let events: [Event]
+        switch await read(ctx) {
+        case .events(let list):
+            events = list
+        case .refused:
+            // (Brightspace ends a sign-in left unused after a time its school sets — often hours: an alert each time
+            // would only nag. Settings says the alerts pause then, until Simpl is next opened.)
+            if notify && ctx.lms != "d2l" { await sayStale() }
+            return 0
+        case .failed:
             return 0
         }
-        guard http.statusCode == 200, let list = Activity.json(data) as? [[String: Any]] else { return 0 }
         UserDefaults.standard.set(false, forKey: Activity.staleKey)
         let now = Date()
         lastCheck = now
         UserDefaults.standard.set(now, forKey: Activity.lastKey)
 
-        let ctx = Activity.context()
-        let events = list.flatMap { Activity.events(from: $0, ctx: ctx) }
         var seen = UserDefaults.standard.stringArray(forKey: Activity.seenKey) ?? []
         let primed = !seen.isEmpty
         let known = Set(seen)
         let fresh = events.filter { !known.contains($0.key) }
         seen.append(contentsOf: fresh.map(\.key))
         if seen.count > Activity.seenCap { seen.removeFirst(seen.count - Activity.seenCap) }
+        if seen.isEmpty { seen = ["primed"] } // (a first read with nothing in it has learned all there is too)
         UserDefaults.standard.set(seen, forKey: Activity.seenKey)
         // (the very first read only learns what is there: an alert for every old thing is not news)
         guard notify, primed else { return 0 }
@@ -210,9 +256,18 @@ final class Activity: ObservableObject {
         for e in said.prefix(Activity.alertsCap) { await post(e) }
         if said.count > Activity.alertsCap {
             let more = said.count - Activity.alertsCap
-            await post(Event(key: "more.\(Int(now.timeIntervalSince1970))", kind: .announcements, title: "Simpl Courses", subtitle: "", body: "\(more) more \(more == 1 ? "update" : "updates") on Canvas.", url: "/", when: now))
+            await post(Event(key: "more.\(Int(now.timeIntervalSince1970))", kind: .announcements, title: "Simpl Courses", subtitle: "", body: "\(more) more \(more == 1 ? "update" : "updates") on \(ctx.lms == "d2l" ? "Brightspace" : "Canvas").", url: "/", when: now))
         }
         return said.count
+    }
+
+    /// The school read as the check reads it, with the sign-in kept on this device.
+    private func read(_ ctx: Context) async -> Read {
+        guard let base = Activity.baseURL() else { return .failed }
+        let host = base.host?.lowercased() ?? ""
+        let cookies = HTTPCookie.requestHeaderFields(with: CookieJar.shared.cookies().filter { Activity.cookie($0, fits: host) })
+        if ctx.lms == "d2l" { return await Activity.readBrightspace(base, ctx: ctx, cookies: cookies) }
+        return await Activity.readCanvas(base, ctx: ctx, cookies: cookies)
     }
 
     private func post(_ e: Event) async {
@@ -234,6 +289,86 @@ final class Activity: ObservableObject {
     }
 
     // MARK: - Reading the stream
+
+    /// A GET with the kept sign-in's cookies: the answer and its status, or nil with no answer.
+    private static func get(_ url: URL, cookies: [String: String]) async -> (data: Data, status: Int)? {
+        var req = URLRequest(url: url, timeoutInterval: 20)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpShouldHandleCookies = false
+        for (k, v) in cookies { req.setValue(v, forHTTPHeaderField: k) }
+        guard let answer = try? await URLSession.shared.data(for: req), let http = answer.1 as? HTTPURLResponse else { return nil }
+        return (answer.0, http.statusCode)
+    }
+
+    /// Canvas: the student's activity stream, its newest forty.
+    private static func readCanvas(_ base: URL, ctx: Context, cookies: [String: String]) async -> Read {
+        guard var comps = URLComponents(url: base.appendingPathComponent("api/v1/users/self/activity_stream"), resolvingAgainstBaseURL: false) else { return .failed }
+        comps.queryItems = [URLQueryItem(name: "per_page", value: "40"), URLQueryItem(name: "only_active_courses", value: "true")]
+        guard let url = comps.url, let answer = await get(url, cookies: cookies) else { return .failed }
+        if answer.status == 401 || answer.status == 403 { return .refused }
+        guard answer.status == 200, let list = json(answer.data) as? [[String: Any]] else { return .failed }
+        return .events(list.flatMap { events(from: $0, ctx: ctx) })
+    }
+
+    /// (1.7) Brightspace: each chosen course's news, and its grades released with the teacher's comment on each —
+    /// the last month's (an older one has long been seen, and what was seen is a list kept short). Who is signed in is
+    /// asked first: refused there, the sign-in has ended (a course refusing says only that the course does).
+    private static func readBrightspace(_ base: URL, ctx: Context, cookies: [String: String]) async -> Read {
+        let lp = ctx.lp ?? "1.50", le = ctx.le ?? "1.82"
+        guard let who = await get(base.appendingPathComponent("d2l/api/lp/\(lp)/users/whoami"), cookies: cookies) else { return .failed }
+        if who.status == 401 || who.status == 403 { return .refused }
+        guard who.status == 200 else { return .failed }
+        let now = Date()
+        let since = now.addingTimeInterval(-30 * 86_400)
+        var out: [Event] = []
+        for (ou, course) in ctx.courses.sorted(by: { $0.key < $1.key }) {
+            async let newsRead = get(base.appendingPathComponent("d2l/api/le/\(le)/\(ou)/news/"), cookies: cookies)
+            async let gradesRead = get(base.appendingPathComponent("d2l/api/le/\(le)/\(ou)/grades/values/myGradeValues/"), cookies: cookies)
+            let (news, grades) = await (newsRead, gradesRead)
+            if let n = news, n.status == 200, let list = json(n.data) as? [[String: Any]] {
+                for item in list {
+                    guard let id = str(item["Id"]), let num = Int(id), (item["IsPublished"] as? Bool) != false, (item["IsHidden"] as? Bool) != true else { continue }
+                    let when = date(item["StartDate"]) ?? date(item["CreatedDate"]) ?? .distantPast
+                    guard when >= since, when <= now else { continue }
+                    let title = (item["Title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "New announcement"
+                    // (the interface's own address for it: the announcement's screen, its id in the interface's news ids)
+                    out.append(Event(key: "d2l.news:\(ou):\(id)", kind: .announcements, title: title, subtitle: course, body: plain(rich(item["Body"])), url: "/courses/\(ou)/discussion_topics/\(3_000_000_000 + num)", when: when))
+                }
+            }
+            if let g = grades, g.status == 200, let list = json(g.data) as? [[String: Any]] {
+                for v in list {
+                    guard let gid = str(v["GradeObjectIdentifier"]) else { continue }
+                    let when = date(v["ReleasedDate"]) ?? date(v["LastModified"])
+                    if let w = when, w < since { continue }
+                    let name = (v["GradeObjectName"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Your work"
+                    let shown = (v["DisplayedGrade"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let points = str(v["PointsNumerator"]).map { n in str(v["PointsDenominator"]).map { "\(n) / \($0)" } ?? n }
+                    let text = points.map { p in shown.isEmpty || shown == p ? p : "\(p) · \(shown)" } ?? shown
+                    guard !text.isEmpty else { continue }
+                    out.append(Event(key: "d2l.grade:\(ou):\(gid):\(text)", kind: .grades, title: "\(name) graded", subtitle: course, body: text, url: "/courses/\(ou)/grades", when: when ?? now))
+                    let said = plain(rich(v["Comments"]), max: 140)
+                    if !said.isEmpty {
+                        out.append(Event(key: "d2l.comment:\(ou):\(gid):\(stamp(said))", kind: .comments, title: "Feedback on \(name)", subtitle: course, body: "“\(said)”", url: "/courses/\(ou)/grades", when: when ?? now))
+                    }
+                }
+            }
+        }
+        return .events(out)
+    }
+
+    /// Brightspace's rich text ({ Text, Html }): the HTML, or the plain text when there is no HTML.
+    private static func rich(_ v: Any?) -> String? {
+        guard let r = v as? [String: Any] else { return nil }
+        if let h = r["Html"] as? String, !h.isEmpty { return h }
+        return r["Text"] as? String
+    }
+
+    /// The same short stamp for the same words on every launch (Swift's own hash differs from one launch to the next).
+    private static func stamp(_ s: String) -> String {
+        var h: UInt64 = 0xcbf2_9ce4_8422_2325
+        for b in s.utf8 { h = (h ^ UInt64(b)) &* 0x0000_0100_0000_01b3 }
+        return String(h, radix: 36)
+    }
 
     private static func baseURL() -> URL? {
         if let dev = AppSession.devBaseURL { return dev }

@@ -183,6 +183,7 @@ const log = [];
 let nextPostId = 6000;
 let nextSubId = 100;
 let nextFileId = 9000;
+const fileBodies = new Map(); // (each file handed in, by its id: fetched back as it came)
 
 /** A multipart body's parts: [{ headers, body: Buffer }]. */
 function parts(buf, boundary) {
@@ -264,6 +265,14 @@ function api(req, res, path, q, body) {
     const t = T[ou];
     if (!t) return json(res, 403, { Errors: [{ Message: 'Not authorized' }] });
     if (p === 'dropbox/folders/') return json(res, 200, t.folders);
+    // one file of a hand-in, as the student fetches it back
+    if ((r = p.match(/^dropbox\/folders\/(\d+)\/submissions\/(\d+)\/files\/(\d+)$/))) {
+      const sub = (t.subs[r[1]] || []).flatMap((e) => e.Submissions || []).find((x) => String(x.Id) === r[2]);
+      const f = sub?.Files.find((x) => String(x.FileId) === r[3]);
+      if (!f) return json(res, 404, { Errors: [{ Message: 'Not found' }] });
+      res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${f.FileName}"` });
+      return res.end(fileBodies.get(String(f.FileId)) || Buffer.from(`%PDF-1.4 ${f.FileName}`));
+    }
     if ((r = p.match(/^dropbox\/folders\/(\d+)\/submissions\/mysubmissions\/$/))) {
       const fid = r[1];
       const f = t.folders.find((x) => String(x.Id) === fid);
@@ -281,7 +290,9 @@ function api(req, res, path, q, body) {
       log.push({ kind: 'submit', ou: Number(ou), folder: Number(fid), comment, files });
       const list = (t.subs[fid] ||= [{ Entity: { DisplayName: 'Avery Quinn', EntityId: 7001, EntityType: 'User', Active: true }, Status: 0, Feedback: null, Submissions: [] }]);
       list[0].Status = 1;
-      list[0].Submissions.push({ Id: nextSubId++, SubmittedBy: { Identifier: ME.Identifier, DisplayName: 'Avery Quinn' }, SubmissionDate: new Date().toISOString(), Comment: { Text: comment.Text || '', Html: comment.Html || '' }, Files: files.map((x) => ({ FileId: nextFileId++, FileName: x.name, Size: x.size })) });
+      const kept = ps.slice(1).map((x, i) => ({ FileId: nextFileId++, FileName: files[i].name, Size: files[i].size, body: x.body }));
+      for (const k of kept) fileBodies.set(String(k.FileId), k.body);
+      list[0].Submissions.push({ Id: nextSubId++, SubmittedBy: { Identifier: ME.Identifier, DisplayName: 'Avery Quinn' }, SubmissionDate: new Date().toISOString(), Comment: { Text: comment.Text || '', Html: comment.Html || '' }, Files: kept.map(({ body: _, ...k }) => k) });
       return json(res, 200);
     }
     if (p === 'quizzes/') return json(res, 200, { Objects: t.quizzes, Next: null });

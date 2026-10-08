@@ -58,7 +58,7 @@ sent on at once.
 | pages, files | HTML topics (read with the session), file topics (fetched from the topic; previewed in Brightspace's viewer) |
 | people | the classlist |
 | the calendar | the course calendars' events (a due date's own entry left out: its work is listed already) |
-| a hand-in | one `multipart/mixed` post to the folder — the comment, then each file (text as a page of its own) |
+| a hand-in | one `multipart/mixed` post to the folder — the comment, then each file (text as a page of its own); each file of it fetched back from the folder's submission (`…/submissions/<id>/files/<file>`) |
 
 Writes carry `X-Csrf-Token` (from `/d2l/lp/auth/xsrf-tokens`), and a write refused for it is tried once with a fresh one.
 What Brightspace keeps nothing of — a course's nickname and colour, the student's own tasks, a tick or a dismissal in
@@ -82,7 +82,9 @@ own, the Brightspace layer among them. `scripts/dev/chrome-setup-test.mjs` holds
 `node scripts/dev/d2l-test.mjs` (in `test-all.mjs` as `d2l`) runs against `scripts/dev/mock-brightspace.mjs`, a made-up
 student with grades given and withheld, work handed in, late and missing, a weighted course, a discussion with replies
 and content with a module inside a module. Every write the mock takes is listed at `GET /__mock/log`; each must carry
-the token.
+the token. It runs the layer in a sandbox, then the extension in Chromium, then the interface as the apps load it
+(`scripts/dev/app-bundle.mjs`, which `ios-test.mjs` uses too) with their chrome on: each native screen's call
+(`native-app.js`) answered from Brightspace, a hand-in and a reply made from the app.
 
 On a real Brightspace (a trial is free from D2L), sign in with a form post to `/d2l/lp/auth/login/login.d2l`
 (`userName`, `password`, `loginPath=/d2l/login`) and load the extension as the suites do. Keep the credentials in the
@@ -104,6 +106,13 @@ themselves knows Brightspace too:
   Brightspace page for an address, as the page has it (`native-app.js` `pageFor`).
 - **The platform.** The page says which it is (`shell.state`, the snapshot: `lms`); `AppSession` keeps it per school,
   for the words that name it (`lmsName`) and for what Brightspace has none of here (no Inbox, no Groups).
+- **New activity.** Brightspace has no activity stream, so the alerts' check (`Native/Activity.swift`) reads it
+  itself: each chosen course's news, and the grades released in it with the teacher's comment on each, from the last
+  month, at the API versions the page found the school answering (`watchInfo`: `lms`, `lp`, `le`). Who is signed in
+  is asked first; refused there, the check pauses without an alert (Brightspace ends a sign-in left unused on its
+  school's clock, often within hours — an alert each time would nag), and Settings says so. Only the kinds Brightspace
+  has are offered (announcements, grades, feedback). `-SimplActivityProbe YES` (`mac-shots.sh`) writes one read to the
+  console, on Canvas and on the mock Brightspace.
 - **Pictures.** `scripts/dev/mac-shots.sh` and `ios-shots.sh` picture the apps on the mock Brightspace too
   (`mock-brightspace.mjs --open`: signed in, as nobody is there to type).
 

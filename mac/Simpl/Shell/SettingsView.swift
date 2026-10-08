@@ -387,7 +387,7 @@ private struct NotificationsPane: View {
                 }
                 .disabled(settings.engine == nil)
                 if activity.on {
-                    ForEach(Activity.Kind.allCases) { k in
+                    ForEach(activity.kindsOffered) { k in
                         Toggle(k.label, isOn: Binding(get: { activity.kinds.contains(k) }, set: { v in
                             if v { activity.kinds.insert(k) } else { activity.kinds.remove(k) }
                         }))
@@ -400,7 +400,7 @@ private struct NotificationsPane: View {
             } header: {
                 Text("New Activity")
             } footer: {
-                Text("Simpl looks about every 20 minutes while it is open — with its window closed too — reading with the sign-in on this Mac: nothing is sent anywhere.")
+                Text("Simpl looks about every 20 minutes while it is open — with its window closed too — reading with the sign-in on this Mac: nothing is sent anywhere." + (activity.onBrightspace ? " Brightspace ends a sign-in left unused after a while (your school sets how long): the alerts pause then, until you next open Simpl." : ""))
                     .foregroundStyle(.secondary)
             }
         }

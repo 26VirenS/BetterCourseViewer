@@ -183,7 +183,7 @@ struct SettingsSheet: View {
                 Label("New Activity", systemImage: "app.badge")
             }
             if activity.on {
-                ForEach(Activity.Kind.allCases) { k in
+                ForEach(activity.kindsOffered) { k in
                     Toggle(k.label, isOn: Binding(get: { activity.kinds.contains(k) }, set: { v in
                         Haptics.select()
                         if v { activity.kinds.insert(k) } else { activity.kinds.remove(k) }
@@ -202,7 +202,7 @@ struct SettingsSheet: View {
         } header: {
             Text("New Activity")
         } footer: {
-            Text("Alerts when something is posted while Simpl is closed. iOS decides when Simpl may look — usually within an hour or a few, more often if you use Simpl a lot — and not after you swipe Simpl away or in Low Power Mode. Read with the sign-in on this iPhone: nothing is sent anywhere.")
+            Text("Alerts when something is posted while Simpl is closed. iOS decides when Simpl may look — usually within an hour or a few, more often if you use Simpl a lot — and not after you swipe Simpl away or in Low Power Mode. Read with the sign-in on this iPhone: nothing is sent anywhere." + (activity.onBrightspace ? " Brightspace ends a sign-in left unused after a while (your school sets how long): the alerts pause then, until you next open Simpl." : ""))
         }
         .animation(.snappy, value: activity.on)
     }

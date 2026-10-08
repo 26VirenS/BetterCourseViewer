@@ -11,6 +11,10 @@
 // Then the browser: the extension loaded in Chromium on the mock — the interface over Brightspace's homepage and a
 // course's, its screens at addresses Brightspace keeps, a hand-in from the assignment's page, a reply, Brightspace's
 // own pages (a quiz, the sign-in) left as they are, a Canvas-style address sent on from Brightspace's 404.
+//
+// Then the apps: the interface loaded as the iPhone app and Simpl for Mac load it (app-bundle.mjs), their own chrome on —
+// each native screen's call (content/app/native-app.js) answered from Brightspace, a hand-in and a reply from the app,
+// and what the app's new-activity check needs to read Brightspace by itself.
 //   node scripts/dev/d2l-test.mjs
 import { createRequire } from 'node:module';
 import { spawn, execSync } from 'node:child_process';
@@ -20,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import vm from 'node:vm';
 import { launchExtension, shortenTimers, afterMigration } from './harness.mjs';
+import { appBundle } from './app-bundle.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -214,6 +219,8 @@ console.log('\nhanding in');
   const [s1] = (await mockLog()).filter((e) => e.kind === 'submit');
   check(/^d2l-upload:/.test(start.upload_url) && s1?.folder === 702 && s1.comment.Text === 'Data attached' && s1.files.length === 1 && s1.files[0].name === 'osmosis.pdf' && s1.files[0].type === 'application/pdf' && s1.files[0].size === 13, `a file is handed in to the folder as Brightspace takes it — the comment, then the file, one multipart/mixed post: ${JSON.stringify(s1 && { comment: s1.comment, files: s1.files.map((f) => f.name) })}`);
   check(sub.workflow_state === 'submitted' && !!sub.submitted_at && sub.attachments[0]?.display_name === 'osmosis.pdf', `and Brightspace’s answer is read back as the submission: ${sub.workflow_state}, ${sub.attachments.map((f) => f.display_name)}`);
+  const back = sub.attachments[0]?.url ? await fetch(new URL(sub.attachments[0].url, BASE), { headers: { cookie: 'd2lSessionVal=ok' } }) : null;
+  check(/^\/d2l\/api\/le\/1\.82\/31001\/dropbox\/folders\/702\/submissions\/\d+\/files\/\d+$/.test(sub.attachments[0]?.url || '') && back?.ok && (await back.text()) === '%PDF-1.4 data', `each file handed in is fetched back from the folder’s submission, as it went (the apps list it and open it): ${sub.attachments[0]?.url}`);
   await C('POST', '/api/v1/courses/31001/assignments/703/submissions', { body: { submission: { submission_type: 'online_text_entry', body: '<p>Mitochondria have their own DNA.</p>' } } });
   const s2 = (await mockLog()).filter((e) => e.kind === 'submit')[1];
   check(s2?.folder === 703 && s2.files[0].name === 'Text Submission.html' && /Mitochondria have their own DNA/.test(s2.files[0].text || ''), 'text is handed in as a page of its own, the way Brightspace keeps a text submission');
@@ -465,6 +472,95 @@ try {
   await context?.close().catch(() => {});
   rmSync(userDataDir, { recursive: true, force: true });
   rmSync(extDir, { recursive: true, force: true });
+}
+
+// ---- the apps -----------------------------------------------------------------------------------------------------------
+// The iPhone app and Simpl for Mac load the same scripts (app-bundle.mjs bundles them as ScriptBundle.swift does) with
+// their own chrome on: the page is the engine of their native screens, and each screen asks it for its content
+// (content/app/native-app.js). On Brightspace that content comes through the layer above, in the same shapes.
+console.log('\nthe apps');
+let appBrowser;
+try {
+  const { shellScript, nativeStub } = appBundle({ root, host: 'localhost' });
+  appBrowser = await chromium.launch({ channel: 'chromium' });
+  const actx = await appBrowser.newContext({ viewport: { width: 402, height: 874 }, isMobile: true, hasTouch: true });
+  await actx.addCookies([{ name: 'd2lSessionVal', value: 'ok', url: BASE }]); // (signed in, as the app's sign-in leaves it)
+  await actx.addInitScript(nativeStub);
+  await actx.addInitScript(shellScript);
+  const ap = await actx.newPage();
+  const appErrors = [];
+  ap.on('pageerror', (e) => appErrors.push(e.message));
+  const told = (op) => ap.evaluate((o) => self.__nativeCalls.filter((c) => c.op === o), op);
+  const nc = (name, args) => ap.evaluate(([n, a]) => self.BCVNative.call(n, a), [name, args || {}]);
+  await fetch(`${BASE}/__mock/reset`);
+  await ap.goto(`${BASE}/d2l/home`);
+  await ap.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !!self.BCVNative, null, { timeout: 25000 });
+  const st = (await told('shell.state')).pop();
+  check(st?.shell === true && st?.signedIn === true && st?.lms === 'd2l', `the page tells the app it is ready, signed in, and on Brightspace (the app’s words and its Inbox and Groups go by it): ${JSON.stringify(st && { shell: st.shell, signedIn: st.signedIn, lms: st.lms })}`);
+  const snap = await nc('snapshot');
+  check(snap.lms === 'd2l' && /Avery/.test(snap.me?.name || '') && snap.inboxUnread === 0, `the account for the app’s bar: ${JSON.stringify({ lms: snap.lms, me: snap.me?.name, notif: snap.notifUnread, inbox: snap.inboxUnread })}`);
+  const wi = await nc('watchInfo');
+  check(wi.lms === 'd2l' && wi.lp === '1.50' && wi.le === '1.82' && wi.me === '7001' && wi.courses?.some((c) => c.id === '31001' && c.name), `what the app’s new-activity check needs to read Brightspace itself — the platform, the API version, the student, the courses: ${JSON.stringify({ lms: wi.lms, lp: wi.lp, le: wi.le, me: wi.me, courses: wi.courses?.map((c) => `${c.id}:${c.name}`) })}`);
+  const cs = await nc('courses');
+  const bio = cs.rows?.find((r) => r.id === '31001');
+  check(!cs.error && cs.rows.length >= 3 && cs.rows.every((r) => r.id && r.url) && !cs.rows.some((r) => r.id === '30980') && bio?.scoreText === '87.5%', `Courses: the term’s courses with their totals, none the student is closed out of: ${JSON.stringify(cs.rows?.map((r) => `${r.id} ${r.code} ${r.scoreText}`))}`);
+  const gr = await nc('grades');
+  check(!gr.error && gr.rows.some((r) => r.pct === 87.5) && gr.rows.find((r) => r.pct === 87.5)?.cats.length === 2, `Grades: each course’s total and its weighted categories: ${JSON.stringify(gr.rows?.map((r) => `${r.code} ${r.pctText} cats:${r.cats.length}`))}`);
+  const td = await nc('todo', { group: 'date' });
+  check(!td.error && td.sections.find((x) => x.title === 'Overdue')?.rows.some((r) => r.title === 'Lab Safety Form') && td.sections.flatMap((x) => x.rows).some((r) => r.title === 'Chapter 4 Check'), `To Do: the work still to do (what is handed in already, above, left out): ${JSON.stringify(td.sections?.map((x) => `${x.title}:${x.rows.map((r) => r.title).join('|')}`))}`);
+  const nf = await nc('notifications');
+  check(!nf.error && nf.total > 0 && nf.days.flatMap((d) => d.rows).some((r) => /Lab 2 moved to Thursday/.test(r.title)), `Notifications: the news and the grades given: ${JSON.stringify({ total: nf.total, titles: nf.days?.flatMap((d) => d.rows).map((r) => r.title).slice(0, 6) })}`);
+  const now = new Date();
+  const cal = await nc('calendar', { from: new Date(now - 14 * DAY).toISOString(), to: new Date(+now + 28 * DAY).toISOString() });
+  check(!cal.error && cal.events.some((e) => /Lab 2: Osmosis/.test(e.title)), `Calendar: the work due, by day: ${JSON.stringify({ events: cal.events?.length, titles: cal.events?.map((e) => e.title).slice(0, 6) })}`);
+
+  const home = await nc('home', { ctx: 'courses/31001' });
+  const kinds = (home.sections || []).map((x) => x.kind);
+  check(!home.error && home.kind === 'courses' && /BIO 110/.test(home.title) && ['assignments', 'modules', 'announcements'].every((k) => kinds.includes(k)) && home.open.some((r) => r.title === 'Chapter 4 Check') && home.announcements.length > 0, `a course’s home: its sections, the work open, the latest news: ${JSON.stringify({ title: home.title, sections: home.sections?.map((x) => `${x.kind}:${x.title || x.label}`), open: home.open?.map((r) => r.title) })}`);
+  const as = await nc('assignments', { ctx: 'courses/31001' });
+  const sec = (t) => as.sections?.find((x) => x.title === t)?.rows.map((r) => r.title) || [];
+  check(!as.error && sec('Overdue').includes('Lab Safety Form') && sec('Upcoming').includes('Lab 2: Osmosis') && !as.sections.flatMap((x) => x.rows).some((r) => /hidden/i.test(r.title)), `Assignments: overdue, upcoming, the rest — a hidden folder left out: ${JSON.stringify(as.sections?.map((x) => `${x.title}:${x.rows.map((r) => r.title).join('|')}`))}`);
+  const a = await nc('assignment', { course: '31001', id: '702' });
+  check(!a.error && a.title === 'Lab 2: Osmosis' && a.canSubmit && a.types.includes('online_upload') && /data table/.test(a.html) && a.canvasUrl === '/courses/31001/assignments/702?bcv=native', `an assignment: its instructions, and handed in from the app: ${JSON.stringify({ title: a.title, canSubmit: a.canSubmit, types: a.types, why: a.why, open: a.canvasUrl })}`);
+  const own = await nc('pageFor', { url: a.canvasUrl });
+  check(own.url === `${BASE}/d2l/lms/dropbox/user/folder_submit_files.d2l?db=702&ou=31001&bcv=native`, `“Open in Brightspace” opens Brightspace’s own page for it, left as it is: ${own.url}`);
+  const rs = await nc('resolveUrl', { url: '/courses/31001/pages/whatever' });
+  check(rs.url?.startsWith(`${BASE}/d2l/`), `an address the app has no screen for leads to a Brightspace page (never a Canvas address, a bare 404 there): ${rs.url}`);
+
+  const pdf = Buffer.from('%PDF-1.4 graph').toString('base64');
+  const up = await nc('submit', { course: '31001', id: '702', type: 'online_upload', files: [{ name: 'graph.pdf', type: 'application/pdf', data: pdf }], comment: 'From my phone' });
+  const tx = await nc('submit', { course: '31001', id: '703', type: 'online_text_entry', text: 'Osmosis was faster than I thought.' });
+  const subs = (await mockLog()).filter((e) => e.kind === 'submit');
+  const f1 = subs.find((e) => e.folder === 702), f2 = subs.find((e) => e.folder === 703);
+  check(up.ok && tx.ok && f1?.files[0]?.name === 'graph.pdf' && f1.comment.Text === 'From my phone' && /Osmosis was faster/.test(f2?.files[0]?.text || ''), `handed in from the app — a file with a comment, and text — as Brightspace takes them, the token on each: ${JSON.stringify({ up, tx, files: subs.map((e) => `${e.folder}:${e.files.map((f) => f.name).join('|')}`) })}`);
+  const a2 = await nc('assignment', { course: '31001', id: '702' });
+  check(/^Submitted /.test(a2.submitted) && a2.submission.files.some((f) => f.name === 'graph.pdf' && f.url.startsWith(`${BASE}/d2l/api/le/1.82/31001/dropbox/folders/702/submissions/`)), `and the assignment says so at once, the file there to open: ${JSON.stringify({ submitted: a2.submitted, files: a2.submission?.files })}`);
+
+  const an = await nc('announcements', { ctx: 'courses/31001' });
+  const first = an.rows?.find((r) => /Lab 2 moved/.test(r.title));
+  const t = first ? await nc('topic', { ctx: 'courses/31001', id: first.id }) : {};
+  check(!an.error && an.rows.length === 2 && Number(first?.id) > 3e9 && t.announcement === true && /Thursday/.test(t.html), `Announcements: the course’s news, each opened as the announcement it is: ${JSON.stringify({ rows: an.rows?.map((r) => `${r.id}:${r.title}`), opened: t.title })}`);
+  const ds = await nc('discussions', { ctx: 'courses/31001' });
+  const wk3 = ds.sections?.flatMap((x) => x.rows).find((r) => r.title === 'Week 3 Discussion');
+  const dt = wk3 ? await nc('topic', { ctx: 'courses/31001', id: wk3.id }) : {};
+  check(!ds.error && wk3?.graded && dt.entries?.length > 0 && dt.canReply && !dt.announcement, `Discussions: a graded topic and its posts, threaded, open to a reply: ${JSON.stringify({ topics: ds.sections?.flatMap((x) => x.rows).map((r) => r.title), posts: dt.entries?.length, depth: dt.entries?.map((e) => e.depth) })}`);
+  const rp = wk3 ? await nc('reply', { ctx: 'courses/31001', id: wk3.id, text: 'A virus needs a host to copy itself.' }) : {};
+  const posted = (await mockLog()).filter((e) => e.kind === 'post').pop();
+  check(rp.ok && posted?.topic === 902 && /needs a host/.test(posted.html), `a reply from the app is posted to the topic: ${JSON.stringify(posted)}`);
+  const md = await nc('modules', { ctx: 'courses/31001' });
+  const items = md.modules?.flatMap((m) => m.items) || [];
+  check(!md.error && md.modules.length > 0 && items.some((i) => i.header) && items.some((i) => i.indent > 0) && items.filter((i) => !i.header).every((i) => i.url), `Content: each module, a module inside one as a heading with its topics a step in, every topic somewhere to go: ${JSON.stringify(md.modules?.map((m) => `${m.name}[${m.items.map((i) => `${i.header ? '#' : ''}${'>'.repeat(i.indent)}${i.title}`).join(', ')}]`))}`);
+  const qz = await nc('quizzes', { ctx: 'courses/31001' });
+  check(!qz.error && qz.rows.some((r) => r.title === 'Midterm Quiz') && qz.rows.some((r) => r.title === 'Chapter 4 Check'), `Quizzes: the course’s quizzes: ${JSON.stringify(qz.rows?.map((r) => `${r.title} → ${r.url}`))}`);
+  const pp = await nc('people', { ctx: 'courses/31001' });
+  const names = pp.sections?.flatMap((x) => x.rows.map((r) => r.name)) || [];
+  check(!pp.error && names.some((n) => /Avery Quinn/.test(n)) && pp.sections.length >= 2, `People: the classlist, by role: ${JSON.stringify(pp.sections?.map((x) => `${x.title}:${x.rows.length}`))}`);
+  check(!appErrors.length, `no page errors in the app${appErrors.length ? `: ${appErrors.slice(0, 3).join(' | ')}` : ''}`);
+} catch (e) {
+  console.error('crashed:', e?.stack || e);
+  failures.push('crash (the apps): ' + e.message);
+} finally {
+  await appBrowser?.close().catch(() => {});
   server.kill();
 }
 console.log(failures.length ? `\n${failures.length} check(s) failed:\n - ${failures.join('\n - ')}` : '\nAll checks passed.');
