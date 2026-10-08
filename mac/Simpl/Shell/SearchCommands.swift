@@ -281,7 +281,7 @@ final class SearchPalette: ObservableObject {
             c.append(PaletteCommand(name: "groups", title: "Groups", hint: "Your groups", symbol: "person.2", action: .go(.groups)))
             c.append(PaletteCommand(name: "group", aliases: ["team"], title: "Open a Group", hint: "One of your groups", symbol: "person.2.fill", takes: "a group", lists: .groups))
         }
-        // TODO(tools): a "tools" command (aliases "widgets", "tool") going to Place.tools — Simpl's tools — once it is in.
+        c.append(PaletteCommand(name: "tools", aliases: ["tool", "widgets", "timer", "calculator"], title: "Tools", hint: "Timer, calculator, flashcards and more", symbol: "wrench.and.screwdriver", key: "⌘7", action: .go(.tools)))
         c.append(PaletteCommand(name: "due", aliases: ["upcoming", "soon", "week"], title: "Due", hint: "What is due: today, tomorrow, this week, or by name", symbol: "clock", takes: "today, tomorrow, week or a name", lists: .due))
         c.append(PaletteCommand(name: "overdue", aliases: ["late", "missing"], title: "Overdue", hint: "Past its date and not handed in", symbol: "exclamationmark.circle", takes: "a name (or nothing)", lists: .overdue))
         c.append(PaletteCommand(name: "assignment", aliases: ["hw", "homework", "assignments"], title: "Assignments", hint: "Find an assignment", symbol: "doc.text", takes: "an assignment", lists: .kinds(["Assignments"])))

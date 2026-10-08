@@ -93,6 +93,10 @@ shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
 shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
 shoot light-33-rubric-grid 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:grid
 shoot light-34-files-preview 14 -SimplPlace section:courses/101:files -SimplOpen file:f1
+shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptable"
+shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
+shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable
+shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
 SIZE=940x820 shoot light-40-narrow-dashboard 14
 SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
 SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox
@@ -110,6 +114,9 @@ shoot d2l-06-content 12 -SimplPlace section:courses/31001:modules
 shoot d2l-07-discussion 14 -SimplPlace course:31001 -SimplPush /courses/31001/discussion_topics/2000000902
 shoot d2l-08-todo 12 -SimplPlace todo
 unset BASE
+# (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
+shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
+shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
 pkill -x Simpl >/dev/null 2>&1 || true
 # the app's crash reports, kept with the pictures (a missing picture is an app that did not stay up: these say why)
 for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl*; do
