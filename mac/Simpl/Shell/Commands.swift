@@ -17,6 +17,10 @@ struct SimplCommands: Commands {
         SidebarCommands()
         ToolbarCommands()
 
+        CommandGroup(after: .appInfo) {
+            CheckForUpdatesButton()
+        }
+
         CommandGroup(after: .appSettings) {
             Button("Change School…") { session.changeSchool() }
                 .disabled(session.host == nil)
@@ -91,6 +95,38 @@ struct SimplCommands: Commands {
         } else {
             Button(title) { engine?.go(place) }
                 .disabled(!ready)
+        }
+    }
+}
+
+/// Simpl ▸ Check for Updates… (1.2): the update feed read now. A newer version, a check that failed, or an update
+/// already on its way opens Settings on Updates (Update Now is there); up to date, a short alert says so. Off in a
+/// development run, which never updates.
+private struct CheckForUpdatesButton: View {
+    @Environment(\.openSettings) private var openSettings
+    @ObservedObject private var updater = Updater.shared
+
+    var body: some View {
+        Button("Check for Updates…") {
+            Task { await check() }
+        }
+        .disabled(Updater.isDevelopmentRun || updater.state == .checking)
+    }
+
+    @MainActor
+    private func check() async {
+        let found = await updater.checkNow()
+        switch found {
+        case .idle, .checking:
+            break
+        case .upToDate:
+            let alert = NSAlert()
+            alert.messageText = "Simpl is up to date"
+            alert.informativeText = "Version \(updater.currentVersion) is the newest." + (updater.heldBack.map { " " + $0 } ?? "")
+            alert.runModal()
+        default:
+            updater.revealPane = true
+            openSettings()
         }
     }
 }

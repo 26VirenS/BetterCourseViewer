@@ -43,14 +43,27 @@ private struct Said: Equatable {
 
 /// Simpl ▸ Settings (⌘,): the Mac's own settings window, a tab for each part — General (the school, the sign-in kept,
 /// the courses and goals), Notifications (due-date reminders, new activity), Grades (tracking, the term's goal,
-/// what-if scores, the grade history and the record before this term), Data and About. Simpl's own settings are read
-/// and written through the page's settings calls (native-app.js), as on the iPhone.
+/// what-if scores, the grade history and the record before this term), Data, Updates (1.2) and About. Simpl's own
+/// settings are read and written through the page's settings calls (native-app.js), as on the iPhone.
 struct SettingsView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var model: AppModel
-    @State private var tab = SettingsTab.general
+    @ObservedObject private var updater = Updater.shared
+    @State private var tab = SettingsView.launchTab
 
-    enum SettingsTab: Hashable { case general, notifications, grades, data, about }
+    enum SettingsTab: Hashable { case general, notifications, grades, data, updates, about }
+
+    /// The screenshot suite's `-SimplSettingsTab updates` (or another tab's name): the window opens there; General otherwise.
+    nonisolated private static var launchTab: SettingsTab {
+        switch UserDefaults.standard.string(forKey: "SimplSettingsTab") ?? "" {
+        case "notifications": return .notifications
+        case "grades": return .grades
+        case "data": return .data
+        case "updates": return .updates
+        case "about": return .about
+        default: return .general
+        }
+    }
 
     var body: some View {
         TabView(selection: $tab) {
@@ -66,6 +79,9 @@ struct SettingsView: View {
             DataPane()
                 .tabItem { Label("Data", systemImage: "externaldrive") }
                 .tag(SettingsTab.data)
+            UpdatesPane()
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+                .tag(SettingsTab.updates)
             AboutPane()
                 .tabItem { Label("About", systemImage: "info.circle") }
                 .tag(SettingsTab.about)
@@ -75,9 +91,18 @@ struct SettingsView: View {
         .onAppear {
             model.engine?.settingsOpen = true
             SettingsModel.shared.engine = model.engine
+            showUpdatesIfAsked()
         }
         .onDisappear { model.engine?.settingsOpen = false }
         .onChange(of: model.engine === nil) { _, _ in SettingsModel.shared.engine = model.engine }
+        .onChange(of: updater.revealPane) { _, asked in if asked { showUpdatesIfAsked() } }
+    }
+
+    /// Check for Updates… found a newer version (or could not check): the window opens on Updates.
+    private func showUpdatesIfAsked() {
+        guard updater.revealPane else { return }
+        updater.revealPane = false
+        tab = .updates
     }
 }
 
@@ -573,6 +598,273 @@ private struct DataPane: View {
         } message: {
             Text(session.onBrightspace ? "Your preferences, grade history, course goals, course nicknames and colours, and your own tasks and ticks kept in the app are cleared, and the setup runs again. Your Brightspace sign-in stays." : "Your preferences, grade history and course goals kept in the app are cleared, and the setup runs again. Your Canvas sign-in stays.")
         }
+    }
+}
+
+// MARK: - Updates
+
+/// Settings ▸ Updates (1.2): this version, whether updates install themselves, Check Now and what it found — a newer
+/// version with Update Now and its notes, the download's progress, why a check or an install failed — and, folded
+/// away, the versions published before, any of which can be put back in this one's place.
+private struct UpdatesPane: View {
+    @ObservedObject private var updater = Updater.shared
+
+    var body: some View {
+        Pane {
+            Section {
+                LabeledContent {
+                    Text(AppSession.version).font(.sBody).monospacedDigit()
+                } label: {
+                    Text("Version").font(.sBody)
+                }
+                Toggle(isOn: $updater.automatic) {
+                    Text("Install updates automatically").font(.sBody)
+                    Text("A new version goes in while you are away from Simpl, and Simpl opens again on it.")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(Updater.isDevelopmentRun)
+                UpdateStatusRow(updater: updater)
+                if let notes {
+                    Text(notes)
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Simpl for Mac")
+            } footer: {
+                Text(footer)
+                    .font(.sCaption)
+                    .foregroundStyle(.secondary)
+            }
+            EarlierVersions(updater: updater)
+        }
+        .animation(Motion.snappy, value: updater.state)
+    }
+
+    /// What the newer version brings, as the feed says it.
+    private var notes: String? {
+        guard case .available(let r) = updater.state, let n = r.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty else { return nil }
+        return n
+    }
+
+    private var footer: String {
+        if Updater.isDevelopmentRun {
+            return "This is a development run of Simpl (a build from Xcode, the mock Canvas or the screenshot suite): it never looks for updates or replaces itself."
+        }
+        var s = "Simpl looks for a new version every four hours. Each one is checked against its published checksum and its signature before it takes this copy’s place, and this copy goes to the Bin."
+        if AppPlacement.isTranslocated {
+            s += " This copy is running from a temporary place macOS made for the download, so an update goes into the Applications folder."
+        }
+        return s
+    }
+}
+
+/// Where updates stand, with the one thing to do about it: Check Now, or Update Now when a newer version is in.
+private struct UpdateStatusRow: View {
+    @ObservedObject var updater: Updater
+
+    var body: some View {
+        LabeledContent {
+            action
+        } label: {
+            TimelineView(.everyMinute) { _ in status } // ("checked 5 minutes ago" kept true while the window is open)
+        }
+    }
+
+    @ViewBuilder private var status: some View {
+        switch updater.state {
+        case .idle:
+            idle
+        case .checking:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Checking…").font(.sBody)
+            }
+        case .upToDate:
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Up to date — checked \(Text(updater.lastCheck ?? Date(), format: .relative(presentation: .named)))")
+                    .font(.sBody)
+                if let held = updater.heldBack {
+                    Text(held).font(.sCallout).foregroundStyle(.secondary)
+                }
+            }
+        case .available(let r):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Version \(r.version) available").font(.sBody.weight(.semibold))
+                if let detail = r.detail {
+                    Text(detail).font(.sCallout).foregroundStyle(.secondary)
+                }
+            }
+        case .downloading(let p):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: "Downloading… \(Int((p * 100).rounded()))%")
+                    .font(.sBody)
+                    .monospacedDigit()
+                ProgressView(value: p)
+                    .progressViewStyle(.linear)
+                    .frame(maxWidth: 280)
+            }
+        case .installing:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Installing… Simpl opens again by itself.").font(.sBody)
+            }
+        case .failed(let message):
+            Label {
+                Text(message)
+                    .font(.sBody)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+        }
+    }
+
+    @ViewBuilder private var idle: some View {
+        if Updater.isDevelopmentRun {
+            Text("Updates are off in a development run.").font(.sBody).foregroundStyle(.secondary)
+        } else if let last = updater.lastCheck {
+            Text("Last checked \(Text(last, format: .relative(presentation: .named)))").font(.sBody)
+        } else {
+            Text("Not checked yet").font(.sBody)
+        }
+    }
+
+    @ViewBuilder private var action: some View {
+        switch updater.state {
+        case .available:
+            Button("Update Now") { updater.install() }
+                .glassButton(prominent: true)
+        case .checking, .downloading, .installing:
+            EmptyView()
+        default:
+            Button("Check Now") { updater.check() }
+                .disabled(Updater.isDevelopmentRun)
+        }
+    }
+}
+
+/// The versions published (newest first), folded away until asked for: each can be put back in this one's place —
+/// with Install updates automatically turned off first, or the next check would bring the newest straight back.
+private struct EarlierVersions: View {
+    @ObservedObject var updater: Updater
+    @State private var open = false
+    @State private var list: [AppRelease]?
+    @State private var problem: String?
+    @State private var chosen: AppRelease?
+
+    var body: some View {
+        Section {
+            DisclosureGroup(isExpanded: $open) {
+                rows
+            } label: {
+                Text("Earlier Versions").font(.sBody)
+            }
+            .task(id: open) {
+                if open && list == nil { await load() }
+            }
+            .confirmationDialog(dialogTitle, isPresented: dialogShown, presenting: chosen) { r in
+                Button("Install Simpl \(r.version)") {
+                    updater.rollback(to: r.version, url: r.url, sha256: r.sha256)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { r in
+                Text("Simpl \(r.version) takes the place of this version (\(updater.currentVersion)), and Simpl quits and opens again on it. Install updates automatically is turned off first, so Simpl stays on \(r.version) until you turn it back on or choose Update Now.")
+            }
+        } footer: {
+            Text("Putting another version back turns Install updates automatically off.")
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var dialogTitle: String {
+        if let chosen { return "Install Simpl \(chosen.version)?" }
+        return "Install another version?"
+    }
+
+    private var dialogShown: Binding<Bool> {
+        Binding(get: { chosen != nil }, set: { shown in if !shown { chosen = nil } })
+    }
+
+    @ViewBuilder private var rows: some View {
+        if let list {
+            if list.isEmpty {
+                Text("No versions are published yet.").font(.sCallout).foregroundStyle(.secondary)
+            } else {
+                ForEach(list) { r in
+                    VersionRow(release: r, installed: r.version == updater.currentVersion, busy: busy) { chosen = r }
+                }
+            }
+        } else if let problem {
+            HStack {
+                Text(problem).font(.sCallout).foregroundStyle(.secondary)
+                Spacer()
+                Button("Try Again") { Task { await load() } }
+            }
+        } else {
+            HStack {
+                Text("Reading the versions…").font(.sCallout).foregroundStyle(.secondary)
+                Spacer()
+                ProgressView().controlSize(.small)
+            }
+        }
+    }
+
+    /// A download or an install under way (nothing else can be put in its place meanwhile), or a development run.
+    private var busy: Bool {
+        if Updater.isDevelopmentRun { return true }
+        switch updater.state {
+        case .downloading, .installing: return true
+        default: return false
+        }
+    }
+
+    private func load() async {
+        problem = nil
+        do {
+            let found = try await updater.releases()
+            withAnimation(Motion.snappy) { list = found }
+        } catch {
+            problem = error.localizedDescription
+        }
+    }
+}
+
+/// One published version: its number, when it came out and its size, and Install (or Installed, for this one).
+private struct VersionRow: View {
+    let release: AppRelease
+    let installed: Bool
+    let busy: Bool
+    let install: () -> Void
+
+    var body: some View {
+        LabeledContent {
+            if installed {
+                Text("Installed").font(.sCallout).foregroundStyle(.secondary)
+            } else {
+                Button("Install…", action: install)
+                    .disabled(busy)
+            }
+        } label: {
+            Text("Simpl \(release.version)").font(.sBody)
+            if let detail = release.detail {
+                Text(detail).font(.sCallout).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+fileprivate extension AppRelease {
+    /// "8 Oct 2026 · 41.4 MB": when it came out and how large its download is, as far as either is known.
+    var detail: String? {
+        var parts: [String] = []
+        if let d = published { parts.append(d.formatted(date: .abbreviated, time: .omitted)) }
+        if let s = size, s > 0 { parts.append(ByteCountFormatter.string(fromByteCount: Int64(s), countStyle: .file)) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 
