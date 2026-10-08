@@ -148,7 +148,10 @@ struct DashboardView: View {
         }
     }
 
+    /// A counter's number: never one from before (1.2) — while the page shows what was kept from last time, or the
+    /// overdue and graded counts are still being made, the tile says it is counting.
     private func value(_ c: Counter) -> Int? {
+        if model.kept { return nil }
         switch c.key {
         case "overdue": return counts?.overdue
         case "graded": return counts?.graded
@@ -157,6 +160,7 @@ struct DashboardView: View {
     }
 
     private func note(_ c: Counter) -> String? {
+        if model.kept { return nil }
         switch c.key {
         case "overdue": return counts?.overdueNote
         case "graded": return counts?.gradedNote
@@ -391,7 +395,7 @@ struct DashboardView: View {
     }
 
     private func loadCounts() async {
-        if let kept = try? await engine.call("todayCounts", ["kept": true], as: TodayCounts.self), kept.overdue != nil, counts == nil { counts = kept }
+        // (1.2: only the live counts — the copy kept from the last visit is not shown, a count from before misleads)
         if let fresh = try? await engine.call("todayCounts", ["kept": false], as: TodayCounts.self) {
             withAnimation(Motion.snappy) { counts = fresh }
         }
