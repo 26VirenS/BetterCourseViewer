@@ -3,29 +3,43 @@ import SwiftUI
 /// The window once Canvas is ready: the sidebar (Simpl's own — Dashboard, To Do, Calendar, Grades, Notifications, the
 /// Inbox, each course with its sections, the groups, and the account at its foot), the screen chosen there with what
 /// is pushed on it, and the toolbar: Back and Forward (a browser's, across the whole window), the screen's own title and
-/// buttons, and Search.
+/// buttons, and Search (whose suggestions run commands, 1.2). The tour, the first time, goes over all of it.
 struct MainShell: View {
     @EnvironmentObject private var engine: Engine
     @State private var columns: NavigationSplitViewVisibility = .all
+    @StateObject private var palette = SearchPalette()
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
+                .tourSpot(.sidebar)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 270, max: 360)
         } detail: {
             DetailStack()
+                .tourSpot(.detail)
         }
         .navigationSplitViewStyle(.balanced)
-        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search \(engine.lmsName)")
-        .onSubmit(of: .search) { engine.search(engine.query) }
+        .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
+        // (1.2) the field finds and does: its suggestions are the web search box's — a sum, commands, courses and their
+        // sections, groups — and "/" (or ">") lists every command (Shell/SearchCommands.swift); one picked runs
+        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search \(engine.lmsName) or type /")
+        .searchSuggestions { PaletteSuggestions(palette: palette) }
+        .onSubmit(of: .search) {
+            if palette.take(engine.query, engine: engine) { return }
+            palette.submit(engine.query, engine: engine)
+        }
         .onChange(of: engine.query) { _, q in
+            if palette.take(q, engine: engine) { return }
+            palette.update(q, engine: engine)
             let t = q.trimmingCharacters(in: .whitespacesAndNewlines)
+            if SearchPalette.isCommand(t) { return } // (a command typed: its list is in the suggestions, nothing is searched)
             if t.count >= 2 {
                 engine.search(t)
             } else if t.isEmpty, case .search = engine.nav.current.place {
                 engine.goBack()
             }
         }
+        .onAppear { palette.launch(engine) }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 ControlGroup {
@@ -165,17 +179,21 @@ struct Sidebar: View {
         VStack(spacing: 0) {
             list
             AccountBar()
+                .tourSpot(.account)
         }
     }
 
     private var list: some View {
         List(selection: selection) {
             Section {
-                Label("Dashboard", systemImage: "square.grid.2x2").tag(Place.dashboard)
+                Label("Dashboard", systemImage: "square.grid.2x2")
+                    .tourSpot(.firstPlace)
+                    .tag(Place.dashboard)
                 Label("To Do", systemImage: "checklist").tag(Place.todo)
                 Label("Calendar", systemImage: "calendar").tag(Place.calendar)
                 Label("Grades", systemImage: "chart.bar.xaxis").tag(Place.grades)
                 Label("Notifications", systemImage: "bell")
+                    .tourSpot(.lastPlace)
                     .badge(engine.countsLive ? (engine.snapshot?.notifUnread ?? 0) : 0) // (1.2: never a count from before)
                     .tag(Place.notifications)
                 if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
@@ -275,7 +293,9 @@ struct Sidebar: View {
             }
             .buttonStyle(.plain)
             .help(expanded ? "Hide sections" : "Show sections")
+            .tourSpot(c.id == engine.courses.first?.id ? .courseChevron : nil)
         }
+        .tourSpot(c.id == engine.courses.first?.id ? .firstCourse : nil)
         .tag(Place.home(ctx))
         .contextMenu {
             Button("Open in \(engine.lmsName)") { if let u = engine.canvasURL(for: .home(ctx)) { engine.openWebScreen(u.absoluteString, title: c.code) } }

@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The menu bar: File ▸ New Task and New Message; View ▸ Reload (Canvas asked afresh) with the sidebar's and the
 /// toolbar's own items; a Go menu as a browser's (Back, Forward, each place in the sidebar by number, each course);
-/// Simpl ▸ Change School; Help ▸ What's New and Canvas in the browser. Each acts on the main window's engine.
+/// Simpl ▸ Change School; Edit ▸ Search Commands (⌘K: the search field on "/"); Help ▸ Take the Tour, What's New and
+/// Canvas in the browser. Each acts on the main window's engine.
 struct SimplCommands: Commands {
     @ObservedObject var session: AppSession
     @FocusedObject private var focused: Engine?
@@ -72,6 +73,9 @@ struct SimplCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
+            Button("Take the Tour") { MacTour.shared.start() } // (1.2, Shell/Tour.swift)
+                .disabled(!ready)
+            Divider()
             Button("What’s New in Simpl") {
                 guard let engine else { return }
                 Task {
@@ -83,6 +87,15 @@ struct SimplCommands: Commands {
                 if let u = engine?.web.baseURL { NSWorkspace.shared.open(u) }
             }
             .disabled(engine == nil)
+        }
+
+        // (1.2) the search field from the keyboard, on "/": every command listed (Shell/SearchCommands.swift)
+        CommandGroup(after: .textEditing) {
+            Button("Search Commands…") {
+                if let engine { SearchPalette.summon(engine) }
+            }
+            .keyboardShortcut("k")
+            .disabled(!ready)
         }
     }
 
