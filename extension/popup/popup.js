@@ -71,7 +71,7 @@
   const url = tab?.url ? new URL(tab.url) : null;
   const onWeb = !!url && /^https?:$/.test(url.protocol);
   const origin = onWeb ? url.origin : '';
-  const builtIn = onWeb && /\.instructure\.com$/i.test(url.hostname);
+  const builtIn = onWeb && !!self.BCV?.settings?.builtInHost(url.hostname);
   // a site on the list is not a site allowed: the Mac app can add one, and Safari still has to be
   // asked for it here, from a press — so the browser's own word is taken first, the list as a fallback
   const saved = onWeb && (settings.domains || []).includes(origin);

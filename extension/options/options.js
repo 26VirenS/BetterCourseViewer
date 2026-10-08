@@ -591,8 +591,8 @@
     const origin = normaliseHost($('newDomain').value);
     const msg = $('domainMsg');
     if (!origin) return;
-    if (/\.instructure\.com$/i.test(new URL(origin).hostname)) {
-      msg.textContent = `${new URL(origin).hostname} is on already: every *.instructure.com site is built in.`;
+    if (BCV.settings.builtInHost(new URL(origin).hostname)) {
+      msg.textContent = /\.instructure\.com$/i.test(new URL(origin).hostname) ? `${new URL(origin).hostname} is on already: every *.instructure.com site is built in.` : `${new URL(origin).hostname} is on already: it is built in.`;
       return;
     }
     msg.textContent = 'Asking for permission…';
@@ -617,6 +617,8 @@
   function renderDomains() {
     const globe = (color) => { const s = h('span'); s.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18a15 15 0 010-18"/></svg>`; return s.firstChild; };
     const rows = [h('div', { class: 'site' }, [globe('var(--ink3)'), h('span', { class: 'site__host', text: '*.instructure.com' }), h('span', { class: 'pill', text: 'Built in' })])];
+    const schools = BCV.settings.builtInSchools(); // (the quiet Chrome build's: the schools' own Canvas addresses it names)
+    if (schools.length) rows.push(h('div', { class: 'site', title: schools.join('\n') }, [globe('var(--ink3)'), h('span', { class: 'site__host', text: `${schools.length} schools’ own Canvas addresses` }), h('span', { class: 'pill', text: 'Built in' })]));
     for (const origin of settings.domains || []) {
       rows.push(h('div', { class: 'site' }, [
         globe('#34c759'),

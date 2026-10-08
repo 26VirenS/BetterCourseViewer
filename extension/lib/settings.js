@@ -91,7 +91,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.99.20';
+  self.BCV_VERSION = '2.99.21';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
@@ -200,7 +200,28 @@
     return { appearance: { skin: !!on, offUntil: on ? 0 : Math.max(0, Number(until) || 0) } };
   }
 
+  /** (2.99.21) Whether the interface runs on a host by the build itself: Canvas's own domain, and in the quiet Chrome build
+   *  the schools' own Canvas addresses it names (scripts/canvas-domains.txt) — read from this build's manifest, so a site
+   *  there is never added again by hand (its scripts would run twice). The full build's every-site access is not this. */
+  let builtIns = null;
+  function builtInHost(host) {
+    const h = String(host || '').toLowerCase();
+    if (!h) return false;
+    if (/(^|\.)instructure\.com$/.test(h)) return true;
+    if (!builtIns) {
+      try {
+        const api = self.chrome?.runtime?.getManifest ? self.chrome : self.browser;
+        builtIns = new Set((api?.runtime?.getManifest?.().host_permissions || []).map((p) => /^\*:\/\/([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase()).filter(Boolean));
+      } catch { builtIns = new Set(); }
+    }
+    return builtIns.has(h);
+  }
+  /** The schools' own addresses this build has built in (none but in the quiet Chrome build). */
+  const builtInSchools = () => { builtInHost('x.instructure.com'); builtInHost('-'); return [...(builtIns || [])].filter((d) => !d.startsWith('*.')); };
+
   BCV.settings = {
+    builtInHost,
+    builtInSchools,
     DEFAULTS,
     STORAGE_KEY,
     deepMerge,

@@ -18,6 +18,8 @@ that (tabs, "Read your browsing history", at 2.8; the on-demand modules' never-m
 2.90), so both are left out below, and scripts/dev/chrome-setup-test.mjs holds each build's
 permission list and host list exactly. Nothing with a warning goes in without that in mind."""
 import json
+import os
+import re
 import sys
 
 path = sys.argv[1]
@@ -60,15 +62,28 @@ if sniffer:
             'js': ['content/sniff.js'],
         })
 else:
-    # the quiet build: Canvas's own domain, and every other site asked for one at a time
-    m['host_permissions'] = ['*://*.instructure.com/*']
+    # the quiet build: Canvas's own domain and the schools' own Canvas addresses Instructure lists (scripts/canvas-domains.txt,
+    # 2.99.21) — the interface, and its setup, start on any of them by themselves, as on Canvas's own domain — and every other
+    # site asked for one at a time. Chrome words the ask "Read and change your data on a number of websites", not every one.
+    here = os.path.dirname(os.path.abspath(__file__))
+    listed = []
+    for line in open(os.path.join(here, 'canvas-domains.txt'), encoding='utf-8'):
+        d = line.strip().lower()
+        if not d or d.startswith('#'):
+            continue
+        assert re.fullmatch(r'[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+', d), f'not a host name: {d!r}'
+        assert not d.endswith('.instructure.com'), f'{d} is under *.instructure.com already'
+        listed.append(f'*://{d}/*')
+    assert len(listed) == len(set(listed)), 'a school listed twice in canvas-domains.txt'
+    sites = ['*://*.instructure.com/*'] + listed
+    m['host_permissions'] = sites
     m['optional_host_permissions'] = ['*://*/*']
     m['content_scripts'] = [cs for cs in m['content_scripts'] if 'content/sniff.js' not in (cs.get('js') or [])]  # it looks at sites the quiet build never asks for
-    # The bar over a tool's own tab stays, narrowed to what this build asks for: Canvas's own domain
-    # (where a launch lands) and whatever site the reader has since said yes to, one at a time.
+    # The interface's own scripts run on every site the build names; the bar over a tool's own tab too (a launch lands back
+    # on the Canvas it came from); whatever site the reader has since said yes to is added one at a time.
     for cs in m['content_scripts']:
-        if 'content/toolbar.js' in (cs.get('js') or []):
-            cs['matches'] = ['*://*.instructure.com/*']
+        if (cs.get('matches') or []) == ['*://*.instructure.com/*'] or 'content/toolbar.js' in (cs.get('js') or []):
+            cs['matches'] = list(sites)
 assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
 with open(path, 'w') as f:
     json.dump(m, f, indent=2)
