@@ -16,7 +16,7 @@ struct MainShell: View {
             DetailStack()
         }
         .navigationSplitViewStyle(.balanced)
-        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search Canvas")
+        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search \(engine.lmsName)")
         .onSubmit(of: .search) { engine.search(engine.query) }
         .onChange(of: engine.query) { _, q in
             let t = q.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -123,7 +123,7 @@ struct WebFallback: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title.isEmpty ? "Canvas" : title, systemImage: "safari")
+            Label(title.isEmpty ? engine.lmsName : title, systemImage: "safari")
         } description: {
             Text("This opens in a window of its own.")
         } actions: {
@@ -251,7 +251,7 @@ struct Sidebar: View {
         }
         .tag(Place.home(ctx))
         .contextMenu {
-            Button("Open in Canvas") { if let u = engine.canvasURL(for: .home(ctx)) { engine.openWebScreen(u.absoluteString, title: c.code) } }
+            Button("Open in \(engine.lmsName)") { if let u = engine.canvasURL(for: .home(ctx)) { engine.openWebScreen(u.absoluteString, title: c.code) } }
             Button("Copy Link") { if let u = engine.canvasURL(for: .home(ctx)) { copyToPasteboard(u.absoluteString) } }
         }
     }
@@ -291,7 +291,7 @@ struct AccountBar: View {
                 Button("What’s New") {
                     Task { if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) } }
                 }
-                Button("Canvas Profile") { engine.openWebScreen("/profile", title: "Profile") }
+                Button("\(engine.lmsName) Profile") { engine.openWebScreen("/profile", title: "Profile") }
                 Divider()
                 Button("Sign Out…") { confirmSignOut = true }
             } label: {
@@ -305,10 +305,10 @@ struct AccountBar: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .overlay(alignment: .top) { Divider() }
-        .confirmationDialog("Sign out of Canvas on this Mac?", isPresented: $confirmSignOut) {
+        .confirmationDialog("Sign out of \(engine.lmsName) on this Mac?", isPresented: $confirmSignOut) {
             Button("Sign Out", role: .destructive) { session.signOut() }
         } message: {
-            Text("Your Canvas session and any saved sign-in are cleared; settings stay.")
+            Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
         }
     }
 }

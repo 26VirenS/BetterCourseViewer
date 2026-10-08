@@ -16,7 +16,7 @@ struct SearchView: View {
         Page {
             ScreenHeading(title: q.isEmpty ? "Search" : "Results for “\(q)”", sub: subline)
             if q.isEmpty {
-                ContentUnavailableView("Search Canvas", systemImage: "magnifyingglass", description: Text("Courses, assignments, quizzes, announcements, pages, discussions, files and people."))
+                ContentUnavailableView("Search \(engine.lmsName)", systemImage: "magnifyingglass", description: Text("Courses, assignments, quizzes, announcements, pages, discussions, files and people."))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
             } else if let d = data, d.groups.isEmpty, !searching {
@@ -63,7 +63,7 @@ struct SearchView: View {
                 .contextMenu {
                     Button("Open") { engine.openFromSearch(r.url, title: r.title, external: r.external == true) }
                     if r.external != true {
-                        Button("Open in Canvas") { engine.openWebScreen(r.url, title: r.title) }
+                        Button("Open in \(engine.lmsName)") { engine.openWebScreen(r.url, title: r.title) }
                     }
                     Button("Copy Link") { if let u = engine.absolute(r.url) { copyToPasteboard(u.absoluteString) } }
                 }

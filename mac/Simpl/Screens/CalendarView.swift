@@ -390,7 +390,7 @@ struct CalendarView: View {
     private func eventMenu(_ ev: CalEvent, url: String) -> some View {
         Button("Open") { engine.openWeb(url, title: ev.title) }
         Divider()
-        Button("Open in Canvas") { engine.openWebScreen(url, title: ev.title) }
+        Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: ev.title) }
         Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
     }
 
@@ -804,7 +804,7 @@ private struct CalendarsPopover: View {
                 .frame(height: listHeight)
             }
             Divider()
-            Text(full ? "Ten calendars at most: turn one off to show another." : "Canvas shows at most 10 calendars at once.")
+            Text(full ? "Ten calendars at most: turn one off to show another." : (engine.onBrightspace ? "At most 10 calendars show at once." : "Canvas shows at most 10 calendars at once."))
                 .font(.caption)
                 .foregroundStyle(full ? Color.orange : Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)

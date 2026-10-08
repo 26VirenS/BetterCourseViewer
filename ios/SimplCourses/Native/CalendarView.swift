@@ -284,7 +284,7 @@ struct CalendarsSheet: View {
                 Section {
                     ForEach(choices.filter { $0.own == true }) { toggleRow($0) }
                 } footer: {
-                    Text("Canvas shows at most 10 calendars at once.")
+                    Text(engine.onBrightspace ? "At most 10 calendars show at once." : "Canvas shows at most 10 calendars at once.")
                 }
                 let other = choices.filter { $0.own != true }
                 if !other.isEmpty {

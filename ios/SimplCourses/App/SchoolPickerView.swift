@@ -66,7 +66,7 @@ struct SchoolPickerView: View {
                     }
                 } footer: {
                     if typing {
-                        Text("The address you open Canvas at in a browser, for example school.instructure.com or canvas.school.edu.")
+                        Text("The address you open Canvas or Brightspace at in a browser, for example school.instructure.com or school.brightspace.com.")
                     }
                 }
             }
@@ -76,10 +76,10 @@ struct SchoolPickerView: View {
             .autocorrectionDisabled()
             .onChange(of: query) { _, q in search.find(q) }
             .task { await search.load(); if !query.isEmpty { search.find(query) } }
-            .alert("That does not look like a Canvas address", isPresented: $invalid) {
+            .alert("That does not look like a Canvas or Brightspace address", isPresented: $invalid) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Enter the site's address, such as school.instructure.com.")
+                Text("Enter the site's address, such as school.instructure.com or school.brightspace.com.")
             }
         }
     }

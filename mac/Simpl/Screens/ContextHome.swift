@@ -362,7 +362,7 @@ private extension View {
             Button("Open", action: open)
             if let url, !url.isEmpty {
                 Divider()
-                Button("Open in Canvas") { engine.openWebScreen(url, title: title) }
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: title) }
                 Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
             }
         }

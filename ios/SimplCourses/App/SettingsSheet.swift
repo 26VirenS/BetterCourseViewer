@@ -41,7 +41,7 @@ struct SettingsSheet: View {
                     dataSection
                 } else {
                     Section {
-                        Text("Grades and data settings appear once Canvas has loaded and you are signed in.")
+                        Text("Grades and data settings appear once \(session.lmsName) has loaded and you are signed in.")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -77,18 +77,18 @@ struct SettingsSheet: View {
             .fileImporter(isPresented: $importing, allowedContentTypes: importKind.types, allowsMultipleSelection: false) { result in
                 picked(importKind, result)
             }
-            .confirmationDialog("Sign out of Canvas on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+            .confirmationDialog("Sign out of \(session.lmsName) on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                 Button("Sign out", role: .destructive) {
                     session.signOut()
                     dismiss()
                 }
             } message: {
-                Text("Your Canvas session and any saved sign-in are cleared; settings stay.")
+                Text("Your \(session.lmsName) session and any saved sign-in are cleared; settings stay.")
             }
             .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("Reset Everything", role: .destructive) { Task { await resetEverything() } }
             } message: {
-                Text("Your preferences, grade history and course goals kept in the app are cleared, and the setup runs again. Your Canvas sign-in stays.")
+                Text(session.onBrightspace ? "Your preferences, grade history, course goals, course nicknames and colours, and your own tasks and ticks kept in the app are cleared, and the setup runs again. Your Brightspace sign-in stays." : "Your preferences, grade history and course goals kept in the app are cleared, and the setup runs again. Your Canvas sign-in stays.")
             }
         }
     }
@@ -97,7 +97,7 @@ struct SettingsSheet: View {
 
     private var schoolSection: some View {
         Section("School") {
-            LabeledContent("Canvas", value: session.host ?? "")
+            LabeledContent(session.lmsName, value: session.host ?? "")
             Button("Change school…") {
                 session.changeSchool()
                 dismiss()
@@ -292,7 +292,7 @@ struct SettingsSheet: View {
         } header: {
             Text("Data")
         } footer: {
-            Text("Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas.")
+            Text(session.onBrightspace ? "Brightspace data is never kept here: only your preferences, grade history and goals, and the course nicknames, colours, tasks and ticks Brightspace has no place for. Your Brightspace account and favourites live on Brightspace." : "Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas.")
         }
     }
 
@@ -303,7 +303,7 @@ struct SettingsSheet: View {
         } header: {
             Text("About")
         } footer: {
-            Text("To take Simpl Courses off this iPhone with everything it stored, delete the app from the Home Screen: touch and hold its icon, then Remove App → Delete App. iOS removes the app's data with it (settings, keys, grade history and the saved session); your Canvas account is not affected.")
+            Text("To take Simpl Courses off this iPhone with everything it stored, delete the app from the Home Screen: touch and hold its icon, then Remove App → Delete App. iOS removes the app's data with it (settings, keys, grade history and the saved session); your \(session.lmsName) account is not affected.")
         }
     }
 

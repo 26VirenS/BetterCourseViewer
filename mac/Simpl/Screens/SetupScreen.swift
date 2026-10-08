@@ -105,7 +105,7 @@ struct SetupScreen: View {
             VStack(spacing: 6) {
                 Text("Welcome to Simpl")
                     .font(.system(size: 28, weight: .bold))
-                Text("Canvas, simply, on your Mac. Two quick questions and you’re in.")
+                Text("\(engine.lmsName), simply, on your Mac. Two quick questions and you’re in.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -172,7 +172,7 @@ struct SetupScreen: View {
                             .buttonStyle(.link)
                         }
                     } footer: {
-                        Text("A nickname shows everywhere in place of the course’s code — in Canvas too.")
+                        Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s code — on this Mac only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -222,7 +222,7 @@ struct SetupScreen: View {
     private func grades(_ d: SetupChoices) -> some View {
         let picked = d.courses.filter { chosen.contains($0.id) }
         return VStack(alignment: .leading, spacing: 0) {
-            stepHeading("Grades", "Canvas keeps no history. Simpl can, on this Mac.")
+            stepHeading("Grades", "\(engine.lmsName) keeps no history. Simpl can, on this Mac.")
             Form {
                 Section {
                     Toggle(isOn: $tracking.animation(Motion.snappy)) {

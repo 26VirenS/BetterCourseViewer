@@ -35,7 +35,7 @@ struct SimplCommands: Commands {
             Button("Reload") { engine?.refresh() }
                 .keyboardShortcut("r")
                 .disabled(!ready)
-            Button("Reload Canvas Page") { engine?.reload() }
+            Button("Reload \(session.lmsName) Page") { engine?.reload() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
                 .disabled(engine == nil)
             Divider()
@@ -75,7 +75,7 @@ struct SimplCommands: Commands {
                 }
             }
             .disabled(!ready)
-            Button("Open Canvas in Browser") {
+            Button("Open \(session.lmsName) in Browser") {
                 if let u = engine?.web.baseURL { NSWorkspace.shared.open(u) }
             }
             .disabled(engine == nil)

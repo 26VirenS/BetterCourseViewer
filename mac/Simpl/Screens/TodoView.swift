@@ -33,7 +33,7 @@ struct TodoView: View {
                         sectionCard(section, group: d.group)
                             .transition(cardTransition)
                     }
-                    Text("Click a task to open it, or right-click it for more. Priority is yours alone and never reaches Canvas.")
+                    Text("Click a task to open it, or right-click it for more. Priority is yours alone and never reaches \(engine.lmsName).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
@@ -80,7 +80,7 @@ struct TodoView: View {
             }
             Button("Cancel", role: .cancel) { deleting = nil }
         } message: {
-            Text("This removes it from your Canvas planner.")
+            Text(engine.onBrightspace ? "This removes it from your To Do." : "This removes it from your Canvas planner.")
         }
     }
 
@@ -347,7 +347,7 @@ private struct TodoTaskRow: View {
         }
         if let url = w.url, !url.isEmpty {
             Divider()
-            Button("Open in Canvas") { engine.openWebScreen(url, title: w.title) }
+            Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: w.title) }
             Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
         }
     }
@@ -513,7 +513,7 @@ struct NewTaskSheet: View {
                 }
                 .pickerStyle(.segmented)
             } footer: {
-                Text("Priority is yours alone and never reaches Canvas.")
+                Text("Priority is yours alone and never reaches \(engine.lmsName).")
             }
             if let failure {
                 Section {

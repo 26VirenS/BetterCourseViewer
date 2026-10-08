@@ -10,13 +10,13 @@ protocol ShellListener: AnyObject {
 }
 
 enum EngineError: LocalizedError {
-    case notReady
+    case notReady(String) // (the school's site by name, Engine.lmsName)
     case unreadable
     case page(String)
 
     var errorDescription: String? {
         switch self {
-        case .notReady: return "Canvas is still loading. Try again in a moment."
+        case .notReady(let site): return "\(site) is still loading. Try again in a moment."
         case .unreadable: return "The answer could not be read."
         case .page(let message): return message
         }
@@ -279,10 +279,10 @@ final class Engine: ObservableObject, ShellListener {
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready
     /// (a page load under way), and tries once more if the page went away mid-call.
     func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async throws -> T {
-        var lastError: Error = EngineError.notReady
+        var lastError: Error = EngineError.notReady(lmsName)
         for attempt in 0..<3 {
             await whenReady()
-            guard ready else { throw EngineError.notReady }
+            guard ready else { throw EngineError.notReady(lmsName) }
             do {
                 let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
                 guard let text = raw as? String, let data = text.data(using: .utf8) else { throw EngineError.unreadable }

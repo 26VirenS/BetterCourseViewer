@@ -87,7 +87,7 @@ struct ContextHome: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { engine.openWebScreen("/\(ctx)?bcv=native", title: model.data?.title ?? "") } label: { Label("Open Canvas’s Page", systemImage: "globe") }
+                    Button { engine.openWebScreen("/\(ctx)?bcv=native", title: model.data?.title ?? "") } label: { Label("Open \(engine.lmsName)’s Page", systemImage: "globe") }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }

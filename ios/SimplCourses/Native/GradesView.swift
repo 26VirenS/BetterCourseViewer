@@ -34,7 +34,7 @@ struct GradesView: View {
                         Text("Press a course for each assignment's grade and what-if scores.")
                     }
                     Section {
-                        Text("Term GPA is worked out here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
+                        Text("Term GPA is worked out here from the scores \(engine.lmsName) reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -297,7 +297,7 @@ struct CourseGradesView: View {
         .onChange(of: sort) { Haptics.select() }
         .task { await load(fresh: true) }
         .sheet(item: $addingTo) { g in
-            AddWhatIfSheet(group: g) { name, possible, score in
+            AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
                 let id = "whatif-\(UUID().uuidString.prefix(8))"
                 added.append(AddedWork(id: id, groupId: g.id, name: name, possible: possible))
                 drafts[id] = score.map { CourseGradesView.num($0) } ?? ""
@@ -594,6 +594,8 @@ struct CourseGradesView: View {
 /// A what-if assignment for a group: its name, what it is out of, and the score to try — a small sheet.
 struct AddWhatIfSheet: View {
     let group: CGGroup
+    /// The school's site by name (Engine.lmsName), for the note that nothing is saved to it.
+    let lmsName: String
     let add: (String, Double, Double?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -612,7 +614,7 @@ struct AddWhatIfSheet: View {
                         TextField("Points", text: $possible).keyboardType(.decimalPad).frame(width: 64)
                     }
                 } footer: {
-                    Text("Counts in \(group.name)\(group.weightText.map { $0.isEmpty ? "" : " (\($0))" } ?? ""). Nothing is saved to Canvas.")
+                    Text("Counts in \(group.name)\(group.weightText.map { $0.isEmpty ? "" : " (\($0))" } ?? ""). Nothing is saved to \(lmsName).")
                 }
             }
             .navigationTitle("What-If Assignment")

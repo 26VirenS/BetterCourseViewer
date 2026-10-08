@@ -277,7 +277,7 @@ private struct GeneralPane: View {
     var body: some View {
         Pane {
             Section("School") {
-                LabeledContent("Canvas", value: session.host ?? "None chosen")
+                LabeledContent(session.lmsName, value: session.host ?? "None chosen")
                 HStack {
                     Button("Change School…") {
                         session.changeSchool()
@@ -319,10 +319,10 @@ private struct GeneralPane: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
-        .confirmationDialog("Sign out of Canvas on this Mac?", isPresented: $confirmSignOut) {
+        .confirmationDialog("Sign out of \(session.lmsName) on this Mac?", isPresented: $confirmSignOut) {
             Button("Sign Out", role: .destructive) { session.signOut() }
         } message: {
-            Text("Your Canvas session and any saved sign-in are cleared; settings stay.")
+            Text("Your \(session.lmsName) session and any saved sign-in are cleared; settings stay.")
         }
         .confirmationDialog("Forget the saved sign-in?", isPresented: $confirmForget) {
             Button("Forget", role: .destructive) {
@@ -422,6 +422,7 @@ private struct NotificationsPane: View {
 // MARK: - Grades
 
 private struct GradesPane: View {
+    @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var settings: SettingsModel
     @State private var importing = false
 
@@ -429,7 +430,7 @@ private struct GradesPane: View {
         Pane {
             if !settings.live {
                 Section {
-                    Text("Grade settings appear once Canvas has loaded and you are signed in.")
+                    Text("Grade settings appear once \(session.lmsName) has loaded and you are signed in.")
                         .foregroundStyle(.secondary)
                 }
             } else if let info = settings.info {
@@ -525,6 +526,7 @@ private struct GradesPane: View {
 // MARK: - Data
 
 private struct DataPane: View {
+    @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var settings: SettingsModel
     @State private var importing = false
     @State private var confirmReset = false
@@ -544,7 +546,7 @@ private struct DataPane: View {
                 } header: {
                     Text("Data")
                 } footer: {
-                    Text("Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas.")
+                    Text(session.onBrightspace ? "Brightspace data is never kept here: only your preferences, grade history and goals, and the course nicknames, colours, tasks and ticks Brightspace has no place for. Your Brightspace account and favourites live on Brightspace." : "Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas.")
                         .foregroundStyle(.secondary)
                 }
                 Section {
@@ -558,7 +560,7 @@ private struct DataPane: View {
                 }
             } else {
                 Section {
-                    Text("Data settings appear once Canvas has loaded and you are signed in.")
+                    Text("Data settings appear once \(session.lmsName) has loaded and you are signed in.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -569,7 +571,7 @@ private struct DataPane: View {
         .confirmationDialog("Reset everything?", isPresented: $confirmReset) {
             Button("Reset Everything", role: .destructive) { Task { await settings.resetEverything() } }
         } message: {
-            Text("Your preferences, grade history and course goals kept in the app are cleared, and the setup runs again. Your Canvas sign-in stays.")
+            Text(session.onBrightspace ? "Your preferences, grade history, course goals, course nicknames and colours, and your own tasks and ticks kept in the app are cleared, and the setup runs again. Your Brightspace sign-in stays." : "Your preferences, grade history and course goals kept in the app are cleared, and the setup runs again. Your Canvas sign-in stays.")
         }
     }
 }
@@ -577,6 +579,8 @@ private struct DataPane: View {
 // MARK: - About
 
 private struct AboutPane: View {
+    @EnvironmentObject private var session: AppSession
+
     var body: some View {
         Pane {
             Section {
@@ -586,14 +590,14 @@ private struct AboutPane: View {
                         .frame(width: 56, height: 56)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Simpl").font(.title2.bold())
-                        Text("Canvas, as a Mac app.").foregroundStyle(.secondary)
+                        Text("\(session.lmsName), as a Mac app.").foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 4)
                 LabeledContent("Version", value: AppSession.version)
                 LabeledContent("Interface", value: AppSession.extensionVersion)
             } footer: {
-                Text("To take Simpl off this Mac with everything it stored, sign out here first, then move Simpl to the Bin. Your Canvas account is not affected.")
+                Text("To take Simpl off this Mac with everything it stored, sign out here first, then move Simpl to the Bin. Your \(session.lmsName) account is not affected.")
                     .foregroundStyle(.secondary)
             }
         }

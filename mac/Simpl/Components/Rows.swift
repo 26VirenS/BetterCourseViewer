@@ -203,7 +203,7 @@ struct CanvasMenu: View {
             Button {
                 if let url { engine.openWebScreen(url, title: title) }
             } label: {
-                Label("Open in Canvas", systemImage: "globe")
+                Label("Open in \(engine.lmsName)", systemImage: "globe")
             }
             Button {
                 if let url, let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) }

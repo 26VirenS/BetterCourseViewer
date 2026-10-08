@@ -46,7 +46,7 @@ struct TodoView: View {
                         }
                     }
                     Section {
-                        Text("Tap a task to open it. Swipe for quick actions. Priority is yours alone and never reaches Canvas.")
+                        Text("Tap a task to open it. Swipe for quick actions. Priority is yours alone and never reaches \(engine.lmsName).")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -76,12 +76,12 @@ struct TodoView: View {
                 }
             }
         } message: {
-            Text("This removes it from your Canvas planner.")
+            Text(engine.onBrightspace ? "This removes it from your To Do." : "This removes it from your Canvas planner.")
         }
         .confirmationDialog("Priority", isPresented: Binding(get: { prioritizing != nil }, set: { if !$0 { prioritizing = nil } }), titleVisibility: .visible) {
             if let row = prioritizing { priorityButtons(row) }
         } message: {
-            Text("Yours alone; it never reaches Canvas.")
+            Text("Yours alone; it never reaches \(engine.lmsName).")
         }
     }
 

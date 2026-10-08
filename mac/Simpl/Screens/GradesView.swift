@@ -25,7 +25,7 @@ struct GradesView: View {
                     if !d.items.isEmpty {
                         ItemGradesCard(items: d.items, counts: counts(d))
                     }
-                    Fact(symbol: "info.circle", text: "Term GPA is worked out here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
+                    Fact(symbol: "info.circle", text: "Term GPA is worked out here from the scores \(engine.lmsName) reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
                         .padding(.horizontal, 6)
                 }
             } else {
@@ -205,7 +205,7 @@ struct GradesView: View {
             Button { engine.go(.home("courses/\(r.id)")) } label: { Label("Open Course", systemImage: "arrow.up.right") }
             Button { engine.go(.section("courses/\(r.id)", "grades")) } label: { Label("Course Grades", systemImage: "chart.bar") }
             Divider()
-            Button { engine.openWebScreen(link, title: r.code) } label: { Label("Open in Canvas", systemImage: "globe") }
+            Button { engine.openWebScreen(link, title: r.code) } label: { Label("Open in \(engine.lmsName)", systemImage: "globe") }
             Button {
                 if let u = engine.absolute(link) { copyToPasteboard(u.absoluteString) }
             } label: {
@@ -538,7 +538,7 @@ private struct ItemGradesCard: View {
             if let u = item.url, !u.isEmpty {
                 Button("Open") { engine.go(u, title: item.name) }
                 Divider()
-                Button("Open in Canvas") { engine.openWebScreen(u, title: item.name) }
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(u, title: item.name) }
                 Button("Copy Link") { if let x = engine.absolute(u) { copyToPasteboard(x.absoluteString) } }
             }
         }
@@ -636,7 +636,7 @@ struct CourseGradesView: View {
         .toolbar { toolbarItems }
         .task(id: engine.dataVersion) { await load(fresh: true, animated: false) }
         .sheet(item: $addingTo) { g in
-            AddWhatIfSheet(group: g) { name, possible, score in
+            AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
                 addWhatIf(to: g, name: name, possible: possible, score: score)
             }
         }
@@ -1070,7 +1070,7 @@ struct CourseGradesView: View {
         }
         if let u = r.url {
             Divider()
-            Button("Open in Canvas") { engine.openWebScreen(u, title: r.name) }
+            Button("Open in \(engine.lmsName)") { engine.openWebScreen(u, title: r.name) }
             Button("Copy Link") { if let x = engine.absolute(u) { copyToPasteboard(x.absoluteString) } }
         }
     }
@@ -1263,6 +1263,8 @@ private struct WhatIfBar: View {
 /// saved to Canvas.
 private struct AddWhatIfSheet: View {
     let group: CGGroup
+    /// The school's site by name (Engine.lmsName), for the note that nothing is saved to it.
+    let lmsName: String
     let add: (String, Double, Double?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -1273,8 +1275,9 @@ private struct AddWhatIfSheet: View {
     /// The sheet's fields, for the one that starts focused.
     private enum Field { case name, score, possible }
 
-    init(group: CGGroup, add: @escaping (String, Double, Double?) -> Void) {
+    init(group: CGGroup, lmsName: String, add: @escaping (String, Double, Double?) -> Void) {
         self.group = group
+        self.lmsName = lmsName
         self.add = add
     }
 
@@ -1326,7 +1329,7 @@ private struct AddWhatIfSheet: View {
 
     private var footnote: String {
         let weight = group.weightText.map { $0.isEmpty ? "" : " (\($0))" } ?? ""
-        let counts = "Counts in \(group.name)\(weight). Nothing is saved to Canvas."
+        let counts = "Counts in \(group.name)\(weight). Nothing is saved to \(lmsName)."
         guard let p = points, let s = AddWhatIfSheet.number(score) else { return counts }
         return String(format: "%.1f%%. ", s / p * 100) + counts
     }

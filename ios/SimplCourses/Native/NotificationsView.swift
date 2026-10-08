@@ -186,7 +186,7 @@ struct SearchView: View {
         List {
             if query.trimmingCharacters(in: .whitespaces).isEmpty {
                 Section {
-                    ContentUnavailableView("Search Canvas", systemImage: "magnifyingglass", description: Text("Courses, assignments, quizzes, announcements, pages, discussions, files and people."))
+                    ContentUnavailableView("Search \(engine.lmsName)", systemImage: "magnifyingglass", description: Text("Courses, assignments, quizzes, announcements, pages, discussions, files and people."))
                 }
             } else if let d = data, d.groups.isEmpty, !searching {
                 Section { ContentUnavailableView.search(text: query) }

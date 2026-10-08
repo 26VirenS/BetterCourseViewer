@@ -119,7 +119,7 @@ struct SetupScreen: View {
                     .padding(.top, 48)
                 VStack(spacing: 8) {
                     Text("Welcome to Simpl Courses").font(.largeTitle.weight(.bold)).multilineTextAlignment(.center)
-                    Text("Canvas, simply, on your iPhone. Two quick questions and you’re in.")
+                    Text("\(engine.lmsName), simply, on your iPhone. Two quick questions and you’re in.")
                         .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
                 .arrive(1, welcomed)
@@ -174,7 +174,7 @@ struct SetupScreen: View {
                         .textCase(nil)
                     }
                 } footer: {
-                    Text("A nickname shows everywhere in place of the course’s code — in Canvas too.")
+                    Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s code — on this iPhone only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.")
                 }
             }
         }
@@ -224,7 +224,7 @@ struct SetupScreen: View {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Grades").font(.title2.weight(.bold))
-                    Text("Canvas keeps no history. Simpl Courses can, on this iPhone.").font(.subheadline).foregroundStyle(.secondary)
+                    Text("\(engine.lmsName) keeps no history. Simpl Courses can, on this iPhone.").font(.subheadline).foregroundStyle(.secondary)
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 4, trailing: 4))

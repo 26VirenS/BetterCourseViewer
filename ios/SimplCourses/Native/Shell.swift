@@ -292,7 +292,7 @@ struct AccountMenu: View {
                         if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) }
                     }
                 } label: { Label("What’s New", systemImage: "star") }
-                Button { engine.openWeb("/profile", title: "Profile") } label: { Label("Canvas Profile", systemImage: "person.crop.circle") }
+                Button { engine.openWeb("/profile", title: "Profile") } label: { Label("\(engine.lmsName) Profile", systemImage: "person.crop.circle") }
             }
             Section {
                 Button(role: .destructive) { confirmSignOut = true } label: {
@@ -309,13 +309,13 @@ struct AccountMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel("Account")
-        .confirmationDialog("Sign out of Canvas on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+        .confirmationDialog("Sign out of \(engine.lmsName) on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 Haptics.play("warning")
                 session.signOut()
             }
         } message: {
-            Text("Your Canvas session and any saved sign-in are cleared; settings stay.")
+            Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
         }
     }
 }

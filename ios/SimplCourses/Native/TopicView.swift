@@ -72,7 +72,7 @@ struct TopicView: View {
                 } label: {
                     Image(systemName: "globe")
                 }
-                .accessibilityLabel("Open Canvas’s Page")
+                .accessibilityLabel("Open \(engine.lmsName)’s Page")
             }
         }
         .task(id: engine.dataVersion) { await load() }

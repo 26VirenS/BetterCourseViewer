@@ -37,7 +37,7 @@ struct CoursesView: View {
         }
         .task(id: engine.dataVersion) { await load() }
         .sheet(item: $naming) { c in
-            NicknameSheet(course: c) { name in save(c, name) }
+            NicknameSheet(course: c, onBrightspace: engine.onBrightspace) { name in save(c, name) }
         }
     }
 
@@ -99,7 +99,7 @@ struct CoursesView: View {
             }
             Divider()
             Button("Nickname…") { naming = c }
-            Button("Open in Canvas") { engine.openWebScreen(c.url, title: c.code) }
+            Button("Open in \(engine.lmsName)") { engine.openWebScreen(c.url, title: c.code) }
             Button("Copy Link") { if let u = engine.absolute(c.url) { copyToPasteboard(u.absoluteString) } }
         }
     }
@@ -130,6 +130,8 @@ struct CoursesView: View {
 /// A course's nickname: shown instead of its Canvas name everywhere, Canvas included; empty, the name comes back.
 private struct NicknameSheet: View {
     let course: CourseRow
+    /// The school's site is Brightspace (Engine.onBrightspace), which keeps no nicknames: they stay on this Mac.
+    let onBrightspace: Bool
     let save: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -137,7 +139,7 @@ private struct NicknameSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Nickname").font(.headline)
-            Text("Shown instead of “\(course.original ?? course.code)” everywhere, in Canvas too.")
+            Text("Shown instead of “\(course.original ?? course.code)” everywhere, \(onBrightspace ? "on this Mac only" : "in Canvas too").")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

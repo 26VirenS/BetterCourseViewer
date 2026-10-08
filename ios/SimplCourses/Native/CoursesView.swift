@@ -56,7 +56,7 @@ struct CoursesView: View {
             }
             Button("Cancel", role: .cancel) { naming = nil }
         } message: {
-            Text("Shown instead of “\(naming?.original ?? "")” everywhere, in Canvas too.")
+            Text("Shown instead of “\(naming?.original ?? "")” everywhere, \(engine.onBrightspace ? "on this iPhone only" : "in Canvas too").")
         }
     }
 

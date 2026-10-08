@@ -549,7 +549,7 @@ extension View {
                     Button(w.label.0) { engine.act(on: url, title: w.title, feedback: false) }
                 }
                 Divider()
-                Button("Open in Canvas") { engine.openWebScreen(url, title: w.title) }
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: w.title) }
                 Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
             }
         }

@@ -73,7 +73,7 @@ struct AssignmentView: View {
                 } label: {
                     Image(systemName: "globe")
                 }
-                .accessibilityLabel("Open Canvas’s Page")
+                .accessibilityLabel("Open \(engine.lmsName)’s Page")
             }
         }
         .task(id: engine.dataVersion) { await load() }
@@ -411,7 +411,7 @@ struct SubmitSheet: View {
 
     private func add(_ f: PickedFile) {
         guard f.data.count <= SubmitSheet.limit else {
-            error = "\(f.name) is larger than 50 MB. Hand it in on Canvas’s own page."
+            error = "\(f.name) is larger than 50 MB. Hand it in on \(engine.lmsName)’s own page."
             return
         }
         guard allowedName(f.name) else {

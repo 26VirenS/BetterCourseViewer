@@ -316,12 +316,12 @@ struct AssignmentView: View {
                 Button {
                     engine.openWebScreen(canvasURL, title: d.title)
                 } label: {
-                    Label("Open in Canvas", systemImage: "globe")
+                    Label("Open in \(engine.lmsName)", systemImage: "globe")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
-                .help("Open Canvas’s own page for this assignment")
+                .help("Open \(engine.lmsName)’s own page for this assignment")
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1219,7 +1219,7 @@ private struct HandInSheet: View {
             return
         }
         if let size = facts?.fileSize, size > HandInSheet.limit {
-            error = "\(name) is larger than 50 MB. Hand it in on Canvas’s own page."
+            error = "\(name) is larger than 50 MB. Hand it in on \(engine.lmsName)’s own page."
             return
         }
         guard let bytes = try? Data(contentsOf: u) else {
@@ -1232,7 +1232,7 @@ private struct HandInSheet: View {
 
     private func add(_ f: PickedFile) {
         guard f.data.count <= HandInSheet.limit else {
-            error = "\(f.name) is larger than 50 MB. Hand it in on Canvas’s own page."
+            error = "\(f.name) is larger than 50 MB. Hand it in on \(engine.lmsName)’s own page."
             return
         }
         guard allowedName(f.name) else {

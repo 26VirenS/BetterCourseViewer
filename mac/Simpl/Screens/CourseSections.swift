@@ -327,7 +327,7 @@ private struct ModulesList: View {
                     Button("Mark Done") { mark(it, m, true) }
                         .controlSize(.small)
                         .disabled(locked)
-                        .help("Mark this item done in Canvas")
+                        .help("Mark this item done in \(engine.lmsName)")
                         .padding(.trailing, 6)
                         .transition(.opacity)
                 }
@@ -383,7 +383,7 @@ private struct ModulesList: View {
         if let url = it.url, !url.isEmpty {
             Divider()
             if it.external != true {
-                Button("Open in Canvas") { engine.openWebScreen(ModulesList.page(url), title: it.title) }
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(ModulesList.page(url), title: it.title) }
             }
             Button("Copy Link") {
                 if let u = engine.absolute(ModulesList.page(url)) { copyToPasteboard(u.absoluteString) }
@@ -594,7 +594,7 @@ struct FilesView: View {
                 Button("Quick Look") { engine.openFile(u, name: f.name) }
                 Divider()
             }
-            Button("Open in Canvas") { engine.openWebScreen(page, title: f.name) }
+            Button("Open in \(engine.lmsName)") { engine.openWebScreen(page, title: f.name) }
             Button("Copy Link") { if let u = engine.absolute(page) { copyToPasteboard(u.absoluteString) } }
         }
     }
@@ -696,9 +696,9 @@ private struct OtherSection: View {
         ContentUnavailableView {
             Label(title, systemImage: Glyph.section(kind))
         } description: {
-            Text("Simpl doesn’t show this part of Canvas itself yet.")
+            Text("Simpl doesn’t show this part of \(engine.lmsName) itself yet.")
         } actions: {
-            Button("Open in Canvas") {
+            Button("Open in \(engine.lmsName)") {
                 if let url { engine.openWebScreen(url, title: title) }
             }
             .disabled(url == nil)
@@ -852,7 +852,7 @@ private extension View {
             Button("Open", action: open)
             if let url, !url.isEmpty {
                 Divider()
-                Button("Open in Canvas") { engine.openWebScreen(url, title: title) }
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: title) }
                 Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
             }
         }

@@ -23,8 +23,11 @@ struct ToolWindow: View {
     private var title: String {
         if !browser.title.isEmpty { return browser.title }
         if !name.isEmpty { return name }
-        return launch?.title ?? "Canvas"
+        return launch?.title ?? lmsName
     }
+
+    /// The school's site by name (the main window's engine knows which), for a window with no title of its own.
+    private var lmsName: String { model.engine?.lmsName ?? "Canvas" }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -43,7 +46,7 @@ struct ToolWindow: View {
             } else {
                 VStack(spacing: 12) {
                     ProgressView()
-                    Text("Opening \(launch?.title ?? "Canvas")…").foregroundStyle(.secondary)
+                    Text("Opening \(launch?.title ?? lmsName)…").foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
