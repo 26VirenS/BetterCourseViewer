@@ -524,7 +524,7 @@
 
     const GRADING = { points: 'Graded', pass_fail: 'Complete or incomplete', letter_grade: 'Letter grade', gpa_scale: 'GPA scale', percent: 'Percentage', not_graded: 'Not graded' };
     const fact = (k, v, sub, extra = {}) => h(extra.onclick ? 'button' : 'div', { class: `bcv-asg__fact ${extra.cls || ''}`, type: extra.onclick ? 'button' : null, onclick: extra.onclick || null, title: extra.title || null }, [
-      U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-ellip', v, 'span'), sub ? U.text('bcv-asg__facts bcv-ellip', sub, 'span') : null]),
+      U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-ellip', v, 'span'), sub ? U.text('bcv-asg__factsub bcv-ellip', sub, 'span') : null]),
       extra.side || null,
     ]);
     const dueSub = lockAt && due && lockAt > due ? `Late until ${U.fmtShort(lockAt)}` : lockAt && due && +lockAt === +due ? 'Closes when due' : unlockAt && unlockAt > Date.now() ? `Opens ${U.fmtShort(unlockAt)}` : lockAt && !due ? `Closes ${U.fmtShort(lockAt)}` : due ? 'No late cutoff' : 'Hand in any time';

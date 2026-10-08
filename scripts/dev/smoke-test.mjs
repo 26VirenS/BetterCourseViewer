@@ -2119,6 +2119,9 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-asg__fact--rubric', { timeout: 10000 });
   const rubFact = await eventually(() => page.$$eval('.bcv-asg__fact--rubric svg.bcv-rubring path[fill]', (p) => p.length > 100), 4000);
+  // (2.99.19) the small line under each fact is read whole, not cut short in a third of its box
+  const subs = await page.$$eval('.bcv-asg__fact .bcv-asg__factsub', (els) => els.map((e) => ({ t: e.textContent, cut: e.scrollWidth > e.clientWidth + 1, display: getComputedStyle(e).display })));
+  check(subs.length >= 3 && subs.every((x) => !x.cut && x.display !== 'grid'), `each fact's small line shows whole: ${JSON.stringify(subs)}`);
   check(rubFact && !(await page.$('.bcv-rr-ov, .bcv-rubg, .bcv-asg .bcv-rubbtn')), 'the rubric is a box among the facts, wearing the ring in miniature, and not on the page until it is asked for');
   await page.click('.bcv-asg__fact--rubric');
   check(await eventually(() => page.$('.bcv-rr-ov').then((e) => !!e), 6000), 'pressing the rubric box opens the rubric');

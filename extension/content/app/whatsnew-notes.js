@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.19', date: '2026-10-08', notes: [
+      { kind: 'fixed', title: 'Fact boxes read whole', body: 'The small line under Due, Points and more is no longer cut.', icon: P.check },
+    ] },
     { version: '2.99.18', date: '2026-10-08', notes: [
       { kind: 'improved', title: 'Links open in the app', body: 'On iPhone, every Canvas link opens its own screen.', icon: P.arrows },
     ] },
