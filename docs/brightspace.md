@@ -54,7 +54,7 @@ sent on at once.
 | assignment groups | grade categories and their weights (weighted when the grading system is) |
 | announcements | news items (3e9 + id) |
 | discussions | forums' topics and their posts, threaded; replies posted with the page's token |
-| modules | the content's table of contents: a module inside one is a heading, its topics a step in |
+| modules | the content's table of contents: a module inside one is a heading, its topics a step in; a topic done by hand asks for the mark, which Brightspace takes on its own page for it only (its API takes none from a student): the web's button goes there, the apps offer none |
 | pages, files | HTML topics (read with the session), file topics (fetched from the topic; previewed in Brightspace's viewer) |
 | people | the classlist |
 | the calendar | the course calendars' events (a due date's own entry left out: its work is listed already) |
@@ -97,6 +97,9 @@ The iPhone app and Simpl for Mac load the same scripts (`ios/SimplCourses/Web/Sc
 the Brightspace layer among them, so their native screens' data comes through it unchanged. What they decide for
 themselves knows Brightspace too:
 
+- **Finding the school.** The first run's search also asks `<the name typed>.brightspace.com` (the name run together,
+  and its first word alone): one that answers is listed first, under the name its sign-in page gives. Any Brightspace
+  address can be typed as well.
 - **Signing in.** Brightspace's own sign-in page (`/d2l/login`, and the `/d2l/lp/auth/login…` its form posts to) is the
   school's sign-in for the reader (`Web/login.js`) and `LoginAssist`: the native form goes over it, as over Canvas's.
 - **Addresses.** The router (`Native/Router.swift`, both apps) reads a Brightspace page's address as the interface's

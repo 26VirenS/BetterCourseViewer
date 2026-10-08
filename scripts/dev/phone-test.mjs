@@ -62,6 +62,9 @@ try {
   // until it is done every page opens the setup; it is exercised on its own below. The flow marker goes with the flags: the
   // background's one-time migration clears them when it finds an older flow, and it may run after this.
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
+  // Wikipedia as when it cannot be reached: the search's checks read the course's own groups, and the live site answers
+  // them or not by the day (its rate limit) — an address of the mock's that answers nothing
+  await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': `${base}/no-wikipedia` }), BASE);
 
   const page = await context.newPage();
   // a page is ready to poke once it is drawn, nothing painted from the cache is still waiting on
