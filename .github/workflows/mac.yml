@@ -1,6 +1,8 @@
-# Simpl for Mac (mac/): built with Xcode 26 for macOS, signed to run locally, and run against the mock Canvas: every
-# native screen pictured in light and dark (scripts/dev/mac-shots.sh), the pictures, the build's errors and the app
-# itself pushed to the mac-shots branch to be looked at. Nothing is published here.
+# Simpl for Mac (mac/): built with Xcode 26 for macOS, signed to run locally, and run against the mock Canvas: the
+# main screens pictured (scripts/dev/mac-shots.sh), the pictures, the build's errors and the app itself pushed to the
+# mac-shots branch to be looked at. Nothing is published here. A push takes the quick set (a dozen pictures, a few
+# minutes) and a newer push cancels the run before it; every screen in light and dark ("full") is taken when a commit's
+# message says [full shots], or by hand: Actions → Mac app → Run workflow → full.
 name: Mac app
 
 on:
@@ -23,13 +25,19 @@ on:
       - 'scripts/dev/mock-brightspace.mjs'
       - '.github/workflows/mac.yml'
   workflow_dispatch:
+    inputs:
+      shots:
+        description: 'Which pictures: quick (a dozen), full (every screen, light and dark), none (the build alone)'
+        default: quick
+        type: choice
+        options: [quick, full, none]
 
 permissions:
   contents: write
 
 concurrency:
   group: mac-app
-  cancel-in-progress: false # (a run under way finishes its pictures; the newest push waits its turn)
+  cancel-in-progress: true # (a newer push cancels the run before it: only the newest is worth waiting for)
 
 jobs:
   mac:
@@ -62,7 +70,9 @@ jobs:
           curl -s -o /dev/null -w "mock brightspace %{http_code}\n" http://localhost:8860/d2l/home
           system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
       - name: Screens
-        if: hashFiles('shots/FAILED') == ''
+        if: hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none'
+        env:
+          SHOTS: ${{ github.event.inputs.shots || (contains(github.event.head_commit.message, '[full shots]') && 'full' || 'quick') }}
         run: bash scripts/dev/mac-shots.sh
       - name: Push the pictures to the mac-shots branch
         if: always()

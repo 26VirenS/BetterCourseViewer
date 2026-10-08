@@ -48,6 +48,32 @@ shoot() {
 MODE=light shoot warmup 25
 rm -f "$OUT_ABS"/warmup*
 
+# the app's crash reports, kept with the pictures (a missing picture is an app that did not stay up: these say why)
+keep_crashes() {
+  pkill -x Simpl >/dev/null 2>&1 || true
+  for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl*; do
+    [ -f "$f" ] && head -c 600000 "$f" > "$OUT_ABS/crash-$(basename "$f" | tr ' ' '-').txt"
+  done
+}
+
+# (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
+# SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
+if [ "${SHOTS:-full}" = quick ]; then
+  MODE=light
+  shoot light-01-dashboard 12
+  shoot light-02-courses 10 -SimplPlace courses
+  shoot light-04-grades 12 -SimplPlace grades
+  shoot light-07-inbox 10 -SimplPlace inbox
+  shoot light-10-assignment 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
+  shoot light-19-quiz-question 14 -SimplOpen quiz:101:9011:take:5
+  shoot light-35-tools 10 -SimplPlace tools
+  shoot light-27-tour 12 -SimplOpen tour
+  MODE=dark
+  shoot dark-01-dashboard 12
+  keep_crashes
+  exit 0
+fi
+
 for MODE in light dark; do
   shoot "$MODE-01-dashboard" 14 -SimplActivityProbe YES
   shoot "$MODE-02-courses" 12 -SimplPlace courses
@@ -119,9 +145,5 @@ unset BASE
 # (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
 shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
 shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
-pkill -x Simpl >/dev/null 2>&1 || true
-# the app's crash reports, kept with the pictures (a missing picture is an app that did not stay up: these say why)
-for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl*; do
-  [ -f "$f" ] && head -c 600000 "$f" > "$OUT_ABS/crash-$(basename "$f" | tr ' ' '-').txt"
-done
+keep_crashes
 exit 0
