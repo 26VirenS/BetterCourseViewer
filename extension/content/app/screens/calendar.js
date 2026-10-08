@@ -53,7 +53,7 @@
           U.iconbtn(IC.chevron, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Next', onClick: () => shift(1) }),
           h('button', { type: 'button', class: 'bcv-roundbtn', text: 'Today', onclick: () => { anchor = U.startOfDay(now); miniMonth = new Date(now.getFullYear(), now.getMonth(), 1); if (view === 'agenda') range = { start: U.startOfDay(now), end: U.addDays(U.startOfDay(now), 20), picking: false }; load(); } }),
         ]),
-        U.el('bcv-cal__tools bcv-ml-auto', [apptBtn, calBtn, segWrap]),
+        U.el('bcv-cal__tools bcv-ml-auto', [BCV.lms?.d2l ? null : apptBtn, calBtn, segWrap]), // (Brightspace has no Scheduler)
       ]))),
       body,
     );

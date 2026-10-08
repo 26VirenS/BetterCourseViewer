@@ -134,7 +134,8 @@ if (on('bundles')) {
   const pbx = readFileSync(join(root, 'macos', 'Simpl Courses', 'Simpl Courses.xcodeproj', 'project.pbxproj'), 'utf8');
   const iosYml = readFileSync(join(root, 'ios', 'project.yml'), 'utf8');
   console.log('\nbundles');
-  for (const entry of readdirSync(join(root, 'extension')).filter((n) => !n.startsWith('.'))) {
+  // (data/ is the iPhone app's school search, which no browser build ships either: scripts/package.sh)
+  for (const entry of readdirSync(join(root, 'extension')).filter((n) => !n.startsWith('.') && n !== 'data')) {
     check(pbx.includes(`path = ../../../extension/${entry};`), `Mac app bundles extension/${entry}`);
   }
   check(pbx.split(`MARKETING_VERSION = ${manifest.version};`).length === 5, `Mac app version is ${manifest.version}`);
@@ -8063,7 +8064,7 @@ try {
   check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.activity === true, 'and back on saves too');
   // Sites and data
   await options.click('.navlink[data-section="sites"]');
-  check((await oTexts('.site__host'))[0] === '*.instructure.com' && (await options.$eval('#addDomain', (b) => b.disabled)), 'Canvas sites lists the built-in host; Add waits for an address');
+  check((await oTexts('.site__host')).slice(0, 2).join(' | ') === '*.instructure.com | *.brightspace.com' && (await options.$eval('#addDomain', (b) => b.disabled)), `Sites lists the built-in hosts, Canvas’s and Brightspace’s; Add waits for an address: ${(await oTexts('.site__host')).join(' | ')}`);
   await options.fill('#newDomain', 'canvas.school');
   check(!(await options.$eval('#addDomain', (b) => b.disabled)), 'an address with a dot enables Add');
   await options.click('.navlink[data-section="data"]');

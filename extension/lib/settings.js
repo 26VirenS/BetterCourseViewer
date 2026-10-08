@@ -200,21 +200,30 @@
     return { appearance: { skin: !!on, offUntil: on ? 0 : Math.max(0, Number(until) || 0) } };
   }
 
-  /** (2.99.21) Whether the interface runs on a host by the build itself: Canvas's own domain, and in the quiet Chrome build
-   *  the schools' own Canvas addresses it names (scripts/canvas-domains.txt) — read from this build's manifest, so a site
-   *  there is never added again by hand (its scripts would run twice). The full build's every-site access is not this. */
+  /** (2.99.21) Whether the interface runs on a host by the build itself: Canvas's own domain, Brightspace's where the build
+   *  names it (2.99.22), and in the quiet Chrome build the schools' own Canvas addresses it names (scripts/canvas-domains.txt)
+   *  — read from this build's manifest, its host permissions and its scripts' matches, so a site there is never added again by
+   *  hand (its scripts would run twice). The full build's every-site access is not this. */
   let builtIns = null;
+  const builtInDomains = []; // (a whole domain, *://*.<domain>/*: Brightspace's own)
   function builtInHost(host) {
     const h = String(host || '').toLowerCase();
     if (!h) return false;
     if (/(^|\.)instructure\.com$/.test(h)) return true;
     if (!builtIns) {
+      builtIns = new Set();
       try {
         const api = self.chrome?.runtime?.getManifest ? self.chrome : self.browser;
-        builtIns = new Set((api?.runtime?.getManifest?.().host_permissions || []).map((p) => /^\*:\/\/([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase()).filter(Boolean));
-      } catch { builtIns = new Set(); }
+        const m = api?.runtime?.getManifest?.() || {};
+        for (const p of [...(m.host_permissions || []), ...(m.content_scripts || []).flatMap((cs) => cs.matches || [])]) {
+          const one = /^\*:\/\/([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase();
+          const all = /^\*:\/\/\*\.([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase();
+          if (one) builtIns.add(one);
+          if (all && !builtInDomains.includes(all)) builtInDomains.push(all);
+        }
+      } catch { /* Canvas's own domain alone */ }
     }
-    return builtIns.has(h);
+    return builtIns.has(h) || builtInDomains.some((d) => h === d || h.endsWith(`.${d}`));
   }
   /** The schools' own addresses this build has built in (none but in the quiet Chrome build). */
   const builtInSchools = () => { builtInHost('x.instructure.com'); builtInHost('-'); return [...(builtIns || [])].filter((d) => !d.startsWith('*.')); };

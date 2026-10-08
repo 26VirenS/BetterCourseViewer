@@ -105,7 +105,7 @@ try {
 
   console.log('the window');
   const nav = await texts('.navlink');
-  check(nav.join(' | ') === 'This Mac | General | Grades | Appearance | Canvas sites | Data & about', `the sections the app's window shows, This Mac first, Grades among them (from the copy of the site's preferences the extension sends), no Courses & targets (that needs the browser's Canvas session): ${nav.join(' | ')}`);
+  check(nav.join(' | ') === 'This Mac | General | Grades | Appearance | Sites | Data & about', `the sections the app's window shows, This Mac first, Grades among them (from the copy of the site's preferences the extension sends), no Courses & targets (that needs the browser's Canvas session): ${nav.join(' | ')}`);
   check((await page.$eval('.section.is-active', (e) => e.id)) === 'app' && (await text('#title')) === 'This Mac' && (await text('#version')) === 'Version 9.9.9', `it opens on This Mac, with the app's version in the corner (${await text('#title')}, ${await text('#version')})`);
   check((await text('#extTitle')) === 'Simpl Courses is on in Safari' && /Settings → Extensions/.test(await text('#extSub')) && (await page.$eval('#extSteps', (e) => e.hidden)), `Safari's word, from the app's state: ${await text('#extTitle')}`);
   check((await text('#updTitle')) === 'Version 9.9.9 is the newest' && /Checked at .* · checks every 4 hours/.test(await text('#updSub')) && (await page.$eval('#updAction', (e) => e.hidden)) && (await page.$eval('#autoUpdate', (e) => e.classList.contains('is-on'))) && (await page.$eval('#loginItem', (e) => e.classList.contains('is-on'))), `the update line: the newest, checked at a time, every hour; both switches on (${await text('#updTitle')} · ${await text('#updSub')})`);

@@ -2,13 +2,14 @@
 //
 // The Chrome Web Store build (scripts/chrome-manifest.py) may look at any page, and runs one small
 // script there (content/sniff.js) that reads the page's markup for Canvas's. This loads that build
-// in Chromium — the interface's own scripts matching Canvas's domain alone, as shipped, so a Canvas
-// at an address of the school's own is only reached through the sniffer — and checks: the page after
+// in Chromium — the interface's own scripts matching Canvas's and Brightspace's own domains alone, as shipped, so a Canvas
+// or a Brightspace at an address of the school's own is only reached through the sniffer — and checks: the page after
 // install says the one thing to do and nothing to press; a page that is not Canvas is left alone,
 // even one that borrows a couple of Canvas's ids; the mock Canvas at localhost is found, enabled
 // (its scripts registered, the site saved) and loaded again with the setup open on it, and the page
 // after install has closed itself by then; a second tab on the site is not loaded again; Canvas's sign-in
-// page is enabled but not loaded again.
+// page is enabled but not loaded again; a school's own Brightspace (the mock, signed in) is found and enabled the same way,
+// and the interface comes up on it as Brightspace's.
 // Run: node scripts/dev/chrome-setup-test.mjs
 import { createRequire } from 'node:module';
 import { spawn, execSync } from 'node:child_process';
@@ -26,6 +27,8 @@ const PORT = 8809; // the school's own Canvas (the mock)
 const BASE = `http://localhost:${PORT}`;
 const OTHER = 8810; // a site that is not Canvas, and a Canvas sign-in page
 const OTHER_BASE = `http://localhost:${OTHER}`;
+const D2L = 8811; // the school's own Brightspace (the mock)
+const D2L_BASE = `http://localhost:${D2L}`;
 const extDir = join(tmpdir(), `bcv-chrome-ext-${Date.now()}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 execSync(`python3 ${JSON.stringify(join(root, 'scripts', 'chrome-manifest.py'))} ${JSON.stringify(join(extDir, 'manifest.json'))}`);
@@ -59,8 +62,8 @@ check(JSON.stringify(manifest.host_permissions) === '["*://*/*"]' && !manifest.o
 // every site already lets this build read a tab's address; storage, unlimitedStorage, scripting and activeTab carry no
 // warning. A change here is a deliberate one, made knowing what it does to the copies out there.
 check(JSON.stringify(manifest.permissions) === '["storage","unlimitedStorage","scripting","activeTab"]', `the Chrome build asks for exactly storage, unlimitedStorage, scripting and activeTab — nothing that reads as browsing history, and nothing new to be accepted at an update: ${JSON.stringify(manifest.permissions)}`);
-check(!!sniffer && JSON.stringify(sniffer.matches) === '["*://*/*"]' && JSON.stringify(sniffer.exclude_matches) === '["*://*.instructure.com/*"]' && sniffer.js.length === 1 && sniffer.run_at === 'document_idle', `the sniffer alone runs on every site but Canvas's own, at idle: ${JSON.stringify(sniffer)}`);
-check(own.length === 2 && own.every((cs) => JSON.stringify(cs.matches) === '["*://*.instructure.com/*"]'), `the interface's own scripts still match Canvas's domain alone (${own.map((cs) => cs.matches.join(',')).join(' | ')})`);
+check(!!sniffer && JSON.stringify(sniffer.matches) === '["*://*/*"]' && JSON.stringify(sniffer.exclude_matches) === '["*://*.instructure.com/*","*://*.brightspace.com/*"]' && sniffer.js.length === 1 && sniffer.run_at === 'document_idle', `the sniffer alone runs on every site but Canvas's and Brightspace's own, at idle: ${JSON.stringify(sniffer)}`);
+check(own.length === 2 && own.every((cs) => JSON.stringify(cs.matches) === '["*://*.instructure.com/*","*://*.brightspace.com/*"]') && own[0].js[0] === 'lib/lms.js' && own[1].js.includes('lib/d2l-api.js'), `the interface's own scripts match Canvas's and Brightspace's own domains alone, which platform a page is told first (${own.map((cs) => cs.matches.join(',')).join(' | ')})`);
 check(!lazy && !lazyOf(quiet) && lazyFiles.length >= 10 && ![manifest, quiet].some((mf) => mf.content_scripts.some((cs) => (cs.js || []).some((f) => lazyFiles.includes(f)))), `the on-demand modules’ never-matching group is left out of both Chrome builds (its host would be listed as a site the extension reads), and none of their ${lazyFiles.length} files is a content script there`);
 check(!!toolbar && JSON.stringify(toolbar.matches) === '["*://*/*"]' && toolbar.js.length === 1 && toolbar.run_at === 'document_start', `the tool bar runs on every site, early enough to be there before the tool's page paints: ${JSON.stringify(toolbar)}`);
 check(!manifest.background.scripts && !('persistent' in manifest.background) && !manifest.author && manifest.action.default_icon['128'] === 'icons/icon-128.png', 'the Firefox/Safari keys are gone and the toolbar icon is the blue tile');
@@ -72,6 +75,9 @@ const quietHosts = [...quiet.host_permissions, ...quiet.content_scripts.flatMap(
 const schoolSites = readFileSync(join(root, 'scripts', 'canvas-domains.txt'), 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((d) => `*://${d}/*`);
 const quietSites = JSON.stringify(['*://*.instructure.com/*', ...schoolSites]);
 check(schoolSites.length > 400 && schoolSites.every((s) => /^\*:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+\/\*$/.test(s)) && schoolSites.includes('*://catcourses.ucmerced.edu/*') && quiet.content_scripts.filter((cs) => !(cs.js || []).includes('content/toolbar.js')).every((cs) => JSON.stringify(cs.matches) === quietSites), `the quiet build names ${schoolSites.length} schools' own Canvas addresses, each a host of its own, and runs the interface on every one of them`);
+// (2.99.22) Brightspace's own domain is not among them: a host the build did not name before is a new warning at an update, and
+// Chrome switches every installed copy off until it is accepted. A Brightspace site is enabled there as any school's own site is.
+check(!quietHosts.some((h) => /brightspace/.test(h)) && quiet.content_scripts.some((cs) => (cs.js || []).includes('lib/d2l-api.js')), `the quiet build names no Brightspace host — nothing new to accept at an update — and carries the Brightspace layer for a site enabled by hand: ${JSON.stringify(quietHosts.filter((h) => /brightspace/.test(h)))}`);
 check(JSON.stringify(quiet.permissions) === '["storage","unlimitedStorage","scripting","activeTab"]' && JSON.stringify(quiet.host_permissions) === quietSites && JSON.stringify(quiet.optional_host_permissions) === '["*://*/*"]' && quietHosts.every((h) => JSON.parse(quietSites).includes(h)) && quiet.content_scripts.length === 3 && !quiet.content_scripts.some((cs) => (cs.js || []).includes('content/sniff.js')) && quiet.content_scripts.some((cs) => (cs.js || []).includes('content/toolbar.js')) && !quiet.background.scripts, `the quiet build asks for the same four permissions, Canvas's own domain and the listed schools alone (every other site optional, asked for one at a time), no sniffer, the bar over a tool's tab on those: ${JSON.stringify({ permissions: quiet.permissions, hosts: quiet.host_permissions.length })}`);
 
 // a site that is not Canvas — with a csrf meta and an #application of its own, as many sites have —
@@ -86,6 +92,7 @@ const other = createServer((req, res) => {
 });
 await new Promise((r) => other.listen(OTHER, r));
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT)], { stdio: 'ignore' });
+const d2lServer = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-brightspace.mjs'), String(D2L)], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 700));
 
 const userDataDir = join(tmpdir(), `bcv-chrome-profile-${Date.now()}`);
@@ -149,6 +156,19 @@ try {
   await login.goto(`${OTHER_BASE}/login/canvas`);
   await login.waitForTimeout(1800);
   check((await domains()).includes(OTHER_BASE) && loads3 === 1 && (await login.$('#login_form')) !== null, `is enabled for the page after signing in, and left as it is now (${loads3} loads, ${JSON.stringify(await domains())})`);
+
+  console.log("the school's own Brightspace");
+  await context.request.post(`${D2L_BASE}/d2l/lp/auth/login/login.d2l`, { form: { userName: 'student', password: 'pw', loginPath: '/d2l/login' }, maxRedirects: 0 });
+  const d2l = await context.newPage();
+  d2l.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
+  let loads4 = 0;
+  d2l.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === d2l.mainFrame()) loads4++; });
+  await d2l.goto(`${D2L_BASE}/d2l/home`);
+  for (let i = 0; i < 80 && !(await domains()).includes(D2L_BASE); i++) await d2l.waitForTimeout(150);
+  await d2l.waitForFunction(() => document.documentElement.classList.contains('bcv-d2l') && (!!document.getElementById('bcv-app') || !!document.getElementById('bcv-setup')), null, { timeout: 20000 }).catch(() => {});
+  const d2lRegs = (await registered()).filter((r) => r.startsWith('bcv-http---localhost-8811-'));
+  const d2lState = await d2l.evaluate(() => ({ d2l: document.documentElement.classList.contains('bcv-d2l'), app: !!document.getElementById('bcv-app'), setup: !!document.getElementById('bcv-setup') }));
+  check((await domains()).includes(D2L_BASE) && d2lRegs.length === 3 && loads4 >= 2 && d2lState.d2l && (d2lState.app || d2lState.setup), `found by its pages under /d2l/ and who is signed in on them, saved as a site of its own and loaded again with the interface up as Brightspace's (${loads4} loads, ${JSON.stringify(d2lState)}, ${d2lRegs.length} scripts)`);
 } catch (e) {
   console.error('crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);
@@ -156,6 +176,7 @@ try {
   await context.close();
   rmSync(userDataDir, { recursive: true, force: true });
   server.kill();
+  d2lServer.kill();
   other.close();
   rmSync(extDir, { recursive: true, force: true });
 }

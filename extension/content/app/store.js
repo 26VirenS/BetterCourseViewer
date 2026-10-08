@@ -15,6 +15,7 @@
   let envCache = null;
   function env() {
     if (envCache) return envCache;
+    if (BCV.lms?.d2l && BCV.d2l) return (envCache = BCV.d2l.env()); // (Brightspace's page says who is signed in: lib/d2l-api.js)
     envCache = {};
     try {
       for (const s of document.querySelectorAll('script:not([src])')) {

@@ -434,6 +434,12 @@ html.bcv-on.bcv-setup-open body { overflow: hidden !important; }
 html.bcv-on.bcv-phone body:has(> :is(.bcv-sheet-ov:not(.is-closing, .is-folding), .bcv-spot-ov:not(.is-folding))) { overflow: hidden !important; }
 html.bcv-on #application, html.bcv-on body > .ic-app, html.bcv-on #flash_message_holder, html.bcv-on #flash_screenreader_holder, html.bcv-on #immersive_reader_mount_point, html.bcv-on #nav-tray-portal, html.bcv-on #header, html.bcv-on #wrapper { display: none !important; }
 html.bcv-on #bcv-app { display: flex; }
+/* Brightspace (lib/lms.js): its page — the navigation bar, the homepage's widgets, every element of its own under
+   <body> — is put away under the interface, as Canvas's is above; what is ours (every id and class of the
+   interface's starts bcv) stays. Brightspace holds its body unseen until its components load (d2l-body-unresolved):
+   the interface is not held with it. */
+html.bcv-on.bcv-d2l body > :not([id^="bcv"]):not([class^="bcv"]):not([class*=" bcv"]):not(script):not(style):not(link):not(template) { display: none !important; }
+html.bcv-on.bcv-d2l body { visibility: visible !important; opacity: 1 !important; display: block !important; }
 
 #bcv-app { display: none; min-height: 100vh; align-items: stretch; background: var(--bcv-bg); color: var(--bcv-ink); font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.4; box-sizing: border-box; }
 #bcv-app *, #bcv-app *::before, #bcv-app *::after { box-sizing: border-box; }

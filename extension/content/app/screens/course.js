@@ -1257,7 +1257,7 @@
       const quizRow = (q) => {
         const a = assignmentOf(q);
         const st = a ? store.workStatus(a) : null;
-        const bits = [q.due_at ? `Due ${U.fmtAt(q.due_at)}` : 'No due date', a && hasGrade(a) ? ptsLabel(a) : `${store.fmtPts(q.points_possible || 0)} pts`, U.plural(q.question_count || 0, 'question'), q.time_limit ? `${q.time_limit} min` : null, attemptsOf(q), q.has_access_code ? 'Access code' : null, q.require_lockdown_browser ? 'LockDown Browser' : null].filter(Boolean);
+        const bits = [q.due_at ? `Due ${U.fmtAt(q.due_at)}` : 'No due date', a && hasGrade(a) ? ptsLabel(a) : `${store.fmtPts(q.points_possible || 0)} pts`, q.question_count == null ? null : U.plural(q.question_count, 'question'), q.time_limit ? `${q.time_limit} min` : null, attemptsOf(q), q.has_access_code ? 'Access code' : null, q.require_lockdown_browser ? 'LockDown Browser' : null].filter(Boolean);
         return U.row([
           U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
           U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', q.title), U.text('bcv-row__sub', bits.join(' · '))]),

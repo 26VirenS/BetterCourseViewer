@@ -29,7 +29,7 @@
     ...(inApp ? [] : [['courses', 'Courses & targets', 'M5 4h13v16H5zM5 17h13M9 8h5']]), // (needs the browser's Canvas session)
     ['grades', 'Grades', 'M4 19h16M7 16V9M12 16V5M17 16v-4'], // (the site's own preferences: in the app's window from the copy the extension sends it)
     ['appearance', 'Appearance', 'M12 3a9 9 0 100 18c1.1 0 2-.9 2-2 0-1.5 1-2 2-2h1a4 4 0 004-4c0-5-4.5-10-9-10z'],
-    ['sites', 'Canvas sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
+    ['sites', 'Sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
     ['data', 'Data & about', 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
   ];
   const NAV_KEYS = new Set(NAV.map(([k]) => k));
@@ -573,7 +573,7 @@
     });
   }
 
-  // ---- Canvas sites ---------------------------------------------------------------------------------
+  // ---- Sites (Canvas's, Brightspace's, the school's own) ----------------------------------------
   const normaliseHost = (raw) => {
     let s = String(raw || '').trim().toLowerCase();
     if (!s) return null;
@@ -592,7 +592,8 @@
     const msg = $('domainMsg');
     if (!origin) return;
     if (BCV.settings.builtInHost(new URL(origin).hostname)) {
-      msg.textContent = /\.instructure\.com$/i.test(new URL(origin).hostname) ? `${new URL(origin).hostname} is on already: every *.instructure.com site is built in.` : `${new URL(origin).hostname} is on already: it is built in.`;
+      const domain = /\.(instructure|brightspace)\.com$/i.exec(new URL(origin).hostname)?.[0];
+      msg.textContent = domain ? `${new URL(origin).hostname} is on already: every *${domain.toLowerCase()} site is built in.` : `${new URL(origin).hostname} is on already: it is built in.`;
       return;
     }
     msg.textContent = 'Asking for permission…';
@@ -617,6 +618,8 @@
   function renderDomains() {
     const globe = (color) => { const s = h('span'); s.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18a15 15 0 010-18"/></svg>`; return s.firstChild; };
     const rows = [h('div', { class: 'site' }, [globe('var(--ink3)'), h('span', { class: 'site__host', text: '*.instructure.com' }), h('span', { class: 'pill', text: 'Built in' })])];
+    // (2.99.22: Brightspace's own domain, in the builds that name it — not the quiet Chrome build, where it is added as any site is)
+    if (BCV.settings.builtInHost('x.brightspace.com')) rows.push(h('div', { class: 'site' }, [globe('var(--ink3)'), h('span', { class: 'site__host', text: '*.brightspace.com' }), h('span', { class: 'pill', text: 'Built in' })]));
     const schools = BCV.settings.builtInSchools(); // (the quiet Chrome build's: the schools' own Canvas addresses it names)
     if (schools.length) rows.push(h('div', { class: 'site', title: schools.join('\n') }, [globe('var(--ink3)'), h('span', { class: 'site__host', text: `${schools.length} schools’ own Canvas addresses` }), h('span', { class: 'pill', text: 'Built in' })]));
     for (const origin of settings.domains || []) {

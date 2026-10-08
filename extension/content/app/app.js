@@ -104,6 +104,9 @@
   }
 
   function parseRoute(href = location.href) {
+    // (Brightspace: its page stands for one of the interface's routes, lib/lms.js; a page of its own that the
+    // interface has no screen for is Brightspace's to draw — the native screen, which leaves it as it is)
+    if (BCV.lms?.d2l) href = BCV.lms.fromPage(href) || '/__brightspace__?bcv=native';
     const url = new URL(href, location.origin);
     const path = url.pathname.replace(/\/+$/, '') || '/';
     const params = url.searchParams;
@@ -282,6 +285,8 @@
     let url;
     try {
       url = new URL(href, location.href);
+      // (Brightspace: the interface's address goes to the Brightspace page that stands for it, lib/lms.js)
+      if (BCV.lms?.d2l && url.origin === location.origin) url = new URL(BCV.lms.toPage(url.pathname + url.search + url.hash), location.origin);
     } catch {
       return;
     }
@@ -428,16 +433,17 @@
     if (shadesMemo?.key !== key) shadesMemo = { key, list: BCV.theme.shades(accent, state.dark, n) };
     return shadesMemo.list;
   }
+  // (Brightspace: no Inbox or Groups of Canvas's kind to read — lib/d2l-api.js — so neither row)
   const navDef = () => [
     ['dashboard', 'Dashboard', IC.dash, '#0a6cff', '/', ''],
     ['courses', 'Courses', IC.book, '#ff9500', '/courses', ''],
-    ['groups', 'Groups', IC.people, '#30b0c7', '/groups', ''],
+    ...(BCV.lms?.d2l ? [] : [['groups', 'Groups', IC.people, '#30b0c7', '/groups', '']]),
     // the green, the indigo and the purple sit darker than the rest on black, so the dark appearance
     // lifts them (the glyphs are drawn at 62% until their row is active) to the others' visibility
     ['todo', 'To Do', IC.check, state.dark ? '#4cd964' : '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
     ['calendar', 'Calendar', IC.cal, state.dark ? '#8c8aff' : '#5856d6', '/calendar', ''],
     ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
-    ['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : ''],
+    ...(BCV.lms?.d2l ? [] : [['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : '']]),
     ['gpa', 'Grades', IC.chart, state.dark ? '#c874f5' : '#af52de', '/grades', ''], // purple: Calendar already has the indigo
     ...(self.BCVBridge?.native ? [] : [['tools', 'Tools', IC.tool, '#30b0c7', '/#tools', '']]), // one row at the bottom, however many tools ship: the tools are cards on its page (none in the iPhone app yet)
   ];
@@ -1651,6 +1657,12 @@
     state.dark = BCV.early?.isDark?.() ?? S.isDark(state.settings, false);
     // Not signed in (login page, public course, error page): leave Canvas alone.
     if (!store.env().current_user_id && !document.querySelector('meta[name="csrf-token"]')) {
+      html.classList.remove('bcv-on');
+      return;
+    }
+    // Brightspace: a page the interface does not draw (a quiz being taken, the content viewer, a page of its own) is
+    // left exactly as Brightspace drew it — the interface comes back on the next page that is one of its screens.
+    if (BCV.lms?.d2l && (BCV.lms.isLoginPage() || parseRoute().params.get('bcv') === 'native')) {
       html.classList.remove('bcv-on');
       return;
     }

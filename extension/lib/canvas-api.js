@@ -148,6 +148,11 @@
   const tune = ({ requestTimeout } = {}) => { if (Number.isFinite(requestTimeout)) REQUEST_TIMEOUT = requestTimeout; };
 
   async function request(method, path, { params, body, all = false, maxPages = 10 } = {}) {
+    // (a Brightspace page: the same request, answered by Brightspace in Canvas's shapes — lib/d2l-api.js)
+    if (self.BCV?.d2l) {
+      if (sessionLost) throw new CanvasError('Signed out of Brightspace', 401);
+      return self.BCV.d2l.request(method, path, { params, body, all, maxPages });
+    }
     let url = buildUrl(path, params);
     const results = [];
     let pages = 0;
@@ -245,6 +250,7 @@
    *  a JSON body with `id` is the finished file, `location` is the confirm
    *  URL to GET (step 3). */
   function upload(url, form, { onProgress = null } = {}) {
+    if (/^d2l-upload:/.test(String(url)) && self.BCV?.d2l) return self.BCV.d2l.upload(url, form, { onProgress }); // (Brightspace takes the file with the hand-in itself)
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
@@ -358,5 +364,7 @@
 
   BCV.canvas = {
     get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, settled, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
+    /** The session has ended (lib/d2l-api.js says so for Brightspace, whose answers do not come through here). */
+    signedOut: loseSession,
   };
 })();

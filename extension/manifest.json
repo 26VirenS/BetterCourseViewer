@@ -46,7 +46,8 @@
     "nativeMessaging"
   ],
   "host_permissions": [
-    "*://*.instructure.com/*"
+    "*://*.instructure.com/*",
+    "*://*.brightspace.com/*"
   ],
   "optional_host_permissions": [
     "*://*/*"
@@ -69,10 +70,12 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.instructure.com/*"
+        "*://*.instructure.com/*",
+        "*://*.brightspace.com/*"
       ],
       "run_at": "document_start",
       "js": [
+        "lib/lms.js",
         "lib/settings.js",
         "lib/theme.js",
         "content/early.js"
@@ -83,7 +86,8 @@
     },
     {
       "matches": [
-        "*://*.instructure.com/*"
+        "*://*.instructure.com/*",
+        "*://*.brightspace.com/*"
       ],
       "run_at": "document_end",
       "js": [
@@ -91,6 +95,7 @@
         "lib/errors.js",
         "lib/record-csv.js",
         "lib/canvas-api.js",
+        "lib/d2l-api.js",
         "content/app/icons.js",
         "content/app/motion.js",
         "content/app/ui.js",
@@ -161,7 +166,8 @@
         "*://*/*"
       ],
       "exclude_matches": [
-        "*://*.instructure.com/*"
+        "*://*.instructure.com/*",
+        "*://*.brightspace.com/*"
       ],
       "run_at": "document_idle",
       "js": [

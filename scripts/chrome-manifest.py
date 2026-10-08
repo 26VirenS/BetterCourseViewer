@@ -57,7 +57,7 @@ if sniffer:
     if not any('content/sniff.js' in (cs.get('js') or []) for cs in m['content_scripts']):
         m['content_scripts'].append({
             'matches': ['*://*/*'],
-            'exclude_matches': ['*://*.instructure.com/*'],
+            'exclude_matches': ['*://*.instructure.com/*', '*://*.brightspace.com/*'],
             'run_at': 'document_idle',
             'js': ['content/sniff.js'],
         })
@@ -76,13 +76,16 @@ else:
         listed.append(f'*://{d}/*')
     assert len(listed) == len(set(listed)), 'a school listed twice in canvas-domains.txt'
     sites = ['*://*.instructure.com/*'] + listed
+    # (2.99.22) Brightspace's own domain is not one of them: a site the build had not named, at an update, is a new warning
+    # Chrome switches every installed copy off for until it is re-enabled. A Brightspace site is enabled as any other is,
+    # from the toolbar button — and its scripts are the interface's own, lib/lms.js and lib/d2l-api.js among them.
     m['host_permissions'] = sites
     m['optional_host_permissions'] = ['*://*/*']
     m['content_scripts'] = [cs for cs in m['content_scripts'] if 'content/sniff.js' not in (cs.get('js') or [])]  # it looks at sites the quiet build never asks for
     # The interface's own scripts run on every site the build names; the bar over a tool's own tab too (a launch lands back
     # on the Canvas it came from); whatever site the reader has since said yes to is added one at a time.
     for cs in m['content_scripts']:
-        if (cs.get('matches') or []) == ['*://*.instructure.com/*'] or 'content/toolbar.js' in (cs.get('js') or []):
+        if '*://*.instructure.com/*' in (cs.get('matches') or []) or 'content/toolbar.js' in (cs.get('js') or []):
             cs['matches'] = list(sites)
 assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
 with open(path, 'w') as f:
