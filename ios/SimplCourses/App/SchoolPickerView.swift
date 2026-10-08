@@ -152,18 +152,59 @@ final class SchoolSearch: ObservableObject {
             scored.append((score, e.school))
         }
         results = Array(scored.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1.name.localizedCaseInsensitiveCompare($1.1.name) == .orderedAscending }.prefix(60).map(\.1))
-        // few carried: Instructure's own lookup too (a school added since the list was made), after a pause in the typing
-        guard results.count < 8, raw.trimmingCharacters(in: .whitespaces).count >= 3 else { asking = false; return }
-        asking = true
+        // after a pause in the typing: (1.7) a Brightspace of that name, asked of the name itself, and with few carried,
+        // Instructure's own lookup too (a school added since the list was made)
+        guard raw.trimmingCharacters(in: .whitespaces).count >= 3, SchoolSearch.addressLike(raw) == nil else { asking = false; return }
+        let lookup = results.count < 8
+        asking = lookup
         pending = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
-            let found = await SchoolSearch.lookup(raw)
+            async let brightspace = SchoolSearch.brightspace(raw)
+            var more: [School] = []
+            if lookup { more = await SchoolSearch.lookup(raw) }
+            let own = await brightspace
             guard !Task.isCancelled, let self, self.last == raw else { return }
             var seen = Set(self.results.map(\.id))
-            for s in found where !seen.contains(s.id) { seen.insert(s.id); self.results.append(s) }
+            // (a Brightspace at the very name typed is the school's own: first)
+            self.results.insert(contentsOf: own.filter { seen.insert($0.id).inserted }, at: 0)
+            for s in more where !seen.contains(s.id) { seen.insert(s.id); self.results.append(s) }
             self.asking = false
         }
+    }
+
+    /// (1.7) A school's Brightspace is most often at <its name>.brightspace.com: the name typed, run together (and its
+    /// first word alone), asked there — one that answers is listed under the name its sign-in page gives.
+    nonisolated static func brightspace(_ name: String) async -> [School] {
+        let words = fold(name).split(separator: " ").map { String($0.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }) }.filter { !$0.isEmpty }
+        guard let first = words.first else { return [] }
+        var slugs = [words.joined()]
+        if words.count > 1 { slugs.append(first) }
+        var out: [School] = []
+        for slug in slugs where slug.count >= 3 && slug.count <= 40 {
+            if let s = await probe(slug) { out.append(s) }
+        }
+        return out
+    }
+
+    /// <slug>.brightspace.com's sign-in page, if there is one (a name nobody has does not resolve): the school's name
+    /// from its title ("Login - Lakeside University"), else the address itself.
+    private nonisolated static func probe(_ slug: String) async -> School? {
+        let host = "\(slug).brightspace.com"
+        guard let url = URL(string: "https://\(host)/d2l/login") else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: 6)
+        req.setValue("text/html", forHTTPHeaderField: "Accept")
+        req.httpShouldHandleCookies = false
+        guard let (data, resp) = try? await URLSession.shared.data(for: req), let http = resp as? HTTPURLResponse, http.statusCode < 500 else { return nil }
+        var name = host
+        let page = String(decoding: data.prefix(200_000), as: UTF8.self)
+        if http.url?.host?.lowercased() == host, let r = page.range(of: "<title>[^<]*</title>", options: [.regularExpression, .caseInsensitive]) {
+            var t = String(page[r]).replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            for (k, v) in ["&amp;": "&", "&#39;": "'", "&quot;": "\"", "&#x27;": "'"] { t = t.replacingOccurrences(of: k, with: v) }
+            t = t.replacingOccurrences(of: "^\\s*Log ?in\\s*[-–—|:]\\s*", with: "", options: [.regularExpression, .caseInsensitive]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !t.isEmpty, t.count <= 120, !t.lowercased().hasPrefix("log") { name = t }
+        }
+        return School(name: name, domain: host)
     }
 
     /// Instructure's "Find my school" lookup (the one Canvas's own apps use): name and Canvas address of each match.
