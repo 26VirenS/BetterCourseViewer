@@ -162,6 +162,7 @@ final class Engine: ObservableObject, ShellListener {
         if let p = UserDefaults.standard.string(forKey: "SimplPlace"), let place = Engine.place(named: p) {
             nav.replace(place) // (where the window opens: nothing behind it to go Back to)
             if let ctx = place.ctx { Task { await loadSections(ctx) } }
+            if case .search(let q) = place { query = q } // (the toolbar's field says what was searched)
         }
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty { openWeb(push, title: "") }
         if let q = LaunchOpen.take("quiz:") {

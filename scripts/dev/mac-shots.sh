@@ -64,7 +64,7 @@ for MODE in light dark; do
   shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
   shoot "$MODE-15-files" 12 -SimplPlace section:courses/101:files
   shoot "$MODE-16-groups" 12 -SimplPlace groups
-  shoot "$MODE-17-search" 12 -SimplPlace search:essay
+  shoot "$MODE-17-search" 12 -SimplPlace search:dis
   shoot "$MODE-18-quiz" 14 -SimplOpen quiz:101:9011
   shoot "$MODE-19-quiz-question" 18 -SimplOpen quiz:101:9011:take:5
   shoot "$MODE-20-quiz-review" 18 -SimplOpen quiz:101:9011:review
