@@ -1,0 +1,30 @@
+# Simpl for Mac (the native app in mac/), released by hand: Actions → Simpl for Mac release → Run workflow. It is
+# built with Xcode 26, signed with the team's Developer ID, notarized and published as a GitHub Release of its own
+# (mac-v<version>) by scripts/release-mac-native.sh. A version already released is never published again.
+name: Simpl for Mac release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mac-native-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, sign, notarize and publish Simpl for Mac
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release-mac-native.sh

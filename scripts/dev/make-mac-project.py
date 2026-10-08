@@ -21,8 +21,8 @@ PROJ = os.path.join(MAC, 'Simpl.xcodeproj')
 
 NAME = 'Simpl'
 BUNDLE_ID = 'com.simplcourses.mac'
-MARKETING_VERSION = '0.1'
-BUILD = '1'
+MARKETING_VERSION = '1.0' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
+BUILD = '1' # raised with every release
 DEPLOYMENT = '14.0'
 
 # The iPhone app's files the Mac app builds too (paths under ios/SimplCourses).
@@ -335,7 +335,7 @@ TARGET = {
     'CODE_SIGN_STYLE': 'Automatic',
     'COMBINE_HIDPI_IMAGES': 'YES',
     'DEVELOPMENT_TEAM': '""',
-    'ENABLE_HARDENED_RUNTIME': 'NO',
+    'ENABLE_HARDENED_RUNTIME': 'YES', # (what notarization needs; the web view runs out of process, so nothing more is asked)
     'ENABLE_PREVIEWS': 'YES',
     'GENERATE_INFOPLIST_FILE': 'NO',
     'INFOPLIST_FILE': 'Support/Info.plist',

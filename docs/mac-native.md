@@ -74,6 +74,18 @@ search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas add
 [:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin`,
 `-SimplAppearance light|dark`.
 
+## Releasing
+
+Simpl for Mac has its own version line (`MARKETING_VERSION` and `BUILD` in `scripts/dev/make-mac-project.py`; 1.0 was
+the first). A release is made by hand: **Actions → Simpl for Mac release → Run workflow**
+(`.github/workflows/mac-native-release.yml`, `scripts/release-mac-native.sh`). It builds the app for Apple silicon and
+Intel, signs it with the team's Developer ID (the same five secrets the Safari app's release uses, `docs/mac-app.md`),
+has Apple notarize it, staples the ticket and publishes `Simpl-Mac-<version>.zip` as a GitHub Release of its own,
+`mac-v<version>`. A version already released is refused, never replaced: raise the version (and the build) first and
+run `python3 scripts/dev/make-mac-project.py`. The site's Mac download and update feed stay the Safari app's.
+
+`simpl://` links open in the app: `simpl://courses/101/assignments/1001` opens that assignment.
+
 ## CI
 
 `.github/workflows/mac.yml` builds the app with Xcode 26 on every change to `mac/` or the shared files, runs it against

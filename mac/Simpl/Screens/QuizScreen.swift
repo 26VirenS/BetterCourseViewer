@@ -39,7 +39,7 @@ struct QuizScreen: View {
                     banner.animation(Motion.gentle, value: run.banner) // (outside the if: it plays on the way in and out)
                 }
         }
-        .frame(minWidth: 780, idealWidth: 920, minHeight: 620, idealHeight: 780)
+        .frame(minWidth: 720, idealWidth: 900, minHeight: 480, idealHeight: 640) // (a sheet no taller than a small Mac's window)
         .background(Theme.page)
         .tint(tint)
         .interactiveDismissDisabled(inAttempt) // (Escape is Close, which asks first during an attempt)

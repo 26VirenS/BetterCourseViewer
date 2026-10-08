@@ -155,7 +155,9 @@ struct Sidebar: View {
 
     private var selection: Binding<Place?> {
         Binding(get: { engine.nav.current.place }, set: { p in
-            guard let p else { return }
+            // (the list says its selection again as its rows change — a course's sections arriving: the place showing,
+            // said again, is not a new step, and must not take away what is pushed on it)
+            guard let p, p != engine.nav.current.place else { return }
             engine.go(p)
         })
     }

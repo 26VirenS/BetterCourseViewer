@@ -24,9 +24,9 @@ struct InboxView: View {
             if let d = model.data {
                 HSplitView {
                     listPane(d)
-                        .frame(minWidth: 300, idealWidth: 350, maxWidth: 480)
+                        .frame(minWidth: 260, idealWidth: 340, maxWidth: 480)
                     reader
-                        .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
                 LoadState(error: model.error) { Task { await load() } }
@@ -92,23 +92,23 @@ struct InboxView: View {
         .background(Theme.card)
     }
 
-    /// The mailboxes, as a segmented control; a menu when the list is too narrow for all five.
+    /// The mailboxes, as a pop-up menu at the head of the list (it fits however narrow the list is drawn), with how
+    /// many the one shown holds.
     private var mailboxPicker: some View {
-        ViewThatFits(in: .horizontal) {
+        HStack(spacing: 8) {
             Picker("Mailbox", selection: $scope) {
-                ForEach(InboxMailbox.all) { m in Text(m.label).tag(m.id) }
+                ForEach(InboxMailbox.all) { m in Label(m.label, systemImage: m.symbol).tag(m.id) }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             .labelsHidden()
             .fixedSize()
-            HStack {
-                Picker("Mailbox", selection: $scope) {
-                    ForEach(InboxMailbox.all) { m in Label(m.label, systemImage: m.symbol).tag(m.id) }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .fixedSize()
-                Spacer(minLength: 0)
+            Spacer(minLength: 0)
+            if let n = model.data?.rows.count, n > 0 {
+                Text("\(n) \(n == 1 ? "conversation" : "conversations")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.numericText(value: Double(n)))
             }
         }
         .help("Mailbox")

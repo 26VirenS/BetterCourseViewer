@@ -22,6 +22,7 @@ struct SimplApp: App {
         .defaultSize(width: 1360, height: 880)
         .windowToolbarStyle(.unified)
         .commands { SimplCommands(session: session) }
+        .handlesExternalEvents(matching: ["*"]) // (a simpl:// link comes to the main window)
 
         // an external tool, or a page of Canvas's own the app does not draw: a window of its own each
         WindowGroup("Canvas", id: "tool", for: ToolLaunch.self) { $launch in
@@ -29,6 +30,7 @@ struct SimplApp: App {
                 .environmentObject(model)
         }
         .defaultSize(width: 1120, height: 800)
+        .handlesExternalEvents(matching: []) // (never an empty tool window for a link from outside)
 
         Settings {
             SettingsView()
@@ -73,5 +75,16 @@ struct ContentView: View {
                 SchoolPicker()
             }
         }
+        .onOpenURL { url in ContentView.open(url) }
+    }
+
+    /// A simpl:// link (simpl://courses/101/assignments/1001): that Canvas address, opened where it leads — its screen,
+    /// a quiz, a file, a tool.
+    @MainActor
+    static func open(_ url: URL) {
+        guard url.scheme?.lowercased() == "simpl", let engine = AppModel.shared.engine else { return }
+        var path = "/" + (url.host ?? "") + url.path
+        if let q = url.query, !q.isEmpty { path += "?" + q }
+        engine.openWeb(path, title: "")
     }
 }
