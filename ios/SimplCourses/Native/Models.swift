@@ -132,6 +132,9 @@ struct CourseRow: Codable, Identifiable, Hashable {
     var scoreText: String
     var unread: Int?
     var url: String
+    /// (Mac 1.2.1, allCourses) In the sidebar — the setup's choice — or not; and its term.
+    var chosen: Bool?
+    var term: String?
 }
 
 struct CoursesData: Codable {

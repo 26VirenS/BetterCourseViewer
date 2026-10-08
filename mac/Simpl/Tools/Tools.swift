@@ -137,6 +137,8 @@ final class ToolsCenter: ObservableObject {
     @Published private(set) var pinned: [ToolKind] = []
     /// The tool open on the Tools page (nil: the page of tiles). Kept while you go elsewhere: Back brings it back as left.
     @Published var open: ToolKind?
+    /// (1.2.1) A pinned tool opened whole over the window, where you are, in a large sheet — not on the Tools page.
+    @Published var popup: ToolKind?
     /// Files handed over from a pin's popover, for `handoffTool` to take.
     @Published private(set) var handoff: [URL] = []
     private(set) var handoffTool: ToolKind?
@@ -157,6 +159,7 @@ final class ToolsCenter: ObservableObject {
         guard !pinned.contains(k) else { return }
         withAnimation(Motion.gentle) { pinned.append(k) }
         save()
+        MacTour.shared.did(.pinned) // (the tour's "Pin a tool")
     }
 
     func unpin(_ k: ToolKind) {
@@ -191,6 +194,15 @@ final class ToolsCenter: ObservableObject {
         handoffInfo = info
         withAnimation(Motion.gentle) { open = k }
         engine?.go(.tools)
+    }
+
+    /// A pinned tool opened whole (1.2.1): over the window, in a large sheet, with any files or details for it — the
+    /// screen you were on stays as it was under it.
+    func popUp(_ k: ToolKind, files: [URL] = [], info: [String: String] = [:]) {
+        handoff = files
+        handoffTool = files.isEmpty ? nil : k
+        handoffInfo = info
+        popup = k
     }
 
     /// The files handed to a tool, taken once.
@@ -327,6 +339,7 @@ struct ToolTile: View {
         .glass(Circle(), tint: on ? kind.color.opacity(0.25) : nil, interactive: true)
         .help(on ? "Unpin \(kind.name) from the toolbar" : "Pin \(kind.name) to the toolbar")
         .accessibilityLabel(on ? "Unpin \(kind.name)" : "Pin \(kind.name)")
+        .tourSpot(on ? nil : .toolPin) // (the tour lights the first one not yet pinned)
     }
 }
 
@@ -334,10 +347,12 @@ struct ToolTile: View {
 /// under it, filling the window.
 struct ToolScreen: View {
     let kind: ToolKind
+    /// (1.2.1) Over the window as a sheet (a pinned tool opened whole): Done closes it.
+    var done: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ToolHeader(kind: kind)
+            ToolHeader(kind: kind, done: done)
                 .padding(.horizontal, 40)
                 .padding(.top, 20)
                 .padding(.bottom, 12)
@@ -371,20 +386,30 @@ struct ToolScreen: View {
 /// A tool's heading: Back to the tiles, the tool's tile, its name and line, and its pin.
 struct ToolHeader: View {
     let kind: ToolKind
+    var done: (() -> Void)? = nil
     @ObservedObject private var tools = ToolsCenter.shared
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            Button {
-                withAnimation(Motion.gentle) { tools.open = nil }
-            } label: {
-                Label("Tools", systemImage: "chevron.left")
+            if let done {
+                Button("Done", action: done)
                     .font(.sCallout.weight(.medium))
-                    .padding(.horizontal, 4)
+                    .glassButton()
+                    .controlSize(.large)
+                    .keyboardShortcut(.cancelAction)
+                    .help("Close \(kind.name) (Escape)")
+            } else {
+                Button {
+                    withAnimation(Motion.gentle) { tools.open = nil }
+                } label: {
+                    Label("Tools", systemImage: "chevron.left")
+                        .font(.sCallout.weight(.medium))
+                        .padding(.horizontal, 4)
+                }
+                .glassButton()
+                .controlSize(.large)
+                .help("Back to all the tools")
             }
-            .glassButton()
-            .controlSize(.large)
-            .help("Back to all the tools")
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(kind.name)
@@ -615,4 +640,24 @@ enum ToolFiles {
 /// "1 term", "3 terms".
 func toolPlural(_ n: Int, _ one: String, _ many: String? = nil) -> String {
     "\(n) \(n == 1 ? one : (many ?? one + "s"))"
+}
+
+/// (1.2.1) A pinned tool opened whole, over the window: the tool as the Tools page has it, in a sheet nearly the
+/// window's size.
+struct ToolPopup: View {
+    let kind: ToolKind
+    @ObservedObject private var tools = ToolsCenter.shared
+
+    var body: some View {
+        let size = ToolPopup.size()
+        ToolScreen(kind: kind) { tools.popup = nil }
+            .frame(width: size.width, height: size.height)
+    }
+
+    /// Nearly the main window's size.
+    @MainActor
+    static func size() -> CGSize {
+        let f = AppModel.shared.engine?.hostView.window?.frame.size ?? CGSize(width: 1280, height: 860)
+        return CGSize(width: max(860, f.width - 70), height: max(600, f.height - 90))
+    }
 }

@@ -86,9 +86,11 @@ done
 # (1.2) in light only: more of the redesign, and the narrow window's layouts
 MODE=light
 shoot light-01c-dashboard-activity 14 -SimplDashView activity
+shoot light-02b-courses-past 12 -SimplPlace courses -SimplCoursesFilter past
 shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4
 shoot light-23b-settings-updates 12 -SimplOpen settings -SimplSettingsTab updates
-shoot light-28-tour-course 16 -SimplOpen tour:3
+shoot light-28-tour-grades 16 -SimplOpen tour:2
+shoot light-29-tour-cards 16 -SimplOpen tour:12
 shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
 shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
 shoot light-33-rubric-grid 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:grid

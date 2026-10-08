@@ -112,6 +112,7 @@ struct DashboardView: View {
                 counterRow(row, cols: cols)
                 if let key = open, let c = row.first(where: { $0.key == key }) {
                     DashCounterPanel(counter: c, value: value(c), note: note(c), width: width, close: { setOpen(nil) })
+                        .tourSpot(.counterPanel)
                         .id(key)
                         .dashMorph(key, in: morph, enabled: !reduceMotion)
                         .transition(.opacity)
@@ -143,6 +144,7 @@ struct DashboardView: View {
                 .accessibilityHidden(true)
         } else {
             DashCounterTile(counter: c, value: value(c), note: note(c)) { setOpen(open == c.key ? nil : c.key) }
+                .tourSpot(c.key == "next" ? .counterNext : nil)
                 .dashMorph(c.key, in: morph, enabled: !reduceMotion)
                 .transition(.opacity)
         }
@@ -170,6 +172,7 @@ struct DashboardView: View {
 
     private func setOpen(_ key: String?) {
         withAnimation(reduceMotion ? .easeInOut(duration: 0.18) : Motion.gentle) { open = key }
+        if key != nil { MacTour.shared.did(.counterOpened) } // (the tour's "The cards open")
     }
 
     // MARK: - The view and the side column

@@ -8,7 +8,7 @@ import Foundation
 final class AnswerCache {
     /// The reads a screen may open on, by their call's name (BCVNative.call).
     static let reads: Set<String> = [
-        "snapshot", "courses", "groups", "home", "today", "todaySheet", "todo", "calendar", "calView", "grades",
+        "snapshot", "courses", "allCourses", "groups", "home", "today", "todaySheet", "todo", "calendar", "calView", "grades",
         "courseGrades", "coursesProgress", "notifications", "inbox", "conversation", "assignment", "topic",
         "announcements", "discussions", "assignments", "quizzes", "modules", "pages", "page", "files", "people",
         "syllabus",

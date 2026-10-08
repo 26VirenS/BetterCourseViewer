@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// All Courses: the courses chosen in the setup as cards — each in its colour, with its code and name, its score, its
-/// unread announcements and how much is handed in, and (1.2) a row of its sections a click away. A course's context
-/// menu opens its sections, gives it a nickname (shown everywhere, Canvas too), or opens it on Canvas.
+/// All Courses (1.2.1): every course, as the web's Courses screen has them — the ones in the sidebar (chosen in the
+/// setup) first, then the rest, each as a card in its colour, with its code and name, its score, its unread
+/// announcements, how much is handed in, and a row of its sections a click away; Past and Future in the toolbar, as the
+/// web's filter has them. A course's context menu opens its sections, gives it a nickname (shown everywhere, Canvas
+/// too), or opens it on Canvas.
 struct CoursesView: View {
     @EnvironmentObject private var engine: Engine
-    @StateObject private var model = Loader<CoursesData>()
+    @StateObject private var model = Loader<AllCoursesData>()
+    @AppStorage("SimplCoursesFilter") private var filter: CourseFilter = .all
     @State private var progress: [String: CourseProgress] = [:]
     @State private var naming: CourseRow?
 
@@ -14,17 +17,7 @@ struct CoursesView: View {
             if let d = model.data {
                 Page {
                     ScreenHeading(title: "Courses", sub: d.sub)
-                    if d.rows.isEmpty {
-                        EmptyNote(text: d.empty ?? "No courses selected.", symbol: "books.vertical")
-                    }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 290), spacing: 18)], spacing: 18) {
-                        ForEach(d.rows) { c in
-                            CourseCard(course: c, progress: progress[c.id]) { naming = c }
-                        }
-                    }
-                    if let hidden = d.hidden, !hidden.isEmpty {
-                        Text(hidden).font(.sCallout).foregroundStyle(.secondary)
-                    }
+                    content(d)
                 }
                 .font(.sBody)
             } else {
@@ -34,13 +27,57 @@ struct CoursesView: View {
         .navigationTitle("Courses")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Picker("Show", selection: $filter.animation(Motion.gentle)) {
+                    ForEach(CourseFilter.allCases) { f in Text(f.title).tag(f) }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .help("Current courses, past ones, or ones to come")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { engine.setup = true } label: { Label("Choose Courses", systemImage: "checklist") }
-                    .help("Choose the courses that count")
+                    .help("Choose the courses in the sidebar")
             }
         }
         .task(id: engine.dataVersion) { await load() }
         .sheet(item: $naming) { c in
             NicknameSheet(course: c, onBrightspace: engine.onBrightspace) { name in save(c, name) }
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ d: AllCoursesData) -> some View {
+        switch filter {
+        case .all:
+            let chosen = d.current.filter { $0.chosen != false }
+            let others = d.current.filter { $0.chosen == false }
+            if d.current.isEmpty {
+                EmptyNote(text: "No current courses.", symbol: "books.vertical")
+            } else if others.isEmpty || chosen.isEmpty {
+                grid(d.current)
+            } else {
+                PageSection(title: "In the Sidebar", trailing: "\(chosen.count)") { grid(chosen) }
+                PageSection(title: "Not in the Sidebar", trailing: "\(others.count)") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Courses you left out in the setup. Choose Courses puts them in the sidebar.")
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                        grid(others)
+                    }
+                }
+            }
+        case .past:
+            if d.past?.isEmpty != false { EmptyNote(text: "No past courses.", symbol: "clock.arrow.circlepath") } else { grid(d.past ?? []) }
+        case .future:
+            if d.future?.isEmpty != false { EmptyNote(text: "No courses to come.", symbol: "calendar.badge.clock") } else { grid(d.future ?? []) }
+        }
+    }
+
+    private func grid(_ rows: [CourseRow]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 290), spacing: 18)], spacing: 18) {
+            ForEach(rows) { c in
+                CourseCard(course: c, progress: progress[c.id]) { naming = c }
+            }
         }
     }
 
@@ -55,9 +92,30 @@ struct CoursesView: View {
     }
 
     private func load(animated: Bool = false) async {
-        await model.load(engine, "courses", animated: animated)
-        if let p = try? await engine.call("coursesProgress", as: [String: CourseProgress].self) {
+        await model.load(engine, "allCourses", animated: animated)
+        if let p = try? await engine.call("coursesProgress", ["all": true], as: [String: CourseProgress].self) {
             withAnimation(Motion.gentle) { progress = p }
+        }
+    }
+}
+
+/// Every course (allCourses): the current ones — those in the sidebar first, saying so — and the past and future ones.
+struct AllCoursesData: Decodable {
+    var sub: String?
+    var current: [CourseRow]
+    var past: [CourseRow]?
+    var future: [CourseRow]?
+}
+
+/// The Courses screen's filter, as the web's: the current courses, the past, the ones to come.
+enum CourseFilter: String, CaseIterable, Identifiable {
+    case all, past, future
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .past: return "Past"
+        case .future: return "Future"
         }
     }
 }

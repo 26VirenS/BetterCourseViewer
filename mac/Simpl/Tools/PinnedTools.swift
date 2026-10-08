@@ -145,7 +145,7 @@ struct PinnedToolPopover: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .help("Open \(kind.name), larger")
+            .help("Open \(kind.name) full size")
         }
     }
 
@@ -177,8 +177,9 @@ struct PinnedToolPopover: View {
         }
     }
 
+    /// The whole tool (1.2.1): over the window where you are, as a large sheet — not on the Tools page.
     private func openFull(info: [String: String] = [:], files: [URL] = []) {
         close()
-        tools.show(kind, engine: engine, files: files, info: info)
+        tools.popUp(kind, files: files, info: info)
     }
 }

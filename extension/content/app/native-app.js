@@ -562,11 +562,32 @@
       empty: 'No courses selected. Choose them in the guided setup or Settings.',
     };
   }
-  /** Each course's "done of total submitted", which reads its assignments. */
-  async function coursesProgress() {
+  // (Mac 1.2.1) Courses, all of them, as the web's Courses screen has them: every course, in the sidebar or not —
+  // current, past and to come. The ones in the sidebar (the setup's choice) come first, in their order, and say so
+  // (`chosen`); the rest after, by name.
+  async function allCourses() {
+    const [all, sel, term, feed] = await Promise.all([store.courses({ past: true }).catch(() => null), selection(), store.currentTerm().catch(() => ''), store.announcementsFeed().catch(() => null)]);
+    if (!all) return { error: 'Your courses could not be loaded.' };
+    const unreadFor = (c) => (feed ? feed.filter((a) => a.read_state === 'unread' && String(a.context_code || '') === `course_${c.id}`).length : 0);
+    const place = new Map(sel.list.map((c, i) => [String(c.id), i]));
+    const byPlace = (a, b) => (place.get(String(a.id)) ?? 1e6) - (place.get(String(b.id)) ?? 1e6) || String(a.name || '').localeCompare(String(b.name || ''));
+    const row = (c) => ({ id: String(c.id), code: c.shortName || c.name, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), nickname: c.nickname || '', original: c.originalName || c.name, color: c.color || GRAY, score: c.score !== null && c.score !== undefined ? Number(c.score) : null, scoreText: c.score !== null && c.score !== undefined ? `${store.fmtPts(c.score)}%` : 'N/A', unread: unreadFor(c), url: c.url || `/courses/${c.id}`, chosen: place.has(String(c.id)), term: c.term || '' });
+    const current = all.filter((c) => c.state !== 'past' && c.state !== 'future').sort(byPlace);
+    const hidden = current.filter((c) => !place.has(String(c.id))).length;
+    return {
+      sub: `${term ? `${term} · ` : ''}${U.plural(current.length, 'course')}${hidden ? ` · ${hidden} not in the sidebar` : ''}`,
+      current: current.map(row),
+      past: all.filter((c) => c.state === 'past').sort(byPlace).map(row),
+      future: all.filter((c) => c.state === 'future').sort(byPlace).map(row),
+    };
+  }
+  /** Each course's "done of total submitted", which reads its assignments (`all`: every current course, not only the
+   *  sidebar's — the Mac's Courses screen, 1.2.1). */
+  async function coursesProgress(args = {}) {
     const sel = await selection();
+    const list = args.all ? ((await store.courses().catch(() => null)) || []).filter((c) => c.state === 'current') : sel.list;
     const out = {};
-    await Promise.all(sel.list.map(async (c) => { try { const { done, total } = await store.progress(c.id); if (total) out[String(c.id)] = { done, total }; } catch { /* left off */ } }));
+    await Promise.all(list.map(async (c) => { try { const { done, total } = await store.progress(c.id); if (total) out[String(c.id)] = { done, total }; } catch { /* left off */ } }));
     return out;
   }
   async function setNickname({ id, name = '' } = {}) {
@@ -2030,7 +2051,7 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

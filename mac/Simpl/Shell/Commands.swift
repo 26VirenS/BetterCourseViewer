@@ -76,6 +76,7 @@ struct SimplCommands: Commands {
         CommandGroup(replacing: .help) {
             Button("Take the Tour") { MacTour.shared.start() } // (1.2, Shell/Tour.swift)
                 .disabled(!ready)
+            Button("Report a Bug…") { ReportBug.open() } // (1.2.1)
             Divider()
             Button("What’s New in Simpl") {
                 guard let engine else { return }

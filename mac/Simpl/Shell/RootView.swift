@@ -82,6 +82,7 @@ struct RootView: View {
         .onAppear {
             AppModel.shared.engine = engine
             engine.start()
+            WideWindow.openWideOnce(engine.hostView) // (1.2.1: the first opening, wide)
         }
     }
 

@@ -1,183 +1,240 @@
+import AppKit
 import SwiftUI
 
-// The Mac tour (1.2): the web's guided tour (extension/content/app/welcome.js) as coach marks. The window stays as it is,
-// dimmed but for the part being shown — the places in the sidebar, a course and its sections, the Dashboard, the search
-// field and its commands, Back and Forward, the account — with a glass callout beside it, its arrow at it, the step's
-// count, Back, Next and Skip. Return or → is the next step, ← the one before, Escape ends it. It comes once, after the
-// app's own window first appears and nothing else is over it (the setup, What's New); Help ▸ Take the Tour, or /tour in
-// the search field, runs it again.
+// The Mac tour (1.2.1): the web's guided tour (extension/content/app/welcome.js), with its steps — all but the Simpl
+// switch's, which the Mac has no use for — and its words. One thing at a time is lit, the window dimmed round it, with a
+// short card beside it that says what it is and what to do; a step that asks for something (click Grades, hover a
+// ring, change a score) waits for it and moves on once it is done, as the web's do. Each lit thing says where it is
+// itself, measured in the window (TourProbe), so the light sits exactly on it however the window is laid out. It comes
+// once, after the app's own window first appears and nothing else is over it; Help ▸ Take the Tour, or /tour in the
+// search field, runs it again. Escape ends it.
 
-/// Where the tour is (nil: not on).
+/// Where the tour is (nil: not on), and what was just done that a step may be waiting for.
 @MainActor
 final class MacTour: ObservableObject {
     static let shared = MacTour()
     @Published private(set) var step: Int?
+    /// The last thing done that a step may wait for, and a count, so the same thing done twice is seen twice.
+    @Published private(set) var event: TourEvent?
+    @Published private(set) var events = 0
 
     func start(at index: Int = 0) {
         AppModel.shared.engine?.hostView.window?.makeKeyAndOrderFront(nil)
+        event = nil
         step = max(0, index)
     }
 
-    func show(_ index: Int) { step = index }
+    func show(_ index: Int) {
+        event = nil
+        step = index
+    }
 
     /// Ended (its last step done, or skipped): not again on its own.
     func finish() {
         step = nil
         UserDefaults.standard.set(true, forKey: "tour:done")
     }
-}
 
-/// The parts of the window the tour points at.
-enum TourSpot: Hashable {
-    case sidebar, firstPlace, lastPlace, firstCourse, courseChevron, account, detail
-}
-
-/// Where each part is, in the window's own coordinates, as each part says. (A row of the sidebar's list is drawn apart
-/// from the window's other views, so a preference from it would not reach the tour; each part says its frame here.)
-@MainActor
-final class TourFrames: ObservableObject {
-    static let shared = TourFrames()
-    private(set) var frames: [TourSpot: CGRect] = [:]
-
-    func set(_ spot: TourSpot, _ rect: CGRect?) {
-        guard frames[spot] != rect else { return }
-        frames[spot] = rect
-        if MacTour.shared.step != nil { objectWillChange.send() } // (redrawn only while the tour is on)
+    /// Something a step may be waiting for, done somewhere in the window (nothing, while the tour is off).
+    func did(_ e: TourEvent) {
+        guard step != nil else { return }
+        event = e
+        events += 1
     }
 }
 
-/// Says where the view it is on is, and again whenever that changes (`tourSpot`).
-struct TourSpotReader: ViewModifier {
-    let spot: TourSpot?
+/// What a step may wait for that the window's own state does not show.
+enum TourEvent: Equatable {
+    case ringHover, whatIfOn, whatIfEdited, whatIfOff, courseHover, pinned, counterOpened
+}
 
-    func body(content: Content) -> some View {
-        content.background {
-            if let spot {
-                GeometryReader { proxy in
-                    let frame = proxy.frame(in: .global)
-                    Color.clear
-                        .onAppear { TourFrames.shared.set(spot, frame) }
-                        .onChange(of: frame) { _, f in TourFrames.shared.set(spot, f) }
-                        .onDisappear { TourFrames.shared.set(spot, nil) }
-                }
+/// The parts of the window the tour lights.
+enum TourSpot: Hashable {
+    case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse
+    case gradeRing, gradeDetails, whatIfSwitch, whatIfScore, toolPin, counterNext, counterPanel
+}
+
+// MARK: - Where each part is
+
+/// Each lit part's view, as it says it is there (TourProbe), and where it is now in its window — measured by AppKit, so
+/// a row of the sidebar's list (drawn in a view of its own) is placed as exactly as anything else.
+@MainActor
+final class TourFrames {
+    static let shared = TourFrames()
+
+    private final class Weak {
+        weak var view: NSView?
+        init(_ view: NSView) { self.view = view }
+    }
+
+    private var views: [TourSpot: [Weak]] = [:]
+
+    func add(_ spot: TourSpot, _ view: NSView) {
+        var list = (views[spot] ?? []).filter { $0.view != nil && $0.view !== view }
+        list.append(Weak(view))
+        views[spot] = list
+    }
+
+    func remove(_ spot: TourSpot, _ view: NSView) {
+        views[spot] = views[spot]?.filter { $0.view != nil && $0.view !== view }
+    }
+
+    /// Where a part is, in its window's content from the top left — the first of its kind on screen (the topmost, then
+    /// the leftmost), cut to what its scroll view shows; nil if none is.
+    func rect(_ spot: TourSpot, in window: NSWindow) -> CGRect? {
+        var best: CGRect?
+        for w in views[spot] ?? [] {
+            guard let v = w.view, v.window === window, !v.isHiddenOrHasHiddenAncestor else { continue }
+            var r = v.convert(v.bounds, to: nil)
+            if let scroll = v.enclosingScrollView {
+                r = r.intersection(scroll.convert(scroll.bounds, to: nil))
+            }
+            guard !r.isNull, r.width >= 2, r.height >= 2 else { continue }
+            let f = TourFrames.flip(r, window)
+            if let b = best, b.minY < f.minY - 1 || (abs(b.minY - f.minY) <= 1 && b.minX <= f.minX) { continue }
+            best = f
+        }
+        return best
+    }
+
+    /// The toolbar's search field, where it is in the window.
+    static func searchField(in window: NSWindow) -> CGRect? {
+        for item in window.toolbar?.items ?? [] {
+            if let s = item as? NSSearchToolbarItem, s.searchField.window === window {
+                return flip(s.searchField.convert(s.searchField.bounds, to: nil), window)
             }
         }
+        return nil
     }
+
+    /// Window coordinates (from the bottom left) to the content's (from the top left).
+    static func flip(_ r: CGRect, _ window: NSWindow) -> CGRect {
+        let h = window.contentView?.frame.height ?? window.frame.height
+        return CGRect(x: r.minX, y: h - r.maxY, width: r.width, height: r.height)
+    }
+}
+
+/// An unseen view under a lit part, saying where it is (it takes no presses).
+final class TourProbeView: NSView {
+    var spot: TourSpot? {
+        didSet {
+            guard oldValue != spot else { return }
+            if let o = oldValue { TourFrames.shared.remove(o, self) }
+            register()
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        register()
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    private func register() {
+        guard let spot else { return }
+        if window != nil { TourFrames.shared.add(spot, self) } else { TourFrames.shared.remove(spot, self) }
+    }
+}
+
+struct TourProbe: NSViewRepresentable {
+    let spot: TourSpot
+
+    func makeNSView(context: Context) -> TourProbeView {
+        let v = TourProbeView()
+        v.spot = spot
+        return v
+    }
+
+    func updateNSView(_ v: TourProbeView, context: Context) { v.spot = spot }
 }
 
 extension View {
-    /// This part of the window, for the tour to point at (nil: none).
-    func tourSpot(_ spot: TourSpot?) -> some View { modifier(TourSpotReader(spot: spot)) }
+    /// This part of the window, for the tour to light (nil: none).
+    func tourSpot(_ spot: TourSpot?) -> some View {
+        background {
+            if let spot { TourProbe(spot: spot).allowsHitTesting(false) }
+        }
+    }
 }
 
-/// A step: what it points at and what it says.
+// MARK: - The steps
+
+/// A step: what it lights, what it says, and what it waits for.
 struct TourStep: Identifiable {
-    enum Aim { case center, places, course, dashboard, search, history, account }
+    enum Aim { case none, spot(TourSpot), search, back }
+    enum Act {
+        case next
+        case place((Place, Bool) -> Bool) // (the place shown, whether something is pushed on it)
+        case event(TourEvent)
+        case typed
+        case opened
+        case closed
+    }
+    enum Gesture { case click, hover, type }
+
     let id: String
     let aim: Aim
-    let symbol: String
     let title: String
-    let body: String
-    var keys: [String] = []
+    let body: Text
+    var doing: String? = nil
+    var gesture: Gesture = .click
+    var act: Act = .next
+    var nextLabel = "Next"
+
+    var waits: Bool {
+        if case .next = act { return false }
+        return true
+    }
 }
 
-/// Which way the callout's arrow points (from the callout's edge to the thing).
-enum TourArrow: Equatable { case none, top, bottom, leading }
-
-/// Where the light, the callout and its arrow go for a step, in the tour's own coordinates.
+/// Where the light, the card and its arrow go for a step, in the tour's own coordinates.
 struct TourPlan {
     var hole: CGRect?
-    var card: CGPoint // (the callout's box, without its arrow)
+    var card: CGPoint // (the card's box, without its arrow)
     var arrow: TourArrow
     var arrowAt: CGFloat // (along the arrow's edge, from the box's leading or top edge)
 
-    enum Side { case right, below, above }
+    private static let gap: CGFloat = 16
+    private static let margin: CGFloat = 14
 
-    private static let gap: CGFloat = 18
-    private static let margin: CGFloat = 16
-
-    static func make(_ aim: TourStep.Aim, spots: [TourSpot: CGRect], size: CGSize, top: CGFloat, card: CGSize, inbox: Bool) -> TourPlan {
-        let bounds = CGRect(origin: .zero, size: size)
-        let sidebar = spots[.sidebar].flatMap { $0.width > 40 && $0.intersects(bounds) ? $0 : nil }
-        switch aim {
-        case .center:
-            return centered(size, card)
-        case .places:
-            guard let sb = sidebar else { return centered(size, card) }
-            let hole: CGRect
-            if let rows = placeRows(spots, sb) {
-                let extra = inbox ? rows.last.height : 0 // (the Inbox, under Notifications)
-                hole = CGRect(x: sb.minX + 8, y: rows.first.minY - 4, width: sb.width - 16, height: rows.last.maxY + extra - rows.first.minY + 8)
-            } else {
-                let y = max(sb.minY, top) + 12
-                hole = CGRect(x: sb.minX + 8, y: y, width: sb.width - 16, height: min(230, sb.height / 3))
-            }
-            return beside(hole, size, top, card, prefer: [.right, .below])
-        case .course:
-            guard let sb = sidebar else { return centered(size, card) }
-            if placeRows(spots, sb) != nil, let row = spots[.firstCourse], row.minX >= sb.minX - 2, row.maxX <= sb.maxX + 2,
-               let last = spots[.lastPlace], row.minY > last.maxY {
-                let hole = CGRect(x: sb.minX + 8, y: row.minY - 3, width: sb.width - 16, height: row.height + 6)
-                let chevron = spots[.courseChevron].flatMap { $0.minY >= hole.minY && $0.maxY <= hole.maxY ? $0 : nil }
-                return beside(hole, size, top, card, prefer: [.right, .below], point: chevron.map { CGPoint(x: $0.midX, y: $0.midY) })
-            }
-            let y = max(sb.minY, top) + 290
-            return beside(CGRect(x: sb.minX + 8, y: y, width: sb.width - 16, height: 40), size, top, card, prefer: [.right, .below])
-        case .dashboard:
-            guard let d = spots[.detail].flatMap({ $0.width > 100 && $0.intersects(bounds) ? $0 : nil }) else { return centered(size, card) }
-            let y = max(d.minY, top) + 14
-            let hole = CGRect(x: d.minX + 28, y: y, width: d.width - 56, height: max(120, min(300, (d.maxY - y) * 0.42)))
-            return beside(hole, size, top, card, prefer: [.below, .right, .above])
-        case .search:
-            return toolbar(x: size.width - 110, size, top, card) // (the field, at the toolbar's trailing end)
-        case .history:
-            return toolbar(x: (sidebar?.maxX ?? 70) + 48, size, top, card) // (Back and Forward, where the screen's toolbar starts)
-        case .account:
-            guard let a = spots[.account].flatMap({ $0.height > 8 && $0.intersects(bounds) ? $0 : nil }) else { return centered(size, card) }
-            return beside(a.insetBy(dx: 6, dy: 2), size, top, card, prefer: [.right, .above])
+    /// Beside the lit place: to its right when it is on the window's leading side (the sidebar), else under it, over
+    /// it, or to its right; under a toolbar item, at the top, its arrow up at it; else in the middle.
+    static func make(hole: CGRect?, toolbarX: CGFloat?, size: CGSize, top: CGFloat, card: CGSize) -> TourPlan {
+        if let x = toolbarX {
+            let cx = clamp(x - card.width / 2, margin, size.width - card.width - margin)
+            return TourPlan(hole: nil, card: CGPoint(x: cx, y: top + 8), arrow: .top, arrowAt: x - cx)
         }
-    }
-
-    /// The sidebar's first and last place, when what they said is believable: inside the sidebar, the one well above the other.
-    private static func placeRows(_ spots: [TourSpot: CGRect], _ sb: CGRect) -> (first: CGRect, last: CGRect)? {
-        guard let a = spots[.firstPlace], let b = spots[.lastPlace],
-              a.minX >= sb.minX - 2, b.maxX <= sb.maxX + 2, b.minY - a.minY > 40, a.minY >= sb.minY, b.maxY <= sb.maxY else { return nil }
-        return (first: a, last: b)
-    }
-
-    private static func clamp(_ v: CGFloat, _ lo: CGFloat, _ hi: CGFloat) -> CGFloat { min(max(v, lo), max(lo, hi)) }
-
-    private static func centered(_ size: CGSize, _ card: CGSize) -> TourPlan {
-        TourPlan(hole: nil, card: CGPoint(x: max(margin, (size.width - card.width) / 2), y: max(margin, (size.height - card.height) / 2)), arrow: .none, arrowAt: 0)
-    }
-
-    /// Under a toolbar item: the callout at the top of the window, its arrow up at the item.
-    private static func toolbar(x: CGFloat, _ size: CGSize, _ top: CGFloat, _ card: CGSize) -> TourPlan {
-        let cx = clamp(x - card.width / 2, margin, size.width - card.width - margin)
-        return TourPlan(hole: nil, card: CGPoint(x: cx, y: top + 14), arrow: .top, arrowAt: x - cx)
-    }
-
-    /// Beside the lit place, on the first side it fits; else at the window's foot, with no arrow.
-    private static func beside(_ hole: CGRect, _ size: CGSize, _ top: CGFloat, _ card: CGSize, prefer: [Side], point: CGPoint? = nil) -> TourPlan {
-        let aim = point ?? CGPoint(x: hole.midX, y: hole.midY)
-        for side in prefer {
+        guard let hole else {
+            return TourPlan(hole: nil, card: CGPoint(x: max(margin, (size.width - card.width) / 2), y: max(margin, (size.height - card.height) / 2)), arrow: .none, arrowAt: 0)
+        }
+        let leading = hole.maxX < size.width * 0.4
+        let sides: [TourArrow] = leading ? [.leading, .top, .bottom] : [.top, .bottom, .leading]
+        for side in sides {
             switch side {
-            case .right where hole.maxX + gap + card.width <= size.width - margin:
-                let y = clamp(aim.y - card.height / 2, top + margin, size.height - card.height - margin)
-                return TourPlan(hole: hole, card: CGPoint(x: hole.maxX + gap, y: y), arrow: .leading, arrowAt: aim.y - y)
-            case .below where hole.maxY + gap + card.height <= size.height - margin:
-                let x = clamp(aim.x - card.width / 2, margin, size.width - card.width - margin)
-                return TourPlan(hole: hole, card: CGPoint(x: x, y: hole.maxY + gap), arrow: .top, arrowAt: aim.x - x)
-            case .above where hole.minY - gap - card.height >= top + margin:
-                let x = clamp(aim.x - card.width / 2, margin, size.width - card.width - margin)
-                return TourPlan(hole: hole, card: CGPoint(x: x, y: hole.minY - gap - card.height), arrow: .bottom, arrowAt: aim.x - x)
+            case .leading where hole.maxX + gap + card.width <= size.width - margin:
+                let y = clamp(hole.midY - card.height / 2, top + margin, size.height - card.height - margin)
+                return TourPlan(hole: hole, card: CGPoint(x: hole.maxX + gap, y: y), arrow: .leading, arrowAt: hole.midY - y)
+            case .top where hole.maxY + gap + card.height <= size.height - margin:
+                let x = clamp(hole.midX - card.width / 2, margin, size.width - card.width - margin)
+                return TourPlan(hole: hole, card: CGPoint(x: x, y: hole.maxY + gap), arrow: .top, arrowAt: hole.midX - x)
+            case .bottom where hole.minY - gap - card.height >= top + margin:
+                let x = clamp(hole.midX - card.width / 2, margin, size.width - card.width - margin)
+                return TourPlan(hole: hole, card: CGPoint(x: x, y: hole.minY - gap - card.height), arrow: .bottom, arrowAt: hole.midX - x)
             default:
                 continue
             }
         }
-        return TourPlan(hole: hole, card: CGPoint(x: max(margin, (size.width - card.width) / 2), y: max(top + margin, size.height - card.height - margin)), arrow: .none, arrowAt: 0)
+        // (no side has room: inside the window's foot, clear of the light where it can be)
+        let y = hole.midY > size.height / 2 ? top + margin : size.height - card.height - margin
+        return TourPlan(hole: hole, card: CGPoint(x: max(margin, (size.width - card.width) / 2), y: y), arrow: .none, arrowAt: 0)
     }
+
+    private static func clamp(_ v: CGFloat, _ lo: CGFloat, _ hi: CGFloat) -> CGFloat { min(max(v, lo), max(lo, hi)) }
 }
+
+/// Which way the card's arrow points (from the card's edge to the thing).
+enum TourArrow: Equatable { case none, top, bottom, leading }
 
 // MARK: - The overlay
 
@@ -187,57 +244,146 @@ struct TourOverlay: View {
     @Binding var columns: NavigationSplitViewVisibility
     @EnvironmentObject private var engine: Engine
     @ObservedObject private var tour = MacTour.shared
-    @ObservedObject private var frames = TourFrames.shared
     @AppStorage("tour:done") private var done = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var cardSize = CGSize(width: 380, height: 240) // (TourCard.width; its height as measured)
+    @State private var cardSize = CGSize(width: TourCard.width, height: 170)
     @State private var nudged = false
     @State private var sawSetup = false
+    @State private var advancing = false
+    @State private var since = Date()
 
     var body: some View {
         GeometryReader { proxy in
-            let list = steps
-            if let i = tour.step, i < list.count {
-                let origin = proxy.frame(in: .global).origin
-                let spots = frames.frames.mapValues { $0.offsetBy(dx: -origin.x, dy: -origin.y) }
-                let plan = TourPlan.make(list[i].aim, spots: spots, size: proxy.size, top: proxy.safeAreaInsets.top, card: cardSize, inbox: !engine.onBrightspace)
-                TourStage(step: list[i], index: i, count: list.count, plan: plan, size: proxy.size, cardSize: $cardSize, nudged: nudged,
-                          next: { next(list.count) }, back: back, skip: { tour.finish() }, poke: poke)
+            ZStack(alignment: .topLeading) {
+                TourProbe(spot: .overlay).allowsHitTesting(false)
+                let list = steps
+                if let i = tour.step, i < list.count {
+                    TimelineView(.periodic(from: .now, by: 0.2)) { time in
+                        let placed = self.plan(for: list[i], size: proxy.size, top: proxy.safeAreaInsets.top)
+                        TourStage(step: list[i], index: i, count: list.count, plan: placed, size: proxy.size, cardSize: $cardSize, nudged: nudged,
+                                  stuck: time.date.timeIntervalSince(since) > 6,
+                                  next: { next(list.count) }, back: back, skip: { tour.finish() }, poke: poke)
+                            .onChange(of: time.date) { _, _ in check(list[i], count: list.count) }
+                    }
                     .transition(.opacity)
+                }
             }
         }
         .allowsHitTesting(tour.step != nil)
         .animation(reduceMotion ? nil : Motion.gentle, value: tour.step)
         .onChange(of: engine.setup) { _, on in if on { sawSetup = true } }
         .onChange(of: tour.step) { old, new in arrive(new, from: old) }
+        .onChange(of: tour.events) { _, _ in
+            let list = steps
+            if let i = tour.step, i < list.count { check(list[i], count: list.count) }
+        }
         .task { await autoStart() }
     }
 
-    /// The steps, as this window has them (a course to point at, the Inbox on Canvas).
+    // MARK: The web's steps (welcome.js's setup run), but the Simpl switch's
+
     private var steps: [TourStep] {
-        let lms = engine.lmsName
         var s: [TourStep] = [
-            TourStep(id: "hello", aim: .center, symbol: "hand.wave.fill", title: "Welcome to Simpl for Mac",
-                     body: "A quick look round: where things are, and the keys that get you there. Press → or Return for the next step, ← to go back, and Escape to end the tour."),
-            TourStep(id: "places", aim: .places, symbol: "sidebar.left", title: "Everything in one sidebar",
-                     body: engine.onBrightspace ? "The Dashboard, To Do, the Calendar, Grades and Notifications — each a click away, or a key." : "The Dashboard, To Do, the Calendar, Grades, Notifications and the Inbox — each a click away, or a key.",
-                     keys: ["⌘1", "⌘2", "⌘3", "⌘4", "⌘5"]),
+            TourStep(id: "report", aim: .spot(.account), title: "Report a bug",
+                     body: Text("Found a bug or want something added? Tell us here.")),
+            TourStep(id: "grades", aim: .spot(.gradesRow), title: "Grades", body: Text("All your grades in one place."),
+                     doing: "Click Grades", act: .place { p, _ in p == .grades }),
+            TourStep(id: "ring", aim: .spot(.gradeRing), title: "A quick breakdown", body: Text("Each ring shows what makes up the grade."),
+                     doing: "Hover over a ring", gesture: .hover, act: .event(.ringHover)),
+            TourStep(id: "details", aim: .spot(.gradeDetails), title: "What if?", body: Text("See every grade, and try out scores."),
+                     doing: "Click it", act: .place { p, _ in
+                         if case .section(_, "grades") = p { return true }
+                         return false
+                     }),
+            TourStep(id: "whatif", aim: .spot(.whatIfSwitch), title: "Try what-if scores", body: Text("See how new scores would change your grade."),
+                     doing: "Turn on What-If Scores", act: .event(.whatIfOn)),
+            TourStep(id: "score", aim: .spot(.whatIfScore), title: "Change a score", body: Text("Type any score. Nothing is saved."),
+                     doing: "Change a score", gesture: .type, act: .event(.whatIfEdited)),
+            TourStep(id: "real", aim: .spot(.whatIfSwitch), title: "Back to the real scores", body: Text("Close it to go back to your real scores."),
+                     doing: "Turn What-If off", act: .event(.whatIfOff)),
         ]
         if !engine.courses.isEmpty {
-            s.append(TourStep(id: "course", aim: .course, symbol: "chevron.right.circle.fill", title: "Your courses, and what’s in them",
-                              body: "Click a course for its home. Its arrow lists its sections — Assignments, Modules, Files and the rest — right here in the sidebar."))
+            s.append(TourStep(id: "courses", aim: .spot(.firstCourse), title: "Your courses", body: Text("Your classes are listed here."),
+                              doing: "Hover over a course", gesture: .hover, act: .event(.courseHover)))
         }
-        s.append(TourStep(id: "dashboard", aim: .dashboard, symbol: "square.grid.2x2.fill", title: "The Dashboard",
-                          body: "What’s due, what’s new and how your grades stand, at a glance. Click a card to see everything in it.", keys: ["⌘1"]))
-        s.append(TourStep(id: "search", aim: .search, symbol: "magnifyingglass", title: "Search — and commands",
-                          body: "Find courses, work, files and people in \(lms). Type / for commands: /grades, /course bio files, /due today, /note read chapter 4, /dark.", keys: ["⌘K"]))
-        s.append(TourStep(id: "history", aim: .history, symbol: "arrow.left.arrow.right", title: "Back and Forward",
-                          body: "Like a browser’s, across the whole window: every place you went and everything you opened.", keys: ["⌘[", "⌘]"]))
-        s.append(TourStep(id: "account", aim: .account, symbol: "person.crop.circle", title: "Your account",
-                          body: "Settings, What’s New and your \(lms) profile are under the … button here — and Sign Out."))
-        s.append(TourStep(id: "done", aim: .center, symbol: "checkmark.seal.fill", title: "You’re all set",
-                          body: "Take the tour again any time from Help ▸ Take the Tour, or type /tour in the search field."))
+        s += [
+            TourStep(id: "tools", aim: .spot(.toolsRow), title: "Tools and widgets", body: TourOverlay.toolsLine,
+                     doing: "Click Tools", act: .place { p, _ in p == .tools }),
+            TourStep(id: "pin", aim: .spot(.toolPin), title: "Pin a tool", body: Text("Pin any tool to the top to keep it one click away."),
+                     doing: "Click a tool’s pin", act: .event(.pinned)),
+            TourStep(id: "dashboard", aim: .spot(.dashboardRow), title: "Back to the Dashboard", body: Text("Everything due, at a glance."),
+                     doing: "Click Dashboard", act: .place { p, pushed in p == .dashboard && !pushed }),
+            TourStep(id: "cards", aim: .spot(.counterNext), title: "The cards open", body: Text("Click a card to see what’s in it."),
+                     doing: "Click Next 7 days", act: .event(.counterOpened)),
+            TourStep(id: "look", aim: .spot(.counterPanel), title: "A quick look", body: Text("Click anything to open it here."),
+                     doing: "Click an item", act: .opened),
+            TourStep(id: "close", aim: .back, title: "Close it", body: Text("You’ll be right where you were."),
+                     doing: "Click Back", act: .closed),
+            TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands."),
+                     doing: "Type anything", gesture: .type, act: .typed),
+            TourStep(id: "end", aim: .none, title: "You’re all set", body: Text("Replay it any time from Help ▸ Take the Tour."), nextLabel: "Done"),
+        ]
         return s
+    }
+
+    /// The web's line, its tools in their colours.
+    private static var toolsLine: Text {
+        Text("Find a ")
+            + Text("PDF Editor, ").foregroundColor(Color(hex: "#ff9f0a"))
+            + Text("File Converter, ").foregroundColor(Color(hex: "#34c759"))
+            + Text("Calculators, ").foregroundColor(Color(hex: "#bf5af2"))
+            + Text("Flashcards, ").foregroundColor(Color(hex: "#2f7cf6"))
+            + Text("Citation Generator").foregroundColor(Color(hex: "#40c8e0"))
+            + Text(" & more.")
+    }
+
+    // MARK: Placing it
+
+    private func plan(for step: TourStep, size: CGSize, top: CGFloat) -> TourPlan {
+        guard let window = engine.hostView.window, let me = TourFrames.shared.rect(.overlay, in: window) else {
+            return TourPlan.make(hole: nil, toolbarX: nil, size: size, top: top, card: cardSize)
+        }
+        let local = { (r: CGRect) in r.offsetBy(dx: -me.minX, dy: -me.minY) }
+        switch step.aim {
+        case .none:
+            return TourPlan.make(hole: nil, toolbarX: nil, size: size, top: top, card: cardSize)
+        case .spot(let spot):
+            let bounds = CGRect(origin: .zero, size: size)
+            let hole = TourFrames.shared.rect(spot, in: window).map { local($0).insetBy(dx: -6, dy: -6) }.flatMap { bounds.intersects($0) ? $0 : nil }
+            return TourPlan.make(hole: hole, toolbarX: nil, size: size, top: top, card: cardSize)
+        case .search:
+            let x = TourFrames.searchField(in: window).map { local($0).midX } ?? (size.width - 150)
+            return TourPlan.make(hole: nil, toolbarX: x, size: size, top: top, card: cardSize)
+        case .back:
+            // (Back and Forward, where the detail's toolbar starts: just past the sidebar)
+            let edge = TourFrames.shared.rect(.sidebar, in: window).map { local($0).maxX } ?? 0
+            return TourPlan.make(hole: nil, toolbarX: edge + 34, size: size, top: top, card: cardSize)
+        }
+    }
+
+    // MARK: Moving on
+
+    /// The step's thing done: on to the next, a moment later (the press seen landing first).
+    private func check(_ step: TourStep, count: Int) {
+        guard !advancing, let i = tour.step else { return }
+        let here = engine.nav.current
+        let pushed = !here.path.isEmpty
+        let did: Bool
+        switch step.act {
+        case .next: did = false
+        case .place(let test): did = test(here.place, pushed)
+        case .event(let e): did = tour.event == e
+        case .typed: did = !engine.query.trimmingCharacters(in: .whitespaces).isEmpty
+        case .opened: did = pushed || engine.quiz != nil
+        case .closed: did = !pushed && engine.quiz == nil
+        }
+        guard did else { return }
+        advancing = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            advancing = false
+            guard tour.step == i else { return }
+            next(count)
+        }
     }
 
     private func next(_ count: Int) {
@@ -250,28 +396,23 @@ struct TourOverlay: View {
         tour.show(i - 1)
     }
 
-    /// A press outside the callout: it nudges, so the eye goes to it.
+    /// A press outside the light: the card nudges, so the eye goes to it.
     private func poke() {
         guard !reduceMotion else { return }
         withAnimation(Motion.snappy) { nudged = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { withAnimation(Motion.snappy) { nudged = false } }
     }
 
-    /// A step arriving: the sidebar shown for the tour; the Dashboard shown for its own step.
+    /// A step arriving: the sidebar shown; the tour begun from the Dashboard, as the web's is.
     private func arrive(_ step: Int?, from old: Int?) {
+        since = Date()
         guard let step else { return }
         if old == nil {
             if columns != .all { columns = .all }
             SearchField.resign(engine)
+            if step == 0, engine.nav.current.place != .dashboard || !engine.nav.current.path.isEmpty { engine.go(.dashboard) }
         }
-        let list = steps
-        guard step < list.count else {
-            tour.finish()
-            return
-        }
-        if list[step].aim == .dashboard, engine.nav.current.place != .dashboard || !engine.nav.current.path.isEmpty {
-            engine.go(.dashboard)
-        }
+        if step >= steps.count { tour.finish() }
     }
 
     /// Once, after the window first appears and nothing else is over it for a moment. (The screenshot suite, whose
@@ -309,7 +450,7 @@ struct TourOverlay: View {
     }
 }
 
-/// The dim with its light, the callout, and the keys.
+/// The dim with its light, and the card.
 private struct TourStage: View {
     let step: TourStep
     let index: Int
@@ -318,6 +459,7 @@ private struct TourStage: View {
     let size: CGSize
     @Binding var cardSize: CGSize
     let nudged: Bool
+    let stuck: Bool
     let next: () -> Void
     let back: () -> Void
     let skip: () -> Void
@@ -328,28 +470,29 @@ private struct TourStage: View {
         ZStack(alignment: .topLeading) {
             escape
             TourVeil(hole: plan.hole)
-                .contentShape(Rectangle())
+                // (the light takes presses through to what is under it; the rest of the window nudges the card)
+                .contentShape(TourHoleShape(hole: plan.hole), eoFill: true)
                 .onTapGesture(perform: poke)
-            TourCard(step: step, index: index, count: count, arrow: plan.arrow, arrowAt: plan.arrowAt, cardSize: $cardSize, next: next, back: back, skip: skip)
+            TourCard(step: step, index: index, count: count, arrow: plan.arrow, arrowAt: plan.arrowAt, stuck: stuck, cardSize: $cardSize, next: next, back: back, skip: skip)
                 .scaleEffect(nudged ? 1.025 : 1)
                 .offset(x: plan.card.x - (plan.arrow == .leading ? CalloutMetrics.length : 0),
                         y: plan.card.y - (plan.arrow == .top ? CalloutMetrics.length : 0))
+                .animation(Motion.gentle, value: plan.card)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
-        // the keys: Return and → on, ← back, Escape out (as the quiz screen takes its keys)
-        .focusable(interactions: .edit)
+        // the keys, on a step that waits for nothing: Return and → on, ← back (a step that asks for typing keeps them)
+        .focusable(!step.waits, interactions: .edit)
         .focused($focused)
         .focusEffectDisabled()
         .onKeyPress(phases: .down) { press in key(press) }
-        .task {
+        .task(id: index) {
             try? await Task.sleep(nanoseconds: 80_000_000) // (once the window has let go of what had the keys)
-            focused = true
+            focused = !step.waits
         }
-        .onChange(of: index) { _, _ in focused = true }
     }
 
     private func key(_ press: KeyPress) -> KeyPress.Result {
-        guard press.modifiers.isDisjoint(with: [.command, .control, .option]) else { return .ignored }
+        guard !step.waits, press.modifiers.isDisjoint(with: [.command, .control, .option]) else { return .ignored }
         switch press.key {
         case .rightArrow, .return:
             next()
@@ -357,16 +500,12 @@ private struct TourStage: View {
         case .leftArrow:
             back()
             return .handled
-        case .escape:
-            skip()
-            return .handled
         default:
             return .ignored
         }
     }
 
-    /// Escape as the window's cancel key too, whatever has the keys (ending twice is ending once): behind the dim,
-    /// where no press reaches it.
+    /// Escape ends it, whatever has the keys: behind the dim, where no press reaches it.
     private var escape: some View {
         Button("", action: skip)
             .keyboardShortcut(.cancelAction)
@@ -376,10 +515,21 @@ private struct TourStage: View {
     }
 }
 
+/// The window, less the light (for presses: even-odd, so the light lets them through).
+private struct TourHoleShape: Shape {
+    let hole: CGRect?
+
+    func path(in r: CGRect) -> Path {
+        var p = Path(r)
+        if let hole { p.addRoundedRect(in: hole, cornerSize: CGSize(width: 14, height: 14), style: .continuous) }
+        return p
+    }
+}
+
 /// The window dimmed but for the lit place, which is ringed in the accent.
 private struct TourVeil: View {
     let hole: CGRect?
-    private static let dim = Theme.dynamic(light: NSColor(white: 0, alpha: 0.24), dark: NSColor(white: 0, alpha: 0.48))
+    private static let dim = Theme.dynamic(light: NSColor(white: 0, alpha: 0.28), dark: NSColor(white: 0, alpha: 0.5))
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -401,19 +551,22 @@ private struct TourVeil: View {
                     .offset(x: hole.minX, y: hole.minY)
             }
         }
+        .animation(Motion.gentle, value: hole)
+        .allowsHitTesting(true)
     }
 }
 
-/// The callout: a glass card with its arrow, the step's count and Skip, its symbol, title and words, the keys it is
-/// about, the steps as dots, Back and Next.
+/// The card: its count and Skip, the title and its line, what to do, a bar of how far along, and Next where the step
+/// waits for nothing (or for something that has not come in a while).
 private struct TourCard: View {
-    static let width: CGFloat = 380
+    static let width: CGFloat = 300
 
     let step: TourStep
     let index: Int
     let count: Int
     let arrow: TourArrow
     let arrowAt: CGFloat
+    let stuck: Bool
     @Binding var cardSize: CGSize
     let next: () -> Void
     let back: () -> Void
@@ -423,7 +576,7 @@ private struct TourCard: View {
 
     var body: some View {
         content
-            .padding(22)
+            .padding(18)
             .frame(width: TourCard.width, alignment: .leading)
             .background {
                 GeometryReader { p in
@@ -439,7 +592,6 @@ private struct TourCard: View {
             .accessibilityAddTraits(.isModal)
     }
 
-    /// Room for the arrow on its side (the box's own size stays as measured).
     private var arrowRoom: EdgeInsets {
         let l = CalloutMetrics.length
         switch arrow {
@@ -451,82 +603,91 @@ private struct TourCard: View {
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
                 Text("\(index + 1) of \(count)")
                     .font(.sFootnote.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 if !last {
-                    Button("Skip Tour", action: skip)
+                    Button("Skip", action: skip)
                         .buttonStyle(.plain)
                         .font(.sFootnote.weight(.medium))
                         .foregroundStyle(.secondary)
                         .help("End the tour (Escape)")
                 }
             }
-            HStack(spacing: 12) {
-                IconTile(symbol: step.symbol, color: .accentColor, size: 38)
-                Text(step.title)
-                    .font(.sTitle3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Text(step.body)
-                .font(.sBody)
+            Text(step.title)
+                .font(.sHeadline)
+            step.body
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if !step.keys.isEmpty { keyCaps }
+            if let doing = step.doing { doingLine(doing) }
             footer
         }
     }
 
-    private var keyCaps: some View {
-        HStack(spacing: 6) {
-            ForEach(step.keys, id: \.self) { k in
-                Text(k)
-                    .font(.sCallout.weight(.medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Theme.well, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
+    private func doingLine(_ text: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol)
+                .font(.sCallout.weight(.semibold))
+                .symbolEffect(.pulse, options: .repeating)
+            Text(text)
+                .font(.sCallout.weight(.semibold))
         }
+        .foregroundStyle(Color.accentColor)
+        .padding(.top, 2)
         .accessibilityElement(children: .combine)
+    }
+
+    private var symbol: String {
+        switch step.gesture {
+        case .click: return "cursorarrow.click"
+        case .hover: return "cursorarrow.rays"
+        case .type: return "keyboard"
+        }
     }
 
     private var footer: some View {
         HStack(spacing: 10) {
-            HStack(spacing: 5) {
-                ForEach(0..<count, id: \.self) { i in
-                    Capsule()
-                        .fill(i == index ? Color.accentColor : Color.secondary.opacity(0.35))
-                        .frame(width: i == index ? 16 : 6, height: 6)
+            ProgressView(value: Double(index + 1), total: Double(count))
+                .progressViewStyle(.linear)
+                .tint(.accentColor)
+                .frame(maxWidth: 90)
+                .accessibilityHidden(true)
+            Spacer(minLength: 6)
+            if !step.waits {
+                if index > 0 && !last {
+                    Button("Back", action: back)
+                        .glassButton()
                 }
+                Button(step.nextLabel, action: next) // (Return, as the stage takes its keys)
+                    .glassButton(prominent: true)
+            } else if stuck {
+                // (the step's thing not done in a while — or not to be found here: on without it)
+                Button("Next", action: next)
+                    .buttonStyle(.plain)
+                    .font(.sFootnote.weight(.medium))
+                    .foregroundStyle(.secondary)
             }
-            .accessibilityHidden(true)
-            Spacer(minLength: 8)
-            if index > 0 {
-                Button("Back", action: back)
-                    .glassButton()
-                    .controlSize(.large)
-            }
-            Button(last ? "Done" : "Next", action: next) // (Return, as the stage takes its keys)
-                .glassButton(prominent: true)
-                .controlSize(.large)
         }
+        .controlSize(.regular)
         .padding(.top, 4)
     }
 }
 
-/// The callout's arrow: how far it stands out from the box, and half its base.
+/// The card's arrow: how far it stands out from the box, and half its base.
 enum CalloutMetrics {
-    static let length: CGFloat = 11
-    static let half: CGFloat = 11
+    static let length: CGFloat = 10
+    static let half: CGFloat = 10
 }
 
-/// The callout's outline: a rounded box with its arrow on one edge, drawn as one shape so the glass is one piece.
+/// The card's outline: a rounded box with its arrow on one edge, drawn as one shape so the glass is one piece.
 struct CalloutShape: Shape {
     let arrow: TourArrow
     let at: CGFloat
-    var radius: CGFloat = 22
+    var radius: CGFloat = 20
 
     func path(in r: CGRect) -> Path {
         let l = CalloutMetrics.length, h = CalloutMetrics.half

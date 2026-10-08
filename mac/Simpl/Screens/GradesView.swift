@@ -228,6 +228,7 @@ struct GradesView: View {
             HStack(spacing: 14) {
                 NestedRings(bands: bands, outerWidth: 5.5, innerWidth: 3.5, gap: 1.5, key: "grades:\(r.id)")
                     .frame(width: 48, height: 48)
+                    .onHover { on in if on { MacTour.shared.did(.ringHover) } }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(r.code)
                         .font(.sHeadline)
@@ -275,6 +276,7 @@ struct GradesView: View {
             CourseGradeCard(row: r)
         }
         .buttonStyle(CardButtonStyle())
+        .tourSpot(.gradeDetails) // (the tour's "What if?": a card opens every grade)
         .help("\(r.code): every assignment’s grade, and what-if scores")
         .accessibilityLabel(spoken(r))
         .contextMenu { courseMenu(r) }
@@ -369,6 +371,8 @@ private struct GradeCourseDetail: View {
         return HStack(alignment: .center, spacing: 22) {
             NestedRings(bands: bands, outerWidth: 11, innerWidth: 7, gap: 2.5, key: "grades-detail:\(row.id)")
                 .frame(width: 124, height: 124)
+                .tourSpot(.gradeRing)
+                .onHover { on in if on { MacTour.shared.did(.ringHover) } }
             VStack(alignment: .leading, spacing: 5) {
                 Text(row.code)
                     .font(.sTitle2)
@@ -411,6 +415,7 @@ private struct GradeCourseDetail: View {
                     Label("Every Grade & What-If", systemImage: "wand.and.stars")
                 }
                 .glassButton(prominent: true)
+                .tourSpot(.gradeDetails)
                 .help("Every assignment’s grade, and scores to try")
                 Button {
                     engine.go(.home("courses/\(row.id)"))
@@ -700,6 +705,8 @@ private struct CourseGradeCard: View {
         return HStack(alignment: .center, spacing: 14) {
             NestedRings(bands: bands, outerWidth: 7, innerWidth: 4.5, gap: 2, key: "grades:\(row.id)")
                 .frame(width: 66, height: 66)
+                .tourSpot(.gradeRing)
+                .onHover { on in if on { MacTour.shared.did(.ringHover) } }
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.code)
                     .font(.sHeadline)
@@ -1159,6 +1166,7 @@ struct CourseGradesView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
                     .tint(.orange)
+                    .tourSpot(.whatIfSwitch)
             }
             if whatIf && (d.gpaIf != nil || !drafts.isEmpty || !added.isEmpty) {
                 HStack(spacing: 8) {
@@ -1377,6 +1385,7 @@ struct CourseGradesView: View {
                     guard v != (drafts[r.id] ?? real) else { return } // (a field ending its edit hands back what it had: no score tried)
                     drafts[r.id] = v
                     scheduleApply()
+                    MacTour.shared.did(.whatIfEdited) // (the tour's "Change a score")
                 }
             ))
             .textFieldStyle(.roundedBorder)
@@ -1385,6 +1394,7 @@ struct CourseGradesView: View {
             .foregroundStyle(tried ? Color.orange : Color.primary)
             .focused($focused, equals: r.id)
             .frame(width: 66)
+            .tourSpot(.whatIfScore)
             .onSubmit { applyNow() }
             .onExitCommand { focused = nil }
             .accessibilityLabel("What-if score for \(r.name), out of \(CourseGradesView.num(r.possible))")
@@ -1486,6 +1496,7 @@ struct CourseGradesView: View {
 
     private func setWhatIf(_ on: Bool) {
         guard on != whatIf else { return }
+        MacTour.shared.did(on ? .whatIfOn : .whatIfOff) // (the tour's what-if steps)
         applying?.cancel()
         if !on { focused = nil }
         withAnimation(Motion.snappy) {

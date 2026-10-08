@@ -18,10 +18,14 @@ struct MainShell: View {
                 .navigationSplitViewColumnWidth(min: 240, ideal: 270, max: 360)
         } detail: {
             DetailStack()
-                .tourSpot(.detail)
         }
         .navigationSplitViewStyle(.balanced)
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
+        // (1.2.1) a pinned tool opened whole: over the window, where you are
+        .sheet(item: $tools.popup) { k in
+            ToolPopup(kind: k)
+                .environmentObject(engine)
+        }
         // (1.2) the field finds and does: its suggestions are the web search box's — a sum, commands, courses and their
         // sections, groups — and "/" (or ">") lists every command (Shell/SearchCommands.swift); one picked runs
         .searchable(text: $engine.query, placement: .toolbar, prompt: "Search \(engine.lmsName) or type /")
@@ -191,7 +195,6 @@ struct Sidebar: View {
         VStack(spacing: 0) {
             list
             AccountBar()
-                .tourSpot(.account)
         }
     }
 
@@ -199,13 +202,14 @@ struct Sidebar: View {
         List(selection: selection) {
             Section {
                 Label("Dashboard", systemImage: "square.grid.2x2")
-                    .tourSpot(.firstPlace)
+                    .tourSpot(.dashboardRow)
                     .tag(Place.dashboard)
                 Label("To Do", systemImage: "checklist").tag(Place.todo)
                 Label("Calendar", systemImage: "calendar").tag(Place.calendar)
-                Label("Grades", systemImage: "chart.bar.xaxis").tag(Place.grades)
+                Label("Grades", systemImage: "chart.bar.xaxis")
+                    .tourSpot(.gradesRow)
+                    .tag(Place.grades)
                 Label("Notifications", systemImage: "bell")
-                    .tourSpot(.lastPlace)
                     .badge(engine.countsLive ? (engine.snapshot?.notifUnread ?? 0) : 0) // (1.2: never a count from before)
                     .tag(Place.notifications)
                 if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
@@ -213,7 +217,9 @@ struct Sidebar: View {
                         .badge(engine.countsLive ? (engine.snapshot?.inboxUnread ?? 0) : 0)
                         .tag(Place.inbox)
                 }
-                Label("Tools", systemImage: "wrench.and.screwdriver").tag(Place.tools) // (1.2)
+                Label("Tools", systemImage: "wrench.and.screwdriver") // (1.2)
+                    .tourSpot(.toolsRow)
+                    .tag(Place.tools)
             }
             Section("Courses") {
                 ForEach(engine.courses) { course in
@@ -306,9 +312,9 @@ struct Sidebar: View {
             }
             .buttonStyle(.plain)
             .help(expanded ? "Hide sections" : "Show sections")
-            .tourSpot(c.id == engine.courses.first?.id ? .courseChevron : nil)
         }
         .tourSpot(c.id == engine.courses.first?.id ? .firstCourse : nil)
+        .onHover { on in if on { MacTour.shared.did(.courseHover) } } // (the tour's "Hover over a course")
         .tag(Place.home(ctx))
         .contextMenu {
             Button("Open in \(engine.lmsName)") { if let u = engine.canvasURL(for: .home(ctx)) { engine.openWebScreen(u.absoluteString, title: c.code) } }
@@ -364,6 +370,8 @@ struct AccountBar: View {
                 }
                 Button("\(engine.lmsName) Profile") { engine.openWebScreen("/profile", title: "Profile") }
                 Divider()
+                Button("Report a Bug…") { ReportBug.open() } // (1.2.1: the web's purple button)
+                Divider()
                 Button("Sign Out…") { confirmSignOut = true }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -371,7 +379,8 @@ struct AccountBar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Account")
+            .help("Account, and Report a Bug")
+            .tourSpot(.account)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -388,4 +397,12 @@ struct AccountBar: View {
 func copyToPasteboard(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+}
+
+/// Report a Bug (1.2.1): the site's form, as the web's purple button opens it.
+enum ReportBug {
+    static let url = URL(string: "https://simplcourses.com/report/")!
+
+    @MainActor
+    static func open() { NSWorkspace.shared.open(url) }
 }
