@@ -27,7 +27,7 @@
   --hair: rgba(0, 0, 0, .08); --hair-2: rgba(0, 0, 0, .14);
   --blue: #0071e3; --blue-hover: #0077ed; --link: #0066cc;
   --soft: #e8e8ed; --soft-hover: #dedee3; --soft-text: #1d1d1f; --soft-sub: #6e6e73; --soft-row: rgba(0, 0, 0, .06); --soft-line: rgba(0, 0, 0, .1);
-  --grad: linear-gradient(100deg, #0a84ff 0%, #5e5ce6 50%, #af52de 100%);
+  --accent: #0071e3;
   --toolbar: #ececee; --toolbar-line: rgba(0, 0, 0, .1); --url: #fff; --url-text: #3c3c43; --card: #fff;
   --shadow-win: 0 0 0 .5px rgba(0, 0, 0, .14), 0 40px 90px -36px rgba(0, 20, 60, .32), 0 18px 40px -28px rgba(0, 20, 60, .26);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -40,7 +40,7 @@
     --hair: rgba(255, 255, 255, .1); --hair-2: rgba(255, 255, 255, .16);
     --blue: #0071e3; --blue-hover: #0a7cf0; --link: #2997ff;
     --soft: #2c2c2e; --soft-hover: #3a3a3c; --soft-text: #f5f5f7; --soft-sub: #a1a1a6; --soft-row: rgba(255, 255, 255, .08); --soft-line: rgba(255, 255, 255, .1);
-    --grad: linear-gradient(100deg, #3d9bff 0%, #7d7aff 50%, #c98cff 100%);
+    --accent: #2997ff;
     --toolbar: #2b2b2e; --toolbar-line: rgba(255, 255, 255, .07); --url: #3b3b3f; --url-text: #d1d1d6; --card: #1c1c1e;
     --shadow-win: 0 0 0 .5px rgba(255, 255, 255, .14), 0 40px 90px -36px rgba(0, 0, 0, .9), 0 18px 40px -28px rgba(0, 0, 0, .7);
   }
@@ -58,7 +58,7 @@ svg { flex: none; }
 .wrap { width: min(var(--wrap), 100% - 44px); margin-inline: auto; }
 .skip { position: absolute; left: 12px; top: -60px; z-index: 100; padding: 10px 16px; border-radius: 12px; background: var(--text); color: var(--bg); text-decoration: none; font-weight: 600; transition: top 200ms var(--ease-out); }
 .skip:focus { top: 12px; }
-.grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-box-decoration-break: clone; }
+.accent { color: var(--accent); }
 
 /* ---- nav: a strip of material the page scrolls under ----------------------------------------------------- */
 .nav { position: fixed; inset: 0 0 auto; z-index: 50; padding-top: env(safe-area-inset-top); background: color-mix(in srgb, var(--bg) 0%, transparent); transition: background-color 240ms ease; }
@@ -144,7 +144,7 @@ svg { flex: none; }
 .stage { position: relative; margin-top: 70px; perspective: 2000px; }
 .stage__enter { position: relative; }
 .stage__tilt { transform-origin: 50% 0; }
-.stage__glow { position: absolute; inset: 14% 10% -4%; z-index: -1; border-radius: 40px; background: var(--grad); opacity: .2; filter: blur(80px); }
+.stage__glow { position: absolute; inset: 14% 10% -4%; z-index: -1; border-radius: 40px; background: #0a84ff; opacity: .16; filter: blur(80px); }
 
 /* ---- device frames -------------------------------------------------------------------------------------- */
 .win { position: relative; margin: 0; border-radius: 12px; overflow: hidden; background: var(--card); box-shadow: var(--shadow-win); }
@@ -220,7 +220,7 @@ section { position: relative; }
 
 /* privacy */
 .privacy { padding: 150px 0 0; }
-.privacy__mark { width: 80px; height: 80px; margin: 0 auto 26px; border-radius: 24px; display: grid; place-items: center; background: var(--grad); color: #fff; }
+.privacy__mark { width: 80px; height: 80px; margin: 0 auto 26px; border-radius: 24px; display: grid; place-items: center; background: #0071e3; color: #fff; }
 .privacy__mark svg { width: 40px; height: 40px; }
 .privacy__mark path, .privacy__mark rect { stroke-dasharray: 1; stroke-dashoffset: 0; }
 .link { display: inline-flex; align-items: center; gap: 5px; margin-top: 22px; font-size: 19px; color: var(--link); text-decoration: none; }
@@ -325,7 +325,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   <section class="hero">
     <div class="wrap">
       <a class="hero__new" href="#more"><b>New</b> Simpl for Brightspace <svg aria-hidden="true"><use href="#i-fwd"/></svg></a>
-      <h1 class="hero__title"><span class="w" style="--i:0">Learning</span> <span class="w" style="--i:1">made</span> <span class="w" style="--i:2"><span class="grad-text">Simpl.</span></span></h1>
+      <h1 class="hero__title"><span class="w" style="--i:0">Learning</span> <span class="w" style="--i:1">made</span> <span class="w" style="--i:2"><span class="accent">Simpl.</span></span></h1>
       <p class="sub">Canvas and Brightspace, made simple.</p>
       <div class="cta">
         <a class="btn btn--blue" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
@@ -366,7 +366,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 
   <!-- ---- grades -------------------------------------------------------------------------------------- -->
   <section class="band" id="grades">
-    <div class="wrap center reveal" style="--k:#8e44ec">
+    <div class="wrap center reveal" style="--k:#30b0c7">
       <p class="kicker">Grades</p>
       <h2 class="h2">Know your grades.</h2>
       <p class="sub">Your GPA and every course, at a glance.</p>
@@ -509,9 +509,9 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       <div class="bento">
         <div class="bit bit--wide reveal" style="--c:#ff453a"><svg aria-hidden="true"><use href="#i-bell"/></svg><p><b>Notifications.</b> Everything new, in one place.</p></div>
         <div class="bit reveal" style="--c:#0a84ff; --d:60ms"><svg aria-hidden="true"><use href="#i-clip"/></svg><p><b>Hand in.</b> Files, links or text.</p></div>
-        <div class="bit reveal" style="--c:#5e5ce6; --d:120ms"><svg aria-hidden="true"><use href="#i-search"/></svg><p><b>Search.</b> One box for everything.</p></div>
+        <div class="bit reveal" style="--c:#0a84ff; --d:120ms"><svg aria-hidden="true"><use href="#i-search"/></svg><p><b>Search.</b> One box for everything.</p></div>
         <div class="bit reveal" style="--c:#ff9f0a"><svg aria-hidden="true"><use href="#i-cards"/></svg><p><b>Study tools.</b> Flashcards, timer, calculator.</p></div>
-        <div class="bit reveal" style="--c:#af52de; --d:60ms"><svg aria-hidden="true"><use href="#i-wand"/></svg><p><b>What-if.</b> See a grade before it lands.</p></div>
+        <div class="bit reveal" style="--c:#30b0c7; --d:60ms"><svg aria-hidden="true"><use href="#i-wand"/></svg><p><b>What-if.</b> See a grade before it lands.</p></div>
         <div class="bit bit--wide reveal" style="--c:#ff375f; --d:120ms"><svg aria-hidden="true"><use href="#i-clock"/></svg><p><b>Reminders.</b> A nudge before it’s due.</p></div>
         <div class="bit bit--wide reveal" style="--c:#30b45a"><svg aria-hidden="true"><use href="#i-list"/></svg><p><b>Your tasks.</b> Add your own to-dos.</p></div>
         <div class="bit bit--wide reveal" style="--c:#64d2ff; --d:60ms"><svg aria-hidden="true"><use href="#i-moon"/></svg><p><b>Dark mode.</b> Easy on the eyes.</p></div>
