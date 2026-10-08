@@ -16,7 +16,7 @@ curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuest
 defaults write com.simplcourses.mac ApplePersistenceIgnoreState -bool YES >/dev/null 2>&1 || true
 
 # shoot <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it: -SimplDemo),
-# pictured <wait> seconds after it starts
+# pictured <wait> seconds after it starts (SIZE=900x820 shoot …: a window of another size)
 shoot() {
   local name="$1" wait="$2"
   shift 2
@@ -24,7 +24,7 @@ shoot() {
   sleep 0.6
   rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
   "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
-    -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplWindowSize 1280x820 \
+    -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplWindowSize "${SIZE:-1280x820}" \
     -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
   local pid=$!
   local i=0
@@ -75,7 +75,26 @@ for MODE in light dark; do
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
   shoot "$MODE-26-school" 8 -SimplPicker merced
+  # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
+  # search field's commands
+  shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
+  shoot "$MODE-01d-dashboard-counter" 16 -SimplSheet next
+  shoot "$MODE-07b-inbox-thread" 14 -SimplPlace inbox -SimplOpen conversation:first
+  shoot "$MODE-27-tour" 14 -SimplOpen tour
+  shoot "$MODE-30-commands" 14 -SimplOpen palette:/
 done
+# (1.2) in light only: more of the redesign, and the narrow window's layouts
+MODE=light
+shoot light-01c-dashboard-activity 14 -SimplDashView activity
+shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4
+shoot light-23b-settings-updates 12 -SimplOpen settings -SimplSettingsTab updates
+shoot light-28-tour-course 16 -SimplOpen tour:3
+shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
+SIZE=940x820 shoot light-40-narrow-dashboard 14
+SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
+SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox
+SIZE=1720x1040 shoot light-43-wide-dashboard 14
+SIZE=1720x1040 shoot light-44-wide-inbox 14 -SimplPlace inbox -SimplOpen conversation:first
 # Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
 export BASE=http://localhost:8860
 MODE=light
