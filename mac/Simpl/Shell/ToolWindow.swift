@@ -1,0 +1,249 @@
+import AppKit
+import SwiftUI
+import WebKit
+
+private struct LaunchAnswer: Decodable {
+    var url: String
+    var name: String?
+    var sessionless: Bool?
+}
+
+/// An external tool (an assignment's, a New Quizzes quiz's, a module item's, a course's own), or a page of Canvas's own
+/// the app has no screen for, in a window of its own: Canvas's one-time launch opens the tool on its own page, in a web
+/// view with the Canvas session — its alerts, file pickers, sign-in windows and video all work — under the Mac's own
+/// toolbar: Back and Forward, Reload, and Open in Browser, Copy Link and Share.
+struct ToolWindow: View {
+    let launch: ToolLaunch?
+    @EnvironmentObject private var model: AppModel
+    @StateObject private var browser = ToolBrowser()
+    @State private var url: URL?
+    @State private var name = ""
+    @State private var error: String?
+
+    private var title: String {
+        if !browser.title.isEmpty { return browser.title }
+        if !name.isEmpty { return name }
+        return launch?.title ?? "Canvas"
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            if let url {
+                ToolWebView(url: url, browser: browser)
+                    .transition(.opacity)
+            } else if let error {
+                ContentUnavailableView {
+                    Label("The tool could not open", systemImage: "puzzlepiece.extension")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try Again") { Task { await start() } }
+                        .keyboardShortcut(.defaultAction)
+                }
+            } else {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Opening \(launch?.title ?? "Canvas")…").foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+            }
+            if browser.loading && url != nil {
+                ProgressView(value: max(browser.progress, 0.05))
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Motion.gentle, value: url)
+        .animation(.easeOut(duration: 0.2), value: browser.loading)
+        .frame(minWidth: 640, minHeight: 480)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .navigationTitle(title)
+        .navigationSubtitle(browser.current?.host ?? "")
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                ControlGroup {
+                    Button { browser.back() } label: { Label("Back", systemImage: "chevron.left") }
+                        .disabled(!browser.canGoBack)
+                        .help("Back")
+                    Button { browser.forward() } label: { Label("Forward", systemImage: "chevron.right") }
+                        .disabled(!browser.canGoForward)
+                        .help("Forward")
+                }
+                .controlGroupStyle(.navigation)
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { browser.reload() } label: { Label("Reload", systemImage: "arrow.clockwise") }
+                    .keyboardShortcut("r")
+                    .help("Reload")
+                    .disabled(url == nil)
+                if let u = browser.current ?? url {
+                    ShareLink(item: u) { Label("Share", systemImage: "square.and.arrow.up") }
+                        .help("Share")
+                    Menu {
+                        Button("Open in Browser") { NSWorkspace.shared.open(u) }
+                        Button("Copy Link") { copyToPasteboard(u.absoluteString) }
+                    } label: {
+                        Label("More", systemImage: "ellipsis.circle")
+                    }
+                    .menuIndicator(.hidden)
+                    .help("More")
+                }
+            }
+        }
+        .task(id: model.engine == nil) { await start() }
+    }
+
+    private func start() async {
+        guard url == nil, let launch else { return }
+        error = nil
+        if let p = launch.args["page"] {
+            url = URL(string: p)
+            return
+        }
+        guard let engine = model.engine else { return } // (the main window makes it; this window waits for it)
+        do {
+            let a = try await engine.call("toolLaunch", launch.args, as: LaunchAnswer.self)
+            guard let u = URL(string: a.url) else { throw EngineError.unreadable }
+            if let n = a.name, !n.isEmpty { name = n }
+            url = u
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+/// The tool's web view's state, for the toolbar over it.
+@MainActor
+final class ToolBrowser: ObservableObject {
+    @Published var title = ""
+    @Published var loading = false
+    @Published var progress = 0.0
+    @Published var canGoBack = false
+    @Published var canGoForward = false
+    @Published var current: URL?
+    weak var webView: WKWebView?
+    private var watchers: [NSKeyValueObservation] = []
+
+    func attach(_ v: WKWebView) {
+        webView = v
+        watchers = [
+            v.observe(\.title) { [weak self] w, _ in Task { @MainActor in self?.title = w.title ?? "" } },
+            v.observe(\.isLoading) { [weak self] w, _ in Task { @MainActor in self?.loading = w.isLoading } },
+            v.observe(\.estimatedProgress) { [weak self] w, _ in Task { @MainActor in self?.progress = w.estimatedProgress } },
+            v.observe(\.canGoBack) { [weak self] w, _ in Task { @MainActor in self?.canGoBack = w.canGoBack } },
+            v.observe(\.canGoForward) { [weak self] w, _ in Task { @MainActor in self?.canGoForward = w.canGoForward } },
+            v.observe(\.url) { [weak self] w, _ in Task { @MainActor in self?.current = w.url } },
+        ]
+    }
+
+    func back() { webView?.goBack() }
+    func forward() { webView?.goForward() }
+    func reload() { webView?.reload() }
+}
+
+/// The tool's own web view: the Canvas session (a tool that asks Canvas again finds it signed in), a window the tool
+/// opens shown in place, its alerts as the window's sheets, a file field's chooser as the open panel, and a download in
+/// Quick Look.
+struct ToolWebView: NSViewRepresentable {
+    let url: URL
+    let browser: ToolBrowser
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+        config.mediaTypesRequiringUserActionForPlayback = []
+        config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
+        let v = WKWebView(frame: .zero, configuration: config)
+        v.allowsBackForwardNavigationGestures = true
+        v.allowsMagnification = true
+        v.navigationDelegate = context.coordinator
+        v.uiDelegate = context.coordinator
+        v.isInspectable = true
+        browser.attach(v)
+        v.load(URLRequest(url: url))
+        return v
+    }
+
+    func updateNSView(_ v: WKWebView, context: Context) {}
+
+    static func dismantleNSView(_ v: WKWebView, coordinator: Coordinator) {
+        v.stopLoading()
+        v.navigationDelegate = nil
+        v.uiDelegate = nil
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        // a window the tool opens (a sign-in, a resource): shown in place, as a tab would be
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if navigationAction.targetFrame == nil { webView.load(navigationAction.request) }
+            return nil
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            let scheme = navigationAction.request.url?.scheme?.lowercased() ?? ""
+            if navigationAction.shouldPerformDownload {
+                decisionHandler(.download)
+            } else if ["http", "https", "about", "blob", "data"].contains(scheme) || scheme.isEmpty {
+                decisionHandler(.allow)
+            } else {
+                if let u = navigationAction.request.url { NSWorkspace.shared.open(u) } // (mailto:, an app's link)
+                decisionHandler(.cancel)
+            }
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+            // (a file the page cannot show: fetched with the session, into Quick Look)
+            decisionHandler(navigationResponse.canShowMIMEType ? .allow : .download)
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+            FilePreview.shared.take(download, name: navigationAction.request.url?.lastPathComponent)
+        }
+
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+            FilePreview.shared.take(download, name: navigationResponse.response.suggestedFilename)
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            let alert = NSAlert()
+            alert.messageText = message
+            alert.addButton(withTitle: "OK")
+            WebController.run(alert, over: webView) { _ in completionHandler() }
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            let alert = NSAlert()
+            alert.messageText = message
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+            WebController.run(alert, over: webView) { completionHandler($0 == .alertFirstButtonReturn) }
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+            let alert = NSAlert()
+            alert.messageText = prompt
+            let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+            field.stringValue = defaultText ?? ""
+            alert.accessoryView = field
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+            WebController.run(alert, over: webView) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
+        }
+
+        func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = true
+            panel.canChooseDirectories = parameters.allowsDirectories
+            panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+            if let window = webView.window {
+                panel.beginSheetModal(for: window) { completionHandler($0 == .OK ? panel.urls : nil) }
+            } else {
+                completionHandler(panel.runModal() == .OK ? panel.urls : nil)
+            }
+        }
+    }
+}

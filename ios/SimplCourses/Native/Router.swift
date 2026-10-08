@@ -1,4 +1,4 @@
-import UIKit
+import SwiftUI
 
 /// Which Canvas addresses the app draws itself (1.2): a course and what is in it — its home,
 /// announcements, discussions and a discussion, assignments and an assignment, modules, pages and a

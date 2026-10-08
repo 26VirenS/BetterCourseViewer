@@ -40,7 +40,9 @@ enum LoginVault {
         SecItemDelete(query() as CFDictionary)
         var q = query()
         q[kSecValueData as String] = data
+        #if os(iOS)
         q[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        #endif
         let ok = SecItemAdd(q as CFDictionary, nil) == errSecSuccess
         NotificationCenter.default.post(name: .simplLoginChanged, object: nil)
         return ok

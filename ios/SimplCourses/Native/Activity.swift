@@ -1,6 +1,8 @@
+#if os(iOS)
 import BackgroundTasks
-import SwiftUI
 import UIKit
+#endif
+import SwiftUI
 import UserNotifications
 
 /// New activity (1.5): an alert when something is posted — an announcement, a grade, a comment on your work, a message,
@@ -74,6 +76,10 @@ final class Activity: ObservableObject {
     @Published private(set) var refreshOff = false
     /// When Canvas was last read for this (in the background or as the app came up).
     @Published private(set) var lastCheck: Date? = UserDefaults.standard.object(forKey: Activity.lastKey) as? Date
+    #if os(macOS)
+    /// (the Mac app: it runs while it is open, so a look every 20 minutes is a timer of its own)
+    private var timer: Timer?
+    #endif
 
     private static func loadKinds() -> Set<Kind> {
         guard let raw = UserDefaults.standard.array(forKey: kindsKey) as? [String] else { return Kind.standard }
@@ -96,7 +102,12 @@ final class Activity: ObservableObject {
 
     func disable() {
         setOn(false)
+        #if os(iOS)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Activity.taskID)
+        #else
+        timer?.invalidate()
+        timer = nil
+        #endif
     }
 
     /// Signed out, another school: what was seen and the courses chosen were that account's.
@@ -106,7 +117,11 @@ final class Activity: ObservableObject {
     }
 
     func checkRefresh() {
+        #if os(iOS)
         refreshOff = UIApplication.shared.backgroundRefreshStatus != .available
+        #else
+        refreshOff = false
+        #endif
     }
 
     private func setOn(_ value: Bool) {
@@ -131,9 +146,19 @@ final class Activity: ObservableObject {
     /// The next background check, no sooner than 20 minutes from now (iOS picks the moment).
     func schedule() {
         guard on else { return }
+        #if os(iOS)
         let r = BGAppRefreshTaskRequest(identifier: Activity.taskID)
         r.earliestBeginDate = Date(timeIntervalSinceNow: 20 * 60)
         try? BGTaskScheduler.shared.submit(r)
+        #else
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 20 * 60, repeats: true) { _ in
+            Task { @MainActor in
+                guard Activity.shared.on else { return }
+                _ = await Activity.shared.check(notify: true)
+            }
+        }
+        #endif
     }
 
     // MARK: - The check

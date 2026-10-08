@@ -1,0 +1,82 @@
+# Simpl for Mac (mac/): built with Xcode 26 for macOS, signed to run locally, and run against the mock Canvas: every
+# native screen pictured in light and dark (scripts/dev/mac-shots.sh), the pictures, the build's errors and the app
+# itself pushed to the mac-shots branch to be looked at. Nothing is published here.
+name: Mac app
+
+on:
+  push:
+    paths:
+      - 'mac/**'
+      - 'ios/SimplCourses/App/AppSession.swift'
+      - 'ios/SimplCourses/App/SchoolPickerView.swift'
+      - 'ios/SimplCourses/Native/Models.swift'
+      - 'ios/SimplCourses/Native/CourseModels.swift'
+      - 'ios/SimplCourses/Native/QuizModels.swift'
+      - 'ios/SimplCourses/Native/QuizRun.swift'
+      - 'ios/SimplCourses/Native/Reminders.swift'
+      - 'ios/SimplCourses/Native/Activity.swift'
+      - 'ios/SimplCourses/Native/Router.swift'
+      - 'ios/SimplCourses/Web/**'
+      - 'extension/content/app/native-app.js'
+      - 'scripts/dev/make-mac-project.py'
+      - 'scripts/dev/mac-shots.sh'
+      - '.github/workflows/mac.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mac-app
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    runs-on: macos-26
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: The project is what the generator writes
+        run: |
+          python3 scripts/dev/make-mac-project.py
+          git diff --exit-code -- mac/Simpl.xcodeproj || { echo "::error::mac/Simpl.xcodeproj differs from scripts/dev/make-mac-project.py's"; exit 1; }
+      - name: Build for macOS
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          mkdir -p shots
+          xcodebuild -project mac/Simpl.xcodeproj -scheme Simpl -configuration Debug -destination 'platform=macOS' \
+            -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build 2>&1 \
+            | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -E "error:" -B2 -A8 build.log | head -600 > shots/build-errors.txt || true
+          grep -E "warning:.*mac/Simpl/" build.log | sort -u | head -300 > shots/build-warnings.txt || true
+          grep -q "BUILD SUCCEEDED" build.log || { echo "build failed" > shots/FAILED; cat shots/build-errors.txt | head -300; }
+      - name: Mock Canvas
+        if: hashFiles('shots/FAILED') == ''
+        run: |
+          node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          sleep 2
+          curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+          system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
+      - name: Screens
+        if: hashFiles('shots/FAILED') == ''
+        run: bash scripts/dev/mac-shots.sh
+      - name: Push the pictures to the mac-shots branch
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p shots
+          tail -c 900000 build.log > shots/build-tail.log 2>/dev/null || true
+          [ -d build/Build/Products/Debug/Simpl.app ] && (cd build/Build/Products/Debug && ditto -c -k --keepParent Simpl.app "$GITHUB_WORKSPACE/shots/Simpl.app.zip") || true
+          echo "${GITHUB_SHA}" > shots/COMMIT
+          cd shots
+          git init -q
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout -q -b mac-shots
+          git add -A
+          git commit -qm "Mac screenshots for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" mac-shots && echo PUSHED
+      - name: The build passed
+        run: test ! -f shots/FAILED

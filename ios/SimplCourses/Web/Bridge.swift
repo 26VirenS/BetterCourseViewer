@@ -1,5 +1,9 @@
 import Foundation
+#if os(iOS)
 import UIKit
+#else
+import AppKit
+#endif
 import WebKit
 
 /// The native half of Web/bridge.js: extension storage, "sign out" and "open settings". One instance
@@ -97,6 +101,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "log":
             print("[Simpl Courses web]", body["text"] as? String ?? "")
             replyHandler(nil, nil)
+        #if os(iOS)
         case "ask":
             // the phone's own alert for a question the page asks (a destructive answer drawn in red)
             let title = body["title"] as? String ?? ""
@@ -132,6 +137,28 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 }
             }
             if !Bridge.present(sheet) { replyHandler(nil, "Simpl Courses: nowhere to show the list") }
+        #else
+        case "ask":
+            // the Mac's own alert, as the window's sheet (a destructive answer marked as such)
+            let alert = NSAlert()
+            alert.messageText = body["title"] as? String ?? ""
+            alert.informativeText = body["note"] as? String ?? ""
+            let ok = alert.addButton(withTitle: body["okLabel"] as? String ?? "OK")
+            if (body["danger"] as? Bool) == true { ok.hasDestructiveAction = true }
+            if let cancel = body["cancelLabel"] as? String, !cancel.isEmpty { alert.addButton(withTitle: cancel) }
+            WebController.run(alert, over: message.webView) { replyHandler(["ok": $0 == .alertFirstButtonReturn], nil) }
+        case "menu":
+            // the Mac's own menu, at the control that asked; the index picked, or -1
+            let items = body["items"] as? [[String: Any]] ?? []
+            guard let view = message.webView else { replyHandler(["index": -1], nil); return }
+            var at = NSPoint(x: view.bounds.midX, y: view.bounds.midY)
+            if let r = body["rect"] as? [String: Any], let x = Bridge.number(r["x"]), let y = Bridge.number(r["y"]) {
+                let h = Bridge.number(r["h"]) ?? 0
+                at = NSPoint(x: x, y: view.isFlipped ? y + h : view.bounds.height - y - h)
+            }
+            let picker = MenuPicker(items: items) { replyHandler(["index": $0], nil) }
+            picker.pop(in: view, at: at)
+        #endif
         case "previewFile":
             // a file in the phone's own viewer, fetched with the page's own session
             guard let address = body["url"] as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let view = message.webView else {
@@ -157,6 +184,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         }
     }
 
+    #if os(iOS)
     /// Present over whatever is on screen; false when there is no window to present in.
     @discardableResult
     static func present(_ controller: UIViewController) -> Bool {
@@ -164,6 +192,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         top.present(controller, animated: true)
         return true
     }
+    #endif
 
     static func number(_ value: Any?) -> CGFloat? {
         (value as? NSNumber).map { CGFloat($0.doubleValue) }
@@ -186,3 +215,48 @@ final class WeakBox<T: AnyObject> {
     weak var value: T?
     init(_ value: T) { self.value = value }
 }
+
+#if os(macOS)
+/// A short list the page offers (a menu, a picker), as the Mac's own pop-up menu: the index picked, or -1 when it
+/// closes with nothing picked.
+final class MenuPicker: NSObject, NSMenuDelegate {
+    private let items: [[String: Any]]
+    private let done: (Int) -> Void
+    private var picked = -1
+    private var keep: MenuPicker?
+
+    init(items: [[String: Any]], done: @escaping (Int) -> Void) {
+        self.items = items
+        self.done = done
+    }
+
+    func pop(in view: NSView, at point: NSPoint) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.delegate = self
+        for (i, item) in items.enumerated() {
+            var label = item["label"] as? String ?? ""
+            if let sub = item["sub"] as? String, !sub.isEmpty { label += " · \(sub)" }
+            let entry = NSMenuItem(title: label, action: #selector(choose(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.tag = i
+            entry.state = (item["active"] as? Bool) == true ? .on : .off
+            menu.addItem(entry)
+        }
+        keep = self // (held until the menu closes)
+        menu.popUp(positioning: nil, at: point, in: view)
+    }
+
+    @objc private func choose(_ sender: NSMenuItem) {
+        picked = sender.tag
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        // (the item's action runs after the menu has closed: the answer waits a turn for it)
+        DispatchQueue.main.async {
+            self.done(self.picked)
+            self.keep = nil
+        }
+    }
+}
+#endif

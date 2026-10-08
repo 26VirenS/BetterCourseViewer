@@ -1,7 +1,11 @@
 import Combine
 import Foundation
+#if os(iOS)
 import SafariServices
 import UIKit
+#else
+import AppKit
+#endif
 import WebKit
 
 /// One web view with the extension injected: the Canvas site (an isolated content world, like an
@@ -36,10 +40,14 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         }
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default() // the Canvas session persists across launches, like a browser
-        config.allowsInlineMediaPlayback = true
         // Identify as Safari: Canvas serves its full web interface to Safari and a cut-down one to
         // unknown web views, and the extension is written for the full one.
+        #if os(iOS)
+        config.allowsInlineMediaPlayback = true
         config.applicationNameForUserAgent = "Version/17.0 Mobile/15E148 Safari/604.1"
+        #else
+        config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15" // (the Mac app: a Mac's Safari, Canvas's desktop pages)
+        #endif
         let ucc = WKUserContentController()
         for script in ScriptBundle.userScripts(for: mode, world: world) { ucc.addUserScript(script) }
         ucc.addScriptMessageHandler(Bridge.shared, contentWorld: world, name: Bridge.handlerName)
@@ -54,24 +62,46 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
+        #if os(iOS)
         webView.isOpaque = false
         webView.backgroundColor = .systemBackground
         // The page lays itself out under the status bar and the home indicator using the safe-area
         // insets it reads from CSS (ScriptBundle sets viewport-fit=cover), so WebKit must not add its own.
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        #endif
         Bridge.shared.register(webView, world: world)
         login.webView = webView
         login.onRestart = { [weak self] in self?.load() } // (Start Over: Canvas afresh, which asks the school anew)
         if case .canvas = mode {
             CookieJar.shared.watch(webView.configuration.websiteDataStore.httpCookieStore) // the session outlives the app
+            #if os(iOS)
             let refresh = UIRefreshControl()
             refresh.addTarget(self, action: #selector(pullToRefresh(_:)), for: .valueChanged)
             webView.scrollView.refreshControl = refresh
+            #endif
         }
     }
 
+    #if os(iOS)
     @objc private func pullToRefresh(_ sender: UIRefreshControl) {
         webView.reload()
+    }
+    #endif
+
+    /// Pull to refresh put away (the phone's; a Mac has none).
+    private func endRefreshing() {
+        #if os(iOS)
+        webView.scrollView.refreshControl?.endRefreshing()
+        #endif
+    }
+
+    /// mailto:, tel:, another app's address: the system's to open.
+    static func openSystem(_ url: URL) {
+        #if os(iOS)
+        UIApplication.shared.open(url)
+        #else
+        NSWorkspace.shared.open(url)
+        #endif
     }
 
     var currentURL: URL? { webView.url }
@@ -139,7 +169,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
         let scheme = url.scheme?.lowercased() ?? ""
         if !["http", "https", "file", "about", "blob", "data"].contains(scheme) {
-            UIApplication.shared.open(url) // mailto:, tel:, another app
+            WebController.openSystem(url) // mailto:, tel:, another app
             decisionHandler(.cancel)
             return
         }
@@ -186,19 +216,19 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         isLoading = false
         pageTitle = webView.title ?? ""
-        webView.scrollView.refreshControl?.endRefreshing()
+        endRefreshing()
         if case .canvas = mode { login.didLoad(webView.url) }
         onFinish?(webView.url)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         isLoading = false
-        webView.scrollView.refreshControl?.endRefreshing()
+        endRefreshing()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLoading = false
-        webView.scrollView.refreshControl?.endRefreshing()
+        endRefreshing()
         let e = error as NSError
         // Not failures: a navigation that was cancelled or superseded (-999), and WebKit's "Frame load
         // interrupted" (WebKitErrorDomain 102), which it raises when a navigation is replaced by another
@@ -245,6 +275,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         return nil
     }
 
+    #if os(iOS)
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
@@ -282,8 +313,65 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
             UIApplication.shared.open(url)
         }
     }
+    #else
+    // The Mac's own: the page's alert, confirm and prompt as the window's sheet (an alert of its own when no window is up),
+    // a file field's chooser as the open panel, and another site in the student's own browser.
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.addButton(withTitle: "OK")
+        WebController.run(alert, over: webView) { _ in completionHandler() }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        WebController.run(alert, over: webView) { completionHandler($0 == .alertFirstButtonReturn) }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = prompt
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = defaultText ?? ""
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        WebController.run(alert, over: webView) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
+    }
+
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = parameters.allowsDirectories
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        if let window = webView.window {
+            panel.beginSheetModal(for: window) { completionHandler($0 == .OK ? panel.urls : nil) }
+        } else {
+            completionHandler(panel.runModal() == .OK ? panel.urls : nil)
+        }
+    }
+
+    /// An alert as the sheet of the window the view is in, else on its own; `done` gets the button pressed.
+    static func run(_ alert: NSAlert, over view: NSView?, done: @escaping (NSApplication.ModalResponse) -> Void) {
+        if let window = view?.window ?? NSApp.keyWindow ?? NSApp.mainWindow {
+            alert.beginSheetModal(for: window, completionHandler: done)
+        } else {
+            done(alert.runModal())
+        }
+    }
+
+    /// Another site, in the student's own browser (its own session there); anything else to the system.
+    func openExternally(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
+    #endif
 }
 
+#if os(iOS)
 extension UIApplication {
     static func topViewController() -> UIViewController? {
         let scenes = shared.connectedScenes.compactMap { $0 as? UIWindowScene }
@@ -294,3 +382,4 @@ extension UIApplication {
         return controller
     }
 }
+#endif

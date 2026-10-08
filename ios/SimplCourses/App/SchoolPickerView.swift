@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if os(iOS)
 /// First run: which Canvas site to open. (1.6.1) The student searches for their school by name — Instructure's listings,
 /// carried in the app (extension/data/schools.json) so the first letters already find it, and Instructure's own "Find my
 /// school" lookup asked as well when the list carried has few — and presses it; the address can still be typed by hand.
@@ -88,6 +89,7 @@ struct SchoolPickerView: View {
         if !session.setHost(raw) { invalid = true }
     }
 }
+#endif
 
 /// The schools to search: Instructure's listings carried in the app, and its live lookup for what they lack.
 @MainActor

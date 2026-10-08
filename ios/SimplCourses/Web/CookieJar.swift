@@ -1,6 +1,10 @@
 import Foundation
 import Security
+#if os(iOS)
 import UIKit
+#else
+import AppKit
+#endif
 import WebKit
 
 /// Keeps the Canvas session across launches. WebKit holds cookies that carry no expiry date (Canvas's
@@ -31,7 +35,13 @@ final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
         guard watched !== store else { return }
         watched = store
         store.add(self)
+        #if os(iOS)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive), name: UIApplication.willResignActiveNotification, object: nil)
+        #else
+        // (a Mac app leaves the front, or quits: the session is written down either way)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive), name: NSApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive), name: NSApplication.willTerminateNotification, object: nil)
+        #endif
     }
 
     func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
@@ -109,7 +119,9 @@ final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
         var q = query()
         SecItemDelete(q as CFDictionary)
         q[kSecValueData as String] = data
+        #if os(iOS)
         q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        #endif
         SecItemAdd(q as CFDictionary, nil)
     }
 
