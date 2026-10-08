@@ -10,7 +10,7 @@ struct DashboardView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<Today>()
     /// The view chosen (Cards, List, Activity), kept on this Mac. (The screenshot suite: -SimplDashView list.)
-    @AppStorage("SimplDashView") private var chosen: DashView = .cards
+    @AppStorage("SimplDashView") private var chosen: DashView = .list // (1.2.1: List unless another is picked)
     @State private var counts: TodayCounts?
     @State private var open: String?
     @State private var sheetAsked = false
@@ -28,7 +28,7 @@ struct DashboardView: View {
 
     /// Brightspace has no activity stream: there the Activity view is not offered.
     private var views: [DashView] { engine.onBrightspace ? [.cards, .list] : DashView.allCases }
-    private var view: DashView { views.contains(chosen) ? chosen : .cards }
+    private var view: DashView { views.contains(chosen) ? chosen : .list }
 
     // MARK: - Widths
 
