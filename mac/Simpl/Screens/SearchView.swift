@@ -196,9 +196,10 @@ private struct KindChip: View {
                     .font(.sCallout.weight(.medium))
                 Text("\(count)")
                     .font(.sCallout.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .opacity(0.7)
             }
-            .foregroundStyle(on ? Color.accentColor : Color.primary)
+            // (white on the chip the accent fills while it is the one shown; its label was lost in the tint)
+            .foregroundStyle(on ? Color.white : Color.primary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .contentShape(Capsule())
