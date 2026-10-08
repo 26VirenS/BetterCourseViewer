@@ -1,19 +1,25 @@
 # Simpl Courses — the website
 
-Three pages, no build step, no dependencies: `public/index.html` (the landing page),
-`public/privacy.html` (the privacy policy, served at `/privacy`) and `public/report/` (Report a
-bug, served at `/report/`, where Simpl's purple button leads). Each is self-contained — the
-styles are inline and every icon is SVG. One small piece of code, `src/worker.js`, answers the
-report form at `/api/report`; everything else is a file served as it is.
+Three pages, no build step, no dependencies: `public/index.html` (the landing page, its pictures in
+`public/img/`), `public/privacy.html` (the privacy policy, served at `/privacy`) and `public/report/` (Report a
+bug, served at `/report/`, where Simpl's purple button leads). Each is self-contained — the styles are inline and
+every icon is SVG. One small piece of code, `src/worker.js`, answers the report form at `/api/report`; everything
+else is a file served as it is.
+
+The landing page's pictures of the interface are the real thing: `scripts/dev/site-shots.mjs` (on the development
+branch) renders the extension at 2× on the mock Canvas and the mock Brightspace, as a made-up school, in light and
+dark; the iPhone and Mac app pictures come from their screenshot suites. **Download for Mac** opens into two
+choices: the Safari extension (`/download/mac`, the Safari app's newest zip) and Simpl for Mac
+(`/download/mac-app`, the newest `mac-v*` release's zip, written into `_redirects` by `scripts/publish-site.sh`).
 
 This branch carries the site and nothing else, so every push to it is a deploy. The
 extension, the Mac app and the iOS app live on the development branches.
 
-**Where to edit what.** The Report a bug page, the code behind it, `wrangler.jsonc` and this
-README are kept on the development branch under `site/`, and the Package workflow lays them over
-this branch at every release (`scripts/publish-site.sh`): edit them there, or the next release puts
-them back. The landing page, the privacy policy, `_headers` and `robots.txt` are edited here. The
-Mac app's update feed and download address are written by the release (below).
+**Where to edit what.** The landing page and its pictures, the Report a bug page, the code behind it,
+`wrangler.jsonc` and this README are kept on the development branch under `site/`, and the Site workflow lays
+them over this branch whenever they change there (`scripts/publish-site.sh`; the Package workflow does too, at
+every release): edit them there, or the next run puts them back. The privacy policy, `_headers` and `robots.txt`
+are edited here. The Mac apps' update feed and download addresses are written by their releases (below).
 
 ## Deploying it
 

@@ -1,0 +1,33 @@
+# The website: site/ laid over the site branch, which Cloudflare deploys (scripts/publish-site.sh) — whenever site/
+# changes on the default branch, after a Simpl for Mac release (its download address, /download/mac-app), or by hand
+# (Actions → Site → Run workflow). The Package workflow does the same at every release.
+name: Site
+
+on:
+  push:
+    paths:
+      - 'site/**'
+      - 'scripts/publish-site.sh'
+      - '.github/workflows/site.yml'
+  workflow_run:
+    workflows: ['Simpl for Mac release']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-branch
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref_name == github.event.repository.default_branch && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish site/ to the site branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/publish-site.sh
