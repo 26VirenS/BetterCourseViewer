@@ -142,6 +142,14 @@ final class Engine: ObservableObject, ShellListener {
     private func setPhase(_ p: Phase) {
         guard phase != p else { return }
         withAnimation(.easeInOut(duration: 0.35)) { phase = p }
+        if p == .native {
+            // (the page underneath lets go of the keyboard: what is typed goes to the app's own screens, never to it)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let window = self.hostView.window, let responder = window.firstResponder as? NSView,
+                      responder === self.web.webView || responder.isDescendant(of: self.web.webView) else { return }
+                window.makeFirstResponder(nil)
+            }
+        }
     }
 
     private func pageFinished(_ url: URL?) {
@@ -343,9 +351,9 @@ final class Engine: ObservableObject, ShellListener {
         if case .section(let ctx, _) = place { Task { await loadSections(ctx) } }
     }
 
-    /// A screen pushed on the place showing.
+    /// A screen pushed on the place showing (on the same short curve as Back and Forward).
     func push(_ route: Route) {
-        nav.push(route)
+        withAnimation(.easeInOut(duration: 0.2)) { nav.push(route) }
     }
 
     func goBack() {

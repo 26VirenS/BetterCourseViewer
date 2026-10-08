@@ -161,6 +161,13 @@ struct Sidebar: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            list
+            AccountBar()
+        }
+    }
+
+    private var list: some View {
         List(selection: selection) {
             Section {
                 Label("Dashboard", systemImage: "square.grid.2x2").tag(Place.dashboard)
@@ -203,7 +210,6 @@ struct Sidebar: View {
         .listStyle(.sidebar)
         .animation(Motion.gentle, value: open)
         .animation(Motion.gentle, value: engine.courses)
-        .safeAreaInset(edge: .bottom, spacing: 0) { AccountBar() }
     }
 
     private func courseRow(_ c: CourseRow) -> some View {
