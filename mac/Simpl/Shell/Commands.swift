@@ -60,6 +60,7 @@ struct SimplCommands: Commands {
             place("Grades", .grades, key: "4")
             place("Notifications", .notifications, key: "5")
             if !(engine?.onBrightspace ?? false) { place("Inbox", .inbox, key: "6") }
+            place("Tools", .tools, key: "7") // (1.2)
             Divider()
             Menu("Courses") {
                 ForEach(engine?.courses ?? []) { c in

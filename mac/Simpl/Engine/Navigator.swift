@@ -10,6 +10,7 @@ enum Place: Hashable {
     case grades
     case notifications
     case inbox
+    case tools // (1.2) the student tools (mac/Simpl/Tools)
     case groups
     case search(String)
     case home(String)

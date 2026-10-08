@@ -2033,6 +2033,36 @@
   const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
+  // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
+  // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
+  async function gradeNeeded({ id } = {}) {
+    const key = String(id);
+    const [all, ownPref] = await Promise.all([store.courses(), store.pref('gradeWeights')]);
+    const c = (all || []).find((x) => String(x.id) === key) || (await store.course(key));
+    if (!c) throw new Error('That course could not be found.');
+    const groups = (await store.assignmentGroups(c.id).catch(() => [])) || [];
+    const own = ownPref && typeof ownPref === 'object' && ownPref[c.id] && typeof ownPref[c.id] === 'object' && Object.keys(ownPref[c.id]).length ? ownPref[c.id] : null;
+    const r1 = (v) => Math.round(v * 10) / 10;
+    let now = c.score === null || c.score === undefined ? null : Number(c.score);
+    if (own) { const t = store.gradeModel(groups, c, {}, false, false, [], { ownWeights: own }).total; if (t !== null && t !== undefined) now = Number(t); }
+    const items = groups.flatMap((g) => (g.assignments || []).filter((a) => !a.omit_from_final_grade && Number(a.points_possible) > 0).map((a) => ({ a, g })));
+    const total = items.reduce((s, { a }) => s + Number(a.points_possible), 0);
+    const groupPts = {};
+    for (const { a, g } of items) groupPts[g.id] = (groupPts[g.id] || 0) + Number(a.points_possible);
+    const weighted = !!c.weighted || !!own;
+    const weightOf = (g) => (own ? (Number(own[String(g.id)]) || 0) : (Number(g.group_weight) || 0));
+    const pieces = [];
+    for (const { a, g } of items) {
+      const sub = a.submission;
+      if (sub && sub.score != null && sub.workflow_state === 'graded' && sub.posted_at !== null) continue;
+      const pts = Number(a.points_possible);
+      const worth = weighted ? (weightOf(g) * pts) / (groupPts[g.id] || pts) : (100 * pts) / (total || pts);
+      pieces.push({ id: String(a.id), name: a.name || 'Untitled', worth: r1(worth), pts, group: g.name || '', groupWeight: weightOf(g), groupPts: groupPts[g.id] || pts, total, due: a.due_at || null });
+    }
+    pieces.sort((x, y) => (y.worth - x.worth) || ((Date.parse(y.due || '') || 0) - (Date.parse(x.due || '') || 0)));
+    return { id: key, now: now === null || !Number.isFinite(now) ? null : r1(now), weighted, own: !!own, pieces };
+  }
+  CALLS.gradeNeeded = gradeNeeded;
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];

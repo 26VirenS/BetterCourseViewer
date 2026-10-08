@@ -6,6 +6,8 @@ import SwiftUI
 /// buttons, and Search (whose suggestions run commands, 1.2). The tour, the first time, goes over all of it.
 struct MainShell: View {
     @EnvironmentObject private var engine: Engine
+    @ObservedObject private var tools = ToolsCenter.shared
+    @ObservedObject private var focus = FocusTimer.shared
     @State private var columns: NavigationSplitViewVisibility = .all
     @StateObject private var palette = SearchPalette()
 
@@ -60,6 +62,15 @@ struct MainShell: View {
                 }
                 .controlGroupStyle(.navigation)
             }
+            // (1.2) the tools pinned to the toolbar, on every screen: a press opens the tool's quick version in a popover;
+            // a running focus timer shows its minutes here (mac/Simpl/Tools/PinnedTools.swift)
+            if !tools.toolbarPins(timerActive: focus.active).isEmpty {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    ForEach(tools.toolbarPins(timerActive: focus.active)) { kind in
+                        PinnedToolButton(kind: kind, engine: engine)
+                    }
+                }
+            }
         }
     }
 }
@@ -97,6 +108,7 @@ struct PlaceScreen: View {
         case .grades: GradesView()
         case .notifications: NotificationsView()
         case .inbox: InboxView()
+        case .tools: ToolsView()
         case .groups: GroupsView()
         case .search(let q): SearchView(query: q)
         case .home(let ctx): ContextHome(ctx: ctx)
@@ -201,6 +213,7 @@ struct Sidebar: View {
                         .badge(engine.countsLive ? (engine.snapshot?.inboxUnread ?? 0) : 0)
                         .tag(Place.inbox)
                 }
+                Label("Tools", systemImage: "wrench.and.screwdriver").tag(Place.tools) // (1.2)
             }
             Section("Courses") {
                 ForEach(engine.courses) { course in
