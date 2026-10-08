@@ -48,6 +48,11 @@
     [/^\/courses\/(\d+)\/quizzes\/(\d+)(?:\/.*)?$/, (m) => `/d2l/lms/quizzing/user/quiz_summary.d2l?qi=${m[2]}&ou=${m[1]}`],
     [/^\/courses\/(\d+)\/modules\/items\/(\d+)$/, (m) => `/d2l/le/content/${m[1]}/viewContent/${m[2]}/View`],
     [/^\/courses\/(\d+)\/files\/(\d+)$/, (m) => `/d2l/le/content/${m[1]}/viewContent/${m[2]}/View`], // (a file is a content topic: Brightspace's viewer shows it)
+    // the account's own pages, as Brightspace's personal menu links them
+    [/^\/profile$/, () => `/d2l/lp/profile/profile_edit.d2l?ou=${orgId() || ''}`],
+    [/^\/profile\/settings$/, () => `/d2l/lp/preferences/preferences_main/preferences_main.d2l?ou=${orgId() || ''}`],
+    [/^\/profile\/communication$/, () => `/d2l/Notifications/Settings?ou=${orgId() || ''}`],
+    [/^\/logout$/, () => '/d2l/logout'],
   ];
   const courseOf = (path) => /^\/courses\/(\d+)(?:\/|$)/.exec(path)?.[1] || null;
   // Brightspace's own page for a screen the interface draws, when the platform's own is asked for (?bcv=native: "Open in

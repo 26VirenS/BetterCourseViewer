@@ -820,7 +820,9 @@
   ];
   // Simpl's Tools are not in the iPhone app yet (1.2): their commands are not offered there
   const TOOL_COMMANDS = new Set(['tool', 'tools', 'pin', 'unpin', 'convert']);
-  const offered = (c) => !(self.BCVBridge?.native && TOOL_COMMANDS.has(c.name));
+  // Brightspace has no Inbox, groups or page history here (lib/d2l-api.js): their commands are not offered there
+  const NOT_ON_D2L = new Set(['inbox', 'groups', 'history']);
+  const offered = (c) => !(self.BCVBridge?.native && TOOL_COMMANDS.has(c.name)) && !(BCV.lms?.d2l && NOT_ON_D2L.has(c.name));
   const byName = (name) => { const s = norm(name).replace(/[’']s$/, ''); return s ? COMMANDS.find((c) => offered(c) && (c.name === s || c.aliases.includes(s))) || null : null; }; // ("/what's due" is /what)
   /** The commands a typed name could mean, best first: the name itself, then a name it starts, then
    *  (unless `strict`) a word inside the name or the line under it. */

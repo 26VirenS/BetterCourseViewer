@@ -6984,8 +6984,12 @@ try {
     const back1x = await eventually(async () => { const c = await pageCanvas(); return c.dpr === 1 && Math.abs(c.w - c.css) <= 1; }, 10000);
     await dprCdp.detach().catch(() => {});
     check(Math.abs(at1x.w - at1x.css) <= 1 && sharp2x && back1x, `the annotator draws its pages in the screen's own pixels, again whenever that changes: ${JSON.stringify({ at1x, at2x, back1x })}`);
-    const ntSel = await page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /mitochondria/.test(s.textContent)); if (!span) return ''; const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return sel.toString(); });
-    check(ntSel === 'The mitochondria is the powerhouse of the cell.' && await eventually(() => page.$('.bcv-mark__bubble').then((b) => !!b), 3000) && (await page.$$('.bcv-mark__bubble .bcv-mark__swatch')).length === 6 && (await texts('.bcv-mark__bubble .bcv-mark__tool')).join(' ') === 'Underline Strike Note', 'selecting words brings up a bubble of six colours, Underline, Strike and Note');
+    // (the pages were just drawn again for the screen's pixels: a text layer still being laid down can take the selection
+    // with it, so the words are selected again until the bubble answers — as a hand selecting them again would)
+    const selectWords = () => page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /mitochondria/.test(s.textContent)); if (!span) return ''; const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return sel.toString(); });
+    let ntSel = '';
+    const bubbled = await eventually(async () => { if (await page.$('.bcv-mark__bubble')) return true; ntSel = await selectWords(); await page.waitForTimeout(250); return !!(await page.$('.bcv-mark__bubble')); }, 6000);
+    check(ntSel === 'The mitochondria is the powerhouse of the cell.' && bubbled && (await page.$$('.bcv-mark__bubble .bcv-mark__swatch')).length === 6 && (await texts('.bcv-mark__bubble .bcv-mark__tool')).join(' ') === 'Underline Strike Note', 'selecting words brings up a bubble of six colours, Underline, Strike and Note');
     await shot(page, '43-annotator-bubble');
     await page.click('.bcv-mark__bubble .bcv-mark__swatch[data-color="green"]');
     await page.waitForTimeout(200);

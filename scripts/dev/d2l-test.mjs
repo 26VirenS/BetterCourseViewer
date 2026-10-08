@@ -102,6 +102,7 @@ console.log('\naddresses, either way');
   ];
   const natBad = nat.filter(([c, d]) => L.toPage(c) !== d || L.fromPage(d) !== c);
   check(!natBad.length && L.toPage('/courses/31001/files/1302?bcv=native') === '/d2l/le/content/31001/viewContent/1302/View', `Brightspace’s own page for a screen, when its own is asked for (“Open in Brightspace”), carries ?bcv=native so the interface leaves it be — and back: ${natBad.map(([c, d]) => `${c} → ${L.toPage(c)} → ${L.fromPage(L.toPage(c))}`).join('; ') || nat.length + ' pairs'}`);
+  check(L.toPage('/profile') === '/d2l/lp/profile/profile_edit.d2l?ou=6606' && L.toPage('/profile/settings') === '/d2l/lp/preferences/preferences_main/preferences_main.d2l?ou=6606' && L.toPage('/profile/communication') === '/d2l/Notifications/Settings?ou=6606' && L.toPage('/logout') === '/d2l/logout', 'the account’s pages — profile, settings, notifications — and signing out are Brightspace’s own, as its personal menu links them');
   check(L.fromPage('/d2l/lp/preferences/preferences_main.d2l?ou=6606') === null && L.toPage('https://example.org/x') === 'https://example.org/x' && L.toPage('/d2l/home/31001') === '/d2l/home/31001', 'a Brightspace page the interface has no screen for is left to Brightspace; another site’s address and a Brightspace one pass through');
   const edit = (raw) => { const u = L.routeUrl(raw); u.searchParams.delete('bcv'); u.searchParams.delete('step'); return L.pageFor(u); };
   check(edit(`${BASE}/d2l/home?simpl=${encodeURIComponent('/?bcv=setup')}`) === '/d2l/home' && edit(`${BASE}/d2l/home/31001?simpl=${encodeURIComponent('/courses/31001/grades?bcv=whatsnew')}`) === '/d2l/home/31001?simpl=%2Fcourses%2F31001%2Fgrades' && edit(`${BASE}/d2l/home?simpl=${encodeURIComponent('/courses?bcv=setup&step=theme&view=past')}`) === '/d2l/home?simpl=%2Fcourses%3Fview%3Dpast', 'the interface’s own query (?bcv=setup, ?bcv=whatsnew) is edited on its own address, inside ?simpl=, and the page address made again');
@@ -413,6 +414,17 @@ try {
   const quiz = await state();
   check(quiz.path.startsWith('/d2l/lms/quizzing/user/quiz_summary.d2l?qi=802&ou=31001') && !quiz.on && (await page.isVisible('#d2l-quiz-start')), `a quiz opens on Brightspace’s own page, which the interface leaves as it is: ${JSON.stringify(quiz)}`);
   await shot('quiz-native');
+
+  // the search box's commands: none for what Brightspace has no such thing for here
+  await page.goto(`${BASE}/d2l/home`);
+  await drawn();
+  await page.keyboard.press('/');
+  await page.waitForTimeout(400);
+  await page.keyboard.type('/', { delay: 30 });
+  await page.waitForTimeout(800);
+  const cmds = await page.evaluate(() => [...document.querySelectorAll('.bcv-omni__t, .bcv-omni__tname')].map((e) => e.textContent.trim()).filter((t) => t.startsWith('/')));
+  await page.keyboard.press('Escape');
+  check(cmds.length > 5 && !cmds.some((t) => /^\/(inbox|groups|history)\b/.test(t)) && cmds.some((t) => /^\/grades\b/.test(t)), `the search box offers no /inbox, /groups or /history on Brightspace: ${cmds.slice(0, 12).join(' ')}`);
 
   await page.goto(`${BASE}/d2l/home#todo`);
   await drawn();

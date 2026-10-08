@@ -721,6 +721,7 @@
    *  _csrf_token cookie, not in a meta tag; an empty token lands on its "Page Error". */
   function logout() {
     if (self.BCVBridge?.native?.signOut) { self.BCVBridge.native.signOut(); return; }
+    if (BCV.lms?.d2l) { go('/logout'); return; } // (Brightspace's own sign-out, /d2l/logout: lib/lms.js)
     const token = BCV.canvas.csrfToken();
     if (!token) { go('/logout'); return; } // no token to be had: Canvas's own logout page asks for confirmation
     const form = h('form', { method: 'post', action: '/logout', style: { display: 'none' } }, [

@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.22', date: '2026-10-08', notes: [
+      { kind: 'new', title: 'Brightspace support', body: 'Simpl now works on Brightspace (D2L) too.', icon: P.sparkle },
+      { kind: 'fixed', title: 'No stray “null” word', body: 'Setup and Grade needed no longer show the word null.', icon: P.check },
+    ] },
     { version: '2.99.21', date: '2026-10-08', notes: [
       { kind: 'improved', title: 'More schools built in', body: 'Chrome: 494 schools’ own Canvas sites start by themselves.', icon: P.sparkle },
     ] },
