@@ -153,7 +153,7 @@
     U.toast(`Fetching ${f.display_name || f.filename}…`);
     try {
       const r = await fetch(f.url, { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`Canvas answered ${r.status}`);
+      if (!r.ok) throw new Error(`${BCV.lms.name} answered ${r.status}`);
       const blob = await r.blob();
       const file = new File([blob], f.display_name || f.filename || 'file', { type: f['content-type'] || blob.type || '' });
       BCV.tools.open('conv', { files: [file], from, over: true });

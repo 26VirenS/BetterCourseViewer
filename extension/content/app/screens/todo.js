@@ -207,7 +207,7 @@
     async function removeTask(it, rowEl, series = null, { sheet = false } = {}) {
       const list = series || [it];
       const title = list.length > 1 ? `Delete all ${list.length} repeats of “${it.title}”?` : `Delete “${it.title}”?`;
-      const note = list.length > 1 ? 'Every one of them leaves your Canvas planner.' : 'This removes the task from your Canvas planner.';
+      const note = list.length > 1 ? `Every one of them leaves your ${BCV.lms.d2l ? 'To Do' : 'Canvas planner'}.` : `This removes the task from your ${BCV.lms.d2l ? 'To Do' : 'Canvas planner'}.`;
       const yes = sheet ? await U.askSheet({ label: 'Delete task', title, note, okLabel: list.length > 1 ? `Delete ${list.length} tasks` : 'Delete', danger: true }) : window.confirm(`${title} ${note}`);
       if (!yes) return;
       for (const x of list) body.querySelector(`.bcv-row[data-item="${CSS.escape(x.id)}"]`)?.style.setProperty('opacity', '.4');
@@ -331,7 +331,7 @@
         }
         Object.assign(draft, blank());
         await reload();
-        U.toast(keys.length > 1 ? `${keys.length} tasks added to your Canvas planner.` : 'Added to your Canvas planner.');
+        U.toast(keys.length > 1 ? `${keys.length} tasks added to your ${BCV.lms.d2l ? 'To Do' : 'Canvas planner'}.` : `Added to your ${BCV.lms.d2l ? 'To Do' : 'Canvas planner'}.`);
       } catch (e) {
         draft.busy = false;
         draft.progress = '';
@@ -404,7 +404,7 @@
           push(groupCard('Later', beyond.length === 1 ? U.fmtLong(beyond[0].date) : `${U.fmtLong(beyond[0].date)} – ${U.fmtLong(beyond[beyond.length - 1].date)}`, beyond));
         }
       }
-      parts.push(U.hint('Ticking an item marks it done in your Canvas planner. Dismissing removes it from your To Do list only — neither submits or completes the work. Priority is yours alone and is never sent to Canvas.', 'bcv-hint--narrow'));
+      parts.push(U.hint(`Ticking an item marks it done ${BCV.lms.d2l ? 'on this device' : 'in your Canvas planner'}. Dismissing removes it from your To Do list only — neither submits or completes the work. Priority is yours alone and is never sent to ${BCV.lms.name}.`, 'bcv-hint--narrow'));
       body.replaceChildren(...parts);
       drawn = true;
     }

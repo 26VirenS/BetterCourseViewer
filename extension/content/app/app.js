@@ -451,9 +451,9 @@
   function siteName() {
     const custom = state.settings?.appearance?.siteName?.trim();
     if (custom) return custom;
-    const label = location.hostname.split('.')[0] || 'Canvas';
+    const label = location.hostname.split('.')[0] || BCV.lms.name;
     if (label === 'canvas' || label === 'www') {
-      const org = location.hostname.split('.').slice(-2)[0] || 'Canvas';
+      const org = location.hostname.split('.').slice(-2)[0] || BCV.lms.name;
       return org.charAt(0).toUpperCase() + org.slice(1);
     }
     return label.charAt(0).toUpperCase() + label.slice(1);
@@ -751,15 +751,15 @@
     const m = U.el('bcv-menu bcv-menu--account', [
       // the photo, large, at the head (the initials in the accent's colour when Canvas has none); a press on it opens the Canvas profile
       h('div', { class: 'bcv-menu__head bcv-menu__head--profile' }, [
-        h('button', { type: 'button', class: 'bcv-menu__photo', title: 'Canvas profile', 'aria-label': 'Canvas profile', onclick: () => { U.closeMenus(); go('/profile'); } }, [profilePhoto(me)]),
+        h('button', { type: 'button', class: 'bcv-menu__photo', title: `${BCV.lms.name} profile`, 'aria-label': `${BCV.lms.name} profile`, onclick: () => { U.closeMenus(); go('/profile'); } }, [profilePhoto(me)]),
         U.text('bcv-menu__name bcv-ellip', `${me?.name || 'Account'}${me?.pronouns ? ` (${me.pronouns})` : ''}`),
         U.text('bcv-menu__sub bcv-ellip', me?.email || me?.loginId || siteName()),
       ]),
       // Canvas's own settings, and one link to Simpl's (the look, the setup, Personalize, the welcome and What's new all live there or in the sidebar)
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
       U.el('bcv-menu__sep'),
-      item(IC.people, 'Canvas profile', null, () => go('/profile')),
-      item(IC.external, 'All Canvas settings', 'Profile, notifications, integrations', () => go('/profile/settings')),
+      item(IC.people, `${BCV.lms.name} profile`, null, () => go('/profile')),
+      item(IC.external, `All ${BCV.lms.name} settings`, 'Profile, notifications, integrations', () => go('/profile/settings')),
       item(IC.bell, 'Notification preferences', null, () => go('/profile/communication')),
       U.el('bcv-menu__sep'),
       item(IC.external, 'Log out', null, logout, 'bcv-menu__item--danger'),
@@ -946,7 +946,7 @@
     if (state.sessionGone) return;
     state.sessionGone = true;
     progress(false);
-    recover('Your Canvas session has ended');
+    recover(`Your ${BCV.lms.name} session has ended`);
   });
   // Back to the tab after a while away, Canvas is asked the cheapest question there is, so a
   // session that ended in the meantime is found out now rather than by the next press.
@@ -1242,7 +1242,7 @@
       } catch (e2) {
         el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`)));
       }
-      if (alive() && BCV.canvas.sessionOk?.() !== false) U.toast(`Showing Canvas's own page: ${gaveWay}`, { error: true, ms: 6000 }); // (a session that ended has its own note up)
+      if (alive() && BCV.canvas.sessionOk?.() !== false) U.toast(`Showing ${BCV.lms.name}'s own page: ${gaveWay}`, { error: true, ms: 6000 }); // (a session that ended has its own note up)
     }
     clearTimeout(skeleton);
     if (!alive()) return;

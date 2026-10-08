@@ -12,6 +12,7 @@
   const U = BCV.ui;
   const IC = BCV.IC;
   const T = BCV.tools;
+  const LMS = BCV.lms?.name || 'Canvas'; // (the platform's name; Canvas in a tool's own tab, whose tray comes without lib/lms.js)
 
   const KEY = 'tools:citations';
   const STYLES = [['mla', 'MLA 9'], ['apa', 'APA 7'], ['chicago', 'Chicago 17']];
@@ -36,7 +37,7 @@
     ];
     if (type === 'coursefile') return [
       F('author', 'Instructor', 'Yuwen Li', '1 1 100%', true), F('title', 'File title', 'Lec06 — Composition of Functions', '1 1 100%', true), F('course', 'Course', 'MATH 021', '1 1 45%', true),
-      F('institution', 'Institution', 'UC Merced', '1 1 45%', true), F('year', 'Year', '2026', '1 1 24%', true), F('url', 'URL', 'Optional Canvas link', '1 1 100%'),
+      F('institution', 'Institution', 'UC Merced', '1 1 45%', true), F('year', 'Year', '2026', '1 1 24%', true), F('url', 'URL', `Optional ${LMS} link`, '1 1 100%'),
     ];
     return [
       F('author', 'Author', 'Jane R. Okonkwo; Amir Haddad', '1 1 100%', true), F('title', 'Page title', 'How Students Actually Read Syllabi', '1 1 100%', true), F('container', 'Website', 'The Atlantic', '1 1 45%', true),
@@ -95,7 +96,7 @@
         put(f.volume || f.issue ? ', ' : '');
         put(dot([f.year, f.pages ? `pp. ${f.pages}` : ''].filter(Boolean).join(', ')));
       } else if (type === 'book') put(dot([f.edition, f.publisher, f.year].filter(Boolean).join(', ')));
-      else if (type === 'coursefile') { put(f.course || ''); put(f.course ? ', ' : ''); put(dot([f.institution, f.year].filter(Boolean).join(', '))); put('Canvas. '); }
+      else if (type === 'coursefile') { put(f.course || ''); put(f.course ? ', ' : ''); put(dot([f.institution, f.year].filter(Boolean).join(', '))); put(`${LMS}. `); }
       else put(dot([f.publisher, [f.day, f.month, f.year].filter(Boolean).join(' ')].filter(Boolean).join(', ')));
       if (url) put(`${url}.`);
       if (url && f.accessed && type === 'website') put(` Accessed ${f.accessed}.`);
@@ -114,7 +115,7 @@
         put(f.container, true); put(f.volume ? ', ' : ''); put(f.volume || '', true); put(f.issue ? `(${f.issue})` : ''); put(f.pages ? `, ${f.pages}` : ''); put('. ');
         if (f.doi) put(`https://doi.org/${String(f.doi).replace(/^https?:\/\/doi\.org\//, '')}`);
       } else if (type === 'book') put(dot(f.publisher));
-      else if (type === 'coursefile') { put(dot([f.institution, 'Canvas'].filter(Boolean).join('. '))); if (url) put(`https://${url}`); }
+      else if (type === 'coursefile') { put(dot([f.institution, LMS].filter(Boolean).join('. '))); if (url) put(`https://${url}`); }
       else { put(dot(f.container)); if (url) put(`https://${url}`); }
       return P;
     }
@@ -134,7 +135,7 @@
       if (f.doi) put(` https://doi.org/${String(f.doi).replace(/^https?:\/\/doi\.org\//, '')}.`);
       return P;
     }
-    if (type === 'coursefile') { put([f.course ? `${f.course} lecture slides` : '', f.institution, f.year].filter(Boolean).join(', ')); put('. Canvas.'); return P; }
+    if (type === 'coursefile') { put([f.course ? `${f.course} lecture slides` : '', f.institution, f.year].filter(Boolean).join(', ')); put(`. ${LMS}.`); return P; }
     put(f.container, true); put('. ');
     put(dot([f.month, f.day].filter(Boolean).join(' ') + (f.year ? `${f.month ? ', ' : ''}${f.year}` : '')));
     if (url) put(`https://${url}.`);

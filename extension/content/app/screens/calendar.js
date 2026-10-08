@@ -209,7 +209,7 @@
           if (!ctx.alive() || seq !== loadSeq) return;
           if (items) {
             events = fromPlanner(items);
-            notice = { kind: 'warn', text: `Canvas would not return calendar events (${res.error.message}). Showing what the planner knows for the selected calendars instead; plain course events may be missing.` };
+            notice = { kind: 'warn', text: `${BCV.lms.name} would not return calendar events (${res.error.message}). Showing what the planner knows for the selected calendars instead; plain course events may be missing.` };
           } else {
             events = [];
             notice = { kind: 'error', text: `Calendar events could not be loaded: ${res.error.message}` };
@@ -219,7 +219,7 @@
           refused = new Set(Array.isArray(res) ? [] : (res.refused || []));
           events = normalize(raw);
           if (!selected.length) notice = { kind: 'hint', text: 'No calendars are selected. Turn one on under Calendars.' };
-          else if (refused.size) notice = { kind: 'hint', text: `Canvas would not share ${refused.size === 1 ? 'one calendar' : `${refused.size} calendars`} (${[...refused].map((c) => ctxMap.get(c)?.name || c).join(', ')}); the rest are shown.` };
+          else if (refused.size) notice = { kind: 'hint', text: `${BCV.lms.name} would not share ${refused.size === 1 ? 'one calendar' : `${refused.size} calendars`} (${[...refused].map((c) => ctxMap.get(c)?.name || c).join(', ')}); the rest are shown.` };
         }
         loadedRange = key;
         loading = false;
@@ -437,14 +437,14 @@
       const row = (c) => U.row([
         U.dot(c.color, 'bcv-dot--sq'),
         U.text('bcv-calrow__name bcv-pretty', c.name, 'span'),
-        refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: 'Canvas refused this calendar (a restricted or concluded course)', text: 'Not shared' }) : null,
+        refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: `${BCV.lms.name} refused this calendar (a restricted or concluded course)`, text: 'Not shared' }) : null,
         U.switchEl(selected.includes(c.code), (on) => toggleContext(c.code, on), `Show ${c.name}`),
       ], { mod: `bcv-row--p12-16 ${refused.has(c.code) ? 'bcv-calrow--refused' : ''}` });
       return [
         own.length ? U.card(own.map(row), 'bcv-card--list bcv-cal__own') : U.emptyCard('No courses'),
         other.length ? U.label('Other calendars') : null,
         other.length ? U.card(other.map(row), 'bcv-card--list bcv-cal__other') : null,
-        U.hint('Struck-through items are submitted or past. Toggling a calendar hides its events; Canvas shows at most 10 at once.'),
+        U.hint(`Struck-through items are submitted or past. Toggling a calendar hides its events; ${BCV.lms.d2l ? 'at most 10 show at once' : 'Canvas shows at most 10 at once'}.`),
       ].filter(Boolean);
     }
     const calSub = () => `${selected.length} of ${contexts.length} on · up to 10 at once`;
@@ -474,7 +474,7 @@
     async function toggleContext(code, on) {
       if (on) {
         if (selected.length >= 10) {
-          U.toast('Canvas shows at most 10 calendars at once. Turn one off first.', { error: true });
+          U.toast(BCV.lms.d2l ? 'At most 10 calendars show at once. Turn one off first.' : 'Canvas shows at most 10 calendars at once. Turn one off first.', { error: true });
           draw();
           return;
         }

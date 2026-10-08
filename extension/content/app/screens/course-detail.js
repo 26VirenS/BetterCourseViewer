@@ -374,7 +374,7 @@
         done = want;
         paint();
       } catch (e) {
-        U.toast(`Canvas did not take the mark: ${e?.message || e}`, { error: true });
+        U.toast(`${BCV.lms.name} did not take the mark: ${e?.message || e}`, { error: true });
       } finally {
         busy = false;
         btn.disabled = false;

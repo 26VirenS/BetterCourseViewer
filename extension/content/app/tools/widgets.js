@@ -330,7 +330,7 @@
     const segBox = U.el('bcv-wimp__seg');
     const paintSeg = () => segBox.replaceChildren(T().seg([['paste', 'Paste'], ['file', 'A file'], ['url', 'An address'], ['starters', 'Starters']], mode, (v) => { if (mode === v) return; mode = v; paintSeg(); paint(); })); // (the control marks the pane chosen: rebuilt on each change, as every tool's is)
     const paint = () => { clearResult(); paneEl.replaceChildren(...panes[mode]()); };
-    body.append(segBox, paneEl, resultEl, U.text('bcv-tool__hint bcv-pretty', 'A widget runs in a sandbox: it cannot see this page, your Canvas or the network. It gets the theme’s colours, a store of its own, a toast, and resize, close, copy and open a link — window.simpl in its script. The header names it and picks its icon and size.'));
+    body.append(segBox, paneEl, resultEl, U.text('bcv-tool__hint bcv-pretty', `A widget runs in a sandbox: it cannot see this page, your ${BCV.lms?.name || 'Canvas'} or the network. It gets the theme’s colours, a store of its own, a toast, and resize, close, copy and open a link — window.simpl in its script. The header names it and picks its icon and size.`)); // (the platform's name; Canvas in a tool's own tab, whose tray comes without lib/lms.js)
     paintSeg();
     paint();
     const ready = self.BCV_WIDGET_STARTERS ? Promise.resolve() : (BCV.lazy?.load?.('starters') || Promise.resolve()).catch(() => {});

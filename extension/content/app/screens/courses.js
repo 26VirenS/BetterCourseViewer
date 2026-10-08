@@ -129,7 +129,7 @@
     /** A course nickname (Canvas's own, so it shows in Canvas too): a small sheet with one field. */
     function nicknameSheet(c, from) {
       U.promptSheet({
-        label: 'Course nickname', title: 'Nickname', note: `Shown instead of “${c.originalName}” everywhere, in Canvas too. Leave it empty for the real name.`,
+        label: 'Course nickname', title: 'Nickname', note: `Shown instead of “${c.originalName}” everywhere, ${BCV.lms.d2l ? 'on this device only' : 'in Canvas too'}. Leave it empty for the real name.`,
         value: c.nickname || '', placeholder: c.originalName, maxLength: 60, clearLabel: c.nickname ? 'Remove nickname' : null, from,
         onSave: async (v) => {
           await store.setNickname(c.id, v);

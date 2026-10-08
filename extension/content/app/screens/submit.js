@@ -166,9 +166,9 @@
       }
       if (!nativeAny) {
         page.append(U.el('bcv-sb__card', [
-          U.text('bcv-sb__kicker', 'Submitted through Canvas', 'span'),
-          U.text('bcv-sb__p', `This assignment takes ${listWords(types.map((t) => WORDS[t] || t))}, which only Canvas's own page can record.`),
-          h('div', {}, U.btn('Open in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(`${course.url}/assignments/${aid}?bcv=native`, { confirmed: true }) })),
+          U.text('bcv-sb__kicker', `Submitted through ${BCV.lms.name}`, 'span'),
+          U.text('bcv-sb__p', `This assignment takes ${listWords(types.map((t) => WORDS[t] || t))}, which only ${BCV.lms.name}'s own page can record.`),
+          h('div', {}, U.btn(`Open in ${BCV.lms.name}`, { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(`${course.url}/assignments/${aid}?bcv=native`, { confirmed: true }) })),
         ]));
         return page;
       }
@@ -449,13 +449,13 @@
         const late = r.ok && U.parse(a.due_at) && Date.now() > U.parse(a.due_at) ? ' · late' : '';
         foot.replaceChildren(U.el('bcv-sb__footin', [
           h('button', { type: 'button', class: `bcv-sb__bubble ${st.commentOpen || said ? 'is-on' : ''}`, title: st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor (it can’t be edited or deleted once sent)', 'aria-label': st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor', 'aria-pressed': String(st.commentOpen), onclick: () => { st.commentOpen = !st.commentOpen; draw(); if (st.commentOpen) screen.querySelector('.bcv-sb__comment')?.focus(); } }, U.svg('M5 6.5A2.5 2.5 0 017.5 4h9A2.5 2.5 0 0119 6.5v7a2.5 2.5 0 01-2.5 2.5H11l-4 3.5V16h0A2 2 0 015 14z', { size: 15, stroke: 'currentColor', width: 1.9 })),
-          U.text('bcv-sb__footnote bcv-ellip', st.busy ? 'Sending to Canvas…' : `Attempt ${st.attempt + 1} · ${what}${late}`, 'span'),
+          U.text('bcv-sb__footnote bcv-ellip', st.busy ? `Sending to ${BCV.lms.name}…` : `Attempt ${st.attempt + 1} · ${what}${late}`, 'span'),
           h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary bcv-sb__go', text: st.busy ? 'Submitting…' : 'Submit', title: r.ok ? r.note : r.note, disabled: !r.ok || st.busy || null, onclick: submit }),
         ]));
         return;
       }
       foot.replaceChildren(U.el('bcv-sb__footin', [
-        U.text('bcv-sb__footnote bcv-pretty', st.busy ? 'Sending to Canvas…' : r.note, 'span'),
+        U.text('bcv-sb__footnote bcv-pretty', st.busy ? `Sending to ${BCV.lms.name}…` : r.note, 'span'),
         extra,
         embed ? null : h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Cancel', disabled: st.busy || null, onclick: () => app.go(back.href) }),
         h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: st.busy ? 'Submitting…' : 'Submit assignment', disabled: !r.ok || st.busy || null, onclick: submit }),

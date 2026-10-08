@@ -1136,7 +1136,7 @@
    *  answers with a location instead of the file. Returns the file id. */
   async function uploadSubmissionFile(cid, aid, file, onProgress) {
     const pre = await C.post(preflightPath(cid, aid), { name: file.name, size: file.size, content_type: file.type || undefined, on_duplicate: 'rename' });
-    if (!pre?.upload_url) throw new Error('Canvas did not return an upload URL');
+    if (!pre?.upload_url) throw new Error(`${BCV.lms.name} did not return an upload URL`);
     const form = new FormData();
     for (const [k, v] of Object.entries(pre.upload_params || {})) form.append(k, v);
     form.append(pre.file_param || 'file', file, file.name); // the file must be the last field
@@ -1595,12 +1595,12 @@
     const canvasTotal = courseInfo.score !== null && courseInfo.score !== undefined ? round1(Number(courseInfo.score)) : null;
     if (!whatIfOn && own) {
       // (your own weights: the total is this one, never Canvas's, which weighs the groups its own way)
-      note = total === null ? 'Nothing graded yet.' : `Weighted by your own weights, not your instructor’s${canvasTotal !== null ? ` — Canvas shows ${fmtPts(canvasTotal)}%` : ''}.`;
+      note = total === null ? 'Nothing graded yet.' : `Weighted by your own weights, not your instructor’s${canvasTotal !== null ? ` — ${BCV.lms.name} shows ${fmtPts(canvasTotal)}%` : ''}.`;
     } else if (!whatIfOn && canvasTotal !== null) {
       total = canvasTotal;
-      note = `As shown in Canvas${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}. ${weighted ? 'Weighted across the groups that have graded work.' : 'Graded work only.'}`;
+      note = `As shown in ${BCV.lms.name}${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}. ${weighted ? 'Weighted across the groups that have graded work.' : 'Graded work only.'}`;
     } else if (!whatIfOn && courseInfo.hideFinal) {
-      note = `${total === null ? 'Nothing graded yet. ' : ''}Canvas hides the total for this course${total === null ? '' : ': this one is worked out from the graded work'}.`;
+      note = `${total === null ? 'Nothing graded yet. ' : ''}${BCV.lms.name} hides the total for this course${total === null ? '' : ': this one is worked out from the graded work'}.`;
     }
     // what the term would end on today, with every ungraded piece counted as zero (Canvas's "final" score; not comparable under your own weights)
     const finalScore = !whatIfOn && !own && courseInfo.finalScore !== null && courseInfo.finalScore !== undefined && !courseInfo.hideFinal ? round1(Number(courseInfo.finalScore)) : null;
@@ -1632,7 +1632,7 @@
       if (g.omitted.length === 1) bits.push(`${g.omitted[0]} excluded`);
       else if (g.omitted.length > 1) bits.push(`${g.omitted.length} not counted`);
       if (g.dropped?.length) bits.push(g.dropped.length === 1 ? `${g.dropped[0]} dropped` : `${g.dropped.length} lowest dropped`);
-      else if (g.rules?.drop_lowest) bits.push(`Canvas drops lowest ${g.rules.drop_lowest}`);
+      else if (g.rules?.drop_lowest) bits.push(`${BCV.lms.name} drops lowest ${g.rules.drop_lowest}`);
       if (!ringed) bits.push('legend only');
       return { id: g.id, label: g.name, detail: bits.join(' · '), weightText: weightText(g), value: g.pct === null ? '—' : `${g.pct}%`, pct: g.pct, weight: g.weight, color: colorOf(i + 1, g.color), ringed, zero: g.zero };
     });

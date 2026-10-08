@@ -162,7 +162,7 @@
           chips.length ? U.el('bcv-pv__chips', chips.map((c) => U.badge(c[0], c[1]))) : null,
           String(d.body || '').trim()
             ? BCV.screens.course.prose(d.body, { cls: 'bcv-pv__prose' })
-            : U.text('bcv-pv__none', 'Canvas holds no description for this one.'),
+            : U.text('bcv-pv__none', `${BCV.lms.name} holds no description for this one.`),
         ].filter(Boolean));
       }).catch((e) => {
         if (!mine()) return;

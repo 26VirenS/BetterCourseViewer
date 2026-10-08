@@ -1017,7 +1017,7 @@
       }
       const id = `${uid}-dev`;
       devBox = h('div', { class: 'bcv-rr__dev', id, role: 'group', 'aria-label': 'Try scores (developer)' }, [
-        U.text('bcv-rr__devnote', 'Pick a mark for each criterion. Nothing is sent to Canvas.', 'p'),
+        U.text('bcv-rr__devnote', `Pick a mark for each criterion. Nothing is sent to ${BCV.lms.name}.`, 'p'),
         U.el('bcv-rr__dpres', [
           preset('Full marks', each((o) => o[0])),
           preset('Mixed', each((o) => o[Math.floor(Math.random() * o.length)])),

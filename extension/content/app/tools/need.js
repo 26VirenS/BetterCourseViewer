@@ -11,6 +11,7 @@
   const { h } = BCV.utils;
   const U = BCV.ui;
   const T = BCV.tools;
+  const LMS = BCV.lms?.name || 'Canvas'; // (the platform's name; Canvas in a tool's own tab, whose tray comes without lib/lms.js)
 
   const SCALE = [['A+', 97], ['A', 93], ['A−', 90], ['B+', 87], ['B', 83], ['B−', 80], ['C+', 77], ['C', 73], ['C−', 70], ['D', 60]];
   const r1 = (v) => Math.round(v * 10) / 10;
@@ -80,7 +81,7 @@
       noteEl,
       result,
       T.card([T.label('Every letter'), rows]),
-      T.hint('Assumes the rest of your work stays at your grade now. Canvas counts graded work only, so this is the mark on that one piece with everything else as it is.'),
+      T.hint(`Assumes the rest of your work stays at your grade now. ${LMS} counts graded work only, so this is the mark on that one piece with everything else as it is.`),
     ]));
 
     const courseOf = () => st.courses.find((c) => String(c.id) === String(st.course)) || null;
@@ -132,15 +133,15 @@
     }
     function paint() {
       const c = courseOf();
-      p.setSub(c ? 'Every number from Canvas: your score, the weights, the points.' : 'Your own numbers.');
-      courseBox.replaceChildren(U.picker([...st.courses.map((x) => ({ value: String(x.id), text: x.name })), { value: '', text: 'Not from Canvas — my own numbers' }], st.course ?? '', (v) => { if (v) pickCourse(v); else { st.course = ''; st.pieces = []; st.piece = 'custom'; paint(); } }, { label: 'Course', placeholder: 'Choose a course' }));
-      nowHint.textContent = c ? (c.score === null ? 'Canvas has no score for this course yet.' : 'From Canvas: your current score, graded work only.') : 'Your current grade, as a percentage.';
+      p.setSub(c ? `Every number from ${LMS}: your score, the weights, the points.` : 'Your own numbers.');
+      courseBox.replaceChildren(U.picker([...st.courses.map((x) => ({ value: String(x.id), text: x.name })), { value: '', text: `Not from ${LMS} — my own numbers` }], st.course ?? '', (v) => { if (v) pickCourse(v); else { st.course = ''; st.pieces = []; st.piece = 'custom'; paint(); } }, { label: 'Course', placeholder: 'Choose a course' }));
+      nowHint.textContent = c ? (c.score === null ? `${LMS} has no score for this course yet.` : `From ${LMS}: your current score, graded work only.`) : 'Your current grade, as a percentage.';
       const opts = [...st.pieces.map((x) => ({ value: x.id, text: `${x.name} · ${x.worth}%` })), { value: 'custom', text: 'Something else…' }];
       pieceBox.hidden = !c;
       pieceBox.replaceChildren(...(c ? [U.picker(opts, st.piece, (v) => { st.piece = v; const x = pieceOf(); if (x) { st.worth = String(x.worth); worthF.inp.value = st.worth; } paint(); }, { label: 'What is left', placeholder: st.loading ? 'Reading the assignments…' : 'Choose what is left' })] : [])); // (a null handed to replaceChildren is written out as the word)
       const x = pieceOf();
       worthF.el.hidden = !!x;
-      pieceHint.textContent = x ? (c?.weighted || st.own ? `${x.group} is ${x.groupWeight}% of the grade${st.own ? ' (your own weights)' : ''}; this is ${U.plural(x.pts, 'point')} of the group's ${x.groupPts}.` : `${U.plural(x.pts, 'point')} of the course's ${x.total}.`) : st.loading ? 'Reading the assignments…' : c && !st.pieces.length ? 'Nothing left ungraded that Canvas knows of. Type what the work is worth.' : 'How much of the final grade the work still to come is worth.';
+      pieceHint.textContent = x ? (c?.weighted || st.own ? `${x.group} is ${x.groupWeight}% of the grade${st.own ? ' (your own weights)' : ''}; this is ${U.plural(x.pts, 'point')} of the group's ${x.groupPts}.` : `${U.plural(x.pts, 'point')} of the course's ${x.total}.`) : st.loading ? 'Reading the assignments…' : c && !st.pieces.length ? `Nothing left ungraded that ${LMS} knows of. Type what the work is worth.` : 'How much of the final grade the work still to come is worth.';
       goalBox.replaceChildren(U.picker([...SCALE.map(([l, cut]) => ({ value: l, text: `${l} · ${cut}%` })), { value: 'custom', text: 'A number of my own' }], st.letter || 'custom', (v) => { st.letter = v; const s = SCALE.find(([l]) => l === v); if (s) { st.goal = String(s[1]); goalF.inp.value = st.goal; } paintResult(); }, { label: 'The grade you want', placeholder: 'Choose a letter' }));
       paintResult();
     }

@@ -676,7 +676,7 @@
           st.picker.open && st.picker.owner === 'course' ? pickerEl() : null,
         ]),
       ]),
-      h('button', { type: 'button', class: 'pz__textbtn', id: 'pzReset', disabled: !changed || null, text: changed ? 'Use the Canvas colour' : 'Canvas colour', onclick: () => { delete st.courseColors[c.id]; render(); } }),
+      h('button', { type: 'button', class: 'pz__textbtn', id: 'pzReset', disabled: !changed || null, text: changed ? (BCV.lms.d2l ? 'Use the saved colour' : 'Use the Canvas colour') : (BCV.lms.d2l ? 'Saved colour' : 'Canvas colour'), onclick: () => { delete st.courseColors[c.id]; render(); } }),
     ]);
   }
   function setCourse(c, hex) {
@@ -724,7 +724,7 @@
     // what the colour lands on, in place: the swatch dots, the course tab dot, the reads
     const custom = T().customHex(st.theme.h, st.theme.s, st.theme.depth);
     ui.root.querySelector('.pz__sw[data-theme="Custom"] .pz__swdot')?.style.setProperty('background', `radial-gradient(circle, ${custom} 0 38%, transparent 40%), conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)`);
-    if (st.picker.owner === 'course') { const c = selCourse(); const any = ui.root.querySelector('#pzAny'); if (any && c) { any.style.background = `radial-gradient(circle, ${courseColour(c)} 0 38%, transparent 40%), conic-gradient(#f44,#fb3,#4d4,#3cf,#66f,#e4e,#f44)`; any.classList.add('is-on'); ui.root.querySelectorAll('.pz__palsw:not(.pz__palsw--any)').forEach((b) => b.classList.toggle('is-on', b.dataset.color === courseColour(c))); const reset = ui.root.querySelector('#pzReset'); if (reset) { reset.disabled = !st.courseColors[c.id]; reset.textContent = st.courseColors[c.id] ? 'Use the Canvas colour' : 'Canvas colour'; } } }
+    if (st.picker.owner === 'course') { const c = selCourse(); const any = ui.root.querySelector('#pzAny'); if (any && c) { any.style.background = `radial-gradient(circle, ${courseColour(c)} 0 38%, transparent 40%), conic-gradient(#f44,#fb3,#4d4,#3cf,#66f,#e4e,#f44)`; any.classList.add('is-on'); ui.root.querySelectorAll('.pz__palsw:not(.pz__palsw--any)').forEach((b) => b.classList.toggle('is-on', b.dataset.color === courseColour(c))); const reset = ui.root.querySelector('#pzReset'); if (reset) { reset.disabled = !st.courseColors[c.id]; reset.textContent = st.courseColors[c.id] ? (BCV.lms.d2l ? 'Use the saved colour' : 'Use the Canvas colour') : (BCV.lms.d2l ? 'Saved colour' : 'Canvas colour'); } } }
   }
   function pickerEl() {
     const t = T();
@@ -822,7 +822,7 @@
       h('div', { class: 'pz__summary' }, summary().map(([k, v]) => h('div', { class: 'pz__srow' }, [h('span', { class: 'pz__sk', text: k }), h('span', { class: 'pz__sv', text: v })]))),
       h('div', { class: 'pz__donebtns' }, [
         h('button', { type: 'button', class: 'pz__back pz__back--tile', id: 'pzEdit', text: 'Edit', onclick: () => { st.done = false; st.step = 0; render('full'); } }),
-        h('button', { type: 'button', class: 'pz__next', id: 'pzOpen', text: 'Open Canvas', onclick: () => finish() }),
+        h('button', { type: 'button', class: 'pz__next', id: 'pzOpen', text: `Open ${BCV.lms.name}`, onclick: () => finish() }),
       ]),
     ]);
   }

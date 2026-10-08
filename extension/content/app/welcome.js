@@ -107,7 +107,7 @@
           title: 'Green: Simpl on', body: 'Green turns Simpl on.', act: 'click', doing: 'Click green',
           on: { click: (e) => !!e.target.closest?.('#bcv-look .bcv-look__opt--on') }, after: 'Simpl is on.' },
         { id: 'look-red', name: 'red', target: () => inLook('.bcv-look__offhead'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
-          title: 'Red: Simpl off', body: 'Red turns Simpl off and shows plain Canvas.', act: 'hover', doing: 'Hover over red',
+          title: 'Red: Simpl off', body: `Red turns Simpl off and shows plain ${BCV.lms.name}.`, act: 'hover', doing: 'Hover over red',
           done: redOpen, after: 'Now pick how long.' },
         { id: 'look-for', name: 'the list', target: () => inLook('.bcv-look__for'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
           title: 'How long', body: 'Choose how long Simpl stays off. Try one — it’s just practice.', act: 'click', doing: 'Pick how long',

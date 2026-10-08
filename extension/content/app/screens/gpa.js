@@ -351,7 +351,7 @@
           h('button', { type: 'button', class: 'bcv-gpa__gear', title: 'GPA settings', 'aria-label': 'GPA settings', onclick: (e) => openSettings(m, { from: e.currentTarget }) }, U.svg(GEAR, { size: 15, stroke: '#fff', width: 1.9 })),
         ]),
         U.el('bcv-gpa__big', [gpaFigure('bcv-gpa__value', m.termGpa, 0), U.text('bcv-gpa__of', 'of 4.00', 'span')]),
-        U.text('bcv-gpa__hero-note', m.shownCount ? `${courseLabel(m)} · computed from your Canvas scores` : 'No current course to score'),
+        U.text('bcv-gpa__hero-note', m.shownCount ? `${courseLabel(m)} · computed from your ${BCV.lms.name} scores` : 'No current course to score'),
         U.el('bcv-gpa__hero-foot', [
           tracking
             ? h('div', {}, [
@@ -381,7 +381,7 @@
         const dated = drawn[1].childElementCount;
         chart = [
           ...drawn,
-          h('p', { class: 'bcv-gpa__note bcv-pretty', text: `${U.plural(snaps.length, 'snapshot')} since ${U.fmtShort(`${snaps[0].date}T12:00:00`)}${snaps[0].date.slice(0, 4) === thisYear ? '' : ` ${snaps[0].date.slice(0, 4)}`}${snaps.length > dated ? `, ${dated} dated below` : ''} — point at the line for any day. Canvas keeps no grade history; past points can be added in settings.` }),
+          h('p', { class: 'bcv-gpa__note bcv-pretty', text: `${U.plural(snaps.length, 'snapshot')} since ${U.fmtShort(`${snaps[0].date}T12:00:00`)}${snaps[0].date.slice(0, 4) === thisYear ? '' : ` ${snaps[0].date.slice(0, 4)}`}${snaps.length > dated ? `, ${dated} dated below` : ''} — point at the line for any day. ${BCV.lms.name} keeps no grade history; past points can be added in settings.` }),
         ];
       } else {
         chart = [U.el('bcv-gpa__empty', [
@@ -414,7 +414,7 @@
         card('momentum', 'Momentum', IC.chart, momentum !== null && momentum < 0 ? '#ff453a' : '#34c759',
           momentum === null ? '—' : `${momentum >= 0 ? '+' : ''}${gpa2(momentum)}`,
           !tracking ? 'Turn on tracking to compare snapshots' : !m.prev ? 'Needs a second snapshot, on another day' : `Change since the ${U.fmtShort(`${m.prev.date}T12:00:00`)} snapshot`,
-          null, 'Momentum is today’s term GPA minus the GPA in the last daily snapshot this page saved. Positive means your scores moved up since then. It needs at least two snapshots, and it only changes when a score in Canvas changes.'),
+          null, `Momentum is today’s term GPA minus the GPA in the last daily snapshot this page saved. Positive means your scores moved up since then. It needs at least two snapshots, and it only changes when a score in ${BCV.lms.name} changes.`),
         card('ontime', 'On-time submissions', IC.clock, '#0a84ff', m.submitted ? `${Math.round((m.onTime / m.submitted) * 100)}%` : '—', m.submitted ? `${m.onTime} of ${m.submitted} submitted before the due time` : 'Nothing submitted yet'),
         card('mix', 'Grade mix', IC.check, '#5856d6', null,
           best ? `Highest ${shortCode(best.c)} at ${best.pct}% · lowest ${shortCode(worst.c)} at ${worst.pct}%` : 'No scores yet',
@@ -487,7 +487,7 @@
           ]),
           // (no score from Canvas: the teacher hides the total, or nothing is marked yet — said which)
           U.text(`bcv-gpa__need bcv-pretty ${ungraded || pf ? '' : needClass(r)}`, ungraded ? (c.hideFinal ? 'The teacher hides the total — no score to project from' : 'Nothing graded yet — no score to project from') : pf ? 'Pass/Fail — no letter to aim at' : needText(r)),
-          U.text('bcv-gpa__cnote', ungraded ? (c.hideFinal ? 'Canvas sends no score while the total is hidden, so it counts for nothing here' : 'Canvas has not computed a score, so it counts for nothing here') : pf ? 'Counts for nothing in the GPA' : ownFor(c) ? `By your own weights${r.m.known ? ` · ${store.fmtPts(r.m.earned)} pts earned so far` : ''}` : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
+          U.text('bcv-gpa__cnote', ungraded ? (c.hideFinal ? `${BCV.lms.name} sends no score while the total is hidden, so it counts for nothing here` : `${BCV.lms.name} has not computed a score, so it counts for nothing here`) : pf ? 'Counts for nothing in the GPA' : ownFor(c) ? `By your own weights${r.m.known ? ` · ${store.fmtPts(r.m.earned)} pts earned so far` : ''}` : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : `Score as ${BCV.lms.name} reports it`),
         ]),
         U.el('bcv-gpa__cfoot', [
           targetChip,
@@ -988,7 +988,7 @@
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       ov.append(U.el('bcv-sheet bcv-gpa-set', [
         U.el('bcv-sheet__head', [
-          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-sheet__title', 'GPA settings'), U.text('bcv-sheet__desc bcv-pretty', 'Term GPA is the plain average of your course letter grades on a 4.0 scale — Canvas publishes no credit weighting, so nothing here is guessed.')]),
+          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-sheet__title', 'GPA settings'), U.text('bcv-sheet__desc bcv-pretty', `Term GPA is the plain average of your course letter grades on a 4.0 scale — ${BCV.lms.name} publishes no credit weighting, so nothing here is guessed.`)]),
           h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
         ]),
         U.el('bcv-sheet__list', [
@@ -1001,7 +1001,7 @@
             ]),
           ]),
           U.el('bcv-gpa-set__sec', [
-            U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Track GPA over time'), U.text('bcv-gpa-set__s bcv-pretty', 'Canvas stores no GPA and no history. With your record before this term, this page shows a cumulative GPA and keeps one snapshot a day from now on.')]),
+            U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Track GPA over time'), U.text('bcv-gpa-set__s bcv-pretty', `${BCV.lms.name} stores no GPA and no history. With your record before this term, this page shows a cumulative GPA and keeps one snapshot a day from now on.`)]),
             trackSwitch,
             trackBody,
           ]),
@@ -1041,7 +1041,7 @@
       body.replaceChildren(...[
         tracking ? null : U.el('bcv-gpa__banner', [
           U.svg(BARS, { size: 19, stroke: 'var(--bcv-blue)', width: 1.9, style: { flex: 'none' } }),
-          U.el('bcv-gpa__banner-body', [U.text('bcv-gpa__banner-title', 'Track GPA over time?'), U.text('bcv-gpa__banner-sub bcv-pretty', 'Canvas stores no GPA and no history. Add your GPA before this term and how many courses it covers, and this page keeps its own daily record.')]),
+          U.el('bcv-gpa__banner-body', [U.text('bcv-gpa__banner-title', 'Track GPA over time?'), U.text('bcv-gpa__banner-sub bcv-pretty', `${BCV.lms.name} stores no GPA and no history. Add your GPA before this term and how many courses it covers, and this page keeps its own daily record.`)]),
           U.btn('Turn on tracking', { kind: 'primary', cls: 'bcv-btn--fill36', onClick: (e) => openSettings(m, { wantTracking: true, from: e.currentTarget }) }),
         ]),
         U.el('bcv-gpa__top', [U.enter(hero(m), 1, 40, 400), U.enter(trend(), 1, 110, 400)]), // hero, then trend
@@ -1051,8 +1051,8 @@
         itemGrades(),
         U.el('bcv-gpa__foot', [
           h('p', { class: 'bcv-pretty', text: tracking
-            ? 'Course scores come straight from Canvas. GPA, targets and history are computed here from the standard 4.0 scale and the prior record you entered — your school’s official GPA may differ.'
-            : 'Course scores and target maths come straight from Canvas. Term GPA is the plain 4.0-scale average of your courses; cumulative GPA and history stay empty until you turn on tracking.' }),
+            ? `Course scores come straight from ${BCV.lms.name}. GPA, targets and history are computed here from the standard 4.0 scale and the prior record you entered — your school’s official GPA may differ.`
+            : `Course scores and target maths come straight from ${BCV.lms.name}. Term GPA is the plain 4.0-scale average of your courses; cumulative GPA and history stay empty until you turn on tracking.` }),
           tracking ? h('button', { type: 'button', class: 'bcv-gpa__linkbtn', text: 'Reset setup', onclick: resetTracking }) : null,
         ]),
       ].filter(Boolean));

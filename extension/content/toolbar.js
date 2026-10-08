@@ -370,8 +370,8 @@
 
     const x = el('button', 'x');
     x.type = 'button';
-    x.title = 'Close and go back to Canvas';
-    x.setAttribute('aria-label', 'Close and go back to Canvas');
+    x.title = `Close and go back to ${self.BCV?.lms?.name || 'Canvas'}`; // (a tool's own site has no lib/lms.js: Canvas there, as before)
+    x.setAttribute('aria-label', `Close and go back to ${self.BCV?.lms?.name || 'Canvas'}`);
     x.append(svg(IC.close, { size: 13, width: 2.3 }));
     x.addEventListener('click', () => { try { api.runtime.sendMessage({ type: 'closeTool' }); } catch { window.close(); } });
 

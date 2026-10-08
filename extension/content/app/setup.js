@@ -40,7 +40,7 @@
   const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => PHONE_STEPS.includes(s.key)) : ALL; };
   const COPY = {
     courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
-    grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
+    grades: ['Grades', `${BCV.lms.name} keeps no history. Simpl Courses can, on this device.`],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
     done: ['You’re set', 'Next, the look: light or dark, a colour of your own, and photos.'],
@@ -319,10 +319,10 @@
     };
     const drawEmpty = () => {
       head.textContent = st.scanError ? 'The courses could not be read' : 'No active courses';
-      sub.textContent = st.scanError ? st.scanError : 'Between terms? Canvas lists nothing active right now.';
+      sub.textContent = st.scanError ? st.scanError : `Between terms? ${BCV.lms.name} lists nothing active right now.`;
       sub.classList.remove('fr__blurb--strong');
       wrap.replaceChildren(h('div', { class: 'empty' }, [
-        h('span', { text: st.scanError ? 'Check that you are signed in to Canvas, then try again.' : 'You can finish setup now and choose courses later on the Courses page.' }),
+        h('span', { text: st.scanError ? `Check that you are signed in to ${BCV.lms.name}, then try again.` : 'You can finish setup now and choose courses later on the Courses page.' }),
         h('button', { type: 'button', class: 'btn btn--sm', text: 'Try again', onclick: run }),
       ]));
       nextBtn.disabled = false;

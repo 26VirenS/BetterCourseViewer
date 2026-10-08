@@ -137,7 +137,7 @@
       // ---- how the grade is weighted ------------------------------------------------
       // (2.98.59) and a button to weight the groups yourself, from the syllabus; the editor takes the section's place
       let weightsSec;
-      const ownBtn = h('button', { type: 'button', class: `bcv-gr__ownbtn ${own ? 'is-on' : ''}`, text: own ? 'Edit my weights' : 'Use my own weights', title: 'Weight the groups yourself, from the syllabus — on this device only, never sent to Canvas', onclick: () => {
+      const ownBtn = h('button', { type: 'button', class: `bcv-gr__ownbtn ${own ? 'is-on' : ''}`, text: own ? 'Edit my weights' : 'Use my own weights', title: `Weight the groups yourself, from the syllabus — on this device only, never sent to ${BCV.lms.name}`, onclick: () => {
         wEdit.on = true;
         wEdit.focus = true;
         wEdit.vals = Object.fromEntries(groups.map((g) => [String(g.id), own ? (own[String(g.id)] ?? 0) : (Number(g.group_weight) || 0)]));
@@ -156,7 +156,7 @@
           ], U.groupAttrs(w.id, w.color, { pick: true, name: w.name })))),
           gm.weightBar.length ? null : U.text('bcv-gr__wnote bcv-pretty', 'No assignment group carries weight yet.'),
           gm.weightNote ? h('p', { class: 'bcv-gr__wnote bcv-pretty', text: gm.weightNote }) : null,
-          gm.own ? h('p', { class: 'bcv-gr__wnote bcv-gr__wnote--own bcv-pretty', text: 'Your own weights, from the syllabus — not your instructor’s. They live on this device and never reach Canvas.' }) : null,
+          gm.own ? h('p', { class: 'bcv-gr__wnote bcv-gr__wnote--own bcv-pretty', text: `Your own weights, from the syllabus — not your instructor’s. They live on this device and never reach ${BCV.lms.name}.` }) : null,
           ownBtn,
         ]);
       } else {
@@ -180,12 +180,12 @@
         const save = async () => {
           const map = {};
           for (const [id, v] of Object.entries(wEdit.vals)) { const n = num(v); if (n > 0) map[id] = n; }
-          if (!Object.keys(map).length) { U.toast('Give at least one group a weight — or go back to Canvas’s.', { error: true }); return; }
+          if (!Object.keys(map).length) { U.toast(`Give at least one group a weight — or go back to ${BCV.lms.name}’s.`, { error: true }); return; }
           own = map;
           wEdit.on = false;
           await store.mergePref('gradeWeights', { [c.id]: map });
           draw();
-          U.toast('Your weights are on for this course. Nothing is sent to Canvas.');
+          U.toast(`Your weights are on for this course. Nothing is sent to ${BCV.lms.name}.`);
         };
         const cancel = () => { wEdit.on = false; draw(); };
         const clear = async () => {
@@ -193,7 +193,7 @@
           wEdit.on = false;
           await store.mergePref('gradeWeights', { [c.id]: null });
           draw();
-          U.toast('Back to the weights Canvas carries.');
+          U.toast(`Back to the weights ${BCV.lms.name} carries.`);
         };
         const rows = groups.map((g) => {
           const id = String(g.id);
@@ -204,7 +204,7 @@
           return U.el('bcv-gr__wedit-row', [
             h('span', { class: 'bcv-wbar__dot', style: { background: colorOf(id) || 'var(--bcv-fill2)' } }),
             U.text('bcv-wbar__name', g.name, 'span'),
-            c.weighted ? U.text('bcv-gr__wcanvas', `Canvas: ${Number(g.group_weight) || 0}%`, 'span') : null,
+            c.weighted ? U.text('bcv-gr__wcanvas', `${BCV.lms.name}: ${Number(g.group_weight) || 0}%`, 'span') : null,
             inp,
             U.text('bcv-gr__wpct', '%', 'span'),
           ]);
@@ -212,9 +212,9 @@
         paintSum();
         return U.el('bcv-gr__sec bcv-gr__sec--w bcv-gr__wedit', [
           U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'My own weights', 'span'), sumEl]),
-          U.text('bcv-gr__wnote bcv-pretty', 'A percent per group, as your syllabus gives them. The total here follows them; nothing is sent to Canvas or your instructor.'),
+          U.text('bcv-gr__wnote bcv-pretty', `A percent per group, as your syllabus gives them. The total here follows them; nothing is sent to ${BCV.lms.name} or your instructor.`),
           ...rows,
-          U.el('bcv-gr__wbtns', [own ? U.btn('Back to Canvas’s weights', { kind: 'danger', cls: 'bcv-gr__wclear', onClick: clear }) : null, h('span', { class: 'bcv-gr__wspace' }), U.btn('Cancel', { cls: 'bcv-gr__wcancel', onClick: cancel }), U.btn('Save', { kind: 'primary', cls: 'bcv-gr__wsave', onClick: save })]),
+          U.el('bcv-gr__wbtns', [own ? U.btn(`Back to ${BCV.lms.name}’s weights`, { kind: 'danger', cls: 'bcv-gr__wclear', onClick: clear }) : null, h('span', { class: 'bcv-gr__wspace' }), U.btn('Cancel', { cls: 'bcv-gr__wcancel', onClick: cancel }), U.btn('Save', { kind: 'primary', cls: 'bcv-gr__wsave', onClick: save })]),
         ]);
       }
       const ringsCard = U.card(U.el('bcv-gr', [U.el('bcv-gr__top', [svg, center]), byGroup, weightsSec]), 'bcv-card--22');
@@ -245,7 +245,7 @@
           U.el('bcv-row__body', [
             h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.added ? U.badge('What-if', 'red', 'bcv-badge--xs') : g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
             // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
-            U.text('bcv-row__sub', g.added ? `${g.group} · made up to test, not in Canvas` : [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
+            U.text('bcv-row__sub', g.added ? `${g.group} · made up to test, not in ${BCV.lms.name}` : [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
           ]),
           dotEl,
           U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),

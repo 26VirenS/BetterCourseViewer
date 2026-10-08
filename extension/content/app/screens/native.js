@@ -12,7 +12,7 @@
   function titleFromPage() {
     const t = document.title.replace(/\s*[:·-]\s*[^:·-]+$/, '').trim();
     const h1 = document.querySelector('#content h1, #content .page-title, #content h2');
-    return (h1 && h1.textContent.trim()) || t || 'Canvas';
+    return (h1 && h1.textContent.trim()) || t || BCV.lms.name;
   }
 
   // In the dark appearance the Canvas content in the hole is darkened with a
@@ -23,11 +23,11 @@
   const applyLight = (on) => html.classList.toggle('bcv-punch-light', !!on);
   function lightButton(ctx) {
     if (!ctx.dark) return null;
-    const btn = U.btn('', { icon: IC.sun, kind: 'xs', cls: 'bcv-native__light', title: 'Show this Canvas page in light mode' });
+    const btn = U.btn('', { icon: IC.sun, kind: 'xs', cls: 'bcv-native__light', title: `Show this ${BCV.lms.name} page in light mode` });
     const label = () => {
       const on = html.classList.contains('bcv-punch-light');
       btn.replaceChildren(U.svg(on ? IC.moon : IC.sun, { size: 14, stroke: 'currentColor', width: 1.8 }), on ? 'Back to dark' : 'View in light mode');
-      btn.title = on ? 'Darken this Canvas page again' : 'Show this Canvas page as Canvas drew it, in light mode';
+      btn.title = on ? `Darken this ${BCV.lms.name} page again` : `Show this ${BCV.lms.name} page as ${BCV.lms.name} drew it, in light mode`;
     };
     btn.addEventListener('click', async () => {
       const on = !html.classList.contains('bcv-punch-light');
@@ -55,13 +55,13 @@
     const app = ctx.app;
     const hasContent = !!(document.getElementById('content') || document.getElementById('main'));
     const note = U.el('bcv-native__bar', [
-      U.text('bcv-native__note', 'This page is shown as Canvas drew it, inside the new look.'),
+      U.text('bcv-native__note', `This page is shown as ${BCV.lms.name} drew it, inside the new look.`),
       h('span', { class: 'bcv-ml-auto' }),
       lightButton(ctx),
       // the same move as the switch at the top right: saved, or this page only (the popup's Persistent switch decides)
-      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => (BCV.early?.flipLook ? BCV.early.flipLook(false) : BCV.settings.update(BCV.settings.lookPatch(false))) }),
+      U.btn(`Open in stock ${BCV.lms.name}`, { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => (BCV.early?.flipLook ? BCV.early.flipLook(false) : BCV.settings.update(BCV.settings.lookPatch(false))) }),
     ]);
-    const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard('Canvas did not render anything for this page.'));
+    const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard(`${BCV.lms.name} did not render anything for this page.`));
     if (hasContent) app.punchIn(hole);
     return U.el('bcv-native', [note, hole]);
   }

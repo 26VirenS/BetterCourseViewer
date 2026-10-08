@@ -203,7 +203,7 @@
     // say so and offer the way back to the page, rather than drawing a screen with nothing on it.
     if (!sub) {
       wrap.replaceChildren(
-        U.errorBox('Canvas did not answer with your submission for this assignment. It is usually back within a minute.'),
+        U.errorBox(`${BCV.lms.name} did not answer with your submission for this assignment. It is usually back within a minute.`),
         U.el('bcv-fb__btns', [
           h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'Try again', onclick: () => app.go(`${backHref}?bcv=feedback&t=${Date.now()}`) }),
           h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to the assignment', onclick: () => app.go(backHref) }),
