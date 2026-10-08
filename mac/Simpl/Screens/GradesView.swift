@@ -99,12 +99,12 @@ struct GradesView: View {
                     .monospacedDigit()
                     .contentTransition(.numericText(value: g ?? 0))
                 Text("of 4.00")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
             GradeBar(value: g.map { $0 / 4 }, color: barColor, height: 8, mark: goal / 4, key: "grades:gpa")
             Text(counted)
-                .font(.caption)
+                .font(.sCaption)
                 .foregroundStyle(.secondary)
         }
         .padding(18)
@@ -133,12 +133,12 @@ struct GradesView: View {
             if let diff {
                 Label(diff >= 0 ? String(format: "+%.2f above goal", diff) : String(format: "%.2f below goal", abs(diff)),
                       systemImage: diff >= 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
-                    .font(.callout.weight(.medium))
+                    .font(.sCallout.weight(.medium))
                     .foregroundStyle(diff >= 0 ? Color.green : Color.orange)
                     .contentTransition(.numericText(value: diff))
             } else {
                 Text("No score to compare yet")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
         }
@@ -367,29 +367,29 @@ private struct CourseGradeCard: View {
                 .frame(width: 62, height: 62)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.code)
-                    .font(.headline)
+                    .font(.sHeadline)
                     .lineLimit(1)
                 if let name = row.name, !name.isEmpty, name != row.code {
                     Text(name)
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Text(graded)
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(row.pct.map { String(format: "%.1f%%", $0) } ?? "N/A")
-                    .font(.title2.weight(.semibold))
+                    .font(.sTitle2.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(row.pct == nil ? .secondary : .primary)
                     .contentTransition(.numericText(value: row.pct ?? 0))
                 HStack(spacing: 6) {
                     if let t = row.target {
                         Text("Target \(t)")
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                     }
                     if let l = row.letter { LetterChip(letter: l) }
@@ -404,7 +404,7 @@ private struct CourseGradeCard: View {
         let colors = categoryColors(cats)
         if cats.isEmpty {
             Text("No graded groups yet.")
-                .font(.callout)
+                .font(.sCallout)
                 .foregroundStyle(.tertiary)
         } else {
             VStack(alignment: .leading, spacing: 9) {
@@ -445,17 +445,17 @@ private struct CategoryLine: View {
             HStack(spacing: 7) {
                 Circle().fill(color).frame(width: 8, height: 8)
                 Text(name)
-                    .font(.callout)
+                    .font(.sCallout)
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if let weight, !weight.isEmpty {
                     Text(weight)
-                        .font(.caption)
+                        .font(.sCaption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Text(value ?? "—")
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: pct ?? 0))
             }
@@ -522,14 +522,14 @@ private struct ItemGradesCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).lineLimit(1)
                     Text("\(item.course) · \(item.pctText)")
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 LetterChip(letter: item.band)
                 Text(item.score)
-                    .font(.callout.weight(.medium))
+                    .font(.sCallout.weight(.medium))
                     .monospacedDigit()
                     .frame(minWidth: 72, alignment: .trailing)
             }
@@ -722,7 +722,7 @@ struct CourseGradesView: View {
                         .contentTransition(.numericText(value: d.total ?? 0))
                     if let l = d.letter {
                         Text(whatIf ? "\(l) with what-if" : l)
-                            .font(.title3.weight(.semibold))
+                            .font(.sTitle3.weight(.semibold))
                             .foregroundStyle(whatIf ? Color.orange : color)
                     }
                     targetPicker(d)
@@ -755,13 +755,13 @@ struct CourseGradesView: View {
     private func notes(_ d: CourseGradesData) -> some View {
         if let note = d.note, !note.isEmpty {
             Text(note)
-                .font(.callout)
+                .font(.sCallout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         if let f = d.final, !f.isEmpty {
             Text(f)
-                .font(.caption)
+                .font(.sCaption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -812,9 +812,9 @@ struct CourseGradesView: View {
                 IconTile(symbol: "wand.and.stars", color: .orange)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("What-If Scores")
-                        .font(.body.weight(.semibold))
+                        .font(.sBody.weight(.semibold))
                     Text(whatIf ? "Type a score into any assignment, or add one. Nothing is saved." : "Try scores and see where your grade would land.")
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
@@ -843,7 +843,7 @@ struct CourseGradesView: View {
                         }
                     }
                 }
-                .font(.callout)
+                .font(.sCallout)
                 .padding(.leading, 42)
                 .transition(slide(.top))
             }
@@ -893,7 +893,7 @@ struct CourseGradesView: View {
             }
             if let detail = g.detail, !detail.isEmpty {
                 Text(detail)
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 8)
@@ -976,7 +976,7 @@ struct CourseGradesView: View {
                 if r.dropped == true { StatusChip(text: "Dropped") }
                 if !line.isEmpty {
                     Text(line)
-                        .font(.caption)
+                        .font(.sCaption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -989,14 +989,14 @@ struct CourseGradesView: View {
             HStack(spacing: 6) {
                 if let l = letter(r, d) { LetterChip(letter: l) }
                 Text(r.scoreText)
-                    .font(.body.weight(.medium))
+                    .font(.sBody.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(r.effective == nil ? Color.secondary : Color.primary)
                     .contentTransition(.numericText(value: r.effective ?? 0))
             }
             if let g = r.grade, !g.isEmpty {
                 Text(g)
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.secondary)
             }
         }
@@ -1017,7 +1017,7 @@ struct CourseGradesView: View {
             ))
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.trailing)
-            .font(.body.weight(tried ? .semibold : .regular).monospacedDigit())
+            .font(.sBody.weight(tried ? .semibold : .regular).monospacedDigit())
             .foregroundStyle(tried ? Color.orange : Color.primary)
             .focused($focused, equals: r.id)
             .frame(width: 66)
@@ -1025,7 +1025,7 @@ struct CourseGradesView: View {
             .onExitCommand { focused = nil }
             .accessibilityLabel("What-if score for \(r.name), out of \(CourseGradesView.num(r.possible))")
             Text("/ \(CourseGradesView.num(r.possible))")
-                .font(.callout)
+                .font(.sCallout)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 44, alignment: .leading)
@@ -1233,17 +1233,17 @@ private struct WhatIfBar: View {
     var body: some View {
         HStack(spacing: 10) {
             Label("What-If", systemImage: "wand.and.stars")
-                .font(.callout.weight(.semibold))
+                .font(.sCallout.weight(.semibold))
                 .foregroundStyle(.orange)
             Text(total)
-                .font(.callout.weight(.bold))
+                .font(.sCallout.weight(.bold))
                 .monospacedDigit()
                 .contentTransition(.numericText(value: value ?? 0))
             if let letter { LetterChip(letter: letter) }
             if let g = gpaIf {
                 Divider().frame(height: 14)
                 Text("Term GPA \(String(format: "%.2f", g))")
-                    .font(.callout)
+                    .font(.sCallout)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText(value: g))
@@ -1295,7 +1295,7 @@ private struct AddWhatIfSheet: View {
                     Text("What-If Assignment")
                 } footer: {
                     Text(footnote)
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1351,7 +1351,7 @@ private struct LetterChip: View {
     var body: some View {
         let color = LetterChip.color(String(letter.prefix(1)))
         Text(letter)
-            .font(.caption.weight(.bold))
+            .font(.sCaption.weight(.bold))
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

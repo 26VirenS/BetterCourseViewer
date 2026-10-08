@@ -11,7 +11,7 @@ struct MainShell: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
-                .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 340)
+                .navigationSplitViewColumnWidth(min: 240, ideal: 270, max: 360)
         } detail: {
             DetailStack()
         }
@@ -47,7 +47,6 @@ struct MainShell: View {
                 .controlGroupStyle(.navigation)
             }
         }
-        .background(Theme.page.ignoresSafeArea())
     }
 }
 
@@ -198,24 +197,52 @@ struct Sidebar: View {
                     }
                 }
                 Label("All Courses", systemImage: "books.vertical").tag(Place.courses)
-            }
-            if !engine.onBrightspace {
-                Section("Groups") {
-                    ForEach(engine.groups) { g in
-                        Label {
-                            Text(g.name).lineLimit(1)
-                        } icon: {
-                            Image(systemName: "person.3.fill").foregroundStyle(Color(hex: g.color))
+                if !engine.onBrightspace, !engine.groups.isEmpty {
+                    // (1.2) the groups in this section under one row of their own, as a course's sections are under it:
+                    // a press opens all of them, the chevron lists them here — never each one pinned to the sidebar
+                    groupsRow
+                    if open.contains("groups") {
+                        ForEach(engine.groups) { g in
+                            HStack(spacing: 9) {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Color(hex: g.color))
+                                    .frame(width: 13, height: 13)
+                                Text(g.name).lineLimit(1)
+                            }
+                            .padding(.leading, 20)
+                            .tag(Place.home("groups/\(g.id)"))
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
-                        .tag(Place.home("groups/\(g.id)"))
                     }
-                    Label("All Groups", systemImage: "person.3").tag(Place.groups)
                 }
             }
         }
         .listStyle(.sidebar)
+        .environment(\.sidebarRowSize, .large)
         .animation(Motion.gentle, value: open)
         .animation(Motion.gentle, value: engine.courses)
+    }
+
+    private var groupsRow: some View {
+        HStack(spacing: 8) {
+            Label("Groups", systemImage: "person.2")
+            Spacer(minLength: 4)
+            Button {
+                withAnimation(Motion.gentle) {
+                    if open.contains("groups") { open.remove("groups") } else { open.insert("groups") }
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(open.contains("groups") ? 90 : 0))
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(open.contains("groups") ? "Hide groups" : "Show groups")
+        }
+        .tag(Place.groups)
     }
 
     private func courseRow(_ c: CourseRow) -> some View {
@@ -224,13 +251,13 @@ struct Sidebar: View {
         return HStack(spacing: 8) {
             RoundedRectangle(cornerRadius: 3.5, style: .continuous)
                 .fill(Color(hex: c.color))
-                .frame(width: 12, height: 12)
+                .frame(width: 13, height: 13)
             Text(c.code)
                 .lineLimit(1)
             Spacer(minLength: 4)
             if let n = c.unread, n > 0 {
                 Text("\(n)")
-                    .font(.caption2.weight(.semibold).monospacedDigit())
+                    .font(.sCaption2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             Button {
@@ -240,7 +267,7 @@ struct Sidebar: View {
                 Task { await engine.loadSections(ctx) }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(expanded ? 90 : 0))
                     .frame(width: 16, height: 16)
@@ -278,10 +305,10 @@ struct AccountBar: View {
             Avatar(person: me, size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(me?.name ?? "Account")
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                     .lineLimit(1)
                 Text(engine.snapshot?.site ?? engine.host)
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

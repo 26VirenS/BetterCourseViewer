@@ -70,7 +70,7 @@ struct Fact: View {
             Image(systemName: symbol).frame(width: 18).accessibilityHidden(true)
             Text(text).textSelection(.enabled)
         }
-        .font(.callout)
+        .font(.sCallout)
         .foregroundStyle(tint)
     }
 }
@@ -89,10 +89,10 @@ struct InfoRow<Trailing: View>: View {
             if let symbol { IconTile(symbol: symbol, color: tint) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(unread ? .body.weight(.semibold) : .body)
+                    .font(unread ? .sBody.weight(.semibold) : .sBody)
                     .lineLimit(2)
                 if let sub, !sub.isEmpty {
-                    Text(sub).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                    Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
             Spacer(minLength: 6)
@@ -124,7 +124,7 @@ struct WorkRowView: View {
                     .strikethrough(row.done, color: .secondary)
                     .foregroundStyle(row.done ? .secondary : .primary)
                 if let sub = row.sub, !sub.isEmpty {
-                    Text(sub).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer(minLength: 6)
@@ -132,7 +132,7 @@ struct WorkRowView: View {
             if showCourse, let course = row.course, !course.isEmpty { CourseChip(text: course, color: row.color) }
             if let time = row.time, !time.isEmpty {
                 Text(time)
-                    .font(.callout.monospacedDigit())
+                    .font(.sCallout.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 58, alignment: .trailing)
             }
@@ -166,21 +166,21 @@ struct PostRowView: View {
                     if row.unread == true {
                         Circle().fill(Color.accentColor).frame(width: 8, height: 8).accessibilityLabel("Unread")
                     }
-                    Text(row.title).font(row.unread == true ? .body.weight(.semibold) : .body).lineLimit(2)
+                    Text(row.title).font(row.unread == true ? .sBody.weight(.semibold) : .sBody).lineLimit(2)
                 }
                 Text([row.author, row.when].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
                 if let p = row.preview, !p.isEmpty {
-                    Text(p).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                    Text(p).font(.sCallout).foregroundStyle(.secondary).lineLimit(2)
                 }
                 if row.graded == true || (row.replies ?? 0) > 0 || (row.unreadCount ?? 0) > 0 {
                     HStack(spacing: 8) {
                         if row.graded == true { StatusChip(text: "Graded", tone: "purple") }
                         if let n = row.replies, n > 0 {
-                            Label("\(n)", systemImage: "bubble.left").font(.caption).foregroundStyle(.secondary)
+                            Label("\(n)", systemImage: "bubble.left").font(.sCaption).foregroundStyle(.secondary)
                         }
                         if let n = row.unreadCount, n > 0 {
-                            Text("\(n) new").font(.caption.weight(.semibold)).foregroundStyle(color)
+                            Text("\(n) new").font(.sCaption.weight(.semibold)).foregroundStyle(color)
                         }
                     }
                     .padding(.top, 1)

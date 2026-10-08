@@ -127,7 +127,7 @@ struct FileToast: View {
             if let name = files.opening {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
-                    Text("Opening \(name)…").font(.callout).lineLimit(1)
+                    Text("Opening \(name)…").font(.sCallout).lineLimit(1)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -138,7 +138,7 @@ struct FileToast: View {
             } else if let why = files.failed {
                 HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    Text(why).font(.callout).lineLimit(2)
+                    Text(why).font(.sCallout).lineLimit(2)
                     Button("OK") { files.failed = nil }
                         .controlSize(.small)
                 }

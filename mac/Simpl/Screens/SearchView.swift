@@ -52,7 +52,7 @@ struct SearchView: View {
                         IconTile(symbol: icon(g.title), color: r.color.map { Color(hex: $0) } ?? .accentColor, size: 28)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r.title).lineLimit(2)
-                            if let s = r.sub, !s.isEmpty { Text(s).font(.callout).foregroundStyle(.secondary).lineLimit(1) }
+                            if let s = r.sub, !s.isEmpty { Text(s).font(.sCallout).foregroundStyle(.secondary).lineLimit(1) }
                         }
                         Spacer(minLength: 4)
                         if r.external == true {

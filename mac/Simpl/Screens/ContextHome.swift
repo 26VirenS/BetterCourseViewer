@@ -53,7 +53,7 @@ struct ContextHome: View {
             VStack(alignment: .leading, spacing: 7) {
                 if let name = d.name, !name.isEmpty, name != d.title {
                     Text(name)
-                        .font(.title3.weight(.semibold))
+                        .font(.sTitle3.weight(.semibold))
                         .lineLimit(2)
                         .textSelection(.enabled)
                 }
@@ -89,12 +89,12 @@ struct ContextHome: View {
                 VStack(spacing: 0) {
                     if let letter {
                         Text(letter)
-                            .font(.title3.weight(.bold))
+                            .font(.sTitle3.weight(.bold))
                             .foregroundStyle(color)
                     }
                     if let s = d.scoreText {
                         Text(s)
-                            .font(.caption.monospacedDigit())
+                            .font(.sCaption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .minimumScaleFactor(0.7)
                             .contentTransition(.numericText(value: d.score ?? 0))
@@ -119,7 +119,7 @@ struct ContextHome: View {
                     HStack(spacing: 10) {
                         IconTile(symbol: Glyph.section(s.kind), color: color, size: 30)
                         Text(s.label)
-                            .font(.body.weight(.medium))
+                            .font(.sBody.weight(.medium))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
                         Spacer(minLength: 0)
@@ -179,7 +179,7 @@ struct ContextHome: View {
             if let n = d.openCount, n > d.open.count {
                 Button("All \(n) To Do") { engine.go(.section(ctx, "assignments")) }
                     .buttonStyle(.link)
-                    .font(.callout)
+                    .font(.sCallout)
             }
         }) {
             if d.open.isEmpty {
@@ -195,7 +195,7 @@ struct ContextHome: View {
             if d.sections.contains(where: { $0.kind == "announcements" }) {
                 Button("All Announcements") { engine.go(.section(ctx, "announcements")) }
                     .buttonStyle(.link)
-                    .font(.callout)
+                    .font(.sCallout)
             }
         }) {
             DividedRows(data: d.announcements, inset: 54) { a in
@@ -216,9 +216,9 @@ struct ContextHome: View {
                 engine.push(.page(ctx: ctx, slug: slug))
             } label: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(f.title).font(.headline)
+                    Text(f.title).font(.sHeadline)
                     if let x = f.excerpt, !x.isEmpty {
-                        Text(x).font(.callout).foregroundStyle(.secondary).lineLimit(4)
+                        Text(x).font(.sCallout).foregroundStyle(.secondary).lineLimit(4)
                     }
                 }
             }
@@ -237,7 +237,7 @@ struct ContextHome: View {
                 } label: {
                     InfoRow(title: m.label, symbol: m.external == true ? "puzzlepiece.extension" : "link", tint: color) {
                         Image(systemName: window ? "macwindow" : "chevron.right")
-                            .font(.footnote.weight(.semibold))
+                            .font(.sFootnote.weight(.semibold))
                             .foregroundStyle(.tertiary)
                     }
                 }

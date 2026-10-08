@@ -4,7 +4,7 @@ import SwiftUI
 
 /// A screen's scrolling page: Simpl's quiet ground, its content in a column that keeps a readable width on a wide window.
 struct Page<Content: View>: View {
-    var maxWidth: CGFloat = 1180
+    var maxWidth: CGFloat = 1480
     var spacing: CGFloat = 22
     @ViewBuilder var content: Content
 
@@ -12,8 +12,8 @@ struct Page<Content: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: spacing) { content }
                 .frame(maxWidth: maxWidth, alignment: .leading)
-                .padding(.horizontal, 32)
-                .padding(.top, 22)
+                .padding(.horizontal, 40)
+                .padding(.top, 26)
                 .padding(.bottom, 40)
                 .frame(maxWidth: .infinity)
         }
@@ -27,16 +27,21 @@ struct CardBackground: ViewModifier {
     var tint: Color? = nil
 
     func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Theme.card)
-                    .overlay {
-                        if let tint { RoundedRectangle(cornerRadius: radius, style: .continuous).fill(tint.opacity(0.1)) }
-                    }
-            }
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1))
-            .shadow(color: Theme.shadow, radius: 1.5, y: 1)
+        if #available(macOS 26.0, *) {
+            // (1.2) Liquid Glass, as the system's own panels are
+            content.glassCard(radius: radius, tint: tint?.opacity(0.22))
+        } else {
+            content
+                .background {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Theme.card)
+                        .overlay {
+                            if let tint { RoundedRectangle(cornerRadius: radius, style: .continuous).fill(tint.opacity(0.1)) }
+                        }
+                }
+                .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1))
+                .shadow(color: Theme.shadow, radius: 1.5, y: 1)
+        }
     }
 }
 
@@ -63,18 +68,27 @@ struct CardButtonStyle: ButtonStyle {
 
         var body: some View {
             let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-            configuration.label
-                .contentShape(shape)
-                .background {
-                    shape.fill(hover ? Theme.cardHover : Theme.card)
-                        .overlay { if let tint { shape.fill(tint.opacity(0.1)) } }
-                }
-                .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
-                .shadow(color: Theme.shadow, radius: hover && !reduceMotion ? 10 : 1.5, y: hover && !reduceMotion ? 4 : 1)
+            surface(configuration.label.contentShape(shape), shape: shape)
                 .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.985 : (hover ? 1.008 : 1)))
                 .animation(Motion.hover, value: hover)
                 .animation(Motion.snappy, value: configuration.isPressed)
                 .onHover { hover = $0 }
+        }
+
+        @ViewBuilder
+        private func surface(_ label: some View, shape: RoundedRectangle) -> some View {
+            if #available(macOS 26.0, *) {
+                // (1.2) glass that answers the pointer
+                label.glass(shape, tint: tint?.opacity(0.22), interactive: true)
+            } else {
+                label
+                    .background {
+                        shape.fill(hover ? Theme.cardHover : Theme.card)
+                            .overlay { if let tint { shape.fill(tint.opacity(0.1)) } }
+                    }
+                    .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
+                    .shadow(color: Theme.shadow, radius: hover && !reduceMotion ? 10 : 1.5, y: hover && !reduceMotion ? 4 : 1)
+            }
         }
     }
 }
@@ -113,12 +127,12 @@ struct CardHeading: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(text.uppercased())
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12.5, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(.secondary)
             Spacer()
             if let trailing, !trailing.isEmpty {
-                Text(trailing).font(.caption).foregroundStyle(.secondary)
+                Text(trailing).font(.sCaption).foregroundStyle(.secondary)
             }
         }
     }
@@ -137,12 +151,12 @@ struct ScreenHeading: View {
                     RoundedRectangle(cornerRadius: 4, style: .continuous).fill(color).frame(width: 14, height: 14)
                 }
                 Text(title)
-                    .font(.system(size: 28, weight: .bold))
-                    .tracking(-0.4)
+                    .font(.system(size: 34, weight: .bold))
+                    .tracking(-0.6)
                     .textSelection(.enabled)
             }
             if let sub, !sub.isEmpty {
-                Text(sub).font(.callout).foregroundStyle(.secondary)
+                Text(sub).font(.sCallout).foregroundStyle(.secondary)
             }
         }
     }
@@ -231,7 +245,7 @@ struct StatusChip: View {
 
     var body: some View {
         Text(text)
-            .font(.caption.weight(.semibold))
+            .font(.sCaption.weight(.semibold))
             .lineLimit(1)
             .padding(.horizontal, 7)
             .padding(.vertical, 2.5)
@@ -260,7 +274,7 @@ struct CourseChip: View {
 
     var body: some View {
         Text(text)
-            .font(.caption.weight(.semibold))
+            .font(.sCaption.weight(.semibold))
             .lineLimit(1)
             .padding(.horizontal, 7)
             .padding(.vertical, 2.5)
@@ -293,12 +307,12 @@ struct CheckCircle: View {
                     .background(Circle().fill(done ? color : (hover ? color.opacity(0.12) : .clear)))
                 if done {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                         .transition(.scale(scale: 0.4).combined(with: .opacity))
                 }
             }
-            .frame(width: 20, height: 20)
+            .frame(width: 22, height: 22)
             .contentShape(Circle())
             .animation(Motion.snappy, value: done)
             .animation(Motion.hover, value: hover)
@@ -494,7 +508,7 @@ struct EmptyNote: View {
             Image(systemName: symbol).foregroundStyle(.tertiary)
             Text(text).foregroundStyle(.secondary)
         }
-        .font(.callout)
+        .font(.sCallout)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 12)
     }

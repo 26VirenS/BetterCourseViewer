@@ -55,12 +55,12 @@ private struct LoggingInView: View {
                 ProgressView()
                     .controlSize(.large)
                 Text("Logging you in")
-                    .font(.title3.weight(.semibold))
+                    .font(.sTitle3.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
                 if offer {
                     VStack(spacing: 10) {
                         Text("Something to do on your school’s page?")
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 10) {
                             Button("Start Over", action: restart)
@@ -97,18 +97,18 @@ private struct HandoffNote: View {
         VStack {
             HStack(spacing: 12) {
                 Image(systemName: "hand.point.up.left.fill")
-                    .font(.title3)
+                    .font(.sTitle3)
                     .foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Finish signing in below").font(.callout.weight(.semibold))
-                    Text("Simpl carries on once you’re through.").font(.caption).foregroundStyle(.secondary)
+                    Text("Finish signing in below").font(.sCallout.weight(.semibold))
+                    Text("Simpl carries on once you’re through.").font(.sCaption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
                 Button("Start Over", action: restart)
                     .controlSize(.small)
                 Button(action: close) {
                     Image(systemName: "xmark")
-                        .font(.caption.weight(.bold))
+                        .font(.sCaption.weight(.bold))
                         .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
@@ -203,9 +203,9 @@ private struct LoginForm: View {
                         .font(.system(size: 40))
                         .foregroundStyle(.tint)
                     Text("Sign in to your school")
-                        .font(.title2.bold())
+                        .font(.sTitle2.bold())
                     Text("Signing in at \(host)")
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
@@ -231,7 +231,7 @@ private struct LoginForm: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .font(.callout)
+                .font(.sCallout)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 VStack(spacing: 10) {

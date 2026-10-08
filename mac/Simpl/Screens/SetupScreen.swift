@@ -106,7 +106,7 @@ struct SetupScreen: View {
                 Text("Welcome to Simpl")
                     .font(.system(size: 28, weight: .bold))
                 Text("\(engine.lmsName), simply, on your Mac. Two quick questions and you’re in.")
-                    .font(.title3)
+                    .font(.sTitle3)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -131,15 +131,15 @@ struct SetupScreen: View {
     private func feature(_ symbol: String, _ tint: Color, _ title: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: symbol)
-                .font(.title2)
+                .font(.sTitle2)
                 .foregroundStyle(tint)
                 .frame(width: 32)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.headline)
+                    .font(.sHeadline)
                 Text(text)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -173,7 +173,7 @@ struct SetupScreen: View {
                         }
                     } footer: {
                         Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s code — on this Mac only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.")
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -199,7 +199,7 @@ struct SetupScreen: View {
                             .lineLimit(1)
                         if !c.name.isEmpty && c.name != c.code {
                             Text(c.name)
-                                .font(.callout)
+                                .font(.sCallout)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                         }
@@ -273,7 +273,7 @@ struct SetupScreen: View {
                     Text("Aiming For")
                 } footer: {
                     Text("Pass/Fail keeps a course out of your GPA.")
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -294,7 +294,7 @@ struct SetupScreen: View {
                 Text("You’re Set")
                     .font(.system(size: 22, weight: .bold))
                 Text("Change any of this later in Settings (⌘,) ▸ General ▸ Courses and Goals.")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,7 +323,7 @@ struct SetupScreen: View {
             Text(title)
                 .font(.system(size: 22, weight: .bold))
             Text(sub)
-                .font(accent ? Font.callout.weight(.semibold) : Font.callout)
+                .font(accent ? Font.sCallout.weight(.semibold) : Font.sCallout)
                 .foregroundStyle(accent ? Color.accentColor : Color.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

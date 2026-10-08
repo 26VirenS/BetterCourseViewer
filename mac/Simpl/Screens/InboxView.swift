@@ -110,7 +110,7 @@ struct InboxView: View {
             Spacer(minLength: 0)
             if let n = model.data?.rows.count, n > 0 {
                 Text("\(n) \(n == 1 ? "conversation" : "conversations")")
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .contentTransition(.numericText(value: Double(n)))
@@ -328,11 +328,11 @@ private struct InboxRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(row.who)
-                        .font(unread ? .body.weight(.semibold) : .body)
+                        .font(unread ? .sBody.weight(.semibold) : .sBody)
                         .lineLimit(1)
                     if let n = row.count, n > 1 {
                         Text("\(n)")
-                            .font(.caption2.weight(.semibold).monospacedDigit())
+                            .font(.sCaption2.weight(.semibold).monospacedDigit())
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
@@ -342,43 +342,43 @@ private struct InboxRowView: View {
                     Spacer(minLength: 6)
                     if draft {
                         Image(systemName: "pencil")
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                             .help("A reply begun here")
                             .accessibilityLabel("Unsent reply")
                     }
                     if row.starred == true {
                         Image(systemName: "star.fill")
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(chosen ? Color.white : Color.yellow)
                             .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.scale(scale: 0.6).combined(with: .opacity))
                             .accessibilityLabel("Starred")
                     }
                     if row.attachment == true {
                         Image(systemName: "paperclip")
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                             .accessibilityLabel("Has an attachment")
                     }
                     if let w = row.when, !w.isEmpty {
                         Text(w)
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
                 Text(row.subject)
-                    .font(.callout.weight(unread ? .semibold : .regular))
+                    .font(.sCallout.weight(unread ? .semibold : .regular))
                     .lineLimit(1)
                 if let p = row.preview, !p.isEmpty {
                     Text(p)
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
                 if let c = row.context, !c.isEmpty {
                     Text(c)
-                        .font(.subheadline)
+                        .font(.sSubheadline)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
@@ -532,7 +532,7 @@ struct ConversationView: View {
                 setStarred(!starred)
             } label: {
                 Image(systemName: starred ? "star.fill" : "star")
-                    .font(.title2)
+                    .font(.sTitle2)
                     .foregroundStyle(starred ? Color.yellow : Color.secondary)
                     .contentTransition(.symbolEffect(.replace))
             }
@@ -541,7 +541,7 @@ struct ConversationView: View {
             .accessibilityLabel(starred ? "Unstar" : "Star")
         } else if starred {
             Image(systemName: "star.fill")
-                .font(.title2)
+                .font(.sTitle2)
                 .foregroundStyle(.yellow)
                 .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.scale(scale: 0.6).combined(with: .opacity))
                 .accessibilityLabel("Starred")
@@ -553,7 +553,7 @@ struct ConversationView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.red)
                     .transition(.opacity)
             }
@@ -652,7 +652,7 @@ private struct InboxBubble: View {
             VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
                 if !mine {
                     Text(message.author)
-                        .font(.caption.weight(.semibold))
+                        .font(.sCaption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 if !message.body.isEmpty {
@@ -669,7 +669,7 @@ private struct InboxBubble: View {
                 }
                 if let w = message.when, !w.isEmpty {
                     Text(w)
-                        .font(.caption2)
+                        .font(.sCaption2)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -716,7 +716,7 @@ private struct InboxReplyBox: View {
         let focused = focus.wrappedValue
         // (the words again, unseen, give the box its height; the editor over them fills it)
         Text(measured)
-            .font(.body)
+            .font(.sBody)
             .lineLimit(7)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -725,7 +725,7 @@ private struct InboxReplyBox: View {
             .accessibilityHidden(true)
             .overlay(alignment: .topLeading) {
                 TextEditor(text: $text)
-                    .font(.body)
+                    .font(.sBody)
                     .scrollContentBackground(.hidden)
                     .focusEffectDisabled()
                     .focused(focus)
@@ -804,7 +804,7 @@ struct ComposeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("New Message")
-                .font(.title3.weight(.semibold))
+                .font(.sTitle3.weight(.semibold))
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
             Form {
@@ -894,7 +894,7 @@ struct ComposeSheet: View {
             .help("Remove \(p.name)")
             .accessibilityLabel("Remove \(p.name)")
         }
-        .font(.callout)
+        .font(.sCallout)
         .padding(.leading, 9)
         .padding(.trailing, 5)
         .padding(.vertical, 3)
@@ -923,7 +923,7 @@ struct ComposeSheet: View {
                         .lineLimit(1)
                     if let s = r.sub, !s.isEmpty {
                         Text(s)
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -956,7 +956,7 @@ struct ComposeSheet: View {
 
     private var messageEditor: some View {
         TextEditor(text: $message)
-            .font(.body)
+            .font(.sBody)
             .scrollContentBackground(.hidden)
             .focusEffectDisabled()
             .focused($focus, equals: .message)
@@ -1229,17 +1229,17 @@ private struct GroupsCard: View {
                 IconTile(symbol: "person.3.fill", color: Color(hex: group.color), size: 36)
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
+                    .font(.sCaption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(group.name)
-                    .font(.headline)
+                    .font(.sHeadline)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 if let sub = group.sub, !sub.isEmpty {
                     Text(sub)
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)

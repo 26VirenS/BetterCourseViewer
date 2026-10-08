@@ -179,7 +179,7 @@ struct CalendarView: View {
             Image(systemName: problem ? "exclamationmark.triangle.fill" : "info.circle")
                 .foregroundStyle(problem ? Color.orange : Color.secondary)
             Text(text)
-                .font(.callout)
+                .font(.sCallout)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Spacer(minLength: 8)
@@ -243,7 +243,7 @@ struct CalendarView: View {
             HStack(spacing: 0) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, s in
                     Text(s.uppercased())
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .tracking(0.6)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -303,7 +303,7 @@ struct CalendarView: View {
                 HStack {
                     Spacer(minLength: 0)
                     Text("\(cal.component(.day, from: day))")
-                        .font(.callout.weight(isToday ? .semibold : .regular).monospacedDigit())
+                        .font(.sCallout.weight(isToday ? .semibold : .regular).monospacedDigit())
                         .foregroundStyle(isToday ? Color.white : (off ? Color.secondary : Color.primary))
                         .frame(minWidth: 24, minHeight: 24)
                         .background {
@@ -314,7 +314,7 @@ struct CalendarView: View {
                     ForEach(evs.prefix(fits)) { ev in CalendarChip(event: ev) }
                     if evs.count > fits {
                         Text("\(evs.count - fits) more")
-                            .font(.caption2.weight(.medium))
+                            .font(.sCaption2.weight(.medium))
                             .foregroundStyle(.secondary)
                             .padding(.leading, 6)
                     }
@@ -439,11 +439,11 @@ struct CalendarView: View {
             } label: {
                 VStack(spacing: 2) {
                     Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .tracking(0.6)
                         .foregroundStyle(.secondary)
                     Text("\(cal.component(.day, from: day))")
-                        .font(.title3.weight(isToday ? .bold : .medium).monospacedDigit())
+                        .font(.sTitle3.weight(isToday ? .bold : .medium).monospacedDigit())
                         .foregroundStyle(isToday ? Color.white : Color.primary)
                         .frame(width: 32, height: 32)
                         .background {
@@ -672,7 +672,7 @@ private struct CalendarChip: View {
                 .foregroundStyle(done ? Color.secondary : Color.primary)
                 .lineLimit(1)
         }
-        .font(.caption)
+        .font(.sCaption)
         .padding(.horizontal, 5)
         .padding(.vertical, 1.5)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -697,7 +697,7 @@ private struct CalendarEventLine: View {
                     .foregroundStyle(done ? Color.secondary : Color.primary)
                     .lineLimit(2)
                 if let sub = event.sub, !sub.isEmpty {
-                    Text(sub).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer(minLength: 6)
@@ -708,7 +708,7 @@ private struct CalendarEventLine: View {
             }
             if let time = event.time, !time.isEmpty {
                 Text(time)
-                    .font(.callout.monospacedDigit())
+                    .font(.sCallout.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 58, alignment: .trailing)
             }
@@ -739,13 +739,13 @@ private struct CalendarWeekBlock: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(event.title)
                 .strikethrough(done && !missing, color: .secondary)
-                .font(.callout.weight(.medium))
+                .font(.sCallout.weight(.medium))
                 .foregroundStyle(done ? Color.secondary : Color.primary)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
             HStack(spacing: 5) {
                 if let time = event.time, !time.isEmpty {
-                    Text(time).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(time).font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
                 }
                 if missing {
                     FlagBadge(flag: WorkFlag(word: "Missing", kind: "bad"))
@@ -784,7 +784,7 @@ private struct CalendarsPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Calendars").font(.headline)
+            Text("Calendars").font(.sHeadline)
             if choices.isEmpty {
                 Text("No calendars to show.").foregroundStyle(.secondary)
             } else {
@@ -793,7 +793,7 @@ private struct CalendarsPopover: View {
                         ForEach(own) { row($0) }
                         if !other.isEmpty {
                             Text("Other Calendars")
-                                .font(.caption.weight(.semibold))
+                                .font(.sCaption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .padding(.top, own.isEmpty ? 0 : 8)
                             ForEach(other) { row($0) }
@@ -805,7 +805,7 @@ private struct CalendarsPopover: View {
             }
             Divider()
             Text(full ? "Ten calendars at most: turn one off to show another." : (engine.onBrightspace ? "At most 10 calendars show at once." : "Canvas shows at most 10 calendars at once."))
-                .font(.caption)
+                .font(.sCaption)
                 .foregroundStyle(full ? Color.orange : Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }

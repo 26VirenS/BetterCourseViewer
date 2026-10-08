@@ -39,7 +39,7 @@ struct SchoolPicker: View {
                         .font(.system(size: 30, weight: .bold))
                         .tracking(-0.4)
                     Text("Find your school’s Canvas, or enter its Brightspace address.")
-                        .font(.title3)
+                        .font(.sTitle3)
                         .foregroundStyle(.secondary)
                 }
                 field
@@ -48,7 +48,7 @@ struct SchoolPicker: View {
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                 } else {
                     Text("If your school’s sign-in page has a username and password, Simpl shows its own sign-in card for it, and can keep you logged in on this Mac if you choose.")
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -83,11 +83,11 @@ struct SchoolPicker: View {
     private var field: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.title3)
+                .font(.sTitle3)
                 .foregroundStyle(.secondary)
             TextField("School name", text: $query)
                 .textFieldStyle(.plain)
-                .font(.title3)
+                .font(.sTitle3)
                 .autocorrectionDisabled()
                 .focused($fieldFocused)
                 .onSubmit { openChosen() }
@@ -161,12 +161,12 @@ struct SchoolPicker: View {
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).foregroundStyle(on ? Color.white : Color.primary).lineLimit(1)
-                    Text(sub).font(.callout).foregroundStyle(on ? Color.white.opacity(0.85) : Color.secondary).lineLimit(1)
+                    Text(sub).font(.sCallout).foregroundStyle(on ? Color.white.opacity(0.85) : Color.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 if on {
                     Image(systemName: "return")
-                        .font(.caption.weight(.semibold))
+                        .font(.sCaption.weight(.semibold))
                         .foregroundStyle(Color.white.opacity(0.85))
                 }
             }
@@ -198,7 +198,7 @@ struct SchoolPicker: View {
                         .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 Text("The address you open Canvas or Brightspace at in a browser, for example school.instructure.com or school.brightspace.com.")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

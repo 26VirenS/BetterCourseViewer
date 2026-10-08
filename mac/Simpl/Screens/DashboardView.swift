@@ -63,7 +63,7 @@ struct DashboardView: View {
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(c.label)
-                    .font(.callout.weight(.medium))
+                    .font(.sCallout.weight(.medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Group {
@@ -123,10 +123,10 @@ struct DashboardView: View {
                     Button { engine.go(.section("courses/\(r.id)", "assignments")) } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack {
-                                Text(r.code).font(.callout.weight(.semibold)).lineLimit(1)
+                                Text(r.code).font(.sCallout.weight(.semibold)).lineLimit(1)
                                 Spacer()
                                 Text("\(r.done) of \(r.total)")
-                                    .font(.callout.monospacedDigit())
+                                    .font(.sCallout.monospacedDigit())
                                     .foregroundStyle(.secondary)
                                     .contentTransition(.numericText(value: Double(r.done)))
                             }
@@ -139,7 +139,7 @@ struct DashboardView: View {
                 }
                 if let idle, idle > 0 {
                     Text("\(idle) \(idle == 1 ? "course" : "courses") with nothing assigned this week")
-                        .font(.caption)
+                        .font(.sCaption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -229,12 +229,12 @@ private struct CounterList: View {
         VStack(alignment: .leading, spacing: 0) {
             if let d = data {
                 Text(d.title)
-                    .font(.headline)
+                    .font(.sHeadline)
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
                     .padding(.bottom, 6)
                 if let note = d.note, !note.isEmpty {
-                    Text(note).font(.callout).foregroundStyle(.secondary)
+                    Text(note).font(.sCallout).foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
                 }
@@ -273,7 +273,7 @@ private struct CounterList: View {
                 RoundedRectangle(cornerRadius: 2).fill(Color(hex: row.color)).frame(width: 4, height: 30)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.title).foregroundStyle(row.quiet == true ? .secondary : .primary).lineLimit(2)
-                    if let sub = row.sub { Text(sub).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                    if let sub = row.sub { Text(sub).font(.sCaption).foregroundStyle(.secondary).lineLimit(2) }
                 }
                 Spacer(minLength: 4)
                 if row.clearable == true, let k = row.key {

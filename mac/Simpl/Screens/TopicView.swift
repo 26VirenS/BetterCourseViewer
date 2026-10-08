@@ -85,10 +85,10 @@ struct TopicView: View {
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(who ?? d.context ?? "")
-                        .font(.headline)
+                        .font(.sHeadline)
                     if !line.isEmpty {
                         Text(line)
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -112,11 +112,11 @@ struct TopicView: View {
             HStack(spacing: 6) {
                 StatusChip(text: "Graded", tone: "purple")
                 Text(g)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                 if d.assignmentUrl != nil {
                     Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
+                        .font(.sCaption2.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -194,7 +194,7 @@ struct TopicView: View {
 
     private func note(_ text: String, symbol: String) -> some View {
         Label(text, systemImage: symbol)
-            .font(.callout)
+            .font(.sCallout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
@@ -208,18 +208,18 @@ struct TopicView: View {
         return VStack(alignment: .leading, spacing: 6) {
             if e.deleted == true {
                 Text(e.text)
-                    .font(.callout)
+                    .font(.sCallout)
                     .italic()
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 8) {
                     PersonAvatar(name: e.author, avatar: e.avatar, size: 26)
                     Text(e.author)
-                        .font(.callout.weight(.semibold))
+                        .font(.sCallout.weight(.semibold))
                         .lineLimit(1)
                     if let w = e.when, !w.isEmpty {
                         Text(w)
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -231,7 +231,7 @@ struct TopicView: View {
                         RichText(html: h)
                     } else {
                         Text(e.text)
-                            .font(.callout)
+                            .font(.sCallout)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -242,7 +242,7 @@ struct TopicView: View {
                         Label("Reply", systemImage: "arrowshape.turn.up.left")
                     }
                     .buttonStyle(.borderless)
-                    .font(.caption.weight(.medium))
+                    .font(.sCaption.weight(.medium))
                     .padding(.leading, 34)
                     .help("Reply to \(e.author)")
                 }
@@ -335,10 +335,10 @@ private struct TopicComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(heading)
-                .font(.callout.weight(.semibold))
+                .font(.sCallout.weight(.semibold))
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
-                    .font(.body)
+                    .font(.sBody)
                     .scrollContentBackground(.hidden)
                     .focused($focused)
                     .disabled(sending)
@@ -359,12 +359,12 @@ private struct TopicComposer: View {
             .animation(Motion.hover, value: focused)
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.red)
             }
             HStack(spacing: 8) {
                 Text("⌘↩ to post · esc to cancel")
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 8)
                 Button("Cancel", action: cancel)

@@ -116,12 +116,12 @@ private struct NotificationRow: View {
                 IconTile(symbol: NotificationRow.icon(row.cat), color: NotificationRow.tone(row.cat), size: 32)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.title)
-                        .font(.body.weight(row.read ? .regular : .semibold))
+                        .font(.sBody.weight(row.read ? .regular : .semibold))
                         .lineLimit(2)
                     if let sub = row.sub, !sub.isEmpty {
-                        Text(sub).font(.callout).foregroundStyle(.secondary).lineLimit(3)
+                        Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(3)
                     }
-                    Text(row.catLabel).font(.caption.weight(.semibold)).foregroundStyle(NotificationRow.tone(row.cat))
+                    Text(row.catLabel).font(.sCaption.weight(.semibold)).foregroundStyle(NotificationRow.tone(row.cat))
                 }
                 Spacer(minLength: 8)
                 ZStack(alignment: .topTrailing) {

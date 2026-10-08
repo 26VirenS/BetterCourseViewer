@@ -137,11 +137,11 @@ struct QuizScreen: View {
             IconTile(symbol: "checklist", color: tint, size: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.headline)
+                    .font(.sHeadline)
                     .lineLimit(1)
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.sCaption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -230,7 +230,7 @@ struct QuizScreen: View {
     private var banner: some View {
         if let b = run.banner {
             Label(b.text, systemImage: b.error ? "exclamationmark.triangle.fill" : "clock.fill")
-                .font(.callout.weight(.semibold))
+                .font(.sCallout.weight(.semibold))
                 .foregroundStyle(b.error ? Color.white : Color.primary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 9)
@@ -316,7 +316,7 @@ private struct QuizClock: View {
                 let spoken: String = left != nil ? "\(time) left" : "\(time) so far"
                 let tip: String = left != nil ? "Time left in this attempt" : "Time taken so far"
                 Label(time, systemImage: left != nil ? "timer" : "clock")
-                    .font(.callout.weight(.semibold).monospacedDigit())
+                    .font(.sCallout.weight(.semibold).monospacedDigit())
                     .foregroundStyle(low ? Color.red : Color.primary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -337,7 +337,7 @@ private struct QuizInstructionsPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Instructions")
-                .font(.headline)
+                .font(.sHeadline)
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
@@ -410,7 +410,7 @@ private struct QuizIntroPane: View {
             HStack(spacing: 8) {
                 IconTile(symbol: "checklist", color: tint, size: 26)
                 Text(intro.context ?? "Quiz")
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                     .foregroundStyle(tint)
                     .lineLimit(1)
             }
@@ -420,12 +420,12 @@ private struct QuizIntroPane: View {
                 .textSelection(.enabled)
             if !intro.facts.isEmpty {
                 Text(intro.facts.joined(separator: " · "))
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
             if let note = intro.note, !note.isEmpty {
                 Text(note)
-                    .font(.footnote)
+                    .font(.sFootnote)
                     .foregroundStyle(.secondary)
             }
         }
@@ -443,7 +443,7 @@ private struct QuizIntroPane: View {
                         .frame(width: 20)
                         .accessibilityHidden(true)
                     Text(r.text)
-                        .font(.callout)
+                        .font(.sCallout)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -463,7 +463,7 @@ private struct QuizIntroPane: View {
                 .onSubmit(startAttempt)
                 .frame(maxWidth: 320)
             Text("Your instructor gives the code. It stays with this attempt.")
-                .font(.caption)
+                .font(.sCaption)
                 .foregroundStyle(.secondary)
         }
         .padding(18)
@@ -473,7 +473,7 @@ private struct QuizIntroPane: View {
 
     private func notice(_ text: String, symbol: String, color: Color, tinted: Bool) -> some View {
         Label(text, systemImage: symbol)
-            .font(.callout)
+            .font(.sCallout)
             .foregroundStyle(color)
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -483,11 +483,11 @@ private struct QuizIntroPane: View {
     private func lastAttempt(_ last: QuizIntro.Last) -> some View {
         CardSection(title: "Your Last Attempt") {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Attempt \(last.attempt)").font(.body.weight(.semibold))
+                Text("Attempt \(last.attempt)").font(.sBody.weight(.semibold))
                 if let s = last.score {
-                    Text(s).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(s).font(.sCallout.monospacedDigit()).foregroundStyle(.secondary)
                 } else if let why = last.why, !why.isEmpty {
-                    Text(why).font(.callout).foregroundStyle(.secondary)
+                    Text(why).font(.sCallout).foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 6)
@@ -694,7 +694,7 @@ private struct QuizTakePane: View {
                 if !run.saveWord.isEmpty { Text("· \(run.saveWord)") }
                 if run.moving != nil { ProgressView().controlSize(.small) }
             }
-            .font(.callout.monospacedDigit())
+            .font(.sCallout.monospacedDigit())
             .foregroundStyle(.secondary)
             Spacer()
             Button(action: back) { Label("Previous", systemImage: "chevron.left") }
@@ -762,7 +762,7 @@ private struct QuizStripView: View {
         let ring: Color = current ? (done ? Color.primary.opacity(0.55) : tint) : .clear
         return Button { jump(k) } label: {
             Text("\(k + 1)")
-                .font(.callout.weight(.semibold).monospacedDigit())
+                .font(.sCallout.weight(.semibold).monospacedDigit())
                 .frame(width: 32, height: 32)
                 .foregroundStyle(ink)
                 .background(Circle().fill(fill))
@@ -865,7 +865,7 @@ private struct QuizQuestionPage: View {
                     answer
                     if !q.hint.isEmpty {
                         Label(q.hint, systemImage: "info.circle")
-                            .font(.footnote)
+                            .font(.sFootnote)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -887,9 +887,9 @@ private struct QuizQuestionPage: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Question \(q.n)")
-                    .font(.title2.weight(.bold))
+                    .font(.sTitle2.weight(.bold))
                 Text(ofLine)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -968,7 +968,7 @@ private struct QuizQuestionPage: View {
                 }
             }
             Text("Pick every answer that applies.")
-                .font(.footnote)
+                .font(.sFootnote)
                 .foregroundStyle(.secondary)
         }
     }
@@ -977,7 +977,7 @@ private struct QuizQuestionPage: View {
         TextField(numeric ? "Number" : "Your answer", text: Binding(get: { q.text }, set: { v in run.set(q.id, typed: true) { $0.text = v } }))
             .textFieldStyle(.roundedBorder)
             .controlSize(.large)
-            .font(.body.monospacedDigit())
+            .font(.sBody.monospacedDigit())
             .autocorrectionDisabled(numeric)
             .focused(focus, equals: .field("\(q.id)#line"))
             .onSubmit(onReturn)
@@ -987,7 +987,7 @@ private struct QuizQuestionPage: View {
     private var essay: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextEditor(text: Binding(get: { q.text }, set: { v in run.set(q.id, typed: true) { $0.text = v } }))
-                .font(.body)
+                .font(.sBody)
                 .scrollContentBackground(.hidden)
                 .focused(focus, equals: .field("\(q.id)#essay"))
                 .padding(8)
@@ -995,7 +995,7 @@ private struct QuizQuestionPage: View {
                 .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.3)))
             Text("A blank line starts a new paragraph; lines starting with • or 1. become a list.")
-                .font(.caption)
+                .font(.sCaption)
                 .foregroundStyle(.secondary)
         }
     }
@@ -1028,7 +1028,7 @@ private struct QuizQuestionPage: View {
             ForEach(q.blanks) { b in
                 HStack(spacing: 12) {
                     Text("\(b.n)")
-                        .font(.callout.weight(.bold).monospacedDigit())
+                        .font(.sCallout.weight(.bold).monospacedDigit())
                         .foregroundStyle(tint)
                         .frame(minWidth: 26, minHeight: 26)
                         .background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
@@ -1074,7 +1074,7 @@ private struct QuizQuestionPage: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(f.name).lineLimit(1)
                         Text("Handed in with this attempt when you submit.")
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -1089,7 +1089,7 @@ private struct QuizQuestionPage: View {
                     .foregroundStyle(dropping ? tint : Color.secondary)
                     .accessibilityHidden(true)
                 Text(dropWords)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 10) {
                     Button { importing = true } label: { Label(q.files.isEmpty ? "Choose File…" : "Replace…", systemImage: "folder") }
@@ -1158,7 +1158,7 @@ private struct QuizQuestionPage: View {
     private var elsewhere: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This kind of question is answered on Canvas’s quiz page. Your other answers are already saved there.")
-                .font(.callout)
+                .font(.sCallout)
                 .foregroundStyle(.secondary)
             Button(action: openCanvas) { Label("Answer on Canvas", systemImage: "globe") }
                 .buttonStyle(.borderedProminent)
@@ -1185,13 +1185,13 @@ private struct QuizOptionRow<Mark: View>: View {
         HStack(alignment: .center, spacing: 12) {
             mark()
             Text(letter)
-                .font(.callout.weight(.semibold))
+                .font(.sCallout.weight(.semibold))
                 .foregroundStyle(on ? tint : Color.secondary)
                 .frame(minWidth: 16)
             QuizOptionText(text: text, html: html)
             if let number {
                 Text("\(number)")
-                    .font(.caption.monospacedDigit())
+                    .font(.sCaption.monospacedDigit())
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -1316,7 +1316,7 @@ private struct QuizReviewPane: View {
                     .padding(8)
                     .card()
                     Text(noBack ? "This quiz seals each question once you leave it." : "Click a question to change it. Submitting ends the attempt; blank questions are graded as incorrect.")
-                        .font(.footnote)
+                        .font(.sFootnote)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: 780, alignment: .leading)
@@ -1332,24 +1332,24 @@ private struct QuizReviewPane: View {
     private func row(_ q: QuizQuestion) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(q.n)")
-                .font(.callout.weight(.bold).monospacedDigit())
+                .font(.sCallout.weight(.bold).monospacedDigit())
                 .frame(width: 28, height: 28)
                 .foregroundStyle(q.isAnswered ? Color.white : Color.secondary)
                 .background(Circle().fill(q.isAnswered ? tint : Theme.well))
             VStack(alignment: .leading, spacing: 3) {
                 Text(q.plain).lineLimit(2)
                 if q.kind == "info" {
-                    Text("Information only").font(.callout).foregroundStyle(.secondary)
+                    Text("Information only").font(.sCallout).foregroundStyle(.secondary)
                 } else if let s = q.summary {
-                    Text(s).font(.callout.weight(.medium)).foregroundStyle(tint).lineLimit(2)
+                    Text(s).font(.sCallout.weight(.medium)).foregroundStyle(tint).lineLimit(2)
                 } else {
-                    Text("Not answered").font(.callout.weight(.semibold)).foregroundStyle(.red)
+                    Text("Not answered").font(.sCallout.weight(.semibold)).foregroundStyle(.red)
                 }
             }
             Spacer(minLength: 4)
             if q.flagged {
                 Image(systemName: "flag.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.orange)
                     .help("Flagged")
                     .accessibilityLabel("Flagged")
@@ -1410,7 +1410,7 @@ private struct QuizReceiptPane: View {
                         .quizArrive(1, shown)
                     if let lead = r?.lead, !lead.isEmpty {
                         Text(lead)
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: 460)
@@ -1462,7 +1462,7 @@ private struct QuizReceiptPane: View {
         HStack {
             Text(k).foregroundStyle(.secondary)
             Spacer()
-            Text(v).font(.body.weight(.semibold).monospacedDigit())
+            Text(v).font(.sBody.weight(.semibold).monospacedDigit())
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -1514,7 +1514,7 @@ private struct QuizFeedbackPane: View {
                     .frame(maxWidth: 440)
                 } else {
                     Label("Canvas has not released the question results for this attempt yet — your score and the questions are shown as they stand.", systemImage: "info.circle")
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }
                 if let cs = fb.comments, !cs.isEmpty { comments(cs) }
@@ -1548,17 +1548,17 @@ private struct QuizFeedbackPane: View {
             ZStack {
                 Ring(value: fb.pct, color: color, lineWidth: 8)
                 Text(fb.pct.map { "\(Int($0.rounded()))%" } ?? "—")
-                    .font(.headline.weight(.bold))
+                    .font(.sHeadline.weight(.bold))
                     .foregroundStyle(color)
             }
             .frame(width: 88, height: 88)
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(fb.score ?? "—") / \(fb.possible ?? "—")")
-                    .font(.title2.weight(.bold).monospacedDigit())
+                    .font(.sTitle2.weight(.bold).monospacedDigit())
                 Text("Attempt \(fb.attempt ?? 1)")
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                 if let s = fb.summary {
-                    Text(s).font(.callout).foregroundStyle(.secondary)
+                    Text(s).font(.sCallout).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)
@@ -1586,8 +1586,8 @@ private struct QuizFeedbackPane: View {
                 HStack(alignment: .top, spacing: 10) {
                     PersonAvatar(name: c.author, size: 30)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(c.author).font(.callout.weight(.semibold))
-                        Text(c.text).font(.callout).textSelection(.enabled)
+                        Text(c.author).font(.sCallout.weight(.semibold))
+                        Text(c.text).font(.sCallout).textSelection(.enabled)
                     }
                     Spacer(minLength: 0)
                 }
@@ -1626,17 +1626,17 @@ private struct QuizFeedbackCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: mark)
-                    .font(.title3)
+                    .font(.sTitle3)
                     .foregroundStyle(ink)
                     .accessibilityHidden(true)
-                Text("Question \(row.n)").font(.headline)
+                Text("Question \(row.n)").font(.sHeadline)
                 Text(row.verdictText)
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                     .foregroundStyle(ink)
                 Spacer()
                 if !row.score.isEmpty {
                     Text(row.score)
-                        .font(.callout.weight(.semibold).monospacedDigit())
+                        .font(.sCallout.weight(.semibold).monospacedDigit())
                         .foregroundStyle(ink)
                 }
             }
@@ -1655,7 +1655,7 @@ private struct QuizFeedbackCard: View {
                         ForEach(opts) { o in
                             HStack(spacing: 10) {
                                 Text(o.letter)
-                                    .font(.caption.weight(.bold))
+                                    .font(.sCaption.weight(.bold))
                                     .frame(width: 24, height: 24)
                                     .background(Circle().fill(Theme.well))
                                 QuizOptionText(text: o.text, html: o.html)
@@ -1667,7 +1667,7 @@ private struct QuizFeedbackCard: View {
                     .padding(.top, 8)
                 } label: {
                     Text(showOptions ? "Hide the Options" : "Show All \(opts.count) Options")
-                        .font(.callout.weight(.semibold))
+                        .font(.sCallout.weight(.semibold))
                 }
             }
             if let s = row.solution {
@@ -1676,7 +1676,7 @@ private struct QuizFeedbackCard: View {
                     if !s.html.isEmpty {
                         RichText(html: s.html)
                     } else {
-                        Text(s.text).font(.callout).textSelection(.enabled)
+                        Text(s.text).font(.sCallout).textSelection(.enabled)
                     }
                 }
                 .padding(12)
@@ -1684,7 +1684,7 @@ private struct QuizFeedbackCard: View {
                 .background(Theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else if row.noSolution {
                 Text("Your instructor left no worked solution for this question.")
-                    .font(.footnote)
+                    .font(.sFootnote)
                     .foregroundStyle(.secondary)
             }
         }
@@ -1695,7 +1695,7 @@ private struct QuizFeedbackCard: View {
 
     private func pill(_ t: String, _ c: Color) -> some View {
         Text(t)
-            .font(.caption.weight(.semibold))
+            .font(.sCaption.weight(.semibold))
             .foregroundStyle(c)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -1707,12 +1707,12 @@ private struct QuizFeedbackCard: View {
         return VStack(alignment: .leading, spacing: 6) {
             CardHeading(text: label)
             if parts.isEmpty {
-                Text(empty).italic().font(.callout).foregroundStyle(.secondary)
+                Text(empty).italic().font(.sCallout).foregroundStyle(.secondary)
             } else {
                 ForEach(Array(parts.enumerated()), id: \.offset) { _, p in
                     if !p.text.isEmpty {
                         Text(p.text)
-                            .font(.callout.weight(row.essay ? .regular : .semibold))
+                            .font(.sCallout.weight(row.essay ? .regular : .semibold))
                             .foregroundStyle(wash ? color : Color.primary)
                             .textSelection(.enabled)
                     } else if !p.html.isEmpty {
@@ -1730,18 +1730,18 @@ private struct QuizFeedbackCard: View {
         VStack(spacing: 8) {
             ForEach(Array(m.rows.enumerated()), id: \.offset) { _, r in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(r.left).font(.callout.weight(.semibold))
+                    Text(r.left).font(.sCallout.weight(.semibold))
                     HStack(spacing: 6) {
                         Image(systemName: r.ok == true ? "checkmark" : (r.ok == false ? "xmark" : "arrow.right"))
-                            .font(.caption.weight(.bold))
+                            .font(.sCaption.weight(.bold))
                             .foregroundStyle(matchInk(r.ok))
                         Text(r.mine ?? "No match set")
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(r.mine == nil ? Color.secondary : Color.primary)
                     }
                     if m.showRight, let right = r.right, r.ok != true {
                         Text("Correct: \(right)")
-                            .font(.footnote.weight(.medium))
+                            .font(.sFootnote.weight(.medium))
                             .foregroundStyle(.green)
                     }
                 }

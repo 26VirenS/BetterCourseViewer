@@ -239,7 +239,7 @@ private struct SaidBar: View {
         ZStack {
             if let said = settings.said {
                 Label(said.text, systemImage: said.error ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .font(.callout.weight(.medium))
+                    .font(.sCallout.weight(.medium))
                     .foregroundStyle(said.error ? Color.red : Color.primary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
@@ -589,7 +589,7 @@ private struct AboutPane: View {
                         .resizable()
                         .frame(width: 56, height: 56)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Simpl").font(.title2.bold())
+                        Text("Simpl").font(.sTitle2.bold())
                         Text("\(session.lmsName), as a Mac app.").foregroundStyle(.secondary)
                     }
                 }

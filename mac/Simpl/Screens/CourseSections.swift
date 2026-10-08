@@ -238,32 +238,32 @@ private struct ModulesList: View {
     private func header(_ m: ModuleData, open: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 12.5, weight: .bold))
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(open ? 90 : 0))
                 .frame(width: 14)
                 .accessibilityHidden(true)
             if m.locked == true {
                 Image(systemName: "lock.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Locked")
             }
             if m.done == true {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.green)
                     .accessibilityLabel("Done")
             }
             Text(m.name)
-                .font(.headline)
+                .font(.sHeadline)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             Spacer(minLength: 8)
             if let p = m.progress, !p.isEmpty {
                 Text(p)
-                    .font(.callout.monospacedDigit())
+                    .font(.sCallout.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             }
@@ -280,7 +280,7 @@ private struct ModulesList: View {
                 .padding(.bottom, 4)
             if m.locked == true, let t = m.lockText, !t.isEmpty {
                 Label(t, systemImage: "lock.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -293,7 +293,7 @@ private struct ModulesList: View {
             }
             if m.items.isEmpty {
                 Text("Nothing in this module yet.")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
@@ -306,7 +306,7 @@ private struct ModulesList: View {
         let pad = CGFloat(it.indent ?? 0) * 20
         if it.header == true {
             Text(it.title)
-                .font(.callout.weight(.semibold))
+                .font(.sCallout.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8 + pad)
                 .padding(.trailing, 8)
@@ -345,18 +345,18 @@ private struct ModulesList: View {
                     .lineLimit(2)
                     .foregroundStyle(locked ? .secondary : .primary)
                 if let s = it.sub, !s.isEmpty {
-                    Text(s).font(.caption).foregroundStyle(.secondary)
+                    Text(s).font(.sCaption).foregroundStyle(.secondary)
                 }
                 if locked, let t = it.lockText, !t.isEmpty {
-                    Text(t).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(t).font(.sCaption).foregroundStyle(.secondary).lineLimit(2)
                 } else if let r = it.requirement, !r.isEmpty, !done {
-                    Text(r).font(.caption.weight(.medium)).foregroundStyle(color)
+                    Text(r).font(.sCaption.weight(.medium)).foregroundStyle(color)
                 }
             }
             Spacer(minLength: 6)
             if done {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
+                    .font(.sTitle3)
                     .foregroundStyle(.green)
                     .help("Done")
                     .accessibilityLabel("Done")
@@ -364,7 +364,7 @@ private struct ModulesList: View {
             }
             if it.external == true {
                 Image(systemName: "arrow.up.right")
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.tertiary)
                     .help("Opens in your browser")
                     .accessibilityLabel("Opens in your browser")
@@ -489,7 +489,7 @@ struct PageView: View {
                     ScreenHeading(title: d.title, sub: d.edited, color: Color(hex: d.color))
                     if let l = d.lockText, !l.isEmpty {
                         Label(l, systemImage: "lock.fill")
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.orange)
                             .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -565,7 +565,7 @@ struct FilesView: View {
         } label: {
             InfoRow(title: f.name, sub: f.sub, symbol: f.locked == true ? "lock.fill" : "folder.fill", tint: color) {
                 Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                    .font(.sFootnote.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -583,7 +583,7 @@ struct FilesView: View {
         } label: {
             InfoRow(title: f.name, sub: f.sub, symbol: locked ? "lock.fill" : kind.symbol, tint: locked ? .gray : kind.tint) {
                 Text(kind.word)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .frame(minWidth: 100, alignment: .trailing)
@@ -658,7 +658,7 @@ private struct PeopleList: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(p.name).lineLimit(1)
                 if let pr = p.pronouns, !pr.isEmpty {
-                    Text(pr).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(pr).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer(minLength: 4)

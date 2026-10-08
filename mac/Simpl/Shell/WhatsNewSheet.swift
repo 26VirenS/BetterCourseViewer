@@ -19,7 +19,7 @@ struct WhatsNewSheet: View {
                     .font(.system(size: 24, weight: .bold))
                     .tracking(-0.3)
                 if let v = data.version ?? data.releases.first?.version {
-                    Text("Version \(v)").font(.callout).foregroundStyle(.secondary)
+                    Text("Version \(v)").font(.sCallout).foregroundStyle(.secondary)
                 }
             }
             .padding(.top, 28)
@@ -35,9 +35,9 @@ struct WhatsNewSheet: View {
                                 HStack(alignment: .top, spacing: 12) {
                                     IconTile(symbol: icon(note.kind), color: tone(note.kind), size: 30)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(note.title).font(.body.weight(.semibold))
+                                        Text(note.title).font(.sBody.weight(.semibold))
                                         if let body = note.body, !body.isEmpty {
-                                            Text(body).font(.callout).foregroundStyle(.secondary)
+                                            Text(body).font(.sCallout).foregroundStyle(.secondary)
                                                 .fixedSize(horizontal: false, vertical: true)
                                         }
                                     }

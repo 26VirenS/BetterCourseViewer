@@ -34,7 +34,7 @@ struct TodoView: View {
                             .transition(cardTransition)
                     }
                     Text("Click a task to open it, or right-click it for more. Priority is yours alone and never reaches \(engine.lmsName).")
-                        .font(.footnote)
+                        .font(.sFootnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
                 }
@@ -381,7 +381,7 @@ private struct TodoPriorityMenu: View {
                         .opacity(hovering ? 1 : 0)
                 }
             }
-            .font(.caption.weight(.semibold))
+            .font(.sCaption.weight(.semibold))
             .padding(.horizontal, 7)
             .padding(.vertical, 2.5)
             .contentShape(Capsule())
@@ -449,7 +449,7 @@ struct NewTaskSheet: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 IconTile(symbol: "checkmark.circle", color: .purple, size: 28)
-                Text("New Task").font(.title3.weight(.semibold))
+                Text("New Task").font(.sTitle3.weight(.semibold))
                 Spacer()
             }
             .padding(.horizontal, 20)

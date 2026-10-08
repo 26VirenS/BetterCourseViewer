@@ -89,7 +89,7 @@ struct AssignmentView: View {
             HStack(spacing: 8) {
                 IconTile(symbol: Glyph.item(d.kind ?? "assignment"), color: color, size: 22)
                 Text(d.kind ?? "Assignment")
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                     .foregroundStyle(color)
                 if let c = d.context, !c.isEmpty {
                     Button {
@@ -137,7 +137,7 @@ struct AssignmentView: View {
             CardSection(title: "Your Work") {
                 if !submitted.isEmpty {
                     Label(submitted, systemImage: "checkmark.seal.fill")
-                        .font(.callout.weight(.semibold))
+                        .font(.sCallout.weight(.semibold))
                         .foregroundStyle(.green)
                         .symbolEffect(.bounce, value: handedIn)
                         .padding(.horizontal, 8)
@@ -145,7 +145,7 @@ struct AssignmentView: View {
                 }
                 if !text.isEmpty {
                     Text(text)
-                        .font(.callout)
+                        .font(.sCallout)
                         .textSelection(.enabled)
                         .lineLimit(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,24 +218,24 @@ struct AssignmentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(c.author)
-                        .font(.callout.weight(.semibold))
+                        .font(.sCallout.weight(.semibold))
                         .lineLimit(1)
                     if let a = c.attempt, a > 0 {
                         Text("Attempt \(a)")
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.tertiary)
                     }
                     Spacer(minLength: 6)
                     if let w = c.when, !w.isEmpty {
                         Text(w)
-                            .font(.caption)
+                            .font(.sCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
                 if !c.text.isEmpty {
                     Text(c.text)
-                        .font(.callout)
+                        .font(.sCallout)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -245,7 +245,7 @@ struct AssignmentView: View {
                             .lineLimit(1)
                     }
                     .buttonStyle(.link)
-                    .font(.callout)
+                    .font(.sCallout)
                     .help("Open \(f.name) in Quick Look")
                     .contextMenu { fileMenu(f) }
                 }
@@ -295,7 +295,7 @@ struct AssignmentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Button { act(d) } label: {
                     Label(next.title, systemImage: next.symbol)
-                        .font(.headline)
+                        .font(.sHeadline)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -304,7 +304,7 @@ struct AssignmentView: View {
                 .help(next.help)
                 if takesDrops(d) {
                     Text(d.types.contains("online_upload") ? "Or drop files on this page." : "Or drop a link on this page.")
-                        .font(.caption)
+                        .font(.sCaption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
@@ -331,7 +331,7 @@ struct AssignmentView: View {
 
     private func whyNote(_ why: String) -> some View {
         Label(why, systemImage: "info.circle")
-            .font(.callout)
+            .font(.sCallout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -345,7 +345,7 @@ struct AssignmentView: View {
                 ZStack {
                     Ring(value: g.pct, color: color, lineWidth: 6, key: "assignment:\(course)/\(id)")
                     Text(g.letter ?? g.pct.map { "\(Int($0.rounded()))%" } ?? "")
-                        .font(.headline.weight(.bold))
+                        .font(.sHeadline.weight(.bold))
                         .foregroundStyle(color)
                         .minimumScaleFactor(0.6)
                         .padding(8)
@@ -355,12 +355,12 @@ struct AssignmentView: View {
                     scoreText(g)
                     if let pct = g.pct {
                         Text(String(format: "%.1f%%", pct))
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(.secondary)
                     }
                     if let late = g.late, !late.isEmpty {
                         Text(late)
-                            .font(.caption.weight(.semibold))
+                            .font(.sCaption.weight(.semibold))
                             .foregroundStyle(.orange)
                     }
                 }
@@ -369,7 +369,7 @@ struct AssignmentView: View {
             .accessibilityElement(children: .combine)
             if let st = d.stats, !st.isEmpty {
                 Label(st, systemImage: "person.3")
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -386,11 +386,11 @@ struct AssignmentView: View {
     private func scoreText(_ g: GradeInfo) -> some View {
         if let s = g.score, let p = g.possible, p > 0 {
             Text("\(AssignmentView.num(s)) / \(AssignmentView.num(p))")
-                .font(.title3.weight(.semibold).monospacedDigit())
+                .font(.sTitle3.weight(.semibold).monospacedDigit())
                 .contentTransition(.numericText(value: s))
         } else {
             Text(g.text)
-                .font(.title3.weight(.semibold))
+                .font(.sTitle3.weight(.semibold))
         }
     }
 
@@ -422,7 +422,7 @@ struct AssignmentView: View {
             InfoRow(title: d.rubricTitle ?? "Rubric", sub: "\(n) \(n == 1 ? "criterion" : "criteria") · how this is marked",
                     symbol: "list.bullet.clipboard", tint: courseTint(d)) {
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
+                    .font(.sCaption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
             .padding(12)
@@ -434,7 +434,7 @@ struct AssignmentView: View {
 
     private var heldNote: some View {
         Label("Graded, but your teacher has not released the grade yet.", systemImage: "eye.slash")
-            .font(.callout)
+            .font(.sCallout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(14)
@@ -474,11 +474,11 @@ struct AssignmentView: View {
             IconTile(symbol: symbol, color: color, size: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .tracking(0.6)
                     .foregroundStyle(.secondary)
                 Text(value)
-                    .font(.callout)
+                    .font(.sCallout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -506,9 +506,9 @@ struct AssignmentView: View {
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(color)
                     Text(d.resubmit == true ? "Drop to Hand In Again" : "Drop to Hand In")
-                        .font(.title3.weight(.semibold))
+                        .font(.sTitle3.weight(.semibold))
                     Text(d.title)
-                        .font(.callout)
+                        .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -714,11 +714,11 @@ private struct RubricPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text(data.rubricTitle ?? "Rubric")
-                    .font(.headline)
+                    .font(.sHeadline)
                 Spacer(minLength: 12)
                 if let s = data.rubricScore, !s.isEmpty {
                     Text(s)
-                        .font(.title3.weight(.bold).monospacedDigit())
+                        .font(.sTitle3.weight(.bold).monospacedDigit())
                 }
             }
             .padding(.horizontal, 16)
@@ -747,12 +747,12 @@ private struct RubricPanel: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(r.name)
-                    .font(.callout.weight(.semibold))
+                    .font(.sCallout.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if let p = r.pts {
                     Text(p)
-                        .font(.callout.monospacedDigit())
+                        .font(.sCallout.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -764,13 +764,13 @@ private struct RubricPanel: View {
                             .foregroundStyle(got ? Color.green : Color.secondary.opacity(0.5))
                             .accessibilityHidden(true)
                         Text(rating.text)
-                            .font(.callout)
+                            .font(.sCallout)
                             .foregroundStyle(got ? .primary : .secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 6)
                         if let p = rating.pts {
                             Text(p)
-                                .font(.callout.monospacedDigit())
+                                .font(.sCallout.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -783,7 +783,7 @@ private struct RubricPanel: View {
             }
             if let c = r.comment, !c.isEmpty {
                 Label(c, systemImage: "text.bubble")
-                    .font(.callout)
+                    .font(.sCallout)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
@@ -807,7 +807,7 @@ private struct CommentComposer: View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
-                    .font(.body)
+                    .font(.sBody)
                     .scrollContentBackground(.hidden)
                     .focused($focused)
                     .disabled(sending)
@@ -828,12 +828,12 @@ private struct CommentComposer: View {
             .animation(Motion.hover, value: focused)
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.red)
             }
             HStack(spacing: 8) {
                 Text("⌘↩ to send · esc to cancel")
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 8)
                 Button("Cancel", action: cancel)
@@ -956,9 +956,9 @@ private struct HandInSheet: View {
             IconTile(symbol: "tray.and.arrow.up.fill", color: accent, size: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(assignment.resubmit == true ? "Hand In Again" : "Hand In")
-                    .font(.title3.weight(.semibold))
+                    .font(.sTitle3.weight(.semibold))
                 Text(subtitle)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -977,7 +977,7 @@ private struct HandInSheet: View {
             Section("Your Text") {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $text)
-                        .font(.body)
+                        .font(.sBody)
                         .scrollContentBackground(.hidden)
                         .frame(height: 200)
                     if text.isEmpty {
@@ -1019,7 +1019,7 @@ private struct HandInSheet: View {
         } footer: {
             if let a = assignment.allowed, !a.isEmpty {
                 Text("This assignment takes \(allowedList) files.")
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
         }
@@ -1031,9 +1031,9 @@ private struct HandInSheet: View {
                 .font(.system(size: 26))
                 .foregroundStyle(.secondary)
             Text("Drop files here")
-                .font(.callout.weight(.semibold))
+                .font(.sCallout.weight(.semibold))
             Text("or choose them below")
-                .font(.caption)
+                .font(.sCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -1056,7 +1056,7 @@ private struct HandInSheet: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(f.sizeText)
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
@@ -1080,11 +1080,11 @@ private struct HandInSheet: View {
                 ProgressView()
                     .controlSize(.small)
                 Text(progressWord)
-                    .font(.callout)
+                    .font(.sCallout)
                     .foregroundStyle(.secondary)
             } else if type == "online_text_entry" {
                 Text("⌘↩ to submit")
-                    .font(.caption)
+                    .font(.sCaption)
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 8)
@@ -1110,7 +1110,7 @@ private struct HandInSheet: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [8, 5]))
                 Label(assignment.types.contains("online_upload") ? "Drop to Add Files" : "Drop to Add the Link", systemImage: "arrow.down.doc.fill")
-                    .font(.headline)
+                    .font(.sHeadline)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 10)
                     .background(.regularMaterial, in: Capsule())

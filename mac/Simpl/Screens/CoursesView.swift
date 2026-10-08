@@ -21,7 +21,7 @@ struct CoursesView: View {
                         ForEach(d.rows) { c in card(c) }
                     }
                     if let hidden = d.hidden, !hidden.isEmpty {
-                        Text(hidden).font(.callout).foregroundStyle(.secondary)
+                        Text(hidden).font(.sCallout).foregroundStyle(.secondary)
                     }
                 }
             } else {
@@ -57,7 +57,7 @@ struct CoursesView: View {
                         HStack {
                             Spacer()
                             Label("\(n)", systemImage: "megaphone.fill")
-                                .font(.caption.weight(.bold))
+                                .font(.sCaption.weight(.bold))
                                 .foregroundStyle(color)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -71,14 +71,14 @@ struct CoursesView: View {
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16, style: .continuous))
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(c.name ?? c.code).font(.callout.weight(.medium)).lineLimit(1)
-                        Text(subline(c)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(c.name ?? c.code).font(.sCallout.weight(.medium)).lineLimit(1)
+                        Text(subline(c)).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 6)
                     ZStack {
                         Ring(value: c.score, color: color, lineWidth: 4, key: "courses:\(c.id)")
                         Text(c.scoreText)
-                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
                             .foregroundStyle(c.score == nil ? .secondary : .primary)
                             .minimumScaleFactor(0.6)
                             .padding(4)
@@ -138,9 +138,9 @@ private struct NicknameSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Nickname").font(.headline)
+            Text("Nickname").font(.sHeadline)
             Text("Shown instead of “\(course.original ?? course.code)” everywhere, \(onBrightspace ? "on this Mac only" : "in Canvas too").")
-                .font(.callout)
+                .font(.sCallout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextField(course.original ?? "Nickname", text: $name)
