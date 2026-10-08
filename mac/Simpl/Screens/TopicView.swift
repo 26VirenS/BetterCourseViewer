@@ -53,14 +53,16 @@ struct TopicView: View {
 
     // MARK: - The page
 
+    /// (1.2) At a reading width, centred: a thread is read line by line, and lines across the whole of a wide window are
+    /// hard to follow.
     private func page(_ d: TopicData) -> some View {
         let color = Color(hex: d.color)
-        return Page {
+        return Page(maxWidth: 1000) {
             ScreenHeading(title: d.title, sub: kindLine(d), color: color)
             postCard(d, color)
             if replyingTo == "topic" {
                 composer(heading: d.announcement == true ? "Reply to the announcement" : "Reply to the discussion", parent: nil)
-                    .padding(16)
+                    .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .card()
                     .id("composer")
@@ -68,6 +70,7 @@ struct TopicView: View {
             }
             repliesCard(d, color)
         }
+        .font(.sBody)
     }
 
     /// The post: who wrote it (or, when Canvas names nobody, the course, on its own colour), when, the assignment it is
@@ -76,12 +79,12 @@ struct TopicView: View {
         let who = (d.author ?? "").isEmpty ? nil : d.author
         let parts: [String?] = [who == nil ? nil : d.context, d.when]
         let line = parts.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
                 if let who {
-                    PersonAvatar(name: who, avatar: d.avatar, size: 38)
+                    PersonAvatar(name: who, avatar: d.avatar, size: 42)
                 } else {
-                    IconTile(symbol: d.announcement == true ? "megaphone.fill" : "bubble.left.and.bubble.right.fill", color: color, size: 38)
+                    IconTile(symbol: d.announcement == true ? "megaphone.fill" : "bubble.left.and.bubble.right.fill", color: color, size: 42)
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(who ?? d.context ?? "")
@@ -99,7 +102,7 @@ struct TopicView: View {
             if !d.html.isEmpty { RichText(html: d.html) }
             if let files = d.attachments, !files.isEmpty { attachments(files) }
         }
-        .padding(18)
+        .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }
@@ -116,7 +119,7 @@ struct TopicView: View {
                     .foregroundStyle(.secondary)
                 if d.assignmentUrl != nil {
                     Image(systemName: "chevron.right")
-                        .font(.sCaption2.weight(.semibold))
+                        .font(.sFootnote.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -156,15 +159,21 @@ struct TopicView: View {
         CardSection(title: "Replies", trailing: d.count.flatMap { $0 > 0 ? "\($0)" : nil }) {
             repliesNote(d)
             ForEach(Array(d.entries.enumerated()), id: \.element.id) { i, e in
-                if i > 0 { RowDivider(inset: 42 + CGFloat(max(e.depth, 0)) * TopicView.indent) }
+                if i > 0 { RowDivider(inset: 47 + CGFloat(max(e.depth, 0)) * TopicView.indent) }
                 entryRow(e, d, color)
                 if replyingTo == e.id {
+                    // (1.2) in the thread, one step in on its line in the course's colour — no box of its own
                     composer(heading: e.author.isEmpty ? "Reply" : "Reply to \(e.author)", parent: e.id)
-                        .padding(12)
-                        .background(Theme.well, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .padding(.leading, 14)
+                        .padding(.vertical, 4)
+                        .overlay(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 1.25, style: .continuous)
+                                .fill(color.opacity(0.6))
+                                .frame(width: 2.5)
+                        }
                         .padding(.leading, 8 + CGFloat(min(max(e.depth, 0) + 1, 4)) * TopicView.indent)
                         .padding(.trailing, 8)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 10)
                         .id("composer")
                         .transition(entering)
                 }
@@ -212,14 +221,14 @@ struct TopicView: View {
                     .italic()
                     .foregroundStyle(.secondary)
             } else {
-                HStack(spacing: 8) {
-                    PersonAvatar(name: e.author, avatar: e.avatar, size: 26)
+                HStack(spacing: 9) {
+                    PersonAvatar(name: e.author, avatar: e.avatar, size: 30)
                     Text(e.author)
-                        .font(.sCallout.weight(.semibold))
+                        .font(.sBody.weight(.semibold))
                         .lineLimit(1)
                     if let w = e.when, !w.isEmpty {
                         Text(w)
-                            .font(.sCaption)
+                            .font(.sFootnote)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -231,19 +240,19 @@ struct TopicView: View {
                         RichText(html: h)
                     } else {
                         Text(e.text)
-                            .font(.sCallout)
+                            .font(.sBody)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.leading, 34)
+                .padding(.leading, 39)
                 if d.canReply == true {
                     Button { reply(to: e) } label: {
                         Label("Reply", systemImage: "arrowshape.turn.up.left")
                     }
                     .buttonStyle(.borderless)
-                    .font(.sCaption.weight(.medium))
-                    .padding(.leading, 34)
+                    .font(.sFootnote.weight(.medium))
+                    .padding(.leading, 39)
                     .help("Reply to \(e.author)")
                 }
             }
@@ -333,9 +342,9 @@ private struct TopicComposer: View {
     private var empty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(heading)
-                .font(.sCallout.weight(.semibold))
+                .font(.sHeadline)
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
                     .font(.sBody)
@@ -344,12 +353,13 @@ private struct TopicComposer: View {
                     .disabled(sending)
                 if text.isEmpty {
                     Text("Write a reply")
+                        .font(.sBody)
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 5)
                         .allowsHitTesting(false)
                 }
             }
-            .frame(height: 120)
+            .frame(height: 140)
             .padding(8)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
@@ -362,13 +372,14 @@ private struct TopicComposer: View {
                     .font(.sCallout)
                     .foregroundStyle(.red)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Text("⌘↩ to post · esc to cancel")
-                    .font(.sCaption)
+                    .font(.sFootnote)
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 8)
                 Button("Cancel", action: cancel)
                     .keyboardShortcut(.cancelAction)
+                    .glassButton()
                     .disabled(sending)
                 Button(action: go) {
                     if sending {
@@ -377,10 +388,11 @@ private struct TopicComposer: View {
                         Text("Post")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .glassButton(prominent: true)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(sending || empty)
             }
+            .controlSize(.large)
         }
         .task {
             try? await Task.sleep(nanoseconds: 50_000_000) // (in the window first, then the box takes the keys)

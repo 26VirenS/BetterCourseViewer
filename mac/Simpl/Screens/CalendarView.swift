@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 
 /// Calendar: a month as a calendar's grid — each day's work and events on it in their calendar's colour, today marked —
-/// with the day picked listed beside it; a week day by day; or the next three weeks as a list. On the calendars chosen
-/// (Canvas shows ten at most). ‹ and › — or ← and → once the calendar has been clicked — move a month or a week, sliding
-/// the way they go; Today comes back.
+/// with the day picked listed beside it (and a task of your own added to it); a week day by day; or the next three weeks
+/// as a list. On the calendars chosen (Canvas shows ten at most). ‹ and › — or ← and → once the calendar has been
+/// clicked — move a month or a week, sliding the way they go; Today comes back.
 struct CalendarView: View {
     @EnvironmentObject private var engine: Engine
     /// Month, week or list, as the page keeps it (`calView`).
@@ -57,7 +57,7 @@ struct CalendarView: View {
         Group {
             if let d = data {
                 Page {
-                    heading
+                    heading(d)
                     if let note = notice(d) {
                         noticeBar(note.text, problem: note.problem)
                     }
@@ -68,6 +68,7 @@ struct CalendarView: View {
                         .onKeyPress(.leftArrow) { step(-1) }
                         .onKeyPress(.rightArrow) { step(1) }
                 }
+                .font(.sBody)
             } else {
                 LoadState(error: error) { Task { await load(animated: false) } }
             }
@@ -137,9 +138,9 @@ struct CalendarView: View {
 
     // MARK: - The heading and the notice
 
-    private var heading: some View {
+    private func heading(_ d: CalendarData) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            ScreenHeading(title: periodTitle, sub: mode == "list" ? "The next three weeks" : nil)
+            ScreenHeading(title: periodTitle, sub: periodLine(d))
             Spacer(minLength: 8)
             if loading {
                 ProgressView()
@@ -148,6 +149,19 @@ struct CalendarView: View {
             }
         }
         .animation(Motion.gentle, value: loading)
+    }
+
+    /// (1.2) Under the heading: how much the month or the week holds and how much of it is missing ("14 items · 2
+    /// missing"); the list's span.
+    private func periodLine(_ d: CalendarData) -> String {
+        if mode == "list" { return "The next three weeks" }
+        let month = String(Self.dayKey.string(from: anchor).prefix(7))
+        let shown = mode == "month" ? d.events.filter { $0.day.hasPrefix(month) } : d.events
+        guard !shown.isEmpty else { return mode == "month" ? "Nothing this month" : "Nothing this week" }
+        let missing = shown.filter { $0.missing == true }.count
+        var parts = ["\(shown.count) \(shown.count == 1 ? "item" : "items")"]
+        if missing > 0 { parts.append("\(missing) missing") }
+        return parts.joined(separator: " · ")
     }
 
     /// "October 2026", "Oct 4 – 10, 2026", "Upcoming".
@@ -185,13 +199,15 @@ struct CalendarView: View {
             Spacer(minLength: 8)
             if problem {
                 Button("Try Again") { Task { await load(animated: true) } }
+                    .glassButton()
             } else {
                 Button("Choose Calendars…") { choosing = true }
+                    .glassButton()
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .card(radius: 12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .card(radius: 14)
         .transition(.opacity)
     }
 
@@ -225,15 +241,15 @@ struct CalendarView: View {
     /// The month's grid with the day picked beside it on a wide window, under it on a narrow one.
     private func monthView(_ byDay: [String: [CalEvent]]) -> some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 18) {
+            HStack(alignment: .top, spacing: 22) {
                 monthGrid(byDay)
-                    .frame(minWidth: 560, idealWidth: 560, maxWidth: .infinity)
-                dayCard(selected, events: byDay[key(selected)] ?? [])
-                    .frame(width: 320)
+                    .frame(minWidth: 540, idealWidth: 640, maxWidth: .infinity)
+                dayPanel(selected, events: byDay[key(selected)] ?? [])
+                    .frame(width: 340)
             }
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 22) {
                 monthGrid(byDay)
-                dayCard(selected, events: byDay[key(selected)] ?? [])
+                dayPanel(selected, events: byDay[key(selected)] ?? [])
             }
         }
     }
@@ -243,14 +259,14 @@ struct CalendarView: View {
             HStack(spacing: 0) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, s in
                     Text(s.uppercased())
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.sFootnote.weight(.semibold))
                         .tracking(0.6)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 10)
+                        .padding(.trailing, 12)
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .accessibilityHidden(true)
             Self.line.frame(height: 1)
             ZStack {
@@ -291,11 +307,13 @@ struct CalendarView: View {
         }
     }
 
+    /// A day of the month: its number (today on the accent, the day picked on its wash), and up to four of its items as
+    /// lines in their calendar's colour — (1.2) flat on the grid, no box round each.
     private func dayCell(_ day: Date, events evs: [CalEvent]) -> some View {
         let off = !cal.isDate(day, equalTo: anchor, toGranularity: .month)
         let isToday = cal.isDateInToday(day)
         let isSel = cal.isDate(day, inSameDayAs: selected)
-        let fits = evs.count > 3 ? 2 : evs.count
+        let fits = evs.count > 4 ? 3 : evs.count
         return Button {
             pick(day)
         } label: {
@@ -303,39 +321,35 @@ struct CalendarView: View {
                 HStack {
                     Spacer(minLength: 0)
                     Text("\(cal.component(.day, from: day))")
-                        .font(.sCallout.weight(isToday ? .semibold : .regular).monospacedDigit())
-                        .foregroundStyle(isToday ? Color.white : (off ? Color.secondary : Color.primary))
-                        .frame(minWidth: 24, minHeight: 24)
+                        .font(.sBody.weight(isToday || isSel ? .semibold : .regular).monospacedDigit())
+                        .foregroundStyle(isToday ? Color.white : (isSel ? Color.accentColor : (off ? Color.secondary : Color.primary)))
+                        .frame(minWidth: 26, minHeight: 26)
                         .background {
-                            if isToday { Circle().fill(Color.accentColor) }
+                            if isToday {
+                                Circle().fill(Color.accentColor)
+                            } else if isSel {
+                                Circle().fill(Color.accentColor.opacity(0.16))
+                            }
                         }
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(evs.prefix(fits)) { ev in CalendarChip(event: ev) }
                     if evs.count > fits {
                         Text("\(evs.count - fits) more")
-                            .font(.sCaption2.weight(.medium))
+                            .font(.sCaption.weight(.medium))
                             .foregroundStyle(.secondary)
-                            .padding(.leading, 6)
+                            .padding(.leading, 16)
                     }
                 }
                 .opacity(off ? 0.6 : 1)
                 Spacer(minLength: 0)
             }
             .padding(5)
-            .frame(maxWidth: .infinity, minHeight: 96, maxHeight: 96, alignment: .topLeading)
-            .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.accentColor.opacity(isSel ? 0.12 : 0))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(Color.accentColor.opacity(isSel ? 0.6 : 0), lineWidth: 1.5)
-                    }
-                    .padding(2)
-            }
+            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
+            .background(Color.accentColor.opacity(isSel ? 0.07 : 0))
             .animation(Motion.snappy, value: isSel)
         }
-        .buttonStyle(RowButtonStyle(radius: 9))
+        .buttonStyle(RowButtonStyle(radius: 0))
         .accessibilityLabel(Self.spoken(day, count: evs.count))
         .accessibilityAddTraits(isSel ? .isSelected : [])
     }
@@ -347,9 +361,35 @@ struct CalendarView: View {
 
     // MARK: A day
 
-    /// A day's work and events, each opening where it lives.
-    private func dayCard(_ day: Date, events evs: [CalEvent]) -> some View {
-        CardSection(title: day.formatted(.dateTime.weekday(.wide).month(.wide).day()), trailing: countLine(day, evs.count)) {
+    /// The day picked beside the month: its name, how much is on it and New Task over one card of its work and events.
+    private func dayPanel(_ day: Date, events evs: [CalEvent]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(day.formatted(.dateTime.weekday(.wide)))
+                        .font(.sTitle3)
+                    Text("\(day.formatted(.dateTime.month(.wide).day())) · \(countLine(day, evs.count))")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+                Spacer(minLength: 8)
+                Button {
+                    newTask(on: day)
+                } label: {
+                    Label("New Task", systemImage: "plus")
+                }
+                .glassButton()
+                .help("A task of your own, due this day (it shows in To Do)")
+            }
+            dayRows(evs)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A day's work and events in one card, each opening where it lives.
+    private func dayRows(_ evs: [CalEvent]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             if evs.isEmpty {
                 EmptyNote(text: "Nothing on this day.", symbol: "calendar")
                     .padding(.horizontal, 8)
@@ -362,12 +402,28 @@ struct CalendarView: View {
                 .transition(.opacity)
             }
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
+    /// A day of the week or of the list: its name as the section's heading, its work and events in one card under it.
+    private func dayCard(_ day: Date, events evs: [CalEvent]) -> some View {
+        PageSection(title: day.formatted(.dateTime.weekday(.wide).month(.wide).day()), trailing: countLine(day, evs.count)) {
+            dayRows(evs)
+        }
     }
 
     /// "Today · 3 items", "Tomorrow · 1 item", "2 items".
     private func countLine(_ day: Date, _ n: Int) -> String {
         let rel = cal.isDateInToday(day) ? "Today · " : cal.isDateInTomorrow(day) ? "Tomorrow · " : ""
         return "\(rel)\(n) \(n == 1 ? "item" : "items")"
+    }
+
+    /// (1.2) A task of your own for a day: New Task's sheet, opened on that day.
+    private func newTask(on day: Date) {
+        NewTaskSheet.startDay = cal.startOfDay(for: day)
+        engine.newTask = true
     }
 
     @ViewBuilder
@@ -382,7 +438,7 @@ struct CalendarView: View {
         } else {
             CalendarEventLine(event: ev)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 7)
+                .padding(.vertical, 9)
         }
     }
 
@@ -437,25 +493,25 @@ struct CalendarView: View {
             Button {
                 pick(day)
             } label: {
-                VStack(spacing: 2) {
+                VStack(spacing: 3) {
                     Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.sFootnote.weight(.semibold))
                         .tracking(0.6)
                         .foregroundStyle(.secondary)
                     Text("\(cal.component(.day, from: day))")
-                        .font(.sTitle3.weight(isToday ? .bold : .medium).monospacedDigit())
-                        .foregroundStyle(isToday ? Color.white : Color.primary)
-                        .frame(width: 32, height: 32)
+                        .font(.sTitle3.weight(isToday || isSel ? .bold : .medium).monospacedDigit())
+                        .foregroundStyle(isToday ? Color.white : (isSel ? Color.accentColor : Color.primary))
+                        .frame(width: 34, height: 34)
                         .background {
-                            if isToday { Circle().fill(Color.accentColor) }
+                            if isToday {
+                                Circle().fill(Color.accentColor)
+                            } else if isSel {
+                                Circle().fill(Color.accentColor.opacity(0.16))
+                            }
                         }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
-                .background {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Color.accentColor.opacity(isSel ? 0.12 : 0))
-                }
                 .animation(Motion.snappy, value: isSel)
             }
             .buttonStyle(RowButtonStyle(radius: 9))
@@ -464,7 +520,7 @@ struct CalendarView: View {
             ForEach(evs) { ev in weekBlock(ev) }
         }
         .padding(6)
-        .frame(maxWidth: .infinity, minHeight: 320, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, minHeight: 380, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -485,14 +541,13 @@ struct CalendarView: View {
 
     // MARK: List
 
-    /// The next three weeks, a card for each day with something on it.
+    /// The next three weeks, each day with something on it as a section of its own.
     private func listView(_ byDay: [String: [CalEvent]]) -> some View {
         let keys = byDay.keys.sorted()
-        return VStack(alignment: .leading, spacing: 18) {
+        return VStack(alignment: .leading, spacing: 22) {
             if keys.isEmpty {
                 EmptyNote(text: "Nothing in the next three weeks.", symbol: "calendar")
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 18)
                     .card()
             }
             ForEach(keys, id: \.self) { k in
@@ -649,8 +704,8 @@ struct CalendarView: View {
 
 // MARK: - Pieces
 
-/// A piece of work or an event on a day of the month: a capsule in its calendar's colour with its name — a red mark
-/// when it is missing, greyed once done (work handed in struck through).
+/// A piece of work or an event on a day of the month: (1.2) a line on the grid with its calendar's colour as a dot
+/// before its name — a red mark when it is missing, greyed once done (work handed in struck through).
 private struct CalendarChip: View {
     let event: CalEvent
 
@@ -659,24 +714,24 @@ private struct CalendarChip: View {
         let missing = event.missing == true
         let done = event.done == true && !missing
         let work = ["Assignment", "Quiz", "Discussion"].contains(event.kind ?? "")
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             if missing {
                 Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.sCaption2.weight(.bold))
                     .foregroundStyle(.red)
+                    .frame(width: 8)
             } else {
-                Circle().fill(c).frame(width: 6, height: 6)
+                Circle().fill(c).frame(width: 7, height: 7)
             }
             Text(event.title)
                 .strikethrough(done && work, color: .secondary)
-                .foregroundStyle(done ? Color.secondary : Color.primary)
+                .foregroundStyle(done ? Color.secondary : (missing ? Color.red : Color.primary))
                 .lineLimit(1)
         }
         .font(.sCaption)
-        .padding(.horizontal, 5)
-        .padding(.vertical, 1.5)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background((missing ? Color.red : c).opacity(0.13), in: Capsule())
         .accessibilityHidden(true)
     }
 }
@@ -693,6 +748,7 @@ private struct CalendarEventLine: View {
             IconTile(symbol: CalendarEventLine.glyph(event.kind), color: Color(hex: event.color))
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.title)
+                    .font(.sBody)
                     .strikethrough(done && !missing, color: .secondary)
                     .foregroundStyle(done ? Color.secondary : Color.primary)
                     .lineLimit(2)
@@ -727,8 +783,8 @@ private struct CalendarEventLine: View {
     }
 }
 
-/// A piece of work or an event in a column of the week: its name on a wash of its calendar's colour with the colour's bar
-/// at its edge, its time, and whether it is missing or excused.
+/// A piece of work or an event in a column of the week: (1.2) its name beside a bar in its calendar's colour, flat in the
+/// column, its time, and whether it is missing or excused.
 private struct CalendarWeekBlock: View {
     let event: CalEvent
 
@@ -745,7 +801,7 @@ private struct CalendarWeekBlock: View {
                 .multilineTextAlignment(.leading)
             HStack(spacing: 5) {
                 if let time = event.time, !time.isEmpty {
-                    Text(time).font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(time).font(.sFootnote.monospacedDigit()).foregroundStyle(.secondary)
                 }
                 if missing {
                     FlagBadge(flag: WorkFlag(word: "Missing", kind: "bad"))
@@ -754,15 +810,14 @@ private struct CalendarWeekBlock: View {
                 }
             }
         }
-        .padding(.leading, 10)
+        .padding(.leading, 12)
         .padding(.trailing, 6)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(c.opacity(0.1), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(alignment: .leading) {
             Capsule()
                 .fill(c)
-                .frame(width: 3)
+                .frame(width: 3.5)
                 .padding(.vertical, 5)
                 .padding(.leading, 3)
         }
@@ -783,17 +838,24 @@ private struct CalendarsPopover: View {
     private var full: Bool { on.count >= 10 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Calendars").font(.sHeadline)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Calendars").font(.sHeadline)
+                Spacer(minLength: 8)
+                Text("\(on.count) of \(choices.count) on")
+                    .font(.sFootnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText(value: Double(on.count)))
+            }
             if choices.isEmpty {
                 Text("No calendars to show.").foregroundStyle(.secondary)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 7) {
+                    VStack(alignment: .leading, spacing: 9) {
                         ForEach(own) { row($0) }
                         if !other.isEmpty {
                             Text("Other Calendars")
-                                .font(.sCaption.weight(.semibold))
+                                .font(.sFootnote.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .padding(.top, own.isEmpty ? 0 : 8)
                             ForEach(other) { row($0) }
@@ -805,28 +867,29 @@ private struct CalendarsPopover: View {
             }
             Divider()
             Text(full ? "Ten calendars at most: turn one off to show another." : (engine.onBrightspace ? "At most 10 calendars show at once." : "Canvas shows at most 10 calendars at once."))
-                .font(.sCaption)
+                .font(.sFootnote)
                 .foregroundStyle(full ? Color.orange : Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
-        .frame(width: 300)
+        .font(.sBody)
+        .padding(18)
+        .frame(width: 340)
         .animation(Motion.snappy, value: full)
         .onAppear { on = Set(choices.filter { $0.on }.map { $0.code }) }
     }
 
     private var listHeight: CGFloat {
-        let rows = CGFloat(choices.count) * 24 + (other.isEmpty ? 0 : 30)
-        return min(max(rows, 24), 380)
+        let rows = CGFloat(choices.count) * 28 + (other.isEmpty ? 0 : 34)
+        return min(max(rows, 28), 420)
     }
 
     private func row(_ c: CalendarChoice) -> some View {
         Toggle(isOn: Binding(get: { on.contains(c.code) }, set: { set(c, $0) })) {
-            HStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
+            HStack(spacing: 8) {
+                Circle()
                     .fill(Color(hex: c.color))
-                    .frame(width: 12, height: 12)
-                Text(c.name).lineLimit(1)
+                    .frame(width: 11, height: 11)
+                Text(c.name).font(.sBody).lineLimit(1)
             }
         }
         .toggleStyle(.checkbox)

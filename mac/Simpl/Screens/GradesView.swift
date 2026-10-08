@@ -6,7 +6,9 @@ import SwiftUI
 
 /// Grades: the term GPA, your goal for it and how it has moved, then every course as rings inside rings — its total
 /// outermost, its assignment groups inside — with each group's weight and score as a bar, and every graded assignment
-/// by its letter. A course clicked opens its own grades, where scores can be tried.
+/// by its letter. (1.2) On a wide window the courses are a list with the one picked beside it: all its groups, its
+/// latest grades and what is still to be graded; on a narrow one they are cards. A course's own grades, where scores
+/// can be tried, are a click away.
 struct GradesView: View {
     @EnvironmentObject private var engine: Engine
     @State private var data: GradesData?
@@ -14,6 +16,10 @@ struct GradesView: View {
     @State private var goal: Double = 4
     @State private var goalSave: Task<Void, Never>?
     @State private var wide = true
+    /// (1.2) Room for the courses as a list with the one picked beside it.
+    @State private var split = true
+    /// The course shown beside the list (the first until another is picked).
+    @State private var picked: String?
 
     var body: some View {
         Group {
@@ -23,11 +29,11 @@ struct GradesView: View {
                     summary(d)
                     courses(d)
                     if !d.items.isEmpty {
-                        ItemGradesCard(items: d.items, counts: counts(d))
+                        ItemGradesCard(items: d.items, counts: counts(d), columns: split ? 2 : 1)
                     }
                     Fact(symbol: "info.circle", text: "Term GPA is worked out here from the scores \(engine.lmsName) reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
-                        .padding(.horizontal, 6)
                 }
+                .font(.sBody)
             } else {
                 LoadState(error: error) { Task { await load() } }
             }
@@ -75,7 +81,7 @@ struct GradesView: View {
                 TrendCard(points: points, range: GradesView.domain(d), goal: goal)
             }
             .fixedSize(horizontal: false, vertical: true) // (the cards of a row as tall as the tallest)
-            .modifier(WidthProbe(threshold: 940, wide: $wide))
+            .widthGate(880, wide: $wide)
         } else {
             HStack(alignment: .top, spacing: 18) {
                 gpaCard(d)
@@ -95,16 +101,16 @@ struct GradesView: View {
             CardHeading(text: "Term GPA", trailing: "4.0 scale")
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(g.map { String(format: "%.2f", $0) } ?? "—")
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: g ?? 0))
                 Text("of 4.00")
-                    .font(.sCallout)
+                    .font(.sBody)
                     .foregroundStyle(.secondary)
             }
             GradeBar(value: g.map { $0 / 4 }, color: barColor, height: 8, mark: goal / 4, key: "grades:gpa")
             Text(counted)
-                .font(.sCaption)
+                .font(.sFootnote)
                 .foregroundStyle(.secondary)
         }
         .padding(18)
@@ -119,13 +125,14 @@ struct GradesView: View {
             CardHeading(text: "Goal", trailing: "saved as you change it")
             HStack(alignment: .center, spacing: 10) {
                 Text(String(format: "%.2f", goal))
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: goal))
                     .accessibilityHidden(true)
                 // (the above/below line rolls, and its colour and the bar's turn, with the goal)
                 Stepper("Goal", value: $goal.animation(Motion.snappy), in: 0...4, step: 0.05)
                     .labelsHidden()
+                    .controlSize(.large)
                     .accessibilityValue(String(format: "%.2f", goal))
                     .help("Raise or lower your goal")
                 Spacer(minLength: 0)
@@ -133,12 +140,12 @@ struct GradesView: View {
             if let diff {
                 Label(diff >= 0 ? String(format: "+%.2f above goal", diff) : String(format: "%.2f below goal", abs(diff)),
                       systemImage: diff >= 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
-                    .font(.sCallout.weight(.medium))
+                    .font(.sBody.weight(.medium))
                     .foregroundStyle(diff >= 0 ? Color.green : Color.orange)
                     .contentTransition(.numericText(value: diff))
             } else {
                 Text("No score to compare yet")
-                    .font(.sCallout)
+                    .font(.sBody)
                     .foregroundStyle(.secondary)
             }
         }
@@ -175,25 +182,94 @@ struct GradesView: View {
 
     // MARK: - Courses
 
+    /// The courses: (1.2) a list with the one picked beside it on a wide window, cards on a narrow one.
     private func courses(_ d: GradesData) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            CardHeading(text: "Courses", trailing: d.rows.isEmpty ? nil : "Click a course for each assignment’s grade and what-if scores")
-                .padding(.horizontal, 6)
+        let note: String? = d.rows.isEmpty ? nil : (split ? "Pick a course to see all of it" : "Click a course for each assignment’s grade and what-if scores")
+        return PageSection(title: "Courses", trailing: note) {
             if d.rows.isEmpty {
                 EmptyNote(text: "No current courses.", symbol: "books.vertical")
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .card()
+            } else if split {
+                courseSplit(d)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 14)], spacing: 14) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
                     ForEach(d.rows) { r in courseCard(r) }
                 }
             }
         }
+        .widthGate(900, wide: $split)
+    }
+
+    /// The list of courses, and the one picked beside it.
+    private func courseSplit(_ d: GradesData) -> some View {
+        let shown = d.rows.first(where: { $0.id == picked }) ?? d.rows[0]
+        return HStack(alignment: .top, spacing: 22) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(d.rows.enumerated()), id: \.element.id) { i, r in
+                    if i > 0 { RowDivider(inset: 70) }
+                    courseRow(r, on: r.id == shown.id)
+                }
+            }
+            .padding(8)
+            .frame(width: 370)
+            .card()
+            GradeCourseDetail(row: shown, scale: d.scale)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func courseRow(_ r: GradeRow, on: Bool) -> some View {
+        let color = Color(hex: r.color)
+        let bands = NestedRings.bands(total: r.pct, color: color, groups: r.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3)
+        return Button {
+            withAnimation(Motion.snappy) { picked = r.id }
+        } label: {
+            HStack(spacing: 14) {
+                NestedRings(bands: bands, outerWidth: 5.5, innerWidth: 3.5, gap: 1.5, key: "grades:\(r.id)")
+                    .frame(width: 48, height: 48)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.code)
+                        .font(.sHeadline)
+                        .lineLimit(1)
+                    if let name = r.name, !name.isEmpty, name != r.code {
+                        Text(name)
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Text(GradesView.gradedLine(r))
+                        .font(.sFootnote)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(r.pct.map { String(format: "%.1f%%", $0) } ?? "N/A")
+                        .font(.sTitle3)
+                        .monospacedDigit()
+                        .foregroundStyle(r.pct == nil ? .secondary : .primary)
+                        .contentTransition(.numericText(value: r.pct ?? 0))
+                    if let l = r.letter { LetterChip(letter: l) }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .modifier(PickedWash(picked: on))
+        }
+        .buttonStyle(RowButtonStyle())
+        .help("\(r.code): its groups and its latest grades")
+        .accessibilityLabel(spoken(r))
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .contextMenu { courseMenu(r) }
+    }
+
+    /// "12 of 20 graded".
+    fileprivate static func gradedLine(_ r: GradeRow) -> String {
+        r.total > 0 ? "\(r.graded) of \(r.total) graded" : "Nothing graded yet"
     }
 
     private func courseCard(_ r: GradeRow) -> some View {
-        let link = r.url ?? "/courses/\(r.id)/grades"
-        return Button {
+        Button {
             engine.go(.section("courses/\(r.id)", "grades"))
         } label: {
             CourseGradeCard(row: r)
@@ -201,16 +277,20 @@ struct GradesView: View {
         .buttonStyle(CardButtonStyle())
         .help("\(r.code): every assignment’s grade, and what-if scores")
         .accessibilityLabel(spoken(r))
-        .contextMenu {
-            Button { engine.go(.home("courses/\(r.id)")) } label: { Label("Open Course", systemImage: "arrow.up.right") }
-            Button { engine.go(.section("courses/\(r.id)", "grades")) } label: { Label("Course Grades", systemImage: "chart.bar") }
-            Divider()
-            Button { engine.openWebScreen(link, title: r.code) } label: { Label("Open in \(engine.lmsName)", systemImage: "globe") }
-            Button {
-                if let u = engine.absolute(link) { copyToPasteboard(u.absoluteString) }
-            } label: {
-                Label("Copy Link", systemImage: "link")
-            }
+        .contextMenu { courseMenu(r) }
+    }
+
+    @ViewBuilder
+    private func courseMenu(_ r: GradeRow) -> some View {
+        let link = r.url ?? "/courses/\(r.id)/grades"
+        Button { engine.go(.home("courses/\(r.id)")) } label: { Label("Open Course", systemImage: "arrow.up.right") }
+        Button { engine.go(.section("courses/\(r.id)", "grades")) } label: { Label("Course Grades", systemImage: "chart.bar") }
+        Divider()
+        Button { engine.openWebScreen(link, title: r.code) } label: { Label("Open in \(engine.lmsName)", systemImage: "globe") }
+        Button {
+            if let u = engine.absolute(link) { copyToPasteboard(u.absoluteString) }
+        } label: {
+            Label("Copy Link", systemImage: "link")
         }
     }
 
@@ -252,6 +332,262 @@ struct GradesView: View {
             await engine.act("setGoal", ["goal": (g * 100).rounded() / 100])
         }
     }
+}
+
+/// (1.2) The course picked beside the list on a wide window, in one card: its rings, score and letter and its target;
+/// each of its groups with its weight and score; then its latest grades and what is still to be graded, each opening
+/// its assignment. Its own Grades — every assignment, What-If — and its home are a click away.
+private struct GradeCourseDetail: View {
+    let row: GradeRow
+    let scale: [ScaleStep]
+    @EnvironmentObject private var engine: Engine
+    @State private var detail: CourseGradesData?
+    @State private var detailFor: String?
+    @State private var failed = false
+
+    private static let firstShown = 8
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            header
+            actions
+            Divider()
+            groups
+            Divider()
+            work
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .card()
+        .task(id: "\(row.id)|\(engine.dataVersion)") { await load() }
+    }
+
+    private var color: Color { Color(hex: row.color) }
+
+    private var header: some View {
+        let bands = NestedRings.bands(total: row.pct, color: color, groups: row.cats.map { (pct: $0.pct, color: $0.color) }, limit: 4)
+        return HStack(alignment: .center, spacing: 22) {
+            NestedRings(bands: bands, outerWidth: 11, innerWidth: 7, gap: 2.5, key: "grades-detail:\(row.id)")
+                .frame(width: 124, height: 124)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(row.code)
+                    .font(.sTitle2)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+                if let name = row.name, !name.isEmpty, name != row.code {
+                    Text(name)
+                        .font(.sBody)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(row.pct.map { String(format: "%.1f%%", $0) } ?? "N/A")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(row.pct == nil ? .secondary : .primary)
+                        .contentTransition(.numericText(value: row.pct ?? 0))
+                    if let l = row.letter { LetterChip(letter: l) }
+                    if let t = row.target {
+                        Text("Target \(t)")
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(GradesView.gradedLine(row))
+                    .font(.sCallout)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var actions: some View {
+        GlassGroup(spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    engine.go(.section("courses/\(row.id)", "grades"))
+                } label: {
+                    Label("Every Grade & What-If", systemImage: "wand.and.stars")
+                }
+                .glassButton(prominent: true)
+                .help("Every assignment’s grade, and scores to try")
+                Button {
+                    engine.go(.home("courses/\(row.id)"))
+                } label: {
+                    Label("Open Course", systemImage: "arrow.up.right")
+                }
+                .glassButton()
+            }
+            .controlSize(.large)
+        }
+    }
+
+    /// Every group, with its weight and score (the four the rings show until the course's own are read).
+    @ViewBuilder
+    private var groups: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            CardHeading(text: "Assignment Groups", trailing: detail?.weighted == true ? "Weighted" : nil)
+            if let d = detail, !d.groups.isEmpty {
+                let colors = gradeGroupColors(d.groups)
+                ForEach(d.groups) { g in
+                    CategoryLine(name: g.name, weight: g.weightText, value: g.value, pct: g.pct, color: colors[g.id] ?? Color.secondary, key: "grades-detail:\(row.id)#\(g.id)")
+                }
+            } else if row.cats.isEmpty {
+                Text("No graded groups yet.")
+                    .font(.sCallout)
+                    .foregroundStyle(.tertiary)
+            } else {
+                let colors = gradeCategoryColors(row.cats)
+                ForEach(Array(row.cats.enumerated()), id: \.offset) { i, cat in
+                    CategoryLine(name: cat.label, weight: cat.weight, value: cat.value, pct: cat.pct, color: colors[i], key: "grades:\(row.id)#cat\(i)")
+                }
+            }
+        }
+    }
+
+    /// The latest grades, newest first, and what is still to be graded, soonest first.
+    @ViewBuilder
+    private var work: some View {
+        if let d = detail {
+            let real = d.rows.filter { $0.added != true }
+            let graded = real.filter { $0.earned != nil }.sorted { ($0.due ?? "") > ($1.due ?? "") }
+            let waiting = real.filter { $0.earned == nil && $0.counted != false }.sorted { ($0.due ?? "9999") < ($1.due ?? "9999") }
+            let colors = gradeGroupColors(d.groups)
+            VStack(alignment: .leading, spacing: 6) {
+                if graded.isEmpty && waiting.isEmpty {
+                    EmptyNote(text: "Nothing with points in this course yet.", symbol: "doc.text")
+                }
+                if !graded.isEmpty {
+                    CardHeading(text: "Latest Grades", trailing: graded.count > GradeCourseDetail.firstShown ? "\(GradeCourseDetail.firstShown) of \(graded.count)" : nil)
+                    lines(Array(graded.prefix(GradeCourseDetail.firstShown)), d, colors: colors)
+                }
+                if !waiting.isEmpty {
+                    CardHeading(text: "Not Graded Yet", trailing: waiting.count > GradeCourseDetail.firstShown ? "\(GradeCourseDetail.firstShown) of \(waiting.count)" : nil)
+                        .padding(.top, graded.isEmpty ? 0 : 12)
+                    lines(Array(waiting.prefix(GradeCourseDetail.firstShown)), d, colors: colors)
+                }
+            }
+        } else if failed {
+            EmptyNote(text: "This course’s assignments could not be read.", symbol: "exclamationmark.triangle")
+        } else {
+            ProgressView()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+        }
+    }
+
+    private func lines(_ rows: [CGRow], _ d: CourseGradesData, colors: [String: Color]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { i, r in
+                if i > 0 { RowDivider(inset: 29) }
+                line(r, d, color: colors[r.groupId] ?? color)
+            }
+        }
+        .padding(.horizontal, -8) // (the rows' words line up with the card's, their wash reaching into its margin)
+    }
+
+    private func line(_ r: CGRow, _ d: CourseGradesData, color: Color) -> some View {
+        let group = d.groups.first(where: { $0.id == r.groupId })?.name
+        let facts = [group, r.dueText].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        let badge = (r.badge ?? "").isEmpty ? nil : r.badge
+        return RowLink {
+            if let u = r.url { engine.go(u, title: r.name) }
+        } label: {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.name)
+                        .font(.sBody)
+                        .lineLimit(1)
+                        .foregroundStyle(r.dropped == true ? .secondary : .primary)
+                    if !facts.isEmpty {
+                        Text(facts)
+                            .font(.sFootnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 8)
+                if let badge { StatusChip(text: badge, tone: CourseGradesView.tone(badge)) }
+                if let l = gradeLetter(r, scale: d.scale.isEmpty ? scale : d.scale) { LetterChip(letter: l) }
+                Text(r.scoreText)
+                    .font(.sBody.weight(.medium))
+                    .monospacedDigit()
+                    .foregroundStyle(r.effective == nil ? Color.secondary : Color.primary)
+                    .frame(minWidth: 76, alignment: .trailing)
+            }
+        }
+        .contextMenu {
+            if let u = r.url {
+                Button("Open Assignment") { engine.go(u, title: r.name) }
+                Divider()
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(u, title: r.name) }
+                Button("Copy Link") { if let x = engine.absolute(u) { copyToPasteboard(x.absoluteString) } }
+            }
+        }
+    }
+
+    private func load() async {
+        let id = row.id
+        if detailFor != id {
+            detail = nil
+            failed = false
+        }
+        do {
+            let d = try await engine.call("courseGrades", ["id": id], as: CourseGradesData.self)
+            guard !Task.isCancelled else { return }
+            withAnimation(Motion.gentle) {
+                detail = d
+                detailFor = id
+                failed = false
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            if detail == nil { failed = true }
+        }
+    }
+}
+
+/// Each group's colour, as its ring has it: those with a score in order on the rings' palette (or their own colour),
+/// those without in their own colour or grey.
+private func gradeGroupColors(_ groups: [CGGroup]) -> [String: Color] {
+    var out: [String: Color] = [:]
+    var graded = 0
+    for g in groups {
+        if g.pct != nil {
+            out[g.id] = g.color.map { Color(hex: $0) } ?? NestedRings.palette[graded % NestedRings.palette.count]
+            graded += 1
+        } else {
+            out[g.id] = g.color.map { Color(hex: $0) } ?? Color.secondary
+        }
+    }
+    return out
+}
+
+/// The same for a course's groups as Grades lists them (in order: a group with no score yet has no ring).
+private func gradeCategoryColors(_ cats: [GradeCategory]) -> [Color] {
+    var out: [Color] = []
+    var graded = 0
+    for c in cats {
+        if c.pct != nil {
+            out.append(c.color.map { Color(hex: $0) } ?? NestedRings.palette[graded % NestedRings.palette.count])
+            graded += 1
+        } else {
+            out.append(c.color.map { Color(hex: $0) } ?? Color.secondary)
+        }
+    }
+    return out
+}
+
+/// An assignment's letter on the course's scale, from the score it has (or is tried at).
+private func gradeLetter(_ r: CGRow, scale: [ScaleStep]) -> String? {
+    guard let e = r.effective, r.possible > 0 else { return nil }
+    let p = e / r.possible * 100
+    return scale.first(where: { p >= $0.min })?.letter ?? scale.last?.letter
 }
 
 /// A day of the term GPA's history.
@@ -332,7 +668,7 @@ private struct TrendCard: View {
                     }
             }
         }
-        .frame(height: 140)
+        .frame(height: 150)
     }
 
     private func hover(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) {
@@ -344,8 +680,8 @@ private struct TrendCard: View {
     }
 }
 
-/// A course's card on Grades: its rings (the total outermost, then its groups), its score and letter, its target, how
-/// much of it is graded, and each group's weight and score as a bar.
+/// A course's card on Grades (a narrow window's): its rings (the total outermost, then its groups), its score and
+/// letter, its target, how much of it is graded, and each group's weight and score as a bar.
 private struct CourseGradeCard: View {
     let row: GradeRow
 
@@ -354,17 +690,16 @@ private struct CourseGradeCard: View {
             header
             groups
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var header: some View {
         let color = Color(hex: row.color)
         let bands = NestedRings.bands(total: row.pct, color: color, groups: row.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3)
-        let graded: String = row.total > 0 ? "\(row.graded) of \(row.total) graded" : "Nothing graded yet"
         return HStack(alignment: .center, spacing: 14) {
             NestedRings(bands: bands, outerWidth: 7, innerWidth: 4.5, gap: 2, key: "grades:\(row.id)")
-                .frame(width: 62, height: 62)
+                .frame(width: 66, height: 66)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.code)
                     .font(.sHeadline)
@@ -375,8 +710,8 @@ private struct CourseGradeCard: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                Text(graded)
-                    .font(.sCaption)
+                Text(GradesView.gradedLine(row))
+                    .font(.sFootnote)
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 8)
@@ -389,7 +724,7 @@ private struct CourseGradeCard: View {
                 HStack(spacing: 6) {
                     if let t = row.target {
                         Text("Target \(t)")
-                            .font(.sCaption)
+                            .font(.sFootnote)
                             .foregroundStyle(.secondary)
                     }
                     if let l = row.letter { LetterChip(letter: l) }
@@ -401,33 +736,18 @@ private struct CourseGradeCard: View {
     @ViewBuilder
     private var groups: some View {
         let cats = Array(row.cats.prefix(4))
-        let colors = categoryColors(cats)
+        let colors = gradeCategoryColors(cats)
         if cats.isEmpty {
             Text("No graded groups yet.")
                 .font(.sCallout)
                 .foregroundStyle(.tertiary)
         } else {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(cats.enumerated()), id: \.offset) { i, cat in
                     CategoryLine(name: cat.label, weight: cat.weight, value: cat.value, pct: cat.pct, color: colors[i], key: "grades:\(row.id)#cat\(i)")
                 }
             }
         }
-    }
-
-    /// Each group's colour, as its ring has it (a group with no score yet has no ring: its own colour, or grey).
-    private func categoryColors(_ cats: [GradeCategory]) -> [Color] {
-        var out: [Color] = []
-        var graded = 0
-        for c in cats {
-            if c.pct != nil {
-                out.append(c.color.map { Color(hex: $0) } ?? NestedRings.palette[graded % NestedRings.palette.count])
-                graded += 1
-            } else {
-                out.append(c.color.map { Color(hex: $0) } ?? Color.secondary)
-            }
-        }
-        return out
     }
 }
 
@@ -441,58 +761,61 @@ private struct CategoryLine: View {
     var key: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 7) {
-                Circle().fill(color).frame(width: 8, height: 8)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Circle().fill(color).frame(width: 9, height: 9)
                 Text(name)
-                    .font(.sCallout)
+                    .font(.sBody)
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if let weight, !weight.isEmpty {
                     Text(weight)
-                        .font(.sCaption)
+                        .font(.sFootnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Text(value ?? "—")
-                    .font(.sCallout.weight(.semibold))
+                    .font(.sBody.weight(.semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: pct ?? 0))
             }
-            GradeBar(value: pct.map { $0 / 100 }, color: color, height: 5, key: key)
+            GradeBar(value: pct.map { $0 / 100 }, color: color, height: 6, key: key)
         }
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Every graded assignment across the courses, by its letter: a switch of All, A, B, C, D and F with how many each holds,
-/// and the work under it — the first dozen, then all of it. A row clicked opens its assignment.
+/// Every graded assignment across the courses, by its letter: a switch of All, A, B, C, D and F with how many each holds
+/// at the section's head, and the work under it in one card — the first ones, then all of it; (1.2) in two columns on
+/// a wide window. A row clicked opens its assignment.
 private struct ItemGradesCard: View {
     let items: [GradeItem]
     let counts: [String: Int]
+    var columns: Int = 1
     @EnvironmentObject private var engine: Engine
     @State private var band = "all"
     @State private var showAll = false
 
     private static let letters = ["A", "B", "C", "D", "F"]
-    private static let firstShown = 12
 
     private var total: Int { ItemGradesCard.letters.reduce(0) { $0 + (counts[$1] ?? 0) } }
+    private var firstShown: Int { columns > 1 ? 16 : 12 }
 
     var body: some View {
         let picked = band == "all" ? items : items.filter { $0.band == band }
-        let shown = showAll ? picked : Array(picked.prefix(ItemGradesCard.firstShown))
-        CardSection(title: "Item Grades", trailing: "by letter") {
-            picker
-            if shown.isEmpty {
-                EmptyNote(text: "No \(band) grades in your courses.", symbol: "line.3.horizontal.decrease.circle")
-                    .padding(.horizontal, 8)
+        let shown = showAll ? picked : Array(picked.prefix(firstShown))
+        PageSection(title: "Item Grades", accessory: { picker }) {
+            VStack(alignment: .leading, spacing: 0) {
+                if shown.isEmpty {
+                    EmptyNote(text: "No \(band) grades in your courses.", symbol: "line.3.horizontal.decrease.circle")
+                        .padding(.horizontal, 8)
+                }
+                grid(shown)
+                more(picked.count, shown: shown.count)
             }
-            ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
-                if i > 0 { RowDivider(inset: 30) }
-                row(item)
-            }
-            more(picked.count, shown: shown.count)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
         }
         .onChange(of: band) { _, _ in showAll = false }
     }
@@ -506,9 +829,19 @@ private struct ItemGradesCard: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(maxWidth: 460)
-        .padding(.horizontal, 6)
-        .padding(.bottom, 8)
+        .fixedSize()
+    }
+
+    private func grid(_ shown: [GradeItem]) -> some View {
+        let n = max(columns, 1)
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 28, alignment: .top), count: n), alignment: .leading, spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
+                VStack(spacing: 0) {
+                    if i >= n { RowDivider(inset: 30) }
+                    row(item)
+                }
+            }
+        }
     }
 
     private func row(_ item: GradeItem) -> some View {
@@ -520,7 +853,9 @@ private struct ItemGradesCard: View {
                     .fill(Color(hex: item.color))
                     .frame(width: 10, height: 10)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).lineLimit(1)
+                    Text(item.name)
+                        .font(.sBody)
+                        .lineLimit(1)
                     Text("\(item.course) · \(item.pctText)")
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
@@ -529,7 +864,7 @@ private struct ItemGradesCard: View {
                 Spacer(minLength: 8)
                 LetterChip(letter: item.band)
                 Text(item.score)
-                    .font(.sCallout.weight(.medium))
+                    .font(.sBody.weight(.medium))
                     .monospacedDigit()
                     .frame(minWidth: 72, alignment: .trailing)
             }
@@ -549,13 +884,17 @@ private struct ItemGradesCard: View {
         if count > shown {
             Button("Show All \(count)") { withAnimation(Motion.gentle) { showAll = true } }
                 .buttonStyle(.link)
+                .font(.sCallout)
                 .padding(.horizontal, 8)
-                .padding(.top, 8)
-        } else if showAll && count > ItemGradesCard.firstShown {
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+        } else if showAll && count > firstShown {
             Button("Show Fewer") { withAnimation(Motion.gentle) { showAll = false } }
                 .buttonStyle(.link)
+                .font(.sCallout)
                 .padding(.horizontal, 8)
-                .padding(.top, 8)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
         }
     }
 }
@@ -605,6 +944,8 @@ struct CourseGradesView: View {
     @State private var applying: Task<Void, Never>?
     @State private var reads = 0
     @State private var wide = true
+    /// (1.2) Room for the groups in two columns.
+    @State private var twoColumns = false
     @FocusState private var focused: String?
 
     // (written out: the state above is of this file's own types, which would keep a synthesized one in this file)
@@ -618,9 +959,9 @@ struct CourseGradesView: View {
                 Page {
                     ScreenHeading(title: sectionTitle, sub: headline(d), color: Color(hex: d.color))
                     overview(d)
-                    whatIfCard(d)
                     assignments(d)
                 }
+                .font(.sBody)
             } else {
                 LoadState(error: error) { Task { await load(fresh: true) } }
             }
@@ -695,17 +1036,19 @@ struct CourseGradesView: View {
 
     // MARK: - The total and the groups
 
-    /// The total and the groups: side by side on a wide window, one over the other on a narrow one.
+    /// The total (with What-If's switch under it) and the groups: side by side on a wide window, one over the other on a
+    /// narrow one.
     private func overview(_ d: CourseGradesData) -> some View {
         let colors = groupColors(d)
         let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 18)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
         return layout {
             totalCard(d)
-                .frame(width: wide ? 440 : nil)
+                .frame(width: wide ? 460 : nil)
             groupsCard(d, colors: colors)
         }
         .fixedSize(horizontal: false, vertical: true) // (the two cards as tall as the taller)
-        .modifier(WidthProbe(threshold: 800, wide: $wide))
+        .widthGate(800, wide: $wide)
+        .widthGate(900, wide: $twoColumns)
     }
 
     private func totalCard(_ d: CourseGradesData) -> some View {
@@ -717,12 +1060,12 @@ struct CourseGradesView: View {
                     .frame(width: 140, height: 140)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(d.totalText)
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .contentTransition(.numericText(value: d.total ?? 0))
                     if let l = d.letter {
                         Text(whatIf ? "\(l) with what-if" : l)
-                            .font(.sTitle3.weight(.semibold))
+                            .font(.sTitle3)
                             .foregroundStyle(whatIf ? Color.orange : color)
                     }
                     targetPicker(d)
@@ -730,10 +1073,12 @@ struct CourseGradesView: View {
                 Spacer(minLength: 0)
             }
             notes(d)
+            Divider()
+            whatIfControl(d)
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .card()
+        .card(tint: whatIf ? .orange : nil)
     }
 
     private func targetPicker(_ d: CourseGradesData) -> some View {
@@ -761,61 +1106,53 @@ struct CourseGradesView: View {
         }
         if let f = d.final, !f.isEmpty {
             Text(f)
-                .font(.sCaption)
+                .font(.sFootnote)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func groupsCard(_ d: CourseGradesData, colors: [String: Color]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             CardHeading(text: "Assignment Groups", trailing: d.weighted == true ? "Weighted" : nil)
-                .padding(.horizontal, 6)
             if d.groups.isEmpty {
                 EmptyNote(text: "No assignment groups.", symbol: "square.stack")
-                    .padding(.horizontal, 6)
             }
-            VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(d.groups) { g in
                     CategoryLine(name: g.name, weight: g.weightText, value: g.value, pct: g.pct, color: colors[g.id] ?? Color.secondary, key: "course-grades:\(courseId)#\(g.id)")
                 }
             }
-            .padding(.horizontal, 6)
             .padding(.top, 2)
         }
-        .padding(14)
+        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .card()
     }
 
-    /// Each group's colour, as its ring has it: those with a score in order on the rings' palette (or their own colour),
-    /// those without in their own colour or grey.
+    /// Each group's colour, as its ring has it (`gradeGroupColors`).
     private func groupColors(_ d: CourseGradesData) -> [String: Color] {
-        var out: [String: Color] = [:]
-        var graded = 0
-        for g in d.groups {
-            if g.pct != nil {
-                out[g.id] = g.color.map { Color(hex: $0) } ?? NestedRings.palette[graded % NestedRings.palette.count]
-                graded += 1
-            } else {
-                out[g.id] = g.color.map { Color(hex: $0) } ?? Color.secondary
-            }
-        }
-        return out
+        gradeGroupColors(d.groups)
     }
 
     // MARK: - What-if
 
-    private func whatIfCard(_ d: CourseGradesData) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    /// What-If's switch at the foot of the total's card (1.2: no card of its own), and the term GPA it would make.
+    private func whatIfControl(_ d: CourseGradesData) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
-                IconTile(symbol: "wand.and.stars", color: .orange)
+                Image(systemName: "wand.and.stars")
+                    .font(.sTitle3)
+                    .foregroundStyle(.orange)
+                    .frame(width: 26)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("What-If Scores")
                         .font(.sBody.weight(.semibold))
                     Text(whatIf ? "Type a score into any assignment, or add one. Nothing is saved." : "Try scores and see where your grade would land.")
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 Toggle("What-If Scores", isOn: Binding(get: { whatIf }, set: { setWhatIf($0) }))
@@ -839,22 +1176,22 @@ struct CourseGradesView: View {
                     Spacer(minLength: 8)
                     if !drafts.isEmpty || !added.isEmpty {
                         Button(role: .destructive) { reset() } label: {
-                            Label("Clear What-If Scores", systemImage: "arrow.uturn.backward")
+                            Label("Clear", systemImage: "arrow.uturn.backward")
                         }
+                        .help("Clear the what-if scores")
                     }
                 }
                 .font(.sCallout)
-                .padding(.leading, 42)
+                .padding(.leading, 38)
                 .transition(slide(.top))
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card(tint: whatIf ? .orange : nil)
     }
 
     // MARK: - The assignments
 
+    /// The assignments: by group — (1.2) the groups in two columns on a wide window, balanced, in their order — or as
+    /// one list sorted.
     @ViewBuilder
     private func assignments(_ d: CourseGradesData) -> some View {
         let colors = groupColors(d)
@@ -864,11 +1201,15 @@ struct CourseGradesView: View {
                     .padding(.horizontal, 8)
             }
         } else if sort == .groups {
-            ForEach(d.groups) { g in
-                let rows = d.rows.filter { $0.groupId == g.id }
-                if !rows.isEmpty || whatIf {
-                    groupSection(g, rows: rows, d, colors: colors)
+            let shown = d.groups.filter { g in whatIf || d.rows.contains(where: { $0.groupId == g.id }) }
+            if twoColumns && shown.count > 1 {
+                let halves = balancedSplit(shown) { g in d.rows.filter { $0.groupId == g.id }.count + 3 }
+                HStack(alignment: .top, spacing: 22) {
+                    groupColumn(halves.left, d, colors: colors)
+                    groupColumn(halves.right, d, colors: colors)
                 }
+            } else {
+                groupColumn(shown, d, colors: colors)
             }
         } else {
             CardSection(title: "All Assignments", trailing: sort.rawValue) {
@@ -876,6 +1217,15 @@ struct CourseGradesView: View {
                 if whatIf && !d.groups.isEmpty { addMenu(d) }
             }
         }
+    }
+
+    private func groupColumn(_ groups: [CGGroup], _ d: CourseGradesData, colors: [String: Color]) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            ForEach(groups) { g in
+                groupSection(g, rows: d.rows.filter { $0.groupId == g.id }, d, colors: colors)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private func groupSection(_ g: CGGroup, rows: [CGRow], _ d: CourseGradesData, colors: [String: Color]) -> some View {
@@ -893,7 +1243,7 @@ struct CourseGradesView: View {
             }
             if let detail = g.detail, !detail.isEmpty {
                 Text(detail)
-                    .font(.sCaption)
+                    .font(.sFootnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 8)
@@ -921,7 +1271,7 @@ struct CourseGradesView: View {
     @ViewBuilder
     private func rowList(_ rows: [CGRow], _ d: CourseGradesData, colors: [String: Color], showGroup: Bool) -> some View {
         ForEach(Array(rows.enumerated()), id: \.element.id) { i, r in
-            if i > 0 { RowDivider() }
+            if i > 0 { RowDivider(inset: 38) }
             row(r, d, color: colors[r.groupId] ?? Color(hex: d.color), showGroup: showGroup)
         }
     }
@@ -931,7 +1281,7 @@ struct CourseGradesView: View {
         if whatIf {
             rowContent(r, d, color: color, showGroup: showGroup) // (the score field takes the clicks)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 7)
+                .padding(.vertical, 9)
                 .contextMenu { rowMenu(r) }
         } else {
             RowLink {
@@ -947,9 +1297,23 @@ struct CourseGradesView: View {
         let tried = r.hypothetical == true || r.added == true
         let group = showGroup ? d.groups.first(where: { $0.id == r.groupId })?.name : nil
         return HStack(spacing: 12) {
-            IconTile(symbol: r.added == true ? "wand.and.stars" : "doc.text", color: r.added == true ? .orange : color, size: 28)
+            // (1.2) the group's colour as a dot, not a tile round the same icon on every row; a what-if one's wand
+            Group {
+                if r.added == true {
+                    Image(systemName: "wand.and.stars")
+                        .font(.sCallout.weight(.semibold))
+                        .foregroundStyle(.orange)
+                } else {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 10, height: 10)
+                }
+            }
+            .frame(width: 18)
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(r.name)
+                    .font(.sBody)
                     .lineLimit(2)
                     .foregroundStyle(r.dropped == true ? .secondary : .primary)
                 facts(r, group: group)
@@ -976,7 +1340,7 @@ struct CourseGradesView: View {
                 if r.dropped == true { StatusChip(text: "Dropped") }
                 if !line.isEmpty {
                     Text(line)
-                        .font(.sCaption)
+                        .font(.sFootnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -996,7 +1360,7 @@ struct CourseGradesView: View {
             }
             if let g = r.grade, !g.isEmpty {
                 Text(g)
-                    .font(.sCaption)
+                    .font(.sFootnote)
                     .foregroundStyle(.secondary)
             }
         }
@@ -1109,7 +1473,7 @@ struct CourseGradesView: View {
         !v.isFinite ? "—" : v == v.rounded() && abs(v) < 1e15 ? String(Int(v)) : String(format: "%g", v)
     }
 
-    private static func tone(_ badge: String) -> String {
+    static func tone(_ badge: String) -> String {
         switch badge {
         case "Missing": return "bad"
         case "Late": return "warn"
@@ -1231,30 +1595,28 @@ private struct WhatIfBar: View {
     let gpaIf: Double?
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Label("What-If", systemImage: "wand.and.stars")
-                .font(.sCallout.weight(.semibold))
+                .font(.sBody.weight(.semibold))
                 .foregroundStyle(.orange)
             Text(total)
-                .font(.sCallout.weight(.bold))
+                .font(.sHeadline)
                 .monospacedDigit()
                 .contentTransition(.numericText(value: value ?? 0))
             if let letter { LetterChip(letter: letter) }
             if let g = gpaIf {
-                Divider().frame(height: 14)
+                Divider().frame(height: 16)
                 Text("Term GPA \(String(format: "%.2f", g))")
-                    .font(.sCallout)
+                    .font(.sBody)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText(value: g))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Theme.edge))
-        .shadow(color: Theme.shadow, radius: 12, y: 4)
-        .padding(.bottom, 14)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .glassCapsule(tint: Color.orange.opacity(0.12)) // (1.2) floating glass, as the system's own bars
+        .padding(.bottom, 16)
         .accessibilityElement(children: .combine)
     }
 }
@@ -1305,14 +1667,18 @@ private struct AddWhatIfSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .glassButton()
                 Button("Add") { submit() }
                     .keyboardShortcut(.defaultAction)
+                    .glassButton(prominent: true)
                     .disabled(points == nil)
             }
+            .controlSize(.large)
             .padding(.horizontal, 20)
             .padding(.bottom, 18)
         }
-        .frame(minWidth: 400, idealWidth: 440, minHeight: 300, idealHeight: 320)
+        .font(.sBody)
+        .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 340)
         .onAppear { focus = .name }
     }
 
@@ -1351,13 +1717,13 @@ private struct LetterChip: View {
     var body: some View {
         let color = LetterChip.color(String(letter.prefix(1)))
         Text(letter)
-            .font(.sCaption.weight(.bold))
+            .font(.sFootnote.weight(.bold))
             .lineLimit(1)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .frame(minWidth: 26)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2.5)
+            .frame(minWidth: 28)
             .foregroundStyle(color)
-            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .background(color.opacity(0.15), in: Capsule())
     }
 
     /// A letter's colour: A green, B teal, C yellow (darker in light, to be read on white), D orange, F red; anything
@@ -1429,27 +1795,5 @@ private struct GradeBar: View {
         let share = CGFloat(min(max(mark, 0), 1))
         let x = width * share - 1
         return min(max(x, 0), max(width - 2, 0))
-    }
-}
-
-/// Whether the column is wide enough for its cards side by side: read from the width it is given, and again as the
-/// window is resized.
-private struct WidthProbe: ViewModifier {
-    let threshold: CGFloat
-    @Binding var wide: Bool
-
-    func body(content: Content) -> some View {
-        content.background {
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { update(geo.size.width) }
-                    .onChange(of: geo.size.width) { _, w in update(w) }
-            }
-        }
-    }
-
-    private func update(_ width: CGFloat) {
-        let w = width >= threshold
-        if w != wide { wide = w }
     }
 }

@@ -2,7 +2,8 @@ import SwiftUI
 
 /// To Do: the next seven days of work and your own tasks, grouped by date, priority or course. A tick marks one done (it
 /// stays a moment, then moves where it now belongs), the flag at a row's end sets its priority, a click opens the work,
-/// a right-click has the rest — and + adds a task of your own.
+/// a right-click has the rest — and + adds a task of your own. (1.2) On a wide window a side column keeps the week in
+/// view: how much is done, the grouping, what is left by day, by course and by priority, and New Task.
 struct TodoView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<TodoData>()
@@ -14,6 +15,8 @@ struct TodoView: View {
     @State private var regrouping = 0
     /// A new task's sheet went up: what is read next is its answer, and arrives on the house spring.
     @State private var expectingTask = false
+    /// (1.2) Room for the side column (most Mac windows have it: read again from the width as it is laid out).
+    @State private var wide = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -21,23 +24,11 @@ struct TodoView: View {
             if let d = model.data {
                 Page {
                     ScreenHeading(title: "To Do", sub: d.sub)
-                    summary(d)
-                    if d.sections.isEmpty {
-                        EmptyNote(text: d.empty ?? "Nothing to do.")
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 6)
-                            .card()
-                            .transition(cardTransition)
-                    }
-                    ForEach(d.sections) { section in
-                        sectionCard(section, group: d.group)
-                            .transition(cardTransition)
-                    }
-                    Text("Click a task to open it, or right-click it for more. Priority is yours alone and never reaches \(engine.lmsName).")
-                        .font(.sFootnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
+                    content(d)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .widthGate(860, wide: $wide)
                 }
+                .font(.sBody)
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -98,6 +89,42 @@ struct TodoView: View {
         reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity)
     }
 
+    /// The list with the side column beside it on a wide window; the progress and the grouping over it on a narrow one.
+    @ViewBuilder
+    private func content(_ d: TodoData) -> some View {
+        if wide {
+            HStack(alignment: .top, spacing: 24) {
+                list(d)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                overview(d)
+                    .frame(width: 320)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 22) {
+                summary(d)
+                list(d)
+            }
+        }
+    }
+
+    private func list(_ d: TodoData) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            if d.sections.isEmpty {
+                EmptyNote(text: d.empty ?? "Nothing to do.")
+                    .padding(.horizontal, 18)
+                    .card()
+                    .transition(cardTransition)
+            }
+            ForEach(d.sections) { section in
+                sectionCard(section, group: d.group)
+                    .transition(cardTransition)
+            }
+            Text("Click a task to open it, or right-click it for more. Priority is yours alone and never reaches \(engine.lmsName).")
+                .font(.sFootnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     // MARK: - The progress and the grouping
 
     /// How much of the week is done, and how it is grouped: side by side on a wide window, one over the other on a narrow one.
@@ -120,13 +147,14 @@ struct TodoView: View {
 
     private func progress(_ d: TodoData) -> some View {
         HStack(spacing: 16) {
-            Ring(value: Double(d.pct), color: .green, lineWidth: 7, key: "todo")
-                .frame(width: 58, height: 58)
+            Ring(value: Double(d.pct), color: .green, lineWidth: 8, key: "todo")
+                .frame(width: 64, height: 64)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(d.pct)%")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
                     .contentTransition(.numericText(value: Double(d.pct)))
                 Text("\(d.done) of \(d.total) done")
+                    .font(.sBody)
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText(value: Double(d.done)))
             }
@@ -143,10 +171,178 @@ struct TodoView: View {
                 Text("Course").tag("course")
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.large)
             .fixedSize()
             Toggle("Show Completed", isOn: Binding(get: { pendingShowDone ?? model.data?.showDone ?? false }, set: { regroup(showDone: $0) }))
                 .toggleStyle(.checkbox)
         }
+    }
+
+    // MARK: - The side column (1.2)
+
+    /// The week at a glance beside the list: the progress, the grouping, what is left day by day, by course and by
+    /// priority, and New Task — one card, its parts between hairlines.
+    private func overview(_ d: TodoData) -> some View {
+        let open = d.sections.flatMap { $0.rows }.filter { !$0.done }
+        return VStack(alignment: .leading, spacing: 16) {
+            progress(d)
+            controls(alignment: .leading)
+            if !open.isEmpty {
+                Divider()
+                weekLoad(open)
+                Divider()
+                courseLoad(open)
+                priorityLoad(open)
+            }
+            Divider()
+            Button {
+                engine.newTask = true
+            } label: {
+                Label("New Task", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .glassButton(prominent: true)
+            .controlSize(.large)
+            .help("A task of your own")
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
+    /// What is left on each of the next seven days, as bars (today's in the accent), and how much is overdue.
+    private func weekLoad(_ open: [WorkRow]) -> some View {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        var perDay = Array(repeating: 0, count: 7)
+        var overdue = 0
+        for r in open {
+            guard let s = r.date, let date = Self.isoFractional.date(from: s) ?? Self.isoPlain.date(from: s) else { continue }
+            if date < Date() {
+                overdue += 1
+                continue
+            }
+            let k = cal.dateComponents([.day], from: today, to: cal.startOfDay(for: date)).day ?? -1
+            if k >= 0 && k < 7 { perDay[k] += 1 }
+        }
+        let most = max(perDay.max() ?? 0, 1)
+        return VStack(alignment: .leading, spacing: 10) {
+            CardHeading(text: "This Week", trailing: overdue > 0 ? "\(overdue) overdue" : nil)
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(0..<7, id: \.self) { k in
+                    let day = cal.date(byAdding: .day, value: k, to: today) ?? today
+                    VStack(spacing: 4) {
+                        Text(perDay[k] > 0 ? "\(perDay[k])" : "")
+                            .font(.sCaption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        Capsule()
+                            .fill(k == 0 ? Color.accentColor : Color.accentColor.opacity(0.35))
+                            .frame(height: max(4, CGFloat(perDay[k]) / CGFloat(most) * 46))
+                        Text(String(day.formatted(.dateTime.weekday(.narrow))))
+                            .font(.sFootnote.weight(k == 0 ? .bold : .regular))
+                            .foregroundStyle(k == 0 ? Color.primary : Color.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(day.formatted(.dateTime.weekday(.wide))), \(perDay[k]) to do")
+                }
+            }
+            .frame(height: 92, alignment: .bottom)
+        }
+    }
+
+    /// What is left in each course (your own tasks as theirs), the busiest first.
+    @ViewBuilder
+    private func courseLoad(_ open: [WorkRow]) -> some View {
+        let loads = Self.loads(open)
+        let most = max(loads.map(\.count).max() ?? 0, 1)
+        VStack(alignment: .leading, spacing: 9) {
+            CardHeading(text: "By Course")
+            ForEach(loads) { l in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Circle().fill(Color(hex: l.color)).frame(width: 9, height: 9)
+                        Text(l.id)
+                            .font(.sCallout)
+                            .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Text("\(l.count)")
+                            .font(.sCallout.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    Capsule()
+                        .fill(Color(hex: l.color).opacity(0.16))
+                        .frame(height: 5)
+                        .overlay(alignment: .leading) {
+                            GeometryReader { g in
+                                Capsule()
+                                    .fill(Color(hex: l.color))
+                                    .frame(width: max(5, g.size.width * CGFloat(l.count) / CGFloat(most)))
+                            }
+                        }
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    /// How much is left at each priority.
+    @ViewBuilder
+    private func priorityLoad(_ open: [WorkRow]) -> some View {
+        let levels = Self.priorityCounts(open)
+        if !levels.isEmpty {
+            Divider()
+            VStack(alignment: .leading, spacing: 9) {
+                CardHeading(text: "By Priority")
+                HStack(spacing: 8) {
+                    ForEach(levels) { c in
+                        Label("\(c.level.short) \(c.count)", systemImage: "flag.fill")
+                            .font(.sCallout.weight(.semibold))
+                            .foregroundStyle(c.level.color)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(c.level.color.opacity(0.14), in: Capsule())
+                    }
+                }
+            }
+        }
+    }
+
+    /// How much is left at a priority.
+    private struct PriorityCount: Identifiable {
+        let level: TodoPriority
+        let count: Int
+        var id: Int { level.id }
+    }
+
+    private static func priorityCounts(_ open: [WorkRow]) -> [PriorityCount] {
+        TodoPriority.all
+            .filter { $0.id > 0 }
+            .map { p in PriorityCount(level: p, count: open.filter { ($0.pri ?? 0) == p.id }.count) }
+            .filter { $0.count > 0 }
+    }
+
+    /// A course's share of what is left.
+    private struct CourseLoad: Identifiable {
+        let id: String
+        let color: String?
+        var count: Int
+    }
+
+    private static func loads(_ open: [WorkRow]) -> [CourseLoad] {
+        var out: [CourseLoad] = []
+        var at: [String: Int] = [:]
+        for r in open {
+            let name = r.courseName ?? r.course ?? "My task"
+            if let i = at[name] {
+                out[i].count += 1
+            } else {
+                at[name] = out.count
+                out.append(CourseLoad(id: name, color: r.color, count: 1))
+            }
+        }
+        return out.sorted { $0.count > $1.count }
     }
 
     // MARK: - The sections
@@ -158,7 +354,7 @@ struct TodoView: View {
         return CardSection(title: section.title, trailing: section.note) {
             ForEach(Array(section.rows.enumerated()), id: \.element.id) { i, row in
                 VStack(spacing: 0) {
-                    if i > 0 { RowDivider(inset: 40) }
+                    if i > 0 { RowDivider(inset: 42) }
                     TodoTaskRow(
                         row: row,
                         shown: Self.shown(row, withCourse: !byCourse, withDay: withDay),
@@ -173,7 +369,6 @@ struct TodoView: View {
             }
         }
     }
-
     /// A row as the shared work row shows it: what it is under its title (its course is its chip, or the card it is
     /// in), and its day with its time where the card is not one day.
     private static func shown(_ row: WorkRow, withCourse: Bool, withDay: Bool) -> WorkRow {
@@ -313,7 +508,7 @@ private struct TodoTaskRow: View {
             } else {
                 line
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 7)
+                    .padding(.vertical, 9)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             TodoPriorityMenu(level: row.pri ?? 0, short: row.priShort, hovering: hover, set: setPriority)
@@ -374,23 +569,23 @@ private struct TodoPriorityMenu: View {
                     Label(word, systemImage: "flag.fill")
                         .labelStyle(.titleAndIcon)
                         .foregroundStyle(p.color)
-                        .background(p.color.opacity(0.14), in: Capsule())
                 } else {
                     Image(systemName: "flag")
                         .foregroundStyle(.secondary)
                         .opacity(hovering ? 1 : 0)
                 }
             }
-            .font(.sCaption.weight(.semibold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2.5)
+            .font(.sFootnote.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(level > 0 ? p.color.opacity(0.14) : Color.clear, in: Capsule())
             .contentShape(Capsule())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .frame(width: 62, alignment: .trailing)
+        .frame(width: 70, alignment: .trailing)
         .animation(Motion.hover, value: hovering)
         .help("Priority")
         .accessibilityLabel(spoken)
@@ -429,6 +624,9 @@ private struct TodoPriority: Identifiable {
 /// A task of your own (a Canvas planner note): what it is, its day, a course and a repeat if wanted, and its priority.
 /// File → New Task and To Do's + put it over the window; Return adds it, Escape puts it away.
 struct NewTaskSheet: View {
+    /// (1.2) The day the next sheet opens on (the Calendar's New Task on a day), taken once; today when nothing is set.
+    @MainActor static var startDay: Date?
+
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
@@ -462,16 +660,26 @@ struct NewTaskSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .glassButton()
                 Button("Add", action: add)
                     .keyboardShortcut(.defaultAction)
+                    .glassButton(prominent: true)
                     .disabled(trimmed.isEmpty || busy)
             }
+            .controlSize(.large)
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
-        .frame(minWidth: 460, idealWidth: 500, minHeight: 430, idealHeight: 500)
+        .font(.sBody)
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 450, idealHeight: 520)
         .task { await loadChoices() }
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .onAppear {
+            if let day = NewTaskSheet.startDay {
+                NewTaskSheet.startDay = nil
+                date = day
+            }
+            DispatchQueue.main.async { focused = true }
+        }
         .onChange(of: date) { _, d in
             // (a repeat ends after it starts)
             if until < d { until = Calendar.current.date(byAdding: .day, value: 56, to: d) ?? d }

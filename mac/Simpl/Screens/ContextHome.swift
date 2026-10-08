@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// A course's home, or a group's: its name, its term, its teachers and how much is still to do, with its grade ring
-/// (clicked, the course's grades); a tile for each of its sections, each a place in the sidebar; what it says about
-/// itself; then, side by side on a wide window, the work still to do and the latest announcements beside the front
-/// page, what was handed in lately and the course's other links.
+/// A course's home, or a group's — (1.2) on the page itself, no card round its head: its name, its term, its teachers
+/// and how much is still to do, with its grade ring (clicked, the course's grades); its sections as a row of glass
+/// pills, each a place in the sidebar; then the work still to do, the latest announcements and what it says about
+/// itself, with the front page, what was handed in lately and its other links in a column beside them on a wide window
+/// (under them on a narrow one).
 struct ContextHome: View {
     let ctx: String
     @EnvironmentObject private var engine: Engine
@@ -13,6 +14,7 @@ struct ContextHome: View {
         Group {
             if let d = model.data {
                 Page { content(d) }
+                    .font(.sBody)
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -34,49 +36,45 @@ struct ContextHome: View {
     private func content(_ d: HomeData) -> some View {
         let color = Color(hex: d.color)
         let tiles = d.sections.filter { $0.kind != "home" } // (the home is where this is)
-        ScreenHeading(title: d.title, color: color)
         header(d, color)
-        if !tiles.isEmpty { sectionTiles(tiles, color) }
-        if let html = d.html, !html.isEmpty {
-            CardSection(title: "About") {
-                RichText(html: html).padding(.horizontal, 6)
-            }
-        }
+        if !tiles.isEmpty { sectionPills(tiles, color) }
         lower(d, color)
     }
 
     // MARK: - The head of the home
 
     private func header(_ d: HomeData, _ color: Color) -> some View {
-        HStack(alignment: .center, spacing: 18) {
-            // (every line with its symbol in one column, so their words start together)
-            VStack(alignment: .leading, spacing: 7) {
-                if let name = d.name, !name.isEmpty, name != d.title {
-                    Text(name)
-                        .font(.sTitle3.weight(.semibold))
-                        .lineLimit(2)
-                        .textSelection(.enabled)
-                }
-                if let sub = d.sub, !sub.isEmpty {
-                    Fact(symbol: d.kind == "groups" ? "person.3" : "book.closed", text: sub)
-                }
-                if let t = d.teachers, !t.isEmpty {
-                    Fact(symbol: "person.crop.circle", text: t)
-                }
-                if let n = d.openCount, n > 0 {
-                    Fact(symbol: "checklist", text: "\(n) still to do", tint: color)
+        HStack(alignment: .center, spacing: 24) {
+            VStack(alignment: .leading, spacing: 12) {
+                ScreenHeading(title: d.title, color: color)
+                // (every line with its symbol in one column, so their words start together)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let name = d.name, !name.isEmpty, name != d.title {
+                        Text(name)
+                            .font(.sTitle3)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                    }
+                    if let sub = d.sub, !sub.isEmpty {
+                        Fact(symbol: d.kind == "groups" ? "person.3" : "book.closed", text: sub)
+                    }
+                    if let t = d.teachers, !t.isEmpty {
+                        Fact(symbol: "person.crop.circle", text: t)
+                    }
+                    if let n = d.openCount, n > 0 {
+                        Fact(symbol: "checklist", text: "\(n) still to do", tint: color)
+                    }
                 }
             }
             Spacer(minLength: 12)
             if d.kind == "courses" {
                 gradeRing(d, color)
             } else {
-                IconTile(symbol: "person.3.fill", color: color, size: 56)
+                IconTile(symbol: "person.3.fill", color: color, size: 72)
             }
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
     }
 
     private func gradeRing(_ d: HomeData, _ color: Color) -> some View {
@@ -85,24 +83,24 @@ struct ContextHome: View {
             engine.go(.section(ctx, "grades"))
         } label: {
             ZStack {
-                Ring(value: d.score, color: color, lineWidth: 7, key: "home:\(ctx)")
-                VStack(spacing: 0) {
+                Ring(value: d.score, color: color, lineWidth: 9, key: "home:\(ctx)")
+                VStack(spacing: 1) {
                     if let letter {
                         Text(letter)
-                            .font(.sTitle3.weight(.bold))
+                            .font(.sTitle2)
                             .foregroundStyle(color)
                     }
                     if let s = d.scoreText {
                         Text(s)
-                            .font(.sCaption.monospacedDigit())
+                            .font(.sFootnote.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .minimumScaleFactor(0.7)
                             .contentTransition(.numericText(value: d.score ?? 0))
                     }
                 }
-                .padding(10)
+                .padding(12)
             }
-            .frame(width: 80, height: 80)
+            .frame(width: 104, height: 104)
             .contentShape(Circle())
         }
         .buttonStyle(RingButtonStyle())
@@ -110,27 +108,31 @@ struct ContextHome: View {
         .accessibilityLabel("Grades, \(d.scoreText ?? "no score")\(d.letter.map { ", \($0)" } ?? "")")
     }
 
-    private func sectionTiles(_ sections: [SectionLink], _ color: Color) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-            ForEach(sections) { s in
-                Button {
-                    engine.go(.section(ctx, s.kind))
-                } label: {
-                    HStack(spacing: 10) {
-                        IconTile(symbol: Glyph.section(s.kind), color: color, size: 30)
-                        Text(s.label)
-                            .font(.sBody.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
+    /// (1.2) The sections as glass pills that run along a line and wrap: a click opens one, its menu has Canvas's page.
+    private func sectionPills(_ sections: [SectionLink], _ color: Color) -> some View {
+        GlassGroup(spacing: 4) {
+            let flow = PillFlow(spacing: 10, lineSpacing: 10)
+            flow {
+                ForEach(sections) { s in
+                    Button {
+                        engine.go(.section(ctx, s.kind))
+                    } label: {
+                        Label {
+                            Text(s.label)
+                                .font(.sBody.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: Glyph.section(s.kind))
+                                .foregroundStyle(color)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(CardButtonStyle(radius: 14))
-                .canvasRowMenu(s.label, url: engine.canvasURL(for: .section(ctx, s.kind))?.absoluteString, engine: engine) {
-                    engine.go(.section(ctx, s.kind))
+                    .buttonStyle(GlassPillStyle())
+                    .canvasRowMenu(s.label, url: engine.canvasURL(for: .section(ctx, s.kind))?.absoluteString, engine: engine) {
+                        engine.go(.section(ctx, s.kind))
+                    }
                 }
             }
         }
@@ -138,36 +140,41 @@ struct ContextHome: View {
 
     // MARK: - The two columns
 
-    /// The work and the news on the left; the front page, what was handed in and the other links on the right — one
-    /// column under the other on a narrow window, or when one side has nothing to show.
+    /// The work, the news and what it says about itself in the main column; the front page, what was handed in and the
+    /// other links in the side column — under the main on a narrow window, or the only one when the other is empty.
     @ViewBuilder
     private func lower(_ d: HomeData, _ color: Color) -> some View {
-        let left = d.kind == "courses" || !d.announcements.isEmpty
-        let right = d.front != nil || !(d.done ?? []).isEmpty || !(d.more ?? []).isEmpty
-        if left && right {
-            let columns = HomeColumns()
+        let main = d.kind == "courses" || !d.announcements.isEmpty || !(d.html ?? "").isEmpty
+        let side = d.front != nil || !(d.done ?? []).isEmpty || !(d.more ?? []).isEmpty
+        if main && side {
+            let columns = SideSplit(side: 360, from: 860, gap: 26, spacing: 24)
             columns {
-                VStack(alignment: .leading, spacing: 22) { leftColumn(d, color) }
-                VStack(alignment: .leading, spacing: 22) { rightColumn(d, color) }
+                VStack(alignment: .leading, spacing: 24) { mainColumn(d, color) }
+                VStack(alignment: .leading, spacing: 24) { sideColumn(d, color) }
             }
-        } else if left {
-            leftColumn(d, color)
-        } else if right {
-            rightColumn(d, color)
+        } else if main {
+            VStack(alignment: .leading, spacing: 24) { mainColumn(d, color) }
+        } else if side {
+            VStack(alignment: .leading, spacing: 24) { sideColumn(d, color) }
         }
     }
 
     @ViewBuilder
-    private func leftColumn(_ d: HomeData, _ color: Color) -> some View {
+    private func mainColumn(_ d: HomeData, _ color: Color) -> some View {
         if d.kind == "courses" { stillToDo(d, color) }
         if !d.announcements.isEmpty { announcements(d, color) }
+        if let html = d.html, !html.isEmpty {
+            CardSection(title: "About", padding: 18) {
+                RichText(html: html)
+            }
+        }
     }
 
     @ViewBuilder
-    private func rightColumn(_ d: HomeData, _ color: Color) -> some View {
+    private func sideColumn(_ d: HomeData, _ color: Color) -> some View {
         if let f = d.front { frontPage(f) }
         if let done = d.done, !done.isEmpty {
-            CardSection(title: "Handed in lately") {
+            CardSection(title: "Handed In Lately") {
                 DividedRows(data: done) { r in workRow(r, color) }
             }
         }
@@ -175,9 +182,9 @@ struct ContextHome: View {
     }
 
     private func stillToDo(_ d: HomeData, _ color: Color) -> some View {
-        CardSection(title: "Still to do", accessory: {
+        CardSection(title: "Still to Do", accessory: {
             if let n = d.openCount, n > d.open.count {
-                Button("All \(n) To Do") { engine.go(.section(ctx, "assignments")) }
+                Button("All \(n)") { engine.go(.section(ctx, "assignments")) }
                     .buttonStyle(.link)
                     .font(.sCallout)
             }
@@ -191,7 +198,7 @@ struct ContextHome: View {
     }
 
     private func announcements(_ d: HomeData, _ color: Color) -> some View {
-        CardSection(title: "Latest announcements", accessory: {
+        CardSection(title: "Latest Announcements", accessory: {
             if d.sections.contains(where: { $0.kind == "announcements" }) {
                 Button("All Announcements") { engine.go(.section(ctx, "announcements")) }
                     .buttonStyle(.link)
@@ -202,7 +209,7 @@ struct ContextHome: View {
                 RowLink {
                     engine.openWeb(a.url, title: a.title)
                 } label: {
-                    PostRowView(row: a, color: color)
+                    PostRowView(row: a, color: color, previewLines: 3)
                 }
                 .canvasRowMenu(a.title, url: a.url, engine: engine) { engine.openWeb(a.url, title: a.title) }
             }
@@ -211,14 +218,14 @@ struct ContextHome: View {
 
     private func frontPage(_ f: FrontPage) -> some View {
         let slug = f.slug ?? ""
-        return CardSection(title: "Front page") {
+        return CardSection(title: "Front Page") {
             RowLink {
                 engine.push(.page(ctx: ctx, slug: slug))
             } label: {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(f.title).font(.sHeadline)
                     if let x = f.excerpt, !x.isEmpty {
-                        Text(x).font(.sCallout).foregroundStyle(.secondary).lineLimit(4)
+                        Text(x).font(.sCallout).foregroundStyle(.secondary).lineLimit(6)
                     }
                 }
             }
@@ -267,53 +274,6 @@ struct ContextHome: View {
 }
 
 // MARK: - Pieces of the home
-
-/// The home's lower half on a wide window: two columns side by side, the left a little wider; on a window too narrow
-/// for two to read well (or with other than two parts), one under the other.
-private struct HomeColumns: Layout {
-    var spacing: CGFloat = 22
-    var gap: CGFloat = 18
-    /// The narrowest width two columns read well in.
-    var twoFrom: CGFloat = 860
-    /// The left column's share of the width.
-    var share: CGFloat = 0.56
-
-    private func split(_ width: CGFloat, _ count: Int) -> (left: CGFloat, right: CGFloat)? {
-        guard count == 2, width.isFinite, width >= twoFrom else { return nil }
-        let left = ((width - gap) * share).rounded()
-        return (left, width - gap - left)
-    }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let width = proposal.width, width.isFinite else {
-            let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-            let height = sizes.map(\.height).reduce(0, +) + spacing * CGFloat(max(sizes.count - 1, 0))
-            return CGSize(width: sizes.map(\.width).max() ?? 0, height: height)
-        }
-        if let cols = split(width, subviews.count) {
-            let l = subviews[0].sizeThatFits(ProposedViewSize(width: cols.left, height: nil)).height
-            let r = subviews[1].sizeThatFits(ProposedViewSize(width: cols.right, height: nil)).height
-            return CGSize(width: width, height: max(l, r))
-        }
-        let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
-        return CGSize(width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(heights.count - 1, 0)))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        if let cols = split(bounds.width, subviews.count) {
-            subviews[0].place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: cols.left, height: nil))
-            subviews[1].place(at: CGPoint(x: bounds.minX + cols.left + gap, y: bounds.minY), anchor: .topLeading,
-                              proposal: ProposedViewSize(width: cols.right, height: nil))
-            return
-        }
-        var y = bounds.minY
-        for s in subviews {
-            let size = ProposedViewSize(width: bounds.width, height: nil)
-            s.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: size)
-            y += s.sizeThatFits(size).height + spacing
-        }
-    }
-}
 
 /// The grade ring as a button: a soft wash and a little lift under the pointer, a give under a click (the wash alone
 /// under Reduce Motion).

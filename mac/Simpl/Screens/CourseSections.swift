@@ -51,7 +51,7 @@ private struct AnnouncementsList: View {
 }
 
 /// A course's or a group's discussions — pinned, open, closed for comments — each with who started it, its latest
-/// activity, its replies and how many are new to you.
+/// activity, its replies and how many are new to you; (1.2) the kinds side by side on a wide window.
 private struct DiscussionsList: View {
     let ctx: String
     @EnvironmentObject private var engine: Engine
@@ -66,7 +66,7 @@ private struct DiscussionsList: View {
                 if d.sections.isEmpty {
                     EmptyCard(text: d.empty ?? "No discussions", symbol: "bubble.left.and.bubble.right")
                 }
-                ForEach(d.sections) { s in
+                SectionColumns(items: d.sections, weight: { $0.rows.count + 2 }) { s in
                     CardSection(title: s.title, trailing: "\(s.rows.count)") {
                         DividedRows(data: s.rows, inset: 54) { r in PostLink(row: r, color: Color(hex: d.color)) }
                     }
@@ -81,7 +81,7 @@ private struct DiscussionsList: View {
 // MARK: - Assignments, quizzes, the syllabus
 
 /// A course's assignments — overdue (in red), upcoming, undated, past — each with where it stands; its menu hands it in
-/// or shows its feedback.
+/// or shows its feedback. (1.2) On a wide window the kinds sit in two columns, in their order.
 private struct AssignmentsList: View {
     let ctx: String
     @EnvironmentObject private var engine: Engine
@@ -96,7 +96,7 @@ private struct AssignmentsList: View {
                 if d.sections.isEmpty {
                     EmptyCard(text: d.empty ?? "No assignments", symbol: "doc.text")
                 }
-                ForEach(d.sections) { s in
+                SectionColumns(items: d.sections, weight: { $0.rows.count + 2 }) { s in
                     CardSection(title: s.title, trailing: "\(s.rows.count)") {
                         DividedRows(data: s.rows) { r in
                             WorkLink(row: r, color: s.title == "Overdue" ? .red : Color(hex: d.color))
@@ -136,7 +136,8 @@ private struct QuizzesList: View {
     private func load() async { await model.load(engine, "quizzes", ["ctx": ctx]) }
 }
 
-/// A course's syllabus to read, at a reading width, and every piece of its work that has a date, in date order.
+/// A course's syllabus to read, at a reading width, and every piece of its work that has a date, in date order —
+/// (1.2) the dated work in a column beside the syllabus on a wide window, under it on a narrow one.
 private struct SyllabusView: View {
     let ctx: String
     @EnvironmentObject private var engine: Engine
@@ -146,24 +147,42 @@ private struct SyllabusView: View {
         let title = courseSectionTitle(engine, ctx, "syllabus", "Syllabus")
         SectionLoaded(model: model, title: title, subtitle: model.data?.context,
                       canvasURL: courseSectionURL(engine, ctx, "syllabus"), load: load) { d in
-            Page(maxWidth: 920) {
-                ScreenHeading(title: title, sub: d.context, color: Color(hex: d.color))
-                if let html = d.html, !html.isEmpty {
-                    RichText(html: html)
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 18)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .card()
-                }
-                if !d.rows.isEmpty {
-                    CardSection(title: "Dated work", trailing: "\(d.rows.count)") {
-                        DividedRows(data: d.rows) { r in WorkLink(row: r, color: Color(hex: d.color)) }
+            let html = d.html ?? ""
+            if !html.isEmpty && !d.rows.isEmpty {
+                Page {
+                    ScreenHeading(title: title, sub: d.context, color: Color(hex: d.color))
+                    let columns = SideSplit(side: 420, from: 940)
+                    columns {
+                        syllabusText(html)
+                        datedWork(d)
                     }
                 }
-                if d.rows.isEmpty && (d.html ?? "").isEmpty {
-                    EmptyCard(text: d.empty ?? "The syllabus is empty", symbol: "list.bullet.rectangle")
+            } else {
+                Page(maxWidth: 920) {
+                    ScreenHeading(title: title, sub: d.context, color: Color(hex: d.color))
+                    if !html.isEmpty {
+                        syllabusText(html)
+                    } else if !d.rows.isEmpty {
+                        datedWork(d)
+                    } else {
+                        EmptyCard(text: d.empty ?? "The syllabus is empty", symbol: "list.bullet.rectangle")
+                    }
                 }
             }
+        }
+    }
+
+    private func syllabusText(_ html: String) -> some View {
+        RichText(html: html)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
+    }
+
+    private func datedWork(_ d: RowsData) -> some View {
+        CardSection(title: "Dated Work", trailing: "\(d.rows.count)") {
+            DividedRows(data: d.rows) { r in WorkLink(row: r, color: Color(hex: d.color)) }
         }
     }
 
@@ -198,7 +217,7 @@ private struct ModulesList: View {
                 if d.modules.isEmpty {
                     EmptyCard(text: d.empty ?? "No modules", symbol: "square.stack.3d.up")
                 } else {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         ForEach(d.modules) { m in module(m, Color(hex: d.color)) }
                     }
                 }
@@ -238,20 +257,20 @@ private struct ModulesList: View {
     private func header(_ m: ModuleData, open: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "chevron.right")
-                .font(.system(size: 12.5, weight: .bold))
+                .font(.sFootnote.weight(.bold))
                 .foregroundStyle(.secondary)
                 .rotationEffect(.degrees(open ? 90 : 0))
-                .frame(width: 14)
+                .frame(width: 16)
                 .accessibilityHidden(true)
             if m.locked == true {
                 Image(systemName: "lock.fill")
-                    .font(.sCallout)
+                    .font(.sBody)
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Locked")
             }
             if m.done == true {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.sCallout)
+                    .font(.sBody)
                     .foregroundStyle(.green)
                     .accessibilityLabel("Done")
             }
@@ -269,7 +288,7 @@ private struct ModulesList: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -325,7 +344,7 @@ private struct ModulesList: View {
                 }
                 if it.markable == true && !done {
                     Button("Mark Done") { mark(it, m, true) }
-                        .controlSize(.small)
+                        .glassButton()
                         .disabled(locked)
                         .help("Mark this item done in \(engine.lmsName)")
                         .padding(.trailing, 6)
@@ -342,15 +361,16 @@ private struct ModulesList: View {
             IconTile(symbol: locked ? "lock.fill" : Glyph.item(it.type), color: locked ? .gray : color, size: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(it.title)
+                    .font(.sBody)
                     .lineLimit(2)
                     .foregroundStyle(locked ? .secondary : .primary)
                 if let s = it.sub, !s.isEmpty {
-                    Text(s).font(.sCaption).foregroundStyle(.secondary)
+                    Text(s).font(.sFootnote).foregroundStyle(.secondary)
                 }
                 if locked, let t = it.lockText, !t.isEmpty {
-                    Text(t).font(.sCaption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(t).font(.sFootnote).foregroundStyle(.secondary).lineLimit(2)
                 } else if let r = it.requirement, !r.isEmpty, !done {
-                    Text(r).font(.sCaption.weight(.medium)).foregroundStyle(color)
+                    Text(r).font(.sFootnote.weight(.medium)).foregroundStyle(color)
                 }
             }
             Spacer(minLength: 6)
@@ -364,7 +384,7 @@ private struct ModulesList: View {
             }
             if it.external == true {
                 Image(systemName: "arrow.up.right")
-                    .font(.sCaption)
+                    .font(.sFootnote)
                     .foregroundStyle(.tertiary)
                     .help("Opens in your browser")
                     .accessibilityLabel("Opens in your browser")
@@ -489,20 +509,21 @@ struct PageView: View {
                     ScreenHeading(title: d.title, sub: d.edited, color: Color(hex: d.color))
                     if let l = d.lockText, !l.isEmpty {
                         Label(l, systemImage: "lock.fill")
-                            .font(.sCallout)
+                            .font(.sBody)
                             .foregroundStyle(.orange)
-                            .padding(14)
+                            .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .card(tint: .orange)
                     }
                     if !d.html.isEmpty {
                         RichText(html: d.html)
-                            .padding(.horizontal, 22)
-                            .padding(.vertical, 18)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 20)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .card()
                     }
                 }
+                .font(.sBody)
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -639,7 +660,7 @@ private struct PeopleList: View {
                 }
                 ForEach(d.sections) { s in
                     CardSection(title: s.title, trailing: "\(s.rows.count)") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 8)], alignment: .leading, spacing: 2) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], alignment: .leading, spacing: 4) {
                             ForEach(s.rows) { p in person(p) }
                         }
                     }
@@ -653,12 +674,12 @@ private struct PeopleList: View {
     }
 
     private func person(_ p: PersonRow) -> some View {
-        HStack(spacing: 10) {
-            PersonAvatar(name: p.name, avatar: p.avatar, size: 34)
+        HStack(spacing: 12) {
+            PersonAvatar(name: p.name, avatar: p.avatar, size: 38)
             VStack(alignment: .leading, spacing: 1) {
-                Text(p.name).lineLimit(1)
+                Text(p.name).font(.sBody).lineLimit(1)
                 if let pr = p.pronouns, !pr.isEmpty {
-                    Text(pr).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(pr).font(.sFootnote).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer(minLength: 4)
@@ -666,13 +687,16 @@ private struct PeopleList: View {
                 writeTo = Recipient(id: p.id, name: p.name)
             } label: {
                 Image(systemName: "envelope")
+                    .font(.sBody)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(RowButtonStyle(radius: 8))
             .help("Message \(p.name)")
             .accessibilityLabel("Message \(p.name)")
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .contentShape(Rectangle())
         .contextMenu {
             Button("Message \(p.name)…") { writeTo = Recipient(id: p.id, name: p.name) }
@@ -725,6 +749,7 @@ private struct SectionLoaded<T: Decodable, Content: View>: View {
         Group {
             if let d = model.data {
                 content(d)
+                    .font(.sBody) // (1.2) the app's own size for anything a row does not size itself
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -752,27 +777,70 @@ private func courseSectionURL(_ engine: Engine, _ ctx: String, _ kind: String) -
     engine.canvasURL(for: .section(ctx, kind))?.absoluteString
 }
 
-/// A card of rows with no heading of its own (the screen's heading names them).
+/// The one card of a section's rows, with no heading of its own (the screen's heading names them).
 private struct RowsCard<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) { content }
-            .padding(8)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
     }
 }
 
-/// What a section says when it has nothing in it, in a card where its rows would be.
+/// What a section says when it has nothing in it: (1.2) on the page itself, quiet and centred where its rows would be —
+/// no card round nothing.
 private struct EmptyCard: View {
     let text: String
     let symbol: String
 
     var body: some View {
-        EmptyNote(text: text, symbol: symbol)
-            .padding(.horizontal, 16)
-            .card()
+        VStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.sBody)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 48)
+    }
+}
+
+/// (1.2) A screen's sections in two columns on a wide window, balanced, in their order (the first ones down the left);
+/// in one column on a narrow one, or when there is only one.
+private struct SectionColumns<Item: Identifiable, Content: View>: View {
+    let items: [Item]
+    var from: CGFloat = 900
+    let weight: (Item) -> Int
+    @ViewBuilder var content: (Item) -> Content
+    @State private var wide = true
+
+    var body: some View {
+        Group {
+            if wide && items.count > 1 {
+                let halves = balancedSplit(items, weight: weight)
+                HStack(alignment: .top, spacing: 22) {
+                    column(halves.left)
+                    column(halves.right)
+                }
+            } else {
+                column(items)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .widthGate(from, wide: $wide)
+    }
+
+    private func column(_ part: [Item]) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            ForEach(part) { item in content(item) }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -787,7 +855,7 @@ private struct PostLink: View {
         RowLink {
             engine.go(row.url, title: row.title)
         } label: {
-            PostRowView(row: row, color: color)
+            PostRowView(row: row, color: color, previewLines: 3)
         }
         .canvasRowMenu(row.title, url: row.url, engine: engine) { engine.go(row.url, title: row.title) }
     }
@@ -823,7 +891,7 @@ private struct OptionalRowLink<Label: View>: View {
         } else {
             label()
                 .padding(.horizontal, 8)
-                .padding(.vertical, 7)
+                .padding(.vertical, 9)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .combine)
         }

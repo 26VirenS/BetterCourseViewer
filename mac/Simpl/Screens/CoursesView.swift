@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// All Courses: the courses chosen in the setup as cards — each in its colour, with its code and name, its score, its
-/// unread announcements and how much is handed in. A course's context menu opens its sections, gives it a nickname
-/// (shown everywhere, Canvas too), or opens it on Canvas.
+/// unread announcements and how much is handed in, and (1.2) a row of its sections a click away. A course's context
+/// menu opens its sections, gives it a nickname (shown everywhere, Canvas too), or opens it on Canvas.
 struct CoursesView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<CoursesData>()
@@ -17,13 +17,16 @@ struct CoursesView: View {
                     if d.rows.isEmpty {
                         EmptyNote(text: d.empty ?? "No courses selected.", symbol: "books.vertical")
                     }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 16)], spacing: 16) {
-                        ForEach(d.rows) { c in card(c) }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 290), spacing: 18)], spacing: 18) {
+                        ForEach(d.rows) { c in
+                            CourseCard(course: c, progress: progress[c.id]) { naming = c }
+                        }
                     }
                     if let hidden = d.hidden, !hidden.isEmpty {
                         Text(hidden).font(.sCallout).foregroundStyle(.secondary)
                     }
                 }
+                .font(.sBody)
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -39,74 +42,6 @@ struct CoursesView: View {
         .sheet(item: $naming) { c in
             NicknameSheet(course: c, onBrightspace: engine.onBrightspace) { name in save(c, name) }
         }
-    }
-
-    private func card(_ c: CourseRow) -> some View {
-        let color = Color(hex: c.color)
-        return Button { engine.openWeb(c.url, title: c.code) } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    LinearGradient(colors: [color, color.opacity(0.78)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    Text(c.code)
-                        .font(.system(size: 19, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                        .padding(14)
-                    if let n = c.unread, n > 0 {
-                        HStack {
-                            Spacer()
-                            Label("\(n)", systemImage: "megaphone.fill")
-                                .font(.sCaption.weight(.bold))
-                                .foregroundStyle(color)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(.white, in: Capsule())
-                                .help("\(n) unread \(n == 1 ? "announcement" : "announcements")")
-                        }
-                        .padding(12)
-                    }
-                }
-                .frame(height: 88)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16, style: .continuous))
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(c.name ?? c.code).font(.sCallout.weight(.medium)).lineLimit(1)
-                        Text(subline(c)).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    Spacer(minLength: 6)
-                    ZStack {
-                        Ring(value: c.score, color: color, lineWidth: 4, key: "courses:\(c.id)")
-                        Text(c.scoreText)
-                            .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(c.score == nil ? .secondary : .primary)
-                            .minimumScaleFactor(0.6)
-                            .padding(4)
-                    }
-                    .frame(width: 44, height: 44)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-            }
-        }
-        .buttonStyle(CardButtonStyle())
-        .accessibilityLabel("\(c.code), \(c.scoreText)")
-        .contextMenu {
-            Button("Open") { engine.openWeb(c.url, title: c.code) }
-            Divider()
-            ForEach([("grades", "Grades"), ("assignments", "Assignments"), ("modules", "Modules"), ("files", "Files"), ("announcements", "Announcements")], id: \.0) { kind, label in
-                Button(label) { engine.go(.section("courses/\(c.id)", kind)) }
-            }
-            Divider()
-            Button("Nickname…") { naming = c }
-            Button("Open in \(engine.lmsName)") { engine.openWebScreen(c.url, title: c.code) }
-            Button("Copy Link") { if let u = engine.absolute(c.url) { copyToPasteboard(u.absoluteString) } }
-        }
-    }
-
-    private func subline(_ c: CourseRow) -> String {
-        if let p = progress[c.id], p.total > 0 { return "\(p.done) of \(p.total) handed in" }
-        return c.nickname?.isEmpty == false ? (c.original ?? "") : ""
     }
 
     private func save(_ c: CourseRow, _ name: String) {
@@ -127,6 +62,164 @@ struct CoursesView: View {
     }
 }
 
+/// A course's card: its colour with its code and its unread announcements, its name, how much is handed in (a bar) and
+/// its score (a ring) — a click opens the course — and (1.2) under a hairline its sections, each a click away. It lifts
+/// a little under the pointer, as the app's other cards do.
+private struct CourseCard: View {
+    let course: CourseRow
+    let progress: CourseProgress?
+    let rename: () -> Void
+    @EnvironmentObject private var engine: Engine
+    @State private var hover = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let links: [(kind: String, label: String)] = [
+        ("grades", "Grades"), ("assignments", "Assignments"), ("modules", "Modules"), ("files", "Files"), ("announcements", "Announcements"),
+    ]
+
+    private var color: Color { Color(hex: course.color) }
+    private var ctx: String { "courses/\(course.id)" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                engine.openWeb(course.url, title: course.code)
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    banner
+                    facts
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(course.code), \(course.scoreText)")
+            Spacer(minLength: 0) // (the cards of a row as tall as each other, their sections along one line)
+            Divider().padding(.horizontal, 14)
+            sections
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .card(radius: 18)
+        .scaleEffect(reduceMotion ? 1 : (hover ? 1.006 : 1))
+        .animation(Motion.hover, value: hover)
+        .onHover { hover = $0 }
+        .contextMenu { menu }
+    }
+
+    private var banner: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(colors: [color, color.opacity(0.78)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            Text(course.code)
+                .font(.sTitle3.weight(.bold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
+                .padding(16)
+                .padding(.trailing, 56)
+            if let n = course.unread, n > 0 {
+                HStack {
+                    Spacer()
+                    Label("\(n)", systemImage: "megaphone.fill")
+                        .font(.sFootnote.weight(.bold))
+                        .foregroundStyle(color)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(.white, in: Capsule())
+                        .help("\(n) unread \(n == 1 ? "announcement" : "announcements")")
+                }
+                .padding(13)
+            }
+        }
+        .frame(height: 92)
+    }
+
+    private var facts: some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(course.name ?? course.code)
+                    .font(.sBody.weight(.medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if let p = progress, p.total > 0 {
+                    Text("\(p.done) of \(p.total) handed in")
+                        .font(.sFootnote)
+                        .foregroundStyle(.secondary)
+                    handedIn(p)
+                } else if course.nickname?.isEmpty == false, let o = course.original, !o.isEmpty {
+                    Text(o)
+                        .font(.sFootnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 6)
+            ZStack {
+                Ring(value: course.score, color: color, lineWidth: 5, key: "courses:\(course.id)")
+                Text(course.scoreText)
+                    .font(.sFootnote.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(course.score == nil ? .secondary : .primary)
+                    .minimumScaleFactor(0.6)
+                    .padding(6)
+            }
+            .frame(width: 56, height: 56)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    /// How much is handed in, as a bar in the course's colour.
+    private func handedIn(_ p: CourseProgress) -> some View {
+        let share = CGFloat(min(max(Double(p.done) / Double(max(p.total, 1)), 0), 1))
+        return Capsule()
+            .fill(color.opacity(0.16))
+            .frame(height: 5)
+            .overlay(alignment: .leading) {
+                GeometryReader { g in
+                    Capsule()
+                        .fill(color)
+                        .frame(width: share > 0 ? max(5, g.size.width * share) : 0)
+                }
+            }
+            .frame(maxWidth: 200)
+            .accessibilityHidden(true)
+    }
+
+    /// (1.2) The course's sections, each a click away.
+    private var sections: some View {
+        HStack(spacing: 2) {
+            ForEach(CourseCard.links, id: \.kind) { link in
+                Button {
+                    engine.go(.section(ctx, link.kind))
+                } label: {
+                    Image(systemName: Glyph.section(link.kind))
+                        .font(.sBody.weight(.medium))
+                        .foregroundStyle(color)
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(RowButtonStyle(radius: 9))
+                .help(link.label)
+                .accessibilityLabel("\(course.code) \(link.label)")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var menu: some View {
+        Button("Open") { engine.openWeb(course.url, title: course.code) }
+        Divider()
+        ForEach(CourseCard.links, id: \.kind) { link in
+            Button(link.label) { engine.go(.section(ctx, link.kind)) }
+        }
+        Divider()
+        Button("Nickname…", action: rename)
+        Button("Open in \(engine.lmsName)") { engine.openWebScreen(course.url, title: course.code) }
+        Button("Copy Link") { if let u = engine.absolute(course.url) { copyToPasteboard(u.absoluteString) } }
+    }
+}
+
 /// A course's nickname: shown instead of its Canvas name everywhere, Canvas included; empty, the name comes back.
 private struct NicknameSheet: View {
     let course: CourseRow
@@ -138,28 +231,32 @@ private struct NicknameSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Nickname").font(.sHeadline)
+            Text("Nickname").font(.sTitle3)
             Text("Shown instead of “\(course.original ?? course.code)” everywhere, \(onBrightspace ? "on this Mac only" : "in Canvas too").")
                 .font(.sCallout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextField(course.original ?? "Nickname", text: $name)
                 .textFieldStyle(.roundedBorder)
+                .font(.sBody)
                 .onSubmit { done(name) }
             HStack {
                 if course.nickname?.isEmpty == false {
                     Button("Remove Nickname", role: .destructive) { done("") }
+                        .glassButton()
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .glassButton()
                 Button("Save") { done(name) }
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
+                    .glassButton(prominent: true)
             }
+            .controlSize(.large)
         }
-        .padding(20)
-        .frame(width: 400)
+        .padding(22)
+        .frame(width: 440)
         .onAppear { name = course.nickname ?? "" }
     }
 
