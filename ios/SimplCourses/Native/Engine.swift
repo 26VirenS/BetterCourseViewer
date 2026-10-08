@@ -56,6 +56,8 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var titles: [UUID: String] = [:]
     private(set) var revealed: Set<UUID> = []
     @Published private(set) var snapshot: Snapshot?
+    /// The school's site as the page says it: "canvas" or "d2l" (Brightspace); nil until it has (Router.swift onBrightspace).
+    @Published private(set) var lms: String?
     @Published var whatsNew: WhatsNewSheetItem? {
         didSet { if whatsNew == nil && oldValue != nil { schedulePopups() } }
     }
@@ -137,6 +139,7 @@ final class Engine: ObservableObject, ShellListener {
     func shellMessage(_ op: String, _ body: [String: Any]) {
         switch op {
         case "shell.state":
+            if let k = body["lms"] as? String, k != lms { lms = k }
             let on = body["shell"] as? Bool ?? false
             web.shellOn = on
             if on {
@@ -251,7 +254,10 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func refreshSnapshot() async {
-        if let s = try? await call("snapshot", as: Snapshot.self) { snapshot = s }
+        if let s = try? await call("snapshot", as: Snapshot.self) {
+            snapshot = s
+            if let k = s.lms, k != lms { lms = k }
+        }
     }
 
     func setBar(_ b: TabBarProbe.Bar) {
@@ -379,15 +385,20 @@ final class Engine: ObservableObject, ShellListener {
     /// Canvas with no screen in the app), in a sheet over the app with the Canvas session (1.6: no longer the web interface's
     /// screen pushed on the stack). Over a quiz or another sheet, it waits for that one to go first.
     func openWebScreen(_ url: String, title: String) {
-        guard let u = absolute(url) else { return }
-        let show = { [weak self] in self?.tool = ToolLaunch(title: title.isEmpty ? "Canvas" : title, args: ["page": u.absoluteString]) }
-        if quiz != nil || tool != nil {
-            quiz = nil
-            tool = nil
-            Task { try? await Task.sleep(nanoseconds: 450_000_000); show() }
-        } else {
-            Haptics.tap()
-            show()
+        guard let raw = absolute(url) else { return }
+        Task {
+            let u = await schoolPage(for: raw) // (on Brightspace: the Brightspace page for the interface's address, 2.99.22)
+            let name = title.isEmpty ? lmsName : title
+            let show = { [weak self] in self?.tool = ToolLaunch(title: name, args: ["page": u.absoluteString]) }
+            if quiz != nil || tool != nil {
+                quiz = nil
+                tool = nil
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                show()
+            } else {
+                Haptics.tap()
+                show()
+            }
         }
     }
 

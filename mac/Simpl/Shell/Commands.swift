@@ -54,7 +54,7 @@ struct SimplCommands: Commands {
             place("Calendar", .calendar, key: "3")
             place("Grades", .grades, key: "4")
             place("Notifications", .notifications, key: "5")
-            place("Inbox", .inbox, key: "6")
+            if !(engine?.onBrightspace ?? false) { place("Inbox", .inbox, key: "6") }
             Divider()
             Menu("Courses") {
                 ForEach(engine?.courses ?? []) { c in
@@ -64,7 +64,7 @@ struct SimplCommands: Commands {
                 Button("All Courses") { engine?.go(.courses) }
             }
             .disabled(!ready)
-            place("Groups", .groups, key: nil)
+            if !(engine?.onBrightspace ?? false) { place("Groups", .groups, key: nil) }
         }
 
         CommandGroup(replacing: .help) {

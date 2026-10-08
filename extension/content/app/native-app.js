@@ -37,7 +37,7 @@
     html.classList.toggle('bcv-native-shell', on);
     if (!force && said === on) return;
     said = on;
-    post('shell.state', { shell: on, signedIn: signedIn(), url: location.href, dark: !!app()?.isDark?.() });
+    post('shell.state', { shell: on, signedIn: signedIn(), url: location.href, dark: !!app()?.isDark?.(), lms: BCV.lms?.kind || 'canvas' });
   }
 
   // ---- navigation: the app's stack, not the page's ----------------------------------------------
@@ -104,7 +104,7 @@
 
   async function snapshot() {
     const [me, notifs, unread, done] = await Promise.all([store.me().catch(() => null), store.notifUnread().catch(() => null), store.unreadCount().catch(() => null), setupDone()]);
-    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done };
+    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done, lms: BCV.lms?.kind || 'canvas' };
   }
 
   // ---- Simpl's own settings, in the app's Settings (1.4.3) ------------------------------------------------------
@@ -1202,10 +1202,20 @@
         if (to) return { url: to, type: cur.type, item: String(cur.id) };
       } catch { /* Canvas's redirect below */ }
     }
+    // (Brightspace: no redirect of Canvas's to follow — an address of the interface's leads to the Brightspace page for it)
+    if (BCV.lms?.d2l) return { url: absUrl(BCV.lms.toPage(at.pathname + at.search + at.hash)) };
     try {
       const r = await fetch(at.href, { credentials: 'include', redirect: 'follow' });
       return { url: local(r.url || at.href) };
     } catch { return { url: local(at.href) }; }
+  }
+
+  /** (2.99.22) The school's own page for an address, for the app's sheet of them: on Brightspace, the Brightspace page for
+   *  one of the interface's addresses (lib/lms.js — ?bcv=native its own page for a screen); on Canvas, the address itself. */
+  async function pageFor({ url = '' } = {}) {
+    const at = new URL(String(url || ''), location.origin);
+    if (at.origin !== location.origin || !BCV.lms?.d2l) return { url: at.href };
+    return { url: absUrl(BCV.lms.toPage(at.pathname + at.search + at.hash)) };
   }
 
   async function toolLaunch({ course, assignment = null, moduleItem = null, tool = null, url = null } = {}) {
@@ -1818,7 +1828,7 @@
 
   const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, resolveUrl, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
+    toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];

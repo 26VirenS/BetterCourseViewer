@@ -17,9 +17,10 @@
   const CANVAS = __CANVAS_HOST__;
   if (self.SimplLogin) return;
   const post = (msg) => { try { webkit.messageHandlers.bcvLogin.postMessage(msg); } catch { /* no app */ } };
-  // Canvas's own pages are not sign-in pages, apart from its login (the "canvas" login, or a school's /login/ldap)
+  // Canvas's own pages are not sign-in pages, apart from its login (the "canvas" login, or a school's /login/ldap); nor are
+  // Brightspace's, apart from its own (/d2l/login, and /d2l/lp/auth/login… the form posts to)
   const onCanvas = location.hostname === CANVAS;
-  if (onCanvas && !/^\/login(\/|$)/.test(location.pathname)) return;
+  if (onCanvas && !/^\/(login|d2l\/login|d2l\/lp\/auth\/login)(\/|$)/i.test(location.pathname)) return;
 
   const shown = (el) => {
     if (!el || el.disabled || el.readOnly || el.type === 'hidden') return false;

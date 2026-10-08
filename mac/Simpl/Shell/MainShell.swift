@@ -179,9 +179,11 @@ struct Sidebar: View {
                 Label("Notifications", systemImage: "bell")
                     .badge(engine.snapshot?.notifUnread ?? 0)
                     .tag(Place.notifications)
-                Label("Inbox", systemImage: "tray")
-                    .badge(engine.snapshot?.inboxUnread ?? 0)
-                    .tag(Place.inbox)
+                if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
+                    Label("Inbox", systemImage: "tray")
+                        .badge(engine.snapshot?.inboxUnread ?? 0)
+                        .tag(Place.inbox)
+                }
             }
             Section("Courses") {
                 ForEach(engine.courses) { course in
@@ -197,16 +199,18 @@ struct Sidebar: View {
                 }
                 Label("All Courses", systemImage: "books.vertical").tag(Place.courses)
             }
-            Section("Groups") {
-                ForEach(engine.groups) { g in
-                    Label {
-                        Text(g.name).lineLimit(1)
-                    } icon: {
-                        Image(systemName: "person.3.fill").foregroundStyle(Color(hex: g.color))
+            if !engine.onBrightspace {
+                Section("Groups") {
+                    ForEach(engine.groups) { g in
+                        Label {
+                            Text(g.name).lineLimit(1)
+                        } icon: {
+                            Image(systemName: "person.3.fill").foregroundStyle(Color(hex: g.color))
+                        }
+                        .tag(Place.home("groups/\(g.id)"))
                     }
-                    .tag(Place.home("groups/\(g.id)"))
+                    Label("All Groups", systemImage: "person.3").tag(Place.groups)
                 }
-                Label("All Groups", systemImage: "person.3").tag(Place.groups)
             }
         }
         .listStyle(.sidebar)

@@ -312,11 +312,18 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         }
     }
 
+    /// The school's own sign-in on its own host: Canvas's /login (and /login/ldap…), Brightspace's /d2l/login (and the
+    /// /d2l/lp/auth/login… its form posts to). Every other page there is the school's site, signed in.
+    static func isSignIn(_ path: String) -> Bool {
+        let p = path.lowercased()
+        return p.hasPrefix("/login") || p.hasPrefix("/d2l/login") || p.hasPrefix("/d2l/lp/auth/login")
+    }
+
     /// A page finished loading in the main frame.
     func didLoad(_ url: URL?) {
         guard let url, let host = url.host?.lowercased() else { return }
         schoolPage(url)
-        if host == canvasHost && !url.path.hasPrefix("/login") {
+        if host == canvasHost && !LoginAssist.isSignIn(url.path) {
             // on Canvas: signed in
             let viaForm = attempt != nil && attempt?.auto == false && typed != nil
             attempt = nil
@@ -336,7 +343,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// off — a sign-in page gone back to is one the school refuses as stale.
     private func schoolPage(_ url: URL) {
         let host = url.host?.lowercased() ?? ""
-        let on = !host.isEmpty && !canvasHost.isEmpty && (host != canvasHost || url.path.hasPrefix("/login"))
+        let on = !host.isEmpty && !canvasHost.isEmpty && (host != canvasHost || LoginAssist.isSignIn(url.path))
         if on != onSchoolPage { onSchoolPage = on }
         webView?.allowsBackForwardNavigationGestures = !on
     }

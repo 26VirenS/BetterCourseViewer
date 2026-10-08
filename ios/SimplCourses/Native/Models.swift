@@ -25,6 +25,8 @@ struct Snapshot: Codable {
     var host: String?
     var version: String?
     var setupDone: Bool?
+    /// The school's site: "canvas" or "d2l" (Brightspace, 2.99.22).
+    var lms: String?
 }
 
 struct WorkRow: Codable, Identifiable, Hashable {

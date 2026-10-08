@@ -9,7 +9,50 @@ import SwiftUI
 /// a module, a person, a grade, a conversation, a calendar event, the dashboard; a file to the phone's viewer;
 /// a module item, or anything else, by where Canvas sends it (`openWeb`). Nothing opens the web interface.
 extension Engine {
+    // MARK: - Brightspace (2.99.22)
+
+    /// The school's site is Brightspace: the page says so (shell.state, the snapshot); before it has, its own domains.
+    var onBrightspace: Bool {
+        if let k = lms { return k == "d2l" }
+        let h = web.baseURL.host?.lowercased() ?? ""
+        return h.hasSuffix(".brightspace.com") || h.hasSuffix(".d2l.com") || h.hasSuffix(".desire2learn.com")
+    }
+
+    /// A Brightspace page's address as the interface's own, which the screens and this router speak (extension/lib/lms.js
+    /// fromPage, in short): the interface's address a page carries in ?simpl=, a course's homepage as the course, the
+    /// homepage as the Dashboard, a quiz's own page as the quiz. Anything else — Canvas's, another site's, a Brightspace page
+    /// of its own — as it is.
+    func interfaceAddress(_ raw: String) -> String {
+        guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased(), url.path.lowercased().hasPrefix("/d2l/") else { return raw }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let value = { (name: String) in items.first(where: { $0.name == name })?.value }
+        let hash = url.fragment.map { "#\($0)" } ?? ""
+        if let own = value("simpl"), own.hasPrefix("/") { return own + hash }
+        let p = url.path.split(separator: "/").map(String.init)
+        if p.count == 2, p[1] == "home" { return "/" + hash }
+        if p.count == 3, p[1] == "home", Engine.numeric(p[2]) { return "/courses/\(p[2])" }
+        if url.path.lowercased() == "/d2l/lms/quizzing/user/quiz_summary.d2l", let ou = value("ou"), let qi = value("qi"), Engine.numeric(ou), Engine.numeric(qi) {
+            return "/courses/\(ou)/quizzes/\(qi)?bcv=native"
+        }
+        return raw
+    }
+
+    /// The school's own page for an address, for the sheet that shows one (Open in Canvas or Brightspace): on Brightspace the
+    /// Brightspace page for one of the interface's addresses, as the page has it (native-app.js pageFor); on Canvas the address.
+    func schoolPage(for url: URL) async -> URL {
+        guard onBrightspace, url.host?.lowercased() == web.baseURL.host?.lowercased(), !url.path.lowercased().hasPrefix("/d2l/") else { return url }
+        struct Page: Decodable { var url: String }
+        if let p = try? await call("pageFor", ["url": url.absoluteString], as: Page.self), let u = absolute(p.url) { return u }
+        return url
+    }
+
+    /// The name the school's own site goes by, for the words that say it.
+    var lmsName: String { onBrightspace ? "Brightspace" : "Canvas" }
+
+    // MARK: - Routes
+
     func nativeRoute(for raw: String, title: String) -> Route? {
+        let raw = interfaceAddress(raw)
         guard let url = absolute(raw), let host = url.host?.lowercased(), host == web.baseURL.host?.lowercased() else { return nil }
         if let q = url.query, q.contains("bcv=") || q.contains("display=") { return nil } // (a screen asked for by name, a frame's view)
         let p = url.path.split(separator: "/").map(String.init)
@@ -58,6 +101,8 @@ extension Engine {
         case "groups" where isCourse:
             return .groups
         case "quizzes" where isCourse:
+            // (on Brightspace a quiz is taken on its own page, in the sheet of the school's pages: not the list)
+            if onBrightspace && rest.count >= 2 { return nil }
             return .section(ctx: ctx, kind: "quizzes")
         case "grades" where isCourse:
             return .section(ctx: ctx, kind: "grades")
@@ -68,6 +113,7 @@ extension Engine {
 
     /// A tab's own address: the dashboard, the course list, the grades, the calendar, the notifications.
     func tabName(for raw: String) -> String? {
+        let raw = interfaceAddress(raw)
         guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
         let p = url.path.split(separator: "/").map(String.init)
         guard let first = p.first else { return "today" }
@@ -83,10 +129,15 @@ extension Engine {
 
     /// A course file's page (…/files/12, its preview, ?wrap=1): the file itself, for the phone's viewer.
     func fileDownload(for raw: String) -> URL? {
+        let raw = interfaceAddress(raw)
         guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
         if Engine.isDownload(url) { return url }
         let p = url.path.split(separator: "/").map(String.init)
         guard let i = p.firstIndex(of: "files"), i + 1 < p.count, Engine.numeric(p[i + 1]) else { return nil }
+        // (on Brightspace a file is a content topic, fetched from the topic itself)
+        if onBrightspace, i == 2, p[0] == "courses", Engine.numeric(p[1]) {
+            return absolute("/d2l/le/content/\(p[1])/topics/files/download/\(p[i + 1])/DirectFileTopicDownload")
+        }
         let base = p[...(i + 1)].joined(separator: "/")
         return absolute("/\(base)/download?download_frd=1")
     }
@@ -101,6 +152,7 @@ extension Engine {
 
     /// A course's own external tool (…/courses/1/external_tools/9): opened in the tool sheet, not a screen.
     func toolLaunch(for raw: String, title: String) -> ToolLaunch? {
+        let raw = interfaceAddress(raw)
         guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
         let p = url.path.split(separator: "/").map(String.init)
         guard p.count == 4, p[0] == "courses", Engine.numeric(p[1]), p[2] == "external_tools" else { return nil }
@@ -115,6 +167,7 @@ extension Engine {
     /// A Classic quiz (…/courses/1/quizzes/9, or its take page): the app's own quiz screen, over everything.
     /// Canvas's own quiz page asked for by name (?bcv=…) stays the web screen.
     func quizLaunch(for raw: String, title: String) -> QuizLaunch? {
+        if onBrightspace { return nil } // (Brightspace's quizzes are taken on its own pages: the sheet of the school's pages)
         guard let url = absolute(raw), url.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
         if let q = url.query, q.contains("bcv=") || q.contains("display=") { return nil }
         let p = url.path.split(separator: "/").map(String.init)

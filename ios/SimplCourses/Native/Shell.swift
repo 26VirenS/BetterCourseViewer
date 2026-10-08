@@ -277,10 +277,12 @@ struct AccountMenu: View {
         let inbox = engine.snapshot?.inboxUnread ?? 0
         Menu {
             Section(me.map { "\($0.name)\($0.email.map { "\n\($0)" } ?? "")" } ?? "Account") {
-                Button { engine.push(.inbox) } label: {
-                    Label(inbox > 0 ? "Inbox (\(inbox) unread)" : "Inbox", systemImage: "tray")
+                if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
+                    Button { engine.push(.inbox) } label: {
+                        Label(inbox > 0 ? "Inbox (\(inbox) unread)" : "Inbox", systemImage: "tray")
+                    }
+                    Button { engine.push(.groups) } label: { Label("Groups", systemImage: "person.3") }
                 }
-                Button { engine.push(.groups) } label: { Label("Groups", systemImage: "person.3") }
                 // (no Tools on the iPhone yet, 1.2)
             }
             Section {

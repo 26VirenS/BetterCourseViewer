@@ -49,6 +49,8 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var phase: Phase = .starting
     @Published var nav = Navigator()
     @Published private(set) var snapshot: Snapshot?
+    /// The school's site as the page says it: "canvas" or "d2l" (Brightspace); nil until it has (Router.swift onBrightspace).
+    @Published private(set) var lms: String?
     /// Bumps when what the screens show may have changed (a tick, a hand-in, a refresh): they read again.
     @Published private(set) var dataVersion = 0
     /// The sidebar's courses (those chosen in the setup) and groups.
@@ -117,6 +119,7 @@ final class Engine: ObservableObject, ShellListener {
     func shellMessage(_ op: String, _ body: [String: Any]) {
         switch op {
         case "shell.state":
+            if let k = body["lms"] as? String, k != lms { lms = k }
             let on = body["shell"] as? Bool ?? false
             web.shellOn = on
             if on {
@@ -256,7 +259,10 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func refreshSnapshot() async {
-        if let s = try? await call("snapshot", as: Snapshot.self) { snapshot = s }
+        if let s = try? await call("snapshot", as: Snapshot.self) {
+            snapshot = s
+            if let k = s.lms, k != lms { lms = k }
+        }
     }
 
     /// The sidebar's courses and groups, read again.
@@ -442,8 +448,11 @@ final class Engine: ObservableObject, ShellListener {
     /// Canvas's own page for an address ("Open in Canvas", a part of Canvas with no screen here), in a window of its own
     /// with the Canvas session.
     func openWebScreen(_ url: String, title: String) {
-        guard let u = absolute(url) else { return }
-        tool = ToolLaunch(title: title.isEmpty ? "Canvas" : title, args: ["page": u.absoluteString])
+        guard let raw = absolute(url) else { return }
+        Task {
+            let u = await schoolPage(for: raw) // (on Brightspace: the Brightspace page for the interface's address, 2.99.22)
+            tool = ToolLaunch(title: title.isEmpty ? lmsName : title, args: ["page": u.absoluteString])
+        }
     }
 
     func openCanvasPage(_ url: String, title: String) { openWebScreen(url, title: title) }
