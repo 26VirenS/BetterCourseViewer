@@ -79,8 +79,11 @@ struct SchoolConfirm: View {
 /// starts clean), zoomed out so the page lays out as on a laptop's screen, and deaf to the pointer.
 struct LoginPreview: NSViewRepresentable {
     static let side: CGFloat = 320
-    /// How far out the page is drawn: a 320-point square shows 1,000 points of the page across, as on a laptop.
-    static let zoom: CGFloat = 0.32
+    /// How far out the page is drawn (1.2.9): WebKit's own zoom goes no further out than half, so the page is drawn at
+    /// that into a larger web view, and the web view drawn smaller still in the square (`shrink`) — about 30% in all:
+    /// the square shows some 1,070 points of the page across, as on a laptop, the whole sign-in in view.
+    static let zoom: CGFloat = 0.5
+    static let shrink: CGFloat = 0.6
 
     enum State: Equatable { case loading, shown, failed }
 
@@ -89,26 +92,27 @@ struct LoginPreview: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(state: $state) }
 
-    func makeNSView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> ShrunkWebHost {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
         config.mediaTypesRequiringUserActionForPlayback = .all
-        let view = StillWebView(frame: NSRect(x: 0, y: 0, width: LoginPreview.side, height: LoginPreview.side), configuration: config)
+        let big = LoginPreview.side / LoginPreview.shrink
+        let view = StillWebView(frame: NSRect(x: 0, y: 0, width: big, height: big), configuration: config)
         view.pageZoom = LoginPreview.zoom
         view.navigationDelegate = context.coordinator
         context.coordinator.load(view, host: host)
-        return view
+        return ShrunkWebHost(web: view, shrink: LoginPreview.shrink)
     }
 
-    func updateNSView(_ view: WKWebView, context: Context) {
+    func updateNSView(_ host: ShrunkWebHost, context: Context) {
         context.coordinator.state = $state
-        if context.coordinator.host != host { context.coordinator.load(view, host: host) }
+        if context.coordinator.host != self.host { context.coordinator.load(host.web, host: self.host) }
     }
 
-    static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
-        view.stopLoading()
-        view.navigationDelegate = nil
+    static func dismantleNSView(_ host: ShrunkWebHost, coordinator: Coordinator) {
+        host.web.stopLoading()
+        host.web.navigationDelegate = nil
     }
 
     @MainActor
@@ -175,6 +179,40 @@ struct LoginPreview: NSViewRepresentable {
         }
 
     }
+}
+
+/// (1.2.9) A web view drawn smaller than it is laid out: its holder's coordinates are scaled (`shrink`), as a scroll view
+/// zooms out on what it holds, so a page laid out across 1,070 points is drawn in a 320-point square. Takes no presses.
+final class ShrunkWebHost: NSView {
+    let web: WKWebView
+    private let shrink: CGFloat
+
+    init(web: WKWebView, shrink: CGFloat) {
+        self.web = web
+        self.shrink = shrink
+        super.init(frame: NSRect(x: 0, y: 0, width: LoginPreview.side, height: LoginPreview.side))
+        wantsLayer = true
+        layer?.masksToBounds = true
+        addSubview(web)
+        fit()
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var isFlipped: Bool { true }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        fit()
+    }
+
+    private func fit() {
+        let size = NSSize(width: frame.width / shrink, height: frame.height / shrink)
+        if bounds.size != size { setBoundsSize(size) }
+        if web.frame.size != size { web.frame = NSRect(origin: .zero, size: size) }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// A web view the pointer passes through: no clicks, no scrolling, no menu.
