@@ -4,8 +4,8 @@ import SwiftUI
 // The work preview over the window (1.2.3; Components/WorkPreview.swift has what it shows and the rows that open it).
 // MainShell puts it over the split view, above the tour. Nothing is drawn, and nothing takes a press, while no card is
 // out. With one: the window lightly dimmed but for the row it grew from, and the card — Liquid Glass — growing out of
-// that row on the house spring to its place: beside the row where there is room, under or over a wide one, else in the
-// middle of the screen's side of the window. It folds back into the row when it closes. Under Reduce Motion it fades
+// that row on the house spring to its place: just under the row (1.2.20), or just over it when there is no room under,
+// else in the middle of the screen's side of the window. It folds back into the row when it closes. Under Reduce Motion it fades
 // in and out in its place.
 
 struct WorkPreviewOverlay: View {
@@ -55,8 +55,7 @@ struct WorkPreviewOverlay: View {
             lead = max(0, side.maxX)
         }
         let area = CGRect(x: lead, y: top, width: max(size.width - lead, 0), height: max(size.height - top, 0))
-        let room = area.height - PreviewPlacement.margin * 2
-        let lines = room >= 640 ? 8 : (room >= 500 ? 5 : 3)
+        let lines = PreviewPlacement.lines(source: source, area: area)
         let target = PreviewPlacement.frame(source: source, area: area, height: measured > 0 ? measured : 300)
         return Placed(source: source, target: target, lines: lines)
     }
@@ -150,16 +149,13 @@ struct WorkPreviewOverlay: View {
     }
 }
 
-/// Where the card goes (1.2.8): beside its row, level with it, on the side the row leaves room — a row on the left of
-/// the window opens to its right, one on the right to its left (1.2.19: narrower, down to `minWidth`, to stay beside
-/// it); a row too wide for that, just under it (or over it), the row left in view; only with room for none of these,
-/// level with it at the window's edge; with no row, the middle of the screen's side of the window — always inside it.
+/// Where the card goes (1.2.20): just under its row, from the row's start, as a menu from it — or just over it when
+/// there is no room under — its excerpt cut to fit (`lines`); with no row, the middle of the screen's side of the
+/// window — always inside it.
 enum PreviewPlacement {
     static let width: CGFloat = 460
     static let margin: CGFloat = 16
     static let gap: CGFloat = 12
-    /// (1.2.19) The narrowest the card goes to stay beside its row.
-    static let minWidth: CGFloat = 340
 
     static func frame(source: CGRect?, area: CGRect, height: CGFloat) -> CGRect {
         let w = min(width, max(area.width - margin * 2, 260))
@@ -168,28 +164,27 @@ enum PreviewPlacement {
         let minY = area.minY + margin, maxY = area.maxY - margin
         let centered = CGRect(x: max(minX, area.midX - w / 2), y: max(minY, area.midY - h / 2), width: w, height: h)
         guard let s = source else { return centered }
-        let clampX = { (x: CGFloat) -> CGFloat in min(max(x, minX), max(minX, maxX - w)) }
         let clampY = { (y: CGFloat) -> CGFloat in min(max(y, minY), max(minY, maxY - h)) }
-        let y = clampY(s.minY - 10)
-        let right = CGRect(x: s.maxX + gap, y: y, width: w, height: h)
-        let left = CGRect(x: s.minX - gap - w, y: y, width: w, height: h)
-        let fits = { (r: CGRect) -> Bool in r.minX >= minX - 0.5 && r.maxX <= maxX + 0.5 }
-        // (the side: where the row stands — a wide row, its words on the left, counts as the left)
-        let rightFirst = s.midX <= area.midX + area.width * 0.12
-        if let r = (rightFirst ? [right, left] : [left, right]).first(where: fits) { return r }
-        // (1.2.19) no room for the whole width beside it: beside it all the same, a little narrower
-        let roomRight = maxX - (s.maxX + gap), roomLeft = s.minX - gap - minX
-        let narrow = rightFirst ? [(roomRight, true), (roomLeft, false)] : [(roomLeft, false), (roomRight, true)]
-        if let pick = narrow.first(where: { $0.0 >= minWidth }) {
-            let (room, onRight) = pick
-            let n = min(w, room)
-            return CGRect(x: onRight ? s.maxX + gap : s.minX - gap - n, y: y, width: n, height: h)
+        // (1.2.20) as a menu from its row, for every row: from the row's start, just under it — or just over it when
+        // there is no room under — the row left in view; with room for neither, on the roomier side, kept in the window
+        let x = min(max(s.minX + 8, minX), max(minX, maxX - w))
+        let below = maxY - (s.maxY + gap), above = (s.minY - gap) - minY
+        if below >= h { return CGRect(x: x, y: s.maxY + gap, width: w, height: h) }
+        if above >= h { return CGRect(x: x, y: s.minY - gap - h, width: w, height: h) }
+        let y = below >= above ? clampY(s.maxY + gap) : clampY(s.minY - gap - h)
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    /// (1.2.20) How many lines of what the work says the card shows: as many as the room under (or over) its row allows,
+    /// so the card fits there.
+    static func lines(source: CGRect?, area: CGRect) -> Int {
+        let room: CGFloat
+        if let s = source {
+            room = max(area.maxY - margin - (s.maxY + gap), (s.minY - gap) - (area.minY + margin))
+        } else {
+            room = area.height - margin * 2
         }
-        // (a row too wide for that, a list's: just under it, from its start — or just over it — the row left in view)
-        let x = clampX(s.minX + 8)
-        if maxY - (s.maxY + gap) >= h { return CGRect(x: x, y: s.maxY + gap, width: w, height: h) }
-        if (s.minY - gap) - minY >= h { return CGRect(x: x, y: s.minY - gap - h, width: w, height: h) }
-        return CGRect(x: clampX(rightFirst ? maxX - w : minX), y: y, width: w, height: h)
+        return room >= 640 ? 8 : (room >= 460 ? 5 : (room >= 340 ? 3 : 2))
     }
 }
 
