@@ -23,7 +23,8 @@ cp -R site/. build/site-sync/
 # hand.
 if command -v gh >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ]; then
   REPO="${GITHUB_REPOSITORY:-26VirenS/BetterCourseViewer}"
-  MAC_REL="$(gh api "repos/$REPO/releases?per_page=50" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith("mac-v")))][0]' 2>/dev/null || true)"
+  # (the highest version, as numbers: GitHub's own order put mac-v1.2.10 after mac-v1.2.3)
+  MAC_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
   MAC_TAG="$(printf '%s' "$MAC_REL" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "null"); print(d["tag_name"] if d else "")' 2>/dev/null || true)"
   if [ -n "$MAC_TAG" ]; then
     MAC_ZIP="https://github.com/$REPO/releases/download/$MAC_TAG/Simpl-Mac-${MAC_TAG#mac-v}.zip"
