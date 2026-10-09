@@ -15,7 +15,7 @@ struct RadialColorPicker: View {
     let change: (AppearanceStore.Custom) -> Void
     var done: () -> Void = {}
     @State private var mode: Mode?
-    @State private var shown = false
+    @State private var shown = UserDefaults.standard.string(forKey: "SimplShotFile") != nil // (a screenshot: already in)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Mode { case hue, sat, depth }
