@@ -70,6 +70,15 @@ struct Navigator: Equatable {
         current.path.append(route)
     }
 
+    /// (1.2.10) A course's screen opened from somewhere else (the Dashboard, Grades, the Calendar, Search): the course's
+    /// own place with the screen on it — the student is in the course — as one step, so Back returns where it was
+    /// opened from. Within the course already: pushed, as any screen.
+    mutating func push(_ route: Route, in place: Place) {
+        guard current.place.ctx != place.ctx else { push(route); return }
+        record()
+        current = Location(place: place, path: [route])
+    }
+
     /// The stack changed from below (a screen's own Back): taken as a step like any other.
     mutating func setPath(_ path: [Route]) {
         guard path != current.path else { return }

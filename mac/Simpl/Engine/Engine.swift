@@ -471,7 +471,25 @@ final class Engine: ObservableObject, ShellListener {
         case .notifications: go(.notifications)
         case .calendar: go(.calendar)
         case .section(let ctx, let kind): go(.section(ctx, kind))
-        default: push(route)
+        default:
+            // (1.2.10) a course's screen opens in its course: the course chosen in the sidebar, the screen on it
+            if let place = Engine.place(of: route), nav.current.place.ctx != place.ctx {
+                withAnimation(.easeInOut(duration: 0.2)) { nav.push(route, in: place) }
+                if let ctx = place.ctx { Task { await loadSections(ctx) } }
+            } else {
+                push(route)
+            }
+        }
+    }
+
+    /// The place in its course a screen belongs under: an assignment under the course's Assignments, a folder under its
+    /// Files, a discussion, an announcement or a page under its home; nil for one of no course (a conversation).
+    static func place(of route: Route) -> Place? {
+        switch route {
+        case .assignment(let course, _): return .section("courses/\(course)", "assignments")
+        case .folder(let ctx, _, _): return .section(ctx, "files")
+        case .topic(let ctx, _), .page(let ctx, _): return .home(ctx)
+        default: return nil
         }
     }
 
