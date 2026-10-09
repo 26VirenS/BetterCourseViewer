@@ -177,7 +177,7 @@ struct ComposeSheet: View {
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background(Color.accentColor.opacity(0.14), in: Capsule())
+        .background(Theme.accent.opacity(0.14), in: Capsule())
         .contextMenu {
             Button("Remove") { remove(p) }
         }
@@ -217,7 +217,7 @@ struct ComposeSheet: View {
             HStack(spacing: 10) {
                 // (a course, a group or a section reaches many people: its own symbol, not initials)
                 if r.id.contains("_") {
-                    IconTile(symbol: "person.3.fill", color: .accentColor, size: 30)
+                    IconTile(symbol: "person.3.fill", color: Theme.accent, size: 30)
                 } else {
                     InboxAvatar(name: r.name, size: 30)
                 }
@@ -243,7 +243,7 @@ struct ComposeSheet: View {
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .background(on ? Color.accentColor.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(on ? Theme.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { inside in

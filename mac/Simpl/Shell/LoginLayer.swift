@@ -50,7 +50,7 @@ private struct LoggingInView: View {
 
     var body: some View {
         ZStack {
-            Theme.page.ignoresSafeArea()
+            PageGround().ignoresSafeArea()
             VStack(spacing: 16) {
                 ProgressView()
                     .controlSize(.large)
@@ -196,7 +196,7 @@ private struct LoginForm: View {
 
     var body: some View {
         ZStack {
-            Theme.page.ignoresSafeArea()
+            PageGround().ignoresSafeArea()
             VStack(spacing: 18) {
                 VStack(spacing: 8) {
                     Image(systemName: "lock.shield.fill")

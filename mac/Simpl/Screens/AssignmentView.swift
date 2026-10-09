@@ -559,7 +559,7 @@ struct AssignmentView: View {
     }
 
     private func courseTint(_ d: AssignmentData) -> Color {
-        guard let c = d.color, !c.isEmpty else { return .accentColor }
+        guard let c = d.color, !c.isEmpty else { return Theme.accent }
         return Color(hex: c)
     }
 
@@ -850,7 +850,7 @@ private struct CommentComposer: View {
             .background(Theme.well, in: RoundedRectangle(cornerRadius: 12, style: .continuous)) // (1.2: a well, not a box in the card)
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.accentColor.opacity(focused ? 0.6 : 0), lineWidth: 2)
+                    .strokeBorder(Theme.accent.opacity(focused ? 0.6 : 0), lineWidth: 2)
             }
             .animation(Motion.hover, value: focused)
             if let error {
@@ -936,6 +936,9 @@ private struct HandInSheet: View {
     @State private var convertible = ConvertInfo(exts: [], line: "")
     /// Files being converted to a type the assignment takes, by name.
     @State private var converting: [String] = []
+    /// (1.3) A chosen file looked at in a window growing out of the sheet's right edge (Screens/HandInPreview.swift).
+    @ObservedObject private var preview = HandInPreview.shared
+    @StateObject private var sheetWindow = WindowRef()
 
     private static let limit = 50 * 1024 * 1024 // (read whole into memory and handed to the page: kept to a sane size)
 
@@ -991,6 +994,8 @@ private struct HandInSheet: View {
         }
         .onChange(of: photos) { _, _ in pickedPhotos() }
         .onAppear { if !dropped.isEmpty { _ = take(dropped) } }
+        .onDisappear { preview.close(animated: false) }
+        .background { WindowProbe(ref: sheetWindow).frame(width: 0, height: 0) }
         .task { await loadConvertible() }
         .interactiveDismissDisabled(sending)
     }
@@ -1077,41 +1082,61 @@ private struct HandInSheet: View {
         }
     }
 
+    /// (1.3) A press on it opens the Open panel, as Choose Files… does.
     private var dropZone: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "arrow.down.doc")
-                .font(.system(size: 26))
-                .foregroundStyle(.secondary)
-            Text("Drop files here")
-                .font(.sCallout.weight(.semibold))
-            Text("or choose them below")
-                .font(.sCaption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(targeted ? Color.accentColor : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func fileRow(_ f: PickedFile) -> some View {
-        HStack(spacing: 10) {
-            Image(nsImage: HandInSheet.icon(f.name))
-                .resizable()
-                .frame(width: 28, height: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(f.name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(f.sizeText)
+        Button { importing = true } label: {
+            VStack(spacing: 6) {
+                Image(systemName: "arrow.down.doc")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.secondary)
+                Text("Drop files here")
+                    .font(.sCallout.weight(.semibold))
+                Text("or click to choose them")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(targeted ? Theme.accent : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(RowButtonStyle(radius: 10))
+        .help("Choose files to hand in")
+        .accessibilityLabel("Drop files here, or choose them")
+    }
+
+    /// (1.3) A press on the file shows it in a window growing out of the sheet's right edge (again: puts it away).
+    private func fileRow(_ f: PickedFile) -> some View {
+        let open = preview.showing == f.id
+        return HStack(spacing: 10) {
+            Button { preview.toggle(f, beside: sheetWindow.window) } label: {
+                HStack(spacing: 10) {
+                    Image(nsImage: HandInSheet.icon(f.name))
+                        .resizable()
+                        .frame(width: 28, height: 28)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(f.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(open ? "\(f.sizeText) · Previewing" : "\(f.sizeText) · Click to preview")
+                            .font(.sCaption)
+                            .foregroundStyle(open ? Theme.accent : Color.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: open ? "eye.fill" : "eye")
+                        .foregroundStyle(open ? Theme.accent : Color.secondary)
+                        .accessibilityHidden(true)
+                }
+                .padding(.vertical, 2)
+                .padding(.horizontal, 4)
+            }
+            .buttonStyle(RowButtonStyle(radius: 8))
+            .help(open ? "Close the preview" : "Preview \(f.name)")
+            .accessibilityHint(Text(open ? "Closes its preview" : "Shows a preview beside this sheet"))
             Button { remove(f) } label: {
                 Image(systemName: "xmark.circle.fill")
             }
@@ -1121,6 +1146,7 @@ private struct HandInSheet: View {
             .accessibilityLabel("Remove \(f.name)")
         }
         .contextMenu {
+            Button(open ? "Close Preview" : "Preview") { preview.toggle(f, beside: sheetWindow.window) }
             Button("Remove", role: .destructive) { remove(f) }
         }
         .transition(.opacity)
@@ -1160,9 +1186,9 @@ private struct HandInSheet: View {
         if targeted && takesDrops {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.07))
+                    .fill(Theme.accent.opacity(0.07))
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [8, 5]))
+                    .strokeBorder(Theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 5]))
                 Label(assignment.types.contains("online_upload") ? "Drop to Add Files" : "Drop to Add the Link", systemImage: "arrow.down.doc.fill")
                     .font(.sHeadline)
                     .padding(.horizontal, 18)
@@ -1182,7 +1208,7 @@ private struct HandInSheet: View {
     }
 
     private var accent: Color {
-        guard let c = assignment.color, !c.isEmpty else { return .accentColor }
+        guard let c = assignment.color, !c.isEmpty else { return Theme.accent }
         return Color(hex: c)
     }
 
@@ -1326,6 +1352,7 @@ private struct HandInSheet: View {
     }
 
     private func remove(_ f: PickedFile) {
+        preview.removed(f)
         withAnimation(Motion.snappy) { files.removeAll { $0.id == f.id } }
     }
 

@@ -9,17 +9,28 @@ struct MainShell: View {
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
     @State private var columns: NavigationSplitViewVisibility = .all
+    /// (1.3) The window was last wide enough for the sidebar beside the screen: crossing below folds it away, crossing
+    /// back brings it out again (a sidebar opened by hand on a narrow window stays until the window narrows again).
+    @State private var wasWide: Bool?
     @StateObject private var palette = SearchPalette()
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
                 .tourSpot(.sidebar)
-                .navigationSplitViewColumnWidth(min: 240, ideal: 270, max: 360)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 270, max: 360)
         } detail: {
             DetailStack()
         }
         .navigationSplitViewStyle(.balanced)
+        .background {
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { fit(g.size.width) }
+                    .onChange(of: g.size.width) { _, w in fit(w) }
+            }
+        }
+        .background(PageGround().ignoresSafeArea()) // (1.3) the theme's scene behind the sidebar's glass too
         .overlay { RubricPopupLayer() } // (1.2.3) the rubric ring, over the whole window (Screens/RubricPopup.swift)
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
@@ -81,6 +92,21 @@ struct MainShell: View {
     }
 }
 
+extension MainShell {
+    /// (1.3) The sidebar folded away below `MainShell.narrow` points across, and out again above it — only as the window
+    /// crosses the line, so the sidebar's own button still opens and closes it at any width.
+    static let narrow: CGFloat = 880
+
+    fileprivate func fit(_ width: CGFloat) {
+        let wide = width >= Self.narrow
+        guard wide != wasWide else { return }
+        let first = wasWide == nil
+        wasWide = wide
+        if first && wide { return } // (a wide window opens as it was)
+        withAnimation(Motion.gentle) { columns = wide ? .all : .detailOnly }
+    }
+}
+
 /// The screen chosen in the sidebar, with what is pushed on it (an assignment, a discussion, a page, a folder, a
 /// conversation). Another place cross-fades in; a push slides as Apple's own stacks do.
 struct DetailStack: View {
@@ -90,17 +116,17 @@ struct DetailStack: View {
         let place = engine.nav.current.place
         NavigationStack(path: Binding(get: { engine.nav.current.path }, set: { engine.nav.setPath($0) })) {
             PlaceScreen(place: place)
-                .background(Theme.page.ignoresSafeArea())
+                .background(PageGround().ignoresSafeArea())
                 .navigationDestination(for: Route.self) { route in
                     RouteScreen(route: route)
                         .navigationBarBackButtonHidden(true) // (the toolbar's own Back and Forward walk the history)
                         // (1.2.3) its own ground, up under the toolbar: the screen it was opened from never shows through
-                        .background(Theme.page.ignoresSafeArea())
+                        .background(PageGround().ignoresSafeArea())
                 }
         }
         .id(place.identity)
         .transition(.opacity)
-        .background(Theme.page.ignoresSafeArea())
+        .background(PageGround().ignoresSafeArea())
     }
 }
 

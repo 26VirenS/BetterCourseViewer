@@ -26,7 +26,7 @@ enum DashCounterLook {
         case "overdue": return Color(hex: "#ff453a")
         case "tomorrow": return Color(hex: "#ff9f0a")
         case "graded": return Color(hex: "#5856d6")
-        default: return .accentColor
+        default: return Theme.accent
         }
     }
 

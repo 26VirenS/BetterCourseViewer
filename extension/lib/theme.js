@@ -230,7 +230,7 @@
   // turned, the shapes jittered from a seed) so six counters each wear their own; the sidebar's and
   // the header's in three. A key names one: 'Dusk@card', 'Dusk@card#3', 'Dusk@side', 'Dusk@head'.
   const PLACES = ['side', 'card', 'head'];
-  const FRAME = { side: [450, 1600], card: [1600, 420], head: [3200, 330] };
+  const FRAME = { side: [450, 1600], card: [1600, 420], head: [3200, 330], back: [1600, 1000] }; // (back: the apps' window, behind their glass — Simpl for Mac 1.3)
   const SCENE_VARIANTS = { side: 3, card: 9, head: 3 };
   const scene = (place, body, defs) => { const [w, h] = FRAME[place]; return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice"><defs>${defs}</defs><rect width="${w}" height="${h}" fill="url(#sky)"/>${body}</svg>`.replace(/\n\s*/g, ''))}`; };
   const rng = (seed) => { let s = (Math.imul(seed + 1, 2654435761) + 40503) >>> 0; return () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9) >>> 0; return ((s >>> 8) & 0xffffff) / 0x1000000; }; };
@@ -263,7 +263,7 @@
     /** A low sun in two rings of light, a far ridge, a shore of lit windows across from it, the light in bars on the water. */
     dusk(k, place) {
       const r = rng(k); const [W, H] = FRAME[place];
-      const L = { side: { sun: [sunX(k, W), 980, 100], hz: 1120, city: [40, 410, 30, 90], bars: 4, ripples: 5 }, card: { sun: [sunX(k, W), 175, 80], hz: 262, city: null, bars: 3, ripples: 2 }, head: { sun: [sunX(k, W), 150, 70], hz: 232, city: [200, 900, 30, 110], bars: 3, ripples: 3 } }[place];
+      const L = { side: { sun: [sunX(k, W), 980, 100], hz: 1120, city: [40, 410, 30, 90], bars: 4, ripples: 5 }, card: { sun: [sunX(k, W), 175, 80], hz: 262, city: null, bars: 3, ripples: 2 }, head: { sun: [sunX(k, W), 150, 70], hz: 232, city: [200, 900, 30, 110], bars: 3, ripples: 3 }, back: { sun: [sunX(k, W), 470, 110], hz: 640, city: [200, 900, 40, 170], bars: 4, ripples: 4 } }[place];
       const [sx, sy, sr] = L.sun;
       const pts = []; for (let x = 0; x <= W; x += Math.round(W / 8)) pts.push(P(x, Math.abs(x - sx) < sr * 2.2 ? L.hz - 8 + r() * 10 : L.hz - 40 - r() * 60));
       const ridge = `<path d="M0 ${L.hz}L${pts.join('L')}L${W} ${L.hz}Z" fill="#3b1f4f"/><path d="M${pts.join('L')}" stroke="#ff9e7a" stroke-opacity=".7" stroke-width="4" fill="none"/>`;
@@ -276,7 +276,7 @@
     /** A sun with short rays, a lighthouse on its point across from it throwing its light, rows of scalloped waves with a crest each, a boat on the long one. */
     ocean(k, place) {
       const r = rng(k + 9); const [W, H] = FRAME[place];
-      const L = { side: { sun: [sunX(k + 1, W), 300, 70], waves: [820, 130, 6], amp: 46, lh: [W / 2, 780, 1], boat: false }, card: { sun: [sunX(k + 1, W), 130, 60], waves: [250, 70, 3], amp: 30, lh: [null, 262, 0.55], boat: false }, head: { sun: [sunX(k + 1, W), 120, 55], waves: [200, 60, 3], amp: 28, lh: [null, 214, 0.6], boat: true } }[place];
+      const L = { side: { sun: [sunX(k + 1, W), 300, 70], waves: [820, 130, 6], amp: 46, lh: [W / 2, 780, 1], boat: false }, card: { sun: [sunX(k + 1, W), 130, 60], waves: [250, 70, 3], amp: 30, lh: [null, 262, 0.55], boat: false }, head: { sun: [sunX(k + 1, W), 120, 55], waves: [200, 60, 3], amp: 28, lh: [null, 214, 0.6], boat: true }, back: { sun: [sunX(k + 1, W), 250, 80], waves: [560, 90, 5], amp: 40, lh: [null, 600, 1], boat: true } }[place];
       const [sx, sy, sr] = L.sun;
       const lx = L.lh[0] ?? (sx > W / 2 ? Math.round(W * 0.14) : Math.round(W * 0.86)); // the lighthouse, across from the sun
       const wave = (y, phase, fill) => { const d = `M${phase} ${y} ${Array(Math.ceil(W / 200) + 1).fill(`q100 -${L.amp} 200 0`).join(' ')}`; return `<path d="${d} V${H} H${phase} Z" fill="${fill}"/><path d="${d}" stroke="#eaf7ff" stroke-opacity=".85" stroke-width="5" fill="none"/>`; };
@@ -288,7 +288,7 @@
     /** A moon in a ring, a far range with snow, a hill with a light contour, a row of pines standing on the dark ground — and a lake at the sidebar's foot. */
     forest(k, place) {
       const r = rng(k + 18); const [W, H] = FRAME[place];
-      const L = { side: { moon: [sunX(k, W), 260, 70], peaks: [[60, 225, 400], 720, [180, 280]], hill: 860, pines: [1180, [30, 130, 240, 340, 440], 30, [170, 130, 200]], lake: 1400 }, card: { moon: [sunX(k, W), 120, 50], peaks: [[200, 560, 960, 1380], 300, [100, 170]], hill: 340, pines: [420, [40, 260, 480, 700, 920, 1140, 1360, 1560], 30, [130, 100, 160, 120]], lake: null }, head: { moon: [sunX(k, W), 110, 50], peaks: [[200, 700, 1200, 1700, 2200, 2700, 3100], 250, [90, 150]], hill: 280, pines: [330, Array.from({ length: 16 }, (_, i) => 60 + i * 210), 26, [100, 80, 120]], lake: null } }[place];
+      const L = { side: { moon: [sunX(k, W), 260, 70], peaks: [[60, 225, 400], 720, [180, 280]], hill: 860, pines: [1180, [30, 130, 240, 340, 440], 30, [170, 130, 200]], lake: 1400 }, card: { moon: [sunX(k, W), 120, 50], peaks: [[200, 560, 960, 1380], 300, [100, 170]], hill: 340, pines: [420, [40, 260, 480, 700, 920, 1140, 1360, 1560], 30, [130, 100, 160, 120]], lake: null }, head: { moon: [sunX(k, W), 110, 50], peaks: [[200, 700, 1200, 1700, 2200, 2700, 3100], 250, [90, 150]], hill: 280, pines: [330, Array.from({ length: 16 }, (_, i) => 60 + i * 210), 26, [100, 80, 120]], lake: null }, back: { moon: [sunX(k, W), 220, 70], peaks: [[200, 560, 960, 1380], 560, [200, 320]], hill: 650, pines: [830, [40, 260, 480, 700, 920, 1140, 1360, 1560], 34, [230, 180, 270, 210]], lake: null } }[place];
       const [mx, my, mr] = L.moon;
       const j = () => Math.round(r() * 30 - 15);
       const hill = `M0 ${L.hill + j()}C${Math.round(W * 0.25)} ${L.hill - 40 + j()} ${Math.round(W * 0.5)} ${L.hill + 20 + j()} ${Math.round(W * 0.75)} ${L.hill - 30 + j()}S${Math.round(W * 0.9)} ${L.hill + j()} ${W} ${L.hill - 10 + j()}`;
@@ -299,7 +299,7 @@
     /** A sun with a ring of ticks, a pyramid or two across from it, dunes with a light crest and two contours each — and a cactus at the sidebar's foot. */
     sand(k, place) {
       const r = rng(k + 27); const [W, H] = FRAME[place];
-      const L = { side: { sun: [sunX(k + 2, W), 300, 70], dunes: [820, 1100, 1400], amp: 60, pyr: [[225, 700, 150, 170]], cactus: [120, 1570, 140] }, card: { sun: [sunX(k + 2, W), 140, 60], dunes: [300, 380], amp: 40, pyr: null, cactus: null }, head: { sun: [sunX(k + 2, W), 120, 55], dunes: [230, 300], amp: 34, pyr: null, cactus: null } }[place];
+      const L = { side: { sun: [sunX(k + 2, W), 300, 70], dunes: [820, 1100, 1400], amp: 60, pyr: [[225, 700, 150, 170]], cactus: [120, 1570, 140] }, card: { sun: [sunX(k + 2, W), 140, 60], dunes: [300, 380], amp: 40, pyr: null, cactus: null }, head: { sun: [sunX(k + 2, W), 120, 55], dunes: [230, 300], amp: 34, pyr: null, cactus: null }, back: { sun: [sunX(k + 2, W), 250, 80], dunes: [600, 760, 900], amp: 70, pyr: null, cactus: null } }[place];
       const [sx, sy, sr] = L.sun;
       const far = sx > W / 2;
       const pyr = L.pyr || (place === 'card' ? [[far ? 300 : W - 300, L.dunes[0] - 10, 120, 130]] : [[far ? 500 : W - 500, L.dunes[0] - 10, 140, 150], [far ? 760 : W - 760, L.dunes[0] - 10, 90, 100]]);
@@ -313,7 +313,7 @@
     /** A sun in a ring, ranges of snow-capped peaks each nearer one deeper — three down the sidebar with a river out of them, two across a counter or the header. */
     peaks(k, place) {
       const r = rng(k + 36); const [W, H] = FRAME[place];
-      const L = { side: { sun: [sunX(k + 1, W), 260, 60], ranges: [[[60, 225, 400], 760, [220, 320]], [[-20, 150, 320, 470], 1000, [200, 280]], [[100, 300, 450], 1240, [160, 220]]], river: true, cloud: false }, card: { sun: [sunX(k + 1, W), 110, 50], ranges: [[[100, 420, 760, 1100, 1450], 330, [130, 200]], [[-40, 280, 600, 940, 1280, 1620], 420, [110, 170]]], river: false, cloud: false }, head: { sun: [sunX(k + 1, W), 100, 48], ranges: [[Array.from({ length: 9 }, (_, i) => 150 + i * 360), 250, [110, 180]], [Array.from({ length: 9 }, (_, i) => -50 + i * 380), 330, [90, 140]]], river: false, cloud: true } }[place];
+      const L = { side: { sun: [sunX(k + 1, W), 260, 60], ranges: [[[60, 225, 400], 760, [220, 320]], [[-20, 150, 320, 470], 1000, [200, 280]], [[100, 300, 450], 1240, [160, 220]]], river: true, cloud: false }, card: { sun: [sunX(k + 1, W), 110, 50], ranges: [[[100, 420, 760, 1100, 1450], 330, [130, 200]], [[-40, 280, 600, 940, 1280, 1620], 420, [110, 170]]], river: false, cloud: false }, head: { sun: [sunX(k + 1, W), 100, 48], ranges: [[Array.from({ length: 9 }, (_, i) => 150 + i * 360), 250, [110, 180]], [Array.from({ length: 9 }, (_, i) => -50 + i * 380), 330, [90, 140]]], river: false, cloud: true }, back: { sun: [sunX(k + 1, W), 220, 70], ranges: [[[100, 420, 760, 1100, 1450], 560, [260, 380]], [[-40, 280, 600, 940, 1280, 1620], 740, [220, 320]], [[150, 550, 950, 1350], 900, [160, 240]]], river: false, cloud: true } }[place];
       const [sx, sy, sr] = L.sun;
       const cols = [['#b6b0e6', '#a19ad8', '#ffffff'], ['#7f78c8', '#6b63b6', '#f2f0ff'], ['#4b438f', '#3b347a', '#e6e3ff']];
       const ranges = L.ranges.map(([xs, base, hs], i) => peaks(r, xs, base, hs, ...cols[Math.min(i, 2)])).join('');
@@ -324,7 +324,7 @@
     /** A low sun behind a far skyline, a near one with its windows lit, the lights in the water — and a bridge across from the sun on the header. */
     city(k, place) {
       const r = rng(k + 45); const [W, H] = FRAME[place];
-      const L = { side: { sun: [sunX(k, W), 330, 80], far: [900, [100, 260]], near: [960, [80, 220]], lights: 10, bridge: false }, card: { sun: [sunX(k, W), 150, 70], far: [330, [60, 160]], near: [360, [40, 130]], lights: 5, bridge: false }, head: { sun: [sunX(k, W), 120, 60], far: [250, [50, 150]], near: [280, [40, 120]], lights: 12, bridge: true } }[place];
+      const L = { side: { sun: [sunX(k, W), 330, 80], far: [900, [100, 260]], near: [960, [80, 220]], lights: 10, bridge: false }, card: { sun: [sunX(k, W), 150, 70], far: [330, [60, 160]], near: [360, [40, 130]], lights: 5, bridge: false }, head: { sun: [sunX(k, W), 120, 60], far: [250, [50, 150]], near: [280, [40, 120]], lights: 12, bridge: true }, back: { sun: [sunX(k, W), 380, 100], far: [700, [160, 400]], near: [780, [120, 330]], lights: 12, bridge: true } }[place];
       const [sx, sy, sr] = L.sun;
       const water = L.near[0] - 4;
       const lights = Array.from({ length: L.lights }, () => `<rect x="${Math.round(r() * (W - 60))}" y="${Math.round(water + 16 + r() * Math.max(8, H - water - 26))}" width="${Math.round(20 + r() * 50)}" height="4" rx="2"/>`).join('');
@@ -343,6 +343,8 @@
   const sceneUrl = (name, k = 0, place = 'card') => { const n = SCENE_VARIANTS[place] || 1; const kk = ((k % n) + n) % n; return scenes().get(sceneKey(name, place, kk)) || null; };
   /** The drawing a scene key stands for ('Dusk@card', 'Dusk@card#3'), or null for anything else (a key from before 2.98.52 too: its raster serves). */
   const sceneUrlOf = (key) => (key ? scenes().get(key) || null : null);
+  /** A scene drawn to the apps' window (Simpl for Mac 1.3: behind its glass), not kept with the page's: 'Dusk', 'Ocean'… */
+  const backScene = (name, k = 0) => DRAW[String(name || '').toLowerCase()]?.(k, 'back') || null;
   /** A scene key taken apart: { name, place, k }, or null. */
   const sceneParts = (key) => { const m = /^([A-Za-z]+)@(side|card|head)(?:#(\d+))?$/.exec(key || ''); return m ? { name: m[1], place: m[2], k: Number(m[3] || 0) } : null; };
   /** The scene a key names, whatever its place or variation ('Dusk@head#2' → 'Dusk'), or null. */
@@ -677,7 +679,7 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, SCENE_PLACES: PLACES, sceneUrl, sceneNameOf, sceneParts, sceneBaseOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY, PLACE_DEFAULT, placeOf, placeVars, isDefaultPlace, ZOOM_MIN, ZOOM_MAX,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
-    readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
+    backScene, readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
     blurDrawn, checkBlur, BLUR_KEY,
     get PRESET_PHOTOS() { return presetPhotosOf(); }, // (the drawings, made on the first ask)
   };

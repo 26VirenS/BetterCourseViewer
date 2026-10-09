@@ -141,7 +141,7 @@ struct FileProgressRing: View {
                 Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
                 Circle()
                     .trim(from: 0, to: max(0.02, value))
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.15), value: value)
             } else {

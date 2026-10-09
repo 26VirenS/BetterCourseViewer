@@ -82,12 +82,12 @@ enum Theme {
         NSColor(srgbRed: r / 255, green: g / 255, blue: b / 255, alpha: a)
     }
 
-    /// The page under the cards.
-    static let page = dynamic(light: rgb(245, 245, 247), dark: rgb(22, 22, 24))
+    /// The page under the cards (1.3: cast with a theme's accent, as the web casts its greys — Support/Themes.swift).
+    static let page = Color(nsColor: cast(rgb(245, 245, 247), rgb(22, 22, 24), by: (0.12, 0.1)))
     /// A card on the page.
-    static let card = dynamic(light: rgb(255, 255, 255), dark: rgb(36, 36, 38))
+    static let card = Color(nsColor: cast(rgb(255, 255, 255), rgb(36, 36, 38), by: (0.05, 0.11)))
     /// A card under the pointer.
-    static let cardHover = dynamic(light: rgb(250, 250, 252), dark: rgb(44, 44, 47))
+    static let cardHover = Color(nsColor: cast(rgb(250, 250, 252), rgb(44, 44, 47), by: (0.08, 0.1)))
     /// A well inside a card (a fact, a field): a little darker than the card in light, lighter in dark.
     static let well = dynamic(light: rgb(118, 118, 128, 0.08), dark: rgb(118, 118, 128, 0.2))
     /// A card's edge: a hairline, stronger in dark where the shadow says less.

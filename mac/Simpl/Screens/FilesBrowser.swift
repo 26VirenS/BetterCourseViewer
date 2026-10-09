@@ -84,7 +84,7 @@ struct FilesBrowser: View {
                 .padding(.bottom, 26)
                 .padding(.trailing, 32)
         }
-        .background(Theme.page)
+        .background(PageGround())
     }
 
     // MARK: - The lists
@@ -164,7 +164,7 @@ struct FilesBrowser: View {
             .background {
                 if on {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.accentColor.opacity(listFocused ? 0.2 : 0.12))
+                        .fill(Theme.accent.opacity(listFocused ? 0.2 : 0.12))
                 }
             }
             .simultaneousGesture(TapGesture(count: 2).onEnded { if wide { engine.openFile(u, name: f.name) } }) // (narrow: the click opened it)

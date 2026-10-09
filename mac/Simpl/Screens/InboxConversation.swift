@@ -60,7 +60,7 @@ struct ConversationView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.page)
+        .background(PageGround())
         // (a link in a message goes through the app: a Canvas address to its screen, another site to the browser)
         .environment(\.openURL, OpenURLAction { url in
             Task { @MainActor in engine.openLink(url) }
@@ -230,7 +230,7 @@ struct ConversationView: View {
                 .onTapGesture { typing = true }
         }
         .glass(shape)
-        .overlay(shape.strokeBorder(Color.accentColor.opacity(typing ? 0.45 : 0), lineWidth: 1.5))
+        .overlay(shape.strokeBorder(Theme.accent.opacity(typing ? 0.45 : 0), lineWidth: 1.5))
         .animation(Motion.snappy, value: typing)
     }
 
@@ -372,7 +372,7 @@ private struct InboxLetter: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(message.mine ? "You" : message.author)
                 .font(.sHeadline)
-                .foregroundStyle(message.mine ? Color.accentColor : Color.primary)
+                .foregroundStyle(message.mine ? Theme.accent : Color.primary)
                 .lineLimit(1)
                 .help(message.author)
             Spacer(minLength: 8)

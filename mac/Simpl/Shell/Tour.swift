@@ -554,9 +554,9 @@ private struct TourVeil: View {
         .overlay(alignment: .topLeading) {
             if let hole {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
                     .frame(width: hole.width, height: hole.height)
-                    .shadow(color: Color.accentColor.opacity(0.45), radius: 8)
+                    .shadow(color: Theme.accent.opacity(0.45), radius: 8)
                     .offset(x: hole.minX, y: hole.minY)
             }
         }
@@ -645,7 +645,7 @@ private struct TourCard: View {
             Text(text)
                 .font(.sCallout.weight(.semibold))
         }
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(Theme.accent)
         .padding(.top, 2)
         .accessibilityElement(children: .combine)
     }
@@ -662,7 +662,7 @@ private struct TourCard: View {
         HStack(spacing: 10) {
             ProgressView(value: Double(index + 1), total: Double(count))
                 .progressViewStyle(.linear)
-                .tint(.accentColor)
+                .tint(Theme.accent)
                 .frame(maxWidth: 90)
                 .accessibilityHidden(true)
             Spacer(minLength: 6)

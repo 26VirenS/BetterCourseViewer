@@ -176,7 +176,7 @@ private struct LoadingLine: View {
     var body: some View {
         GeometryReader { g in
             Rectangle()
-                .fill(Color.accentColor)
+                .fill(Theme.accent)
                 .frame(width: g.size.width * min(max(progress, 0), 1), height: 2)
                 .animation(.easeOut(duration: 0.2), value: progress)
         }

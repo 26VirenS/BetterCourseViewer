@@ -138,7 +138,7 @@ private struct ResultRow: View {
     var body: some View {
         RowLink { engine.openFromSearch(row.url, title: row.title, external: external) } label: {
             HStack(spacing: 14) {
-                IconTile(symbol: symbol, color: row.color.map { Color(hex: $0) } ?? Color.accentColor, size: 36)
+                IconTile(symbol: symbol, color: row.color.map { Color(hex: $0) } ?? Theme.accent, size: 36)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.title)
                         .font(.sBody.weight(.medium))
@@ -205,7 +205,7 @@ private struct KindChip: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .glassCapsule(tint: on ? Color.accentColor : nil, interactive: true)
+        .glassCapsule(tint: on ? Theme.accent : nil, interactive: true)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

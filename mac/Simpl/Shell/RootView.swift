@@ -9,6 +9,7 @@ struct RootView: View {
     @StateObject private var engine: Engine
     @ObservedObject private var reminders = Reminders.shared
     @ObservedObject private var files = FilePreview.shared
+    @ObservedObject private var theme = ThemeStore.shared
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
@@ -23,6 +24,7 @@ struct RootView: View {
                 .allowsHitTesting(engine.phase != .native)
             if engine.phase == .native {
                 MainShell()
+                    .id(theme.revision) // (1.3: a theme worn, the window drawn again whole in its colours)
                     .transition(.opacity)
             }
             if engine.phase == .starting {
@@ -31,6 +33,8 @@ struct RootView: View {
             }
         }
         .overlay { LoginLayer(assist: engine.web.login, pageShown: engine.phase != .native) }
+        .tint(Theme.accent) // (1.3) one accent throughout: the theme's, or the Mac's own
+        .themeCanvas() // (1.3) the window's canvas, for the scene behind every screen (Support/Themes.swift)
         .overlay(alignment: .bottom) { FileToast(files: files) }
         .environmentObject(engine)
         .focusedSceneObject(engine)
@@ -98,7 +102,7 @@ struct Splash: View {
 
     var body: some View {
         ZStack {
-            Theme.page.ignoresSafeArea()
+            PageGround().ignoresSafeArea()
             VStack(spacing: 16) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()

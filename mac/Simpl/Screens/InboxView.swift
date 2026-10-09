@@ -33,7 +33,7 @@ struct InboxView: View {
 
     var body: some View {
         content
-            .background(Theme.page)
+            .background(PageGround())
             .navigationTitle(shown.label)
             .navigationSubtitle(subtitle)
             .toolbar { toolbar }
@@ -192,7 +192,7 @@ struct InboxView: View {
         } label: {
             Image(systemName: on ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                 .font(.sTitle3.weight(.regular))
-                .foregroundStyle(on ? Color.accentColor : Color.secondary)
+                .foregroundStyle(on ? Theme.accent : Color.secondary)
                 .frame(width: 38, height: 38)
                 .contentShape(Circle())
         }
@@ -214,7 +214,7 @@ struct InboxView: View {
         } label: {
             HStack(spacing: 7) {
                 Circle()
-                    .fill(tone ?? Color.accentColor)
+                    .fill(tone ?? Theme.accent)
                     .frame(width: 8, height: 8)
                 Text(name)
                     .font(.sCallout.weight(.medium))
@@ -228,7 +228,7 @@ struct InboxView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .glassCapsule(tint: (tone ?? Color.accentColor).opacity(0.3), interactive: true)
+        .glassCapsule(tint: (tone ?? Theme.accent).opacity(0.3), interactive: true)
         .help("Show Every Course")
         .accessibilityLabel("\(name), show every course")
     }
@@ -304,7 +304,7 @@ struct InboxView: View {
                 .controlSize(.large)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Theme.page)
+            .background(PageGround())
         }
     }
 
@@ -586,13 +586,13 @@ private struct InboxMailboxSwitcher: View {
                 }
             }
             .font(.sCallout.weight(.semibold))
-            .foregroundStyle(on ? Color.accentColor : Color.secondary)
+            .foregroundStyle(on ? Theme.accent : Color.secondary)
             .padding(.horizontal, on ? 12 : 6)
             .frame(maxWidth: on ? nil : CGFloat.infinity, minHeight: 34)
             .background {
                 if on {
                     Capsule()
-                        .fill(Color.accentColor.opacity(0.15))
+                        .fill(Theme.accent.opacity(0.15))
                         .matchedGeometryEffect(id: "mailbox", in: pill)
                 }
             }
@@ -665,7 +665,7 @@ private struct InboxRowView: View {
         let chosen = prominence == .increased
         HStack(alignment: .top, spacing: 10) {
             Circle()
-                .fill(unread ? (chosen ? Color.white : Color.accentColor) : Color.clear)
+                .fill(unread ? (chosen ? Color.white : Theme.accent) : Color.clear)
                 .frame(width: 9, height: 9)
                 .padding(.top, 6)
                 .accessibilityLabel("Unread")
@@ -771,7 +771,7 @@ struct GroupsView: View {
                 if d.current.isEmpty && d.past.isEmpty {
                     ContentUnavailableView("No Groups", systemImage: "person.3", description: Text(d.empty ?? "You are not in any groups."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Theme.page)
+                        .background(PageGround())
                 } else {
                     Page {
                         ScreenHeading(title: "Groups", sub: summary(d))

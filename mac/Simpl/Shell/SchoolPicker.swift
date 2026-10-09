@@ -34,7 +34,7 @@ struct SchoolPicker: View {
 
     var body: some View {
         ZStack {
-            Theme.page.ignoresSafeArea()
+            PageGround().ignoresSafeArea()
             if let school = confirming {
                 SchoolConfirm(school: school, yes: { open(school) }, no: back)
                     .frame(width: 520)
@@ -182,7 +182,7 @@ struct SchoolPicker: View {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(on ? Color.white : Color.accentColor)
+                    .foregroundStyle(on ? Color.white : Theme.accent)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).foregroundStyle(on ? Color.white : Color.primary).lineLimit(1)
@@ -200,7 +200,7 @@ struct SchoolPicker: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(on ? Color.accentColor : Color.clear)
+                    .fill(on ? Theme.accent : Color.clear)
             }
             .contentShape(Rectangle())
         }

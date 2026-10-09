@@ -364,7 +364,7 @@ private struct TopicComposer: View {
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.3), lineWidth: focused ? 2 : 1)
+                    .strokeBorder(focused ? Theme.accent.opacity(0.6) : Color.secondary.opacity(0.3), lineWidth: focused ? 2 : 1)
             }
             .animation(Motion.hover, value: focused)
             if let error {

@@ -51,11 +51,12 @@ struct SettingsView: View {
     @ObservedObject private var updater = Updater.shared
     @State private var tab = SettingsView.launchTab
 
-    enum SettingsTab: Hashable { case general, notifications, grades, data, updates, about }
+    enum SettingsTab: Hashable { case general, appearance, notifications, grades, data, updates, about }
 
     /// The screenshot suite's `-SimplSettingsTab updates` (or another tab's name): the window opens there; General otherwise.
     nonisolated private static var launchTab: SettingsTab {
         switch UserDefaults.standard.string(forKey: "SimplSettingsTab") ?? "" {
+        case "appearance": return .appearance
         case "notifications": return .notifications
         case "grades": return .grades
         case "data": return .data
@@ -70,6 +71,9 @@ struct SettingsView: View {
             GeneralPane()
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
+            AppearancePane()
+                .tabItem { Label("Appearance", systemImage: "paintpalette") }
+                .tag(SettingsTab.appearance)
             NotificationsPane()
                 .tabItem { Label("Notifications", systemImage: "bell.badge") }
                 .tag(SettingsTab.notifications)
@@ -87,6 +91,7 @@ struct SettingsView: View {
                 .tag(SettingsTab.about)
         }
         .frame(width: 560)
+        .tint(Theme.accent) // (1.3) the theme's accent here too
         .environmentObject(SettingsModel.shared)
         .onAppear {
             model.engine?.settingsOpen = true
@@ -279,6 +284,108 @@ private struct Pane<Content: View>: View {
             .formStyle(.grouped)
             .frame(minHeight: 360, idealHeight: 460)
             .overlay(alignment: .bottom) { SaidBar() }
+    }
+}
+
+// MARK: - Appearance (1.3)
+
+/// Light, dark or as the Mac is; a theme — the web's ready-made ones, each a colour and its drawn scene inked behind the
+/// window's glass — and the colour and the scene each on their own.
+private struct AppearancePane: View {
+    @ObservedObject private var theme = ThemeStore.shared
+    @State private var look = AppLook(rawValue: UserDefaults.standard.string(forKey: "SimplAppearance") ?? "") ?? .system
+    @State private var custom = Color.blue
+
+    private let columns = [GridItem(.adaptive(minimum: 132, maximum: 160), spacing: 14)]
+
+    var body: some View {
+        Pane {
+            Section {
+                Picker("Appearance", selection: $look) {
+                    Text("Light").tag(AppLook.light)
+                    Text("Dark").tag(AppLook.dark)
+                    Text("System").tag(AppLook.system)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: look) { _, l in AppLook.set(l) }
+            }
+            Section {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                    ForEach(ThemeStore.ready) { r in tile(r) }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Theme")
+            } footer: {
+                Text("A theme is a colour and a drawing behind the window's glass, as on the web. Pick the colour and the drawing on their own below.")
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Colour") {
+                HStack(spacing: 10) {
+                    dot(nil, Color(nsColor: .controlAccentColor), "Regular")
+                    ForEach(ThemeStore.colours) { c in dot(c.hex, Color(hex: c.hex), c.name) }
+                    Spacer(minLength: 6)
+                    ColorPicker("Custom", selection: Binding(get: { custom }, set: { c in
+                        custom = c
+                        theme.setAccent(ThemeStore.readable(NSColor(c)))
+                    }), supportsOpacity: false)
+                    .help("A colour of your own: moved, if need be, until it reads as words and as a glyph by day and by night")
+                }
+                Picker("Drawing", selection: Binding(get: { theme.scene ?? "" }, set: { theme.setScene($0.isEmpty ? nil : $0) })) {
+                    Text("None").tag("")
+                    Divider()
+                    ForEach(ThemeStore.ready.compactMap(\.scene), id: \.self) { Text($0).tag($0) }
+                }
+            }
+        }
+        .onAppear { if let h = theme.accentHex { custom = Color(hex: h) } }
+    }
+
+    private func tile(_ r: ThemeStore.Ready) -> some View {
+        let on = theme.wearing == r
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return Button {
+            withAnimation(Motion.snappy) { theme.wear(r) }
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                ThemeSwatch(ready: r)
+                    .frame(height: 80)
+                    .clipShape(shape)
+                    .overlay(shape.strokeBorder(on ? Theme.accent : Color.primary.opacity(0.12), lineWidth: on ? 2.5 : 1))
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(r.accent.map { Color(hex: $0) } ?? Color(nsColor: .controlAccentColor))
+                        .frame(width: 9, height: 9)
+                    Text(r.name).font(.sCallout.weight(on ? .semibold : .regular))
+                    if on {
+                        Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("\(r.name) theme"))
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func dot(_ hex: String?, _ color: Color, _ name: String) -> some View {
+        let on = theme.accentHex == hex
+        return Button {
+            withAnimation(Motion.snappy) { theme.setAccent(hex) }
+        } label: {
+            ZStack {
+                Circle().fill(color).frame(width: 22, height: 22)
+                if on { Circle().strokeBorder(Color.primary.opacity(0.85), lineWidth: 2).frame(width: 30, height: 30) }
+            }
+            .frame(width: 30, height: 30)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(name)
+        .accessibilityLabel(Text(name))
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

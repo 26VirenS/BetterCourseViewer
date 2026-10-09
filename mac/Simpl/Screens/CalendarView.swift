@@ -323,13 +323,13 @@ struct CalendarView: View {
                     Spacer(minLength: 0)
                     Text("\(cal.component(.day, from: day))")
                         .font(.sBody.weight(isToday || isSel ? .semibold : .regular).monospacedDigit())
-                        .foregroundStyle(isToday ? Color.white : (isSel ? Color.accentColor : (off ? Color.secondary : Color.primary)))
+                        .foregroundStyle(isToday ? Color.white : (isSel ? Theme.accent : (off ? Color.secondary : Color.primary)))
                         .frame(minWidth: 26, minHeight: 26)
                         .background {
                             if isToday {
-                                Circle().fill(Color.accentColor)
+                                Circle().fill(Theme.accent)
                             } else if isSel {
-                                Circle().fill(Color.accentColor.opacity(0.16))
+                                Circle().fill(Theme.accent.opacity(0.16))
                             }
                         }
                 }
@@ -352,7 +352,7 @@ struct CalendarView: View {
             }
             .padding(5)
             .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
-            .background(Color.accentColor.opacity(isSel ? 0.07 : 0))
+            .background(Theme.accent.opacity(isSel ? 0.07 : 0))
             .animation(Motion.snappy, value: isSel)
         }
         .buttonStyle(RowButtonStyle(radius: 0))
@@ -509,13 +509,13 @@ struct CalendarView: View {
                         .foregroundStyle(.secondary)
                     Text("\(cal.component(.day, from: day))")
                         .font(.sTitle3.weight(isToday || isSel ? .bold : .medium).monospacedDigit())
-                        .foregroundStyle(isToday ? Color.white : (isSel ? Color.accentColor : Color.primary))
+                        .foregroundStyle(isToday ? Color.white : (isSel ? Theme.accent : Color.primary))
                         .frame(width: 34, height: 34)
                         .background {
                             if isToday {
-                                Circle().fill(Color.accentColor)
+                                Circle().fill(Theme.accent)
                             } else if isSel {
-                                Circle().fill(Color.accentColor.opacity(0.16))
+                                Circle().fill(Theme.accent.opacity(0.16))
                             }
                         }
                 }

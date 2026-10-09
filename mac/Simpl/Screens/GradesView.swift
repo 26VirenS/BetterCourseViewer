@@ -96,7 +96,7 @@ struct GradesView: View {
         let diff = g.map { $0 - goal }
         let scored = d.rows.filter { $0.pct != nil }.count
         let counted: String = scored == 0 ? "No course has a score yet." : "From \(scored) \(scored == 1 ? "course" : "courses"), each counting equally."
-        let barColor: Color = diff.map { $0 >= 0 ? Color.green : Color.orange } ?? Color.accentColor
+        let barColor: Color = diff.map { $0 >= 0 ? Color.green : Color.orange } ?? Theme.accent
         return VStack(alignment: .leading, spacing: 10) {
             CardHeading(text: "Term GPA", trailing: "4.0 scale")
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -650,10 +650,10 @@ private struct TrendCard: View {
             ForEach(points) { p in
                 AreaMark(x: .value("Day", p.id), yStart: .value("Low", range.lowerBound), yEnd: .value("GPA", shown(p.gpa)))
                     .interpolationMethod(.monotone)
-                    .foregroundStyle(LinearGradient(colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0)], startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(LinearGradient(colors: [Theme.accent.opacity(0.25), Theme.accent.opacity(0)], startPoint: .top, endPoint: .bottom))
                 LineMark(x: .value("Day", p.id), y: .value("GPA", shown(p.gpa)))
                     .interpolationMethod(.monotone)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Theme.accent)
                     .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
             }
             if showsGoal {
@@ -666,7 +666,7 @@ private struct TrendCard: View {
                     .lineStyle(StrokeStyle(lineWidth: 1))
                     .foregroundStyle(Color.secondary.opacity(0.5))
                 PointMark(x: .value("Day", h.id), y: .value("GPA", shown(h.gpa)))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Theme.accent)
                     .symbolSize(70)
             }
         }

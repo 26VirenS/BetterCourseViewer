@@ -9,15 +9,17 @@ struct Page<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: spacing) { content }
-                .frame(maxWidth: maxWidth, alignment: .leading)
-                .padding(.horizontal, 40)
-                .padding(.top, 26)
-                .padding(.bottom, 40)
-                .frame(maxWidth: .infinity)
+        GeometryReader { g in
+            ScrollView {
+                VStack(alignment: .leading, spacing: spacing) { content }
+                    .frame(maxWidth: maxWidth, alignment: .leading)
+                    .padding(.horizontal, g.size.width < 700 ? 22 : 40) // (1.3: a narrow window keeps its room for the content)
+                    .padding(.top, 26)
+                    .padding(.bottom, 40)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .background(Theme.page)
+        .background(PageGround())
     }
 }
 
@@ -363,7 +365,7 @@ struct Avatar: View {
 
     private var initials: some View {
         ZStack {
-            Circle().fill(Color.accentColor.gradient)
+            Circle().fill(Theme.accent.gradient)
             Text(person?.initials?.isEmpty == false ? person!.initials! : "·")
                 .font(.system(size: size * 0.4, weight: .semibold))
                 .foregroundStyle(.white)

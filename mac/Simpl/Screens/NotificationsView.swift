@@ -116,7 +116,7 @@ struct NotificationsView: View {
     private func kinds(_ d: NotificationsData) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                kindRow(key: "all", label: "All", symbol: "bell.fill", color: .accentColor, count: d.total)
+                kindRow(key: "all", label: "All", symbol: "bell.fill", color: Theme.accent, count: d.total)
                 ForEach(d.cats) { c in
                     kindRow(key: c.key, label: c.label, symbol: NotificationRow.icon(c.key), color: NotificationRow.tone(c.key), count: c.count)
                 }
@@ -234,7 +234,7 @@ private struct NotificationRow: View {
                         .font(.sBody)
                         .transition(.opacity)
                     } else if !row.read {
-                        Circle().fill(Color.accentColor).frame(width: 9, height: 9)
+                        Circle().fill(Theme.accent).frame(width: 9, height: 9)
                             .padding(.top, 6)
                             .accessibilityLabel("Unread")
                             .transition(.opacity)

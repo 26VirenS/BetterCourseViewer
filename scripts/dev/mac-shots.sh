@@ -78,7 +78,16 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-26-school 8 -SimplPicker merced
   shoot light-26b-school-confirm 18 -SimplPicker catcourses -SimplPickerConfirm YES
   shoot light-27-tour 12 -SimplOpen tour
+  # (1.3) themes, To Do's fixed side column, a narrow window, the setup's nicknames
+  shoot light-50-theme-dusk 12 -SimplTheme Dusk
+  shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
+  shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance
+  shoot light-03-todo 12 -SimplPlace todo
+  shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+  shoot light-22-setup 14 -SimplOpen setup
+  SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
+  shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-01-dashboard 12
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   keep_crashes

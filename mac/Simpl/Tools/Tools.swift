@@ -361,7 +361,7 @@ struct ToolScreen: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Theme.page)
+        .background(PageGround())
     }
 
     @ViewBuilder
@@ -528,7 +528,7 @@ struct ToolDropZone: View {
     let types: [UTType]
     var multiple = true
     var symbol = "square.and.arrow.down.on.square"
-    var tint: Color = .accentColor
+    var tint: Color = Theme.accent
     var height: CGFloat = 170
     let onFiles: ([URL]) -> Void
     @State private var over = false

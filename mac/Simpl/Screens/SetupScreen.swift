@@ -21,8 +21,8 @@ private struct SetupChoices: Decodable {
     var tracking: Bool
 }
 
-/// The guided setup, as a sheet over the window: a welcome; the courses that count (each with a nickname if you like);
-/// the grade history, its GPA goal and the grade aimed for in each course; and a read-back. Back and Continue sit at its
+/// The guided setup, as a sheet over the window: a welcome; the courses that count, by their names alone (1.3); a
+/// nickname for each, if you like (1.3: a step of its own); the grade history, its GPA goal and the grade aimed for in each course; and a read-back. Back and Continue sit at its
 /// foot, and each step slides in from the side it is going to. Shown on the first run, and again from Settings ▸ General
 /// ▸ Courses and Goals (straight to the courses, with Cancel).
 struct SetupScreen: View {
@@ -31,7 +31,7 @@ struct SetupScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var info = Loader<SetupChoices>()
 
-    private enum Step: Int, CaseIterable { case welcome, courses, grades, done }
+    private enum Step: Int, CaseIterable { case welcome, courses, nicknames, grades, done }
     @State private var step: Step = .welcome
     /// The way the last step went (Back slides the other way): set a moment before the step itself.
     @State private var forward = true
@@ -73,6 +73,7 @@ struct SetupScreen: View {
         switch step {
         case .welcome: welcome
         case .courses: courses(d)
+        case .nicknames: nicknamesStep(d)
         case .grades: grades(d)
         case .done: readBack(d)
         }
@@ -105,7 +106,7 @@ struct SetupScreen: View {
             VStack(spacing: 6) {
                 Text("Welcome to Simpl")
                     .font(.system(size: 28, weight: .bold))
-                Text("\(engine.lmsName), simply, on your Mac. Two quick questions and you’re in.")
+                Text("\(engine.lmsName), simply, on your Mac. A few quick questions and you’re in.")
                     .font(.sTitle3)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -171,10 +172,6 @@ struct SetupScreen: View {
                             }
                             .buttonStyle(.link)
                         }
-                    } footer: {
-                        Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s code — on this Mac only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.")
-                            .font(.sCallout)
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -183,40 +180,59 @@ struct SetupScreen: View {
         }
     }
 
-    /// A course to tick, with its colour, its code and its name; ticked, a nickname for it.
+    /// A course to tick, by its names alone (1.3): its code, and its full name under it.
     private func courseRow(_ c: SetupChoices.Course) -> some View {
-        let on = chosen.contains(c.id)
-        return VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: Binding(get: { chosen.contains(c.id) }, set: { pick(c.id, $0) })) {
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                        .fill(Color(hex: c.color))
-                        .frame(width: 12, height: 12)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(c.code)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                        if !c.name.isEmpty && c.name != c.code {
-                            Text(c.name)
-                                .font(.sCallout)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                    }
-                }
-            }
-            .toggleStyle(.checkbox)
-            if on {
-                TextField("Nickname", text: nickname(c), prompt: Text("Nickname (optional)"))
-                    .labelsHidden()
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 320)
-                    .padding(.leading, 22)
-                    .transition(reveal)
+        Toggle(isOn: Binding(get: { chosen.contains(c.id) }, set: { pick(c.id, $0) })) {
+            courseNames(c)
+        }
+        .toggleStyle(.checkbox)
+        .padding(.vertical, 2)
+    }
+
+    private func courseNames(_ c: SetupChoices.Course) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(c.code)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+            if !c.name.isEmpty && c.name != c.code {
+                Text(c.name)
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
         }
-        .padding(.vertical, 2)
+    }
+
+    /// (1.3) The courses chosen, each with a field for a shorter name of the student's own: every one optional.
+    private func nicknamesStep(_ d: SetupChoices) -> some View {
+        let picked = d.courses.filter { chosen.contains($0.id) }
+        return VStack(alignment: .leading, spacing: 0) {
+            stepHeading("Nicknames", "Give a course a shorter name, if you like. Leave it empty to keep its own.")
+            Form {
+                Section {
+                    if picked.isEmpty {
+                        Text("No courses chosen: nothing to name.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(picked) { c in
+                        LabeledContent {
+                            TextField("Nickname", text: nickname(c), prompt: Text(c.code))
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 220)
+                        } label: {
+                            courseNames(c)
+                        }
+                    }
+                } footer: {
+                    Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s code — on this Mac only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+        }
     }
 
     private func grades(_ d: SetupChoices) -> some View {
@@ -258,14 +274,8 @@ struct SetupScreen: View {
                             Divider()
                             Text("Pass/Fail").tag("P/F")
                         } label: {
-                            HStack(spacing: 8) {
-                                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                                    .fill(Color(hex: c.color))
-                                    .frame(width: 12, height: 12)
-                                    .accessibilityHidden(true)
-                                Text(label(c))
-                                    .lineLimit(1)
-                            }
+                            Text(label(c))
+                                .lineLimit(1)
                         }
                         .pickerStyle(.menu)
                     }
@@ -324,7 +334,7 @@ struct SetupScreen: View {
                 .font(.system(size: 22, weight: .bold))
             Text(sub)
                 .font(accent ? Font.sCallout.weight(.semibold) : Font.sCallout)
-                .foregroundStyle(accent ? Color.accentColor : Color.secondary)
+                .foregroundStyle(accent ? Theme.accent : Color.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 30)
@@ -366,12 +376,12 @@ struct SetupScreen: View {
         .padding(.vertical, 14)
     }
 
-    /// Three steps after the welcome, as a bar of three.
+    /// The steps after the welcome, as a bar of as many.
     private var progress: some View {
         HStack(spacing: 6) {
             ForEach(1..<Step.allCases.count, id: \.self) { i in
                 Capsule()
-                    .fill(i <= step.rawValue ? Color.accentColor : Color.secondary.opacity(0.25))
+                    .fill(i <= step.rawValue ? Theme.accent : Color.secondary.opacity(0.25))
                     .frame(width: 26, height: 5)
             }
         }

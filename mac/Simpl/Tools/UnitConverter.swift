@@ -229,7 +229,7 @@ struct UnitConverterTool: View {
                                 Spacer()
                                 Text("\(UnitMath.text(UnitMath.convert(v, from: from.unit, to: u.unit))) \(u.symbol)")
                                     .font(.sBody.monospacedDigit())
-                                    .foregroundStyle(u == to ? Color.accentColor : Color.secondary)
+                                    .foregroundStyle(u == to ? Theme.accent : Color.secondary)
                             }
                         }
                     }

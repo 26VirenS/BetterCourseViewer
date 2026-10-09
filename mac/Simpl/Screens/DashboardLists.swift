@@ -207,7 +207,7 @@ struct DashActivityList: View {
         PreviewLink(item: preview(r)) {
             HStack(alignment: .top, spacing: 12) {
                 Circle()
-                    .fill(r.unread == true ? Color.accentColor : Color.clear)
+                    .fill(r.unread == true ? Theme.accent : Color.clear)
                     .frame(width: 8, height: 8)
                     .padding(.top, 13)
                     .accessibilityLabel(Text(r.unread == true ? "New" : ""))

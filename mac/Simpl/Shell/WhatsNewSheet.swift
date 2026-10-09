@@ -61,7 +61,7 @@ struct WhatsNewSheet: View {
             .padding(16)
         }
         .frame(width: 500, height: 560)
-        .background(Theme.page)
+        .background(PageGround())
         .onAppear { onShown?() }
     }
 

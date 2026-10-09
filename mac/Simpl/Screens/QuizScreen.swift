@@ -55,7 +55,7 @@ struct QuizScreen: View {
                 }
         }
         .frame(minWidth: 720, idealWidth: ideal.width, minHeight: 500, idealHeight: ideal.height) // (1.2: the window's room, never taller than it)
-        .background(Theme.page)
+        .background(PageGround())
         .tint(tint)
         .interactiveDismissDisabled(inAttempt) // (Escape is Close, which asks first during an attempt)
         .task { await start() }

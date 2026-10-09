@@ -17,9 +17,10 @@ struct SimplApp: App {
             ContentView()
                 .environmentObject(session)
                 .environmentObject(model)
-                .frame(minWidth: 960, minHeight: 640)
+                .frame(minWidth: 720, minHeight: 520) // (1.3: down to a half-screen window; the screens fold to fit)
         }
         .defaultSize(width: 1360, height: 880)
+        .windowResizability(.contentMinSize)
         .windowToolbarStyle(.unified)
         .commands { SimplCommands(session: session) }
         .handlesExternalEvents(matching: ["*"]) // (a simpl:// link comes to the main window)

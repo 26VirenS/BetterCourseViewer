@@ -16,18 +16,23 @@ struct TodoView: View {
     @State private var regrouping = 0
     /// A new task's sheet went up: what is read next is its answer, and arrives on the house spring.
     @State private var expectingTask = false
-    /// (1.2) Room for the side column (most Mac windows have it: read again from the width as it is laid out).
-    @State private var wide = true
+    /// (1.3) Where the list's first card starts, down its scrolling column: the side column starts level with it.
+    @State private var firstCardTop: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
             if let d = model.data {
-                Page {
-                    ScreenHeading(title: "To Do", sub: d.sub)
-                    content(d)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .widthGate(860, wide: $wide)
+                GeometryReader { g in
+                    if g.size.width >= Self.sideAt {
+                        wideLayout(d)
+                    } else {
+                        Page {
+                            ScreenHeading(title: "To Do", sub: d.sub)
+                            content(d)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 }
                 .font(.sBody)
             } else {
@@ -90,21 +95,48 @@ struct TodoView: View {
         reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity)
     }
 
-    /// The list with the side column beside it on a wide window; the progress and the grouping over it on a narrow one.
-    @ViewBuilder
-    private func content(_ d: TodoData) -> some View {
-        if wide {
-            HStack(alignment: .top, spacing: 24) {
-                list(d)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+    /// How wide the screen is before the side column stands beside the list (1.3: the screen's width, as it fits).
+    static let sideAt: CGFloat = 940
+
+    /// (1.3) A wide window: the list scrolls in its own column and the side column stays put beside it, its top level
+    /// with the list's first card.
+    private func wideLayout(_ d: TodoData) -> some View {
+        HStack(alignment: .top, spacing: 24) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    ScreenHeading(title: "To Do", sub: d.sub)
+                    list(d)
+                        .environment(\.cardTopSpace, "todo-list")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 26)
+                .padding(.bottom, 40)
+                .coordinateSpace(name: "todo-list")
+            }
+            .onPreferenceChange(CardTopKey.self) { top in
+                if let top, abs(top - firstCardTop) > 0.5 { firstCardTop = top }
+            }
+            .scrollIndicators(.automatic)
+            ScrollView { // (only when the window is too short for it: otherwise it stays as it is)
                 overview(d)
-                    .frame(width: 320)
+                    .padding(.top, firstCardTop)
+                    .padding(.bottom, 24)
             }
-        } else {
-            VStack(alignment: .leading, spacing: 22) {
-                summary(d)
-                list(d)
-            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(width: 320)
+        }
+        .padding(.leading, 40)
+        .padding(.trailing, 32)
+        .frame(maxWidth: 1480)
+        .frame(maxWidth: .infinity)
+        .background(PageGround())
+    }
+
+    /// A narrow window: the progress and the grouping over the list.
+    private func content(_ d: TodoData) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            summary(d)
+            list(d)
         }
     }
 
@@ -175,8 +207,16 @@ struct TodoView: View {
             .labelsHidden()
             .controlSize(.large)
             .fixedSize()
-            Toggle("Show Completed", isOn: Binding(get: { pendingShowDone ?? model.data?.showDone ?? false }, set: { regroup(showDone: $0) }))
-                .toggleStyle(.checkbox)
+            // (1.3) a button, as the Dashboard's List has it: completed work shown or hidden
+            let showing = pendingShowDone ?? model.data?.showDone ?? false
+            Button {
+                regroup(showDone: !showing)
+            } label: {
+                Label(showing ? "Hide Completed" : "Show Completed · \(model.data?.done ?? 0)", systemImage: showing ? "checkmark.circle" : "eye")
+                    .font(.sCallout)
+            }
+            .glassButton()
+            .help(showing ? "Hide completed work" : "Show completed work too")
         }
     }
 
@@ -238,7 +278,7 @@ struct TodoView: View {
                             .font(.sCaption.weight(.semibold).monospacedDigit())
                             .foregroundStyle(.secondary)
                         Capsule()
-                            .fill(k == 0 ? Color.accentColor : Color.accentColor.opacity(0.35))
+                            .fill(k == 0 ? Theme.accent : Theme.accent.opacity(0.35))
                             .frame(height: max(4, CGFloat(perDay[k]) / CGFloat(most) * 46))
                         Text(String(day.formatted(.dateTime.weekday(.narrow))))
                             .font(.sFootnote.weight(k == 0 ? .bold : .regular))

@@ -12,13 +12,43 @@ struct CardSection<Content: View, Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
 
+    @Environment(\.cardTopSpace) private var topSpace
+
     var body: some View {
         PageSection(title: title, trailing: trailing, accessory: accessory) {
             VStack(alignment: .leading, spacing: 0) { content() }
                 .padding(padding)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
+                .background {
+                    // (1.3) where its card starts, for a column beside the list to line up with the first one
+                    if let topSpace {
+                        GeometryReader { g in
+                            Color.clear.preference(key: CardTopKey.self, value: g.frame(in: .named(topSpace)).minY)
+                        }
+                    }
+                }
         }
+    }
+}
+
+/// (1.3) The top of the first card of a list, in a coordinate space a screen names (`cardTopSpace`).
+struct CardTopKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        if let n = nextValue() { value = min(value ?? n, n) }
+    }
+}
+
+private struct CardTopSpaceKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    /// A coordinate space the cards under it report their tops in (CardTopKey); nil: they do not.
+    var cardTopSpace: String? {
+        get { self[CardTopSpaceKey.self] }
+        set { self[CardTopSpaceKey.self] = newValue }
     }
 }
 
@@ -76,7 +106,7 @@ struct InfoRow<Trailing: View>: View {
     let title: String
     var sub: String? = nil
     var symbol: String? = nil
-    var tint: Color = .accentColor
+    var tint: Color = Theme.accent
     var unread = false
     @ViewBuilder var trailing: () -> Trailing
 
@@ -99,7 +129,7 @@ struct InfoRow<Trailing: View>: View {
 }
 
 extension InfoRow where Trailing == EmptyView {
-    init(title: String, sub: String? = nil, symbol: String? = nil, tint: Color = .accentColor, unread: Bool = false) {
+    init(title: String, sub: String? = nil, symbol: String? = nil, tint: Color = Theme.accent, unread: Bool = false) {
         self.init(title: title, sub: sub, symbol: symbol, tint: tint, unread: unread) { EmptyView() }
     }
 }
@@ -154,7 +184,7 @@ struct ARowView: View {
 /// wide column show more of what it says (1.2).
 struct PostRowView: View {
     let row: PostRow
-    var color: Color = .accentColor
+    var color: Color = Theme.accent
     var previewLines: Int = 2
 
     var body: some View {
@@ -163,7 +193,7 @@ struct PostRowView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     if row.unread == true {
-                        Circle().fill(Color.accentColor).frame(width: 8, height: 8).accessibilityLabel("Unread")
+                        Circle().fill(Theme.accent).frame(width: 8, height: 8).accessibilityLabel("Unread")
                     }
                     Text(row.title).font(row.unread == true ? .sBody.weight(.semibold) : .sBody).lineLimit(2)
                 }
@@ -407,7 +437,7 @@ struct PickedWash: ViewModifier {
     func body(content: Content) -> some View {
         content.background {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.accentColor.opacity(picked ? 0.14 : 0))
+                .fill(Theme.accent.opacity(picked ? 0.14 : 0))
         }
         .animation(Motion.snappy, value: picked)
     }

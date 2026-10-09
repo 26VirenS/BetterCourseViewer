@@ -719,7 +719,7 @@ struct PaletteRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var tint: Color { item.color.map { Color(hex: $0) } ?? Color.accentColor }
+    private var tint: Color { item.color.map { Color(hex: $0) } ?? Theme.accent }
 }
 
 /// A command as a glass button (the Search screen's): pressed, it runs.
@@ -734,7 +734,7 @@ struct CommandPill: View {
             HStack(spacing: 8) {
                 Image(systemName: item.symbol)
                     .font(.sCallout.weight(.semibold))
-                    .foregroundStyle(item.color.map { Color(hex: $0) } ?? Color.accentColor)
+                    .foregroundStyle(item.color.map { Color(hex: $0) } ?? Theme.accent)
                 Text(item.title)
                     .font(.sCallout.weight(.medium))
                     .lineLimit(1)

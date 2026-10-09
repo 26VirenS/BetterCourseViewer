@@ -515,7 +515,7 @@ private struct QuizQuestionPage: View {
             .contentShape(Rectangle())
             .onTapGesture { focus.wrappedValue = .keys } // (a click off the answers: the keys are the attempt's again)
         }
-        .background(Theme.page)
+        .background(PageGround())
     }
 
     private var header: some View {

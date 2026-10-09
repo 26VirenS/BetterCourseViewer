@@ -289,7 +289,7 @@ struct PreviewCard: View {
 
     private var tint: Color {
         let hex = assignment?.color ?? page?.color ?? item.color
-        return hex == nil ? .accentColor : Color(hex: hex)
+        return hex == nil ? Theme.accent : Color(hex: hex)
     }
 
     /// "Assignment · BIO 101".
