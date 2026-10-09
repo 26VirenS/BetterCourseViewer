@@ -46,7 +46,9 @@ enum Shot {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             guard !taken else { return }
             let up = Date().timeIntervalSince(started), quiet = Date().timeIntervalSince(lastActivity)
-            if up >= min(4, after) && busy == 0 && quiet >= 1.4 {
+            // (and the app's own screens are up — before then nothing is asked, which is not the same as done)
+            let ready = MainActor.assumeIsolated { AppModel.shared.engine.map { $0.phase == .native && $0.countsLive } ?? true }
+            if up >= min(4, after) && ready && busy == 0 && quiet >= 1.4 {
                 take(file)
             } else if up < after {
                 poll(file, after: after)
