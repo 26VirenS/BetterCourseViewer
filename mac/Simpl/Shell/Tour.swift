@@ -204,7 +204,7 @@ struct TourPlan {
     static func make(hole: CGRect?, toolbarX: CGFloat?, size: CGSize, top: CGFloat, card: CGSize) -> TourPlan {
         if let x = toolbarX {
             let cx = clamp(x - card.width / 2, margin, size.width - card.width - margin)
-            return TourPlan(hole: nil, card: CGPoint(x: cx, y: top + 8), arrow: .top, arrowAt: x - cx)
+            return TourPlan(hole: nil, card: CGPoint(x: cx, y: top - 4), arrow: .top, arrowAt: x - cx) // (1.2.16: up, its point at the field)
         }
         guard let hole else {
             return TourPlan(hole: nil, card: CGPoint(x: max(margin, (size.width - card.width) / 2), y: max(margin, (size.height - card.height) / 2)), arrow: .none, arrowAt: 0)
@@ -311,8 +311,11 @@ struct TourOverlay: View {
         s += [
             TourStep(id: "tools", aim: .spot(.toolsRow), title: "Tools and widgets", body: TourOverlay.toolsLine,
                      doing: "Click Tools", act: .place { p, _ in p == .tools }),
-            TourStep(id: "pin", aim: .spot(.toolPin), title: "Pin a tool", body: Text("Pin any tool to the top to keep it one click away."),
-                     doing: "Click a tool’s pin", act: .event(.pinned)),
+            // (1.2.16) the graphing calculator's pin, to keep it at the top; pinned already, the step says so and moves on
+            ToolsCenter.shared.pinned.contains(.graph)
+                ? TourStep(id: "pin", aim: .none, title: "Pinned tools", body: Text("The graphing calculator is pinned at the top, one click away."))
+                : TourStep(id: "pin", aim: .spot(.toolPin), title: "Pin the graphing calculator", body: Text("Pin it to keep it at the top, one click away."),
+                           doing: "Click the graphing calculator’s pin", act: .event(.pinned)),
             TourStep(id: "dashboard", aim: .spot(.dashboardRow), title: "Back to the Dashboard", body: Text("Everything due, at a glance."),
                      doing: "Click Dashboard", act: .place { p, pushed in p == .dashboard && !pushed }),
             TourStep(id: "cards", aim: .spot(.counterNext), title: "The cards open", body: Text("Click a card to see what’s in it."),
@@ -325,8 +328,8 @@ struct TourOverlay: View {
                            doing: "Close it", act: .closed)
                 : TourStep(id: "close", aim: .back, title: "Close it", body: Text("You’ll be right where you were."),
                            doing: "Click Back", act: .closed),
-            TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands."),
-                     doing: "Type anything", gesture: .type, act: .typed),
+            // (1.2.16) pointed out, not tried: Next moves on
+            TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands.")),
             TourStep(id: "end", aim: .none, title: "You’re all set", body: Text("Replay it any time from Help ▸ Take the Tour."), nextLabel: "Done"),
         ]
         return s

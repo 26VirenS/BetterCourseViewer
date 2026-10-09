@@ -16,6 +16,10 @@ struct ToolWindow: View {
     let launch: ToolLaunch?
     @EnvironmentObject private var model: AppModel
     @StateObject private var browser = ToolBrowser()
+    @ObservedObject private var tools = ToolsCenter.shared
+    @ObservedObject private var focus = FocusTimer.shared
+    /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it off).
+    @AppStorage(ToolDarkPage.key) private var darkPage = true
     @State private var url: URL?
     @State private var name = ""
     @State private var error: String?
@@ -52,9 +56,7 @@ struct ToolWindow: View {
                 .transition(.opacity)
             }
             if browser.loading && url != nil {
-                ProgressView(value: max(browser.progress, 0.05))
-                    .progressViewStyle(.linear)
-                    .controlSize(.small)
+                LoadingLine(progress: max(browser.progress, 0.05)) // (1.2.16: thin, flush with the window's top under the toolbar)
                     .transition(.opacity)
             }
         }
@@ -94,6 +96,20 @@ struct ToolWindow: View {
                     .help("More")
                 }
             }
+            // (1.2.16) the tools pinned in the main window, here too
+            if let engine = model.engine, !tools.toolbarPins(timerActive: focus.active).isEmpty {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    ForEach(tools.toolbarPins(timerActive: focus.active)) { kind in
+                        PinnedToolButton(kind: kind, engine: engine)
+                            .environmentObject(engine)
+                    }
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Toggle(isOn: $darkPage) { Label("Dark Page", systemImage: darkPage ? "moon.fill" : "moon") }
+                    .toggleStyle(.button)
+                    .help(darkPage ? "Light pages are drawn dark in Dark Mode. Click to show them as they are." : "Draw light pages dark in Dark Mode")
+            }
             // (1.2.1) a tool that says to allow third-party cookies: the way round it, at the window's top right
             ToolbarItem(placement: .primaryAction) {
                 Button { Task { await fixCookies() } } label: { Label("Cookies", systemImage: "checkmark.shield") }
@@ -103,6 +119,7 @@ struct ToolWindow: View {
             }
         }
         .task(id: model.engine == nil) { await start() }
+        .onChange(of: darkPage) { _, on in ToolDarkPage.set(on, in: browser.webView) }
     }
 
     /// The Cookies button (1.2.1): cross-site cookies allowed for Simpl's web pages, then the tool launched again on
@@ -151,6 +168,67 @@ struct ToolWindow: View {
     }
 }
 
+/// (1.2.16) The page loading: a 2-point line across the window's top, under the toolbar.
+private struct LoadingLine: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { g in
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(width: g.size.width * min(max(progress, 0), 1), height: 2)
+                .animation(.easeOut(duration: 0.2), value: progress)
+        }
+        .frame(height: 2)
+        .accessibilityLabel("Loading")
+    }
+}
+
+/// (1.2.16) A tool's page in Dark Mode: a page with no dark look of its own (a light background, no dark colour scheme)
+/// is drawn dark — its colours turned round, its pictures and video kept as they are; a page that is dark already, or
+/// says it has a dark scheme, is left alone. The moon in the tool window's toolbar turns it off (kept for every tool).
+enum ToolDarkPage {
+    static let key = "SimplToolDarkPage"
+
+    static var script: WKUserScript {
+        let on = UserDefaults.standard.object(forKey: key) as? Bool ?? true
+        let js = """
+        (function () {
+          if (window.__simplDarkApply) return;
+          window.__simplDark = \(on ? "true" : "false");
+          var mq = window.matchMedia('(prefers-color-scheme: dark)');
+          var lum = function (c) { var m = (c || '').match(/\\d+(\\.\\d+)?/g); if (!m || m.length < 3) return null; if (m.length > 3 && +m[3] === 0) return null; return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; };
+          var light = function () {
+            var meta = document.querySelector('meta[name="color-scheme"]');
+            if (meta && /dark/i.test(meta.content || '')) return false;
+            var b = document.body ? lum(getComputedStyle(document.body).backgroundColor) : null;
+            var h = lum(getComputedStyle(document.documentElement).backgroundColor);
+            var v = b != null ? b : (h != null ? h : 1);
+            return v > 0.55;
+          };
+          window.__simplDarkApply = function () {
+            var id = 'simpl-dark-page', s = document.getElementById(id);
+            var want = window.__simplDark && mq.matches && document.documentElement && (s ? true : light());
+            if (want && !s) {
+              s = document.createElement('style'); s.id = id;
+              s.textContent = 'html{filter:invert(.92) hue-rotate(180deg)!important;background:#fff!important}img,video,picture,canvas,embed,object,svg image,[style*="background-image"]{filter:invert(1) hue-rotate(180deg)!important}';
+              (document.head || document.documentElement).appendChild(s);
+            } else if (!want && s) { s.remove(); }
+          };
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', window.__simplDarkApply, { once: true }); else window.__simplDarkApply();
+          window.addEventListener('load', window.__simplDarkApply, { once: true });
+          mq.addEventListener && mq.addEventListener('change', function () { var s = document.getElementById('simpl-dark-page'); if (s) s.remove(); window.__simplDarkApply(); });
+        })();
+        """
+        return WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+    }
+
+    /// The moon turned: the page showing follows at once (the next pages read the setting as they load).
+    static func set(_ on: Bool, in view: WKWebView?) {
+        view?.evaluateJavaScript("window.__simplDark = \(on ? "true" : "false"); var s = document.getElementById('simpl-dark-page'); if (s && !window.__simplDark) s.remove(); window.__simplDarkApply && window.__simplDarkApply();", completionHandler: nil)
+    }
+}
+
 /// The tool's web view's state, for the toolbar over it.
 @MainActor
 final class ToolBrowser: ObservableObject {
@@ -195,6 +273,7 @@ struct ToolWebView: NSViewRepresentable {
         config.websiteDataStore = .default()
         config.mediaTypesRequiringUserActionForPlayback = []
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
+        config.userContentController.addUserScript(ToolDarkPage.script)
         let v = WKWebView(frame: .zero, configuration: config)
         v.allowsBackForwardNavigationGestures = true
         v.allowsMagnification = true

@@ -159,7 +159,7 @@ final class ToolsCenter: ObservableObject {
         guard !pinned.contains(k) else { return }
         withAnimation(Motion.gentle) { pinned.append(k) }
         save()
-        MacTour.shared.did(.pinned) // (the tour's "Pin a tool")
+        if k == .graph { MacTour.shared.did(.pinned) } // (the tour's "Pin the graphing calculator")
     }
 
     func unpin(_ k: ToolKind) {
@@ -339,7 +339,7 @@ struct ToolTile: View {
         .glass(Circle(), tint: on ? kind.color.opacity(0.25) : nil, interactive: true)
         .help(on ? "Unpin \(kind.name) from the toolbar" : "Pin \(kind.name) to the toolbar")
         .accessibilityLabel(on ? "Unpin \(kind.name)" : "Pin \(kind.name)")
-        .tourSpot(on ? nil : .toolPin) // (the tour lights the first one not yet pinned)
+        .tourSpot(kind == .graph && !on ? .toolPin : nil) // (1.2.16: the tour lights the graphing calculator's)
     }
 }
 
