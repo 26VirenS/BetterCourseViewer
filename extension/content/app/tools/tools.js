@@ -239,7 +239,12 @@
     const v = VENDOR[name];
     if (!v) throw new Error(`No such library: ${name}`);
     if (v.has()) { if (v.then) await v.then(); return true; }
-    if (self.BCVBridge?.native) throw new Error('This conversion needs the browser extension.');
+    if (self.BCVBridge?.native) {
+      // (Mac 1.2.13) in the apps: the library from the app's own copy of the extension, through its bridge
+      if (!self.BCVBridge.native.inject) throw new Error('This conversion needs the browser extension.');
+      if (!loading[name]) loading[name] = self.BCVBridge.native.inject(v.files).then(async (ok) => { if (!ok || !v.has()) throw new Error(`${name} did not load.`); if (v.then) await v.then(); return true; }).finally(() => { delete loading[name]; });
+      return loading[name];
+    }
     if (!loading[name]) {
       loading[name] = Promise.resolve(api.runtime.sendMessage({ type: 'inject', files: v.files })).then(async (r) => {
         if (r && r.ok === false) throw new Error(r.message || 'The engine did not load.');

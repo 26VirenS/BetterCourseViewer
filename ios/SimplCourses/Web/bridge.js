@@ -183,6 +183,8 @@
       menu: (o) => call({ op: 'menu', title: String(o?.title || ''), items: (o?.items || []).map((it) => ({ label: String(it.label || ''), sub: String(it.sub || ''), active: !!it.active, danger: !!it.danger })), rect: o?.rect || null }).then((r) => (r && Number.isInteger(r.index) ? r.index : -1)),
       previewFile: (o) => call({ op: 'previewFile', url: String(o?.url || ''), name: String(o?.name || '') }).then((r) => !!(r && r.ok)),
       navState: (o) => call({ op: 'navState', canSwipeBack: !!o?.canSwipeBack }).then(noop),
+      // (Mac 1.2.13) a library the converter draws on, from the app's own copy of the extension (lib/vendor/…)
+      inject: (files) => call({ op: 'inject', files: (files || []).map(String) }).then((r) => !!(r && r.ok)),
     } : null,
     storageChanged: (changes) => emitChanged(changes),
   };

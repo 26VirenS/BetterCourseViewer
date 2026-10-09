@@ -79,6 +79,9 @@ export function appBundle({ root, host }) {
       case 'ask': return Promise.resolve({ ok: !!self.__nativeAnswers.ask });
       case 'menu': return Promise.resolve({ index: self.__nativeAnswers.menu });
       case 'previewFile': return Promise.resolve({ ok: true });
+      // (Mac 1.2.13) a converter library from the app's copy of the extension: here, from the suite's own address for it
+      case 'inject': return Promise.all((msg.files || []).map(function (f) { return fetch('https://simpl-vendor.test/' + f).then(function (r) { return r.ok ? r.text() : Promise.reject(new Error(f)); }); }))
+        .then(function (texts) { texts.forEach(function (t) { (0, eval)(t); }); return { ok: true }; }).catch(function () { return { ok: false }; });
       default: return Promise.resolve(null);
     }
   } } } };

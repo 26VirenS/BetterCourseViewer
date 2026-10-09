@@ -1326,6 +1326,31 @@
     };
   }
   /** Hand in from the phone: text, a web address, or files the app picked (base64 here, Files again for Canvas's upload). */
+  // (Mac 1.2.13) The hand-in's converter, the web's own (tools/convert.js): a file of a type the assignment does not take is
+  // turned into one it does, as the web hand-in box does. convertInfo says what can be (for the file chooser and the
+  // line under it); convertFile converts one, given and handed back as base64.
+  const withConv = async () => { try { await BCV.lazy?.load?.('tool:conv'); } catch { /* not loaded: nothing converts */ } return BCV.toolsConvert || null; };
+  async function convertInfo({ allowed = [] } = {}) {
+    const C = await withConv();
+    const r = C ? await C.convertible(allowed).catch(() => null) : null;
+    return { exts: r?.exts || [], line: r?.line || '' };
+  }
+  const fromB64 = (b64) => { const bin = atob(String(b64 || '')); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return bytes; };
+  const toB64 = async (blob) => {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
+  async function convertFile({ name = 'file', type = '', data = '', allowed = [] } = {}) {
+    const C = await withConv();
+    if (!C) throw new Error('The converter could not be loaded.');
+    const file = new File([fromB64(data)], name, { type: type || 'application/octet-stream' });
+    const p = await C.plan(file, allowed);
+    if (!p) return { converted: false };
+    const out = await C.convertToFile(file, p);
+    return { converted: true, name: out.name, type: out.type || 'application/octet-stream', data: await toB64(out), cloud: !!p.cloud };
+  }
   async function submit({ course, id, type = '', text = '', url = '', files = [], comment = '' } = {}) {
     const cid = String(course), aid = String(id);
     if (!NATIVE_TYPES.includes(type)) throw new Error(`That kind of submission is handed in on ${BCV.lms.name}’s own page.`);
@@ -2059,7 +2084,7 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

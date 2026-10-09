@@ -903,6 +903,19 @@ private struct CommentComposer: View {
 /// Hand In, as a sheet over the assignment: the kinds it takes from here (text, a web address, files — chosen in an
 /// Open panel or from Photos, or dropped on the sheet), a note for the teacher, and Submit. The assignment's own file
 /// types are checked before anything is sent; while it goes, the sheet says so, and says why if it could not.
+/// (1.2.13) What the hand-in can take converted, and a file converted (native-app.js convertInfo, convertFile).
+private struct ConvertInfo: Decodable {
+    var exts: [String]
+    var line: String
+}
+
+private struct Converted: Decodable {
+    var converted: Bool
+    var name: String?
+    var type: String?
+    var data: String?
+}
+
 private struct HandInSheet: View {
     let assignment: AssignmentData
     let dropped: [URL]
@@ -919,6 +932,10 @@ private struct HandInSheet: View {
     @State private var sending = false
     @State private var error: String?
     @State private var targeted = false
+    /// (1.2.13) What else the hand-in takes, converted (the web's converter): the extensions and the line saying so.
+    @State private var convertible = ConvertInfo(exts: [], line: "")
+    /// Files being converted to a type the assignment takes, by name.
+    @State private var converting: [String] = []
 
     private static let limit = 50 * 1024 * 1024 // (read whole into memory and handed to the page: kept to a sane size)
 
@@ -974,6 +991,7 @@ private struct HandInSheet: View {
         }
         .onChange(of: photos) { _, _ in pickedPhotos() }
         .onAppear { if !dropped.isEmpty { _ = take(dropped) } }
+        .task { await loadConvertible() }
         .interactiveDismissDisabled(sending)
     }
 
@@ -1033,6 +1051,12 @@ private struct HandInSheet: View {
         Section {
             if files.isEmpty { dropZone }
             ForEach(files) { f in fileRow(f) }
+            ForEach(converting, id: \.self) { name in
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Converting \(name)…").foregroundStyle(.secondary)
+                }
+            }
             HStack(spacing: 10) {
                 Button { importing = true } label: {
                     Label("Choose Files…", systemImage: "folder")
@@ -1046,7 +1070,7 @@ private struct HandInSheet: View {
             Text("Files")
         } footer: {
             if let a = assignment.allowed, !a.isEmpty {
-                Text("This assignment takes \(allowedList) files.")
+                Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line)."))
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
@@ -1186,8 +1210,8 @@ private struct HandInSheet: View {
     }
 
     private var allowedTypes: [UTType] {
-        let list = (assignment.allowed ?? []).compactMap { UTType(filenameExtension: $0) }
-        return list.isEmpty ? [.item] : list
+        let list = ((assignment.allowed ?? []) + convertible.exts).compactMap { UTType(filenameExtension: $0) }
+        return (assignment.allowed ?? []).isEmpty ? [.item] : list
     }
 
     private var allowedList: String {
@@ -1266,12 +1290,39 @@ private struct HandInSheet: View {
             return
         }
         guard allowedName(f.name) else {
-            error = "This assignment takes \(allowedList) files."
+            convert(f)
             return
         }
         error = nil
         guard !files.contains(where: { $0.name == f.name && $0.data.count == f.data.count }) else { return } // (dropped twice)
         withAnimation(Motion.snappy) { files.append(f) }
+    }
+
+    /// (1.2.13) A file of a type the assignment doesn't take: converted to one it does, as the web hand-in does
+    /// (Word, text and pictures to PDF, and so on); said plainly when it can't be.
+    private func convert(_ f: PickedFile) {
+        guard let allowed = assignment.allowed, !converting.contains(f.name) else { return }
+        error = nil
+        withAnimation(Motion.snappy) { converting.append(f.name) }
+        Task {
+            defer { withAnimation(Motion.snappy) { converting.removeAll { $0 == f.name } } }
+            do {
+                let r = try await engine.call("convertFile", ["name": f.name, "type": f.type, "data": f.data.base64EncodedString(), "allowed": allowed], as: Converted.self)
+                guard r.converted, let name = r.name, let b64 = r.data, let bytes = Data(base64Encoded: b64) else {
+                    error = "\(f.name) can’t be turned into \(allowedList) here. This assignment takes \(allowedList) files."
+                    return
+                }
+                add(PickedFile(name: name, type: r.type ?? "application/octet-stream", data: bytes))
+            } catch {
+                self.error = "\(f.name) could not be converted: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func loadConvertible() async {
+        guard let allowed = assignment.allowed, !allowed.isEmpty,
+              let c = try? await engine.call("convertInfo", ["allowed": allowed], as: ConvertInfo.self) else { return }
+        convertible = c
     }
 
     private func remove(_ f: PickedFile) {

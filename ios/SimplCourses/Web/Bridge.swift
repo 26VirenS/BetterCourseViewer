@@ -60,6 +60,15 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         views[ObjectIdentifier(webView)] = (WeakBox(webView), world)
     }
 
+    /// Scripts run one after another in a page's world (each whole, as a content script is), then `done`.
+    private static func run(_ sources: [String], in view: WKWebView, frame: WKFrameInfo, world: WKContentWorld, done: @escaping (Bool) -> Void) {
+        guard let first = sources.first else { done(true); return }
+        view.evaluateJavaScript(first + "\n;true", in: frame, in: world) { result in
+            if case .failure = result { done(false); return }
+            run(Array(sources.dropFirst()), in: view, frame: frame, world: world, done: done)
+        }
+    }
+
     /// The extension's saved settings (the appearance, among others), for the app's own chrome.
     var settings: [String: Any] {
         store.get("settings")["settings"] as? [String: Any] ?? [:]
@@ -165,6 +174,23 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             let picker = MenuPicker(items: items) { replyHandler(["index": $0], nil) }
             picker.pop(in: view, at: at)
         #endif
+        case "inject":
+            // (Mac 1.2.13) a library the converter draws on (jsPDF, mammoth, pdf-lib, pdf.js, the Word engine): read from the
+            // app's own copy of the extension and run in the asking page's world — only files under lib/vendor/ and the
+            // tools' own office.js, never a path given from elsewhere
+            let files = (body["files"] as? [String] ?? []).filter { f in
+                !f.contains("..") && (f.hasPrefix("lib/vendor/") || f == "content/app/tools/office.js") && f.hasSuffix(".js")
+            }
+            guard let view = message.webView, !files.isEmpty else {
+                replyHandler(["ok": false], nil)
+                return
+            }
+            let source = files.map { ScriptBundle.file($0) + "\n//# sourceURL=simpl-courses/\($0)" }
+            guard !source.contains(where: { $0.hasPrefix("\n//# sourceURL") }) else { // (a file missing from the app)
+                replyHandler(["ok": false], nil)
+                return
+            }
+            Bridge.run(source, in: view, frame: message.frameInfo, world: message.world) { ok in replyHandler(["ok": ok], nil) }
         case "previewFile":
             // a file in the phone's own viewer, fetched with the page's own session
             guard let address = body["url"] as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let view = message.webView else {

@@ -48,6 +48,13 @@ const context = await browser.newContext({ viewport: { width: 402, height: 874 }
 fastMotion(context); // every page's animations MOTION_RATE× faster (harness.mjs)
 await context.addInitScript(nativeStub);
 await context.addInitScript(initScript);
+// (Mac 1.2.13) the app's copy of the extension, for the converter's libraries (the native stand-in's inject)
+const vendorFiles = (ctx) => ctx.route('https://simpl-vendor.test/**', (route) => {
+  const rel = decodeURIComponent(new URL(route.request().url()).pathname.slice(1));
+  if (rel.includes('..') || !(rel.startsWith('lib/vendor/') || rel === 'content/app/tools/office.js')) return route.fulfill({ status: 404, body: '' });
+  try { return route.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: readFileSync(join(root, 'extension', rel), 'utf8') }); } catch { return route.fulfill({ status: 404, body: '' }); }
+});
+await vendorFiles(context);
 let page = null;
 const errors = [];
 const calls = (op) => page.evaluate((o) => self.__nativeCalls.filter((c) => !o || c.op === o), op);
@@ -192,6 +199,7 @@ try {
   fastMotion(shellCtx);
   await shellCtx.addInitScript(nativeStub);
   await shellCtx.addInitScript(shellScript); // (the app fills the placeholder in: the shell is on)
+  await vendorFiles(shellCtx);
   const sp = await shellCtx.newPage();
   const shellErrors = [];
   sp.on('pageerror', (e) => shellErrors.push(e.message));
@@ -243,6 +251,11 @@ try {
   const schools = JSON.parse(readFileSync(join(root, 'extension', 'data', 'schools.json'), 'utf8')).schools;
   const hostOk = (d) => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d);
   check(schools.length > 10000 && schools.every((s) => Array.isArray(s) && s.length === 2 && s[0].trim() && hostOk(s[1])) && schools.some(([n, d]) => /Merced/.test(n) && d === 'catcourses.ucmerced.edu') && schools.some(([n, d]) => n === 'Abraham Baldwin Agricultural College' && d === 'abac.view.usg.edu') && schools.filter(([, d]) => d.endsWith('.brightspace.com')).length > 500 && new Set(schools.map((s) => `${s[0]}|${s[1]}`)).size === schools.length, `the school search carries ${schools.length} listings, Canvas and Brightspace, each a name and an address, none twice`);
+  // (Mac 1.2.13) the hand-in's converter, the web's own: what a PDF-only assignment takes besides PDF, and a text file turned into one
+  const convInfo = await nc('convertInfo', { allowed: ['pdf'] });
+  const converted = await nc('convertFile', { name: 'notes.txt', type: 'text/plain', data: Buffer.from('Lab notes\nLine two').toString('base64'), allowed: ['pdf'] });
+  const pdfHead = converted.data ? Buffer.from(converted.data, 'base64').subarray(0, 5).toString() : '';
+  check(!convInfo.error && convInfo.exts.includes('txt') && /converted to PDF/.test(convInfo.line) && converted.converted === true && converted.name === 'notes.pdf' && pdfHead === '%PDF-', `the hand-in converts a file of another type to one the assignment takes: ${JSON.stringify({ exts: convInfo.exts, line: convInfo.line, name: converted.name, type: converted.type, head: pdfHead, error: converted.error })}`);
   // (iPhone 1.6) an address the app has no screen for as it stands is opened where it leads: a module item is the item it names
   const viaItem = await nc('resolveUrl', { url: '/courses/102/modules/items/i2' });
   const viaPage = await nc('resolveUrl', { url: '/courses/102/modules/items/i1' });
