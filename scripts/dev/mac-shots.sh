@@ -105,7 +105,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
   shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
-  shoot light-51b-settings-picker 12 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
+  shoot light-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot light-03-todo 12 -SimplPlace todo
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
@@ -114,6 +114,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   MODE=dark
   shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
+  shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   wait

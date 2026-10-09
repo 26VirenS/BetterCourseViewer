@@ -951,7 +951,7 @@ private struct HandInSheet: View {
     var body: some View {
         HStack(spacing: 0) {
             form
-                .frame(width: 580)
+                .frame(width: preview.formWidth)
             if preview.file != nil {
                 Divider()
                 HandInPreviewPane(preview: preview)

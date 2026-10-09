@@ -13,9 +13,12 @@ final class HandInPreview: ObservableObject {
     @Published private(set) var showing: UUID?
     @Published private(set) var file: URL?
     @Published private(set) var name = ""
+    /// The form's width and the pane's, as the window has room for them (never wider together than the window).
+    @Published private(set) var formWidth: CGFloat = HandInPreview.form
+    @Published private(set) var paneWidth: CGFloat = 540
     private var folder: URL?
 
-    static let width: CGFloat = 540
+    static let form: CGFloat = 580
 
     /// A file's row pressed: its preview opened in the sheet, or — the one already open — put away.
     func toggle(_ f: PickedFile) {
@@ -24,6 +27,7 @@ final class HandInPreview: ObservableObject {
             return
         }
         guard let url = write(f) else { return }
+        fit()
         withAnimation(Motion.gentle) {
             showing = f.id
             file = url
@@ -35,9 +39,27 @@ final class HandInPreview: ObservableObject {
         let put = {
             self.showing = nil
             self.file = nil
+            self.formWidth = HandInPreview.form
         }
         if animated { withAnimation(Motion.gentle, put) } else { put() }
         clean()
+    }
+
+    /// The widths for the window the sheet is on: the pane up to 540 points, the form 580 — the form giving up to 120
+    /// of its own before the pane goes below 380 — together never wider than the window, less a margin.
+    private func fit() {
+        let parent = NSApp.keyWindow?.sheetParent ?? NSApp.mainWindow
+        let room = max(700, (parent?.frame.width ?? 1400) - 48)
+        var form = Self.form
+        var pane = min(540, room - form)
+        if pane < 380 {
+            form = max(Self.form - 120, room - 380)
+            pane = room - form
+        }
+        withAnimation(Motion.gentle) {
+            formWidth = form
+            paneWidth = max(300, pane)
+        }
     }
 
     /// A file taken out of the hand-in: its preview, if it is the one open, put away.
@@ -99,7 +121,7 @@ struct HandInPreviewPane: View {
                     .id(url)
             }
         }
-        .frame(width: HandInPreview.width)
+        .frame(width: preview.paneWidth)
         .background(Color(nsColor: .textBackgroundColor).opacity(0.35))
     }
 }
