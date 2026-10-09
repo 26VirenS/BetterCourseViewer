@@ -280,6 +280,8 @@ enum DocViewerSkin {
               box-shadow: inset 0 .5px 1px rgba(0,0,0,.06) !important; text-align: center; }
             .simpl-bar input:focus { outline: 3px solid color-mix(in srgb, ${accent} 45%, transparent) !important; outline-offset: 0; }
             .simpl-bar .simpl-rule { border-style: solid !important; border-color: rgba(0,0,0,.12) !important; }
+            .simpl-empty { display: none !important; }
+            .simpl-bar .simpl-bar { background: transparent !important; border-bottom: 0 !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
             @media (prefers-color-scheme: dark) {
               .simpl-bar { background: rgba(40,40,44,.82) !important; border-bottom-color: rgba(255,255,255,.08) !important; color: rgba(255,255,255,.88) !important; }
               .simpl-bar button:hover, .simpl-bar [role="button"]:hover, .simpl-bar a:hover { background: rgba(255,255,255,.1) !important; }
@@ -301,10 +303,33 @@ enum DocViewerSkin {
                     el.classList.add('simpl-bar');
                     for (const x of el.querySelectorAll('*')) { const cs = getComputedStyle(x); if (/dashed|dotted/.test(cs.borderLeftStyle + cs.borderRightStyle + cs.borderTopStyle + cs.borderBottomStyle)) x.classList.add('simpl-rule'); }
                   }
+                  // the whole bar across the top it sits in (Canvas's grey band, the options' row with it), dressed the same
+                  let top = el;
+                  while (top.parentElement && top.parentElement !== document.body) {
+                    const pr = top.parentElement.getBoundingClientRect();
+                    if (pr.top <= 4 && pr.width >= W * .7 && pr.height <= 220) top = top.parentElement; else break;
+                  }
+                  top.classList.add('simpl-bar');
+                  tidy(top);
                   return;
                 }
                 el = el.parentElement;
               }
+            }
+          };
+          // (1.3.11) a row of the bar with nothing in it (the drawing tools' options, while the pointer is the tool) folded
+          // away; it comes back the moment something is put in it
+          const tidy = (bar) => {
+            const bw = bar.getBoundingClientRect().width;
+            const rows = [...bar.children].flatMap((c) => [c, ...c.children]);
+            for (const r of rows) {
+              if (/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG|SVG|CANVAS)$/i.test(r.tagName)) continue;
+              const was = r.classList.contains('simpl-empty');
+              if (was) r.classList.remove('simpl-empty'); // (measured as it would be shown)
+              const rr = r.getBoundingClientRect();
+              const row = rr.width >= bw * .6 && rr.height >= 16; // (a row across the bar, not a divider or a field)
+              const empty = row && !r.querySelector('button, [role="button"], input, select, textarea, svg, canvas, img') && !r.textContent.trim();
+              r.classList.toggle('simpl-empty', empty);
             }
           };
           let t = 0;
