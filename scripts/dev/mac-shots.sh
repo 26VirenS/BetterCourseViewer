@@ -75,7 +75,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-19-quiz-question 14 -SimplOpen quiz:101:9011:take:5
   shoot light-35-tools 10 -SimplPlace tools
   shoot light-26-school 8 -SimplPicker merced
-  shoot light-26b-school-confirm 16 -SimplPicker merced -SimplPickerConfirm YES
+  shoot light-26b-school-confirm 18 -SimplPicker catcourses -SimplPickerConfirm YES
   shoot light-27-tour 12 -SimplOpen tour
   MODE=dark
   shoot dark-01-dashboard 12
@@ -111,7 +111,7 @@ for MODE in light dark; do
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
   shoot "$MODE-26-school" 8 -SimplPicker merced
-  shoot "$MODE-26b-school-confirm" 16 -SimplPicker merced -SimplPickerConfirm YES
+  shoot "$MODE-26b-school-confirm" 18 -SimplPicker catcourses -SimplPickerConfirm YES
   # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list

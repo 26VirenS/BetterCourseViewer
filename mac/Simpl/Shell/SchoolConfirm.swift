@@ -78,9 +78,9 @@ struct SchoolConfirm: View {
 /// The school's own page, small: a web view of its own (nothing kept — no cookies, no storage — so the sign-in after it
 /// starts clean), zoomed out so the page lays out as on a laptop's screen, and deaf to the pointer.
 struct LoginPreview: NSViewRepresentable {
-    static let side: CGFloat = 264
-    /// How far out the page is drawn: a 264-point square shows about 880 points of the page across.
-    static let zoom: CGFloat = 0.3
+    static let side: CGFloat = 320
+    /// How far out the page is drawn: a 320-point square shows 1,000 points of the page across, as on a laptop.
+    static let zoom: CGFloat = 0.32
 
     enum State: Equatable { case loading, shown, failed }
 
@@ -137,7 +137,26 @@ struct LoginPreview: NSViewRepresentable {
             if state.wrappedValue != s { state.wrappedValue = s }
         }
 
+        /// (1.2.7) The zoom again for every page: a sign-in that sends on to another site (the school's own) is drawn
+        /// in a fresh page that starts at full size.
+        private func zoomOut(_ webView: WKWebView) {
+            if abs(webView.pageZoom - LoginPreview.zoom) > 0.001 { webView.pageZoom = LoginPreview.zoom }
+        }
+
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            zoomOut(webView)
+        }
+
+        func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+            zoomOut(webView)
+        }
+
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            zoomOut(webView)
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            zoomOut(webView)
             // (a sign-in page often sends on to the school's own: shown once a page is in, kept as it moves on)
             set(.shown)
         }
