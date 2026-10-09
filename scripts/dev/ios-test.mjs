@@ -214,6 +214,14 @@ try {
   check(!today.error && today.counters?.length === 6 && today.counters.map((c) => c.key).join() === 'today,next,unread,overdue,tomorrow,graded' && Array.isArray(today.list?.rows) && today.list.rows.length > 0 && today.list.rows.every((r) => r.id && r.title && r.color && 'done' in r) && !!today.dateLine && today.me?.name, `Today for the app: the six counters, the day's list, the week's load, who is signed in: ${JSON.stringify({ counters: today.counters, heading: today.list?.heading, rows: today.list?.rows?.length, load: today.load?.length, me: today.me?.name })}`);
   const counts = await nc('todayCounts', { kept: false });
   check(Number.isInteger(counts.overdue) && Number.isInteger(counts.graded), `Overdue and Graded counted from the courses' assignments: ${JSON.stringify(counts)}`);
+  // (Mac 1.2.18) a row dismissed from Overdue leaves its count at once, and stays out of it
+  const odSheet = await nc('todaySheet', { key: 'overdue' });
+  const odRow = odSheet.sections.flatMap((s) => s.rows).find((r) => r.clearable && r.key);
+  if (odRow) {
+    const cleared = await nc('clearOverdue', { key: odRow.key });
+    const after = await nc('todayCounts', { kept: false });
+    check(cleared.ok && cleared.overdue === counts.overdue - 1 && after.overdue === counts.overdue - 1 && after.overdueNote === cleared.overdueNote, `dismissing an overdue row lowers Overdue's count: ${JSON.stringify({ before: counts.overdue, cleared, after: after.overdue, note: after.overdueNote })}`);
+  } else check(counts.overdue === 0, `no overdue row to dismiss only when nothing is overdue: ${JSON.stringify({ counts, odSheet })}`);
   const sheet = await nc('todaySheet', { key: 'next' });
   check(sheet.title === 'Next 7 days' && sheet.sections.length > 0 && sheet.sections[0].rows.every((r) => r.title && r.url), `a counter's list as the app's sheet, split the Dashboard's way: ${JSON.stringify({ title: sheet.title, note: sheet.note, sections: sheet.sections.map((s) => [s.title, s.rows.length]) })}`);
   const cs = await nc('courses');

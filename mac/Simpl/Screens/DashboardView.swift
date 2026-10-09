@@ -128,9 +128,11 @@ struct DashboardView: View {
                     let tile = g[a]
                     let w = min(DashCounterPanel.width, g.size.width)
                     let x = tile.minX + w <= g.size.width + 0.5 ? tile.minX : max(0, tile.maxX - w)
-                    DashCounterPanel(counter: c, value: value(c), note: note(c), width: w, close: { setOpen(nil) }) { h in
-                        if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
-                    }
+                    DashCounterPanel(counter: c, value: value(c), note: note(c), width: w, close: { setOpen(nil) },
+                                     onHeight: { h in
+                                         if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
+                                     },
+                                     onCleared: cleared)
                     // (1.2.9: the shape that moves is the panel itself, sized to the tile on its way in and out — the
                     // size it rests at is the frame round it — so it grows out of its tile and folds back into it)
                     .dashMorph(key, in: morph, enabled: !reduceMotion)
@@ -197,6 +199,23 @@ struct DashboardView: View {
         case "graded": return counts?.graded
         default: return c.value
         }
+    }
+
+    /// (1.2.18) Overdue's number as rows are dismissed from its panel: one less at the press, then what Canvas counts
+    /// once it is told (or one back, if it could not be).
+    private func cleared(_ step: DashCounterPanel.Cleared) {
+        guard var c = counts, let n = c.overdue else { return }
+        switch step {
+        case .pressed:
+            c.overdue = max(n - 1, 0)
+        case .failed:
+            c.overdue = n + 1
+        case .done(let left):
+            c.overdue = left.overdue
+        }
+        let m = c.overdue ?? 0
+        c.overdueNote = m > 0 ? "\(m) not submitted" : "Nothing overdue"
+        withAnimation(Motion.snappy) { counts = c }
     }
 
     private func note(_ c: Counter) -> String? {

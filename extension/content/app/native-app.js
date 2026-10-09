@@ -324,10 +324,12 @@
     // (Mac 1.2.12) the kept copy and the live answer are asked side by side: the kept one never overwrites the live one
     if (!kept || !st.countsLive) st.counts = { od, gr };
     if (!kept) st.countsLive = true;
+    // (Mac 1.2.18) what was dismissed is not counted, as it is not listed
+    const left = od.overdue.filter((o) => !clearedOverdue.has(o.key)).length;
     return {
-      overdue: od.overdue.length, graded: gr.graded.length,
+      overdue: left, graded: gr.graded.length,
       // (Simpl for Mac 1.2) the lines under the two numbers, as the web Dashboard's counters have them
-      overdueNote: od.overdue.length ? `${od.overdue.length} not submitted` : 'Nothing overdue',
+      overdueNote: overdueNote(left),
       gradedNote: gr.graded.length ? `${store.fmtPts(gr.earned)} / ${store.fmtPts(gr.possible)} points` : 'No grades posted this week',
     };
   }
@@ -374,11 +376,14 @@
     if (!todayState?.counts) await todayCounts({ kept: false }).catch(() => null);
     const o = todayState?.counts?.od?.overdue.find((x) => x.key === key) || listedOverdue.get(key);
     if (!o) return { ok: false };
-    await store.dismiss(o.item);
+    // (Mac 1.2.18) left out of the count at once, so a count read while Canvas is told is already one less
     clearedOverdue.add(key);
+    try { await store.dismiss(o.item); } catch (e) { clearedOverdue.delete(key); throw e; }
     app()?.refreshCounts?.();
-    return { ok: true, overdue: (todayState?.counts?.od?.overdue || []).filter((x) => !clearedOverdue.has(x.key)).length };
+    const left = (todayState?.counts?.od?.overdue || []).filter((x) => !clearedOverdue.has(x.key)).length;
+    return { ok: true, overdue: left, overdueNote: overdueNote(left) };
   }
+  const overdueNote = (n) => (n ? `${n} not submitted` : 'Nothing overdue');
 
   // ---- the Mac's Dashboard (Simpl for Mac 1.2) ------------------------------------------------------------------------
   // What the web Dashboard shows beyond Today's counters, by its rules (screens/dashboard.js): the courses as cards, the

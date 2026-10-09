@@ -132,6 +132,9 @@ struct DashCounterPanel: View {
     let close: () -> Void
     /// (1.2.8) How tall what it shows stands, for the page to size the floating panel to it.
     var onHeight: (CGFloat) -> Void = { _ in }
+    /// (1.2.18) A row dismissed (the page's Overdue number drops with it), then Canvas's word on it.
+    enum Cleared { case pressed, done(TodayCounts), failed }
+    var onCleared: (Cleared) -> Void = { _ in }
     @EnvironmentObject private var engine: Engine
     @ObservedObject private var preview = WorkPreview.shared
     @State private var data: ItemsSheetData?
@@ -321,16 +324,19 @@ struct DashCounterPanel: View {
     }
 
     /// (1.2.11) The row goes at once (the next can be dismissed straight after); Canvas is told, and the list read again.
+    /// (1.2.18) The tile's number goes down with it, and is set to what Canvas counts once it has been told.
     private func clear(_ k: String) {
         if var d = data {
             for i in d.sections.indices { d.sections[i].rows.removeAll { $0.key == k } }
             d.sections.removeAll { $0.rows.isEmpty }
             withAnimation(Motion.gentle) { data = d }
         }
+        onCleared(.pressed)
         Task {
-            let ok = await engine.act("clearOverdue", ["key": k])
+            let left = try? await engine.call("clearOverdue", ["key": k], as: TodayCounts.self)
+            if let left, left.overdue != nil { onCleared(.done(left)) } else { onCleared(.failed) }
             await load()
-            if ok { engine.changed() }
+            if left?.overdue != nil { engine.changed() }
         }
     }
 }
