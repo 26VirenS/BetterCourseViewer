@@ -65,12 +65,17 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-02-courses 10 -SimplPlace courses
   shoot light-04-grades 12 -SimplPlace grades
   shoot light-07-inbox 10 -SimplPlace inbox
+  shoot light-07b-inbox-thread 12 -SimplPlace inbox -SimplOpen conversation:first
   shoot light-10-assignment 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
+  shoot light-10b-grades-assignment 12 -SimplPlace grades -SimplPush /courses/101/assignments/1001
+  shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric
+  shoot light-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   shoot light-19-quiz-question 14 -SimplOpen quiz:101:9011:take:5
   shoot light-35-tools 10 -SimplPlace tools
   shoot light-27-tour 12 -SimplOpen tour
   MODE=dark
   shoot dark-01-dashboard 12
+  shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   keep_crashes
   exit 0
 fi
