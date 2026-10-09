@@ -28,6 +28,10 @@ struct AssignmentView: View {
     @State private var lit: String?
     /// Counts the hand-ins made here: each one bounces the Submitted seal once it is in view.
     @State private var handedIn = 0
+    /// (1.3.8) The feedback popup: the work in Canvas's viewer, the comments beside it.
+    @State private var review: SubmissionReview.Target?
+    /// (1.3.8) How tall the heading is: the fixed right column starts level with the left one's first card.
+    @State private var headerHeight: CGFloat = 90
     /// (1.3.5) A quiz taken: its intro (`quizIntro`), for whether its feedback can be seen and another attempt begun.
     @State private var quizIntro: QuizIntro?
 
@@ -64,6 +68,12 @@ struct AssignmentView: View {
                     .environmentObject(engine)
             }
         }
+        .sheet(item: $review) { t in
+            if let d = model.data {
+                SubmissionReview(assignment: d, picked: t.file)
+                    .environmentObject(engine)
+            }
+        }
         .onDisappear { RubricPopup.shared.dismiss(owner: owner) } // (the ring goes with its page)
     }
 
@@ -74,13 +84,23 @@ struct AssignmentView: View {
 
     // MARK: - The page
 
+    /// (1.3.8) On a wide window the page scrolls in its left column and the right one — what to do, the grade, the facts
+    /// — stays put beside it, its top level with the left column's first card (as To Do's side column does); on a narrow
+    /// one, one column that scrolls, the right one's cards first.
     private func page(_ d: AssignmentData) -> some View {
-        let columns = AssignmentColumns()
-        return Page(spacing: 32) {
-            header(d)
-            columns {
-                mainColumn(d)
-                sideColumn(d)
+        GeometryReader { g in
+            let pad: CGFloat = g.size.width < 700 ? 22 : 40
+            let room = max(0, min(1480, g.size.width - pad * 2))
+            if room >= AssignmentColumns.twoFrom {
+                widePage(d, room: room, pad: pad)
+            } else {
+                Page(spacing: 32) {
+                    header(d)
+                    AssignmentColumns() {
+                        mainColumn(d)
+                        sideColumn(d)
+                    }
+                }
             }
         }
         .overlay { dropOverlay(d) }
@@ -88,6 +108,36 @@ struct AssignmentView: View {
             dropOnPage(urls, d)
         } isTargeted: { on in
             withAnimation(Motion.snappy) { dropTargeted = on }
+        }
+    }
+
+    private func widePage(_ d: AssignmentData, room: CGFloat, pad: CGFloat) -> some View {
+        let side = AssignmentColumns.sideWidth(room)
+        return HStack(alignment: .top, spacing: AssignmentColumns.gap) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 32) {
+                    header(d)
+                        .background {
+                            GeometryReader { h in Color.clear.preference(key: AssignmentHeaderKey.self, value: h.size.height) }
+                        }
+                    mainColumn(d)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 26)
+                .padding(.bottom, 40)
+            }
+            .environment(\.pageWidth, room - side - AssignmentColumns.gap)
+            PinnedSide(top: 26 + headerHeight + 32) {
+                sideColumn(d)
+            }
+            .frame(width: side)
+        }
+        .padding(.horizontal, pad)
+        .frame(maxWidth: 1480 + pad * 2)
+        .frame(maxWidth: .infinity)
+        .background(PageGround())
+        .onPreferenceChange(AssignmentHeaderKey.self) { h in
+            if abs(h - headerHeight) > 0.5 { headerHeight = h }
         }
     }
 
@@ -205,7 +255,7 @@ struct AssignmentView: View {
                     }
                     ForEach(Array(files.enumerated()), id: \.element.id) { i, f in
                         if i > 0 || !submitted.isEmpty || !text.isEmpty || !link.isEmpty { RowDivider(inset: 54) }
-                        AttachmentRow(file: f)
+                        AttachmentRow(file: f) { review = SubmissionReview.Target(file: f) }
                     }
                 }
                 .padding(8)
@@ -359,20 +409,29 @@ struct AssignmentView: View {
         } else if !why.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 whyNote(why)
-                Button {
-                    engine.openWebScreen(canvasURL, title: d.title)
-                } label: {
-                    Label("Open in \(engine.lmsName)", systemImage: "globe")
-                        .frame(maxWidth: .infinity)
+                // (1.3.8) work handed in: its feedback, in the popup; nothing handed in, nothing to press
+                if hasWork(d) {
+                    Button {
+                        review = SubmissionReview.Target(file: d.submission?.files?.first)
+                    } label: {
+                        Label("See Feedback", systemImage: "text.bubble")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .glassButton()
+                    .controlSize(.large)
+                    .help("Your work, with your teacher's marks and comments")
                 }
-                .glassButton()
-                .controlSize(.large)
-                .help("Open \(engine.lmsName)’s own page for this assignment")
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
+    }
+
+    /// Something handed in (or graded) to look back at.
+    private func hasWork(_ d: AssignmentData) -> Bool {
+        !(d.submitted ?? "").isEmpty || d.grade != nil || !(d.submission?.files ?? []).isEmpty
+            || !(d.submission?.text ?? "").isEmpty || !(d.submission?.url ?? "").isEmpty
     }
 
     private func whyNote(_ why: String) -> some View {
@@ -663,6 +722,8 @@ struct AssignmentView: View {
                 engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title, feedback: true))
             } else if d.grade != nil && rubricMarked(d) {
                 openRubric(d)
+            } else if let f = d.submission?.files?.first { // (1.3.8) a file handed in: it and its comments, in the popup
+                review = SubmissionReview.Target(file: f)
             } else if d.grade != nil {
                 jump = "grade"
             } else if !d.comments.isEmpty {
@@ -724,6 +785,8 @@ struct AssignmentView: View {
         if model.data?.canSubmit == true, LaunchOpen.take("handin") != nil { handIn = true }
         if let d = model.data, !d.rubric.isEmpty, let shot = LaunchOpen.take("rubric") { openRubricShot(shot, d) }
         if let d = model.data { arrived(d) }
+        // (the screenshot suite: -SimplOpen feedback opens the feedback popup)
+        if let d = model.data, hasWork(d), LaunchOpen.take("feedback") != nil { review = SubmissionReview.Target(file: d.submission?.files?.first) }
         if let d = model.data { await loadQuizIntro(d) }
     }
 
@@ -745,10 +808,19 @@ private struct NextStep {
 /// The assignment's page in two columns on a wide window — what to read and what was said on the left, the next step,
 /// the grade and the facts on the right (a little wider as the window grows) — and in one column on a narrow one, the
 /// right's cards first.
+/// The page's heading's height (the fixed right column's start).
+private struct AssignmentHeaderKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 private struct AssignmentColumns: Layout {
-    private static let gap: CGFloat = 28
+    static let gap: CGFloat = 28
     /// The narrowest the page's column may be and still hold the two side by side.
-    private static let twoFrom: CGFloat = 780
+    static let twoFrom: CGFloat = 780
+
+    /// The right column's width for the page's room.
+    static func sideWidth(_ width: CGFloat) -> CGFloat { min(400, max(290, ((width - gap) * 0.32).rounded())) }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard subviews.count == 2 else { return .zero }
@@ -768,7 +840,7 @@ private struct AssignmentColumns: Layout {
     /// Where each column goes, and how tall the two are together.
     private func frames(_ width: CGFloat, _ subviews: Subviews) -> (main: CGRect, side: CGRect, height: CGFloat) {
         if width >= AssignmentColumns.twoFrom {
-            let sideWidth = min(400, max(290, ((width - AssignmentColumns.gap) * 0.32).rounded()))
+            let sideWidth = AssignmentColumns.sideWidth(width)
             let mainWidth = width - AssignmentColumns.gap - sideWidth
             let mainHeight = subviews[0].sizeThatFits(ProposedViewSize(width: mainWidth, height: nil)).height
             let sideHeight = subviews[1].sizeThatFits(ProposedViewSize(width: sideWidth, height: nil)).height
@@ -785,88 +857,34 @@ private struct AssignmentColumns: Layout {
     }
 }
 
-/// A file handed in, as a row of Your Work: a click opens it in Quick Look; Preview shows it here, in the page, as
-/// Quick Look draws it (fetched the first time it is asked for); its menu has the rest (its app, Download, Copy Link).
+/// A file handed in, as a row of Your Work: a click — or Preview — opens it with its feedback in the popup (Canvas's
+/// viewer, the teacher's marks on it, the comments beside); its menu has the rest (Quick Look, its app, Download, Copy Link).
 private struct AttachmentRow: View {
     let file: Attachment
+    let review: () -> Void
     @EnvironmentObject private var engine: Engine
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var open = false
-    @State private var local: URL?
-    @State private var problem: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                RowLink { engine.openFile(file.url, name: file.name) } label: {
-                    HStack(spacing: 12) {
-                        FileIcon(name: file.name, size: 32)
-                        Text(file.name)
-                            .font(.sBody)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
-                        Spacer(minLength: 6)
-                    }
+        HStack(spacing: 8) {
+            RowLink(action: review) {
+                HStack(spacing: 12) {
+                    FileIcon(name: file.name, size: 32)
+                    Text(file.name)
+                        .font(.sBody)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 6)
                 }
-                .help("Open \(file.name) in Quick Look")
-                Button {
-                    withAnimation(reduceMotion ? nil : Motion.gentle) { open.toggle() }
-                } label: {
-                    Label(open ? "Hide" : "Preview", systemImage: open ? "chevron.up" : "eye")
-                }
-                .glassButton()
-                .help(open ? "Hide the preview" : "Show \(file.name) here")
-                .padding(.trailing, 4)
             }
-            .contextMenu { FileMenuItems(engine: engine, url: file.url, name: file.name) }
-            if open {
-                preview
-                    .frame(height: 520)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                    .transition(.opacity)
+            .help("Open \(file.name) with its feedback")
+            Button(action: review) {
+                Label("Preview", systemImage: "eye")
             }
+            .glassButton()
+            .help("\(file.name) with your teacher's marks and comments")
+            .padding(.trailing, 4)
         }
-        .task(id: open) {
-            guard open, local == nil else { return }
-            await fetch()
-        }
-    }
-
-    @ViewBuilder
-    private var preview: some View {
-        if let local {
-            QuickLookView(file: local)
-                .accessibilityLabel("Preview of \(file.name)")
-        } else if let problem {
-            ContentUnavailableView {
-                Label("No Preview", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(problem)
-            } actions: {
-                Button("Try Again") { Task { await fetch() } }
-            }
-        } else {
-            VStack(spacing: 10) {
-                ProgressView()
-                Text("Loading \(file.name)…")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private func fetch() async {
-        problem = nil
-        do {
-            local = try await engine.fetchFile(file.url, name: file.name)
-        } catch is CancellationError {
-            return
-        } catch {
-            problem = error.localizedDescription
-        }
+        .contextMenu { FileMenuItems(engine: engine, url: file.url, name: file.name) }
     }
 }
 

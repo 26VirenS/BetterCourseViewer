@@ -99,6 +99,8 @@ struct DiscussionsData: Codable {
 struct Attachment: Codable, Identifiable, Hashable {
     var name: String
     var url: String
+    /// (Mac 1.3.8) Canvas's viewer for it (DocViewer: the teacher's marks on it), where Canvas has one.
+    var preview: String?
     var id: String { url }
 }
 
@@ -233,6 +235,8 @@ struct SubmissionInfo: Codable, Hashable {
     var files: [Attachment]?
     var url: String?
     var text: String?
+    /// (Mac 1.3.8) The submission's own page in Canvas: its viewer and comments together.
+    var viewer: String?
 }
 
 struct AssignmentData: Codable {

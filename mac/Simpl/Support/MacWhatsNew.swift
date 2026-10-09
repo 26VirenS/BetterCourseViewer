@@ -11,7 +11,9 @@ enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.8", date: "2026-10-09", notes: [
             ReleaseNote(kind: "improved", title: "Locked work opens", body: "Open locked items to see why and when they open."),
+            ReleaseNote(kind: "new", title: "Feedback in a popup", body: "See your file with your teacher's marks and comments."),
             ReleaseNote(kind: "new", title: "Your school on top", body: "Your school's logo and name head the sidebar."),
+            ReleaseNote(kind: "improved", title: "Side column stays put", body: "An assignment's side column stays as you scroll."),
             ReleaseNote(kind: "improved", title: "Question numbers", body: "A neat card of numbered tiles; a click goes there."),
             ReleaseNote(kind: "improved", title: "Preview opens itself", body: "A file added to Hand In shows its preview at once."),
             ReleaseNote(kind: "fixed", title: "Tool work isn't closed", body: "A tool's assignment no longer says it is closed."),

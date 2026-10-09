@@ -1353,13 +1353,16 @@
       grade: scored ? { text: st.word, score: Number(sub.score), possible: Number(a.points_possible) || 0, pct, letter: a.grading_type && a.grading_type !== 'points' && sub.grade ? String(sub.grade) : (pct !== null ? BCV.screens?.gpa?.letterFor?.(pct)?.[0] || null : null), late: sub.points_deducted ? `−${store.fmtPts(sub.points_deducted)} pts late` : '' } : null,
       held, stats,
       submitted: sub.submitted_at ? `Submitted ${U.fmtAt(sub.submitted_at)}${sub.late ? ' · late' : ''}` : '', attemptsText,
-      submission: { files: (sub.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'File', url: absUrl(x.url) })).filter((x) => x.url), url: sub.url || null, text: sub.body ? textOf(sub.body, 600) : '' },
+      // (Mac 1.3.8) each file's Canvas viewer (preview_url: DocViewer, the teacher's marks on it), and the submission's own
+      // page in Canvas (its viewer and comments together) for work with no file
+      submission: { files: (sub.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'File', url: absUrl(x.url), preview: x.preview_url ? absUrl(x.preview_url) : null })).filter((x) => x.url), url: sub.url || null, text: sub.body ? textOf(sub.body, 600) : '',
+        viewer: sub.user_id && (sub.submitted_at || sub.workflow_state === 'graded') ? absUrl(`/courses/${cid}/assignments/${aid}/submissions/${sub.user_id}`) : null },
       types: here, allowed: (a.allowed_extensions || []).map((x) => String(x).toLowerCase()), canSubmit, why, resubmit: !!sub.submitted_at,
       quizUrl: isQuiz && a.quiz_id ? `/courses/${cid}/quizzes/${a.quiz_id}` : null, quizId: isQuiz && a.quiz_id ? String(a.quiz_id) : null,
       toolUrl: types.includes('external_tool') || ltiQuiz ? `/courses/${cid}/assignments/${aid}?bcv=native` : null, ltiQuiz,
       discussionUrl: a.discussion_topic?.id ? `/courses/${cid}/discussion_topics/${a.discussion_topic.id}` : null,
       canvasUrl: `/courses/${cid}/assignments/${aid}?bcv=native`,
-      comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: cm.comment || (cm.media_comment ? 'Media comment' : ''), attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),
+      comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: String(cm.comment || '').trim() || (cm.media_comment ? 'Media comment' : ''), /* (trimmed: Canvas keeps the blank lines round a comment) */ attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),
       rubric, rubricTitle: a.rubric_settings?.title || 'Rubric', rubricScore: R?.rubricScore && a.rubric?.length && !held ? R.rubricScore(a.rubric, assess)?.text || '' : '',
     };
   }

@@ -639,3 +639,40 @@ extension View {
         }
     }
 }
+
+// MARK: - A side column that stays put
+
+/// (1.3.8) A side column that stays put beside a scrolling one (To Do's, an assignment's): its top level with the other
+/// column's first card (`top`); grown taller than the room under that, it moves up — the growth pushes it upwards, its
+/// foot kept clear of the window's — and only taller than the whole window does it scroll.
+struct PinnedSide<Content: View>: View {
+    let top: CGFloat
+    var minTop: CGFloat = 18
+    var bottom: CGFloat = 24
+    @ViewBuilder var content: Content
+    @State private var height: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { g in
+            let at = max(minTop, min(top, g.size.height - height - bottom))
+            ScrollView {
+                content
+                    .background {
+                        GeometryReader { h in Color.clear.preference(key: PinnedSideHeightKey.self, value: h.size.height) }
+                    }
+                    .padding(.top, at)
+                    .padding(.bottom, bottom)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.never)
+            .onPreferenceChange(PinnedSideHeightKey.self) { h in
+                if abs(h - height) > 0.5 { withAnimation(Motion.gentle) { height = h } }
+            }
+        }
+    }
+}
+
+private struct PinnedSideHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}

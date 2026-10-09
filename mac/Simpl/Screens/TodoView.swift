@@ -117,12 +117,9 @@ struct TodoView: View {
                 if let top, abs(top - firstCardTop) > 0.5 { firstCardTop = top }
             }
             .scrollIndicators(.automatic)
-            ScrollView { // (only when the window is too short for it: otherwise it stays as it is)
+            PinnedSide(top: firstCardTop) { // (1.3.8: taller than the room under the first card, it moves up)
                 overview(d)
-                    .padding(.top, firstCardTop)
-                    .padding(.bottom, 24)
             }
-            .scrollBounceBehavior(.basedOnSize)
             .frame(width: 320)
         }
         .padding(.leading, 40)

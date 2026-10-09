@@ -118,7 +118,7 @@ function assignmentObj(courseId, row) {
   const due = at(dueDay, Math.floor(dueHour), Math.round((dueHour % 1) * 60));
   const submitted = subDay !== null || (earned !== null && !extra.noSub); // (noSub: marked with nothing ever handed in — a tool's score sent back, a teacher's entry — as Canvas then reports it: graded, no submitted_at, missing)
   const submission = {
-    id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : extra.gradingType === 'pass_fail' ? (earned > 0 ? 'complete' : 'incomplete') : String(earned),
+    id: `s${id}`, assignment_id: id, user_id: '7', workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : extra.gradingType === 'pass_fail' ? (earned > 0 ? 'complete' : 'incomplete') : String(earned),
     submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null && !extra.noSub ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
     // Canvas posts a grade separately from marking it; one assignment here is marked but held back
     posted_at: earned !== null ? (extra.held || (mockConfig.held || []).includes(String(id)) ? null : at(dueDay, 8, 5)) : null, // (POST /__mock/config {"held": ["1001"]} holds one back for a test: a quiz Canvas calls muted)
@@ -141,7 +141,7 @@ function assignmentObj(courseId, row) {
         { attempt: 2, submitted_at: subDay !== null ? at(subDay, 15, 52) : at(dueDay - 1, 16, 1), submission_type: 'online_upload', score: earned, late: !!extra.late, attachments: [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231, url: `/files/f${id}/download?download_frd=1` }] },
       ] : undefined),
     submission_type: submitted ? (extra.quiz ? 'online_quiz' : 'online_upload') : null,
-    attachments: submitted && !extra.quiz ? [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231, url: `/files/f${id}/download?download_frd=1` }] : undefined,
+    attachments: submitted && !extra.quiz ? [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231, url: `/files/f${id}/download?download_frd=1`, preview_url: `/mock-docviewer/f${id}` }] : undefined, // (preview_url: Canvas's DocViewer for it, stood in for below)
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
@@ -1187,6 +1187,10 @@ const server = http.createServer((req, res) => {
       if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
       if (data && data.__status) return json(res, { errors: data.errors || [] }, data.__status);
       return json(res, data);
+    }
+    if (path.startsWith('/mock-docviewer/')) { // a stand-in for Canvas's DocViewer (an attachment's preview_url): the file's page with a teacher's mark on it
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>DocViewer</title></head><body style="margin:0;background:#525659;font-family:-apple-system,sans-serif"><div style="margin:24px auto;width:520px;min-height:640px;background:#fff;padding:48px 56px;box-sizing:border-box;position:relative"><h2 style="margin:0 0 16px">Submitted work</h2><p style="color:#333;line-height:1.6">Three sources, APA. The argument opens with the problem and the evidence for it.</p><div id="docviewer-mark" style="position:absolute;right:-12px;top:120px;background:#ffe9a8;border:1px solid #e0b100;border-radius:6px;padding:10px 12px;width:180px;font-size:13px;color:#4a3b00">Good evidence — cite the second study too.</div></div></body></html>`);
     }
     if (path.startsWith('/api/') || path === '/dashboard/view') return json(res, { errors: [{ message: 'not found' }] }, 404);
     if (/^\/courses\/\w+\/external_tools\/retrieve/.test(path)) { // Canvas's launch of a tool (a course's, an assignment's, a module's): the tool's own page framed, here a line of text

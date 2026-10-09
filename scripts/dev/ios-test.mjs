@@ -303,6 +303,20 @@ try {
   if (markable) await nc('markDone', { ctx, module: markable.m.id, item: markable.it.id, done: false });
   const asg = await nc('assignments', { ctx });
   check(!asg.error && asg.sections.length > 0 && asg.sections.every((x) => ['Overdue', 'Upcoming', 'Undated', 'Past'].includes(x.title)) && asg.sections.flatMap((x) => x.rows).every((r) => r.status?.word && /\/assignments\/\d+$/.test(r.url)), `assignments by when they are due, each with its status: ${JSON.stringify(asg.sections.map((x) => `${x.title}:${x.rows.length}`))}`);
+  // (Mac 1.3.8) work handed in as a file: the file carries Canvas's viewer for it (the teacher's marks), the work its page in Canvas
+  let withFile = null;
+  for (const cid of ['101', '102', '103', '104']) {
+    const list = await nc('assignments', { ctx: `courses/${cid}` });
+    for (const r of (list.sections || []).flatMap((x) => x.rows)) {
+      if (!/Submitted|Graded|\d/.test(r.status?.word || '')) continue;
+      const id = (r.url.match(/assignments\/(\d+)/) || [])[1];
+      const one = id ? await nc('assignment', { course: cid, id }) : null;
+      if (one?.submission?.files?.length && !one.quizId) { withFile = { cid, id, one }; break; }
+    }
+    if (withFile) break;
+  }
+  const wf = withFile?.one?.submission;
+  check(!!wf && /\/mock-docviewer\//.test(wf.files[0].preview || '') && new RegExp(`/courses/${withFile.cid}/assignments/${withFile.id}/submissions/\\w+$`).test(wf.viewer || '') && (withFile.one.comments || []).every((c) => c.text === c.text.trim()), `a file handed in carries Canvas's viewer for it, the work its own page, comments trimmed: ${JSON.stringify({ at: withFile && `${withFile.cid}/${withFile.id}`, preview: wf?.files?.[0]?.preview, viewer: wf?.viewer })}`);
   // (Mac 1.3.8) a tool's assignment Canvas says cannot be submitted (can_submit: false, as of every tool's) is not called closed
   const toolA = await nc('assignment', { course: '104', id: '4003' });
   check(!toolA.error && !!toolA.toolUrl && toolA.why !== 'This assignment is closed.' && !toolA.canSubmit, `a tool's assignment open in the tool is not "closed": ${JSON.stringify({ why: toolA.why, tool: !!toolA.toolUrl, canSubmit: toolA.canSubmit })}`);
