@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.28', date: '2026-10-09', notes: [
+      { kind: 'fixed', title: 'Module check marks', body: 'A module counts as done only once all its work is.', icon: P.check },
+    ] },
     { version: '2.99.27', date: '2026-10-09', notes: [
       { kind: 'new', title: 'Your grading scale', body: 'Set each letter’s cutoff to match your instructor.', icon: P.steps },
     ] },
