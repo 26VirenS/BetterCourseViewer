@@ -255,7 +255,8 @@ struct DashboardView: View {
                         if twoColumns {
                             DashTodayLine(row: row) { done in toggle(row, done) }
                         } else {
-                            RowLink { openRow(row) } label: {
+                            // (1.2.3) a press grows its preview out of the row; a double-click opens it
+                            PreviewLink(item: .work(row, engine: engine, toggle: { done in toggle(row, done) })) {
                                 WorkRowView(row: row) { done in toggle(row, done) }
                             }
                             .workMenu(WorkAction(row), engine: engine)
@@ -543,11 +544,6 @@ struct DashboardView: View {
             }
         }
         withAnimation(Motion.snappy) { list = l }
-    }
-
-    private func openRow(_ row: WorkRow) {
-        guard let url = row.url else { return }
-        engine.openWeb(url, title: row.title)
     }
 
     /// An activity item opened: its dot goes (here and on the web Dashboard), and it opens.

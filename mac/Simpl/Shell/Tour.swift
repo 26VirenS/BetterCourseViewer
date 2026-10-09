@@ -52,6 +52,7 @@ enum TourEvent: Equatable {
 enum TourSpot: Hashable {
     case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse
     case gradeRing, gradeDetails, whatIfSwitch, whatIfScore, toolPin, counterNext, counterPanel
+    case preview // (1.2.3) a piece of work's quick look (Shell/WorkPreviewOverlay.swift)
 }
 
 // MARK: - Where each part is
@@ -244,6 +245,7 @@ struct TourOverlay: View {
     @Binding var columns: NavigationSplitViewVisibility
     @EnvironmentObject private var engine: Engine
     @ObservedObject private var tour = MacTour.shared
+    @ObservedObject private var preview = WorkPreview.shared
     @AppStorage("tour:done") private var done = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var cardSize = CGSize(width: TourCard.width, height: 170)
@@ -315,10 +317,14 @@ struct TourOverlay: View {
                      doing: "Click Dashboard", act: .place { p, pushed in p == .dashboard && !pushed }),
             TourStep(id: "cards", aim: .spot(.counterNext), title: "The cards open", body: Text("Click a card to see what’s in it."),
                      doing: "Click Next 7 days", act: .event(.counterOpened)),
-            TourStep(id: "look", aim: .spot(.counterPanel), title: "A quick look", body: Text("Click anything to open it here."),
+            TourStep(id: "look", aim: .spot(.counterPanel), title: "A quick look", body: Text("Click anything to preview it here."),
                      doing: "Click an item", act: .opened),
-            TourStep(id: "close", aim: .back, title: "Close it", body: Text("You’ll be right where you were."),
-                     doing: "Click Back", act: .closed),
+            // (1.2.3) an item previewed closes where it is, as the web's does; one opened whole (a double-click) goes Back
+            preview.item != nil
+                ? TourStep(id: "close", aim: .spot(.preview), title: "Close it", body: Text("You’ll be right where you were."),
+                           doing: "Close it", act: .closed)
+                : TourStep(id: "close", aim: .back, title: "Close it", body: Text("You’ll be right where you were."),
+                           doing: "Click Back", act: .closed),
             TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands."),
                      doing: "Type anything", gesture: .type, act: .typed),
             TourStep(id: "end", aim: .none, title: "You’re all set", body: Text("Replay it any time from Help ▸ Take the Tour."), nextLabel: "Done"),
@@ -374,8 +380,8 @@ struct TourOverlay: View {
         case .place(let test): did = test(here.place, pushed)
         case .event(let e): did = tour.event == e
         case .typed: did = !engine.query.trimmingCharacters(in: .whitespaces).isEmpty
-        case .opened: did = pushed || engine.quiz != nil
-        case .closed: did = !pushed && engine.quiz == nil
+        case .opened: did = pushed || engine.quiz != nil || preview.item != nil
+        case .closed: did = !pushed && engine.quiz == nil && preview.item == nil
         }
         guard did else { return }
         advancing = true
@@ -446,7 +452,7 @@ struct TourOverlay: View {
         guard engine.phase == .native, let snap = engine.snapshot else { return false }
         let setUp = snap.setupDone != false || sawSetup
         return setUp && !engine.setup && engine.whatsNew == nil && engine.quiz == nil && !engine.newTask && !engine.newMessage
-            && !engine.settingsOpen && engine.query.isEmpty
+            && !engine.settingsOpen && engine.query.isEmpty && preview.item == nil
     }
 }
 
