@@ -239,6 +239,18 @@ struct SubmissionInfo: Codable, Hashable {
     var viewer: String?
 }
 
+/// How the class did on a piece of work: the five numbers of a box plot, the mean, your own score, out of what.
+struct ClassStats: Codable, Hashable {
+    var min: Double?
+    var lowerQ: Double?
+    var median: Double?
+    var upperQ: Double?
+    var max: Double?
+    var mean: Double?
+    var mine: Double?
+    var possible: Double?
+}
+
 struct AssignmentData: Codable {
     var id: String
     var course: String
@@ -255,6 +267,8 @@ struct AssignmentData: Codable {
     var grade: GradeInfo?
     var held: Bool?
     var stats: String?
+    /// (Mac 1.3.10) The class's scores as numbers: the box plot.
+    var classStats: ClassStats?
     var submitted: String?
     var attemptsText: String?
     var submission: SubmissionInfo?

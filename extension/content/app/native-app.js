@@ -1352,6 +1352,11 @@
       html: clean(a.description || ''), status: statusOf(st),
       grade: scored ? { text: st.word, score: Number(sub.score), possible: Number(a.points_possible) || 0, pct, letter: a.grading_type && a.grading_type !== 'points' && sub.grade ? String(sub.grade) : (pct !== null ? BCV.screens?.gpa?.letterFor?.(pct)?.[0] || null : null), late: sub.points_deducted ? `−${store.fmtPts(sub.points_deducted)} pts late` : '' } : null,
       held, stats,
+      // (Mac 1.3.10) the class's scores as numbers, for the box plot the web draws (course-detail.js classPlot)
+      classStats: scored && a.score_statistics && Number.isFinite(Number(a.score_statistics.mean)) ? (() => {
+        const st = a.score_statistics, n = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+        return { min: n(st.min), lowerQ: n(st.lower_q), median: n(st.median), upperQ: n(st.upper_q), max: n(st.max), mean: n(st.mean), mine: n(sub.score), possible: n(a.points_possible) };
+      })() : null,
       submitted: sub.submitted_at ? `Submitted ${U.fmtAt(sub.submitted_at)}${sub.late ? ' · late' : ''}` : '', attemptsText,
       // (Mac 1.3.8) each file's Canvas viewer (preview_url: DocViewer, the teacher's marks on it), and the submission's own
       // page in Canvas (its viewer and comments together) for work with no file

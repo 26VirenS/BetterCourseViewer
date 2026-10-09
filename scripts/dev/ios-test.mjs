@@ -317,6 +317,10 @@ try {
   }
   const wf = withFile?.one?.submission;
   check(!!wf && /\/mock-docviewer\//.test(wf.files[0].preview || '') && new RegExp(`/courses/${withFile.cid}/assignments/${withFile.id}/submissions/\\w+$`).test(wf.viewer || '') && (withFile.one.comments || []).every((c) => c.text === c.text.trim()), `a file handed in carries Canvas's viewer for it, the work its own page, comments trimmed: ${JSON.stringify({ at: withFile && `${withFile.cid}/${withFile.id}`, preview: wf?.files?.[0]?.preview, viewer: wf?.viewer })}`);
+  // (Mac 1.3.10) a marked assignment's class numbers, for the box plot: the five numbers, the mean, your own score, out of what
+  const boxA = await nc('assignment', { course: '101', id: '1008' });
+  const bs = boxA.classStats;
+  check(!!bs && [bs.min, bs.lowerQ, bs.median, bs.upperQ, bs.max, bs.mean, bs.possible].every((v) => typeof v === 'number') && bs.min <= bs.lowerQ && bs.lowerQ <= bs.median && bs.median <= bs.upperQ && bs.upperQ <= bs.max && typeof bs.mine === 'number', `a marked assignment carries the class's numbers for the box plot: ${JSON.stringify(bs)}`);
   // (Mac 1.3.8) a tool's assignment Canvas says cannot be submitted (can_submit: false, as of every tool's) is not called closed
   const toolA = await nc('assignment', { course: '104', id: '4003' });
   check(!toolA.error && !!toolA.toolUrl && toolA.why !== 'This assignment is closed.' && !toolA.canSubmit, `a tool's assignment open in the tool is not "closed": ${JSON.stringify({ why: toolA.why, tool: !!toolA.toolUrl, canSubmit: toolA.canSubmit })}`);

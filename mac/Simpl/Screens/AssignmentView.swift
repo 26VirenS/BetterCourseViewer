@@ -503,6 +503,7 @@ struct AssignmentView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let cs = d.classStats { ClassBoxPlot(stats: cs, tint: color) } // (1.3.10: the web's box plot)
             if !d.rubric.isEmpty { rubricJump(d) }
         }
         .padding(18)
@@ -682,6 +683,15 @@ struct AssignmentView: View {
             if again { out.append(NextStep(title: "New Attempt", symbol: "arrow.counterclockwise", help: "Take this quiz again", again: true)) }
             if !out.isEmpty { return out }
         }
+        // (1.3.10) handed in, and it may be handed in again: what was handed in (its feedback, once there is any) beside
+        // Hand In Again, as a quiz's See Feedback stands beside New Attempt
+        if d.canSubmit, d.resubmit == true, hasWork(d) {
+            let marked = d.grade != nil || !d.comments.isEmpty
+            let look = marked
+                ? NextStep(title: "See Feedback", symbol: "text.bubble", help: "Your work, with your teacher's marks and comments", feedback: true)
+                : NextStep(title: "View Submission", symbol: "doc.text.magnifyingglass", help: "What you handed in", feedback: true)
+            if let again = nextStepOne(d) { return [look, again] }
+        }
         return nextStepOne(d).map { [$0] } ?? []
     }
 
@@ -717,7 +727,9 @@ struct AssignmentView: View {
     }
 
     private func act(_ d: AssignmentData, _ step: NextStep? = nil) {
-        if let step, let q = d.quizId, step.feedback || step.again {
+        if let step, step.feedback, d.quizId == nil { // (1.3.10: work handed in, looked at in the popup)
+            review = SubmissionReview.Target(file: d.submission?.files?.first)
+        } else if let step, let q = d.quizId, step.feedback || step.again {
             engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title, begin: step.again, feedback: step.feedback))
         } else if let step = nextStep(d), step.feedback || step.again {
             act(d, step)
