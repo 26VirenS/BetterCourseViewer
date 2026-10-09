@@ -43,13 +43,20 @@ final class AnswerCache {
         guard let f = AnswerCache.file(name, args) else { return nil }
         if let d = memory[f] { return d }
         guard let d = try? Data(contentsOf: dir.appendingPathComponent(f)) else { return nil }
-        memory[f] = d
+        remember(f, d)
         return d
+    }
+
+    /// (1.2.14) What is held in memory as well as on disk, capped: past 48 answers the oldest go (the disk keeps them all).
+    private var order: [String] = []
+    private func remember(_ f: String, _ d: Data) {
+        if memory.updateValue(d, forKey: f) == nil { order.append(f) }
+        while order.count > 48 { memory.removeValue(forKey: order.removeFirst()) }
     }
 
     func keep(_ data: Data, _ name: String, _ args: [String: Any]) {
         guard !stopped, let f = AnswerCache.file(name, args) else { return }
-        memory[f] = data
+        remember(f, data)
         let url = dir.appendingPathComponent(f)
         let dir = self.dir
         disk.async {
@@ -62,6 +69,7 @@ final class AnswerCache {
     func stop() {
         stopped = true
         memory.removeAll()
+        order.removeAll()
     }
 
     private var stopped = false
@@ -69,6 +77,7 @@ final class AnswerCache {
     /// Everything kept, gone (signing out: the next account's screens are not this one's).
     func clear() {
         memory.removeAll()
+        order.removeAll()
         let dir = self.dir
         disk.async { try? FileManager.default.removeItem(at: dir) }
     }

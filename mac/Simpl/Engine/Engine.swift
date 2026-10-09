@@ -179,7 +179,27 @@ final class Engine: ObservableObject, ShellListener {
         }
     }
 
+    /// (1.2.14) The page under the app's own screens is never seen while they are up: it keeps its code and its data but
+    /// lays out, paints and animates nothing (content-visibility skips its whole body), so it costs next to no CPU, GPU
+    /// or memory for pictures; shown again (a sign-in, a page to finish by hand), it draws as before.
+    private func idlePage(_ idle: Bool) {
+        let js = """
+        (function (on) {
+          var d = document.documentElement; if (!d) return;
+          var id = 'simpl-engine-idle', s = document.getElementById(id);
+          if (on && !s) {
+            s = document.createElement('style'); s.id = id;
+            s.textContent = 'html.simpl-engine-idle body{content-visibility:hidden!important}html.simpl-engine-idle *,html.simpl-engine-idle *::before,html.simpl-engine-idle *::after{animation-play-state:paused!important;transition:none!important}';
+            (document.head || d).appendChild(s);
+          }
+          d.classList.toggle('simpl-engine-idle', !!on);
+        })(\(idle ? "true" : "false"));
+        """
+        web.webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     private func setPhase(_ p: Phase) {
+        idlePage(p == .native)
         guard phase != p else { return }
         withAnimation(.easeInOut(duration: 0.35)) { phase = p }
         if p == .native {
@@ -197,6 +217,7 @@ final class Engine: ObservableObject, ShellListener {
         // the page is what the window shows — at the start, after signing out, or a session that ran out while the
         // app's screens were up (1.2.8: they no longer stay over a sign-in, hiding its code prompts and next steps)
         guard let u = url, let h = u.host?.lowercased() else { return }
+        if phase == .native { idlePage(true) } // (a page loaded afresh under the app's screens: idle again)
         if h != host.lowercased() || LoginAssist.isSignIn(u.path), phase != .web {
             openedOnKept = false
             ready = false
