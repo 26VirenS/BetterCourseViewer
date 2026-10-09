@@ -42,6 +42,7 @@ struct RootView: View {
         .sheet(item: $engine.quiz) { q in
             QuizScreen(launch: q)
                 .environmentObject(engine)
+                .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
         }
         .sheet(isPresented: $engine.setup) {
             SetupScreen()

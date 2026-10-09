@@ -2,6 +2,7 @@ import AppKit
 import CoreServices
 import CryptoKit
 import Foundation
+import SwiftUI
 
 /// A version of Simpl for Mac that can be installed: the feed's newest, or one of the releases published on GitHub.
 struct AppRelease: Equatable, Identifiable, Sendable {
@@ -22,11 +23,12 @@ private struct UpdateFailure: LocalizedError {
 }
 
 /// Simpl for Mac keeps itself up to date (1.2), as the Safari extension's app does (`macos/…/Updater.swift`). At launch
-/// when the last look is older than two hours, and every two hours after, it reads the feed on simplcourses.com — one
+/// when the last look is older than an hour, and every hour after (1.2.19), it reads the feed on simplcourses.com — one
 /// small JSON file naming the newest version, where its zip is and the zip's SHA-256 — and when that version is newer
 /// than this one and runs on this Mac's macOS, Settings ▸ Updates offers it (Update Now). When updates install
-/// themselves (on unless turned off) one waits for a quiet moment: Simpl not in front and no sheet open, so a quiz or a
-/// message is never cut off by a relaunch. An install downloads the zip, checks it is a zip and matches the published
+/// themselves (on unless turned off) one goes in at once (1.2.19), unless a quiz is open, or an external tool's window
+/// (any window of Canvas's own pages), or a sheet or a modal panel — then it waits until they are closed, so nothing
+/// is ever cut off by a relaunch. An install downloads the zip, checks it is a zip and matches the published
 /// checksum, unpacks it with ditto, checks the app inside is Simpl, signed, and signed by the same team as this copy,
 /// puts it in this copy's place (this copy goes to the Bin; into the Applications folder when this copy cannot be
 /// replaced where it is) and opens it as this one quits. A development run never checks or installs anything.
@@ -54,9 +56,9 @@ final class Updater: ObservableObject {
     }()
     /// Simpl for Mac's releases, for Earlier Versions (each `mac-v<version>`, its zip `Simpl-Mac-<version>.zip`).
     private static let releasesAPI = "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases"
-    let interval: TimeInterval = 2 * 3600 // (a check is one small request; an update rarely waits on the hour)
+    let interval: TimeInterval = 3600 // (1.2.19: every hour; a check is one small request)
     let currentVersion: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
-    private static let lastKey = "lastUpdateCheck" // (kept across launches: a relaunch inside the two hours does not read the feed again)
+    private static let lastKey = "lastUpdateCheck" // (kept across launches: a relaunch inside the hour does not read the feed again)
 
     @Published private(set) var state: State = .idle
     @Published private(set) var lastCheck: Date? = nil
@@ -103,9 +105,9 @@ final class Updater: ObservableObject {
 
     // MARK: - The schedule
 
-    /// From the app's launch: the feed read now when the last look is older than two hours, and looked at again every
-    /// ten minutes (and whenever Simpl comes to the front) for the two hours being up — a Mac asleep does not count
-    /// its hours. An update waiting to install itself goes in when Simpl leaves the front.
+    /// From the app's launch: the feed read now when the last look is older than an hour, and looked at again every
+    /// ten minutes (and whenever Simpl comes to the front) for the hour being up — a Mac asleep does not count its
+    /// hours. An update waiting to install itself goes in as soon as nothing holds it back (`quiet`).
     func start() {
         guard !started, !Self.isDevelopmentRun else { return }
         started = true
@@ -131,7 +133,7 @@ final class Updater: ObservableObject {
         installIfQuiet()
     }
 
-    /// The feed read when the last look is two hours old (or was never made, or the clock went back).
+    /// The feed read when the last look is an hour old (or was never made, or the clock went back).
     func checkIfDue() {
         guard started else { return }
         if let last = lastCheck {
@@ -242,15 +244,27 @@ final class Updater: ObservableObject {
         begin(asked: true)
     }
 
-    /// An update that came by itself goes in only when updates are automatic and Simpl is not in use.
+    /// An update that came by itself goes in only when updates are automatic and nothing holds it back.
     func installIfQuiet() {
-        guard started, automatic, case .available = state, Self.quiet else { return }
+        guard started, automatic, case .available = state, quiet else { return }
         begin(asked: false)
     }
 
-    /// Simpl is not in front, and no window has a sheet (a quiz, a message, a task) or a modal panel open.
-    private static var quiet: Bool {
-        guard !NSApp.isActive, NSApp.modalWindow == nil else { return false }
+    /// (1.2.19) What is open that an update waits for: a quiz, an external tool's window (`UpdateHold`).
+    private var holds = 0
+
+    func hold() { holds += 1 }
+
+    /// One closed: with none left, a waiting update goes in.
+    func release() {
+        holds = max(0, holds - 1)
+        if holds == 0 { installIfQuiet() }
+    }
+
+    /// No quiz and no external tool open (1.2.19: in front or not), and no window with a sheet (a hand-in, a message, a
+    /// task) or a modal panel open.
+    private var quiet: Bool {
+        guard holds == 0, NSApp.modalWindow == nil else { return false }
         return !NSApp.windows.contains(where: { $0.isVisible && $0.attachedSheet != nil })
     }
 
@@ -321,8 +335,8 @@ final class Updater: ObservableObject {
             state = .failed(error.localizedDescription)
             return
         }
-        if !asked && !Self.quiet {
-            ready = (release: release, unpacked: unpacked) // (Simpl came back to the front meanwhile: in at the next quiet moment, no second download)
+        if !asked && !quiet {
+            ready = (release: release, unpacked: unpacked) // (a quiz or a tool opened meanwhile: in at the next quiet moment, no second download)
             state = .available(release)
             return
         }
@@ -396,6 +410,15 @@ final class Updater: ObservableObject {
         let sum = sha256?.trimmingCharacters(in: .whitespacesAndNewlines)
         state = .available(AppRelease(version: version, url: url, sha256: (sum ?? "").isEmpty ? nil : sum))
         begin(asked: true)
+    }
+}
+
+/// (1.2.19) A view an update waits for while it is shown: the quiz screen, an external tool's window.
+struct UpdateHold: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .onAppear { Updater.shared.hold() }
+            .onDisappear { Updater.shared.release() }
     }
 }
 

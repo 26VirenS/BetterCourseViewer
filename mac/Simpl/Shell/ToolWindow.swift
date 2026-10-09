@@ -64,6 +64,7 @@ struct ToolWindow: View {
         .animation(.easeOut(duration: 0.2), value: browser.loading)
         .frame(minWidth: 640, minHeight: 480)
         .background(Color(nsColor: .windowBackgroundColor))
+        .modifier(UpdateHold()) // (1.2.19: no update relaunches Simpl while a tool is open)
         .navigationTitle(title)
         .navigationSubtitle(browser.current?.host ?? "")
         .toolbar {
