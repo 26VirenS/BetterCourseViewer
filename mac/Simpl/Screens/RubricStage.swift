@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The rubric ring's stage (1.2.2): rubric-ring.js's drawing and motion on the Mac. A few values sit on one clock
+// The rubric ring's stage (1.2.3): rubric-ring.js's drawing and motion on the Mac. A few values sit on one clock
 // (RingMotion) — how far the ring has bloomed in, how far it has bent to its marks, how far it has opened a criterion
 // into its bar, how far a switch along the bar has got, and each slice's swell under the pointer — and every point of
 // the geometry is drawn from them each frame (RingPainter, in a Canvas under a TimelineView). A tween cut short starts

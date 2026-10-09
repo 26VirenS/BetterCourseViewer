@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The rubric ring over the window (1.2.2): the web's rubric-ring.js overlay on the Mac. An assignment's page shows its
+// The rubric ring over the window (1.2.3): the web's rubric-ring.js overlay on the Mac. An assignment's page shows its
 // rubric as one row (RubricSummaryRow) and the grade card's rubric button; either brings the ring up over the whole
 // window — sidebar and all — with nothing round it: the window behind dims and blurs, a little right behind the ring
 // and more around it. The ring blooms in and, marked, bends to its marks; a slice, its label or Return opens a
@@ -436,7 +436,7 @@ private struct RubricVeils: View {
 
 // MARK: - On the assignment's page
 
-/// The rubric on an assignment's page (1.2.2): one row — the ring in miniature, the rubric's name and score, how many
+/// The rubric on an assignment's page (1.2.3): one row — the ring in miniature, the rubric's name and score, how many
 /// criteria — that brings the ring up over the window.
 struct RubricSummaryRow: View {
     let data: AssignmentData
