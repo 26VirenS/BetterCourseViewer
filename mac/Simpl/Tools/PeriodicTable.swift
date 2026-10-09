@@ -133,6 +133,8 @@ struct PTGrid: View {
     var compact = false
     let pick: (PTElement) -> Void
     var hover: (PTElement?) -> Void = { _ in }
+    /// A press on the picked element's card (the pin's: the whole table opened on it).
+    var card: (PTElement) -> Void = { _ in }
 
     private let gapRow: CGFloat = 0.45
 
@@ -143,9 +145,12 @@ struct PTGrid: View {
             let byHeight = (geo.size.height - 8 * gap) / (9 + gapRow)
             let cell = max(8, min(byWidth, byHeight))
             ZStack(alignment: .topLeading) {
-                if !compact, let e = selected {
+                if let e = selected {
                     PTCornerCard(element: e, cell: cell)
                         .frame(width: 10 * (cell + gap) - gap, height: 3 * (cell + gap) - gap)
+                        .contentShape(Rectangle())
+                        .onTapGesture { card(e) }
+                        .help(compact ? "Open \(e.name) in the Periodic Table" : "")
                         .offset(x: 2 * (cell + gap), y: 0)
                 }
                 ForEach(PeriodicTable.elements) { e in
@@ -434,11 +439,13 @@ private struct PTFacts: View {
 }
 
 /// The table's pin, opened: the whole table, small, with a search that lights the matches and a line naming the element
-/// under the pointer (or the first match). A press on an element opens the table on it.
+/// under the pointer (or the first match). (1.3.5) A press on an element shows its card in the table's empty top, there
+/// in the pin; a press on the card opens the whole table on it.
 struct PeriodicTableCompact: View {
     var openFull: ([String: String]) -> Void
     @State private var query = ""
     @State private var over: PTElement?
+    @State private var picked: PTElement?
 
     private var found: [PTElement] { PeriodicTable.find(query) }
 
@@ -449,17 +456,26 @@ struct PeriodicTableCompact: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.sCallout)
                     .frame(width: 160)
-                    .onSubmit { if let e = found.first { openFull(["element": String(e.number)]) } }
+                    .onSubmit { if let e = found.first { pick(e) } }
                 Text(line)
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            PTGrid(selected: nil, matches: query.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Set(found.map(\.number)), category: nil, compact: true, pick: { e in
-                openFull(["element": String(e.number)])
-            }, hover: { e in over = e })
+            PTGrid(selected: picked, matches: query.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Set(found.map(\.number)), category: nil, compact: true,
+                   pick: { e in pick(e) }, hover: { e in over = e }, card: { e in openFull(["element": String(e.number)]) })
         }
+        // (the screenshot suite: -SimplPinElement 25 shows that element's card)
+        .onAppear {
+            let n = UserDefaults.standard.integer(forKey: "SimplPinElement")
+            if n > 0, picked == nil { picked = PeriodicTable.byNumber(n) }
+        }
+    }
+
+    /// An element shown in the card (pressed again: put away).
+    private func pick(_ e: PTElement) {
+        withAnimation(Motion.snappy) { picked = picked == e ? nil : e }
     }
 
     private var line: String {

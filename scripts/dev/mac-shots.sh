@@ -112,6 +112,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   shoot light-22-setup 14 -SimplOpen setup
   shoot light-53-whats-new 12 -SimplOpen whatsnew
+  shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   shoot dark-50-theme-forest 12 -SimplTheme Forest

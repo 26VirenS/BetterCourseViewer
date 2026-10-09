@@ -40,6 +40,12 @@ struct PinnedToolButton: View {
                 .environmentObject(engine)
         }
         .contextMenu { menu }
+        // (the screenshot suite: -SimplPinOpen ptable opens that pin's popover a moment after launch)
+        .task {
+            guard UserDefaults.standard.string(forKey: "SimplPinOpen") == kind.rawValue else { return }
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            shown = true
+        }
     }
 
     @ViewBuilder

@@ -28,6 +28,8 @@ struct AssignmentView: View {
     @State private var lit: String?
     /// Counts the hand-ins made here: each one bounces the Submitted seal once it is in view.
     @State private var handedIn = 0
+    /// (1.3.5) A quiz taken: its intro (`quizIntro`), for whether its feedback can be seen and another attempt begun.
+    @State private var quizIntro: QuizIntro?
 
     var body: some View {
         Group {
@@ -46,7 +48,7 @@ struct AssignmentView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if let d = model.data, let next = nextStep(d) {
-                    Button { act(d) } label: {
+                    Button { act(d, next) } label: {
                         Label(next.title, systemImage: next.symbol)
                     }
                     .help(next.help)
@@ -325,17 +327,26 @@ struct AssignmentView: View {
     @ViewBuilder
     private func actionPanel(_ d: AssignmentData) -> some View {
         let why = d.why ?? ""
-        if let next = nextStep(d) {
+        let steps = nextSteps(d)
+        if !steps.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Button { act(d) } label: {
-                    Label(next.title, systemImage: next.symbol)
-                        .font(.sHeadline)
-                        .frame(maxWidth: .infinity)
+                // (1.3.5) a quiz taken with an attempt left: See Feedback and New Attempt side by side, the new one lit
+                HStack(spacing: 10) {
+                    ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
+                        Button { act(d, step) } label: {
+                            Label(step.title, systemImage: step.symbol)
+                                .font(.sHeadline)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .glassButton(prominent: i == steps.count - 1)
+                        .controlSize(.extraLarge)
+                        .tint(courseTint(d))
+                        .help(step.help)
+                    }
                 }
-                .glassButton(prominent: true)
-                .controlSize(.extraLarge)
-                .tint(courseTint(d))
-                .help(next.help)
+                .animation(Motion.snappy, value: steps.map(\.title))
                 if takesDrops(d) {
                     Text(d.types.contains("online_upload") ? "Or drop files on this page." : "Or drop a link on this page.")
                         .font(.sCallout)
@@ -571,8 +582,41 @@ struct AssignmentView: View {
 
     // MARK: - Doing
 
-    /// The one thing to do next: hand in (again), take the quiz, open the discussion or the tool.
-    private func nextStep(_ d: AssignmentData) -> NextStep? {
+    /// The one thing to do next (the lit one, where there are two): see that, `nextSteps`.
+    private func nextStep(_ d: AssignmentData) -> NextStep? { nextSteps(d).last }
+
+    /// What to do next: hand in (again), take the quiz, open the discussion or the tool. A quiz taken (1.3.5): See
+    /// Feedback where its results can be seen, and New Attempt beside it while an attempt is left — as the quiz's own
+    /// screen puts them; New Attempt alone where its results are hidden.
+    private func nextSteps(_ d: AssignmentData) -> [NextStep] {
+        if d.quizId != nil, quizTaken(d) {
+            let underWay = quizIntro?.begin.hasPrefix("Continue") == true
+            if underWay { return [NextStep(title: "Continue Quiz", symbol: "checklist", help: "Go back to the attempt under way", again: true)] }
+            // (before the intro is in: its feedback, as the quiz was taken)
+            let feedback = quizIntro.map { $0.last?.feedback == true } ?? true
+            let again = quizIntro?.canStart == true
+            var out: [NextStep] = []
+            if feedback { out.append(NextStep(title: "See Feedback", symbol: "text.bubble", help: "See your last attempt’s results", feedback: true)) }
+            if again { out.append(NextStep(title: "New Attempt", symbol: "arrow.counterclockwise", help: "Take this quiz again", again: true)) }
+            if !out.isEmpty { return out }
+        }
+        return nextStepOne(d).map { [$0] } ?? []
+    }
+
+    /// A quiz with an attempt in: handed in, or graded.
+    private func quizTaken(_ d: AssignmentData) -> Bool {
+        !(d.submitted ?? "").isEmpty || d.grade != nil
+    }
+
+    /// (1.3.5) A taken quiz's intro, read once the page is: whether its feedback shows and another attempt may begin.
+    private func loadQuizIntro(_ d: AssignmentData) async {
+        guard let q = d.quizId, quizTaken(d) else { return }
+        if let i = try? await engine.call("quizIntro", ["course": course, "quiz": q], as: QuizIntro.self) {
+            withAnimation(Motion.snappy) { quizIntro = i }
+        }
+    }
+
+    private func nextStepOne(_ d: AssignmentData) -> NextStep? {
         if d.canSubmit {
             return d.resubmit == true
                 ? NextStep(title: "Hand In Again", symbol: "tray.and.arrow.up.fill", help: "Hand in this assignment again")
@@ -590,8 +634,12 @@ struct AssignmentView: View {
         return nil
     }
 
-    private func act(_ d: AssignmentData) {
-        if d.canSubmit {
+    private func act(_ d: AssignmentData, _ step: NextStep? = nil) {
+        if let step, let q = d.quizId, step.feedback || step.again {
+            engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title, begin: step.again, feedback: step.feedback))
+        } else if let step = nextStep(d), step.feedback || step.again {
+            act(d, step)
+        } else if d.canSubmit {
             handIn = true
         } else if let q = d.quizId {
             engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title))
@@ -675,6 +723,7 @@ struct AssignmentView: View {
         if model.data?.canSubmit == true, LaunchOpen.take("handin") != nil { handIn = true }
         if let d = model.data, !d.rubric.isEmpty, let shot = LaunchOpen.take("rubric") { openRubricShot(shot, d) }
         if let d = model.data { arrived(d) }
+        if let d = model.data { await loadQuizIntro(d) }
     }
 
     private func reload() async {
@@ -687,6 +736,9 @@ private struct NextStep {
     let title: String
     let symbol: String
     let help: String
+    /// (1.3.5) A quiz's: its last attempt's feedback, or a new attempt begun (or the one under way gone back to).
+    var feedback = false
+    var again = false
 }
 
 /// The assignment's page in two columns on a wide window — what to read and what was said on the left, the next step,
