@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.26"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.27"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1997,6 +1997,20 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail__gpct { flex: none; min-width: 44px; text-align: right; font: 600 13px/1.2 var(--bcv-font); }
 .bcv-gpa-detail__need { margin: 2px 0 0; font: 500 11.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-gpa-detail__note { margin: 0; font: 400 11.5px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
+/* (2.99.27) a course's grading scale, as its instructor set it: a cutoff per letter */
+.bcv-scale__toggle { margin-left: 8px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--bcv-chip, rgba(127,127,127,.14)); color: var(--bcv-ink1); font: 600 11.5px/1.2 var(--bcv-font); cursor: pointer; }
+.bcv-scale__editor { display: grid; gap: 10px; margin-top: 8px; }
+.bcv-scale__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.bcv-scale__cell { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 10px; background: var(--bcv-chip, rgba(127,127,127,.1)); }
+.bcv-scale__letter { min-width: 22px; font: 700 12.5px/1 var(--bcv-font); color: var(--bcv-ink1); }
+.bcv-scale__input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--bcv-ink1); font: 500 12.5px/1.2 var(--bcv-font); text-align: right; -moz-appearance: textfield; }
+.bcv-scale__input::-webkit-inner-spin-button, .bcv-scale__input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.bcv-scale__input:focus { outline: none; }
+.bcv-scale__cell:focus-within { box-shadow: 0 0 0 2px var(--bcv-accent, #0a84ff); }
+.bcv-scale__pct { font: 400 11.5px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-scale__err { font: 500 11.5px/1.4 var(--bcv-font); color: #ff453a; }
+.bcv-scale__err:empty { display: none; }
+.bcv-scale__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .bcv-gpa-detail__legend { display: flex; gap: 14px; flex-wrap: wrap; }
 .bcv-gpa-detail__lg { display: flex; align-items: center; gap: 6px; }
 .bcv-gpa-detail__lgtext { font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink2); }

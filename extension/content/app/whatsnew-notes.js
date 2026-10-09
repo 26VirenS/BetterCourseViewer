@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.27', date: '2026-10-09', notes: [
+      { kind: 'new', title: 'Your grading scale', body: 'Set each letter’s cutoff to match your instructor.', icon: P.steps },
+    ] },
     { version: '2.99.26', date: '2026-10-09', notes: [
       { kind: 'improved', title: 'Rubric ring first', body: 'Every rubric opens on the ring. Grid is one click away.', icon: P.layers },
     ] },

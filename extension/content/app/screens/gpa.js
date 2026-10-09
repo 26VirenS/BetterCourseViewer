@@ -23,10 +23,34 @@
     const letter = Number.isInteger(t) ? OLD_SCALE[t] : typeof t === 'string' ? t : null;
     return letter ? SCALE.findIndex((s) => norm(s[0]) === norm(letter)) : -1;
   };
-  const letterFor = (pct) => SCALE.find((s) => pct >= s[1]) || SCALE[SCALE.length - 1];
+  const letterFor = (pct, scale = SCALE) => scale.find((s) => pct >= s[1]) || scale[scale.length - 1];
+  // (2.99.27) a course's own grading scale, as its instructor set it (the syllabus's cutoffs): the student's entry, kept
+  // per course in gradeScales ({ [course]: { 'A+': 97, A: 93, … } }); a letter left out keeps the standard cutoff. F is
+  // always 0. Read with each screen that letters a score (loadScales); the same letters in the same order as SCALE.
+  let scales = {};
+  const scaleOf = (cid) => {
+    const own = cid != null ? scales[String(cid)] : null;
+    if (!own || typeof own !== 'object') return SCALE;
+    return SCALE.map(([l, min, pts]) => { const v = Number(own[norm(l)]); return [l, norm(l) === 'F' ? 0 : Number.isFinite(v) ? v : min, pts]; });
+  };
+  const hasScale = (cid) => cid != null && !!scales[String(cid)];
+  const loadScales = async () => {
+    const v = await store.pref('gradeScales', {}).catch(() => ({}));
+    scales = v && typeof v === 'object' ? v : {};
+    return scales;
+  };
+  /** A course's scale saved ({ letter: min% }), or let go (null): the standard again. Cutoffs must fall letter by letter. */
+  const setScale = async (cid, map) => {
+    await loadScales();
+    const all = { ...scales };
+    if (map) all[String(cid)] = map; else delete all[String(cid)];
+    scales = all;
+    await store.setPref('gradeScales', all);
+    return scaleOf(cid);
+  };
   const isPassFail = (t) => typeof t === 'string' && /^p\s*\/\s*f$/i.test(t.trim()); // the setup's Pass/Fail switch, saved in place of a letter
   // Canvas's own letter when the course publishes one, else the standard scale
-  const pointsFor = (letter, pct) => (norm(letter) in POINTS ? POINTS[norm(letter)] : letterFor(pct)[2]);
+  const pointsFor = (letter, pct, scale = SCALE) => (norm(letter) in POINTS ? POINTS[norm(letter)] : letterFor(pct, scale)[2]);
   const gpa2 = (n) => (n === null || n === undefined ? '—' : n.toFixed(2));
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const shortCode = (c) => (c.shortName || c.name).replace(/^[A-Z]\d{2}-/, '');
@@ -222,6 +246,7 @@
     body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
 
     introIfFirst(ctx.app).catch(() => {}); // the first opening: the tour's steps, waiting for the cards as they draw
+    await loadScales(); // (2.99.27) each course's own grading scale, where entered
     const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref, ownPref] = await Promise.all([
       store.courses({ maxAge: store.freshness.grades }).catch(() => null), store.currentTerm().catch(() => ''), // never a score older than the freshness: a tool may have posted one since
       store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true), store.pref('gradeWeights'),
@@ -279,24 +304,27 @@
       const rows = scored.map((c) => {
         const op = ownPct(c); // (the student's own weights: their total, and a letter from it, never Canvas's)
         const pct = op !== null ? op : Number(c.score);
-        const letter = op === null && c.grade ? String(c.grade).replace(/-/g, '−') : letterFor(pct)[0];
-        const pts = pointsFor(op === null ? c.grade : null, pct);
+        // (2.99.27) the course's own scale, where the student entered it, letters the score (over Canvas's letter)
+        const S = scaleOf(c.id);
+        const canvasLetter = op === null && !hasScale(c.id) ? c.grade : null;
+        const letter = canvasLetter ? String(canvasLetter).replace(/-/g, '−') : letterFor(pct, S)[0];
+        const pts = pointsFor(canvasLetter, pct, S);
         const m = courseMath(groupsBy.get(c.id), c.weighted, ownFor(c));
-        const found = SCALE.findIndex((s) => norm(s[0]) === norm(letter));
-        const defaultIdx = found >= 0 ? found : SCALE.indexOf(letterFor(pct));
+        const found = S.findIndex((s) => norm(s[0]) === norm(letter));
+        const defaultIdx = found >= 0 ? found : S.indexOf(letterFor(pct, S));
         const saved = targetIndex(targets[c.id]);
-        const idx = clamp(saved >= 0 ? saved : defaultIdx, 0, SCALE.length - 1);
-        const target = SCALE[idx];
+        const idx = clamp(saved >= 0 ? saved : defaultIdx, 0, S.length - 1);
+        const target = S[idx];
         const needed = m.known ? m.needed(target[1]) : null;
         const met = needed === null ? pct >= target[1] : needed <= 0;
         const reachable = needed === null ? met : needed <= 100;
-        return { c, pct, letter, pts, m, idx, target, needed, met, reachable };
+        return { c, pct, letter, pts, m, idx, target, needed, met, reachable, S };
       });
       const n = rows.length;
       const termGpa = n ? rows.reduce((s, r) => s + r.pts, 0) / n : null;
       // the range's low end: the remaining work of each course landing LOWER_BY points under its
       // current score (a course with nothing left to grade stays where it is)
-      const lowGpa = n ? rows.reduce((s, r) => s + pointsFor(null, r.m.known && r.m.slope > 0 ? r.m.project(Math.max(0, r.pct - LOWER_BY) / 100) : r.pct), 0) / n : null;
+      const lowGpa = n ? rows.reduce((s, r) => s + pointsFor(null, r.m.known && r.m.slope > 0 ? r.m.project(Math.max(0, r.pct - LOWER_BY) / 100) : r.pct, r.S), 0) / n : null;
       const cum = hasPrior() && termGpa !== null ? (tracking.priorGpa * tracking.priorCourses + termGpa * n) / (tracking.priorCourses + n) : null;
       // on-time: every submitted, dated assignment across the shown courses; Canvas's own `late` flag decides
       let submitted = 0, onTime = 0;
@@ -689,7 +717,7 @@
             U.el('bcv-gpa-detail__line', [
               U.text(`bcv-gpa-detail__pct ${hyp !== null ? 'is-hyp' : ''}`, shownPct !== null && shownPct !== undefined ? `${store.fmtPts(shownPct)}%` : 'N/A', 'span'),
               hyp !== null
-                ? h('span', { class: 'bcv-gpa-detail__letter is-hyp', text: `${letterFor(hyp)[0]} · what-if` })
+                ? h('span', { class: 'bcv-gpa-detail__letter is-hyp', text: `${letterFor(hyp, scaleOf(c.id))[0]} · what-if` })
                 : h('span', { class: 'bcv-gpa-detail__letter', style: r || pfPct !== null ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : pf ? 'Pass/Fail' : 'No grade yet' }),
               r ? U.el('bcv-gpa-detail__target', [
                 U.text('bcv-gpa-detail__tlabel', 'Target', 'span'),
@@ -821,7 +849,7 @@
         // A repaint (a what-if typed, a target stepped) keeps each side where it was scrolled to.
         const scrolled = ['.bcv-gpa-detail__cols', '.bcv-gpa-detail__col--left', '.bcv-gpa-detail__col--right'].map((sel) => [sel, sheet.querySelector(sel)?.scrollTop || 0]);
         sheet.replaceChildren(head, U.el('bcv-sheet__list bcv-gpa-detail__body', U.el('bcv-gpa-detail__cols', [
-          U.el('bcv-gpa-detail__col bcv-gpa-detail__col--left', [byGroup, weights]),
+          U.el('bcv-gpa-detail__col bcv-gpa-detail__col--left', [byGroup, weights, scaleSection(c, () => { current = model(); draw(); paint(); })]),
           U.el('bcv-gpa-detail__col bcv-gpa-detail__col--right', [list]),
         ])));
         for (const [sel, top] of scrolled) if (top) { const el = sheet.querySelector(sel); if (el) el.scrollTop = top; }
@@ -1107,5 +1135,48 @@
     return { items, counts };
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y };
+  /** (2.99.27) The course's grading scale, as its instructor set it: a cutoff per letter, entered from the syllabus;
+   *  Save keeps it (letters, targets and Grade needed follow it), Standard scale lets it go. */
+  function scaleSection(c, changed) {
+    const S = scaleOf(c.id);
+    const own = hasScale(c.id);
+    const open = { on: own };
+    const inputs = new Map();
+    const status = U.text('bcv-gpa-detail__hsub', own ? 'Your instructor’s scale' : 'The standard scale', 'span');
+    const grid = U.el('bcv-scale__grid', S.filter(([l]) => norm(l) !== 'F').map(([l, min]) => {
+      const inp = h('input', { type: 'number', class: 'bcv-scale__input', min: '0', max: '100', step: '0.01', value: String(min), 'aria-label': `Lowest percentage for ${l}` });
+      inputs.set(norm(l), inp);
+      return h('label', { class: 'bcv-scale__cell' }, [U.text('bcv-scale__letter', l, 'span'), inp, U.text('bcv-scale__pct', '%', 'span')]);
+    }));
+    const err = U.text('bcv-scale__err', '', 'div');
+    const save = U.btn('Save scale', { kind: 'primary', onClick: async () => {
+      const map = {};
+      let last = Infinity;
+      for (const [l] of S) {
+        if (norm(l) === 'F') continue;
+        const v = Number(inputs.get(norm(l)).value);
+        if (!Number.isFinite(v) || v < 0 || v > 100) { err.textContent = `${l} needs a percentage from 0 to 100.`; return; }
+        if (v >= last) { err.textContent = `${l}’s cutoff must be lower than the letter above it.`; return; }
+        last = v;
+        map[norm(l)] = v;
+      }
+      err.textContent = '';
+      await setScale(c.id, map);
+      U.toast(`Saved ${c.shortName || c.name}’s grading scale.`);
+      changed();
+    } });
+    const reset = U.btn('Standard scale', { onClick: async () => { await setScale(c.id, null); U.toast('Back to the standard scale.'); changed(); } });
+    const editor = U.el('bcv-scale__editor', [
+      U.text('bcv-gpa-detail__note', 'Enter the lowest percentage for each letter, as your syllabus or instructor sets it.'),
+      grid, err, U.el('bcv-scale__actions', [own ? reset : null, save]),
+    ]);
+    editor.hidden = !open.on;
+    const toggle = h('button', { type: 'button', class: 'bcv-scale__toggle', 'aria-expanded': String(open.on), text: open.on ? 'Hide' : 'Edit', onclick: () => { open.on = !open.on; editor.hidden = !open.on; toggle.textContent = open.on ? 'Hide' : 'Edit'; toggle.setAttribute('aria-expanded', String(open.on)); } });
+    return U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line bcv-scale', [
+      U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Grading scale', 'span'), status, toggle]),
+      editor,
+    ]);
+  }
+
+  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, loadScales, setScale };
 })();

@@ -205,6 +205,9 @@ struct GradeRow: Codable, Identifiable, Hashable {
     var own: Bool?
     var target: String?
     var cats: [GradeCategory]
+    /// (Mac 1.2.17) The course's grading scale (its instructor's, where the student entered it), and whether it is theirs.
+    var scale: [ScaleStep]?
+    var ownScale: Bool?
 }
 
 struct ScaleStep: Codable, Hashable {

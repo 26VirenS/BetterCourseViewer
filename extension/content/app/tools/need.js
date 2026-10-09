@@ -47,13 +47,19 @@
     }
     return out.sort((x, y) => (y.worth - x.worth) || ((y.due || 0) - (x.due || 0)));
   }
-  const nextLetter = (now) => { for (let i = SCALE.length - 1; i >= 0; i--) if (SCALE[i][1] > now) return SCALE[i]; return SCALE[0]; };
+  const nextLetter = (now, scale = SCALE) => { for (let i = scale.length - 1; i >= 0; i--) if (scale[i][1] > now) return scale[i]; return scale[0]; };
   const an = (letter) => (/^A/.test(letter) ? `an ${letter}` : `a ${letter}`);
 
   async function open(app, { from = null, now = null, worth = null, goal = null } = {}) {
     const tool = T.toolOf('need');
     const own = now !== null || worth !== null || goal !== null; // numbers handed in (the pin's quick menu): no course
     const st = { courses: [], course: own ? '' : null, pieces: [], piece: own ? 'custom' : '', now: now ?? '', worth: worth ?? '', goal: goal ?? '', letter: goal === null ? '' : 'custom', loading: false, note: '' };
+    // (2.99.27) the chosen course's own grading scale, where the student entered it on Grades; else the standard
+    const scaleNow = () => {
+      const G = BCV.screens?.gpa;
+      return st.course && G?.scaleOf ? G.scaleOf(st.course).filter(([l]) => l !== 'F').map(([l, cut]) => [l, cut]) : SCALE;
+    };
+    BCV.screens?.gpa?.loadScales?.().then(() => { if (p.alive?.()) paint(); }).catch(() => {});
     const body = U.el('bcv-need');
     const p = T.popup({ tool, title: 'Grade needed', sub: '', width: 620, body, from });
     // the fields, made once (typing in them must not redraw them)
@@ -108,7 +114,7 @@
         st.now = c.score === null || c.score === undefined ? '' : String(r1(Number(c.score)));
         nowF.inp.value = st.now;
         const n = num(st.now);
-        if (n !== null) { const [letter, cut] = nextLetter(n); st.letter = letter; st.goal = String(cut); goalF.inp.value = st.goal; }
+        if (n !== null) { const [letter, cut] = nextLetter(n, scaleNow()); st.letter = letter; st.goal = String(cut); goalF.inp.value = st.goal; }
         st.loading = true;
         paint();
         let groups = [];
@@ -123,7 +129,7 @@
         st.own = own;
         if (own) { // (the score to start from is the one your own weights give, not Canvas's)
           const t = BCV.store.gradeModel(groups, c, {}, false, false, [], { ownWeights: own }).total;
-          if (t !== null && t !== undefined) { st.now = String(r1(Number(t))); nowF.inp.value = st.now; const n = num(st.now); if (n !== null) { const [letter, cut] = nextLetter(n); st.letter = letter; st.goal = String(cut); goalF.inp.value = st.goal; } }
+          if (t !== null && t !== undefined) { st.now = String(r1(Number(t))); nowF.inp.value = st.now; const n = num(st.now); if (n !== null) { const [letter, cut] = nextLetter(n, scaleNow()); st.letter = letter; st.goal = String(cut); goalF.inp.value = st.goal; } }
         }
         st.pieces = pieces(c, groups, own);
         const first = st.pieces.find((x) => x.worth > 0);
@@ -142,7 +148,7 @@
       const x = pieceOf();
       worthF.el.hidden = !!x;
       pieceHint.textContent = x ? (c?.weighted || st.own ? `${x.group} is ${x.groupWeight}% of the grade${st.own ? ' (your own weights)' : ''}; this is ${U.plural(x.pts, 'point')} of the group's ${x.groupPts}.` : `${U.plural(x.pts, 'point')} of the course's ${x.total}.`) : st.loading ? 'Reading the assignments…' : c && !st.pieces.length ? `Nothing left ungraded that ${LMS} knows of. Type what the work is worth.` : 'How much of the final grade the work still to come is worth.';
-      goalBox.replaceChildren(U.picker([...SCALE.map(([l, cut]) => ({ value: l, text: `${l} · ${cut}%` })), { value: 'custom', text: 'A number of my own' }], st.letter || 'custom', (v) => { st.letter = v; const s = SCALE.find(([l]) => l === v); if (s) { st.goal = String(s[1]); goalF.inp.value = st.goal; } paintResult(); }, { label: 'The grade you want', placeholder: 'Choose a letter' }));
+      goalBox.replaceChildren(U.picker([...scaleNow().map(([l, cut]) => ({ value: l, text: `${l} · ${cut}%` })), { value: 'custom', text: 'A number of my own' }], st.letter || 'custom', (v) => { st.letter = v; const s = scaleNow().find(([l]) => l === v); if (s) { st.goal = String(s[1]); goalF.inp.value = st.goal; } paintResult(); }, { label: 'The grade you want', placeholder: 'Choose a letter' }));
       paintResult();
     }
     function paintResult() {
@@ -150,7 +156,8 @@
       const x = pieceOf();
       const where = x ? `on ${x.name}` : 'on what is left';
       const r = needed(nowV, worthV, goalV);
-      const letter = SCALE.find(([l]) => l === st.letter && Number(l && st.goal) === SCALE.find(([m]) => m === l)?.[1]) ? st.letter : null;
+      const S = scaleNow();
+      const letter = S.find(([l]) => l === st.letter && Number(l && st.goal) === S.find(([m]) => m === l)?.[1]) ? st.letter : null;
       const goalWord = letter ? `${an(letter)} (${goalV}%)` : goalV === null ? 'your goal' : `${goalV}%`;
       noteEl.hidden = !(worthV !== null && (worthV <= 0 || worthV > 100));
       noteEl.textContent = 'The work left has to be worth something between 0 and 100% of the grade.';
@@ -160,7 +167,7 @@
       );
       const list = [];
       if (nowV !== null && worthV !== null) {
-        for (const [l, cut] of SCALE) {
+        for (const [l, cut] of S) {
           const q = needed(nowV, worthV, cut);
           if (!q) break;
           list.push(h('div', { class: `bcv-need__row ${q.kind === 'over' ? 'is-over' : ''} ${l === st.letter ? 'is-goal' : ''}` }, [h('span', { text: l }), h('span', { text: q.kind === 'over' ? 'out of reach' : q.kind === 'under' ? 'already there' : `${q.pct}%` })]));

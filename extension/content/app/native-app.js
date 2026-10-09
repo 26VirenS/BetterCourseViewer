@@ -743,6 +743,7 @@
   // Grades: the term GPA on the 4.0 scale, each course's score, letter, categories and target — phone.js gpa()'s numbers
   async function grades() {
     const G = BCV.screens.gpa;
+    await G.loadScales?.(); // (2.99.27) each course's own grading scale, where entered
     const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref, ownPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots'), store.pref('gradeWeights')]);
     if (!all) return { error: 'Your courses could not be loaded.' };
     const ownW = ownPref && typeof ownPref === 'object' ? ownPref : {};
@@ -769,13 +770,16 @@
         if (a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined) graded++;
       }
       const ti = G.targetIndex(targets[c.id]);
+      const S = G.scaleOf ? G.scaleOf(c.id) : G.SCALE;
+      const ownScale = !!G.hasScale?.(c.id);
       return {
         id: String(c.id), code: c.shortName || c.name, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), color: c.color || GRAY, url: `/courses/${c.id}/grades`,
         pct: scored ? pct : null, pctText: scored ? `${store.fmtPts(pct)}%` : 'N/A',
-        letter: scored ? (op !== null || !c.grade ? G.letterFor(pct)[0] : String(c.grade).replace(/-/g, '−')) : null,
-        points: scored ? (op !== null ? G.letterFor(pct)[2] : G.pointsFor(c.grade, pct)) : null,
+        letter: scored ? (op !== null || ownScale || !c.grade ? G.letterFor(pct, S)[0] : String(c.grade).replace(/-/g, '−')) : null,
+        points: scored ? (op !== null || ownScale ? G.letterFor(pct, S)[2] : G.pointsFor(c.grade, pct)) : null,
         graded, total, own: op !== null,
         target: ti >= 0 ? G.SCALE[ti][0] : null,
+        scale: S.map(([letter, min, points]) => ({ letter, min, points })), ownScale,
         cats: (gmFor(c).legend || []).slice(0, 4).map((ct) => ({ label: ct.label, weight: ct.weightText || '', value: ct.value, pct: ct.pct ?? null, color: ct.color })),
       };
     });
@@ -794,6 +798,29 @@
       trend: tracking && snaps.length >= 2 ? snaps.map((s) => ({ date: s.date, gpa: s.gpa })) : [],
       minY: G.MIN_Y, maxY: G.MAX_Y,
     };
+  }
+  /** (2.99.27) A course's grading scale, as its instructor set it: { letter: min% } from A+ down to D (F is 0), or null for
+   *  the standard scale again. Cutoffs must fall letter by letter. */
+  async function setScale({ id, scale = null } = {}) {
+    const G = BCV.screens.gpa;
+    if (!G?.setScale || id === null || id === undefined) return { ok: false };
+    if (scale && typeof scale === 'object') {
+      const map = {};
+      let last = Infinity;
+      for (const [l] of G.SCALE) {
+        const k = String(l).replace(/−/g, '-').toUpperCase();
+        if (k === 'F') continue;
+        const v = Number(scale[k] ?? scale[l]);
+        if (!Number.isFinite(v) || v < 0 || v > 100 || v >= last) throw new Error(`${l} needs a cutoff from 0 to 100, lower than the letter above it.`);
+        last = v;
+        map[k] = v;
+      }
+      await G.setScale(String(id), map);
+    } else {
+      await G.setScale(String(id), null);
+    }
+    gradeCache.delete(String(id));
+    return { ok: true };
   }
   async function setGoal({ goal } = {}) { const g = Math.max(0, Math.min(4, Number(goal))); if (!Number.isFinite(g)) return { ok: false }; await store.setPref('gpaGoal', +g.toFixed(2)); return { ok: true }; }
   async function setTarget({ id, letter = null } = {}) {
@@ -1995,8 +2022,11 @@
     const on = !!switchOn || Object.keys(wi).length > 0 || extra.length > 0;
     const m = store.gradeModel(entry.groups, entry.c, wi, on, false, extra, { ownWeights: entry.own });
     const total = m.total === null || m.total === undefined ? null : Number(m.total);
-    const canvasLetter = !on && entry.c.grade && !entry.own ? String(entry.c.grade).replace(/-/g, '−') : null;
-    const letter = total === null ? null : canvasLetter || G.letterFor(total)[0];
+    await G.loadScales?.();
+    const S = G.scaleOf ? G.scaleOf(entry.c.id) : G.SCALE; // (2.99.27) the course's own grading scale, where entered
+    const ownScale = !!G.hasScale?.(entry.c.id);
+    const canvasLetter = !on && entry.c.grade && !entry.own && !ownScale ? String(entry.c.grade).replace(/-/g, '−') : null;
+    const letter = total === null ? null : canvasLetter || G.letterFor(total, S)[0];
     const legend = new Map((m.legend || []).map((g) => [String(g.id), g]));
     const ungraded = new Map((m.ungraded || []).map((g) => [String(g.id), g]));
     // each group keeps its own colour while scores are tried (the web screen greys its rings instead)
@@ -2016,12 +2046,12 @@
     if (others) {
       const pts = (rowsOf) => { const p = rowsOf.filter((x) => x !== null); return p.length ? p.reduce((s, x) => s + x, 0) / p.length : null; };
       gpa = pts(others.map((r) => r.points));
-      if (on && total !== null) gpaIf = pts(others.map((r) => (r.id === key ? G.letterFor(total)[2] : r.points)).concat(others.some((r) => r.id === key) ? [] : [G.letterFor(total)[2]]));
+      if (on && total !== null) gpaIf = pts(others.map((r) => (r.id === key ? G.letterFor(total, S)[2] : r.points)).concat(others.some((r) => r.id === key) ? [] : [G.letterFor(total, S)[2]]));
     }
     return {
       id: key, code: entry.short, name: entry.c.name, color: entry.c.color || GRAY,
       total, totalText: total === null ? '—' : `${store.fmtPts(total)}%`, letter, note: m.center?.note || '', final: m.center?.final || '', whatIf: on, weighted: !!m.weighted,
-      target: entry.target ? String(entry.target).replace(/-/g, '−') : null, scale: G.SCALE.map(([l, min, points]) => ({ letter: l, min, points })),
+      target: entry.target ? String(entry.target).replace(/-/g, '−') : null, scale: S.map(([l, min, points]) => ({ letter: l, min, points })), ownScale,
       groups, rows, gpa, gpaIf,
     };
   }
@@ -2084,7 +2114,7 @@
     return { ok: true };
   }
 
-  const CALLS = { convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

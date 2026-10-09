@@ -346,6 +346,7 @@ private struct GradeCourseDetail: View {
     @State private var detail: CourseGradesData?
     @State private var detailFor: String?
     @State private var failed = false
+    @State private var editingScale = false
 
     private static let firstShown = 8
 
@@ -423,8 +424,20 @@ private struct GradeCourseDetail: View {
                     Label("Open Course", systemImage: "arrow.up.right")
                 }
                 .glassButton()
+                // (1.2.17) the course's grading scale, as its instructor set it
+                Button {
+                    editingScale = true
+                } label: {
+                    Label("Grading Scale…", systemImage: "slider.horizontal.3")
+                }
+                .glassButton()
+                .help(row.ownScale == true ? "Your instructor’s cutoffs for each letter" : "Set each letter’s cutoff as your instructor did")
             }
             .controlSize(.large)
+        }
+        .sheet(isPresented: $editingScale) {
+            GradingScaleSheet(courseID: row.id, course: row.code, scale: row.scale ?? scale, own: row.ownScale == true)
+                .environmentObject(engine)
         }
     }
 
@@ -1806,5 +1819,118 @@ private struct GradeBar: View {
         let share = CGFloat(min(max(mark, 0), 1))
         let x = width * share - 1
         return min(max(x, 0), max(width - 2, 0))
+    }
+}
+
+
+/// (1.2.17) A course's grading scale, as its instructor set it (the syllabus's cutoffs): the lowest percentage for each
+/// letter from A+ down to D (F is anything under). Saved, the course's letter, its target and Grade needed follow it;
+/// Standard Scale goes back to the usual cutoffs.
+private struct GradingScaleSheet: View {
+    let courseID: String
+    let course: String
+    let scale: [ScaleStep]
+    let own: Bool
+    @EnvironmentObject private var engine: Engine
+    @Environment(\.dismiss) private var dismiss
+    @State private var values: [String: String] = [:]
+    @State private var error: String?
+    @State private var saving = false
+
+    private var letters: [ScaleStep] { scale.filter { $0.letter != "F" } }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Grading Scale").font(.sTitle3.weight(.semibold))
+                Text(course).font(.sCallout).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            Form {
+                Section {
+                    ForEach(letters, id: \.letter) { s in
+                        LabeledContent(s.letter) {
+                            HStack(spacing: 4) {
+                                TextField("", text: binding(s.letter), prompt: Text(Self.fmt(s.min)))
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 70)
+                                Text("% and up").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("Enter the lowest percentage for each letter, as your syllabus or instructor sets it.")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                }
+                if let error {
+                    Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            Divider()
+            HStack {
+                if own {
+                    Button("Standard Scale") { Task { await save(nil) } }
+                }
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") { if let m = collect() { Task { await save(m) } } }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+            }
+            .disabled(saving)
+            .padding(16)
+        }
+        .frame(width: 400, height: 560)
+        .onAppear {
+            for s in letters where values[s.letter] == nil { values[s.letter] = Self.fmt(s.min) }
+        }
+    }
+
+    private func binding(_ letter: String) -> Binding<String> {
+        Binding(get: { values[letter] ?? "" }, set: { values[letter] = $0 })
+    }
+
+    private static func fmt(_ v: Double) -> String {
+        v == v.rounded() ? String(Int(v)) : String(format: "%g", v)
+    }
+
+    /// The cutoffs typed, checked: each from 0 to 100, each lower than the letter above it.
+    private func collect() -> [String: Double]? {
+        var out: [String: Double] = [:]
+        var last = Double.infinity
+        for s in letters {
+            let raw = (values[s.letter] ?? "").trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "%", with: "")
+            guard let v = Double(raw), v >= 0, v <= 100 else {
+                error = "\(s.letter) needs a percentage from 0 to 100."
+                return nil
+            }
+            guard v < last else {
+                error = "\(s.letter)’s cutoff must be lower than the letter above it."
+                return nil
+            }
+            last = v
+            out[s.letter.replacingOccurrences(of: "−", with: "-")] = v
+        }
+        error = nil
+        return out
+    }
+
+    /// Saved (`nil`: the standard scale again).
+    private func save(_ map: [String: Double]?) async {
+        saving = true
+        defer { saving = false }
+        let args: [String: Any] = ["id": courseID, "scale": map.map { $0 as Any } ?? NSNull()]
+        do {
+            _ = try await engine.call("setScale", args, as: OK.self)
+            engine.changed()
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }

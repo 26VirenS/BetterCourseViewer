@@ -256,6 +256,17 @@ try {
   const converted = await nc('convertFile', { name: 'notes.txt', type: 'text/plain', data: Buffer.from('Lab notes\nLine two').toString('base64'), allowed: ['pdf'] });
   const pdfHead = converted.data ? Buffer.from(converted.data, 'base64').subarray(0, 5).toString() : '';
   check(!convInfo.error && convInfo.exts.includes('txt') && /converted to PDF/.test(convInfo.line) && converted.converted === true && converted.name === 'notes.pdf' && pdfHead === '%PDF-', `the hand-in converts a file of another type to one the assignment takes: ${JSON.stringify({ exts: convInfo.exts, line: convInfo.line, name: converted.name, type: converted.type, head: pdfHead, error: converted.error })}`);
+  // (2.99.27) a course's grading scale, as its instructor set it: the course's letter follows it; the standard scale again after
+  const gBefore = await nc('grades');
+  const course = gBefore.rows.find((r) => r.pct !== null && r.pct > 90 && r.pct < 93) || gBefore.rows.find((r) => r.pct !== null);
+  const cut = Math.floor(course.pct) - 1;
+  const own = { 'A+': 99, A: cut, 'A-': cut - 2, 'B+': cut - 4, B: cut - 6, 'B-': cut - 8, 'C+': cut - 10, C: cut - 12, 'C-': cut - 14, D: cut - 24 };
+  const setOk = await nc('setScale', { id: course.id, scale: own });
+  const gOwn = (await nc('grades')).rows.find((r) => r.id === course.id);
+  const bad = await nc('setScale', { id: course.id, scale: { ...own, B: own['B+'] + 1 } });
+  await nc('setScale', { id: course.id, scale: null });
+  const gBack = (await nc('grades')).rows.find((r) => r.id === course.id);
+  check(setOk.ok && gOwn.letter === 'A' && gOwn.ownScale === true && gOwn.scale.find((x) => x.letter === 'A').min === cut && !!bad.error && gBack.ownScale === false && gBack.letter === course.letter, `a course's own grading scale letters its score (and a scale out of order is refused): ${JSON.stringify({ pct: course.pct, before: course.letter, own: gOwn.letter, back: gBack.letter, bad: bad.error })}`);
   // (iPhone 1.6) an address the app has no screen for as it stands is opened where it leads: a module item is the item it names
   const viaItem = await nc('resolveUrl', { url: '/courses/102/modules/items/i2' });
   const viaPage = await nc('resolveUrl', { url: '/courses/102/modules/items/i1' });
