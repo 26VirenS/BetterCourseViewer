@@ -462,9 +462,15 @@ struct DashboardView: View {
     }
 
     private func loadCounts() async {
-        // (1.2: only the live counts — the copy kept from the last visit is not shown, a count from before misleads)
-        if let fresh = try? await engine.call("todayCounts", ["kept": false], as: TodayCounts.self) {
-            withAnimation(Motion.snappy) { counts = fresh }
+        // (1.2.12) Overdue and Graded at once, as the web Dashboard has them: counted from the assignments the page keeps
+        // (read on the last visit), then from Canvas's answer now — reading every course again took a while
+        async let quick = try? engine.call("todayCounts", ["kept": true], as: TodayCounts.self)
+        async let fresh = try? engine.call("todayCounts", ["kept": false], as: TodayCounts.self)
+        if let k = await quick, k.overdue != nil, counts == nil {
+            withAnimation(Motion.snappy) { counts = k }
+        }
+        if let f = await fresh {
+            withAnimation(Motion.snappy) { counts = f }
         }
     }
 

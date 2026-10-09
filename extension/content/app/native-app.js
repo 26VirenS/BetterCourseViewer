@@ -321,7 +321,9 @@
     const W = kept ? st.W : st.Wf;
     const [od, gr] = await Promise.all([W.overdueP, W.gradedP]);
     if (!od || !gr) return { overdue: null, graded: null };
-    st.counts = { od, gr };
+    // (Mac 1.2.12) the kept copy and the live answer are asked side by side: the kept one never overwrites the live one
+    if (!kept || !st.countsLive) st.counts = { od, gr };
+    if (!kept) st.countsLive = true;
     return {
       overdue: od.overdue.length, graded: gr.graded.length,
       // (Simpl for Mac 1.2) the lines under the two numbers, as the web Dashboard's counters have them
