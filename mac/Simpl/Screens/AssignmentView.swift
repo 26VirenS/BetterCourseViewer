@@ -788,6 +788,11 @@ struct AssignmentView: View {
         // (the screenshot suite: -SimplOpen feedback opens the feedback popup)
         if let d = model.data, hasWork(d), LaunchOpen.take("feedback") != nil { review = SubmissionReview.Target(file: d.submission?.files?.first) }
         if let d = model.data { await loadQuizIntro(d) }
+        // (the screenshot suite: what the page has, to the console)
+        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil, let d = model.data {
+            NSLog("SimplAssignment %@: files %d, comments %d, steps %@, review %d, handIn %d, error %@", id, d.submission?.files?.count ?? 0, d.comments.count,
+                  nextSteps(d).map(\.title).joined(separator: "+"), review == nil ? 0 : 1, handIn ? 1 : 0, model.error ?? "-")
+        }
     }
 
     private func reload() async {
