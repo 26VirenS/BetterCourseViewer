@@ -1,9 +1,9 @@
 {
-  "version": "1.2.1",
-  "url": "https://github.com/26VirenS/BetterCourseViewer/releases/download/mac-v1.2.1/Simpl-Mac-1.2.1.zip",
-  "sha256": "c5a7a561c51e185705d37e9a6703237ed917a13dc5d2f95efd44d88a35178292",
-  "size": 47212813,
+  "version": "1.2.2",
+  "url": "https://github.com/26VirenS/BetterCourseViewer/releases/download/mac-v1.2.2/Simpl-Mac-1.2.2.zip",
+  "sha256": "d52a69d6e473fe5d1fb0df1e29ddd07af00e390bd5924446893527d830ea9d95",
+  "size": 47247894,
   "minimumOS": "14.0",
-  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/mac-v1.2.1",
-  "published": "2026-10-08T23:56:05Z"
+  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/mac-v1.2.2",
+  "published": "2026-10-09T00:05:38Z"
 }
