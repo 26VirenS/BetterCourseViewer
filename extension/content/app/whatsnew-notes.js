@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.29', date: '2026-10-09', notes: [
+      { kind: 'improved', title: 'Square counters', body: 'A wide Dashboard shows its six counters in a row.', icon: P.layers },
+    ] },
     { version: '2.99.28', date: '2026-10-09', notes: [
       { kind: 'fixed', title: 'Module check marks', body: 'A module counts as done only once all its work is.', icon: P.check },
     ] },
