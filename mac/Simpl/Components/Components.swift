@@ -6,20 +6,40 @@ import SwiftUI
 struct Page<Content: View>: View {
     var maxWidth: CGFloat = 1480
     var spacing: CGFloat = 22
+    /// (1.3) The width the content has, as the window gives it — never what the content itself grew to — for a screen
+    /// laying itself out by it (the Dashboard's columns).
+    var onWidth: ((CGFloat) -> Void)? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
         GeometryReader { g in
+            let pad: CGFloat = g.size.width < 700 ? 22 : 40 // (1.3: a narrow window keeps its room for the content)
+            let room = max(0, min(maxWidth, g.size.width - pad * 2))
             ScrollView {
                 VStack(alignment: .leading, spacing: spacing) { content }
                     .frame(maxWidth: maxWidth, alignment: .leading)
-                    .padding(.horizontal, g.size.width < 700 ? 22 : 40) // (1.3: a narrow window keeps its room for the content)
+                    .padding(.horizontal, pad)
                     .padding(.top, 26)
                     .padding(.bottom, 40)
                     .frame(maxWidth: .infinity)
             }
+            .environment(\.pageWidth, room)
+            .onAppear { onWidth?(room) }
+            .onChange(of: room) { _, w in onWidth?(w) }
         }
         .background(PageGround())
+    }
+}
+
+private struct PageWidthKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension EnvironmentValues {
+    /// (1.3) The width a page's content has (Page), for what lays itself out by width inside it.
+    var pageWidth: CGFloat? {
+        get { self[PageWidthKey.self] }
+        set { self[PageWidthKey.self] = newValue }
     }
 }
 

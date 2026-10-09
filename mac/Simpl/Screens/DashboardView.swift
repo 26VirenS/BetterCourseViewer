@@ -75,16 +75,10 @@ struct DashboardView: View {
     // MARK: - The page
 
     private func page(_ d: Today) -> some View {
-        Page(spacing: 26) {
+        // (1.3: the width the window gives the page — read inside the page, a wide layout once drawn held itself wide)
+        Page(spacing: 26, onWidth: { w in if abs(w - width) > 0.5 { width = w } }) {
             ScreenHeading(title: greeting(d), sub: d.dateLine)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    GeometryReader { g in
-                        Color.clear
-                            .onAppear { width = g.size.width }
-                            .onChange(of: g.size.width) { _, w in width = w }
-                    }
-                }
             // (laid out once the page's width is known: the counters' rows and the columns follow it)
             if width > 0 {
                 VStack(alignment: .leading, spacing: 26) {

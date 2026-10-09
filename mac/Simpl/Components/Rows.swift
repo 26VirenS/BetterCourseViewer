@@ -357,6 +357,9 @@ struct PillFlow: Layout {
 struct WidthGate: ViewModifier {
     let threshold: CGFloat
     @Binding var wide: Bool
+    /// (1.3) The page's own width: a view never counts as wider than the page it is on (a wide layout, once drawn, can
+    /// hold its view wide; the page says what the window really gives).
+    @Environment(\.pageWidth) private var pageWidth
 
     func body(content: Content) -> some View {
         content.background {
@@ -364,12 +367,14 @@ struct WidthGate: ViewModifier {
                 Color.clear
                     .onAppear { update(geo.size.width) }
                     .onChange(of: geo.size.width) { _, w in update(w) }
+                    .onChange(of: pageWidth) { _, _ in update(geo.size.width) }
             }
         }
     }
 
-    private func update(_ width: CGFloat) {
-        guard width > 0 else { return }
+    private func update(_ measured: CGFloat) {
+        guard measured > 0 else { return }
+        let width = min(measured, pageWidth ?? .infinity)
         let w = width >= threshold
         if w != wide { wide = w }
     }
