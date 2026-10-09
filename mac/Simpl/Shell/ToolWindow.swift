@@ -265,6 +265,8 @@ final class ToolBrowser: ObservableObject {
 struct ToolWebView: NSViewRepresentable {
     let url: URL
     let browser: ToolBrowser
+    /// (1.3.10) Scripts of the page's own put in too (the feedback popup's restyling of Canvas's viewer).
+    var scripts: [WKUserScript] = []
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -275,6 +277,7 @@ struct ToolWebView: NSViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = []
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
         config.userContentController.addUserScript(ToolDarkPage.script)
+        for script in scripts { config.userContentController.addUserScript(script) }
         let v = WKWebView(frame: .zero, configuration: config)
         v.allowsBackForwardNavigationGestures = true
         v.allowsMagnification = true

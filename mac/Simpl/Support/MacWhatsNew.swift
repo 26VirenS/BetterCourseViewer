@@ -12,6 +12,7 @@ enum MacWhatsNew {
         Release(version: "1.3.10", date: "2026-10-09", notes: [
             ReleaseNote(kind: "new", title: "How the class did", body: "A box plot of the class's scores, with yours on it."),
             ReleaseNote(kind: "improved", title: "Your work, then again", body: "See Feedback or View Submission beside Hand In Again."),
+            ReleaseNote(kind: "improved", title: "A Mac-like viewer", body: "Canvas's file viewer wears the Mac's look in Feedback."),
         ]),
         Release(version: "1.3.9", date: "2026-10-09", notes: [
             ReleaseNote(kind: "fixed", title: "Complete grades", body: "A complete grade shows a tick in its ring, not a word."),

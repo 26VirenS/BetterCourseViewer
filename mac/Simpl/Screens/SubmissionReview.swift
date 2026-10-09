@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import WebKit
 
 /// (1.3.8) Your work and what was said about it, in a popup over the assignment: on the left the file in Canvas's own
 /// viewer (DocViewer: the teacher's marks drawn on it, as Canvas shows them), one file at a time where there are several;
@@ -200,7 +201,7 @@ private struct CanvasViewer: View {
     @StateObject private var browser = ToolBrowser()
 
     var body: some View {
-        ToolWebView(url: url, browser: browser)
+        ToolWebView(url: url, browser: browser, scripts: [DocViewerSkin.script()])
             .overlay(alignment: .top) {
                 if browser.loading {
                     ProgressView(value: browser.progress)
@@ -248,5 +249,70 @@ private struct QuickLookFile: View {
         } catch {
             problem = error.localizedDescription
         }
+    }
+}
+
+/// (1.3.10) Canvas's file viewer (DocViewer) dressed to sit in a Mac window: its toolbar becomes a translucent bar in
+/// the system's font, its buttons rounded and lit under the pointer, the tool in use in the accent, its dashed rules
+/// hairlines, its page field a rounded field — light or dark with the Mac. DocViewer's markup is its own and unnamed,
+/// so the bar is found by its shape (a bar across the top of the page holding several buttons), looked for again as the
+/// viewer draws itself; a viewer it does not find is left exactly as Canvas draws it.
+enum DocViewerSkin {
+    @MainActor
+    static func script() -> WKUserScript {
+        let accent = AppearanceStore.shared.accentHex ?? "#0a84ff"
+        let source = """
+        (() => {
+          if (window.__simplSkin) return; window.__simplSkin = true;
+          const accent = \(String(reflecting: accent));
+          const css = `
+            .simpl-bar { background: rgba(246,246,248,.82) !important; -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+              border: 0 !important; border-bottom: 1px solid rgba(0,0,0,.1) !important; box-shadow: none !important; color: rgba(0,0,0,.82) !important; }
+            .simpl-bar, .simpl-bar * { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif !important; letter-spacing: 0 !important; text-transform: none !important; }
+            .simpl-bar button, .simpl-bar [role="button"], .simpl-bar a { border-radius: 8px !important; background: transparent !important; color: inherit !important;
+              box-shadow: none !important; transition: background-color .12s ease, color .12s ease; }
+            .simpl-bar button:hover, .simpl-bar [role="button"]:hover, .simpl-bar a:hover { background: rgba(0,0,0,.07) !important; }
+            .simpl-bar button:active, .simpl-bar [role="button"]:active { background: rgba(0,0,0,.12) !important; }
+            .simpl-bar :is(button, [role="button"])[aria-pressed="true"], .simpl-bar :is(button, [role="button"])[aria-checked="true"],
+            .simpl-bar :is(button, [role="button"])[aria-selected="true"], .simpl-bar .simpl-on { background: ${accent} !important; color: #fff !important; }
+            .simpl-bar :is(button, [role="button"])[aria-pressed="true"] *, .simpl-bar .simpl-on * { color: #fff !important; fill: currentColor; }
+            .simpl-bar input { border-radius: 7px !important; border: 1px solid rgba(0,0,0,.14) !important; background: #fff !important; color: rgba(0,0,0,.85) !important;
+              box-shadow: inset 0 .5px 1px rgba(0,0,0,.06) !important; text-align: center; }
+            .simpl-bar input:focus { outline: 3px solid color-mix(in srgb, ${accent} 45%, transparent) !important; outline-offset: 0; }
+            .simpl-bar .simpl-rule { border-style: solid !important; border-color: rgba(0,0,0,.12) !important; }
+            @media (prefers-color-scheme: dark) {
+              .simpl-bar { background: rgba(40,40,44,.82) !important; border-bottom-color: rgba(255,255,255,.08) !important; color: rgba(255,255,255,.88) !important; }
+              .simpl-bar button:hover, .simpl-bar [role="button"]:hover, .simpl-bar a:hover { background: rgba(255,255,255,.1) !important; }
+              .simpl-bar button:active, .simpl-bar [role="button"]:active { background: rgba(255,255,255,.16) !important; }
+              .simpl-bar input { background: rgba(255,255,255,.08) !important; border-color: rgba(255,255,255,.14) !important; color: rgba(255,255,255,.9) !important; }
+              .simpl-bar .simpl-rule { border-color: rgba(255,255,255,.12) !important; }
+            }`;
+          const put = () => { if (document.head && !document.getElementById('simpl-skin')) { const st = document.createElement('style'); st.id = 'simpl-skin'; st.textContent = css; document.head.appendChild(st); } };
+          // the bar: across the top of the page, short, holding three buttons or more
+          const find = () => {
+            put();
+            const W = window.innerWidth || 1;
+            for (const b of document.querySelectorAll('button, [role="button"]')) {
+              let el = b.parentElement;
+              while (el && el !== document.body) {
+                const r = el.getBoundingClientRect();
+                if (r.top <= 4 && r.width >= W * .7 && r.height >= 30 && r.height <= 160 && el.querySelectorAll('button, [role="button"]').length >= 3) {
+                  if (!el.classList.contains('simpl-bar')) {
+                    el.classList.add('simpl-bar');
+                    for (const x of el.querySelectorAll('*')) { const cs = getComputedStyle(x); if (/dashed|dotted/.test(cs.borderLeftStyle + cs.borderRightStyle + cs.borderTopStyle + cs.borderBottomStyle)) x.classList.add('simpl-rule'); }
+                  }
+                  return;
+                }
+                el = el.parentElement;
+              }
+            }
+          };
+          let t = 0;
+          const soon = () => { clearTimeout(t); t = setTimeout(find, 120); };
+          const go = () => { find(); new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true }); };
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true }); else go();
+        })();
+        """
+        return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
     }
 }
