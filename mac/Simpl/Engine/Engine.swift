@@ -395,12 +395,19 @@ final class Engine: ObservableObject, ShellListener {
         Task { await Reminders.shared.reschedule(self) }
     }
 
-    /// View → Reload: Canvas asked afresh (the page's caches let go), then every screen reads again.
+    /// View → Reload and the toolbar's Refresh (1.3.2): Canvas asked afresh (the page's caches let go), then every
+    /// screen reads again. `refreshing` while it goes (the button turns); a second press meanwhile is the same one.
+    @Published private(set) var refreshing = false
+
     func refresh() {
+        guard !refreshing else { return }
+        refreshing = true
         Task {
             _ = try? await call("refresh", as: OK.self)
             await loadSidebar()
             changed()
+            try? await Task.sleep(nanoseconds: 400_000_000) // (the screens' own reads begin; the turn shows it was done)
+            refreshing = false
         }
     }
 

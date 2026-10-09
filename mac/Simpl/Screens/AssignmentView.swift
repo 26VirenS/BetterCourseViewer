@@ -936,9 +936,8 @@ private struct HandInSheet: View {
     @State private var convertible = ConvertInfo(exts: [], line: "")
     /// Files being converted to a type the assignment takes, by name.
     @State private var converting: [String] = []
-    /// (1.3) A chosen file looked at in a window growing out of the sheet's right edge (Screens/HandInPreview.swift).
+    /// (1.3.2) A chosen file looked at in a pane at the sheet's right, the sheet widening for it (HandInPreview.swift).
     @ObservedObject private var preview = HandInPreview.shared
-    @StateObject private var sheetWindow = WindowRef()
 
     private static let limit = 50 * 1024 * 1024 // (read whole into memory and handed to the page: kept to a sane size)
 
@@ -950,6 +949,41 @@ private struct HandInSheet: View {
     }
 
     var body: some View {
+        HStack(spacing: 0) {
+            form
+                .frame(width: 580)
+            if preview.file != nil {
+                Divider()
+                HandInPreviewPane(preview: preview)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .frame(minHeight: 460, idealHeight: 560)
+        .overlay { dropOverlay }
+        .dropDestination(for: URL.self) { urls, _ in
+            take(urls)
+        } isTargeted: { on in
+            withAnimation(Motion.snappy) { targeted = on }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: allowedTypes, allowsMultipleSelection: true) { result in
+            pickedFiles(result)
+        }
+        .onChange(of: photos) { _, _ in pickedPhotos() }
+        .onAppear {
+            if !dropped.isEmpty { _ = take(dropped) }
+            // (the screenshot suite: -SimplHandInPreview <file> puts a file in and opens its preview)
+            if let path = UserDefaults.standard.string(forKey: "SimplHandInPreview"), let data = FileManager.default.contents(atPath: path) {
+                let f = PickedFile(name: (path as NSString).lastPathComponent, type: "application/octet-stream", data: data)
+                files.append(f)
+                preview.toggle(f)
+            }
+        }
+        .onDisappear { preview.close(animated: false) }
+        .task { await loadConvertible() }
+        .interactiveDismissDisabled(sending)
+    }
+
+    private var form: some View {
         VStack(spacing: 0) {
             header
             Form {
@@ -982,22 +1016,6 @@ private struct HandInSheet: View {
             Divider()
             footer
         }
-        .frame(minWidth: 520, idealWidth: 580, minHeight: 460, idealHeight: 560)
-        .overlay { dropOverlay }
-        .dropDestination(for: URL.self) { urls, _ in
-            take(urls)
-        } isTargeted: { on in
-            withAnimation(Motion.snappy) { targeted = on }
-        }
-        .fileImporter(isPresented: $importing, allowedContentTypes: allowedTypes, allowsMultipleSelection: true) { result in
-            pickedFiles(result)
-        }
-        .onChange(of: photos) { _, _ in pickedPhotos() }
-        .onAppear { if !dropped.isEmpty { _ = take(dropped) } }
-        .onDisappear { preview.close(animated: false) }
-        .background { WindowProbe(ref: sheetWindow).frame(width: 0, height: 0) }
-        .task { await loadConvertible() }
-        .interactiveDismissDisabled(sending)
     }
 
     // MARK: - Parts
@@ -1108,11 +1126,11 @@ private struct HandInSheet: View {
         .accessibilityLabel("Drop files here, or choose them")
     }
 
-    /// (1.3) A press on the file shows it in a window growing out of the sheet's right edge (again: puts it away).
+    /// (1.3) A press on the file shows it in a pane at the sheet's right, the sheet widening for it (again: puts it away).
     private func fileRow(_ f: PickedFile) -> some View {
         let open = preview.showing == f.id
         return HStack(spacing: 10) {
-            Button { preview.toggle(f, beside: sheetWindow.window) } label: {
+            Button { preview.toggle(f) } label: {
                 HStack(spacing: 10) {
                     Image(nsImage: HandInSheet.icon(f.name))
                         .resizable()
@@ -1136,7 +1154,7 @@ private struct HandInSheet: View {
             }
             .buttonStyle(RowButtonStyle(radius: 8))
             .help(open ? "Close the preview" : "Preview \(f.name)")
-            .accessibilityHint(Text(open ? "Closes its preview" : "Shows a preview beside this sheet"))
+            .accessibilityHint(Text(open ? "Closes its preview" : "Shows a preview in this sheet"))
             Button { remove(f) } label: {
                 Image(systemName: "xmark.circle.fill")
             }
@@ -1146,7 +1164,7 @@ private struct HandInSheet: View {
             .accessibilityLabel("Remove \(f.name)")
         }
         .contextMenu {
-            Button(open ? "Close Preview" : "Preview") { preview.toggle(f, beside: sheetWindow.window) }
+            Button(open ? "Close Preview" : "Preview") { preview.toggle(f) }
             Button("Remove", role: .destructive) { remove(f) }
         }
         .transition(.opacity)

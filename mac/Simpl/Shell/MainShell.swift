@@ -81,6 +81,17 @@ struct MainShell: View {
                 }
                 .controlGroupStyle(.navigation)
             }
+            // (1.3.2) Refresh: everything asked of the school afresh, whatever screen this is (View ▸ Reload, ⌘R)
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    engine.refresh()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                        .modifier(Turning(on: engine.refreshing))
+                }
+                .disabled(engine.phase != .native)
+                .help("Refresh (⌘R): everything read from \(engine.lmsName) again")
+            }
             // (1.2) the tools pinned to the toolbar, on every screen: a press opens the tool's quick version in a popover;
             // a running focus timer shows its minutes here (mac/Simpl/Tools/PinnedTools.swift)
             if !tools.toolbarPins(timerActive: focus.active).isEmpty {
@@ -90,6 +101,19 @@ struct MainShell: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// (1.3.2) A symbol turning while something goes (macOS 15's rotate effect; still before it).
+private struct Turning: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.symbolEffect(.rotate, isActive: on)
+        } else {
+            content
         }
     }
 }

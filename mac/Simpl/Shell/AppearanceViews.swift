@@ -6,13 +6,17 @@ import SwiftUI
 
 // MARK: - The radial picker
 
-/// The web's radial picker (content/app/personalize.js): a hue ring round the outside; inside it, saturation up the
-/// left arc (grey to full) and depth down the right (light to deep); the colour in the middle, with how it reads as
-/// words on a light ground and on a dark one. Dragged anywhere on a part, that part follows the pointer.
+/// The web's radial picker (content/app/personalize.js, setup-css.js .pz__pk), drawn as the web draws it: a disc with a
+/// thin hue band round its edge; inside it, saturation up the left arc (grey to full) and depth down the right (light to
+/// deep), each named along its arc; and at the middle the colour as words — "Aa" on white over "Aa" on the dark card,
+/// each stepped until it reads — ringed in the colour, with Done on it. Dragged anywhere on a part, that part follows.
 struct RadialColorPicker: View {
     let value: AppearanceStore.Custom
     let change: (AppearanceStore.Custom) -> Void
+    var done: () -> Void = {}
     @State private var mode: Mode?
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Mode { case hue, sat, depth }
     private let size: CGFloat = 272
@@ -30,24 +34,30 @@ struct RadialColorPicker: View {
     var body: some View {
         let hex = value.hex
         ZStack {
-            // the hue ring
+            Circle().fill(.regularMaterial)
+            Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+            // the hue band: 108 to 127 from the middle, the web's
             Circle()
-                .stroke(AngularGradient(colors: stride(from: 0, through: 360, by: 30).map { color(Double($0), 1, 0.5) },
-                                        center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 34)
-                .frame(width: 236, height: 236)
-            arc(200, 340, AngularGradient(colors: [color(value.h, 0, lightness), color(value.h, 1, lightness)],
-                                          center: .center, startAngle: .degrees(110), endAngle: .degrees(250)))
-            arc(20, 160, AngularGradient(colors: [color(value.h, value.s, 0.72), color(value.h, value.s, 0.32)],
-                                         center: .center, startAngle: .degrees(-70), endAngle: .degrees(70)))
-            label("SATURATION", at: pt(270, 62), angle: -90)
-            label("DEPTH", at: pt(90, 62), angle: 90)
-            knob(at: pt(value.h, 118), fill: color(value.h, 1, 0.5), r: 11)
-            knob(at: pt(200 + value.s * 140, 86), fill: Color(hex: hex), r: 9)
-            knob(at: pt(20 + value.depth / 100 * 140, 86), fill: Color(hex: hex), r: 9)
+                .stroke(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, Color(red: 1, green: 0, blue: 1), .red],
+                                        center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 19)
+                .frame(width: 235, height: 235)
+            arc(200, 340, LinearGradient(colors: [color(value.h, 0, lightness), color(value.h, 1, lightness)],
+                                         startPoint: UnitPoint(x: 0.5, y: 232 / size), endPoint: UnitPoint(x: 0.5, y: 40 / size)))
+            arc(20, 160, LinearGradient(colors: [color(value.h, value.s, 0.72), color(value.h, value.s, 0.32)],
+                                        startPoint: UnitPoint(x: 0.5, y: 40 / size), endPoint: UnitPoint(x: 0.5, y: 232 / size)))
+            curved("SATURATION", around: 270)
+            curved("DEPTH", around: 90)
+            knob(at: pt(value.h, 117.5), fill: color(value.h, 1, 0.5), r: 11, line: 3.5)
+            knob(at: pt(200 + value.s * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
+            knob(at: pt(20 + value.depth / 100 * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
             core(hex)
         }
         .frame(width: size, height: size)
-        .contentShape(Rectangle())
+        .shadow(color: .black.opacity(0.28), radius: 24, y: 14)
+        .scaleEffect(shown || reduceMotion ? 1 : 0.92)
+        .opacity(shown ? 1 : 0)
+        .onAppear { withAnimation(Motion.gentle) { shown = true } }
+        .contentShape(Circle())
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { g in turn(g.startLocation, g.location) }
@@ -63,52 +73,81 @@ struct RadialColorPicker: View {
         }
     }
 
-    private func arc(_ a0: Double, _ a1: Double, _ fill: AngularGradient) -> some View {
+    private func arc<S: ShapeStyle>(_ a0: Double, _ a1: Double, _ fill: S) -> some View {
         Path { p in
             p.addArc(center: CGPoint(x: c, y: c), radius: 86, startAngle: .degrees(a0 - 90), endAngle: .degrees(a1 - 90), clockwise: false)
         }
         .stroke(fill, style: StrokeStyle(lineWidth: 14, lineCap: .round))
     }
 
-    private func label(_ text: String, at p: CGPoint, angle: Double) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .tracking(1.2)
-            .foregroundStyle(.secondary)
-            .rotationEffect(.degrees(angle))
-            .position(p)
+    /// A word set along its arc at 66 from the middle, each letter turned to the arc (the web's textPath): up the left
+    /// side for saturation, down the right for depth.
+    private func curved(_ text: String, around centre: Double) -> some View {
+        let letters = Array(text)
+        let step = 6.7 / 66 * 180 / .pi // (degrees a letter takes, with the web's .14em tracking)
+        let first = centre - Double(letters.count - 1) / 2 * step
+        return ZStack {
+            ForEach(Array(letters.enumerated()), id: \.offset) { i, ch in
+                let a = first + Double(i) * step
+                Text(String(ch))
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(a))
+                    .position(pt(a, 66))
+            }
+        }
+        .frame(width: size, height: size)
+        .allowsHitTesting(false)
     }
 
-    private func knob(at p: CGPoint, fill: Color, r: CGFloat) -> some View {
+    private func knob(at p: CGPoint, fill: Color, r: CGFloat, line: CGFloat) -> some View {
         Circle()
             .fill(fill)
-            .overlay(Circle().strokeBorder(.white, lineWidth: 3))
-            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            .overlay(Circle().strokeBorder(.white, lineWidth: line))
+            .shadow(color: .black.opacity(0.3), radius: 2.5, y: 1)
             .frame(width: r * 2, height: r * 2)
             .position(p)
+            .allowsHitTesting(false)
     }
 
-    /// The colour, and how it reads as words: on white (left) and on the dark card (right), each stepped until it reads.
+    /// The colour as words, by day over by night, ringed in the colour; Done on it, in it.
     private func core(_ hex: String) -> some View {
         let ns = NSColor(Color(hex: hex))
+        let dark = NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
         let onLight = Color(nsColor: AppearanceStore.readable(ns, on: .white, ratio: 4.5))
-        let onDark = Color(nsColor: AppearanceStore.readable(ns, on: NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1), ratio: 4.5))
+        let onDark = Color(nsColor: AppearanceStore.readable(ns, on: dark, ratio: 4.5))
+        let ink: Color = AppearanceStore.luminance(ns) > 0.36 ? Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255) : .white
         return ZStack {
-            Circle().fill(Color(hex: hex))
-            HStack(spacing: 0) {
-                Text("Aa").font(.system(size: 15, weight: .bold)).foregroundStyle(onLight)
-                    .frame(width: 44, height: 30).background(Color.white)
-                Text("Aa").font(.system(size: 15, weight: .bold)).foregroundStyle(onDark)
-                    .frame(width: 44, height: 30).background(Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255))
+            VStack(spacing: 0) {
+                Text("Aa").font(.system(size: 17, weight: .bold)).foregroundStyle(onLight)
+                    .padding(.top, 14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(Color.white)
+                Text("Aa").font(.system(size: 17, weight: .bold)).foregroundStyle(onDark)
+                    .padding(.bottom, 14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .background(Color(nsColor: dark))
             }
-            .clipShape(Capsule())
-            .offset(y: 22)
+            .clipShape(Circle())
+            Button(action: done) {
+                Text("Done")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(ink)
+                    .padding(.horizontal, 13)
+                    .frame(height: 26)
+                    .background(Capsule().fill(Color(hex: hex)))
+                    .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
         }
         .frame(width: 112, height: 112)
+        .overlay(Circle().strokeBorder(Color(hex: hex), lineWidth: 3).padding(-3))
+        .shadow(color: .black.opacity(0.25), radius: 9, y: 6)
         .help("How your colour reads as words, by day and by night")
     }
 
-    /// A drag on the picker: the part it began on follows the pointer.
+    /// A drag on the picker: the part it began on follows the pointer (the core's Done keeps its own press).
     private func turn(_ start: CGPoint, _ now: CGPoint) {
         func read(_ p: CGPoint) -> (a: Double, d: Double) {
             let dx = Double(p.x - c), dy = Double(p.y - c)

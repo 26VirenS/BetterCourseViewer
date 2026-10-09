@@ -344,6 +344,15 @@ private struct AppearancePane: View {
                     customDot
                     Spacer(minLength: 0)
                 }
+                // (1.3.2) the picker in the pane, under the colours, as the web's opens in its panel
+                if picking {
+                    RadialColorPicker(value: store.custom, change: { store.setCustom($0) }, done: {
+                        withAnimation(Motion.gentle) { picking = false }
+                    })
+                    .padding(.vertical, 18)
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
+                }
             } header: {
                 Text("Colour")
             } footer: {
@@ -418,7 +427,10 @@ private struct AppearancePane: View {
     /// Custom: a rainbow round the colour of your own; pressed, the radial picker.
     private var customDot: some View {
         let on = store.wearingCustom
-        return Button { picking = true } label: {
+        return Button {
+            withAnimation(Motion.gentle) { picking.toggle() }
+            if !store.wearingCustom { store.setCustom(store.custom) }
+        } label: {
             ZStack {
                 Circle()
                     .fill(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center))
@@ -432,15 +444,6 @@ private struct AppearancePane: View {
         .buttonStyle(.plain)
         .help("Any colour")
         .accessibilityLabel(Text("Custom colour"))
-        .popover(isPresented: $picking, arrowEdge: .bottom) {
-            VStack(spacing: 12) {
-                RadialColorPicker(value: store.custom) { store.setCustom($0) }
-                Button("Done") { picking = false }
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(16)
-            .onAppear { if !store.wearingCustom { store.setCustom(store.custom) } }
-        }
     }
 }
 

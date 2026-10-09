@@ -108,6 +108,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-51b-settings-picker 12 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot light-03-todo 12 -SimplPlace todo
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+  shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   shoot light-22-setup 14 -SimplOpen setup
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
