@@ -404,24 +404,30 @@ struct QuizFeedbackPane: View {
                 filterRows(rows)
             }
             if !rows.isEmpty {
+                // (1.3.9) the questions as a small card of tiles, as the attempt's are — no bubbles
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Questions")
-                        .font(.sHeadline)
-                    GlassGroup(spacing: 6) {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 38, maximum: 46), spacing: 8)], alignment: .leading, spacing: 8) {
-                            ForEach(rows) { r in
-                                Button { go(to: r, proxy: proxy) } label: {
-                                    QuizVerdictChip(n: r.n, verdict: r.verdict)
-                                        .opacity(passes(r) ? 1 : 0.4)
-                                }
-                                .buttonStyle(QuizChipStyle())
-                                .help("Question \(r.n) · \(r.verdictText)")
-                                .accessibilityLabel("Question \(r.n), \(r.verdictText)")
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Questions")
+                            .font(.sHeadline)
+                        Spacer(minLength: 6)
+                        Text("\(rows.filter { $0.verdict == "right" }.count) of \(rows.count) right")
+                            .font(.sFootnote.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
+                        ForEach(rows) { r in
+                            Button { go(to: r, proxy: proxy) } label: {
+                                QuizVerdictChip(n: r.n, verdict: r.verdict)
+                                    .opacity(passes(r) ? 1 : 0.4)
                             }
+                            .buttonStyle(QuizTileStyle())
+                            .help("Question \(r.n) · \(r.verdictText)")
+                            .accessibilityLabel("Question \(r.n), \(r.verdictText)")
                         }
-                        .padding(.vertical, 2)
                     }
                 }
+                .padding(14)
+                .card(radius: 16)
             }
         }
     }
@@ -616,7 +622,8 @@ struct QuizFeedbackPane: View {
     }
 }
 
-/// A question's chip in the feedback's column: its number on glass, in the colour of how it went.
+/// A question's tile in the feedback's column: its number in a small rounded square, washed in the colour of how it
+/// went (green, red, orange; grey where it was not marked). Flat, as the attempt's tiles are.
 private struct QuizVerdictChip: View {
     let n: Int
     let verdict: String
@@ -631,12 +638,13 @@ private struct QuizVerdictChip: View {
     }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         Text("\(n)")
             .font(.sCallout.weight(.semibold).monospacedDigit())
             .foregroundStyle(ink)
-            .frame(width: 38, height: 38)
-            .background(Circle().fill(ink.opacity(verdict == "none" ? 0 : 0.18)))
-            .glass(Circle())
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .background(shape.fill(verdict == "none" ? Color.primary.opacity(0.07) : ink.opacity(0.18)))
+            .contentShape(shape)
     }
 }
 

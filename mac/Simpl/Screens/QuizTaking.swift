@@ -460,7 +460,8 @@ private struct QuizNumberTile: View {
 }
 
 /// A tile as a button: a touch brighter under the pointer, a little smaller under a click (under Reduce Motion, dimmed).
-private struct QuizTileStyle: ButtonStyle {
+/// The feedback's tiles use it too.
+struct QuizTileStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         TileBody(configuration: configuration)
     }
@@ -524,36 +525,6 @@ enum QuizClickProbe {
                                           windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
                 NSApp.postEvent(e, atStart: false)
             }
-        }
-    }
-}
-
-/// A chip as a button: it grows a little under the pointer and gives under a click (under Reduce Motion the click
-/// dims it instead). The feedback's chips use it too.
-struct QuizChipStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        ChipBody(configuration: configuration)
-    }
-
-    private struct ChipBody: View {
-        let configuration: ButtonStyleConfiguration
-        @State private var hover = false
-        @Environment(\.isEnabled) private var enabled
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-        private var scale: CGFloat {
-            if reduceMotion { return 1 }
-            if configuration.isPressed { return 0.92 }
-            return hover && enabled ? 1.08 : 1
-        }
-
-        var body: some View {
-            configuration.label
-                .scaleEffect(scale)
-                .opacity(reduceMotion && configuration.isPressed ? 0.7 : 1)
-                .animation(Motion.hover, value: hover)
-                .animation(Motion.snappy, value: configuration.isPressed)
-                .onHover { hover = $0 }
         }
     }
 }

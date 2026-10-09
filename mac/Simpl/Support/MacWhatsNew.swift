@@ -12,6 +12,7 @@ enum MacWhatsNew {
         Release(version: "1.3.9", date: "2026-10-09", notes: [
             ReleaseNote(kind: "fixed", title: "Complete grades", body: "A complete grade shows a tick in its ring, not a word."),
             ReleaseNote(kind: "fixed", title: "Quiz drop-downs", body: "An unanswered drop-down says Select, never an answer."),
+            ReleaseNote(kind: "improved", title: "Results as tiles", body: "A quiz's results show their questions as tiles too."),
         ]),
         Release(version: "1.3.8", date: "2026-10-09", notes: [
             ReleaseNote(kind: "improved", title: "Locked work opens", body: "Open locked items to see why and when they open."),

@@ -263,7 +263,7 @@ final class Engine: ObservableObject, ShellListener {
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty { openWeb(push, title: "") }
         if let q = LaunchOpen.take("quiz:") {
             let parts = q.split(separator: ":").map(String.init)
-            if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && (parts[2] == "take" || parts[2] == "review"), startAt: parts.count > 3 ? Int(parts[3]) : nil, review: parts.count > 2 && parts[2] == "review") }
+            if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && (parts[2] == "take" || parts[2] == "review"), startAt: parts.count > 3 ? Int(parts[3]) : nil, feedback: parts.count > 2 && parts[2] == "feedback", review: parts.count > 2 && parts[2] == "review") }
         } else if let t = LaunchOpen.take("tool:") {
             let parts = t.split(separator: ":").map(String.init)
             if parts.count == 2 { tool = .courseTool(course: parts[0], id: parts[1], title: "Tool") }

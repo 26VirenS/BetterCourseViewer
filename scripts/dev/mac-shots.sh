@@ -102,6 +102,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   shoot light-19-quiz-question 14 -SimplOpen quiz:101:9011:take:5
   shoot light-19d-quiz-click 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick 4
+  shoot light-19f-quiz-feedback 18 -SimplOpen quiz:101:9001:feedback
   shoot light-19e-quiz-click-next 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick next
   shoot light-35-tools 10 -SimplPlace tools
   shoot light-26-school 8 -SimplPicker merced
