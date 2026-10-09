@@ -20,6 +20,7 @@ struct MainShell: View {
             DetailStack()
         }
         .navigationSplitViewStyle(.balanced)
+        .overlay { RubricPopupLayer() } // (1.2.2) the rubric ring, over the whole window (Screens/RubricPopup.swift)
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         // (1.2.1) a pinned tool opened whole: over the window, where you are
         .sheet(item: $tools.popup) { k in
