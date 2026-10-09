@@ -50,19 +50,47 @@ jobs:
         run: |
           python3 scripts/dev/make-mac-project.py
           git diff --exit-code -- mac/Simpl.xcodeproj || { echo "::error::mac/Simpl.xcodeproj differs from scripts/dev/make-mac-project.py's"; exit 1; }
+      # (1.3.1) the last build's intermediates, and every file not changed since dated as it was then: only what changed
+      # is compiled again (scripts/dev/mtime-cache.py)
+      - name: The last build
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: mac-debug-${{ github.sha }}
+          restore-keys: mac-debug-
+      - name: Unchanged files keep their dates
+        run: python3 scripts/dev/mtime-cache.py restore build
       - name: Build for macOS
         run: |
           set -o pipefail
           xcodebuild -version
           mkdir -p shots
-          xcodebuild -project mac/Simpl.xcodeproj -scheme Simpl -configuration Debug -destination 'platform=macOS' \
-            -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
-            COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES -showBuildTimingSummary build 2>&1 \
-            | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          build() {
+            xcodebuild -project mac/Simpl.xcodeproj -scheme Simpl -configuration Debug -destination 'platform=macOS' \
+              -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+              COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES -showBuildTimingSummary build 2>&1 \
+              | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          }
+          build
+          # (an incremental build that failed is tried once more from clean: a stale intermediate is never the answer)
+          if ! grep -q "BUILD SUCCEEDED" build.log && [ -f build/.mtimes.json ]; then
+            echo "::warning::incremental build failed; building clean"
+            rm -rf build
+            build
+          fi
           grep -E "error:" -B2 -A8 build.log | head -600 > shots/build-errors.txt || true
           grep -E "warning:.*mac/Simpl/" build.log | sort -u | head -300 > shots/build-warnings.txt || true
           sed -n '/Build Timing Summary/,$p' build.log | head -80 > shots/build-timing.txt || true
           grep -q "BUILD SUCCEEDED" build.log || { echo "build failed" > shots/FAILED; cat shots/build-errors.txt | head -300; }
+      - name: Keep this build for the next
+        if: hashFiles('shots/FAILED') == ''
+        run: python3 scripts/dev/mtime-cache.py save build
+      - name: Save the build
+        if: hashFiles('shots/FAILED') == ''
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: mac-debug-${{ github.sha }}
       - name: Mock Canvas
         if: hashFiles('shots/FAILED') == ''
         run: |

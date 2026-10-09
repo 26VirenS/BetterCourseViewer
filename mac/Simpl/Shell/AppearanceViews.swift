@@ -145,7 +145,7 @@ struct PhotoSlotEditor: View {
     @State private var targeted = false
 
     private var photo: SlotPhoto? { store.photos[slot] }
-    private var boxSize: CGSize { slot.isSide ? CGSize(width: 130, height: 130 / slot.aspect) : CGSize(width: 300, height: 300 / slot.aspect) }
+    private var boxSize: CGSize { slot.isSide ? CGSize(width: 110, height: 110 / slot.aspect) : CGSize(width: 236, height: 236 / slot.aspect) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 18) {
@@ -153,31 +153,32 @@ struct PhotoSlotEditor: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(slot.isSide ? "Sidebar" : "\(slot.title) card")
                     .font(.sHeadline)
-                HStack(spacing: 8) {
-                    Button("Upload Photo…") { store.upload(to: slot) }
-                    Menu("Drawing") {
-                        ForEach(AppearanceStore.scenes, id: \.self) { s in
-                            Button(s) { store.setScene(s, in: slot) }
-                        }
-                    }
+                Button("Upload Photo…") { store.upload(to: slot) }
                     .fixedSize()
+                Menu("Drawing") {
+                    ForEach(AppearanceStore.scenes, id: \.self) { s in
+                        Button(s) { store.setScene(s, in: slot) }
+                    }
                 }
+                .fixedSize()
                 if photo != nil {
                     HStack(spacing: 8) {
                         Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
                         Slider(value: zoom, in: PhotoPlace.zoom) { editing in if !editing { store.commitPlace() } }
-                            .frame(maxWidth: 160)
+                            .frame(minWidth: 90, maxWidth: 160)
                         Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
                     }
                     .help("Zoom the photo (or pinch it)")
                     HStack(spacing: 8) {
-                        Button("Reset Position") {
+                        Button("Reset") {
                             store.setPlace(slot.defaultPlace, in: slot)
                             store.commitPlace()
                         }
+                        .help("Put the photo back where it started")
                         .disabled(photo?.place == slot.defaultPlace)
                         Button("Remove", role: .destructive) { store.remove(slot) }
                     }
+                    .fixedSize()
                     Text("Drag the photo to move it.")
                         .font(.sCaption)
                         .foregroundStyle(.secondary)

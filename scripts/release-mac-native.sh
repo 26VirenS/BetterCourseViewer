@@ -61,6 +61,7 @@ rm -f "$TMP/cert.p12"
 
 # ---- build, signed for distribution outside the App Store ------------------------------------------------
 xcodebuild -version
+release_build() {
 xcodebuild \
   -project mac/Simpl.xcodeproj \
   -scheme Simpl \
@@ -76,6 +77,14 @@ xcodebuild \
   ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
   COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf \
   build 2>&1 | tee build-mac-native.log | grep -E "error:|warning: .*mac/Simpl|BUILD (SUCCEEDED|FAILED)" || true
+}
+release_build
+# (1.3.1: the last release's intermediates are reused; one that will not build is set aside and built from clean)
+if ! grep -q "BUILD SUCCEEDED" build-mac-native.log && [[ -f build/mac-native/.mtimes.json ]]; then
+  echo "The incremental build failed; building clean." >&2
+  rm -rf build/mac-native
+  release_build
+fi
 grep -q "BUILD SUCCEEDED" build-mac-native.log || { grep -E "error:" -B2 -A6 build-mac-native.log | head -200; exit 1; }
 # (CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO: a plain build otherwise asks for the debugger's get-task-allow, which the
 # notary service refuses; the hardened runtime is what notarization needs; both Apple silicon and Intel Macs; no index

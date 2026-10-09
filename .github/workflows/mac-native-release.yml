@@ -19,6 +19,15 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      # (1.3.1) the last release's intermediates, unchanged files dated as they were: only what changed is compiled
+      - name: The last release build
+        uses: actions/cache/restore@v4
+        with:
+          path: build/mac-native
+          key: mac-release-${{ github.sha }}
+          restore-keys: mac-release-
+      - name: Unchanged files keep their dates
+        run: python3 scripts/dev/mtime-cache.py restore build/mac-native
       - name: Build, sign, notarize and publish Simpl for Mac
         env:
           MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
@@ -28,3 +37,12 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/release-mac-native.sh
+      - name: Keep this build for the next
+        if: success()
+        run: python3 scripts/dev/mtime-cache.py save build/mac-native
+      - name: Save the build
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: build/mac-native
+          key: mac-release-${{ github.sha }}
