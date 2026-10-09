@@ -195,7 +195,7 @@ final class Engine: ObservableObject, ShellListener {
     private func pageFinished(_ url: URL?) {
         // the school's sign-in, on its own host (nothing of ours runs there to say so), or the school site's own login:
         // the page is what the window shows — at the start, after signing out, or a session that ran out while the
-        // app's screens were up (1.2.9: they no longer stay over a sign-in, hiding its code prompts and next steps)
+        // app's screens were up (1.2.8: they no longer stay over a sign-in, hiding its code prompts and next steps)
         guard let u = url, let h = u.host?.lowercased() else { return }
         if h != host.lowercased() || LoginAssist.isSignIn(u.path), phase != .web {
             openedOnKept = false
@@ -204,7 +204,7 @@ final class Engine: ObservableObject, ShellListener {
         }
     }
 
-    /// (1.2.9) Signed out: the window shows the school's sign-in page at once — not the app's screens over it — and the
+    /// (1.2.8) Signed out: the window shows the school's sign-in page at once — not the app's screens over it — and the
     /// next account starts afresh (nothing of this one's kept, shown or remembered, its first steps run again).
     func signedOut() {
         answers.clear()

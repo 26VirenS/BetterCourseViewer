@@ -247,16 +247,26 @@ struct PreviewLink<Label: View>: View {
         }
     }
 
-    /// The screenshot suite (-SimplOpen preview): the first row that appears opens its preview.
+    /// The screenshot suite (-SimplOpen preview): the first row that is on screen opens its preview (1.2.8: one laid out
+    /// below the fold no longer takes it, so the card is pictured where it grows from).
     private func shot() {
-        guard LaunchOpen.take("preview") != nil else { return }
+        guard PreviewShot.wanted, !PreviewShot.taken else { return }
         let item = item
         let anchor = anchor
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_200_000_000)
+            guard !PreviewShot.taken, anchor.rect() != nil else { return }
+            PreviewShot.taken = true
             WorkPreview.shared.open(item, from: anchor)
         }
     }
+}
+
+/// The screenshot suite's preview, asked for once at launch (-SimplOpen preview) and opened once.
+@MainActor
+enum PreviewShot {
+    static let wanted = LaunchOpen.take("preview") != nil
+    static var taken = false
 }
 
 // MARK: - From the rows
