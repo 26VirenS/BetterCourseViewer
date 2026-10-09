@@ -13,14 +13,17 @@ struct MainShell: View {
     /// back brings it out again (a sidebar opened by hand on a narrow window stays until the window narrows again).
     @State private var wasWide: Bool?
     @StateObject private var palette = SearchPalette()
+    @ObservedObject private var appearance = AppearanceStore.shared
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
+                .id(appearance.revision) // (1.3.1: a colour worn, the sidebar drawn again in it — never the whole split view)
                 .tourSpot(.sidebar)
                 .navigationSplitViewColumnWidth(min: 210, ideal: 270, max: 360)
         } detail: {
             DetailStack()
+                .id(appearance.revision)
         }
         .navigationSplitViewStyle(.balanced)
         .background {
@@ -30,7 +33,6 @@ struct MainShell: View {
                     .onChange(of: g.size.width) { _, w in fit(w) }
             }
         }
-        .background(PageGround().ignoresSafeArea()) // (1.3) the theme's scene behind the sidebar's glass too
         .overlay { RubricPopupLayer() } // (1.2.3) the rubric ring, over the whole window (Screens/RubricPopup.swift)
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
@@ -222,15 +224,13 @@ struct Sidebar: View {
         })
     }
 
-    @ObservedObject private var theme = ThemeStore.shared
-
     var body: some View {
         VStack(spacing: 0) {
             list
-                .scrollContentBackground(theme.scene == nil ? .automatic : .hidden)
+                .scrollContentBackground(.hidden) // (the sidebar's glass is the column's own)
             AccountBar()
         }
-        .background { SidebarGround() } // (1.3) a theme's drawing through the sidebar too
+        .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
     }
 
     private var list: some View {
@@ -290,6 +290,7 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .labelStyle(SidebarThemeLabel()) // (1.3.1) a colour worn: the rows' glyphs and words in it
         .environment(\.sidebarRowSize, .large)
         .animation(Motion.gentle, value: open)
         .animation(Motion.gentle, value: engine.courses)

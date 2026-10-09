@@ -287,14 +287,19 @@ private struct Pane<Content: View>: View {
     }
 }
 
-// MARK: - Appearance (1.3)
+// MARK: - Appearance (1.3.1)
 
-/// Light, dark or as the Mac is; a theme — the web's ready-made ones, each a colour and its drawn scene inked behind the
-/// window's glass — and the colour and the scene each on their own.
+/// Light, dark or as the Mac is; a theme (the web's ready-made ones: a colour and its drawing in every place); the colour
+/// (one of the web's, or any from the radial picker); and the photos — the sidebar's and each Dashboard counter's, one
+/// of your own or a drawing, each moved and zoomed in its place.
 private struct AppearancePane: View {
-    @ObservedObject private var theme = ThemeStore.shared
+    @ObservedObject private var store = AppearanceStore.shared
     @State private var look = AppLook(rawValue: UserDefaults.standard.string(forKey: "SimplAppearance") ?? "") ?? .system
-    @State private var custom = Color.blue
+    @State private var picking = false
+    @State private var slot: PhotoSlot = AppearancePane.launchSlot
+
+    /// The screenshot suite's -SimplPhotoSlot graded (or another place): the editor opens on it.
+    private static var launchSlot: PhotoSlot { PhotoSlot(rawValue: UserDefaults.standard.string(forKey: "SimplPhotoSlot") ?? "") ?? .side }
 
     private let columns = [GridItem(.adaptive(minimum: 132, maximum: 160), spacing: 14)]
 
@@ -309,44 +314,49 @@ private struct AppearancePane: View {
                 .pickerStyle(.segmented)
                 .onChange(of: look) { _, l in AppLook.set(l) }
             }
-            Section {
+            Section("Theme") {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                    ForEach(ThemeStore.ready) { r in tile(r) }
+                    ForEach(AppearanceStore.ready) { r in tile(r) }
                 }
                 .padding(.vertical, 4)
+            }
+            Section {
+                HStack(spacing: 8) {
+                    dot(nil, Color(nsColor: .controlAccentColor), "Regular")
+                    ForEach(AppearanceStore.colours) { c in dot(c.hex, Color(hex: c.hex), c.name) }
+                    customDot
+                    Spacer(minLength: 0)
+                }
             } header: {
-                Text("Theme")
+                Text("Colour")
             } footer: {
-                Text("A theme is a colour and a drawing behind the window's glass, as on the web. Pick the colour and the drawing on their own below.")
+                Text("The sidebar, the cards' glyphs, the titles and every control take it, each shade stepped until it reads.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            Section("Colour") {
-                HStack(spacing: 10) {
-                    dot(nil, Color(nsColor: .controlAccentColor), "Regular")
-                    ForEach(ThemeStore.colours) { c in dot(c.hex, Color(hex: c.hex), c.name) }
-                    Spacer(minLength: 6)
-                    ColorPicker("Custom", selection: Binding(get: { custom }, set: { c in
-                        custom = c
-                        theme.setAccent(ThemeStore.readable(NSColor(c)))
-                    }), supportsOpacity: false)
-                    .help("A colour of your own: moved, if need be, until it reads as words and as a glyph by day and by night")
+            Section("Photos") {
+                HStack(alignment: .top, spacing: 12) {
+                    Button { slot = .side } label: { PhotoSlotThumb(slot: .side, picked: slot == .side) }
+                        .buttonStyle(.plain)
+                    LazyVGrid(columns: [GridItem(.fixed(78)), GridItem(.fixed(78)), GridItem(.fixed(78))], alignment: .leading, spacing: 8) {
+                        ForEach(PhotoSlot.cards) { s in
+                            Button { slot = s } label: { PhotoSlotThumb(slot: s, picked: slot == s) }
+                                .buttonStyle(.plain)
+                        }
+                    }
                 }
-                Picker("Drawing", selection: Binding(get: { theme.scene ?? "" }, set: { theme.setScene($0.isEmpty ? nil : $0) })) {
-                    Text("None").tag("")
-                    Divider()
-                    ForEach(ThemeStore.ready.compactMap(\.scene), id: \.self) { Text($0).tag($0) }
-                }
+                PhotoSlotEditor(slot: slot)
+                    .padding(.vertical, 4)
             }
         }
-        .onAppear { if let h = theme.accentHex { custom = Color(hex: h) } }
+        .onAppear { if UserDefaults.standard.bool(forKey: "SimplPickerOpen") { picking = true } }
     }
 
-    private func tile(_ r: ThemeStore.Ready) -> some View {
-        let on = theme.wearing == r
+    private func tile(_ r: AppearanceStore.Ready) -> some View {
+        let on = store.wearing == r
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         return Button {
-            withAnimation(Motion.snappy) { theme.wear(r) }
+            withAnimation(Motion.snappy) { store.wear(r) }
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 ThemeSwatch(ready: r)
@@ -371,9 +381,9 @@ private struct AppearancePane: View {
     }
 
     private func dot(_ hex: String?, _ color: Color, _ name: String) -> some View {
-        let on = theme.accentHex == hex
+        let on = store.accentHex == hex
         return Button {
-            withAnimation(Motion.snappy) { theme.setAccent(hex) }
+            withAnimation(Motion.snappy) { store.setAccent(hex) }
         } label: {
             ZStack {
                 Circle().fill(color).frame(width: 22, height: 22)
@@ -386,6 +396,34 @@ private struct AppearancePane: View {
         .help(name)
         .accessibilityLabel(Text(name))
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// Custom: a rainbow round the colour of your own; pressed, the radial picker.
+    private var customDot: some View {
+        let on = store.wearingCustom
+        return Button { picking = true } label: {
+            ZStack {
+                Circle()
+                    .fill(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center))
+                    .frame(width: 22, height: 22)
+                Circle().fill(Color(hex: store.custom.hex)).frame(width: 10, height: 10)
+                if on { Circle().strokeBorder(Color.primary.opacity(0.85), lineWidth: 2).frame(width: 30, height: 30) }
+            }
+            .frame(width: 30, height: 30)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Any colour")
+        .accessibilityLabel(Text("Custom colour"))
+        .popover(isPresented: $picking, arrowEdge: .bottom) {
+            VStack(spacing: 12) {
+                RadialColorPicker(value: store.custom) { store.setCustom($0) }
+                Button("Done") { picking = false }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(16)
+            .onAppear { if !store.wearingCustom { store.setCustom(store.custom) } }
+        }
     }
 }
 

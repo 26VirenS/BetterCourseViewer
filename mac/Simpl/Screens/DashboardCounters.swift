@@ -18,7 +18,9 @@ enum DashCounterLook {
         }
     }
 
+    /// (1.3.1) A colour worn: every counter's glyph in it; Regular, each in its own.
     static func color(_ key: String) -> Color {
+        if Theme.themed { return Theme.accentIcon }
         switch key {
         case "today": return Color(hex: "#ff453a")
         case "next": return Color(hex: "#34c759")
@@ -82,6 +84,8 @@ struct DashCounterTile: View {
     let value: Int?
     let note: String?
     let action: () -> Void
+    /// (1.3.1) Its photo's editor, from its context menu.
+    @State private var editing = false
 
     private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
 
@@ -108,8 +112,25 @@ struct DashCounterTile: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background {
+                // (1.3.1) its photo, frosted under its words (Settings ▸ Appearance, or its context menu)
+                if let slot = PhotoSlot.card(counter.key) {
+                    SlotPhotoView(slot: slot)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+            }
         }
         .buttonStyle(CardButtonStyle(radius: 18, tint: alert ? .red : nil))
+        .contextMenu {
+            if PhotoSlot.card(counter.key) != nil {
+                Button("Card Photo…") { editing = true }
+            }
+        }
+        .sheet(isPresented: $editing) {
+            if let slot = PhotoSlot.card(counter.key) {
+                PhotoSlotSheet(slot: slot)
+            }
+        }
         .animation(Motion.snappy, value: value)
         .help("Show \(DashCounterLook.fullName(counter.key, counter.label).lowercased())")
         .accessibilityLabel("\(DashCounterLook.fullName(counter.key, counter.label)): \(value.map(String.init) ?? "counting")")

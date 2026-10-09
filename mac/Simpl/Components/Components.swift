@@ -175,6 +175,7 @@ struct ScreenHeading: View {
                 Text(title)
                     .font(.system(size: 34, weight: .bold))
                     .tracking(-0.6)
+                    .foregroundStyle(Theme.themed ? Theme.accentText : Color.primary) // (1.3.1) a colour worn: the title in it
                     .textSelection(.enabled)
             }
             if let sub, !sub.isEmpty {

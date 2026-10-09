@@ -81,7 +81,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   # (1.3) themes, To Do's fixed side column, a narrow window, the setup's nicknames
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
-  shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance
+  shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
+  shoot light-51b-settings-picker 12 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot light-03-todo 12 -SimplPlace todo
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
   shoot light-22-setup 14 -SimplOpen setup

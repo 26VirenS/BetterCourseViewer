@@ -253,8 +253,7 @@ struct DashboardView: View {
         switch view {
         case .cards: courseCards
         case .list:
-            courseLines
-            upcoming
+            upcoming // (1.3.1: no Courses card here — the sidebar and the Cards view have the courses)
         case .activity: activityList
         }
     }
@@ -331,27 +330,6 @@ struct DashboardView: View {
     /// A course's share handed in: nil until read; a course left out of the answer has nothing to hand in.
     private func progressOf(_ id: String) -> CourseProgress? {
         progress[id] ?? (progressRead ? CourseProgress(done: 0, total: 0) : nil)
-    }
-
-    private var courseLines: some View {
-        PageSection(title: "Courses", trailing: courses.map { "\($0.rows.count) \($0.rows.count == 1 ? "course" : "courses")" }) {
-            if let c = courses {
-                if c.rows.isEmpty {
-                    EmptyNote(text: c.empty ?? "No courses chosen yet.", symbol: "books.vertical")
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(c.rows.enumerated()), id: \.element.id) { i, row in
-                            if i > 0 { RowDivider(inset: 27) }
-                            DashCourseLine(course: row, progress: progressOf(row.id), wide: mainWidth >= 860)
-                        }
-                    }
-                    .padding(8)
-                    .card(radius: 18)
-                }
-            } else {
-                loadingNote("Reading your courses…")
-            }
-        }
     }
 
     private var upcoming: some View {
