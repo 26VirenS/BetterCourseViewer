@@ -63,6 +63,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01-dashboard 12
   shoot light-01d-dashboard-counter 14 -SimplSheet next
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
+  shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
   shoot light-02-courses 10 -SimplPlace courses
   shoot light-04-grades 12 -SimplPlace grades

@@ -13,6 +13,8 @@ struct DashboardView: View {
     @AppStorage("SimplDashView") private var chosen: DashView = .list // (1.2.1: List unless another is picked)
     @State private var counts: TodayCounts?
     @State private var open: String?
+    /// (1.2.8) The opened counter's panel, as tall as what it lists (measured).
+    @State private var panelHeight: CGFloat = 0
     @State private var sheetAsked = false
     @State private var width: CGFloat = 0
     @State private var courses: DashCoursesData?
@@ -106,8 +108,9 @@ struct DashboardView: View {
 
     // MARK: - Counters
 
-    /// The counters in rows (six across where they fit, else three or two); a counter opened grows into its panel right
-    /// under its own row.
+    /// The counters in rows (six across where they fit, else three or two). (1.2.8) A counter opened grows out of its own
+    /// tile into a panel that floats over the page — as wide as a panel needs, not the page — from the tile's corner
+    /// (its right one for a tile near the page's right edge); nothing under it moves.
     private func counters(_ d: Today) -> some View {
         let cols = width >= 900 ? 6 : (width >= 520 ? 3 : 2)
         let list = DashboardView.ordered(d.counters)
@@ -117,16 +120,30 @@ struct DashboardView: View {
         return VStack(alignment: .leading, spacing: 14) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 counterRow(row, cols: cols)
-                if let key = open, let c = row.first(where: { $0.key == key }) {
-                    DashCounterPanel(counter: c, value: value(c), note: note(c), width: width, close: { setOpen(nil) })
-                        .tourSpot(.counterPanel)
-                        .id(key)
-                        .dashMorph(key, in: morph, enabled: !reduceMotion)
-                        .transition(.opacity)
-                        .zIndex(1)
+            }
+        }
+        .overlayPreferenceValue(DashTileAnchors.self) { anchors in
+            GeometryReader { g in
+                if let key = open, let c = list.first(where: { $0.key == key }), let a = anchors[key] {
+                    let tile = g[a]
+                    let w = min(DashCounterPanel.width, g.size.width)
+                    let x = tile.minX + w <= g.size.width + 0.5 ? tile.minX : max(0, tile.maxX - w)
+                    DashCounterPanel(counter: c, value: value(c), note: note(c), width: w, close: { setOpen(nil) }) { h in
+                        if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
+                    }
+                    .frame(width: w, height: panelHeight > 0 ? panelHeight : max(tile.height, 160))
+                    .tourSpot(.counterPanel)
+                    .dashMorph(key, in: morph, enabled: !reduceMotion)
+                    .shadow(color: Color.black.opacity(0.18), radius: 24, y: 10)
+                    .id(key)
+                    .transition(.opacity)
+                    .padding(.leading, x)
+                    .padding(.top, tile.minY)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
+        .zIndex(1) // (over the page below it)
     }
 
     private func counterRow(_ row: [Counter], cols: Int) -> some View {
@@ -145,16 +162,19 @@ struct DashboardView: View {
     /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
     @ViewBuilder
     private func counterSlot(_ c: Counter) -> some View {
-        if open == c.key && !reduceMotion {
-            DashCounterTile(counter: c, value: value(c), note: note(c)) {}
-                .hidden()
-                .accessibilityHidden(true)
-        } else {
-            DashCounterTile(counter: c, value: value(c), note: note(c)) { setOpen(open == c.key ? nil : c.key) }
-                .tourSpot(c.key == "next" ? .counterNext : nil)
-                .dashMorph(c.key, in: morph, enabled: !reduceMotion)
-                .transition(.opacity)
+        Group {
+            if open == c.key && !reduceMotion {
+                DashCounterTile(counter: c, value: value(c), note: note(c)) {}
+                    .hidden()
+                    .accessibilityHidden(true)
+            } else {
+                DashCounterTile(counter: c, value: value(c), note: note(c)) { setOpen(open == c.key ? nil : c.key) }
+                    .tourSpot(c.key == "next" ? .counterNext : nil)
+                    .dashMorph(c.key, in: morph, enabled: !reduceMotion)
+                    .transition(.opacity)
+            }
         }
+        .anchorPreference(key: DashTileAnchors.self, value: .bounds) { [c.key: $0] } // (where its panel grows from)
     }
 
     /// A counter's number: never one from before (1.2) — while the page shows what was kept from last time, or the
@@ -187,6 +207,7 @@ struct DashboardView: View {
     }
 
     private func setOpen(_ key: String?) {
+        if key != open { panelHeight = 0 } // (a new panel is measured afresh)
         withAnimation(reduceMotion ? .easeInOut(duration: 0.18) : Motion.gentle) { open = key }
         if key != nil { MacTour.shared.did(.counterOpened) } // (the tour's "The cards open")
     }

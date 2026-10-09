@@ -1,8 +1,8 @@
 import SwiftUI
 
 // The Dashboard's six counters (1.2): each a glass tile with its symbol, its number and the line under it. Pressed, a
-// tile grows where it stands into a panel across the page listing what it counted — no popover to be clipped by the
-// screen's edge — and folds back into its tile when closed (its ✕, Escape, or the tile pressed again).
+// tile grows where it stands into a panel floating over the page (1.2.8: a panel's width, from the tile's corner)
+// listing what it counted, and folds back into its tile when closed (its ✕, Escape, a click round it, or the tile).
 
 /// A counter's look, as the web Dashboard's: its symbol and colour, and its name in full for the panel it opens.
 enum DashCounterLook {
@@ -117,16 +117,21 @@ struct DashCounterTile: View {
 }
 
 /// The panel a counter grows into: its header (the tile's symbol, name and number, larger) and what it counted —
-/// what wants attention first, then, quieter, the rest of the same span beside it when the page is wide enough. Each
-/// row previews its work (1.2.3; a double-click opens it); an overdue one the student has let go can be cleared.
+/// what wants attention first, then, quieter, the rest of the same span under it. Each row previews its work (1.2.3; a
+/// double-click opens it); an overdue one the student has let go can be cleared.
 struct DashCounterPanel: View {
+    /// (1.2.8) How wide a panel opens (narrower only on a narrower page).
+    static let width: CGFloat = 520
+
     let counter: Counter
     let value: Int?
     let note: String?
-    /// The page's width: the panel's words are laid out at it from the first frame, so they never squeeze while the
-    /// tile grows (the growing shape shows more of them as it opens).
+    /// The panel's width: its words are laid out at it from the first frame, so they never squeeze while the tile
+    /// grows (the growing shape shows more of them as it opens).
     let width: CGFloat
     let close: () -> Void
+    /// (1.2.8) How tall what it shows stands, for the page to size the floating panel to it.
+    var onHeight: (CGFloat) -> Void = { _ in }
     @EnvironmentObject private var engine: Engine
     @State private var data: ItemsSheetData?
     @State private var error: String?
@@ -135,6 +140,13 @@ struct DashCounterPanel: View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         content
             .frame(width: max(width, 280), alignment: .topLeading)
+            .background {
+                GeometryReader { p in
+                    Color.clear
+                        .onAppear { onHeight(p.size.height) }
+                        .onChange(of: p.size.height) { _, h in onHeight(h) }
+                }
+            }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
             .clipShape(shape)
             .glass(shape, tint: DashCounterLook.color(counter.key).opacity(0.10))
@@ -310,6 +322,14 @@ struct DashCounterPanel: View {
                 engine.changed()
             }
         }
+    }
+}
+
+/// Where each counter's tile stands, for its panel to grow from (1.2.8).
+struct DashTileAnchors: PreferenceKey {
+    static let defaultValue: [String: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
     }
 }
 

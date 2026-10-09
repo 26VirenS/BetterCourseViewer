@@ -150,7 +150,9 @@ struct WorkPreviewOverlay: View {
     }
 }
 
-/// Where the card goes: beside a narrow row (to its right, else its left), under or over a wide one, else in the middle
+/// Where the card goes (1.2.8): beside its row, level with it, on the side the row leaves room — a row on the left of
+/// the window opens to its right, one on the right to its left; a row too wide for the card beside it has it level with
+/// it at the window's edge on that side (over the row's far end, never over or under the row); with no row, the middle
 /// of the screen's side of the window — always inside it.
 enum PreviewPlacement {
     static let width: CGFloat = 460
@@ -166,15 +168,14 @@ enum PreviewPlacement {
         guard let s = source else { return centered }
         let clampX = { (x: CGFloat) -> CGFloat in min(max(x, minX), max(minX, maxX - w)) }
         let clampY = { (y: CGFloat) -> CGFloat in min(max(y, minY), max(minY, maxY - h)) }
-        let right = CGRect(x: s.maxX + gap, y: clampY(s.minY - 10), width: w, height: h)
-        let left = CGRect(x: s.minX - gap - w, y: clampY(s.minY - 10), width: w, height: h)
-        let below = CGRect(x: clampX(s.minX), y: s.maxY + gap, width: w, height: h)
-        let above = CGRect(x: clampX(s.minX), y: s.minY - gap - h, width: w, height: h)
-        let fits = { (r: CGRect) -> Bool in
-            r.minX >= minX - 0.5 && r.maxX <= maxX + 0.5 && r.minY >= minY - 0.5 && r.maxY <= maxY + 0.5
-        }
-        let order = s.width < w * 1.4 ? [right, left, below, above] : [below, above, right, left]
-        return order.first(where: fits) ?? centered
+        let y = clampY(s.minY - 10)
+        let right = CGRect(x: s.maxX + gap, y: y, width: w, height: h)
+        let left = CGRect(x: s.minX - gap - w, y: y, width: w, height: h)
+        let fits = { (r: CGRect) -> Bool in r.minX >= minX - 0.5 && r.maxX <= maxX + 0.5 }
+        // (the side: where the row stands — a wide row, its words on the left, counts as the left)
+        let rightFirst = s.midX <= area.midX + area.width * 0.12
+        if let r = (rightFirst ? [right, left] : [left, right]).first(where: fits) { return r }
+        return CGRect(x: clampX(rightFirst ? maxX - w : minX), y: y, width: w, height: h)
     }
 }
 
