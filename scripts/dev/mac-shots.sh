@@ -15,12 +15,12 @@ OUT_ABS="$(cd "$OUT" && pwd)"
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
 defaults write com.simplcourses.mac ApplePersistenceIgnoreState -bool YES >/dev/null 2>&1 || true
 
-# (1.3.1) Several copies of the app at once (JOBS, 4 by default), each with a home of its own (CFFIXED_USER_HOME: its
+# (1.3.1) Several copies of the app at once (JOBS, 5 by default), each with a home of its own (CFFIXED_USER_HOME: its
 # settings, its caches and its web storage apart from the others'), each picture taken from inside its app of its own
 # windows only (Shot.swift) as soon as the app has settled — no answers asked for in a moment — the <wait> being now
 # only the longest it waits. A picture of a web page loading (a school's sign-in, a tool's window, Quick Look) waits
 # the whole <wait> (-SimplShotSettle NO).
-JOBS="${JOBS:-4}"
+JOBS="${JOBS:-5}"
 HOMES="$(mktemp -d /tmp/simpl-shots.XXXXXX)"
 for i in $(seq 1 "$JOBS"); do mkdir -p "$HOMES/home$i/Library/Preferences"; done
 
@@ -56,6 +56,7 @@ shoot() {
       i=$((i + 1))
     done
     if [ -f "$OUT_ABS/$name-app.png" ]; then echo "shot $name ($((i / 4))s)"; else echo "no picture $name (the app did not get there)"; fi
+    echo "$name $((i / 4))s worker$slot" >> "$OUT_ABS/shot-times.txt"
     kill "$pid" >/dev/null 2>&1 || true
     sleep 0.3
     kill -9 "$pid" >/dev/null 2>&1 || true

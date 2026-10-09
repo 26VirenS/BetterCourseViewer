@@ -19,6 +19,17 @@ def tracked():
     return [p for p in out.decode('utf-8', 'surrogateescape').split('\0') if p and os.path.isfile(p)]
 
 
+def folders(files):
+    """Every folder holding a tracked file, and the folders above it (not the repository's root)."""
+    out = set()
+    for p in files:
+        d = os.path.dirname(p)
+        while d:
+            out.add(d)
+            d = os.path.dirname(d)
+    return out
+
+
 def digest(path):
     h = hashlib.sha1()
     with open(path, 'rb') as f:
@@ -35,7 +46,10 @@ def main():
     if mode == 'save':
         os.makedirs(folder, exist_ok=True)
         # (to the nanosecond: the Swift driver compares a file's date exactly with the one its last build recorded)
-        data = {p: [digest(p), os.stat(p).st_mtime_ns] for p in tracked()}
+        files = tracked()
+        data = {p: [digest(p), os.stat(p).st_mtime_ns] for p in files}
+        # (and the folders that hold them — an asset catalogue is a folder, and Xcode dates it by the folder's own date)
+        data['/dirs'] = {d: [sorted(os.listdir(d)), os.stat(d).st_mtime_ns] for d in folders(files)}
         with open(record, 'w') as f:
             json.dump(data, f)
         print(f'mtimes: {len(data)} files recorded')
@@ -47,14 +61,24 @@ def main():
         print('mtimes: no record (a clean build)')
         return
     same = changed = 0
-    for p in tracked():
+    files = tracked()
+    for p in files:
         kept = data.get(p)
         if kept and kept[0] == digest(p):
             os.utime(p, ns=(int(kept[1]), int(kept[1])))
             same += 1
         else:
             changed += 1
-    print(f'mtimes: {same} files as before, {changed} new or changed')
+    # a folder whose entries are what they were, and none of whose files changed, dated as it was (deepest first)
+    dirs = data.get('/dirs', {})
+    touched = {os.path.dirname(p) or '.' for p in files if not (data.get(p) and data[p][0] == digest(p))}
+    kept_dirs = 0
+    for d in sorted(folders(files), key=lambda x: -x.count('/')):
+        old = dirs.get(d)
+        if old and old[0] == sorted(os.listdir(d)) and not any(t == d or t.startswith(d + '/') for t in touched):
+            os.utime(d, ns=(int(old[1]), int(old[1])))
+            kept_dirs += 1
+    print(f'mtimes: {same} files as before, {changed} new or changed; {kept_dirs} folders as before')
 
 
 if __name__ == '__main__':
