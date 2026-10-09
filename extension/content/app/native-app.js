@@ -1425,6 +1425,15 @@
     const sorted = [...(list || [])].sort((x, y) => Number(!!y.front_page) - Number(!!x.front_page));
     return { title: 'Pages', context: info.title, color: info.color, rows: sorted.map((p) => ({ slug: p.url, title: p.title || 'Page', sub: [p.front_page ? 'Front page' : '', p.updated_at ? `Edited ${U.fmtRecent(p.updated_at)}` : ''].filter(Boolean).join(' · ') })), empty: 'No pages yet.' };
   }
+  /** (Mac 1.3.7) The items either side of one, in the order the web's Previous / Next walks them (store.itemNeighbours:
+   *  its own tab's order, else the modules'): { prev, next }, each { name, url } or null. `type`: Assignment, Quiz,
+   *  Discussion, Announcement or Page; `id`: its id (a page's: its url name). */
+  async function neighbours({ ctx, type, id } = {}) {
+    const c = ctxOf(ctx);
+    const n = await store.itemNeighbours(c.id, String(type || ''), String(id || ''), { kind: c.kind, courseUrl: c.base }).catch(() => null);
+    const one = (x) => (x && x.href ? { name: x.name || 'Untitled', url: x.href } : null);
+    return { prev: one(n?.prev), next: one(n?.next) };
+  }
   async function page({ ctx, slug = '' } = {}) {
     const c = ctxOf(ctx);
     const [info, p] = await Promise.all([contextInfo(c), slug ? store.page(c.id, slug, c.opts) : store.frontPage(c.id, c.opts)]);
@@ -2122,7 +2131,7 @@
 
   const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
+    toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
   async function gradeNeeded({ id } = {}) {

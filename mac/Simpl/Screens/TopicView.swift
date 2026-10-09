@@ -34,6 +34,9 @@ struct TopicView: View {
         .navigationSubtitle(model.data.map { kindLine($0) } ?? "")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                if let d = model.data {
+                    NeighbourButtons(ctx: ctx, type: d.announcement == true ? "Announcement" : "Discussion", id: id)
+                }
                 Button { reply(to: nil) } label: {
                     Label("Reply", systemImage: "arrowshape.turn.up.left")
                 }

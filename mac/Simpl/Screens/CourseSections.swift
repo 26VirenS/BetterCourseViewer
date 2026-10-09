@@ -531,7 +531,10 @@ struct PageView: View {
         .navigationTitle(model.data?.title ?? "Page")
         .navigationSubtitle(model.data?.context ?? "")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if let s = model.data?.slug, !s.isEmpty {
+                    NeighbourButtons(ctx: ctx, type: "Page", id: s)
+                }
                 CanvasMenu(url: canvasPath, title: model.data?.title ?? "Page")
             }
         }

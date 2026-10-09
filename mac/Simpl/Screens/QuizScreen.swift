@@ -38,7 +38,7 @@ struct QuizScreen: View {
             return CGSize(width: 1040, height: 700)
         }
         let room = w.contentLayoutRect.size
-        return CGSize(width: min(max(room.width - 80, 720), 1320), height: min(max(room.height - 44, 500), 900))
+        return CGSize(width: min(max(room.width - 64, 720), 1400), height: min(max(room.height - 36, 500), 960))
     }
 
     private var tint: Color { Color(hex: run.attempt?.color ?? run.intro?.color ?? "#0a84ff") }
@@ -54,7 +54,8 @@ struct QuizScreen: View {
                     banner.animation(Motion.gentle, value: run.banner) // (outside the if: it plays on the way in and out)
                 }
         }
-        .frame(minWidth: 720, idealWidth: ideal.width, minHeight: 500, idealHeight: ideal.height) // (1.2: the window's room, never taller than it)
+        // (1.3.7) exactly that size: a sheet keeps to its least width, not its ideal one, so the ideal alone left it at 720
+        .frame(width: ideal.width, height: ideal.height) // (1.2: the window's room, never taller than it)
         .background(PageGround())
         .tint(tint)
         .interactiveDismissDisabled(inAttempt) // (Escape is Close, which asks first during an attempt)
@@ -343,7 +344,7 @@ enum QuizLayout {
     /// The width from which a pane puts a column beside the page (the questions, the score, the summary).
     static let wide: CGFloat = 900
     /// The readable width of a question and of a list of answers.
-    static let column: CGFloat = 760
+    static let column: CGFloat = 840
     /// The room left at the foot of a scrolling page so its end clears the floating bar.
     static let barClearance: CGFloat = 116
 }

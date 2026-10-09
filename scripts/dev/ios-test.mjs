@@ -303,6 +303,10 @@ try {
   if (markable) await nc('markDone', { ctx, module: markable.m.id, item: markable.it.id, done: false });
   const asg = await nc('assignments', { ctx });
   check(!asg.error && asg.sections.length > 0 && asg.sections.every((x) => ['Overdue', 'Upcoming', 'Undated', 'Past'].includes(x.title)) && asg.sections.flatMap((x) => x.rows).every((r) => r.status?.word && /\/assignments\/\d+$/.test(r.url)), `assignments by when they are due, each with its status: ${JSON.stringify(asg.sections.map((x) => `${x.title}:${x.rows.length}`))}`);
+  // (Mac 1.3.7) Previous / Next: an assignment's neighbours in the course's own order, each a name and an assignment's address
+  const around = await nc('neighbours', { ctx: 'courses/101', type: 'Assignment', id: '1012' });
+  const pageAround = await nc('neighbours', { ctx: 'courses/101', type: 'Page', id: 'nope-no-such-page' });
+  check(!around.error && (around.prev || around.next) && [around.prev, around.next].filter(Boolean).every((x) => x.name && /\/courses\/101\/assignments\/\d+/.test(x.url)) && !pageAround.error, `Previous / Next for the Mac: an assignment's neighbours, and nothing (not an error) for a page it cannot place: ${JSON.stringify({ around, pageAround })}`);
   const a12 = await nc('assignment', { course: '101', id: '1012' });
   check(!a12.error && a12.canSubmit && a12.types.includes('online_text_entry') && a12.types.includes('online_upload') && a12.status?.word && a12.due && a12.points, `an assignment for the app: its facts, its instructions, and the ways it can be handed in from the phone: ${JSON.stringify({ title: a12.title, types: a12.types, due: a12.due, points: a12.points, status: a12.status })}`);
   const sentText = await nc('submit', { course: '101', id: '1012', type: 'online_text_entry', text: 'My answer\n\nwith two paragraphs', comment: 'Sent from the phone' });

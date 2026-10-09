@@ -38,19 +38,22 @@ struct QuizTakePane: View {
             let wide = geo.size.width >= QuizLayout.wide
             HStack(spacing: 0) {
                 if wide {
-                    holdingKeys(QuizRail(run: run, tint: tint, jump: jump, review: review))
+                    QuizRail(run: run, tint: tint, jump: jump, review: review)
                         .frame(width: 256)
                     Divider()
                 }
                 VStack(spacing: 0) {
                     if !wide {
-                        holdingKeys(QuizStripView(run: run, tint: tint, jump: jump, review: review))
+                        QuizStripView(run: run, tint: tint, jump: jump, review: review)
                     }
                     page
                         .overlay(alignment: .bottom) { bar }
                 }
             }
             .onChange(of: wide) { _, _ in focus = .keys } // (the side column and the strip trade places: the keys go with them)
+            // (1.3.7) the keys held by a view of their own, under everything: held by the chips' column, its first click went
+            // to taking the keys back (after typing an answer), not to the chip, so a number took two or three clicks
+            .background { holdingKeys(Color.clear.frame(width: 1, height: 1)).accessibilityHidden(true) }
         }
         .defaultFocus($focus, .keys)
         .task {
@@ -60,7 +63,7 @@ struct QuizTakePane: View {
         .onChange(of: run.idx) { _, _ in focus = .keys }
     }
 
-    /// The strip or the side column as the holder of the attempt's keys (whether or not keyboard navigation is on).
+    /// The holder of the attempt's keys (whether or not keyboard navigation is on): an unseen view that takes no clicks.
     private func holdingKeys<V: View>(_ v: V) -> some View {
         v.focusable(interactions: .edit)
             .focused($focus, equals: .keys)
@@ -491,7 +494,7 @@ private struct QuizQuestionPage: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 30) {
                 header
                 if q.kind == "pending" {
                     ProgressView("Loading the question…")
@@ -508,8 +511,8 @@ private struct QuizQuestionPage: View {
                 }
             }
             .frame(maxWidth: QuizLayout.column, alignment: .leading)
-            .padding(.horizontal, 40)
-            .padding(.top, 18)
+            .padding(.horizontal, 56)
+            .padding(.top, 30)
             .padding(.bottom, QuizLayout.barClearance)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
@@ -575,7 +578,7 @@ private struct QuizQuestionPage: View {
     // one answer: a row per option with its radio, the whole row the target; its number on the keyboard picks it. The
     // rows reach a little past the column, so their words start where the question's do.
     private var choices: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 8) {
             ForEach(Array(q.options.enumerated()), id: \.element.id) { k, o in
                 let on = q.pick == o.id
                 Button { choose(o) } label: {
@@ -588,13 +591,13 @@ private struct QuizQuestionPage: View {
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(.horizontal, -14)
+        .padding(.horizontal, -20)
     }
 
     // every answer that applies: a row per option with its box, the whole row the target
     private var multiple: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(spacing: 4) {
+            VStack(spacing: 8) {
                 ForEach(Array(q.options.enumerated()), id: \.element.id) { k, o in
                     let on = q.picks.contains(o.id)
                     let ticked = Binding(get: { on }, set: { v in if v != on { choose(o) } })
@@ -609,7 +612,7 @@ private struct QuizQuestionPage: View {
                     }
                 }
             }
-            .padding(.horizontal, -14)
+            .padding(.horizontal, -20)
             Text("Pick every answer that applies.")
                 .font(.sCallout)
                 .foregroundStyle(.secondary)
@@ -837,7 +840,7 @@ private struct QuizOptionRow<Mark: View>: View {
     @ViewBuilder var mark: () -> Mark
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 16) {
             mark()
             Text(letter)
                 .font(.sBody.weight(.semibold))
@@ -855,9 +858,9 @@ private struct QuizOptionRow<Mark: View>: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
         .contentShape(Rectangle())
     }
 }

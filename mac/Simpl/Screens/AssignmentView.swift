@@ -47,6 +47,7 @@ struct AssignmentView: View {
         .navigationSubtitle(model.data?.context ?? "")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                NeighbourButtons(ctx: "courses/\(course)", type: "Assignment", id: id) // (a quiz's too: the next opens as a page, not a quiz)
                 if let d = model.data, let next = nextStep(d) {
                     Button { act(d, next) } label: {
                         Label(next.title, systemImage: next.symbol)
