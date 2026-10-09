@@ -88,6 +88,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   shoot dark-50-theme-forest 12 -SimplTheme Forest
+  shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-01-dashboard 12
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   keep_crashes

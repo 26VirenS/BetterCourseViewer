@@ -222,11 +222,15 @@ struct Sidebar: View {
         })
     }
 
+    @ObservedObject private var theme = ThemeStore.shared
+
     var body: some View {
         VStack(spacing: 0) {
             list
+                .scrollContentBackground(theme.scene == nil ? .automatic : .hidden)
             AccountBar()
         }
+        .background { SidebarGround() } // (1.3) a theme's drawing through the sidebar too
     }
 
     private var list: some View {

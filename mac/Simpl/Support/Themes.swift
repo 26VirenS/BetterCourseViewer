@@ -232,11 +232,33 @@ private struct ThemeCanvas: ViewModifier {
             .background {
                 GeometryReader { g in
                     Color.clear
-                        .onAppear { canvas = g.frame(in: .global) }
-                        .onChange(of: g.frame(in: .global)) { _, f in canvas = f }
+                        .onAppear { take(g.frame(in: .global)) }
+                        .onChange(of: g.frame(in: .global)) { _, f in take(f) }
                 }
                 .ignoresSafeArea()
             }
+    }
+
+    /// Kept only when it moved by a point or more, and a beat later — never in the same pass as the screens' own
+    /// measuring, which a window being resized is busy with.
+    private func take(_ f: CGRect) {
+        let r = CGRect(x: f.minX.rounded(), y: f.minY.rounded(), width: f.width.rounded(), height: f.height.rounded())
+        guard r != canvas else { return }
+        DispatchQueue.main.async { if canvas != r { canvas = r } }
+    }
+}
+
+/// (1.3) The sidebar's ground with a scene: the scene's own part of it, under a veil of the page, so the drawing reads
+/// through the sidebar as through the cards' glass and its words stay clear.
+struct SidebarGround: View {
+    @ObservedObject private var theme = ThemeStore.shared
+
+    var body: some View {
+        if let scene = theme.scene {
+            ThemeBackdrop(scene: scene)
+                .overlay(Theme.page.opacity(0.42))
+                .ignoresSafeArea()
+        }
     }
 }
 

@@ -49,7 +49,8 @@ extension View {
     @ViewBuilder
     func glassButton(prominent: Bool = false) -> some View {
         if #available(macOS 26.0, *) {
-            if prominent { self.buttonStyle(.glassProminent) } else { self.buttonStyle(.glass) }
+            // (1.3: the window's tint is the theme's accent — a prominent button wears it; a plain glass one stays clear)
+            if prominent { self.buttonStyle(.glassProminent).tint(Theme.accent) } else { self.buttonStyle(.glass).tint(nil) }
         } else {
             if prominent { self.buttonStyle(.borderedProminent) } else { self.buttonStyle(.bordered) }
         }
