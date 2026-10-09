@@ -4,8 +4,10 @@ import SwiftUI
 /// (1.2.5) D2L's listings carried in the app, and Instructure's own "Find my school" lookup for what they lack
 /// (SchoolSearch, shared with the iPhone app) — as in
 /// Spotlight: the field keeps the keyboard, ↑ and ↓ move through the schools found, Return opens the one chosen. The
-/// address can still be typed by hand. The sign-in that follows is the school's own page, with the app's own card over
-/// it where the page has a username and password.
+/// address can still be typed by hand. (1.2.6) The school chosen is shown before it is opened — a small square of its
+/// sign-in page and "Is this your school?" (SchoolConfirm): yes opens it, no comes back to the search as it was. The
+/// sign-in that follows is the school's own page, with the app's own card over it where the page has a username and
+/// password.
 struct SchoolPicker: View {
     @EnvironmentObject private var session: AppSession
     @StateObject private var search = SchoolSearch()
@@ -14,6 +16,9 @@ struct SchoolPicker: View {
     @State private var typing = false
     @State private var address = ""
     @State private var invalid = false
+    /// (1.2.6) The school chosen, shown to be confirmed before it is opened.
+    @State private var confirming: SchoolSearch.School?
+    @State private var confirmAsked = false
     @FocusState private var fieldFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -30,37 +35,18 @@ struct SchoolPicker: View {
     var body: some View {
         ZStack {
             Theme.page.ignoresSafeArea()
-            VStack(spacing: 22) {
-                VStack(spacing: 10) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 84, height: 84)
-                        .accessibilityHidden(true)
-                    Text("Welcome to Simpl")
-                        .font(.system(size: 30, weight: .bold))
-                        .tracking(-0.4)
-                    Text("Find your school’s Canvas, or enter its Brightspace address.")
-                        .font(.sTitle3)
-                        .foregroundStyle(.secondary)
-                }
-                field
-                if !trimmed.isEmpty {
-                    results
-                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                } else {
-                    Text("If your school’s sign-in page has a username and password, Simpl shows its own sign-in card for it, and can keep you logged in on this Mac if you choose.")
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .transition(.opacity)
-                }
-                manual
+            if let school = confirming {
+                SchoolConfirm(school: school, yes: { open(school) }, no: back)
+                    .frame(width: 520)
+                    .padding(.vertical, 36)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
+                    .id(school.id)
+            } else {
+                searching
+                    .transition(.opacity)
             }
-            .frame(width: 520)
-            .padding(.vertical, 36)
-            .animation(Motion.gentle, value: trimmed.isEmpty)
         }
+        .animation(Motion.gentle, value: confirming)
         .navigationTitle("Simpl")
         .onChange(of: query) { _, q in
             search.find(q)
@@ -68,6 +54,11 @@ struct SchoolPicker: View {
         }
         .onChange(of: search.results) { _, _ in
             if chosen == nil || !choices.contains(chosen ?? "") { chosen = choices.first }
+            // (the screenshot suite: -SimplPickerConfirm YES shows the first school found, to be confirmed)
+            if !confirmAsked, UserDefaults.standard.bool(forKey: "SimplPickerConfirm"), let first = search.results.first {
+                confirmAsked = true
+                confirming = first
+            }
         }
         .task {
             await search.load()
@@ -79,6 +70,39 @@ struct SchoolPicker: View {
         } message: {
             Text("Enter the site’s address, such as school.instructure.com or school.brightspace.com.")
         }
+    }
+
+    private var searching: some View {
+        VStack(spacing: 22) {
+            VStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 84, height: 84)
+                    .accessibilityHidden(true)
+                Text("Welcome to Simpl")
+                    .font(.system(size: 30, weight: .bold))
+                    .tracking(-0.4)
+                Text("Find your school’s Canvas or Brightspace.")
+                    .font(.sTitle3)
+                    .foregroundStyle(.secondary)
+            }
+            field
+            if !trimmed.isEmpty {
+                results
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            } else {
+                Text("If your school’s sign-in page has a username and password, Simpl shows its own sign-in card for it, and can keep you logged in on this Mac if you choose.")
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity)
+            }
+            manual
+        }
+        .frame(width: 520)
+        .padding(.vertical, 36)
+        .animation(Motion.gentle, value: trimmed.isEmpty)
     }
 
     private var field: some View {
@@ -124,10 +148,10 @@ struct SchoolPicker: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if let typed = SchoolSearch.addressLike(query) {
-                        row(id: "open:" + typed, title: "Open \(typed)", sub: "The address as typed", symbol: "arrow.up.right.circle") { pick(typed) }
+                        row(id: "open:" + typed, title: "Open \(typed)", sub: "The address as typed", symbol: "arrow.up.right.circle") { pickTyped(typed) }
                     }
                     ForEach(search.results) { s in
-                        row(id: s.id, title: s.name, sub: s.domain, symbol: "building.columns") { pick(s.domain) }
+                        row(id: s.id, title: s.name, sub: s.domain, symbol: "building.columns") { pick(s) }
                     }
                     if search.asking && search.results.isEmpty {
                         HStack(spacing: 8) {
@@ -194,8 +218,8 @@ struct SchoolPicker: View {
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
                         .textContentType(.URL)
-                        .onSubmit { pick(address) }
-                    Button("Continue") { pick(address) }
+                        .onSubmit { pickTyped(address) }
+                    Button("Continue") { pickTyped(address) }
                         .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 Text("The address you open Canvas or Brightspace at in a browser, for example school.instructure.com or school.brightspace.com.")
@@ -219,13 +243,38 @@ struct SchoolPicker: View {
     private func openChosen() {
         guard let id = chosen ?? choices.first else { return }
         if id.hasPrefix("open:") {
-            pick(String(id.dropFirst(5)))
+            pickTyped(String(id.dropFirst(5)))
         } else if let s = search.results.first(where: { $0.id == id }) {
-            pick(s.domain)
+            pick(s)
         }
     }
 
-    private func pick(_ raw: String) {
-        if !session.setHost(raw) { invalid = true }
+    /// An address typed: shown to be confirmed under its own name.
+    private func pickTyped(_ raw: String) {
+        guard let host = AppSession.normalizeHost(raw) else { invalid = true; return }
+        pick(SchoolSearch.School(name: host, domain: host))
+    }
+
+    /// (1.2.6) A school chosen: its sign-in page shown small, to be confirmed.
+    private func pick(_ school: SchoolSearch.School) {
+        fieldFocused = false
+        confirming = school
+    }
+
+    /// Yes: the school opened, and its sign-in as always.
+    private func open(_ school: SchoolSearch.School) {
+        if !session.setHost(school.domain) {
+            confirming = nil
+            invalid = true
+        }
+    }
+
+    /// No: back to the search as it was left, the same school still picked out.
+    private func back() {
+        confirming = nil
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            fieldFocused = true
+        }
     }
 }
