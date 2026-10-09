@@ -108,17 +108,23 @@ struct ClassBoxPlot: View {
     }
 
     private func tip(_ m: Mark) -> some View {
+        // (1.3.11) solid colours of its own, never the system's: over a card's glass those came out grey on grey
         HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text(m.name).font(.sCaption).opacity(0.75)
-            Text(Self.num(m.value)).font(.sCaption.weight(.bold).monospacedDigit())
+            Text(m.name).font(.sCaption.weight(.medium)).foregroundStyle(Self.tipInk.opacity(0.8))
+            Text(Self.num(m.value)).font(.sCallout.weight(.bold).monospacedDigit()).foregroundStyle(Self.tipInk)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .foregroundStyle(Color(nsColor: .windowBackgroundColor))
-        .background(Color.primary, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Self.tipGround, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+        .compositingGroup()
         .fixedSize()
         .allowsHitTesting(false)
     }
+
+    /// The label's ground and words: near-black with white words by day, near-white with black ones by night.
+    private static let tipGround = Theme.dynamic(light: NSColor(white: 0.12, alpha: 1), dark: NSColor(white: 0.94, alpha: 1))
+    private static let tipInk = Theme.dynamic(light: NSColor.white, dark: NSColor(white: 0.06, alpha: 1))
 
     private static func num(_ v: Double) -> String {
         if !v.isFinite { return "—" }
