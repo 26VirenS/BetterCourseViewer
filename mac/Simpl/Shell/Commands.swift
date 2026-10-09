@@ -78,11 +78,8 @@ struct SimplCommands: Commands {
                 .disabled(!ready)
             Button("Report a Bug…") { ReportBug.open() } // (1.2.1)
             Divider()
-            Button("What’s New in Simpl") {
-                guard let engine else { return }
-                Task {
-                    if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) }
-                }
+            Button("What’s New in Simpl for Mac") {
+                engine?.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) // (1.3.3: the Mac app's own notes)
             }
             .disabled(!ready)
             Button("Open \(session.lmsName) in Browser") {

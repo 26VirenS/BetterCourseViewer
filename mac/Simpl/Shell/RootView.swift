@@ -37,9 +37,7 @@ struct RootView: View {
         .environmentObject(engine)
         .focusedSceneObject(engine)
         .sheet(item: $engine.whatsNew) { item in
-            WhatsNewSheet(data: item.data) {
-                Task { _ = try? await engine.call("whatsNewSeen", ["version": item.data.version ?? ""], as: OK.self) }
-            }
+            WhatsNewSheet(data: item.data) { MacWhatsNew.markSeen() }
         }
         .sheet(item: $engine.quiz) { q in
             QuizScreen(launch: q)

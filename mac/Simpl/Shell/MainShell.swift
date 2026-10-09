@@ -425,9 +425,7 @@ struct AccountBar: View {
             Spacer(minLength: 4)
             Menu {
                 SettingsLink { Text("Settings…") }
-                Button("What’s New") {
-                    Task { if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) } }
-                }
+                Button("What’s New") { engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) }
                 Button("\(engine.lmsName) Profile") { engine.openWebScreen("/profile", title: "Profile") }
                 Divider()
                 Button("Report a Bug…") { ReportBug.open() } // (1.2.1: the web's purple button)

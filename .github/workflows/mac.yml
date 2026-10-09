@@ -50,6 +50,10 @@ jobs:
         run: |
           python3 scripts/dev/make-mac-project.py
           git diff --exit-code -- mac/Simpl.xcodeproj || { echo "::error::mac/Simpl.xcodeproj differs from scripts/dev/make-mac-project.py's"; exit 1; }
+          # (1.3.3) the Mac's own What's New has an entry for this version, first
+          v=$(sed -n "s/^MARKETING_VERSION = '\([^']*\)'.*/\1/p" scripts/dev/make-mac-project.py)
+          n=$(grep -m1 -o 'Release(version: "[^"]*"' mac/Simpl/Support/MacWhatsNew.swift | sed 's/.*"\(.*\)"/\1/')
+          [ "$v" = "$n" ] || { echo "::error::mac/Simpl/Support/MacWhatsNew.swift's newest entry is $n, the app is $v"; exit 1; }
       # (1.3.1) the last build's intermediates, and every file not changed since dated as it was then: only what changed
       # is compiled again (scripts/dev/mtime-cache.py)
       - name: The last build

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What changed in Simpl, after an update (or from Help ▸ What's New): each version's notes with their kind's symbol —
+/// What changed in Simpl for Mac (1.3.3: its own notes, Support/MacWhatsNew.swift), after an update (or from Help ▸ What's New): each version's notes with their kind's symbol —
 /// new, better, fixed — under the app's mark, and Continue.
 struct WhatsNewSheet: View {
     let data: WhatsNewData
@@ -15,7 +15,7 @@ struct WhatsNewSheet: View {
                     .resizable()
                     .frame(width: 64, height: 64)
                     .accessibilityHidden(true)
-                Text("What’s New in Simpl")
+                Text("What’s New in Simpl for Mac")
                     .font(.system(size: 24, weight: .bold))
                     .tracking(-0.3)
                 if let v = data.version ?? data.releases.first?.version {

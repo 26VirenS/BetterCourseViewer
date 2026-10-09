@@ -246,9 +246,7 @@ final class SearchPalette: ObservableObject {
         case .reloadPage: engine.reload()
         case .settings: NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         case .whatsNew:
-            Task {
-                if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) }
-            }
+            engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all)
         case .setup: engine.setup = true
         case .tour: MacTour.shared.start()
         case .look(let look): AppLook.set(look)

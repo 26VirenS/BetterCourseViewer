@@ -282,16 +282,18 @@ final class Engine: ObservableObject, ShellListener {
         if UserDefaults.standard.bool(forKey: "SimplActivityProbe") { Task { await Activity.shared.probe(self) } }
         // the first run: the app's own setup (the courses that count, the goals), before anything else
         if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
+            if snapshot?.setupDone == false { MacWhatsNew.markSeen() } // (a first run: nothing is new to it)
             queuePopup(.setup)
             return
         }
         Task { await NotificationAsk.afterSetup(self, delay: 4) } // (1.2.1: a setup made before this one asks, once)
-        if LaunchOpen.take("whatsnew") != nil, let wn = try? await call("whatsNew", as: WhatsNewData.self) {
-            queuePopup(.whatsNew(wn))
+        if LaunchOpen.take("whatsnew") != nil {
+            queuePopup(.whatsNew(MacWhatsNew.due() ?? MacWhatsNew.all))
             return
         }
-        // after an update: what changed (seen once its sheet is really up)
-        if let wn = try? await call("whatsNew", ["due": true, "peek": true], as: WhatsNewData.self), !wn.releases.isEmpty {
+        // after an update: what changed in this app since the version last seen (1.3.3: the Mac's own notes, not the
+        // web extension's; seen once its sheet is really up)
+        if let wn = MacWhatsNew.due() {
             queuePopup(.whatsNew(wn))
         }
     }
