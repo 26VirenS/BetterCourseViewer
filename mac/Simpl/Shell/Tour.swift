@@ -7,7 +7,8 @@ import SwiftUI
 // ring, change a score) waits for it and moves on once it is done, as the web's do. Each lit thing says where it is
 // itself, measured in the window (TourProbe), so the light sits exactly on it however the window is laid out. It comes
 // once, after the app's own window first appears and nothing else is over it; Help ▸ Take the Tour, or /tour in the
-// search field, runs it again. Escape ends it.
+// search field, runs it again. (1.3.4) There is no Skip, nor does Escape end it, as on the web (welcome.js): it ends on
+// its last step.
 
 /// Where the tour is (nil: not on), and what was just done that a step may be waiting for.
 @MainActor
@@ -29,7 +30,7 @@ final class MacTour: ObservableObject {
         step = index
     }
 
-    /// Ended (its last step done, or skipped): not again on its own.
+    /// Ended (its last step done): not again on its own.
     func finish() {
         step = nil
         UserDefaults.standard.set(true, forKey: "tour:done")
@@ -264,7 +265,7 @@ struct TourOverlay: View {
                         let placed = self.plan(for: list[i], size: proxy.size, top: proxy.safeAreaInsets.top)
                         TourStage(step: list[i], index: i, count: list.count, plan: placed, size: proxy.size, cardSize: $cardSize, nudged: nudged,
                                   stuck: time.date.timeIntervalSince(since) > 6,
-                                  next: { next(list.count) }, back: back, skip: { tour.finish() }, poke: poke)
+                                  next: { next(list.count) }, back: back, poke: poke)
                             .onChange(of: time.date) { _, _ in check(list[i], count: list.count) }
                     }
                     .transition(.opacity)
@@ -471,18 +472,16 @@ private struct TourStage: View {
     let stuck: Bool
     let next: () -> Void
     let back: () -> Void
-    let skip: () -> Void
     let poke: () -> Void
     @FocusState private var focused: Bool
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            escape
             TourVeil(hole: plan.hole)
                 // (the light takes presses through to what is under it; the rest of the window nudges the card)
                 .contentShape(TourHoleShape(hole: plan.hole), eoFill: true)
                 .onTapGesture(perform: poke)
-            TourCard(step: step, index: index, count: count, arrow: plan.arrow, arrowAt: plan.arrowAt, stuck: stuck, cardSize: $cardSize, next: next, back: back, skip: skip)
+            TourCard(step: step, index: index, count: count, arrow: plan.arrow, arrowAt: plan.arrowAt, stuck: stuck, cardSize: $cardSize, next: next, back: back)
                 .scaleEffect(nudged ? 1.025 : 1)
                 .offset(x: plan.card.x - (plan.arrow == .leading ? CalloutMetrics.length : 0),
                         y: plan.card.y - (plan.arrow == .top ? CalloutMetrics.length : 0))
@@ -512,15 +511,6 @@ private struct TourStage: View {
         default:
             return .ignored
         }
-    }
-
-    /// Escape ends it, whatever has the keys: behind the dim, where no press reaches it.
-    private var escape: some View {
-        Button("", action: skip)
-            .keyboardShortcut(.cancelAction)
-            .opacity(0)
-            .frame(width: 1, height: 1)
-            .accessibilityHidden(true)
     }
 }
 
@@ -565,7 +555,7 @@ private struct TourVeil: View {
     }
 }
 
-/// The card: its count and Skip, the title and its line, what to do, a bar of how far along, and Next where the step
+/// The card: its count, the title and its line, what to do, a bar of how far along, and Next where the step
 /// waits for nothing (or for something that has not come in a while).
 private struct TourCard: View {
     static let width: CGFloat = 300
@@ -579,7 +569,6 @@ private struct TourCard: View {
     @Binding var cardSize: CGSize
     let next: () -> Void
     let back: () -> Void
-    let skip: () -> Void
 
     private var last: Bool { index == count - 1 }
 
@@ -613,19 +602,9 @@ private struct TourCard: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("\(index + 1) of \(count)")
-                    .font(.sFootnote.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                if !last {
-                    Button("Skip", action: skip)
-                        .buttonStyle(.plain)
-                        .font(.sFootnote.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .help("End the tour (Escape)")
-                }
-            }
+            Text("\(index + 1) of \(count)")
+                .font(.sFootnote.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
             Text(step.title)
                 .font(.sHeadline)
             step.body
