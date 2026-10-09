@@ -337,7 +337,8 @@ private struct ModulesList: View {
             let locked = it.locked == true
             let done = marking[it.id] ?? (it.done == true)
             HStack(spacing: 8) {
-                OptionalRowLink(enabled: !locked && (it.url != nil || it.type == "ExternalTool")) {
+                // (1.3.8) a locked item opens too: its page says why it is locked and when it opens
+                OptionalRowLink(enabled: it.url != nil || it.type == "ExternalTool") {
                     openItem(it)
                 } label: {
                     itemLabel(it, locked: locked, done: done, color: color)
@@ -394,7 +395,7 @@ private struct ModulesList: View {
 
     @ViewBuilder
     private func itemMenu(_ it: ModuleItem, _ m: ModuleData, locked: Bool, done: Bool) -> some View {
-        if !locked, it.url != nil || it.type == "ExternalTool" {
+        if it.url != nil || it.type == "ExternalTool" {
             Button("Open") { openItem(it) }
         }
         if it.markable == true, !locked {
@@ -418,8 +419,11 @@ private struct ModulesList: View {
     }
 
     private func openItem(_ it: ModuleItem) {
-        // (a module's tool opens in a window of its own; everything else where it leads)
-        if it.type == "ExternalTool", ctx.hasPrefix("courses/") {
+        // (a module's tool opens in a window of its own; everything else where it leads. A locked file or tool has nothing
+        // to download or launch: its page in Canvas, which says why, instead)
+        if it.locked == true, it.type == "File" || it.type == "ExternalTool", let url = it.url, !url.isEmpty {
+            engine.openWebScreen(ModulesList.page(url), title: it.title)
+        } else if it.type == "ExternalTool", ctx.hasPrefix("courses/") {
             engine.openTool(.moduleItem(course: ContextHome.id(of: ctx), id: it.id, title: it.title))
         } else {
             engine.go(it.url, title: it.title)
