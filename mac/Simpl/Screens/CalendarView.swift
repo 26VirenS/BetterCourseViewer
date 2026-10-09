@@ -336,7 +336,7 @@ struct CalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     // (1.2.3) an item clicked on the grid grows its preview out of it; the rest of the day picks the day
                     ForEach(evs.prefix(fits)) { ev in
-                        PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 5) {
+                        PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 5, inline: false) {
                             CalendarChip(event: ev)
                         }
                     }
@@ -435,7 +435,7 @@ struct CalendarView: View {
     /// (1.2.3) A press grows the item's preview out of its row (a double-click opens it where it lives).
     private func eventRow(_ ev: CalEvent) -> some View {
         withEventMenu(ev) {
-            PreviewLink(item: .event(ev, engine: engine)) {
+            PreviewLink(item: .event(ev, engine: engine), inline: false) {
                 CalendarEventLine(event: ev)
             }
         }
@@ -534,7 +534,7 @@ struct CalendarView: View {
 
     private func weekBlock(_ ev: CalEvent) -> some View {
         withEventMenu(ev) {
-            PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 8) {
+            PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 8, inline: false) {
                 CalendarWeekBlock(event: ev)
             }
         }

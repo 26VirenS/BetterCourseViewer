@@ -236,11 +236,13 @@ private struct PreviewAction {
 
 /// The card's face: what the work is and where, its title, where it stands, its facts, the first words of what it says,
 /// and what can be done with it. Laid out at the card's width and its own height, which it tells the overlay.
-private struct PreviewCard: View {
+struct PreviewCard: View {
     let item: PreviewItem
     let width: CGFloat
     let lines: Int
     let onMeasure: (CGFloat) -> Void
+    /// (1.2.15) Open under its row in a list: its row already says what it is, so no title; no Return for Open.
+    var inline = false
     @EnvironmentObject private var engine: Engine
     @State private var details: PreviewDetails?
     @State private var excerpt: String?
@@ -366,19 +368,21 @@ private struct PreviewCard: View {
                     .foregroundStyle(tint)
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                Button { WorkPreview.shared.close() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                // (1.2.15: a close that reads as one — a labelled button, not a faint ×)
+                Button { if inline { WorkPreview.shared.closeInline() } else { WorkPreview.shared.close() } } label: {
+                    Label("Close", systemImage: "xmark.circle.fill")
+                        .font(.sCallout.weight(.medium))
                 }
-                .buttonStyle(DashIconButtonStyle())
-                .help("Close (Esc)")
-                .accessibilityLabel("Close")
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .help("Close (Esc, or click anywhere else)")
             }
-            Text(assignment?.title ?? page?.title ?? item.title)
-                .font(.sTitle3)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+            if !inline {
+                Text(assignment?.title ?? page?.title ?? item.title)
+                    .font(.sTitle3)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.leading, 20)
         .padding(.trailing, 14)
@@ -465,8 +469,8 @@ private struct PreviewCard: View {
                     Text(item.openLabel)
                 }
                 .glassButton(prominent: true)
-                .keyboardShortcut(.defaultAction)
-                .help("\(item.openLabel) (Return)")
+                .keyboardShortcut(inline ? nil : .defaultAction)
+                .help(inline ? item.openLabel : "\(item.openLabel) (Return)")
             }
         }
         .font(.sBody)

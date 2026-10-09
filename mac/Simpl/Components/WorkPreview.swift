@@ -144,6 +144,7 @@ final class WorkPreview: ObservableObject {
 
     /// Gone at once (the work opened whole, the window gone somewhere else).
     func dismiss() {
+        closeInline(animated: false)
         guard item != nil else { return }
         var t = Transaction()
         t.disablesAnimations = true
@@ -157,17 +158,102 @@ final class WorkPreview: ObservableObject {
 
     /// Open: the work whole, as its row opened it before.
     func openWhole() {
-        guard let open = item?.openWhole else { return }
+        guard let open = (item ?? inlineItem)?.openWhole else { return }
         dismiss()
         open()
     }
 
     /// Mark Done (or back): the card says so at once, and the row's own tick does the rest.
     func markDone(_ done: Bool) {
+        if var it = inlineItem, item == nil, let toggle = it.toggle {
+            it.done = done
+            withAnimation(Motion.snappy) { inlineItem = it }
+            toggle(done)
+            return
+        }
         guard var it = item, let toggle = it.toggle else { return }
         it.done = done
         withAnimation(Motion.snappy) { item = it }
         toggle(done)
+    }
+
+    // MARK: - Inline (1.2.15)
+
+    /// The row whose preview is open in its list, under it (lists: the Dashboard's, a counter's, To Do); nil: none.
+    @Published private(set) var inlineID: String?
+    /// What that preview shows.
+    @Published private(set) var inlineItem: PreviewItem?
+    private var inlineAnchor: PreviewAnchor?
+    private var monitor: Any?
+
+    /// A row of a list pressed: its preview opens under it, in the list — or, a double-click or ⌘-click, the work
+    /// itself; the row whose preview is open, pressed again, closes it.
+    func pressInline(_ item: PreviewItem, from anchor: PreviewAnchor?) {
+        let now = Date()
+        let again = lastPress.map { $0.id == item.id && now.timeIntervalSince($0.at) <= NSEvent.doubleClickInterval } ?? false
+        lastPress = (item.id, now)
+        if let open = item.openWhole, again || WorkPreview.wantsWhole() {
+            lastPress = nil
+            dismiss()
+            open()
+            return
+        }
+        if again { return }
+        if inlineID == item.id {
+            closeInline()
+            return
+        }
+        withAnimation(WorkPreview.motion) {
+            inlineID = item.id
+            inlineItem = item
+        }
+        inlineAnchor = anchor
+        watch()
+    }
+
+    /// The preview in its list closed (its Close, Escape, a click anywhere round it).
+    func closeInline(animated: Bool = true) {
+        unwatch()
+        guard inlineID != nil else { return }
+        lastPress = nil
+        if animated {
+            withAnimation(WorkPreview.motion) {
+                inlineID = nil
+                inlineItem = nil
+            }
+        } else {
+            inlineID = nil
+            inlineItem = nil
+        }
+        inlineAnchor = nil
+    }
+
+    /// While one is open: a click outside its row and preview closes it (the click still does what it does), and
+    /// Escape closes it first.
+    private func watch() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak self] e in
+            guard let self, self.inlineID != nil else { return e }
+            if e.type == .keyDown {
+                if e.keyCode == 53 { // (Escape)
+                    self.closeInline()
+                    return nil
+                }
+                return e
+            }
+            guard let view = self.inlineAnchor?.view, let window = view.window, e.window === window else {
+                DispatchQueue.main.async { self.closeInline() }
+                return e
+            }
+            let r = view.convert(view.bounds, to: nil)
+            if !r.contains(e.locationInWindow) { DispatchQueue.main.async { self.closeInline() } }
+            return e
+        }
+    }
+
+    private func unwatch() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil
     }
 }
 
@@ -219,21 +305,48 @@ struct PreviewLink<Label: View>: View {
     let item: PreviewItem
     var padded = true
     var radius: CGFloat = 10
+    /// (1.2.15) The preview opens under the row, in its list (a list's rows); off, it grows out over the window (the
+    /// calendar's small items).
+    var inline = true
     @ViewBuilder var label: () -> Label
     @State private var anchor = PreviewAnchor()
+    @State private var rowWidth: CGFloat = 0
+    @ObservedObject private var preview = WorkPreview.shared
+
+    private var open: Bool { inline && preview.inlineID == item.id }
 
     var body: some View {
-        withOpen(
-            Button { WorkPreview.shared.press(item, from: anchor) } label: {
-                label()
-                    .padding(.horizontal, padded ? 8 : 0)
-                    .padding(.vertical, padded ? 9 : 0)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 0) {
+            withOpen(
+                Button {
+                    if inline { WorkPreview.shared.pressInline(item, from: anchor) } else { WorkPreview.shared.press(item, from: anchor) }
+                } label: {
+                    label()
+                        .padding(.horizontal, padded ? 8 : 0)
+                        .padding(.vertical, padded ? 9 : 0)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(RowButtonStyle(radius: radius))
+                .accessibilityHint(Text(open ? "Closes its preview" : "Shows a preview"))
+            )
+            if open, let shown = preview.inlineItem {
+                PreviewCard(item: shown, width: max(rowWidth - 8, 260), lines: 5, onMeasure: { _ in }, inline: true)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.primary.opacity(0.06)))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+                    .padding(.leading, 4)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .buttonStyle(RowButtonStyle(radius: radius))
-            .background { PreviewProbe(anchor: anchor).allowsHitTesting(false) }
-            .accessibilityHint(Text("Shows a preview"))
-        )
+        }
+        .background { PreviewProbe(anchor: anchor).allowsHitTesting(false) }
+        .background {
+            GeometryReader { p in
+                Color.clear
+                    .onAppear { rowWidth = p.size.width }
+                    .onChange(of: p.size.width) { _, w in rowWidth = w }
+            }
+        }
         .onAppear(perform: shot)
     }
 
@@ -257,7 +370,7 @@ struct PreviewLink<Label: View>: View {
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             guard !PreviewShot.taken, anchor.rect() != nil else { return }
             PreviewShot.taken = true
-            WorkPreview.shared.open(item, from: anchor)
+            if inline { WorkPreview.shared.pressInline(item, from: anchor) } else { WorkPreview.shared.open(item, from: anchor) }
         }
     }
 }

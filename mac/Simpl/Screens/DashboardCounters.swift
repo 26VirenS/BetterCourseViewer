@@ -133,7 +133,11 @@ struct DashCounterPanel: View {
     /// (1.2.8) How tall what it shows stands, for the page to size the floating panel to it.
     var onHeight: (CGFloat) -> Void = { _ in }
     @EnvironmentObject private var engine: Engine
+    @ObservedObject private var preview = WorkPreview.shared
     @State private var data: ItemsSheetData?
+
+    /// One of its rows has its preview open under it.
+    private var previewing: Bool { preview.inlineID?.hasPrefix("sheet:\(counter.key):") == true }
     @State private var error: String?
 
     var body: some View {
@@ -161,7 +165,9 @@ struct DashCounterPanel: View {
             header
             if let d = data {
                 // (1.2.2) no taller than three and a half rows: the rest scrolls inside the panel
-                CappedScroll(max: 240) { lists(d) } // (1.2.3: half of a fourth row shows, so it reads as one to scroll)
+                // (1.2.3: half of a fourth row shows, so it reads as one to scroll; 1.2.15: taller while one of its rows
+                // has its preview open under it)
+                CappedScroll(max: previewing ? 560 : 240) { lists(d) }
             } else if let error {
                 Text(error).font(.sCallout).foregroundStyle(.secondary)
             } else {
