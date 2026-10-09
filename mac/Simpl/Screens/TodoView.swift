@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// To Do: the next seven days of work and your own tasks, grouped by date, priority or course. A tick marks one done (it
-/// stays a moment, then moves where it now belongs), the flag at a row's end sets its priority, a click opens the work,
-/// a right-click has the rest — and + adds a task of your own. (1.2) On a wide window a side column keeps the week in
-/// view: how much is done, the grouping, what is left by day, by course and by priority, and New Task.
+/// stays a moment, then moves where it now belongs), the flag at a row's end sets its priority, a click grows its
+/// preview out of the row (1.2.3; a double-click opens the work), a right-click has the rest — and + adds a task of your
+/// own. (1.2) On a wide window a side column keeps the week in view: how much is done, the grouping, what is left by
+/// day, by course and by priority, and New Task.
 struct TodoView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<TodoData>()
@@ -119,7 +120,7 @@ struct TodoView: View {
                 sectionCard(section, group: d.group)
                     .transition(cardTransition)
             }
-            Text("Click a task to open it, or right-click it for more. Priority is yours alone and never reaches \(engine.lmsName).")
+            Text("Click a task for a quick look, double-click it to open it, or right-click it for more. Priority is yours alone and never reaches \(engine.lmsName).")
                 .font(.sFootnote)
                 .foregroundStyle(.secondary)
         }
@@ -359,7 +360,7 @@ struct TodoView: View {
                         row: row,
                         shown: Self.shown(row, withCourse: !byCourse, withDay: withDay),
                         showCourse: !byCourse,
-                        open: opener(row),
+                        preview: .work(row, engine: engine, toggle: { toggle(row, $0) }),
                         toggle: { toggle(row, $0) },
                         setPriority: { setPriority(row, $0) },
                         delete: { deleting = row }
@@ -404,11 +405,6 @@ struct TodoView: View {
         }
         guard let time = row.time, !time.isEmpty else { return day }
         return "\(day) \(time)"
-    }
-
-    private func opener(_ row: WorkRow) -> (() -> Void)? {
-        guard row.custom != true, let url = row.url, !url.isEmpty else { return nil }
-        return { engine.openWeb(url, title: row.title) }
     }
 
     // MARK: - Reading and acting
@@ -488,13 +484,14 @@ struct TodoView: View {
 // MARK: - A row
 
 /// A row of To Do: the shared work row (its tick, its title and what it is, where it stands, its course, its time) with
-/// its priority's flag at its end. A click opens the work; a right-click opens it, hands it in or shows its feedback,
-/// marks it done, sets its priority, deletes a task of your own, or opens it in Canvas.
+/// its priority's flag at its end. A click grows its preview out of it (1.2.3; a double-click opens the work); a
+/// right-click opens it, hands it in or shows its feedback, marks it done, sets its priority, deletes a task of your
+/// own, or opens it in Canvas.
 private struct TodoTaskRow: View {
     let row: WorkRow
     let shown: WorkRow
     let showCourse: Bool
-    let open: (() -> Void)?
+    let preview: PreviewItem
     let toggle: (Bool) -> Void
     let setPriority: (Int) -> Void
     let delete: () -> Void
@@ -503,14 +500,7 @@ private struct TodoTaskRow: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            if let open {
-                RowLink(action: open) { line }
-            } else {
-                line
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 9)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            PreviewLink(item: preview) { line }
             TodoPriorityMenu(level: row.pri ?? 0, short: row.priShort, hovering: hover, set: setPriority)
         }
         .onHover { hover = $0 }

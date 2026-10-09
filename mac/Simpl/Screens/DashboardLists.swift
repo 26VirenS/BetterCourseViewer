@@ -48,7 +48,7 @@ struct DashDayList: View {
                     VStack(spacing: 0) {
                         ForEach(Array(day.rows.enumerated()), id: \.element.id) { i, row in
                             if i > 0 { RowDivider(inset: 92) }
-                            DashWorkLine(row: row, wide: wide) { done in toggle(row, done) }
+                            DashWorkLine(row: row, wide: wide, day: day.title) { done in toggle(row, done) }
                                 .transition(.opacity)
                         }
                     }
@@ -77,15 +77,18 @@ struct DashDayList: View {
 }
 
 /// A piece of work in the List: its tick, its kind in its course's colour, its course and kind with where it stands,
-/// its title, its points and when it is due. A press opens it; its context menu hands it in or shows its feedback.
+/// its title, its points and when it is due. A press grows its preview out of it (1.2.3; a double-click opens it); its
+/// context menu hands it in or shows its feedback.
 struct DashWorkLine: View {
     let row: DashRow
     let wide: Bool
+    /// The day it is under ("Today", "Saturday"), for its preview's due line.
+    var day: String? = nil
     let toggle: (Bool) -> Void
     @EnvironmentObject private var engine: Engine
 
     var body: some View {
-        RowLink { if let u = row.url { engine.openWeb(u, title: row.title) } } label: {
+        PreviewLink(item: .dash(row, day: day, engine: engine, toggle: toggle)) {
             HStack(spacing: 12) {
                 CheckCircle(done: row.done, color: .green) { toggle(!row.done) }
                 IconTile(symbol: DashGlyph.work(row.type), color: Color(hex: row.color), size: 32)
@@ -122,14 +125,14 @@ struct DashWorkLine: View {
 }
 
 /// The day's work beside the cards, in the narrow column: its tick, its title, its course in its colour with its
-/// kind, its time.
+/// kind, its time. A press grows its preview out of it (1.2.3).
 struct DashTodayLine: View {
     let row: WorkRow
     let toggle: (Bool) -> Void
     @EnvironmentObject private var engine: Engine
 
     var body: some View {
-        RowLink { if let u = row.url { engine.openWeb(u, title: row.title) } } label: {
+        PreviewLink(item: .work(row, engine: engine, toggle: toggle)) {
             HStack(alignment: .top, spacing: 11) {
                 CheckCircle(done: row.done, color: .green) { toggle(!row.done) }
                 VStack(alignment: .leading, spacing: 3) {
@@ -165,7 +168,8 @@ struct DashTodayLine: View {
 }
 
 /// Canvas's recent activity: what is new marked with a dot, each with its symbol in its course's colour, its title
-/// and when, what it is and where, and its first lines.
+/// and when, what it is and where, and its first lines. A press grows its preview out of it (1.2.3; a double-click
+/// opens it, its dot going as it always did).
 struct DashActivityList: View {
     let data: DashActivityData
     let open: (DashActivityRow) -> Void
@@ -186,8 +190,21 @@ struct DashActivityList: View {
         }
     }
 
+    /// An item's preview: what its row says, and (a grade posted) the assignment as the card opens.
+    private func preview(_ r: DashActivityRow) -> PreviewItem {
+        var item = PreviewItem(id: "activity:\(r.id)", title: r.title, kind: PreviewFormat.text(r.kind), symbol: DashGlyph.activity(r.type),
+                               course: PreviewFormat.text(r.course), color: r.color)
+        item.when = PreviewFormat.text(r.when)
+        item.excerpt = PreviewFormat.text(r.preview)
+        if let u = PreviewFormat.text(r.url) {
+            item.url = u
+            item.openWhole = { open(r) }
+        }
+        return item
+    }
+
     private func line(_ r: DashActivityRow) -> some View {
-        RowLink { open(r) } label: {
+        PreviewLink(item: preview(r)) {
             HStack(alignment: .top, spacing: 12) {
                 Circle()
                     .fill(r.unread == true ? Color.accentColor : Color.clear)

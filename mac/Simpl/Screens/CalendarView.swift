@@ -4,7 +4,8 @@ import SwiftUI
 /// Calendar: a month as a calendar's grid — each day's work and events on it in their calendar's colour, today marked —
 /// with the day picked listed beside it (and a task of your own added to it); a week day by day; or the next three weeks
 /// as a list. On the calendars chosen (Canvas shows ten at most). ‹ and › — or ← and → once the calendar has been
-/// clicked — move a month or a week, sliding the way they go; Today comes back.
+/// clicked — move a month or a week, sliding the way they go; Today comes back. (1.2.3) An item clicked — on the grid, in
+/// the day, the week or the list — grows its preview out of itself (Components/WorkPreview.swift); a double-click opens it.
 struct CalendarView: View {
     @EnvironmentObject private var engine: Engine
     /// Month, week or list, as the page keeps it (`calView`).
@@ -333,7 +334,12 @@ struct CalendarView: View {
                         }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(evs.prefix(fits)) { ev in CalendarChip(event: ev) }
+                    // (1.2.3) an item clicked on the grid grows its preview out of it; the rest of the day picks the day
+                    ForEach(evs.prefix(fits)) { ev in
+                        PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 5) {
+                            CalendarChip(event: ev)
+                        }
+                    }
                     if evs.count > fits {
                         Text("\(evs.count - fits) more")
                             .font(.sCaption.weight(.medium))
@@ -426,19 +432,22 @@ struct CalendarView: View {
         engine.newTask = true
     }
 
-    @ViewBuilder
+    /// (1.2.3) A press grows the item's preview out of its row (a double-click opens it where it lives).
     private func eventRow(_ ev: CalEvent) -> some View {
-        if let url = ev.url, !url.isEmpty {
-            RowLink {
-                engine.openWeb(url, title: ev.title)
-            } label: {
+        withEventMenu(ev) {
+            PreviewLink(item: .event(ev, engine: engine)) {
                 CalendarEventLine(event: ev)
             }
-            .contextMenu { eventMenu(ev, url: url) }
+        }
+    }
+
+    /// An item's own menu (open it, open it in Canvas, copy its link), where it has an address.
+    @ViewBuilder
+    private func withEventMenu<V: View>(_ ev: CalEvent, @ViewBuilder _ content: () -> V) -> some View {
+        if let url = ev.url, !url.isEmpty {
+            content().contextMenu { eventMenu(ev, url: url) }
         } else {
-            CalendarEventLine(event: ev)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 9)
+            content()
         }
     }
 
@@ -523,20 +532,13 @@ struct CalendarView: View {
         .frame(maxWidth: .infinity, minHeight: 380, maxHeight: .infinity, alignment: .top)
     }
 
-    @ViewBuilder
     private func weekBlock(_ ev: CalEvent) -> some View {
-        if let url = ev.url, !url.isEmpty {
-            Button {
-                engine.openWeb(url, title: ev.title)
-            } label: {
+        withEventMenu(ev) {
+            PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 8) {
                 CalendarWeekBlock(event: ev)
             }
-            .buttonStyle(RowButtonStyle(radius: 8))
-            .contextMenu { eventMenu(ev, url: url) }
-            .help(ev.sub ?? ev.title)
-        } else {
-            CalendarWeekBlock(event: ev)
         }
+        .help(ev.sub ?? ev.title)
     }
 
     // MARK: List
@@ -703,6 +705,44 @@ struct CalendarView: View {
 }
 
 // MARK: - Pieces
+
+private extension PreviewItem {
+    /// (1.2.3) A piece of work or an event of the calendar, for its preview: its line under the title is "course · kind ·
+    /// points · place" (native-app.js calendar). An event whose address is the calendar itself opens on Canvas's page.
+    static func event(_ ev: CalEvent, engine: Engine) -> PreviewItem {
+        let kind = PreviewFormat.text(ev.kind) ?? "Event"
+        let work = ["Assignment", "Quiz", "Discussion"].contains(kind)
+        let parts = (ev.sub ?? "").components(separatedBy: " · ").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let course = parts.first.flatMap { c -> String? in c == kind || c.hasSuffix(" pts") ? nil : c }
+        let place = parts.filter { $0 != course && $0 != kind && !$0.hasSuffix(" pts") && !$0.hasSuffix(" pt") }
+        var item = PreviewItem(id: "cal:\(ev.id)", title: ev.title, kind: kind, symbol: CalendarEventLine.glyph(kind), course: course, color: ev.color)
+        let day = PreviewFormat.date(ev.date).map { PreviewFormat.dayWord($0) }
+        item.when = PreviewFormat.when(day: day, time: ev.time, due: work)
+        item.points = PreviewFormat.points(in: ev.sub)
+        item.detail = place.isEmpty ? nil : place.joined(separator: " · ")
+        if ev.missing == true {
+            item.flags = [WorkFlag(word: "Missing", kind: "bad")]
+        } else if ev.excused == true {
+            item.flags = [WorkFlag(word: "Excused", kind: "muted")]
+        } else if work && ev.done == true {
+            item.flags = [WorkFlag(word: "Submitted", kind: "good")]
+        }
+        if let url = PreviewFormat.text(ev.url) {
+            item.url = url
+            if engine.tabName(for: url) == "calendar" {
+                // (Canvas's own page for an event: here the calendar would only open on itself)
+                item.openLabel = "Open in \(engine.lmsName)"
+                item.openWhole = { engine.openWebScreen(url, title: ev.title) }
+            } else {
+                item.openWhole = { engine.openWeb(url, title: ev.title) }
+            }
+            if work {
+                item.work = WorkAction(url: url, title: ev.title, kind: kind.lowercased(), handedIn: ev.done == true && ev.missing != true)
+            }
+        }
+        return item
+    }
+}
 
 /// A piece of work or an event on a day of the month: (1.2) a line on the grid with its calendar's colour as a dot
 /// before its name — a red mark when it is missing, greyed once done (work handed in struck through).

@@ -118,7 +118,7 @@ struct DashCounterTile: View {
 
 /// The panel a counter grows into: its header (the tile's symbol, name and number, larger) and what it counted —
 /// what wants attention first, then, quieter, the rest of the same span beside it when the page is wide enough. Each
-/// row opens its work; an overdue one the student has let go can be cleared.
+/// row previews its work (1.2.3; a double-click opens it); an overdue one the student has let go can be cleared.
 struct DashCounterPanel: View {
     let counter: Counter
     let value: Int?
@@ -242,8 +242,10 @@ struct DashCounterPanel: View {
         }
     }
 
+    /// A row of the panel: a press grows its preview out of it (1.2.3, as the web's sheet previews its rows); a
+    /// double-click opens it.
     private func item(_ row: SheetRow) -> some View {
-        RowLink { if let u = row.url { engine.openWeb(u, title: row.title) } } label: {
+        PreviewLink(item: .sheet(row, counter: counter.key, engine: engine)) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(Color(hex: row.color).opacity(row.quiet == true ? 0.5 : 1))
