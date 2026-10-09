@@ -61,6 +61,11 @@ struct QuizTakePane: View {
             if focus == nil { focus = .keys }
         }
         .onChange(of: run.idx) { _, _ in focus = .keys }
+        .task {
+            guard QuizClickProbe.target > 0 else { return }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            QuizClickProbe.fire()
+        }
     }
 
     /// The holder of the attempt's keys (whether or not keyboard navigation is on): an unseen view that takes no clicks.
@@ -218,7 +223,7 @@ struct QuizTakePane: View {
 
 // MARK: - The questions as chips
 
-/// Every question as a glass chip in a strip over the page (a narrow sheet), Review at its end. The strip follows the
+/// Every question's number as a tile in a strip over the page (a narrow sheet), Review at its end. The strip follows the
 /// question showing.
 private struct QuizStripView: View {
     @ObservedObject var run: QuizRun
@@ -230,16 +235,16 @@ private struct QuizStripView: View {
         HStack(spacing: 12) {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
-                    GlassGroup(spacing: 6) {
-                        HStack(spacing: 8) {
-                            ForEach(Array(run.questions.enumerated()), id: \.element.id) { k, q in
-                                QuizChip(run: run, q: q, k: k, tint: tint, jump: jump)
-                                    .id(k)
-                            }
+                    HStack(spacing: 6) {
+                        ForEach(Array(run.questions.enumerated()), id: \.element.id) { k, q in
+                            QuizChip(run: run, q: q, k: k, tint: tint, width: 36, jump: jump)
+                                .id(k)
                         }
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 8)
                     }
+                    .padding(8)
+                    .card(radius: 14)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 6)
                 }
                 .scrollIndicators(.never)
                 .onAppear { proxy.scrollTo(run.idx, anchor: .center) }
@@ -258,31 +263,19 @@ private struct QuizStripView: View {
     }
 }
 
-/// The questions down the side of a wide sheet: every question as a glass chip in a grid, what the chips mean, how
-/// much is answered (and whether it is saved), and the review.
+/// The questions down the side of a wide sheet: every question's number in a small card (QuizNumberCard), what the tiles
+/// mean, how much is answered (and whether it is saved), and the review.
 private struct QuizRail: View {
     @ObservedObject var run: QuizRun
     let tint: Color
     let jump: (Int) -> Void
     let review: () -> Void
 
-    private let grid = [GridItem(.adaptive(minimum: 38, maximum: 46), spacing: 8)]
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("Questions")
-                        .font(.sHeadline)
-                    GlassGroup(spacing: 6) {
-                        LazyVGrid(columns: grid, alignment: .leading, spacing: 8) {
-                            ForEach(Array(run.questions.enumerated()), id: \.element.id) { k, q in
-                                QuizChip(run: run, q: q, k: k, tint: tint, size: 38, jump: jump)
-                                    .id(k)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
+                    QuizNumberCard(run: run, tint: tint, jump: jump)
                     legend
                     Divider()
                     progress
@@ -312,9 +305,9 @@ private struct QuizRail: View {
 
     private func key(fill: Color, ring: Color?, _ text: String) -> some View {
         HStack(spacing: 10) {
-            Circle()
+            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
                 .fill(fill)
-                .overlay(Circle().strokeBorder(ring ?? Color.clear, lineWidth: 1.5))
+                .overlay(RoundedRectangle(cornerRadius: 3.5, style: .continuous).strokeBorder(ring ?? Color.clear, lineWidth: 1.5))
                 .frame(width: 13, height: 13)
             Text(text)
         }
@@ -351,14 +344,47 @@ private struct QuizRail: View {
     }
 }
 
-/// One question's chip as a button: a click goes to it. Answered, flagged, the one showing, one sealed behind the
-/// student (no going back) dimmed and shut.
+/// (1.3.8) Every question's number in a small card, a clean grid of tiles five across, with how many are answered at its
+/// head: in place of the glass bubbles (a glass face drawn inside each button, under which a click could be lost).
+private struct QuizNumberCard: View {
+    @ObservedObject var run: QuizRun
+    let tint: Color
+    let jump: (Int) -> Void
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 5)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Questions")
+                    .font(.sHeadline)
+                Spacer(minLength: 6)
+                Text("\(run.answeredCount) of \(run.questions.count)")
+                    .font(.sFootnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText(value: Double(run.answeredCount)))
+                    .animation(Motion.snappy, value: run.answeredCount)
+            }
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(Array(run.questions.enumerated()), id: \.element.id) { k, q in
+                    QuizChip(run: run, q: q, k: k, tint: tint, jump: jump)
+                        .id(k)
+                }
+            }
+        }
+        .padding(14)
+        .card(radius: 16)
+    }
+}
+
+/// One question's tile as a button: a click goes to it. Answered, flagged, the one showing, one sealed behind the student
+/// (no going back) dimmed and shut. `width`: fixed in the strip; in the card, the grid's column.
 private struct QuizChip: View {
     @ObservedObject var run: QuizRun
     let q: QuizQuestion
     let k: Int
     let tint: Color
-    var size: CGFloat = 34
+    var width: CGFloat? = nil
     let jump: (Int) -> Void
 
     var body: some View {
@@ -366,12 +392,13 @@ private struct QuizChip: View {
         let sealed = run.attempt?.noBack == true && k < run.idx
         let done = q.isAnswered && q.kind != "info"
         Button { jump(k) } label: {
-            QuizChipFace(number: k + 1, current: current, done: done, flagged: q.flagged, loading: run.moving == k, tint: tint, size: size)
+            QuizNumberTile(number: k + 1, current: current, done: done, flagged: q.flagged, loading: run.moving == k, tint: tint, width: width)
                 .opacity(sealed ? 0.35 : 1)
         }
-        .buttonStyle(QuizChipStyle())
-        .disabled(sealed || current || run.moving != nil)
+        .buttonStyle(QuizTileStyle())
+        .disabled(sealed || run.moving != nil) // (the one showing stays a button: a click on it does nothing, and asks nothing)
         .help(tip(sealed: sealed))
+        .background { QuizClickProbe.mark(k) }
         .accessibilityLabel("Question \(k + 1)\(done ? ", answered" : "")\(q.flagged ? ", flagged" : "")\(current ? ", showing" : "")")
     }
 
@@ -389,55 +416,102 @@ private struct QuizChip: View {
     }
 }
 
-/// A chip's face: the number on glass — the one showing filled with the colour, an answered one washed in it, a flagged
-/// one ringed in orange with its flag, one on its way a spinner.
-private struct QuizChipFace: View {
+/// A tile's face: the number in a small rounded square — the one showing filled with the colour, an answered one washed
+/// in it, one not yet answered a quiet grey; a flagged one edged in orange with its flag in the corner, one on its way a
+/// spinner. Flat: no glass.
+private struct QuizNumberTile: View {
     let number: Int
     let current: Bool
     let done: Bool
     let flagged: Bool
     var loading = false
     let tint: Color
-    var size: CGFloat = 34
-
-    private var ink: Color {
-        if current { return .white }
-        return done ? tint : Color.secondary
-    }
-
-    private var fill: Color? {
-        if current { return tint }
-        return done ? tint.opacity(0.2) : nil
-    }
+    var width: CGFloat? = nil
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         Text("\(number)")
             .font(.sCallout.weight(.semibold).monospacedDigit())
-            .foregroundStyle(ink)
-            .frame(width: size, height: size)
-            .background {
-                if let fill { Circle().fill(fill) }
-            }
-            .glass(Circle())
-            .overlay {
-                if flagged && !current { Circle().strokeBorder(Color.orange, lineWidth: 2) }
-            }
+            .foregroundStyle(current ? Color.white : (done ? tint : Color.secondary))
+            .frame(width: width, height: 32)
+            .frame(maxWidth: width == nil ? .infinity : nil)
+            .background(shape.fill(current ? tint : (done ? tint.opacity(0.18) : Color.primary.opacity(0.07))))
+            .overlay(shape.strokeBorder(flagged && !current ? Color.orange : Color.clear, lineWidth: 1.5))
             .overlay(alignment: .topTrailing) {
                 if flagged {
                     Image(systemName: "flag.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(3)
-                        .background(Circle().fill(.orange))
-                        .offset(x: 4, y: -4)
-                        .transition(.scale(scale: 0.5).combined(with: .opacity))
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(current ? Color.white : Color.orange)
+                        .padding(4)
+                        .transition(.opacity)
                 }
             }
             .overlay {
-                if loading { ProgressView().controlSize(.small) }
+                if loading { ProgressView().controlSize(.mini) }
             }
+            .contentShape(shape)
             .animation(Motion.snappy, value: done)
+            .animation(Motion.snappy, value: current)
             .animation(Motion.snappy, value: flagged)
+    }
+}
+
+/// A tile as a button: a touch brighter under the pointer, a little smaller under a click (under Reduce Motion, dimmed).
+private struct QuizTileStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        TileBody(configuration: configuration)
+    }
+
+    private struct TileBody: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hover = false
+        @Environment(\.isEnabled) private var enabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .brightness(hover && enabled ? 0.06 : 0)
+                .scaleEffect(!reduceMotion && configuration.isPressed ? 0.94 : 1)
+                .opacity(reduceMotion && configuration.isPressed ? 0.7 : 1)
+                .animation(Motion.snappy, value: configuration.isPressed)
+                .animation(Motion.hover, value: hover)
+                .onHover { hover = $0 }
+        }
+    }
+}
+
+/// (the screenshot suite: -SimplQuizClick 4 clicks question 4's tile as a person would — a mouse down and a mouse up put on
+/// the app's queue at the tile's middle in the sheet's window — so the picture shows whether a click lands)
+@MainActor
+enum QuizClickProbe {
+    static let target = UserDefaults.standard.integer(forKey: "SimplQuizClick")
+    private static var frame: CGRect?
+
+    /// Where the target's tile is, in its window (nothing drawn, and nothing at all unless the suite asked).
+    @ViewBuilder
+    static func mark(_ k: Int) -> some View {
+        if target == k + 1 {
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { frame = g.frame(in: .global) }
+                    .onChange(of: g.frame(in: .global)) { _, f in frame = f }
+            }
+        }
+    }
+
+    static func fire() {
+        guard target > 0, let r = frame,
+              let w = NSApp.windows.first(where: { $0.isSheet && $0.isVisible }) ?? NSApp.keyWindow,
+              let content = w.contentView else { return }
+        NSApp.activate(ignoringOtherApps: true) // (as a person's click finds it: the app in front, the sheet's window key)
+        w.makeKey()
+        let at = NSPoint(x: r.midX, y: content.bounds.height - r.midY)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            if let e = NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                          windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
+                NSApp.postEvent(e, atStart: false)
+            }
+        }
     }
 }
 
