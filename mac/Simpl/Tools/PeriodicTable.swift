@@ -249,7 +249,7 @@ private struct PTCornerCard: View {
         HStack(spacing: cell * 0.3) {
             VStack(spacing: 0) {
                 Text("\(element.number)")
-                    .font(.system(size: cell * 0.3, weight: .semibold).monospacedDigit())
+                    .font(.system(size: max(8, cell * 0.3), weight: .semibold).monospacedDigit())
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(element.symbol)
                     .font(.system(size: cell * 1.1, weight: .bold))
@@ -260,17 +260,18 @@ private struct PTCornerCard: View {
             .foregroundStyle(.white)
             .background(color, in: RoundedRectangle(cornerRadius: cell * 0.3, style: .continuous))
             VStack(alignment: .leading, spacing: cell * 0.06) {
+                // (never smaller than reads: the pin's table is small)
                 Text(element.name)
-                    .font(.system(size: cell * 0.5, weight: .bold))
+                    .font(.system(size: max(14, cell * 0.5), weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 Text("\(element.kind.label) · \(element.massText) u")
-                    .font(.system(size: cell * 0.26))
+                    .font(.system(size: max(11, cell * 0.26)))
                     .foregroundStyle(color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(element.config)
-                    .font(.system(size: cell * 0.24).monospaced())
+                    .font(.system(size: max(10.5, cell * 0.24)).monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -479,7 +480,7 @@ struct PeriodicTableCompact: View {
     }
 
     private var line: String {
-        if let e = over ?? found.first { return e.line }
+        if let e = over ?? picked ?? found.first { return e.line }
         return query.trimmingCharacters(in: .whitespaces).isEmpty ? "" : "No element"
     }
 }
