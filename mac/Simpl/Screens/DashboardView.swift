@@ -131,9 +131,11 @@ struct DashboardView: View {
                     DashCounterPanel(counter: c, value: value(c), note: note(c), width: w, close: { setOpen(nil) }) { h in
                         if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
                     }
-                    .frame(width: w, height: panelHeight > 0 ? panelHeight : max(tile.height, 160))
-                    .tourSpot(.counterPanel)
+                    // (1.2.9: the shape that moves is the panel itself, sized to the tile on its way in and out — the
+                    // size it rests at is the frame round it — so it grows out of its tile and folds back into it)
                     .dashMorph(key, in: morph, enabled: !reduceMotion)
+                    .frame(width: w, height: panelHeight > 0 ? panelHeight : max(tile.height, 160), alignment: .topLeading)
+                    .tourSpot(.counterPanel)
                     .shadow(color: Color.black.opacity(0.18), radius: 24, y: 10)
                     .id(key)
                     .transition(.opacity)
