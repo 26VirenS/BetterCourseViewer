@@ -208,6 +208,9 @@ struct DashCounterPanel: View {
             .help("Close (Esc)")
             .accessibilityLabel("Close")
         }
+        // (1.2.11) the card pressed again — its head, where the tile was — closes it (the ✕ keeps its own press)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: close)
     }
 
     @ViewBuilder
@@ -273,16 +276,12 @@ struct DashCounterPanel: View {
                 }
                 Spacer(minLength: 6)
                 if row.clearable == true, let k = row.key {
-                    Button { clear(k) } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 28, height: 28)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Clear from Overdue")
-                    .accessibilityLabel("Clear \(row.title) from Overdue")
+                    // (1.2.11) a button that says what it does; one after another, each row going as it is pressed
+                    Button("Dismiss") { clear(k) }
+                        .controlSize(.small)
+                        .buttonStyle(.bordered)
+                        .help("Dismiss from Overdue")
+                        .accessibilityLabel("Dismiss \(row.title) from Overdue")
                 } else if row.url != nil {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
@@ -298,7 +297,7 @@ struct DashCounterPanel: View {
             }
             if row.clearable == true, let k = row.key {
                 Divider()
-                Button("Clear from Overdue") { clear(k) }
+                Button("Dismiss from Overdue") { clear(k) }
             }
         }
     }
@@ -315,12 +314,17 @@ struct DashCounterPanel: View {
         }
     }
 
+    /// (1.2.11) The row goes at once (the next can be dismissed straight after); Canvas is told, and the list read again.
     private func clear(_ k: String) {
+        if var d = data {
+            for i in d.sections.indices { d.sections[i].rows.removeAll { $0.key == k } }
+            d.sections.removeAll { $0.rows.isEmpty }
+            withAnimation(Motion.gentle) { data = d }
+        }
         Task {
-            if await engine.act("clearOverdue", ["key": k]) {
-                await load()
-                engine.changed()
-            }
+            let ok = await engine.act("clearOverdue", ["key": k])
+            await load()
+            if ok { engine.changed() }
         }
     }
 }

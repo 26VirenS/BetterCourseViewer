@@ -354,6 +354,7 @@
     if (!c) return { title: key === 'overdue' ? 'Overdue' : 'Graded this week', note: `Could not be read from ${BCV.lms.name}.`, empty: 'Try again in a moment.', sections: [] };
     if (key === 'overdue') {
       const list = c.od.overdue.filter((o) => !clearedOverdue.has(o.key));
+      for (const o of list) if (o.key) listedOverdue.set(o.key, o);
       const recent = W.recentOf('Handed in late', c.od.lateIn);
       return { title: 'Overdue', note: list.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission', empty: 'Nothing is overdue.', sections: [section(recent && list.length ? 'Not handed in' : '', list), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
     }
@@ -362,14 +363,19 @@
     return { title: 'Graded this week', note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(st.weekStart)}` : `Week of ${U.fmtShort(st.weekStart)}`, empty: 'Nothing has been graded this week.', sections: [section(recent && graded.length ? 'This week' : '', graded), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
   }
   const clearedOverdue = new Set();
-  /** The X on an Overdue row: dismissed on Canvas's planner (the Dashboard's X). */
+  // (Mac 1.2.11) the overdue rows last listed, by key: one dismissed while the Dashboard reads again (its counts not yet
+  // made afresh) is still found, so several can be dismissed one after another
+  const listedOverdue = new Map();
+  /** The X (the Mac's Dismiss) on an Overdue row: dismissed on Canvas's planner (the Dashboard's X). */
   async function clearOverdue({ key } = {}) {
-    const o = todayState?.counts?.od?.overdue.find((x) => x.key === key);
+    if (!todayState) await today();
+    if (!todayState?.counts) await todayCounts({ kept: false }).catch(() => null);
+    const o = todayState?.counts?.od?.overdue.find((x) => x.key === key) || listedOverdue.get(key);
     if (!o) return { ok: false };
     await store.dismiss(o.item);
     clearedOverdue.add(key);
     app()?.refreshCounts?.();
-    return { ok: true, overdue: todayState.counts.od.overdue.filter((x) => !clearedOverdue.has(x.key)).length };
+    return { ok: true, overdue: (todayState?.counts?.od?.overdue || []).filter((x) => !clearedOverdue.has(x.key)).length };
   }
 
   // ---- the Mac's Dashboard (Simpl for Mac 1.2) ------------------------------------------------------------------------
