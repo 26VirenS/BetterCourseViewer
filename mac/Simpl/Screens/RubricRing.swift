@@ -3,8 +3,8 @@ import SwiftUI
 // The rubric as a ring (1.2): the web's rubric-ring.js on the Mac. One slice per criterion, as long as its share of the
 // points; marked and posted, each slice turns to its grade's colour (green near full marks, yellow to orange for part
 // marks, red where most was lost) and bends out where the work did well and in where it lost points, its colour,
-// thickness and bend carried smoothly into its neighbours'. The total in the middle; a slice, its label or the keys open
-// a criterion beside the ring (RubricPanels.swift).
+// thickness and bend carried smoothly into its neighbours'. This file reads the rubric (RubricModel) and draws it in
+// miniature; the ring itself floats over the window (1.2.2: RubricPopup.swift, drawn by RubricStage.swift).
 
 private let tau = 2 * Double.pi
 
@@ -61,6 +61,39 @@ struct RingRGB: Hashable {
             return 255 * (l - a * max(-1, min(k - 3, min(9 - k, 1))))
         }
         return RingRGB(r: f(0), g: f(8), b: f(4))
+    }
+
+    /// The colour as hue (degrees), saturation and lightness.
+    var hslParts: (h: Double, s: Double, l: Double) {
+        let rr = r / 255, gg = g / 255, bb = b / 255
+        let mx = max(rr, gg, bb), mn = min(rr, gg, bb)
+        let l = (mx + mn) / 2
+        let d = mx - mn
+        if d == 0 { return (0, 0, l) }
+        let hh: Double
+        if mx == rr {
+            hh = ((gg - bb) / d).truncatingRemainder(dividingBy: 6)
+        } else if mx == gg {
+            hh = (bb - rr) / d + 2
+        } else {
+            hh = (rr - gg) / d + 4
+        }
+        return ((hh * 60 + 360).truncatingRemainder(dividingBy: 360), d / max(1e-9, 1 - abs(2 * l - 1)), l)
+    }
+
+    /// From this colour to another round the colour wheel, the short way (1.2.2): a turn that stays vivid, where a
+    /// straight mix of two far-apart colours goes grey half-way.
+    func turn(to other: RingRGB, _ t: Double) -> RingRGB {
+        if t <= 0 { return self }
+        if t >= 1 { return other }
+        let a = hslParts
+        let b = other.hslParts
+        var dh = b.h - a.h
+        if dh > 180 { dh -= 360 }
+        if dh < -180 { dh += 360 }
+        var hue = (a.h + dh * t).truncatingRemainder(dividingBy: 360)
+        if hue < 0 { hue += 360 }
+        return RingRGB.hsl(hue, a.s + (b.s - a.s) * t, a.l + (b.l - a.l) * t)
     }
 
     /// A criterion's mark as a colour: green at full marks or near them (90 % and up), yellow to orange for part marks
@@ -231,21 +264,6 @@ struct RubricModel {
                      pts: r.value ?? number(in: r.pts))
     }
 
-    /// Where each level sits on its criterion's bar: 1 at the top (the best), 0 at the foot — by points, or evenly in
-    /// their order when there are no points to place them by.
-    static func positions(_ levels: [Level]) -> [Double] {
-        let vals = levels.compactMap(\.pts)
-        let count = levels.count
-        let even: (Int) -> Double = { i in count <= 1 ? 1 : 1 - Double(i) / Double(count - 1) }
-        guard let top = vals.max(), let lo = vals.min(), top - lo > 1e-9 else {
-            return levels.indices.map(even)
-        }
-        return levels.enumerated().map { i, l in
-            guard let p = l.pts else { return even(i) }
-            return (p - lo) / (top - lo)
-        }
-    }
-
     /// How far up its bar a criterion's mark sits (the stretch above it was not earned).
     private static func fraction(_ levels: [Level], worth: Double, score: Double?, mark: Int) -> Double {
         guard let score else { return 1 }
@@ -355,392 +373,11 @@ struct RubricModel {
         values[b.from] + (values[b.to] - values[b.from]) * b.t
     }
 
-    func colour(_ cols: [RingRGB], at th: Double) -> RingRGB {
-        let b = between(th)
-        return cols[b.from].mix(cols[b.to], b.t)
-    }
-
-    /// The run of colour round the whole ring, for an angular gradient from twelve o'clock.
-    func gradient(_ cols: [RingRGB]) -> Gradient {
-        guard n > 0 else { return Gradient(colors: [.gray, .gray]) }
-        let steps = 120
-        return Gradient(stops: (0...steps).map { i in
-            let t = Double(i) / Double(steps)
-            return Gradient.Stop(color: colour(cols, at: t * tau).color, location: t)
-        })
-    }
-
     /// The slice an angle falls in.
     func slice(at th: Double) -> Int {
         var a = th.truncatingRemainder(dividingBy: tau)
         if a < 0 { a += tau }
         return ends.firstIndex { a < $0 } ?? max(0, n - 1)
-    }
-
-    /// A point along slice `k` (`v` from 0 to 1, a hair past): its angle, the radius of the band's middle, its width.
-    /// `swell` pushes it out under the pointer; `grow` is how far it has bent to its marks.
-    func sample(_ k: Int, _ v: Double, radius: Double, swell: Double, grow: Double) -> (theta: Double, rad: Double, width: Double) {
-        let z = radius / 176
-        let th = starts[k] + (ends[k] - starts[k]) * v
-        let b = between(th)
-        let s1 = sin(Double.pi * clamp01(v))
-        let sw = swell * s1 * s1
-        let width = blend(thick, b) * z
-        let go = blend(bend, b) * z * grow
-        let rad = radius + go - (width - 10 * z) / 2 + 9 * z * sw // (thicker inward: the outer edge stays on the circle)
-        return (th, rad, width + 2.5 * z * sw)
-    }
-}
-
-// MARK: - Drawing
-
-/// One criterion's slice of the ring, drawn as one smooth band: its outline sampled along it, so its bend and
-/// thickness run on into its neighbours' with no step where two meet.
-struct RingSlice: Shape {
-    let model: RubricModel
-    let k: Int
-    let radius: CGFloat
-    var swell: Double
-    var grow: Double
-
-    var animatableData: AnimatablePair<Double, Double> {
-        get { AnimatablePair(swell, grow) }
-        set {
-            swell = newValue.first
-            grow = newValue.second
-        }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        guard k < model.n else { return p }
-        let cx = Double(rect.midX)
-        let cy = Double(rect.midY)
-        let r = Double(radius)
-        let len = max(1, r * (model.ends[k] - model.starts[k]))
-        let steps = max(8, min(260, Int(len / 2.5)))
-        let over = model.n > 1 ? 0.6 / len : 0 // (each slice runs on a hair under the next: no seam shows)
-        var outer: [CGPoint] = []
-        var inner: [CGPoint] = []
-        outer.reserveCapacity(steps + 1)
-        inner.reserveCapacity(steps + 1)
-        for j in 0...steps {
-            let v = Double(j) / Double(steps) * (1 + over)
-            let s = model.sample(k, v, radius: r, swell: swell, grow: grow)
-            let sn = sin(s.theta)
-            let cs = cos(s.theta)
-            let ro = s.rad + s.width / 2
-            let ri = s.rad - s.width / 2
-            outer.append(CGPoint(x: cx + ro * sn, y: cy - ro * cs))
-            inner.append(CGPoint(x: cx + ri * sn, y: cy - ri * cs))
-        }
-        p.move(to: outer[0])
-        for q in outer.dropFirst() { p.addLine(to: q) }
-        for q in inner.reversed() { p.addLine(to: q) }
-        p.closeSubpath()
-        return p
-    }
-}
-
-/// How large the ring is drawn: the stage it stands on (room round it for the labels) and its radius.
-struct RingStage: Equatable {
-    let width: CGFloat
-    let height: CGFloat
-    let radius: CGFloat
-
-    static let large = RingStage(width: 560, height: 450, radius: 136)
-    static let medium = RingStage(width: 480, height: 390, radius: 112)
-    static let small = RingStage(width: 380, height: 320, radius: 88)
-
-    /// The web ring's units in this one's points.
-    var z: CGFloat { radius / 176 }
-}
-
-/// The rubric as a ring: its slices, a dot beyond each, a label for each round it (a button: what a screen reader and
-/// the keys work), and the total in the middle — or, under the pointer, the criterion the pointer is on. A slice or its
-/// label picks the criterion (shown beside the ring); a press beside the ring lets it go. With the ring focused, ← →
-/// walk the criteria, Return opens the one under the pointer, Escape lets go. It blooms in, then bends to its marks.
-struct RubricRingView: View {
-    let model: RubricModel
-    let stage: RingStage
-    @Binding var selected: Int?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// How far it has bent to its marks (0 to 1): it blooms in round, then bends.
-    @State private var grow: Double = 0
-    @State private var shown = false
-    /// The slice under the pointer on the ring, and the label under it.
-    @State private var ringHover: Int?
-    @State private var labelHover: Int?
-    @FocusState private var focused: Bool
-
-    private var hot: Int? { ringHover ?? labelHover }
-    private var z: CGFloat { stage.z }
-
-    var body: some View {
-        let hueFill = AngularGradient(gradient: model.gradient(model.hues), center: .center, startAngle: .degrees(-90), endAngle: .degrees(270))
-        let gradeFill = AngularGradient(gradient: model.gradient(model.grades), center: .center, startAngle: .degrees(-90), endAngle: .degrees(270))
-        return ZStack {
-            ForEach(0..<model.n, id: \.self) { k in
-                slice(k, hueFill: hueFill, gradeFill: gradeFill)
-            }
-            ForEach(0..<model.n, id: \.self) { k in dot(k) }
-            focusHalo
-            centre
-            ForEach(0..<model.n, id: \.self) { k in label(k) }
-        }
-        .frame(width: stage.width, height: stage.height)
-        .contentShape(Rectangle())
-        .onContinuousHover { phase in
-            switch phase {
-            case .active(let at): ringHover = hit(at)
-            case .ended: ringHover = nil
-            }
-        }
-        .gesture(SpatialTapGesture().onEnded { value in tapped(value.location) })
-        .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
-        .onKeyPress(.rightArrow) { step(1) }
-        .onKeyPress(.downArrow) { step(1) }
-        .onKeyPress(.leftArrow) { step(-1) }
-        .onKeyPress(.upArrow) { step(-1) }
-        .onKeyPress(.return) { openHot() }
-        .onKeyPress(.space) { openHot() }
-        .onKeyPress(.escape) { letGo() }
-        .scaleEffect(shown || reduceMotion ? 1 : 0.94)
-        .opacity(shown ? 1 : 0)
-        .onAppear(perform: bloom)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Rubric ring, \(model.n == 1 ? "1 criterion" : "\(model.n) criteria")")
-    }
-
-    // MARK: Parts
-
-    private func slice(_ k: Int, hueFill: AngularGradient, gradeFill: AngularGradient) -> some View {
-        let on = hot == k || selected == k
-        let dim = selected != nil && selected != k && hot != k
-        let shape = RingSlice(model: model, k: k, radius: stage.radius, swell: on ? 1 : 0, grow: grow)
-        return ZStack {
-            shape.fill(hueFill)
-            if model.graded {
-                shape.fill(gradeFill).opacity(grow)
-            }
-        }
-        .opacity(dim ? 0.38 : 1)
-        .animation(reduceMotion ? nil : Motion.hover, value: on)
-        .animation(Motion.gentle, value: dim)
-        .accessibilityHidden(true)
-    }
-
-    /// A dot beyond each slice's middle, in its colour.
-    private func dot(_ k: Int) -> some View {
-        let on = hot == k || selected == k
-        let r = stage.radius + CGFloat(model.bend[k] * grow) * z + 22 * z + (on ? 9 * z : 0)
-        let mid = model.mids[k]
-        let colour = model.hues[k].mix(model.grades[k], model.graded ? grow : 0).color
-        let size: CGFloat = on ? 9 : (model.n > 15 ? 5 : 7)
-        return Circle()
-            .fill(colour)
-            .frame(width: size, height: size)
-            .position(x: stage.width / 2 + r * CGFloat(sin(mid)), y: stage.height / 2 - r * CGFloat(cos(mid)))
-            .opacity(selected != nil && selected != k && hot != k ? 0.38 : 1)
-            .animation(reduceMotion ? nil : Motion.hover, value: on)
-            .accessibilityHidden(true)
-    }
-
-    /// While the ring has the keys: a soft ring round it, so it is clear where they go.
-    @ViewBuilder
-    private var focusHalo: some View {
-        if focused {
-            Circle()
-                .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 2)
-                .frame(width: (stage.radius + 36 * z) * 2, height: (stage.radius + 36 * z) * 2)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-    }
-
-    /// The total in the middle; the criterion under the pointer while it is on one.
-    private var centre: some View {
-        let inner = max(120, (stage.radius - 30 * z) * 2 * 0.86)
-        let big = 46 * stage.radius / 136
-        return VStack(spacing: 2) {
-            if let k = hot, k < model.n {
-                let c = model.criteria[k]
-                Text(c.short)
-                    .font(.sCallout.weight(.semibold))
-                    .foregroundStyle(model.colors[k].color)
-                    .lineLimit(1)
-                Text(RubricModel.num(c.score ?? c.worth))
-                    .font(.system(size: big, weight: .bold, design: .rounded).monospacedDigit())
-                Text(hoverLine(c))
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            } else {
-                Text(model.graded ? "Score" : "Total")
-                    .font(.sCallout.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(RubricModel.num(model.graded ? model.earned : model.possible))
-                    .font(.system(size: big, weight: .bold, design: .rounded).monospacedDigit())
-                    .contentTransition(.numericText())
-                Text(totalLine)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                if selected == nil {
-                    Text("Pick a colour to open it")
-                        .font(.sCaption)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 4)
-                }
-            }
-        }
-        .multilineTextAlignment(.center)
-        .frame(width: inner)
-        .allowsHitTesting(false)
-        .animation(Motion.snappy, value: hot)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var totalLine: String {
-        guard model.graded else { return model.possible == 1 ? "point" : "points" }
-        let pct = model.possible > 0 ? Int((model.earned / model.possible * 100).rounded()) : 0
-        return "of \(RubricModel.num(model.possible)) · \(pct)%"
-    }
-
-    private func hoverLine(_ c: RubricModel.Criterion) -> String {
-        guard model.graded else { return c.worth == 1 ? "point" : "points" }
-        guard c.score != nil else { return "of \(RubricModel.num(c.worth)) · not marked" }
-        let level = c.mark >= 0 ? " · \(c.levels[c.mark].label)" : ""
-        return "of \(RubricModel.num(c.worth))\(level)"
-    }
-
-    /// A criterion's name and points round the ring, beside its slice: a button.
-    private func label(_ k: Int) -> some View {
-        let c = model.criteria[k]
-        let mid = model.mids[k]
-        let on = hot == k || selected == k
-        let r = stage.radius + CGFloat(model.bend[k] * grow) * z + 36 * z + (on ? 9 * z : 0)
-        let s = sin(mid)
-        let co = cos(mid)
-        let side: HorizontalAlignment = s > 0.3 ? .leading : (s < -0.3 ? .trailing : .center)
-        let anchor = Alignment(horizontal: side, vertical: co > 0.3 ? .bottom : (co < -0.3 ? .top : .center))
-        // (many criteria: every other label, and the ones the pointer or the pick is on)
-        let quiet = model.n > 12 && k % 2 == 1 && !on
-        return Color.clear
-            .frame(width: 1, height: 1)
-            .overlay(alignment: anchor) {
-                labelButton(c, k, side: side, on: on)
-                    .opacity(quiet ? 0 : 1)
-            }
-            .position(x: stage.width / 2 + r * CGFloat(s), y: stage.height / 2 - r * CGFloat(co))
-            .animation(reduceMotion ? nil : Motion.hover, value: on)
-    }
-
-    /// The labels' size: smaller as the criteria crowd the ring.
-    private var labelFont: Font {
-        if model.n <= 6 { return Font.sCallout.weight(.semibold) }
-        if model.n <= 10 { return Font.sFootnote.weight(.semibold) }
-        return Font.sCaption.weight(.semibold)
-    }
-
-    private func labelButton(_ c: RubricModel.Criterion, _ k: Int, side: HorizontalAlignment, on: Bool) -> some View {
-        Button {
-            pick(k)
-        } label: {
-            VStack(alignment: side, spacing: 1) {
-                Text(c.short)
-                    .font(labelFont)
-                    .foregroundStyle(on ? model.colors[k].color : Color.primary)
-                if model.n <= 15 {
-                    Text(model.pointsLabel(c))
-                        .font((model.n <= 10 ? Font.sCaption : Font.sCaption2).monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .multilineTextAlignment(side == .leading ? .leading : (side == .trailing ? .trailing : .center))
-            .fixedSize()
-            .padding(.horizontal, 5)
-            .padding(.vertical, 3)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { inside in
-            if inside {
-                labelHover = k
-            } else if labelHover == k {
-                labelHover = nil
-            }
-        }
-        .help(c.name)
-        .accessibilityLabel(model.spoken(c))
-        .accessibilityHint("Shows this criterion’s levels and comments")
-        .accessibilityAddTraits(selected == k ? .isSelected : [])
-    }
-
-    // MARK: The pointer and the keys
-
-    /// The slice under a point of the stage (on the band, or just inside or outside it).
-    private func hit(_ at: CGPoint) -> Int? {
-        guard model.n > 0 else { return nil }
-        let dx = Double(at.x - stage.width / 2)
-        let dy = Double(at.y - stage.height / 2)
-        let r = (dx * dx + dy * dy).squareRoot()
-        let R = Double(stage.radius)
-        let zz = Double(z)
-        guard r >= R - 34 * zz, r <= R + 48 * zz else { return nil }
-        return model.slice(at: atan2(dx, -dy))
-    }
-
-    private func tapped(_ at: CGPoint) {
-        focused = true
-        if let k = hit(at) {
-            pick(k)
-        } else {
-            withAnimation(Motion.gentle) { selected = nil }
-        }
-    }
-
-    /// A criterion picked (the one already picked, let go).
-    private func pick(_ k: Int) {
-        withAnimation(Motion.gentle) { selected = selected == k ? nil : k }
-    }
-
-    private func step(_ d: Int) -> KeyPress.Result {
-        guard model.n > 0 else { return .ignored }
-        let from = selected ?? (d > 0 ? -1 : model.n)
-        let k = ((from + d) % model.n + model.n) % model.n
-        withAnimation(Motion.gentle) { selected = k }
-        return .handled
-    }
-
-    private func openHot() -> KeyPress.Result {
-        guard model.n > 0 else { return .ignored }
-        let k = hot ?? selected ?? 0
-        withAnimation(Motion.gentle) { selected = k }
-        return .handled
-    }
-
-    private func letGo() -> KeyPress.Result {
-        guard selected != nil else { return .ignored }
-        withAnimation(Motion.gentle) { selected = nil }
-        return .handled
-    }
-
-    /// In: round and in its own colours, then — marked — bending to its marks and turning to its grades' colours.
-    private func bloom() {
-        guard !shown else { return }
-        if reduceMotion {
-            shown = true
-            grow = 1
-            return
-        }
-        withAnimation(Motion.gentle) { shown = true }
-        if model.graded {
-            withAnimation(Motion.fill.delay(0.45)) { grow = 1 }
-        } else {
-            grow = 1
-        }
     }
 }
 

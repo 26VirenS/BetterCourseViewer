@@ -6,11 +6,11 @@ import UniformTypeIdentifiers
 /// One assignment, as a page of its own (1.2: sections on the page itself, one card deep): its kind, its course and
 /// where your work stands over its name; then the instructions, what you handed in and the comments on the left, and on
 /// the right the one thing to do next — Hand In, Take Quiz, Open Discussion, Open Tool — in glass, with the grade and
-/// the facts: due, points, when it is open, how it is handed in, the attempts. The rubric is the ring (RubricRing.swift)
-/// across the page: under the name once it is marked, after everything else before. A narrow window shows the right's
-/// cards first, in one column. A file handed in or attached opens in Quick Look with a click (or previews in the page);
-/// files dropped on the page open Hand In with them already in it; arriving from a piece of work's Hand In or See
-/// Feedback does that at once.
+/// the facts: due, points, when it is open, how it is handed in, the attempts. The rubric is one row under the name (and
+/// a button on the grade card) that brings the rubric ring up over the window (1.2.2, RubricPopup.swift). A narrow
+/// window shows the right's cards first, in one column. A file handed in or attached opens in Quick Look with a click
+/// (or previews in the page); files dropped on the page open Hand In with them already in it; arriving from a piece of
+/// work's Hand In or See Feedback does that at once.
 struct AssignmentView: View {
     let course: String
     let id: String
@@ -22,14 +22,12 @@ struct AssignmentView: View {
     /// What was dropped on the page (files, or a web address): Hand In opens with it in.
     @State private var dropped: [URL] = []
     @State private var dropTargeted = false
-    /// A part of the page to bring into view ("work" after a hand-in; "grade", "rubric" or "comments" for feedback), and
+    /// A part of the page to bring into view ("work" after a hand-in; "grade" or "comments" for feedback), and
     /// the one lit up for a moment once it is there.
     @State private var jump: String?
     @State private var lit: String?
     /// Counts the hand-ins made here: each one bounces the Submitted seal once it is in view.
     @State private var handedIn = 0
-    /// The screenshot suite's way to the rubric (-SimplOpen rubric, rubric:2, rubric:grid).
-    @State private var rubricShot: String?
 
     var body: some View {
         Group {
@@ -63,7 +61,11 @@ struct AssignmentView: View {
                     .environmentObject(engine)
             }
         }
+        .onDisappear { RubricPopup.shared.dismiss(owner: owner) } // (the ring goes with its page)
     }
+
+    /// Which assignment this is, to the rubric ring over the window.
+    private var owner: String { "\(course)/\(id)" }
 
     private var canvasURL: String { model.data?.canvasUrl ?? "/courses/\(course)/assignments/\(id)?bcv=native" }
 
@@ -71,15 +73,12 @@ struct AssignmentView: View {
 
     private func page(_ d: AssignmentData) -> some View {
         let columns = AssignmentColumns()
-        let ringFirst = rubricFirst(d)
         return Page(spacing: 32) {
             header(d)
-            if ringFirst { rubricSection(d) }
             columns {
                 mainColumn(d)
                 sideColumn(d)
             }
-            if !ringFirst && !d.rubric.isEmpty { rubricSection(d) }
         }
         .overlay { dropOverlay(d) }
         .dropDestination(for: URL.self) { urls, _ in
@@ -112,20 +111,34 @@ struct AssignmentView: View {
                 }
             }
             ScreenHeading(title: d.title)
+            if !d.rubric.isEmpty {
+                RubricSummaryRow(data: d) { openRubric(d) }
+                    .padding(.top, 4)
+            }
         }
     }
 
     // MARK: - The rubric
 
-    /// Marked and posted, the rubric is the feedback: it comes first, under the name.
-    private func rubricFirst(_ d: AssignmentData) -> Bool {
+    /// Marked and posted, the rubric is the feedback.
+    private func rubricMarked(_ d: AssignmentData) -> Bool {
         !d.rubric.isEmpty && RubricModel(rows: d.rubric).graded
     }
 
-    private func rubricSection(_ d: AssignmentData) -> some View {
-        RubricSection(data: d, shot: rubricShot)
-            .overlay { litFrame("rubric", d).padding(-12) }
-            .id("rubric")
+    /// The rubric ring up over the window (RubricPopup.swift).
+    private func openRubric(_ d: AssignmentData, open k: Int? = nil, view: String? = nil) {
+        RubricPopup.shared.show(RubricPopup.Item(data: d, owner: owner, open: k, view: view))
+    }
+
+    /// The screenshot suite's way to the ring: "" opens it, ":2" opened on the second criterion, ":grid" as the grid.
+    private func openRubricShot(_ shot: String, _ d: AssignmentData) {
+        if shot == ":grid" {
+            openRubric(d, view: "grid")
+        } else if let k = Int(shot.dropFirst()), k >= 1, k <= d.rubric.count {
+            openRubric(d, open: k - 1, view: "ring")
+        } else {
+            openRubric(d)
+        }
     }
 
     // MARK: - The left: what to read, what was handed in, what was said
@@ -302,9 +315,6 @@ struct AssignmentView: View {
             } else if d.held == true {
                 heldNote
             }
-            if d.grade == nil && !d.rubric.isEmpty {
-                rubricRow(d)
-            }
             factsCard(d)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -421,9 +431,9 @@ struct AssignmentView: View {
         }
     }
 
-    /// The grade's way to the rubric that explains it: the ring in miniature, its score; the page goes to it.
+    /// The grade's way to the rubric that explains it: the ring in miniature, its score; the ring comes up over the window.
     private func rubricJump(_ d: AssignmentData) -> some View {
-        Button { jump = "rubric" } label: {
+        Button { openRubric(d) } label: {
             HStack(spacing: 10) {
                 RubricMiniRing(model: RubricModel(rows: d.rubric), size: 26)
                 Text(d.rubricTitle ?? "Rubric")
@@ -434,7 +444,7 @@ struct AssignmentView: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-                Image(systemName: rubricFirst(d) ? "chevron.up" : "chevron.down")
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.sCaption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -444,32 +454,6 @@ struct AssignmentView: View {
         .glassButton()
         .controlSize(.large)
         .help("See how this was marked, criterion by criterion")
-    }
-
-    /// No grade yet, but a rubric: how it will be marked, a click away down the page.
-    private func rubricRow(_ d: AssignmentData) -> some View {
-        let n = d.rubric.count
-        return Button { jump = "rubric" } label: {
-            HStack(spacing: 12) {
-                RubricMiniRing(model: RubricModel(rows: d.rubric), size: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(d.rubricTitle ?? "Rubric")
-                        .font(.sBody.weight(.semibold))
-                        .lineLimit(1)
-                    Text("\(n) \(n == 1 ? "criterion" : "criteria") · how this is marked")
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 6)
-                Image(systemName: "chevron.down")
-                    .font(.sCaption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(14)
-        }
-        .buttonStyle(CardButtonStyle())
-        .help("See how this will be marked")
     }
 
     private var heldNote: some View {
@@ -621,15 +605,17 @@ struct AssignmentView: View {
     }
 
     /// Arrived from a piece of work's own action: its Hand In done at once, or its feedback shown (a quiz's in the quiz
-    /// screen; else the page goes to the marked rubric, the grade, or the comments, and lights it).
+    /// screen; a marked rubric's ring over the window; else the page goes to the grade or the comments, and lights it).
     private func arrived(_ d: AssignmentData) {
         guard let a = engine.arrival, a.id == id else { return }
         engine.arrival = nil
         if a.feedback {
             if let q = d.quizId {
                 engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title, feedback: true))
+            } else if d.grade != nil && rubricMarked(d) {
+                openRubric(d)
             } else if d.grade != nil {
-                jump = rubricFirst(d) ? "rubric" : "grade"
+                jump = "grade"
             } else if !d.comments.isEmpty {
                 jump = "comments"
             }
@@ -687,10 +673,7 @@ struct AssignmentView: View {
     private func load() async {
         await model.load(engine, "assignment", ["course": course, "id": id])
         if model.data?.canSubmit == true, LaunchOpen.take("handin") != nil { handIn = true }
-        if model.data?.rubric.isEmpty == false, let shot = LaunchOpen.take("rubric") {
-            rubricShot = shot
-            jump = "rubric"
-        }
+        if let d = model.data, !d.rubric.isEmpty, let shot = LaunchOpen.take("rubric") { openRubricShot(shot, d) }
         if let d = model.data { arrived(d) }
     }
 

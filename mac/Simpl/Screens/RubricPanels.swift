@@ -1,207 +1,73 @@
 import SwiftUI
 
-// The rubric on an assignment's page (1.2): the ring (RubricRing.swift) with the criterion picked beside it — its
-// levels up a bar at the height of their points, the one given marked, the marker's note — or the same rubric as a grid
-// of criteria and levels. A switch at the section's head turns between the two; the choice is kept for the next rubric.
+// The rubric ring's panels (1.2.2): the Ring / Grid switch at the top right of the ring over the window
+// (RubricPopup.swift), and the grid — the same rubric as rows and columns, a criterion a row, its levels lined up under
+// columns by what they are worth, the one given marked. Drawn on the ring's dimmed ground: light words in both
+// appearances, as the web's ring has them.
 
-/// An assignment's rubric as a section of its page: its title, its score, the Ring / Grid switch, and the rubric.
-struct RubricSection: View {
-    let data: AssignmentData
-    /// The screenshot suite's way in: ":2" opens the second criterion, ":grid" shows the grid (not kept).
-    var shot: String? = nil
-    @AppStorage("rubricView") private var view = "ring"
-    @State private var selected: Int?
-    @State private var forced: String?
-
-    var body: some View {
-        let model = RubricModel(rows: data.rubric)
-        let showing = forced ?? view
-        return PageSection(title: title, trailing: trailing(model), accessory: {
-            RubricViewSwitch(view: Binding(get: { forced ?? view }, set: { forced = nil; view = $0 }))
-        }) {
-            if showing == "grid" {
-                RubricGrid(model: model)
-                    .transition(.opacity)
-            } else {
-                ringAndDetail(model)
-                    .transition(.opacity)
-            }
-        }
-        .animation(Motion.gentle, value: showing)
-        .onAppear(perform: takeShot)
-        .onChange(of: shot) { _, _ in takeShot() }
+/// Two or three choices in a glass capsule, the one showing lit on a knob that slides.
+struct RubricSegments: View {
+    struct Option: Hashable {
+        let key: String
+        let title: String
+        var symbol: String? = nil
     }
 
-    private var title: String {
-        let t = (data.rubricTitle ?? "").trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? "Rubric" : t
-    }
-
-    private func trailing(_ m: RubricModel) -> String {
-        if !m.graded && data.held == true { return "\(m.summary) · marks not posted yet" }
-        return "\(m.summary) · \(m.n == 1 ? "1 criterion" : "\(m.n) criteria")"
-    }
-
-    /// The ring with the criterion beside it on a wide page; under it on a narrow one (the ring smaller as it narrows).
-    private func ringAndDetail(_ m: RubricModel) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 26) {
-                RubricRingView(model: m, stage: .large, selected: $selected)
-                detail(m)
-            }
-            stacked(m, .large)
-            stacked(m, .medium)
-            stacked(m, .small)
-        }
-    }
-
-    private func stacked(_ m: RubricModel, _ stage: RingStage) -> some View {
-        VStack(alignment: .center, spacing: 18) {
-            RubricRingView(model: m, stage: stage, selected: $selected)
-            detail(m)
-        }
-    }
-
-    private func detail(_ m: RubricModel) -> some View {
-        RubricDetail(model: m, held: data.held == true, selected: $selected)
-            .frame(minWidth: 300, idealWidth: 320, maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    private func takeShot() {
-        guard let shot else { return }
-        if shot == ":grid" {
-            forced = "grid"
-        } else if let k = Int(shot.dropFirst()), k >= 1, k <= data.rubric.count {
-            forced = "ring"
-            selected = k - 1
-        }
-    }
-}
-
-/// Ring or Grid: two words in a glass capsule, the one showing lit.
-struct RubricViewSwitch: View {
-    @Binding var view: String
+    let options: [Option]
+    @Binding var selection: String
+    let label: String
     @Namespace private var knob
 
     var body: some View {
         HStack(spacing: 2) {
-            option("ring", "Ring", "circle.dashed")
-            option("grid", "Grid", "square.grid.2x2")
+            ForEach(options, id: \.key) { o in option(o) }
         }
         .padding(3)
         .glassCapsule()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Show the rubric as")
+        .accessibilityLabel(label)
     }
 
-    private func option(_ key: String, _ title: String, _ symbol: String) -> some View {
-        let on = view == key
+    private func option(_ o: Option) -> some View {
+        let on = selection == o.key
         return Button {
-            withAnimation(Motion.snappy) { view = key }
+            withAnimation(Motion.snappy) { selection = o.key }
         } label: {
-            Label(title, systemImage: symbol)
-                .font(.sCallout.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .foregroundStyle(on ? Color.primary : Color.secondary)
-                .background {
-                    if on {
-                        Capsule()
-                            .fill(Color.primary.opacity(0.1))
-                            .matchedGeometryEffect(id: "knob", in: knob)
-                    }
+            Group {
+                if let s = o.symbol {
+                    Label(o.title, systemImage: s)
+                } else {
+                    Text(o.title)
                 }
-                .contentShape(Capsule())
+            }
+            .font(.sCallout.weight(.semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .foregroundStyle(on ? Color.primary : Color.secondary)
+            .background {
+                if on {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.14))
+                        .matchedGeometryEffect(id: "knob", in: knob)
+                }
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("Show the rubric as a \(title.lowercased())")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
-// MARK: - Beside the ring
-
-/// Beside the ring: with nothing picked, every criterion in a line (its colour, its name, how far it got, its points);
-/// with one picked, that criterion — which of how many, its name and description, its levels up a bar at the height of
-/// their points with the one given marked, and the marker's note — with ‹ › and the dots to move along.
-struct RubricDetail: View {
-    let model: RubricModel
-    var held = false
-    @Binding var selected: Int?
+/// Ring or Grid. The choice is kept: the next rubric opens as this one was left.
+struct RubricViewSwitch: View {
+    @Binding var view: String
 
     var body: some View {
-        Group {
-            if let k = selected, k < model.n {
-                CriterionDetail(model: model, k: k, selected: $selected)
-                    .id(k)
-                    .transition(.opacity)
-            } else {
-                overview
-                    .transition(.opacity)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .card(radius: 20)
-    }
-
-    private var overview: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(model.graded ? "How it was marked" : "How it will be marked")
-                .font(.sHeadline)
-            Text(hint)
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 2)
-                .padding(.bottom, 10)
-            ForEach(model.criteria, id: \.index) { c in
-                if c.index > 0 { RowDivider(inset: 32) }
-                Button {
-                    withAnimation(Motion.gentle) { selected = c.index }
-                } label: {
-                    overviewRow(c)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
-                }
-                .buttonStyle(RowButtonStyle())
-                .accessibilityLabel(model.spoken(c))
-                .accessibilityHint("Shows this criterion’s levels and comments")
-            }
-        }
-    }
-
-    private var hint: String {
-        if model.graded { return "The ring pushes out where you scored well and pulls in where you lost points. Pick a criterion to see how it was marked." }
-        if held { return "Marked, but your teacher has not posted the marks yet." }
-        return "Each colour’s stretch is its share of the points. Pick a criterion to see its levels."
-    }
-
-    private func overviewRow(_ c: RubricModel.Criterion) -> some View {
-        let colour = model.colors[c.index]
-        return HStack(spacing: 12) {
-            Circle()
-                .fill(colour.color)
-                .frame(width: 12, height: 12)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(c.name)
-                    .font(.sBody)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                if model.graded {
-                    LevelTrack(fraction: c.score == nil ? 0 : c.frac, color: colour.color)
-                }
-            }
-            Spacer(minLength: 8)
-            Text(model.pointsLabel(c))
-                .font(.sCallout.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Image(systemName: "chevron.right")
-                .font(.sCaption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-        }
-        .contentShape(Rectangle())
+        RubricSegments(options: [RubricSegments.Option(key: "ring", title: "Ring", symbol: "circle.dashed"),
+                                 RubricSegments.Option(key: "grid", title: "Grid", symbol: "square.grid.2x2")],
+                       selection: $view, label: "Show the rubric as")
+            .help("Show the rubric as a ring or a grid")
     }
 }
 
@@ -212,7 +78,7 @@ struct LevelTrack: View {
 
     var body: some View {
         Capsule()
-            .fill(Theme.well)
+            .fill(Color.primary.opacity(0.14))
             .frame(height: 5)
             .overlay(alignment: .leading) {
                 GeometryReader { g in
@@ -222,213 +88,6 @@ struct LevelTrack: View {
                 }
             }
             .accessibilityHidden(true)
-    }
-}
-
-/// One criterion, picked from the ring.
-private struct CriterionDetail: View {
-    let model: RubricModel
-    let k: Int
-    @Binding var selected: Int?
-    @State private var more = false
-
-    private var c: RubricModel.Criterion { model.criteria[k] }
-    private var colour: RingRGB { model.colors[k] }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            head
-            dots
-            Text(c.name)
-                .font(.sTitle3)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-            if !c.desc.isEmpty { descriptionText }
-            ladder
-            if !c.comment.isEmpty { note }
-        }
-    }
-
-    private var ladder: some View {
-        let layout = LevelLadder(positions: positions)
-        let marked = model.graded && c.score != nil
-        return layout {
-            ForEach(Array(levels.enumerated()), id: \.offset) { i, l in
-                LevelRow(level: l, picked: isPicked(i), dim: marked && !isPicked(i), colour: colour)
-            }
-        }
-        .background(alignment: .topLeading) { LevelBar(fraction: marked ? c.frac : 1, colour: colour) }
-    }
-
-    private var head: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(colour.color)
-                .frame(width: 12, height: 12)
-            Text("Criterion \(k + 1) of \(model.n) · \(model.pointsLabel(c))")
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            GlassGroup(spacing: 6) {
-                HStack(spacing: 6) {
-                    roundButton("chevron.left", "Previous criterion") { go(-1) }
-                    roundButton("chevron.right", "Next criterion") { go(1) }
-                    roundButton("xmark", "All criteria") { withAnimation(Motion.gentle) { selected = nil } }
-                }
-            }
-        }
-    }
-
-    /// A dot per criterion, in its colour: the one showing larger; a press moves to another.
-    private var dots: some View {
-        HStack(spacing: model.n > 15 ? 3 : 6) {
-            ForEach(model.criteria, id: \.index) { other in
-                let on = other.index == k
-                Button {
-                    withAnimation(Motion.gentle) { selected = other.index }
-                } label: {
-                    Circle()
-                        .fill(model.colors[other.index].color)
-                        .frame(width: on ? 12 : 8, height: on ? 12 : 8)
-                        .overlay {
-                            if on { Circle().strokeBorder(Color.primary.opacity(0.35), lineWidth: 1.5).frame(width: 18, height: 18) }
-                        }
-                        .frame(width: 18, height: 18)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .help(other.name)
-                .accessibilityLabel("\(other.name), criterion \(other.index + 1) of \(model.n)")
-                .accessibilityAddTraits(on ? .isSelected : [])
-            }
-        }
-    }
-
-    private var descriptionText: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(c.desc)
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
-                .lineLimit(more ? nil : 3)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-            if c.desc.count > 180 {
-                Button(more ? "Less" : "More") {
-                    withAnimation(Motion.gentle) { more.toggle() }
-                }
-                .buttonStyle(.link)
-                .font(.sCallout)
-            }
-        }
-    }
-
-    /// The marker's note on this criterion.
-    private var note: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "text.bubble.fill")
-                .font(.sBody)
-                .foregroundStyle(colour.color)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Comment")
-                    .font(.sCaption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(c.comment)
-                    .font(.sBody)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(.top, 4)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func roundButton(_ symbol: String, _ help: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.sCallout.weight(.semibold))
-                .frame(width: 30, height: 30)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glass(Circle(), interactive: true)
-        .help(help)
-        .accessibilityLabel(help)
-    }
-
-    private func go(_ d: Int) {
-        let next = ((k + d) % model.n + model.n) % model.n
-        withAnimation(Motion.gentle) { selected = next }
-    }
-
-    /// Its levels — or, marked freely, the one score (or what it is worth) standing alone.
-    private var levels: [RubricModel.Level] {
-        if !c.levels.isEmpty { return c.levels }
-        if model.graded, let s = c.score {
-            return [RubricModel.Level(label: "Your score", text: "Out of \(RubricModel.num(c.worth)) — marked without set levels.", pts: s)]
-        }
-        return [RubricModel.Level(label: "Marked freely", text: "No set levels: your teacher gives a score up to this.", pts: c.worth)]
-    }
-
-    private var positions: [Double] {
-        c.levels.isEmpty ? [c.score == nil ? 1 : c.frac] : RubricModel.positions(c.levels)
-    }
-
-    private func isPicked(_ i: Int) -> Bool {
-        guard model.graded else { return false }
-        return c.levels.isEmpty ? c.score != nil : c.mark == i
-    }
-}
-
-/// A level of a criterion: its points, its name (and "Your mark" on the one given), what it asks for; a tick on the
-/// bar beside it.
-private struct LevelRow: View {
-    let level: RubricModel.Level
-    let picked: Bool
-    let dim: Bool
-    let colour: RingRGB
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            tick
-                .frame(width: LevelBar.gutter)
-            Text(level.pts.map { RubricModel.num($0) } ?? "–")
-                .font(.sTitle3.monospacedDigit())
-                .foregroundStyle(picked ? colour.color : Color.primary)
-                .frame(minWidth: 34, alignment: .trailing)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(level.label)
-                        .font(picked ? Font.sBody.weight(.semibold) : Font.sBody)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if picked { YourMark(colour: colour) }
-                }
-                if !level.text.isEmpty {
-                    Text(level.text)
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .opacity(dim ? 0.5 : 1)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(picked ? .isSelected : [])
-    }
-
-    private var tick: some View {
-        ZStack {
-            if picked {
-                Circle().fill(colour.color).frame(width: 16, height: 16)
-                Circle().strokeBorder(Color.white.opacity(0.9), lineWidth: 2).frame(width: 16, height: 16)
-            } else {
-                Circle().fill(Theme.card).frame(width: 10, height: 10)
-                Circle().strokeBorder(colour.color.opacity(0.8), lineWidth: 2).frame(width: 10, height: 10)
-            }
-        }
-        .accessibilityHidden(true)
     }
 }
 
@@ -447,128 +106,102 @@ struct YourMark: View {
     }
 }
 
-/// The criterion's bar, down the levels' left: its colour from the foot to its mark (darker at the foot, lighter at
-/// the top), the stretch above it not earned.
-private struct LevelBar: View {
-    let fraction: Double
-    let colour: RingRGB
-    static let gutter: CGFloat = 22
-    static let inset: CGFloat = 18
-
-    var body: some View {
-        GeometryReader { g in
-            let h = max(0, g.size.height - 2 * LevelBar.inset)
-            let f = max(0, min(1, fraction))
-            ZStack(alignment: .bottom) {
-                Capsule().fill(Theme.well)
-                Capsule()
-                    .fill(LinearGradient(colors: [colour.mix(.black, 0.18).color, colour.color, colour.mix(.white, 0.22).color],
-                                         startPoint: .bottom, endPoint: .top))
-                    .frame(height: max(6, h * CGFloat(f)))
-            }
-            .frame(width: 6, height: h)
-            .position(x: LevelBar.gutter / 2, y: LevelBar.inset + h / 2)
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// The levels at the height of their points (the best at the top), pushed apart where two would overlap.
-private struct LevelLadder: Layout {
-    /// Each row's place: 1 at the top, 0 at the foot.
-    let positions: [Double]
-    var minHeight: CGFloat = 230
-    var gap: CGFloat = 10
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 380
-        let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
-        return CGSize(width: width, height: total(heights))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)).height }
-        let ys = centres(heights, total(heights))
-        for (i, s) in subviews.enumerated() {
-            s.place(at: CGPoint(x: bounds.minX, y: bounds.minY + ys[i] - heights[i] / 2), anchor: .topLeading,
-                    proposal: ProposedViewSize(width: bounds.width, height: heights[i]))
-        }
-    }
-
-    private func total(_ heights: [CGFloat]) -> CGFloat {
-        max(minHeight, heights.reduce(0, +) + gap * CGFloat(max(0, heights.count - 1)) + 8)
-    }
-
-    /// Each row's middle: where its points put it on the bar, then pushed down clear of the one above, then — at the
-    /// foot — back up clear of the one below.
-    private func centres(_ heights: [CGFloat], _ height: CGFloat) -> [CGFloat] {
-        let span = max(1, height - 2 * LevelBar.inset)
-        var ys = heights.indices.map { i -> CGFloat in
-            let p = i < positions.count ? positions[i] : 0
-            let want = LevelBar.inset + CGFloat(1 - max(0, min(1, p))) * span
-            return min(max(want, heights[i] / 2), height - heights[i] / 2)
-        }
-        guard !ys.isEmpty else { return ys }
-        for i in ys.indices.dropFirst() {
-            ys[i] = max(ys[i], ys[i - 1] + heights[i - 1] / 2 + gap + heights[i] / 2)
-        }
-        let last = ys.count - 1
-        if ys[last] + heights[last] / 2 > height {
-            ys[last] = height - heights[last] / 2
-            for i in stride(from: last - 1, through: 0, by: -1) {
-                ys[i] = min(ys[i], ys[i + 1] - heights[i + 1] / 2 - gap - heights[i] / 2)
-            }
-        }
-        return ys
-    }
-}
-
 // MARK: - The grid
 
+/// The rubric as a grid over the window: what it is and for which assignment, its score and how many criteria, Before
+/// grading or Graded (marked), then the grid — scrolling when it is taller than the window has room for.
+struct RubricGridPanel: View {
+    let model: RubricModel
+    let eyebrow: String
+    let title: String
+    @State private var shown = "graded"
+
+    var body: some View {
+        let marks = shown == "graded" && model.graded
+        VStack(alignment: .leading, spacing: 16) {
+            head(marks)
+            ViewThatFits(in: .vertical) {
+                RubricGrid(model: model, showMarks: marks)
+                ScrollView {
+                    RubricGrid(model: model, showMarks: marks)
+                        .padding(.trailing, 8)
+                }
+            }
+            Text(marks ? "Your mark is outlined on each row." : "How each criterion will be graded.")
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .glassCard(radius: 28, tint: Color.black.opacity(0.3))
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .onTapGesture {} // (a press on the grid is not a press beside it)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(title) rubric as a grid")
+    }
+
+    private func head(_ marks: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(eyebrow.uppercased())
+                    .font(.sCaption.weight(.semibold))
+                    .tracking(0.9)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(title)
+                    .font(.sTitle2)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 12)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(RubricModel.num(marks ? model.earned : model.possible))
+                    .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
+                Text(marks ? "/ \(RubricModel.num(model.possible))" : (model.possible == 1 ? "pt" : "pts"))
+                    .font(.sHeadline)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            Text(model.n == 1 ? "1 criterion" : "\(model.n) criteria")
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
+            if model.graded {
+                RubricSegments(options: [RubricSegments.Option(key: "before", title: "Before grading"),
+                                         RubricSegments.Option(key: "graded", title: "Graded")],
+                               selection: $shown, label: "Show")
+                    .help("The rubric as it read before grading, or with your marks")
+            }
+        }
+    }
+}
+
 /// The same rubric as rows and columns: a criterion a row, its levels lined up under the columns by what they are
-/// worth (the best on the left, nothing on the right), the one given marked. Marked, Before grading shows the rubric as
-/// it read before any marks.
+/// worth (the best on the left, nothing on the right), the one given marked.
 struct RubricGrid: View {
     let model: RubricModel
-    @State private var marks = true
+    let showMarks: Bool
 
     var body: some View {
         let plan = GridPlan(model)
-        let showMarks = marks && model.graded
-        return VStack(alignment: .leading, spacing: 14) {
-            if model.graded {
-                Picker("Show", selection: $marks) {
-                    Text("Before grading").tag(false)
-                    Text("Graded").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+        Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 0) {
+            GridRow {
+                Text("Criterion")
+                    .font(.sCaption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 210, alignment: .leading)
+                    .padding(.bottom, 10)
+                ForEach(plan.heads.indices, id: \.self) { j in headCell(plan.heads[j]) }
             }
-            Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 0) {
+            ForEach(model.criteria, id: \.index) { c in
+                Rectangle()
+                    .fill(Color.primary.opacity(0.12))
+                    .frame(height: 1)
+                    .gridCellUnsizedAxes(.horizontal)
                 GridRow {
-                    Text("Criterion")
-                        .font(.sCaption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 200, alignment: .leading)
-                        .padding(.bottom, 10)
-                    ForEach(plan.heads.indices, id: \.self) { j in headCell(plan.heads[j]) }
-                }
-                ForEach(model.criteria, id: \.index) { c in
-                    Divider()
-                    GridRow {
-                        criterionCell(c, showMarks)
-                        ForEach(0..<plan.cols, id: \.self) { j in levelCell(c, j, plan, showMarks) }
-                    }
+                    criterionCell(c)
+                    ForEach(0..<plan.cols, id: \.self) { j in levelCell(c, j, plan) }
                 }
             }
-            Text(showMarks ? "Your mark is outlined on each row." : "How each criterion will be graded.")
-                .font(.sCaption)
-                .foregroundStyle(.tertiary)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card(radius: 20)
     }
 
     private func headCell(_ h: GridPlan.Head) -> some View {
@@ -583,7 +216,7 @@ struct RubricGrid: View {
         .padding(.bottom, 10)
     }
 
-    private func criterionCell(_ c: RubricModel.Criterion, _ showMarks: Bool) -> some View {
+    private func criterionCell(_ c: RubricModel.Criterion) -> some View {
         let scored = showMarks && c.score != nil
         let colour = scored ? model.grades[c.index] : model.hues[c.index]
         return VStack(alignment: .leading, spacing: 5) {
@@ -611,13 +244,13 @@ struct RubricGrid: View {
                 .frame(maxWidth: 160)
         }
         .padding(.vertical, 12)
-        .frame(width: 200, alignment: .leading)
+        .frame(width: 210, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(model.spoken(c))
     }
 
     @ViewBuilder
-    private func levelCell(_ c: RubricModel.Criterion, _ j: Int, _ plan: GridPlan, _ showMarks: Bool) -> some View {
+    private func levelCell(_ c: RubricModel.Criterion, _ j: Int, _ plan: GridPlan) -> some View {
         if let i = plan.slots[c.index].firstIndex(of: j) {
             let l = c.levels[i]
             let head = plan.heads[j]
