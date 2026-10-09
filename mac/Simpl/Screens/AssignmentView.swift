@@ -443,6 +443,32 @@ struct AssignmentView: View {
 
     /// The grade: its ring and letter, the points, the percentage, what lateness took, the class's numbers, and the way
     /// to the rubric.
+    /// (1.3.9) What the ring holds: the letter (or the percentage); a complete / incomplete grade as a tick or a cross,
+    /// and any other word on one line, made small enough to fit — never broken across lines.
+    @ViewBuilder
+    private func ringMark(_ g: GradeInfo, _ color: Color) -> some View {
+        let word = (g.letter ?? "").trimmingCharacters(in: .whitespaces)
+        switch word.lowercased() {
+        case "complete", "pass":
+            Image(systemName: "checkmark")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(color)
+                .accessibilityLabel(word.capitalized)
+        case "incomplete", "fail":
+            Image(systemName: "xmark")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(word.capitalized)
+        default:
+            Text(word.isEmpty ? (g.pct.map { "\(Int($0.rounded()))%" } ?? "") : word)
+                .font(.sTitle3.weight(.bold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+                .padding(10)
+        }
+    }
+
     private func gradeCard(_ g: GradeInfo, _ d: AssignmentData) -> some View {
         let color = courseTint(d)
         return VStack(alignment: .leading, spacing: 14) {
@@ -452,11 +478,7 @@ struct AssignmentView: View {
             HStack(spacing: 16) {
                 ZStack {
                     Ring(value: g.pct, color: color, lineWidth: 7, key: "assignment:\(course)/\(id)")
-                    Text(g.letter ?? g.pct.map { "\(Int($0.rounded()))%" } ?? "")
-                        .font(.sTitle3.weight(.bold))
-                        .foregroundStyle(color)
-                        .minimumScaleFactor(0.6)
-                        .padding(9)
+                    ringMark(g, color)
                 }
                 .frame(width: 76, height: 76)
                 VStack(alignment: .leading, spacing: 3) {

@@ -135,7 +135,12 @@ struct AssignmentView: View {
         return HStack(spacing: 16) {
             ZStack {
                 Ring(value: g.pct, color: color, lineWidth: 6, key: "assignment:\(course)/\(id)")
-                Text(g.letter ?? (g.pct.map { "\(Int($0.rounded()))%" } ?? "")).font(.headline.weight(.bold)).foregroundStyle(color).minimumScaleFactor(0.6)
+                // (a complete / incomplete grade as a tick or a cross; any other word on one line, made to fit)
+                switch (g.letter ?? "").lowercased() {
+                case "complete", "pass": Image(systemName: "checkmark").font(.title3.weight(.bold)).foregroundStyle(color)
+                case "incomplete", "fail": Image(systemName: "xmark").font(.title3.weight(.bold)).foregroundStyle(.secondary)
+                default: Text(g.letter ?? (g.pct.map { "\(Int($0.rounded()))%" } ?? "")).font(.headline.weight(.bold)).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.4).padding(.horizontal, 6)
+                }
             }
             .frame(width: 64, height: 64)
             VStack(alignment: .leading, spacing: 3) {
