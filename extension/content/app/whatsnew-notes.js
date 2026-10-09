@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.26', date: '2026-10-09', notes: [
+      { kind: 'improved', title: 'Rubric ring first', body: 'Every rubric opens on the ring. Grid is one click away.', icon: P.layers },
+    ] },
     { version: '2.99.25', date: '2026-10-08', notes: [
       { kind: 'improved', title: 'Updates every 2 hours', body: 'Simpl now looks for updates every two hours.', icon: P.clock },
     ] },

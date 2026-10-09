@@ -2266,15 +2266,15 @@ try {
   check(settledBack && (await rState()) === 'ring', 'Done ends the tour with the ring still open, settled back in the middle');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
-  await page.evaluate(() => localStorage.setItem('bcv:rubricView', 'grid')); // (2.98.98: the grid kept by 2.98.95–2.98.97 is let go: the ring opens)
+  await page.evaluate(() => { localStorage.setItem('bcv:rubricView', 'grid'); localStorage.setItem('bcv:rubricLast', 'grid'); }); // (2.99.26: a grid kept by the releases before is let go: the ring opens)
   await page.click('.bcv-asg__fact--rubric');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(2300); // (past where the tour would start on a marked ring)
   check(!(await page.$('#bcv-tour')) && !(await page.$('.bcv-rr__dev')), 'the tour comes once: the next ring opens without it (and without Try scores, which is the developer\'s)');
   // (2.98.95) a small two-way switch at the top right turns the ring into the grid — a criterion a row, its levels in
   // columns named once — and back; the grid shows the marks (Graded) or the rubric as it reads before any (Before
-  // grading); the choice is kept, so the next rubric opens as the last was left
-  const vSw = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__view').getBoundingClientRect(); return { right: Math.round(innerWidth - r.right), top: Math.round(r.top), pressed: [...document.querySelectorAll('.bcv-rr__vbtn')].map((b) => `${b.dataset.view}:${b.getAttribute('aria-pressed')}`).join(), ring: !document.querySelector('.bcv-rr-ov').classList.contains('is-grid'), old: localStorage.getItem('bcv:rubricView'), widgets: Math.max(0, ...[...document.querySelectorAll('#bcv-report, #bcv-tray')].map((e) => e.getBoundingClientRect().bottom)) }; });
+  // grading); the choice is this rubric's only (2.99.26): the next rubric opens on the ring again
+  const vSw = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__view').getBoundingClientRect(); return { right: Math.round(innerWidth - r.right), top: Math.round(r.top), pressed: [...document.querySelectorAll('.bcv-rr__vbtn')].map((b) => `${b.dataset.view}:${b.getAttribute('aria-pressed')}`).join(), ring: !document.querySelector('.bcv-rr-ov').classList.contains('is-grid'), old: localStorage.getItem('bcv:rubricView'), last: localStorage.getItem('bcv:rubricLast'), widgets: Math.max(0, ...[...document.querySelectorAll('#bcv-report, #bcv-tray')].map((e) => e.getBoundingClientRect().bottom)) }; });
   const ringScore = (await texts('.bcv-rr__cbig'))[0];
   await page.click('.bcv-rr__vbtn[data-view="grid"]');
   await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.classList.contains('is-grid') && getComputedStyle(document.querySelector('.bcv-rg')).opacity === '1', null, { timeout: 4000 });
@@ -2291,20 +2291,19 @@ try {
   }));
   const g1 = await gridAt();
   await shot(page, '14r4-rubric-grid');
-  check(vSw.ring && vSw.old === null, `the ring is the default: a grid kept by the releases before is let go: ${JSON.stringify(vSw)}`);
+  check(vSw.ring && vSw.old === null && vSw.last === null, `the ring is the default: a grid kept by the releases before is let go: ${JSON.stringify(vSw)}`);
   check(vSw.right <= 24 && vSw.top >= vSw.widgets && vSw.pressed === 'ring:true,grid:false' && g1.heads === 'Criterion|Full marks|Partial|No marks' && g1.rows === 2 && g1.names === 'Correctness|Work shown' && g1.marks.split(',').length === 2 && g1.mine === 2
-    && g1.score === ringScore && g1.seg === 'Before grading:false,Graded:true' && g1.foot === 'Your mark is outlined on each row' && g1.ringInert && g1.stored === 'grid',
-    `the switch at the top right (under the page's own buttons) turns the ring into the grid: the columns named once, a row a criterion, your level outlined on each, the score the ring's, Graded on — and the choice kept: ${JSON.stringify({ vSw, ringScore, g1 })}`);
+    && g1.score === ringScore && g1.seg === 'Before grading:false,Graded:true' && g1.foot === 'Your mark is outlined on each row' && g1.ringInert && g1.stored === null,
+    `the switch at the top right (under the page's own buttons) turns the ring into the grid: the columns named once, a row a criterion, your level outlined on each, the score the ring's, Graded on — and nothing kept: ${JSON.stringify({ vSw, ringScore, g1 })}`);
   await page.click('.bcv-rg__segbtn:first-of-type');
   const g2 = await gridAt();
   check(g2.marks === '' && g2.mine === 0 && g2.dash && g2.score === null && g2.seg === 'Before grading:true,Graded:false' && g2.foot === 'How each criterion will be graded', `Before grading shows the rubric as it reads before any marks: ${JSON.stringify(g2)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   await page.click('.bcv-asg__fact--rubric');
-  const gridAgain = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov.is-grid .bcv-rg__crit'), null, { timeout: 8000 }).then(() => true).catch(() => false);
-  await page.click('.bcv-rr__vbtn[data-view="ring"]');
-  const ringAgain = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov').classList.contains('is-grid') && localStorage.getItem('bcv:rubricLast') === 'ring' && !document.querySelector('.bcv-rr__field').inert && document.querySelector('.bcv-rg').inert, null, { timeout: 4000 }).then(() => true).catch(() => false);
-  check(gridAgain && ringAgain, `the next rubric opens as the grid it was left as, and the switch turns it back into the ring (kept too): ${JSON.stringify({ gridAgain, ringAgain })}`);
+  await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
+  const ringAgain = await page.evaluate(() => ({ grid: document.querySelector('.bcv-rr-ov').classList.contains('is-grid'), field: !document.querySelector('.bcv-rr__field').inert, pressed: [...document.querySelectorAll('.bcv-rr__vbtn')].map((b) => `${b.dataset.view}:${b.getAttribute('aria-pressed')}`).join(), stored: localStorage.getItem('bcv:rubricLast') }));
+  check(!ringAgain.grid && ringAgain.field && ringAgain.pressed === 'ring:true,grid:false' && ringAgain.stored === null, `the next rubric opens on the ring again, though the last was left as the grid: ${JSON.stringify(ringAgain)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   // Escape ends the tour and leaves the ring; a second closes the ring

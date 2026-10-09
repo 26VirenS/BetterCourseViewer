@@ -114,7 +114,6 @@ struct RubricPopupView: View {
     private let model: RubricModel
     private let geo: RingGeometry
     @StateObject private var motion: RingMotion
-    @AppStorage("rubricView") private var keptView = "ring"
     @State private var view: String
     @State private var shown = false
     /// The slice the pointer is on over the ring (from the presses' layer, not a label).
@@ -132,8 +131,9 @@ struct RubricPopupView: View {
         model = m
         geo = g
         _motion = StateObject(wrappedValue: RingMotion(geometry: g))
-        let kept = UserDefaults.standard.string(forKey: "rubricView") == "grid" ? "grid" : "ring"
-        _view = State(initialValue: item.view == "grid" || item.view == "ring" ? (item.view ?? kept) : kept)
+        // (1.2.4) every rubric opens on the ring; the grid is one press away and never kept (as on the web, 2.99.26)
+        UserDefaults.standard.removeObject(forKey: "rubricView")
+        _view = State(initialValue: item.view == "grid" ? "grid" : "ring")
     }
 
     private var on: Bool { shown && !leaving }
@@ -319,7 +319,6 @@ struct RubricPopupView: View {
 
     private func setView(_ v: String) {
         guard v == "ring" || v == "grid", v != view else { return }
-        keptView = v
         if v == "grid" { motion.hover(-1) }
         withAnimation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Motion.gentle) { view = v }
     }
