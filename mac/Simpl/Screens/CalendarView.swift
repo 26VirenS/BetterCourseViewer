@@ -709,6 +709,7 @@ struct CalendarView: View {
 private extension PreviewItem {
     /// (1.2.3) A piece of work or an event of the calendar, for its preview: its line under the title is "course · kind ·
     /// points · place" (native-app.js calendar). An event whose address is the calendar itself opens on Canvas's page.
+    @MainActor
     static func event(_ ev: CalEvent, engine: Engine) -> PreviewItem {
         let kind = PreviewFormat.text(ev.kind) ?? "Event"
         let work = ["Assignment", "Quiz", "Discussion"].contains(kind)

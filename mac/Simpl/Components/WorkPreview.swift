@@ -274,6 +274,7 @@ extension WorkAction {
 
 extension PreviewItem {
     /// A row of work in Today's list or To Do (its planner kind from its id, "assignment:12"); `toggle` is its tick.
+    @MainActor
     static func work(_ row: WorkRow, engine: Engine, toggle: ((Bool) -> Void)?) -> PreviewItem {
         let type = PreviewFormat.text(row.type) ?? row.id.split(separator: ":").first.map(String.init)
         let custom = row.custom == true
@@ -297,6 +298,7 @@ extension PreviewItem {
     }
 
     /// A row of the Dashboard's List, under its day ("Today", "Saturday", "Oct 16").
+    @MainActor
     static func dash(_ row: DashRow, day: String?, engine: Engine, toggle: ((Bool) -> Void)?) -> PreviewItem {
         let type = PreviewFormat.text(row.type) ?? row.id.split(separator: ":").first.map(String.init)
         let custom = row.custom == true
@@ -317,6 +319,7 @@ extension PreviewItem {
     }
 
     /// A row of a counter's panel: its line under the title is "course · kind · points · when" (native-app.js sheetRow).
+    @MainActor
     static func sheet(_ row: SheetRow, counter: String, engine: Engine) -> PreviewItem {
         let parts = (row.sub ?? "").components(separatedBy: " · ").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         let found: (String, String) = counter == "unread"
