@@ -385,7 +385,7 @@
       if (hit(`${m.name} ${nameOf(c)}`, q)) {
         out.push({
           icon: IC.modules, title: m.name, tint: c.color || null, href: `/courses/${c.id}/modules`, module: m, course: c,
-          sub: [nameOf(c), m.state === 'locked' ? `Locked${m.unlock_at ? ` until ${U.whenShort(U.parse(m.unlock_at))}` : ''}` : m.state === 'completed' ? 'Completed' : req.length ? `${done} of ${req.length} requirements done` : null, U.plural(items.length, 'item')].filter(Boolean).join(' · '),
+          sub: [nameOf(c), m.state === 'locked' ? `Locked${m.unlock_at ? ` until ${U.whenShort(U.parse(m.unlock_at))}` : ''}` : m.state === 'completed' && req.length ? 'Completed' : req.length ? `${done} of ${req.length} requirements done` : null, U.plural(items.length, 'item')].filter(Boolean).join(' · '),
         });
       }
       if (q) for (const it of items) if (hit(`${it.title} ${m.name}`, q)) out.push(moduleItemRow(it, m, c));

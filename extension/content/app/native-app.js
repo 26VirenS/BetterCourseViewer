@@ -1275,7 +1275,8 @@
           };
         });
         const req = items.filter((x) => x.requirement);
-        return { id: String(m.id), name: m.name || 'Module', locked, lockText, state: m.state || '', done: m.state === 'completed', progress: req.length ? `${req.filter((x) => x.done).length} of ${req.length} done` : '', items };
+        // (done: every requirement met — Canvas calls a module with nothing to complete "completed" as soon as it opens)
+        return { id: String(m.id), name: m.name || 'Module', locked, lockText, state: m.state || '', done: m.state === 'completed' && req.length > 0 && req.every((x) => x.done), progress: req.length ? `${req.filter((x) => x.done).length} of ${req.length} done` : '', items };
       }),
     };
   }
