@@ -230,19 +230,11 @@ private final class SettingsModel: ObservableObject {
         }
     }
 
-    /// Everything kept here cleared; the page loads again and the setup runs, as on a first run.
+    /// (1.2.4) Everything Simpl keeps on this Mac erased — settings, history, the pages kept, the sign-in, every
+    /// preference — and the app restarted, as on its first run (Support/EraseAll.swift).
     func resetEverything() async {
-        guard let engine else { return }
         busy = true
-        defer { busy = false }
-        do {
-            _ = try await engine.call("resetEverything", as: OK.self)
-            engine.reload()
-            NotificationCenter.default.post(name: .simplOpenSetup, object: nil)
-            NSApp.keyWindow?.performClose(nil)
-        } catch {
-            say("Could not reset: \(error.localizedDescription)", error: true)
-        }
+        await EraseAll.run(engine)
     }
 
     func say(_ text: String, error: Bool = false) {
@@ -574,29 +566,30 @@ private struct DataPane: View {
                     Text(session.onBrightspace ? "Brightspace data is never kept here: only your preferences, grade history and goals, and the course nicknames, colours, tasks and ticks Brightspace has no place for. Your Brightspace account and favourites live on Brightspace." : "Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas.")
                         .foregroundStyle(.secondary)
                 }
-                Section {
-                    LabeledContent {
-                        Button("Reset Everything…", role: .destructive) { confirmReset = true }
-                            .disabled(settings.busy)
-                    } label: {
-                        Text("Reset")
-                        Text(session.onBrightspace ? "Your preferences, grade history, goals, nicknames, colours and your own tasks are cleared and the setup runs again." : "Your preferences, grade history and goals are cleared and the setup runs again.")
-                    }
-                }
             } else {
                 Section {
                     Text("Data settings appear once \(session.lmsName) has loaded and you are signed in.")
                         .foregroundStyle(.secondary)
                 }
             }
+            // (1.2.4) always here, signed in or not: the way out of anything
+            Section {
+                LabeledContent {
+                    Button("Reset Everything…", role: .destructive) { confirmReset = true }
+                        .disabled(settings.busy)
+                } label: {
+                    Text("Reset")
+                    Text("Erases everything Simpl keeps on this Mac, signs you out and restarts Simpl.")
+                }
+            }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: SettingsImport.settings.types, allowsMultipleSelection: false) { result in
             settings.picked(.settings, result)
         }
-        .confirmationDialog("Reset everything?", isPresented: $confirmReset) {
-            Button("Reset Everything", role: .destructive) { Task { await settings.resetEverything() } }
+        .confirmationDialog("Erase everything and restart Simpl?", isPresented: $confirmReset) {
+            Button("Erase and Restart", role: .destructive) { Task { await settings.resetEverything() } }
         } message: {
-            Text(session.onBrightspace ? "Your preferences, grade history, course goals, course nicknames and colours, and your own tasks and ticks kept in the app are cleared, and the setup runs again. Your Brightspace sign-in stays." : "Your preferences, grade history and course goals kept in the app are cleared, and the setup runs again. Your Canvas sign-in stays.")
+            Text("Your settings, grade history, goals, saved pages, reminders and \(session.lmsName) sign-in are erased from this Mac. Simpl then restarts as if it were new. This can’t be undone.")
         }
     }
 }

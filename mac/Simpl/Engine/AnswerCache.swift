@@ -48,7 +48,7 @@ final class AnswerCache {
     }
 
     func keep(_ data: Data, _ name: String, _ args: [String: Any]) {
-        guard let f = AnswerCache.file(name, args) else { return }
+        guard !stopped, let f = AnswerCache.file(name, args) else { return }
         memory[f] = data
         let url = dir.appendingPathComponent(f)
         let dir = self.dir
@@ -58,11 +58,36 @@ final class AnswerCache {
         }
     }
 
+    /// (1.2.4) Nothing kept from here on (Reset Everything: the app is about to restart, erased).
+    func stop() {
+        stopped = true
+        memory.removeAll()
+    }
+
+    private var stopped = false
+
     /// Everything kept, gone (signing out: the next account's screens are not this one's).
     func clear() {
         memory.removeAll()
         let dir = self.dir
         disk.async { try? FileManager.default.removeItem(at: dir) }
+    }
+
+    /// (1.2.4) Every school's kept answers, gone from disk at once (Reset Everything): only the files this cache writes
+    /// (a SHA-256 name, .json) and the folders they leave empty.
+    static func eraseAll() {
+        let fm = FileManager.default
+        guard let base = fm.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("Answers", isDirectory: true),
+              let schools = try? fm.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) else { return }
+        let ours = try? NSRegularExpression(pattern: "^[0-9a-f]{64}\\.json$")
+        for school in schools {
+            for f in (try? fm.contentsOfDirectory(at: school, includingPropertiesForKeys: nil)) ?? [] {
+                let name = f.lastPathComponent
+                if ours?.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil { try? fm.removeItem(at: f) }
+            }
+            if (try? fm.contentsOfDirectory(atPath: school.path))?.isEmpty == true { try? fm.removeItem(at: school) }
+        }
+        if (try? fm.contentsOfDirectory(atPath: base.path))?.isEmpty == true { try? fm.removeItem(at: base) }
     }
 
     /// What has not been read in a month, let go (a course long finished, an assignment looked at once).

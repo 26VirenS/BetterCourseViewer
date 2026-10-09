@@ -68,7 +68,20 @@ final class BridgeStore {
         return changes
     }
 
+    /// Everything gone from memory and the file deleted now; no write after it (the app is about to restart).
+    func erase() {
+        erased = true
+        pendingSave?.cancel()
+        pendingSave = nil
+        data = [:]
+        let url = fileURL
+        queue.sync { try? FileManager.default.removeItem(at: url) }
+    }
+
+    private var erased = false
+
     private func scheduleSave() {
+        guard !erased else { return }
         pendingSave?.cancel()
         let snapshot = data
         let url = fileURL

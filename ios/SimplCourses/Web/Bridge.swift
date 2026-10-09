@@ -23,6 +23,12 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         _ = store.set(items)
     }
 
+    /// (Mac 1.2.4) Everything the extension kept, erased from disk at once, and nothing written again before the app
+    /// quits (Reset Everything restarts it).
+    func eraseStorage() {
+        store.erase()
+    }
+
     /// What the app's settings always are, whatever writes them (a settings import from a computer, an old
     /// command): light or dark is the phone's own setting (1.4: "system"), and Simpl's look is always on
     /// (1.4.5) — off, the app's own screens and the menu that leads back to Settings would be gone.
