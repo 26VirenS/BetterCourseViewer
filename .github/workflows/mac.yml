@@ -73,7 +73,7 @@ jobs:
           }
           build
           # (an incremental build that failed is tried once more from clean: a stale intermediate is never the answer)
-          if ! grep -q "BUILD SUCCEEDED" build.log && [ -f build/.mtimes.json ]; then
+          if ! grep -q "BUILD SUCCEEDED" build.log && [ -f build/.mtimes-ns.json ]; then
             echo "::warning::incremental build failed; building clean"
             rm -rf build
             build

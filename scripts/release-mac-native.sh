@@ -80,7 +80,7 @@ xcodebuild \
 }
 release_build
 # (1.3.1: the last release's intermediates are reused; one that will not build is set aside and built from clean)
-if ! grep -q "BUILD SUCCEEDED" build-mac-native.log && [[ -f build/mac-native/.mtimes.json ]]; then
+if ! grep -q "BUILD SUCCEEDED" build-mac-native.log && [[ -f build/mac-native/.mtimes-ns.json ]]; then
   echo "The incremental build failed; building clean." >&2
   rm -rf build/mac-native
   release_build

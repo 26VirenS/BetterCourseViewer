@@ -31,10 +31,11 @@ def main():
     if len(sys.argv) != 3 or sys.argv[1] not in ('save', 'restore'):
         sys.exit(__doc__)
     mode, folder = sys.argv[1], sys.argv[2]
-    record = os.path.join(folder, '.mtimes.json')
+    record = os.path.join(folder, '.mtimes-ns.json') # (a record of float seconds is not used: it lost the nanoseconds)
     if mode == 'save':
         os.makedirs(folder, exist_ok=True)
-        data = {p: [digest(p), os.stat(p).st_mtime] for p in tracked()}
+        # (to the nanosecond: the Swift driver compares a file's date exactly with the one its last build recorded)
+        data = {p: [digest(p), os.stat(p).st_mtime_ns] for p in tracked()}
         with open(record, 'w') as f:
             json.dump(data, f)
         print(f'mtimes: {len(data)} files recorded')
@@ -49,7 +50,7 @@ def main():
     for p in tracked():
         kept = data.get(p)
         if kept and kept[0] == digest(p):
-            os.utime(p, (kept[1], kept[1]))
+            os.utime(p, ns=(int(kept[1]), int(kept[1])))
             same += 1
         else:
             changed += 1
