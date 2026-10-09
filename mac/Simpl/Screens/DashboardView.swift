@@ -400,6 +400,12 @@ struct DashboardView: View {
     /// `animated`: after a tick here, the row ticked off leaves and the next one slides in (as To Do's do); any other
     /// load is a redraw, not an arrival.
     private func load(animated: Bool = false) async {
+        // (1.2.3: every part opens on what it showed last time, and each asks Canvas at once, not after the day's)
+        showKept()
+        Task { await loadCounts() }
+        Task { await loadCourses() }
+        Task { await loadSkyline() }
+        Task { await loadView() }
         await model.load(engine, "today", animated: animated)
         guard model.data != nil else { return }
         // (the screenshot suite: -SimplSheet next opens a counter's panel)
@@ -407,10 +413,28 @@ struct DashboardView: View {
             sheetAsked = true
             open = key
         }
-        Task { await loadCounts() }
-        Task { await loadCourses() }
-        Task { await loadSkyline() }
-        await loadView()
+    }
+
+    /// The cards, the List, the activity and the skyline as they were last time (AnswerCache), until the live answers
+    /// are in. Their counts wait for the live answer, as every count does: a card's due today and unread, a new dot.
+    private func showKept() {
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            if courses == nil, var c = engine.kept("dashCourses", as: DashCoursesData.self) {
+                for i in c.rows.indices {
+                    c.rows[i].unread = nil
+                    c.rows[i].dueToday = nil
+                }
+                courses = c
+            }
+            if sky == nil, let s = engine.kept("dashSkyline", ["kept": false], as: DashSkylineData.self) { sky = s }
+            if list == nil, let l = engine.kept("dashList", as: DashListData.self) { list = l }
+            if activity == nil, var a = engine.kept("dashActivity", as: DashActivityData.self) {
+                for i in a.rows.indices { a.rows[i].unread = nil }
+                activity = a
+            }
+        }
     }
 
     private func loadCounts() async {

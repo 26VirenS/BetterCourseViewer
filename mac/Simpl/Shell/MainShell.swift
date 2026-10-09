@@ -88,9 +88,12 @@ struct DetailStack: View {
         let place = engine.nav.current.place
         NavigationStack(path: Binding(get: { engine.nav.current.path }, set: { engine.nav.setPath($0) })) {
             PlaceScreen(place: place)
+                .background(Theme.page.ignoresSafeArea())
                 .navigationDestination(for: Route.self) { route in
                     RouteScreen(route: route)
                         .navigationBarBackButtonHidden(true) // (the toolbar's own Back and Forward walk the history)
+                        // (1.2.3) its own ground, up under the toolbar: the screen it was opened from never shows through
+                        .background(Theme.page.ignoresSafeArea())
                 }
         }
         .id(place.identity)

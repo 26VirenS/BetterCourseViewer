@@ -11,7 +11,7 @@ final class AnswerCache {
         "snapshot", "courses", "allCourses", "groups", "home", "today", "todaySheet", "todo", "calendar", "calView", "grades",
         "courseGrades", "coursesProgress", "notifications", "inbox", "conversation", "assignment", "topic",
         "announcements", "discussions", "assignments", "quizzes", "modules", "pages", "page", "files", "people",
-        "syllabus",
+        "syllabus", "dashCourses", "dashList", "dashActivity", "dashSkyline",
     ]
 
     private let dir: URL

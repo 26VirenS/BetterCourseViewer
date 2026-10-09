@@ -148,8 +148,8 @@ struct DashCounterPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             if let d = data {
-                // (1.2.2) no taller than three rows' worth: the rest scrolls inside the panel
-                CappedScroll(max: 210) { lists(d) }
+                // (1.2.2) no taller than three and a half rows: the rest scrolls inside the panel
+                CappedScroll(max: 240) { lists(d) } // (1.2.3: half of a fourth row shows, so it reads as one to scroll)
             } else if let error {
                 Text(error).font(.sCallout).foregroundStyle(.secondary)
             } else {

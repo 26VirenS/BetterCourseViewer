@@ -209,20 +209,20 @@ struct ConversationView: View {
 
     private func composer(_ d: ConversationData) -> some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
-        return HStack(alignment: .bottom, spacing: 8) {
+        // (1.2.3: one slim line, the words and Send on one centre line; it grows as the reply does)
+        return HStack(alignment: .center, spacing: 8) {
             InboxReplyBox(text: draft, focus: $typing, prompt: replyPrompt(d))
             if !draft.wrappedValue.isEmpty && !sending {
                 Text("⌘↩")
                     .font(.sCaption.weight(.medium))
                     .foregroundStyle(.tertiary)
-                    .padding(.bottom, 10)
                     .accessibilityHidden(true)
             }
             sendButton
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
+        .padding(.leading, 12)
+        .padding(.trailing, 5)
+        .padding(.vertical, 4)
         // (a click anywhere on the bar puts the typing there)
         .background {
             Color.clear
@@ -247,10 +247,10 @@ struct ConversationView: View {
                 }
             }
             .font(.sCallout.weight(.semibold))
-            .frame(minWidth: 68)
+            .frame(minWidth: 56)
         }
         .glassButton(prominent: true)
-        .controlSize(.large)
+        .controlSize(.regular)
         .buttonBorderShape(.capsule)
         .keyboardShortcut(.return, modifiers: .command)
         .disabled(!canSend)
@@ -263,7 +263,7 @@ struct ConversationView: View {
         switch people.count {
         case 0: return "Write a reply"
         case 1: return "Reply to \(people[0])"
-        default: return "Reply to all \(people.count)"
+        default: return "Reply to all \(people.count) people"
         }
     }
 
@@ -559,8 +559,8 @@ private struct InboxReplyBox: View {
             .font(.sBody)
             .lineLimit(6)
             .padding(.horizontal, 6)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 36, alignment: .topLeading)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
             .opacity(0)
             .accessibilityHidden(true)
             .overlay(alignment: .topLeading) {
@@ -570,7 +570,7 @@ private struct InboxReplyBox: View {
                     .focusEffectDisabled()
                     .focused(focus)
                     .padding(.horizontal, 1)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                     .accessibilityLabel("Reply")
             }
             .overlay(alignment: .topLeading) {
@@ -580,7 +580,7 @@ private struct InboxReplyBox: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                         .allowsHitTesting(false)
                 }
             }
