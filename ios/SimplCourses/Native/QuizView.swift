@@ -802,10 +802,10 @@ private struct QuestionView: View {
                                 }
                             }
                         } label: {
-                            pickLabel(choiceName(q.map[b.id], in: b), placeholder: b.label.hasPrefix("Blank ") ? "Choose…" : b.label)
+                            pickLabel(choiceName(q.map[b.id], in: b), placeholder: "Select…") // (never the blank's own name: it is often its answer)
                         }
                     } else {
-                        TextField(b.label.hasPrefix("Blank ") ? "Your answer" : b.label, text: Binding(get: { q.map[b.id] ?? "" }, set: { v in run.set(q.id, typed: true) { $0.map[b.id] = v } }))
+                        TextField("Your answer", text: Binding(get: { q.map[b.id] ?? "" }, set: { v in run.set(q.id, typed: true) { $0.map[b.id] = v } }))
                             .textInputAutocapitalization(.never)
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.secondarySystemBackground)))

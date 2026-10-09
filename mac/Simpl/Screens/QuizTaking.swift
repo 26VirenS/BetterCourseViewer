@@ -741,7 +741,7 @@ private struct QuizQuestionPage: View {
                 HStack(spacing: 18) {
                     QuizOptionText(text: o.text, html: o.html)
                     Picker(QuizFormat.optionName(o), selection: Binding(get: { q.map[o.id] }, set: { v in run.set(q.id) { $0.map[o.id] = v } })) {
-                        Text("Choose…").tag(String?.none)
+                        Text("Select…").tag(String?.none)
                         ForEach(q.matches) { m in
                             Text(m.text).tag(Optional(m.id))
                         }
@@ -769,7 +769,9 @@ private struct QuizQuestionPage: View {
                         .accessibilityHidden(true)
                     if q.kind == "drops" {
                         Picker(b.label, selection: Binding(get: { q.map[b.id] }, set: { v in run.set(q.id) { $0.map[b.id] = v } })) {
-                            Text(b.label.hasPrefix("Blank ") ? "Choose…" : b.label).tag(String?.none)
+                            // (1.3.9: never the blank's own name — an instructor often names it after its answer — so an
+                            // empty menu never looks answered)
+                            Text("Select…").tag(String?.none)
                             ForEach(b.options) { c in
                                 Text(c.text).tag(Optional(c.id))
                             }
@@ -778,7 +780,7 @@ private struct QuizQuestionPage: View {
                         .labelsHidden()
                         .frame(maxWidth: 340, alignment: .leading)
                     } else {
-                        TextField(b.label.hasPrefix("Blank ") ? "Your answer" : b.label, text: Binding(get: { q.map[b.id] ?? "" }, set: { v in run.set(q.id, typed: true) { $0.map[b.id] = v } }))
+                        TextField("Your answer", text: Binding(get: { q.map[b.id] ?? "" }, set: { v in run.set(q.id, typed: true) { $0.map[b.id] = v } }))
                             .textFieldStyle(.roundedBorder)
                             .font(.sBody)
                             .focused(focus, equals: .field("\(q.id)#\(b.id)"))
