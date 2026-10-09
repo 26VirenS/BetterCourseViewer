@@ -151,13 +151,15 @@ struct WorkPreviewOverlay: View {
 }
 
 /// Where the card goes (1.2.8): beside its row, level with it, on the side the row leaves room — a row on the left of
-/// the window opens to its right, one on the right to its left; a row too wide for the card beside it has it level with
-/// it at the window's edge on that side (over the row's far end, never over or under the row); with no row, the middle
-/// of the screen's side of the window — always inside it.
+/// the window opens to its right, one on the right to its left (1.2.19: narrower, down to `minWidth`, to stay beside
+/// it); a row too wide for that, just under it (or over it), the row left in view; only with room for none of these,
+/// level with it at the window's edge; with no row, the middle of the screen's side of the window — always inside it.
 enum PreviewPlacement {
     static let width: CGFloat = 460
     static let margin: CGFloat = 16
     static let gap: CGFloat = 12
+    /// (1.2.19) The narrowest the card goes to stay beside its row.
+    static let minWidth: CGFloat = 340
 
     static func frame(source: CGRect?, area: CGRect, height: CGFloat) -> CGRect {
         let w = min(width, max(area.width - margin * 2, 260))
@@ -175,6 +177,18 @@ enum PreviewPlacement {
         // (the side: where the row stands — a wide row, its words on the left, counts as the left)
         let rightFirst = s.midX <= area.midX + area.width * 0.12
         if let r = (rightFirst ? [right, left] : [left, right]).first(where: fits) { return r }
+        // (1.2.19) no room for the whole width beside it: beside it all the same, a little narrower
+        let roomRight = maxX - (s.maxX + gap), roomLeft = s.minX - gap - minX
+        let narrow = rightFirst ? [(roomRight, true), (roomLeft, false)] : [(roomLeft, false), (roomRight, true)]
+        if let pick = narrow.first(where: { $0.0 >= minWidth }) {
+            let (room, onRight) = pick
+            let n = min(w, room)
+            return CGRect(x: onRight ? s.maxX + gap : s.minX - gap - n, y: y, width: n, height: h)
+        }
+        // (a row too wide for that, a list's: just under it, from its start — or just over it — the row left in view)
+        let x = clampX(s.minX + 8)
+        if maxY - (s.maxY + gap) >= h { return CGRect(x: x, y: s.maxY + gap, width: w, height: h) }
+        if (s.minY - gap) - minY >= h { return CGRect(x: x, y: s.minY - gap - h, width: w, height: h) }
         return CGRect(x: clampX(rightFirst ? maxX - w : minX), y: y, width: w, height: h)
     }
 }

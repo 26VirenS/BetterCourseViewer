@@ -305,9 +305,9 @@ struct PreviewLink<Label: View>: View {
     let item: PreviewItem
     var padded = true
     var radius: CGFloat = 10
-    /// (1.2.15) The preview opens under the row, in its list (a list's rows); off, it grows out over the window (the
-    /// calendar's small items).
-    var inline = true
+    /// (1.2.15) The preview opens under the row, in its list; off (1.2.19: every row again), the card grows out of the
+    /// row over the window, level with it.
+    var inline = false
     @ViewBuilder var label: () -> Label
     @State private var anchor = PreviewAnchor()
     @State private var rowWidth: CGFloat = 0
