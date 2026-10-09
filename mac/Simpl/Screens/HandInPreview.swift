@@ -48,7 +48,10 @@ final class HandInPreview: ObservableObject {
     /// The widths for the window the sheet is on: the pane up to 540 points, the form 580 — the form giving up to 120
     /// of its own before the pane goes below 380 — together never wider than the window, less a margin.
     private func fit() {
-        let parent = NSApp.keyWindow?.sheetParent ?? NSApp.mainWindow
+        // (the window the sheet is on: the key window's, or the app's largest window — the app need not be in front)
+        let parent = NSApp.keyWindow?.sheetParent ?? NSApp.mainWindow ?? NSApp.windows
+            .filter { $0.isVisible && $0.sheetParent == nil && !($0 is NSPanel) }
+            .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
         let room = max(700, (parent?.frame.width ?? 1400) - 48)
         var form = Self.form
         var pane = min(540, room - form)

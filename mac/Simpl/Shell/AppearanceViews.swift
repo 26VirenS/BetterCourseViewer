@@ -84,11 +84,14 @@ struct RadialColorPicker: View {
     /// side for saturation, down the right for depth.
     private func curved(_ text: String, around centre: Double) -> some View {
         let letters = Array(text)
-        let step = 6.7 / 66 * 180 / .pi // (degrees a letter takes, with the web's .14em tracking)
-        let first = centre - Double(letters.count - 1) / 2 * step
+        // (each letter's own width, with the web's .14em tracking, in degrees at this radius — a narrow I leaves no gap)
+        let widths = letters.map { ch -> Double in ("IJ1".contains(ch) ? 3.4 : ch == "M" || ch == "W" ? 7.6 : 6.2) + 1.2 }
+        let total = widths.reduce(0, +)
+        let toDeg = 180 / Double.pi / 66
+        let centres = widths.indices.map { i in centre + (widths[..<i].reduce(0, +) + widths[i] / 2 - total / 2) * toDeg }
         return ZStack {
             ForEach(Array(letters.enumerated()), id: \.offset) { i, ch in
-                let a = first + Double(i) * step
+                let a = centres[i]
                 Text(String(ch))
                     .font(.system(size: 8.5, weight: .semibold))
                     .foregroundStyle(.secondary)
