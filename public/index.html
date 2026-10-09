@@ -84,7 +84,7 @@ svg { flex: none; }
 .btn--soft { background: var(--soft); color: var(--soft-text); }
 @media (hover: hover) and (pointer: fine) { .btn--blue:hover { background: var(--blue-hover); } .btn--soft:hover { background: var(--soft-hover); } }
 .cta { position: relative; z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
-.cta > .btn, .cta > .macdl { width: 236px; }
+.cta > .btn, .cta > .macdl { width: 260px; }
 @media (max-width: 560px) { .cta { flex-direction: column; align-items: stretch; width: 100%; max-width: 330px; margin-inline: auto; } .cta > .btn, .cta > .macdl { width: 100%; } }
 
 /* ---- Download for Mac: the button opens into its two choices, up or down as there is room --------------- */
@@ -117,7 +117,8 @@ svg { flex: none; }
 .macdl__ic--safari svg { width: 22px; height: 22px; }
 .macdl__ic img { width: 34px; height: 34px; border-radius: 8px; }
 .macdl__t { display: grid; gap: 2px; text-align: left; }
-.macdl__t b { font: 600 15px/1.15 var(--font); letter-spacing: -.01em; }
+.macdl__t b { font: 600 15px/1.15 var(--font); letter-spacing: -.01em; white-space: nowrap; }
+.macdl__rec { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; background: var(--mr); color: var(--mt); font: 600 10.5px/1.3 var(--font); letter-spacing: .01em; vertical-align: 1px; }
 .macdl__t small { font: 400 12.5px/1.2 var(--font); color: var(--ms); letter-spacing: 0; }
 
 /* ---- type ------------------------------------------------------------------------------------------------ */
@@ -329,14 +330,14 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       <p class="sub">Canvas and Brightspace, made simple.</p>
       <div class="cta">
         <a class="btn btn--blue" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
-        <div class="macdl" data-macdl>
-          <button class="btn btn--soft macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-hero"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+        <div class="macdl macdl--blue" data-macdl>
+          <button class="btn btn--blue macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-hero"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
           <div class="macdl__float">
             <div class="macdl__panel" id="macdl-hero">
               <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
               <div class="macdl__opts">
-                <a class="macdl__opt" href="/download/mac" style="--i:0"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
-                <a class="macdl__opt" href="/download/mac-app" style="--i:1"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34"></span><span class="macdl__t"><b>Mac App</b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac-app" style="--i:0"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34"></span><span class="macdl__t"><b>Mac App<span class="macdl__rec">Recommended</span></b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac" style="--i:1"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
               </div>
             </div>
           </div>
@@ -459,8 +460,8 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
             <div class="macdl__panel" id="macdl-mac">
               <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
               <div class="macdl__opts">
-                <a class="macdl__opt" href="/download/mac" style="--i:0"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
-                <a class="macdl__opt" href="/download/mac-app" style="--i:1"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34" loading="lazy"></span><span class="macdl__t"><b>Mac App</b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac-app" style="--i:0"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34" loading="lazy"></span><span class="macdl__t"><b>Mac App<span class="macdl__rec">Recommended</span></b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac" style="--i:1"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
               </div>
             </div>
           </div>
@@ -539,14 +540,14 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       <p class="sub">Free for Canvas and Brightspace.</p>
       <div class="cta">
         <a class="btn btn--blue" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
-        <div class="macdl" data-macdl>
-          <button class="btn btn--soft macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-get"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+        <div class="macdl macdl--blue" data-macdl>
+          <button class="btn btn--blue macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-get"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
           <div class="macdl__float">
             <div class="macdl__panel" id="macdl-get">
               <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
               <div class="macdl__opts">
-                <a class="macdl__opt" href="/download/mac" style="--i:0"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
-                <a class="macdl__opt" href="/download/mac-app" style="--i:1"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34" loading="lazy"></span><span class="macdl__t"><b>Mac App</b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac-app" style="--i:0"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34" loading="lazy"></span><span class="macdl__t"><b>Mac App<span class="macdl__rec">Recommended</span></b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac" style="--i:1"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
               </div>
             </div>
           </div>
