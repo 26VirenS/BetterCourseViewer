@@ -531,7 +531,9 @@ try {
   check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /^Next 7 days/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Due tomorrow/i.test(stats[4]) && /^Graded this week/i.test(stats[5]), `six stat cards (mockup 13), Due tomorrow before Graded this week: ${stats.join(' | ')}`);
   const statLabel = await page.$eval('.bcv-stat__head .bcv-label', (e) => ({ size: parseFloat(getComputedStyle(e).fontSize), tt: getComputedStyle(e).textTransform, text: e.textContent }));
   check(statLabel.size >= 13 && statLabel.tt === 'none', `a card is named in sentence case at a readable size, not a small capital label: ${JSON.stringify(statLabel)}`);
-  check((await page.$eval('.bcv-stats', (e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)) === 3 && (await page.$$eval('.bcv-stat', (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).filter((t, i, a) => a.indexOf(t) === i).length === 2, 'a fixed 2×3 grid: three columns, two rows');
+  // (2.99.29) a main column of 860px or more lays the six out as the Mac's square cards, in one row and the Mac's order; under that, a fixed 2×3 grid
+  const grid = await page.evaluate(() => ({ cols: getComputedStyle(document.querySelector('.bcv-stats')).gridTemplateColumns.split(' ').length, rows: new Set([...document.querySelectorAll('.bcv-stat')].map((e) => Math.round(e.getBoundingClientRect().top))).size, main: Math.round(document.querySelector('.bcv-main').getBoundingClientRect().width), order: [...document.querySelectorAll('.bcv-stat')].sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left).map((e) => e.dataset.stat).join() }));
+  check(grid.main >= 860 ? grid.cols === 6 && grid.rows === 1 && grid.order === 'today,tomorrow,week,overdue,unread,graded' : grid.cols === 3 && grid.rows === 2, `the counters' grid: ${grid.main >= 860 ? "six square cards in one row, in the Mac's order" : 'a fixed 2×3 grid: three columns, two rows'}: ${JSON.stringify(grid)}`);
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
   // Overdue: past due with nothing handed in (Canvas's missing flag); work handed in late, scored or still waiting on a grade, is not overdue; the number matches its sheet
   check(/^Overdue\s*1\s*1 not submitted$/i.test(stats[3]), `Overdue counts work past its due date with nothing handed in (late work, scored or awaiting a grade, is not overdue): ${stats[3]}`);
@@ -627,14 +629,14 @@ try {
   // (2.98.82) a counter's box hangs from where the counter stands in its row: the left one's top-left corner, the middle
   // one's top centre, the right one's top-right — growing away from the row's edge; on the right its preview opens on the list's left
   const anchored = [];
-  for (const nth of [1, 2, 3]) {
+  for (const nth of [1, 2, 6]) { // (Due today on the left, Next 7 days in the middle, Graded on the right: in the 2×3 grid and the row of six alike)
     const c = await page.$eval(`.bcv-stats .bcv-stat:nth-child(${nth})`, (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top }; });
     await page.click(`.bcv-stats .bcv-stat:nth-child(${nth})`);
     await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
     await page.waitForTimeout(700);
     const b = await page.$eval('.bcv-sheet', (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top, from: e.dataset.from }; });
     let split = null;
-    if (nth === 3) {
+    if (nth === 6) {
       await page.click('.bcv-sheet .bcv-sheet__row');
       split = await eventually(async () => page.evaluate(() => { const sh = document.querySelector('.bcv-sheet'); const pv = sh.querySelector('.bcv-pv--in'); if (!pv || !sh.classList.contains('is-split')) return false; const a = pv.getBoundingClientRect(), l = sh.querySelector('.bcv-sheet__list').getBoundingClientRect(); return a.right <= l.left + 1; }), 4000);
       split = split && Math.abs((await page.$eval('.bcv-sheet', (e) => e.getBoundingClientRect().right)) - c.r) < 3;
@@ -740,7 +742,7 @@ try {
   check(glassBox.stat && glassBox.layers === 2 && (!glassBox.noblur || (glassBox.solid && glassBox.blur === 'none')) && /^blur\(20px\)/.test(glassLit.blur) && !glassLit.solid && glassBox.ink === 'rgb(255, 255, 255)' && glassBox.row === 'rgb(255, 255, 255)' && glassBox.ground === '0' && glassBox.counter === 'hidden', `the counter's box wears the search's glass (20px behind it, the rim, white words; solid where no blur is drawn), the counter's own ground faded from over it, the counter itself hidden behind it: ${JSON.stringify({ glassBox, lit: glassLit.blur })}`);
   check(!(await pageHeld(page, 20, 700)).moved, "the page behind a counter's box is held still while it is open");
   // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
-  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).backgroundImage), vw: innerWidth, vh: innerHeight }; });
+  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), from: e.dataset.from, card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).backgroundImage), vw: innerWidth, vh: innerHeight }; });
   check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h === 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box (430px) with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
@@ -763,7 +765,10 @@ try {
     return { w: Math.round(sheet.width), h: Math.round(sheet.height), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview'), hintShown: !!hint && getComputedStyle(hint).display !== 'none' };
   });
   const splitAt = await page.evaluate(() => { const r = document.querySelector('.bcv-sheet').getBoundingClientRect(); const l = document.querySelector('.bcv-sheet__list').getBoundingClientRect(); const p = document.querySelector('.bcv-pv--in').getBoundingClientRect(); return { x: Math.round(r.left), right: Math.round(r.right), listX: Math.round(l.left), listW: Math.round(l.width), pvW: Math.round(p.width) }; });
-  check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvLeft - splitAt.x) <= 2 && split.pvRight <= splitAt.listX + 2 && !split.shifted && Math.abs(splitAt.right - (steady0.x + steady0.w)) <= 2 && Math.abs(splitAt.listX - steady0.x) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed in a counter at the right of its row widens the box to the left for a smaller preview — the box's right edge and the list where they were, the preview on the list's left — the page itself never moving: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
+  // (2.99.29) Unread stands at the right of its row in the 2×3 grid, in the middle of the row of six (the box then keeps its list
+  // at its left, the preview opening on the list's right, the whole sliding left to stay on screen)
+  if (steady0.from === 'end') check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvLeft - splitAt.x) <= 2 && split.pvRight <= splitAt.listX + 2 && !split.shifted && Math.abs(splitAt.right - (steady0.x + steady0.w)) <= 2 && Math.abs(splitAt.listX - steady0.x) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed in a counter at the right of its row widens the box to the left for a smaller preview — the box's right edge and the list where they were, the preview on the list's left — the page itself never moving: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
+  else check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvLeft - split.listRight) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.right <= steady0.vw - 14 && splitAt.x >= 14 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed in a counter in the middle of its row widens the box for a smaller preview on the list's right, the box kept on screen: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
   await shot(page, '01c-dashboard-preview');
   // pressing another row swaps what the panel shows, the sheet staying put
   await (await page.$$('.bcv-sheet__row'))[1].click();
@@ -5082,7 +5087,7 @@ try {
   await motionAt(page, WATCH);
   await page.click('.bcv-stat');
   const glideAt = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => { const m = (sel) => new DOMMatrix(getComputedStyle(sh.querySelector(sel)).transform); const v = m('.bcv-sheet__value'), l = m('.bcv-sheet__label'), i = m('.bcv-sheet__tile > svg'); return { vx: Math.round(v.e), vs: +v.a.toFixed(2), lx: Math.round(l.e), is: +i.a.toFixed(2), headShown: getComputedStyle(sh.querySelector('.bcv-sheet__head')).opacity, noteFades: +getComputedStyle(sh.querySelector('.bcv-sheet__note')).opacity < 1 }; });
-  check(glideAt.vx > 100 && glideAt.vs > 1.2 && glideAt.lx < 0 && glideAt.is < 1 && glideAt.headShown === '1' && glideAt.noteFades, `as the box opens, the header's number is out to the right and bigger (the counter's), the label to the left, the icon smaller — the header itself shown while its note comes in: ${JSON.stringify(glideAt)}`);
+  check(Math.abs(glideAt.vx) > 40 && glideAt.vs > 1.2 && glideAt.lx < 0 && glideAt.is < 1 && glideAt.headShown === '1' && glideAt.noteFades, `as the box opens, the header's number is out where the counter's stands (right of the label in the grid, under it in a square card) and bigger, the label to the left, the icon smaller — the header itself shown while its note comes in: ${JSON.stringify(glideAt)}`);
   await motionAt(page, MOTION_RATE);
   await page.waitForTimeout(300);
   const glideDone = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => ['.bcv-sheet__value', '.bcv-sheet__label', '.bcv-sheet__tile > svg'].map((s) => getComputedStyle(sh.querySelector(s)).transform).join(','));
@@ -5091,8 +5096,8 @@ try {
   // (the transform is set at once; its transition moves with the next painted frame, late under load, so it is polled for)
   const readBack = () => page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => ({ folding: sh.parentElement.classList.contains('is-folding'), vx: Math.round(new DOMMatrix(getComputedStyle(sh.querySelector('.bcv-sheet__value')).transform).e), inline: /translate/.test(sh.querySelector('.bcv-sheet__value').style.transform) })).catch(() => null);
   let glideBack = await readBack();
-  await eventually(async () => { const g = await readBack(); if (g) glideBack = g; return !!g && g.vx > 0; }, 400);
-  check(glideBack?.folding && glideBack?.inline && glideBack?.vx > 0, `Escape sends the number back out to the counter's place as the box folds: ${JSON.stringify(glideBack)}`);
+  await eventually(async () => { const g = await readBack(); if (g) glideBack = g; return !!g && Math.sign(g.vx) === Math.sign(glideAt.vx) && g.vx !== 0; }, 400);
+  check(glideBack?.folding && glideBack?.inline && Math.sign(glideBack?.vx) === Math.sign(glideAt.vx) && glideBack?.vx !== 0, `Escape sends the number back out to the counter's place as the box folds: ${JSON.stringify(glideBack)}`);
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // (2.98.47) a short window: the box is pushed up inside it, away from its counter — the words still start exactly
   // on the counter's own and land back on them as the box folds (they used to be offset by the box's push)

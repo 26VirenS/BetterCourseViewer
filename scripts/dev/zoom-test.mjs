@@ -83,7 +83,9 @@ const MEASURE = () => {
       }
     }
   }
-  for (const c of document.querySelectorAll('.bcv-ccard, .bcv-tool-card, .bcv-stat')) { const r = c.getBoundingClientRect(); if (r.width && r.width < 200 && res.narrow.length < 3) res.narrow.push(`${c.className.split(' ')[0]} ${Math.round(r.width)}px`); }
+  // (2.99.29) a counter laid out as a square card (six in a row: its label over its number) is built for less: 110px
+  const six = (e) => e.classList.contains('bcv-stat') && getComputedStyle(e.parentElement).gridTemplateColumns.split(' ').length === 6;
+  for (const c of document.querySelectorAll('.bcv-ccard, .bcv-tool-card, .bcv-stat')) { const r = c.getBoundingClientRect(); if (r.width && r.width < (six(c) ? 110 : 200) && res.narrow.length < 3) res.narrow.push(`${c.className.split(' ')[0]} ${Math.round(r.width)}px`); }
   res.sideW = getComputedStyle(html).getPropertyValue('--bcv-side-w').trim();
   const stats = document.querySelector('.bcv-stats');
   res.statCols = stats ? getComputedStyle(stats).gridTemplateColumns.split(' ').length : 0;
@@ -91,7 +93,8 @@ const MEASURE = () => {
   return res;
 };
 // the Dashboard's counters: three across where three of at least 210px fit (12px gaps), else two, else one — the CSS's own rule
-const colsFor = (w) => Math.max(1, Math.min(3, Math.floor((w + 12) / 222)));
+// (2.99.29) six square cards in a row from a main column of 860px (the counters' own width then 804px or more); else as many of 210px as fit, three at most
+const colsFor = (w) => (w >= 804 ? 6 : Math.max(1, Math.min(3, Math.floor((w + 12) / 222))));
 
 async function withContext(c, fn) {
   const userDataDir = join(tmpdir(), `bcv-zoom-profile-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
@@ -146,7 +149,7 @@ try {
       if (!phone) {
         const compact = c.cw <= 1100;
         check(first.sideW === (compact ? '200px' : '242px'), `${c.label}: the sidebar is ${compact ? 'the compact 200px' : 'the full 242px'} (${first.sideW})`);
-        check(first.statCols === colsFor(first.statsW) && first.statsW / first.statCols >= 200, `${c.label}: the Dashboard's counters run ${first.statCols} across in ${first.statsW}px, none squeezed`);
+        check(first.statCols === colsFor(first.statsW) && first.statsW / first.statCols >= (first.statCols === 6 ? 110 : 200), `${c.label}: the Dashboard's counters run ${first.statCols} across in ${first.statsW}px, none squeezed`);
       }
       await go('/');
       if (!phone) {
