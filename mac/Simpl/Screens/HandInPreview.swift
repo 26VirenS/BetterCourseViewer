@@ -26,13 +26,19 @@ final class HandInPreview: ObservableObject {
             close()
             return
         }
-        guard let url = write(f) else { return }
+        open(f)
+    }
+
+    /// (1.3.8) A file's preview opened (a file just added opens its own: no press needed).
+    func open(_ f: PickedFile) {
+        guard showing != f.id, let url = write(f) else { return }
         fit()
         withAnimation(Motion.gentle) {
             showing = f.id
             file = url
             name = f.name
         }
+        resizeSheet()
     }
 
     func close(animated: Bool = true) {
@@ -43,6 +49,23 @@ final class HandInPreview: ObservableObject {
         }
         if animated { withAnimation(Motion.gentle, put) } else { put() }
         clean()
+        if animated { resizeSheet() }
+    }
+
+    /// (1.3.8) The sheet's window made as wide as the form and the pane together. A sheet already up kept its width when
+    /// the pane came in, so the pane sat cut off past its right edge ("Previewing", and nothing to see); the window is
+    /// sized here, kept centred on its parent, its top where it was.
+    private func resizeSheet() {
+        let want = formWidth + (file != nil ? paneWidth + 1 : 0)
+        DispatchQueue.main.async {
+            guard let sheet = NSApp.windows.first(where: { $0.isSheet && $0.isVisible && $0.contentView?.frame.width ?? 0 > 0 }) else { return }
+            let content = sheet.contentRect(forFrameRect: sheet.frame)
+            guard abs(content.width - want) > 1 else { return }
+            var frame = sheet.frameRect(forContentRect: NSRect(x: content.minX, y: content.minY, width: want, height: content.height))
+            if let parent = sheet.sheetParent { frame.origin.x = parent.frame.midX - frame.width / 2 }
+            frame.origin.y = sheet.frame.maxY - frame.height
+            sheet.setFrame(frame, display: true, animate: true)
+        }
     }
 
     /// The widths for the window the sheet is on: the pane up to 540 points, the form 580 — the form giving up to 120

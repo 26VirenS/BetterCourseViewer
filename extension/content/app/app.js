@@ -1768,7 +1768,7 @@
   }
 
   BCV.app = {
-    state, go, render, renderSide, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
+    state, go, render, renderSide, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, schoolLogo, toggleTheme, logout, backTo, nameHere, markBack,
     rawQuizUrl, // (the look switch turns the look off mid-quiz by going there, see early.js)
     isDark: () => state.dark,
     holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)

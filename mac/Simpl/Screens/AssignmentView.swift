@@ -1025,10 +1025,11 @@ private struct HandInSheet: View {
         .onAppear {
             if !dropped.isEmpty { _ = take(dropped) }
             // (the screenshot suite: -SimplHandInPreview <file> puts a file in and opens its preview)
+            // (1.3.8: a moment after the sheet is up, and through add(), as a file chosen is: the preview opens by itself)
             if let path = UserDefaults.standard.string(forKey: "SimplHandInPreview"), let data = FileManager.default.contents(atPath: path) {
-                let f = PickedFile(name: (path as NSString).lastPathComponent, type: "application/octet-stream", data: data)
-                files.append(f)
-                preview.toggle(f)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    add(PickedFile(name: (path as NSString).lastPathComponent, type: "application/octet-stream", data: data))
+                }
             }
         }
         .onDisappear { preview.close(animated: false) }
@@ -1393,6 +1394,7 @@ private struct HandInSheet: View {
         error = nil
         guard !files.contains(where: { $0.name == f.name && $0.data.count == f.data.count }) else { return } // (dropped twice)
         withAnimation(Motion.snappy) { files.append(f) }
+        preview.open(f) // (1.3.8: a file added is looked at straight away — the last one added, where several come at once)
     }
 
     /// (1.2.13) A file of a type the assignment doesn't take: converted to one it does, as the web hand-in does

@@ -104,7 +104,10 @@
 
   async function snapshot() {
     const [me, notifs, unread, done] = await Promise.all([store.me().catch(() => null), store.notifUnread().catch(() => null), store.unreadCount().catch(() => null), setupDone()]);
-    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done, lms: BCV.lms?.kind || 'canvas' };
+    // (Mac 1.3.8) the school's logo, as the web's sidebar finds it (app.js schoolLogo): a square mark, or a wide one on its colour
+    const lg = (() => { try { return app()?.schoolLogo?.() || null; } catch { return null; } })();
+    const logo = lg?.url ? { url: absUrl(lg.url), square: !!lg.square, bg: lg.bg || null } : null;
+    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done, lms: BCV.lms?.kind || 'canvas', logo };
   }
 
   // ---- Simpl's own settings, in the app's Settings (1.4.3) ------------------------------------------------------
@@ -1315,7 +1318,9 @@
     const attemptsLeft = !(a.allowed_attempts > 0) || (sub.attempt || 0) < a.allowed_attempts + (sub.extra_attempts || 0);
     const here = types.filter((t) => NATIVE_TYPES.includes(t));
     const locked = !!a.locked_for_user;
-    const closed = a.can_submit === false || (a.lock_at && U.parse(a.lock_at) < new Date());
+    // (closed: past its closing date, or Canvas refusing a hand-in it would take here. Canvas says can_submit: false of every
+    // tool or quiz assignment, whose hand-in is the tool's or the quiz's own, not its form's: that is not closed)
+    const closed = !!(a.lock_at && U.parse(a.lock_at) < new Date()) || (a.can_submit === false && here.length > 0);
     const why = locked ? (textOf(a.lock_explanation || '', 200) || 'This assignment is locked.')
       : sub.excused ? 'You are excused from this assignment.'
       : !attemptsLeft ? 'No attempts left.'

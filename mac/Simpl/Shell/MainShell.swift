@@ -250,6 +250,7 @@ struct Sidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            SchoolHeader() // (1.3.8) the school at the top, as the web's sidebar has it; Dashboard under it
             list
                 .scrollContentBackground(.hidden) // (the sidebar's glass is the column's own)
             AccountBar()

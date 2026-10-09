@@ -152,6 +152,7 @@ function assignmentObj(courseId, row) {
     allowed_extensions: mockConfig.ext?.[id] || extra.ext || [], locked_for_user: extra.lockAt !== undefined && extra.lockAt < 0, lock_explanation: extra.lockAt !== undefined && extra.lockAt < 0 ? `This assignment was locked ${at(extra.lockAt, 23, 59)}.` : undefined, // (POST /__mock/config {"ext": {"4002": ["pdf"]}} narrows an assignment's types for a test; lockAt: a lock date in days, closed once past)
     quiz_access_code: extra.code || null, quiz_ip_filter: extra.ip || null, quiz_lockdown: !!extra.lockdown, quiz_survey: extra.survey || null, quiz_code_hidden: !!extra.codeHidden, // (the mock's own notes: what the quiz built from this is restricted by)
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
+    can_submit: extra.tool ? false : undefined, // (as Canvas says it of a tool's assignment: handed in through the tool, never its form)
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
     // POST /__mock/config {"ltiAttempts": ["4003"]}: a tool assignment handed in twice through the tool (New Quizzes'

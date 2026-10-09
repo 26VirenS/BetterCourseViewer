@@ -27,6 +27,15 @@ struct Snapshot: Codable {
     var setupDone: Bool?
     /// The school's site: "canvas" or "d2l" (Brightspace, 2.99.22).
     var lms: String?
+    /// (Mac 1.3.8) The school's logo, as the web's sidebar shows it.
+    var logo: SchoolLogo?
+}
+
+/// A school's logo: its address, whether it is a square mark (else a wide one, drawn whole on `bg`, the nav's colour).
+struct SchoolLogo: Codable, Hashable {
+    var url: String
+    var square: Bool?
+    var bg: String?
 }
 
 struct WorkRow: Codable, Identifiable, Hashable {

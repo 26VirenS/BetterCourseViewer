@@ -303,6 +303,9 @@ try {
   if (markable) await nc('markDone', { ctx, module: markable.m.id, item: markable.it.id, done: false });
   const asg = await nc('assignments', { ctx });
   check(!asg.error && asg.sections.length > 0 && asg.sections.every((x) => ['Overdue', 'Upcoming', 'Undated', 'Past'].includes(x.title)) && asg.sections.flatMap((x) => x.rows).every((r) => r.status?.word && /\/assignments\/\d+$/.test(r.url)), `assignments by when they are due, each with its status: ${JSON.stringify(asg.sections.map((x) => `${x.title}:${x.rows.length}`))}`);
+  // (Mac 1.3.8) a tool's assignment Canvas says cannot be submitted (can_submit: false, as of every tool's) is not called closed
+  const toolA = await nc('assignment', { course: '104', id: '4003' });
+  check(!toolA.error && !!toolA.toolUrl && toolA.why !== 'This assignment is closed.' && !toolA.canSubmit, `a tool's assignment open in the tool is not "closed": ${JSON.stringify({ why: toolA.why, tool: !!toolA.toolUrl, canSubmit: toolA.canSubmit })}`);
   // (Mac 1.3.7) Previous / Next: an assignment's neighbours in the course's own order, each a name and an assignment's address
   const around = await nc('neighbours', { ctx: 'courses/101', type: 'Assignment', id: '1012' });
   const pageAround = await nc('neighbours', { ctx: 'courses/101', type: 'Page', id: 'nope-no-such-page' });

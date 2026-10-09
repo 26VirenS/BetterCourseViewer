@@ -62,9 +62,11 @@ struct QuizTakePane: View {
         }
         .onChange(of: run.idx) { _, _ in focus = .keys }
         .task {
-            guard QuizClickProbe.target > 0 else { return }
+            guard !QuizClickProbe.target.isEmpty else { return }
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             QuizClickProbe.fire()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            NSLog("SimplQuizClick after: question %d showing", run.idx + 1)
         }
     }
 
@@ -124,6 +126,7 @@ struct QuizTakePane: View {
             .glassButton(prominent: true)
             .disabled(run.moving != nil)
             .help(run.isLast ? "Review your answers (Return)" : "Next question (Return or →)")
+            .background { QuizClickProbe.mark("next") }
         }
     }
 
@@ -398,7 +401,7 @@ private struct QuizChip: View {
         .buttonStyle(QuizTileStyle())
         .disabled(sealed || run.moving != nil) // (the one showing stays a button: a click on it does nothing, and asks nothing)
         .help(tip(sealed: sealed))
-        .background { QuizClickProbe.mark(k) }
+        .background { QuizClickProbe.mark(String(k + 1)) }
         .accessibilityLabel("Question \(k + 1)\(done ? ", answered" : "")\(q.flagged ? ", flagged" : "")\(current ? ", showing" : "")")
     }
 
@@ -480,17 +483,18 @@ private struct QuizTileStyle: ButtonStyle {
     }
 }
 
-/// (the screenshot suite: -SimplQuizClick 4 clicks question 4's tile as a person would — a mouse down and a mouse up put on
-/// the app's queue at the tile's middle in the sheet's window — so the picture shows whether a click lands)
+/// (the screenshot suite: -SimplQuizClick 4 clicks question 4's tile, -SimplQuizClick next the bar's Next, as a person
+/// would — a mouse down and a mouse up put on the app's queue at its middle in the sheet's window — so the picture shows
+/// whether a click lands; what the click finds there is written to the console)
 @MainActor
 enum QuizClickProbe {
-    static let target = UserDefaults.standard.integer(forKey: "SimplQuizClick")
+    static let target = UserDefaults.standard.string(forKey: "SimplQuizClick") ?? ""
     private static var frame: CGRect?
 
-    /// Where the target's tile is, in its window (nothing drawn, and nothing at all unless the suite asked).
+    /// Where the target is, in its window (nothing drawn, and nothing at all unless the suite asked for this one).
     @ViewBuilder
-    static func mark(_ k: Int) -> some View {
-        if target == k + 1 {
+    static func mark(_ id: String) -> some View {
+        if target == id {
             GeometryReader { g in
                 Color.clear
                     .onAppear { frame = g.frame(in: .global) }
@@ -500,12 +504,21 @@ enum QuizClickProbe {
     }
 
     static func fire() {
-        guard target > 0, let r = frame,
+        guard !target.isEmpty, let r = frame,
               let w = NSApp.windows.first(where: { $0.isSheet && $0.isVisible }) ?? NSApp.keyWindow,
-              let content = w.contentView else { return }
+              let content = w.contentView else {
+            NSLog("SimplQuizClick %@: nothing to click (frame %@)", target, String(describing: frame))
+            return
+        }
         NSApp.activate(ignoringOtherApps: true) // (as a person's click finds it: the app in front, the sheet's window key)
         w.makeKey()
         let at = NSPoint(x: r.midX, y: content.bounds.height - r.midY)
+        let hit = content.hitTest(content.convert(at, from: nil))
+        var chain: [String] = []
+        var v: NSView? = hit
+        while let x = v, chain.count < 8 { chain.append(String(describing: type(of: x))); v = x.superview }
+        NSLog("SimplQuizClick %@ at %@ (frame %@): active %d, key %d, sheet %d; hit %@", target, NSStringFromPoint(at), NSStringFromRect(r),
+              NSApp.isActive ? 1 : 0, w.isKeyWindow ? 1 : 0, w.isSheet ? 1 : 0, chain.joined(separator: " < "))
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             if let e = NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                           windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
