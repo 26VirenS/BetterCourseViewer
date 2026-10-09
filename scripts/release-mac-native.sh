@@ -74,10 +74,12 @@ xcodebuild \
   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   ENABLE_HARDENED_RUNTIME=YES \
   ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+  COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf \
   build 2>&1 | tee build-mac-native.log | grep -E "error:|warning: .*mac/Simpl|BUILD (SUCCEEDED|FAILED)" || true
 grep -q "BUILD SUCCEEDED" build-mac-native.log || { grep -E "error:" -B2 -A6 build-mac-native.log | head -200; exit 1; }
 # (CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO: a plain build otherwise asks for the debugger's get-task-allow, which the
-# notary service refuses; the hardened runtime is what notarization needs; both Apple silicon and Intel Macs)
+# notary service refuses; the hardened runtime is what notarization needs; both Apple silicon and Intel Macs; no index
+# and no dSYM, which nothing here keeps — 1.3.1, quicker)
 APP="build/mac-native/Build/Products/Release/Simpl.app"
 [[ -d "$APP" ]] || { echo "The app was not built at $APP" >&2; exit 1; }
 codesign --verify --deep --strict --verbose=2 "$APP"

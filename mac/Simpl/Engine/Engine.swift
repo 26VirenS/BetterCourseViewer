@@ -413,6 +413,8 @@ final class Engine: ObservableObject, ShellListener {
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready (a page load
     /// under way), and tries once more if the page went away mid-call.
     func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async throws -> T {
+        Shot.began() // (the screenshot suite's picture waits for the page's answers: Support/Shot.swift)
+        defer { Shot.ended() }
         var lastError: Error = EngineError.notReady(lmsName)
         for attempt in 0..<3 {
             await whenReady()

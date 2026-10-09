@@ -3,8 +3,8 @@
 # sections, an assignment, Hand In, a discussion, the Inbox, a quiz, a tool's window, the setup and Settings — in
 # light and in dark; then against the mock Brightspace (2.99.22), its own: the Dashboard, a course, its work, an
 # assignment, its grades, its content, a discussion. Run by .github/workflows/mac.yml once the app is built and the
-# mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860 (mock-brightspace.mjs 8860 --open). Pictures in ./shots: <name>.png from screencapture (the screen as
-# shown) and <name>-app.png from inside the app (Shot.swift), in case the runner may not record the screen.
+# mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860 (mock-brightspace.mjs 8860 --open).
+# Pictures in ./shots: <name>-app.png, taken from inside the app of its own windows (Shot.swift).
 set -u
 OUT="${OUT:-shots}"
 APP="${APP:-build/Build/Products/Debug/Simpl.app}"
@@ -15,38 +15,60 @@ OUT_ABS="$(cd "$OUT" && pwd)"
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
 defaults write com.simplcourses.mac ApplePersistenceIgnoreState -bool YES >/dev/null 2>&1 || true
 
+# (1.3.1) Several copies of the app at once (JOBS, 4 by default), each with a home of its own (CFFIXED_USER_HOME: its
+# settings, its caches and its web storage apart from the others'), each picture taken from inside its app of its own
+# windows only (Shot.swift) as soon as the app has settled — no answers asked for in a moment — the <wait> being now
+# only the longest it waits. A picture of a web page loading (a school's sign-in, a tool's window, Quick Look) waits
+# the whole <wait> (-SimplShotSettle NO).
+JOBS="${JOBS:-4}"
+HOMES="$(mktemp -d /tmp/simpl-shots.XXXXXX)"
+for i in $(seq 1 "$JOBS"); do mkdir -p "$HOMES/home$i/Library/Preferences"; done
+
+# a free worker's number (its lock taken), waiting for one while all are busy
+take_slot() {
+  while true; do
+    for i in $(seq 1 "$JOBS"); do
+      if mkdir "$HOMES/lock$i" 2>/dev/null; then echo "$i"; return; fi
+    done
+    sleep 0.2
+  done
+}
+
 # shoot <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it: -SimplDemo),
-# pictured <wait> seconds after it starts (SIZE=900x820 shoot …: a window of another size)
+# pictured once it has settled, <wait> seconds at most (SIZE=900x820 shoot …: a window of another size). It runs in the
+# background on a free worker; `wait` at the end gathers them.
 shoot() {
   local name="$1" wait="$2"
   shift 2
-  pkill -x Simpl >/dev/null 2>&1 || true
-  sleep 0.6
-  rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
-  "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
-    -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplWindowSize "${SIZE:-1280x820}" \
-    -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
-  local pid=$!
-  local i=0
-  while [ ! -f "$OUT_ABS/$name.rect" ] && [ $i -lt $(( (wait + 25) * 4 )) ]; do
-    sleep 0.25
-    i=$((i + 1))
-  done
-  if [ -f "$OUT_ABS/$name.rect" ]; then
-    screencapture -x -R"$(cat "$OUT_ABS/$name.rect")" "$OUT_ABS/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no screencapture $name"
-  else
-    echo "no picture $name (the app did not get there)"
-  fi
-  kill "$pid" >/dev/null 2>&1 || true
-  sleep 0.4
-  kill -9 "$pid" >/dev/null 2>&1 || true
-  # (a console with nothing worth keeping is dropped)
-  [ -s "$OUT_ABS/console-$name.txt" ] || rm -f "$OUT_ABS/console-$name.txt"
+  local slot
+  slot="$(take_slot)"
+  local settle=YES
+  case " $* " in *PickerConfirm*|*" tool:"*|*" file:"*) settle=NO ;; esac
+  (
+    rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
+    CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
+      -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplShotSettle "$settle" -SimplWindowSize "${SIZE:-1280x820}" \
+      -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
+    local pid=$!
+    local i=0
+    while [ ! -f "$OUT_ABS/$name.rect" ] && [ $i -lt $(( (wait + 25) * 4 )) ] && kill -0 "$pid" 2>/dev/null; do
+      sleep 0.25
+      i=$((i + 1))
+    done
+    if [ -f "$OUT_ABS/$name-app.png" ]; then echo "shot $name ($((i / 4))s)"; else echo "no picture $name (the app did not get there)"; fi
+    kill "$pid" >/dev/null 2>&1 || true
+    sleep 0.3
+    kill -9 "$pid" >/dev/null 2>&1 || true
+    # (a console with nothing worth keeping is dropped)
+    [ -s "$OUT_ABS/console-$name.txt" ] || rm -f "$OUT_ABS/console-$name.txt"
+    rmdir "$HOMES/lock$slot"
+  ) &
 }
 
-# a first launch to warm WebKit and the mock (the first start is slow), not pictured
-MODE=light shoot warmup 25
-rm -f "$OUT_ABS"/warmup*
+# a first launch in each worker's home to warm WebKit and the mock (the first start is slow), not pictured
+for i in $(seq 1 "$JOBS"); do MODE=light shoot "warmup$i" 20; done
+wait
+rm -f "$OUT_ABS"/warmup* "$OUT_ABS"/console-warmup*
 
 # the app's crash reports, kept with the pictures (a missing picture is an app that did not stay up: these say why)
 keep_crashes() {
@@ -92,6 +114,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-01-dashboard 12
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
+  wait
   keep_crashes
   exit 0
 fi
@@ -165,8 +188,10 @@ shoot d2l-06-content 12 -SimplPlace section:courses/31001:modules
 shoot d2l-07-discussion 14 -SimplPlace course:31001 -SimplPush /courses/31001/discussion_topics/2000000902
 shoot d2l-08-todo 12 -SimplPlace todo
 unset BASE
+wait # (the rest alone: a running focus timer is kept)
 # (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
 shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
 shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
+wait
 keep_crashes
 exit 0
