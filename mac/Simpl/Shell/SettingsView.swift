@@ -304,6 +304,22 @@ private struct AppearancePane: View {
     private let columns = [GridItem(.adaptive(minimum: 132, maximum: 160), spacing: 14)]
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+                .onAppear {
+                    // (the screenshot suite: the picker open, or a place's photo, brought into view)
+                    let d = UserDefaults.standard
+                    if d.bool(forKey: "SimplPickerOpen") {
+                        proxy.scrollTo("colour", anchor: .top)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { picking = true }
+                    } else if d.string(forKey: "SimplPhotoSlot") != nil {
+                        proxy.scrollTo("photos", anchor: .top)
+                    }
+                }
+        }
+    }
+
+    private var form: some View {
         Pane {
             Section {
                 Picker("Appearance", selection: $look) {
@@ -323,6 +339,7 @@ private struct AppearancePane: View {
             Section {
                 HStack(spacing: 8) {
                     dot(nil, Color(nsColor: .controlAccentColor), "Regular")
+                        .id("colour")
                     ForEach(AppearanceStore.colours) { c in dot(c.hex, Color(hex: c.hex), c.name) }
                     customDot
                     Spacer(minLength: 0)
@@ -336,6 +353,7 @@ private struct AppearancePane: View {
             }
             Section("Photos") {
                 HStack(alignment: .top, spacing: 12) {
+                    Color.clear.frame(width: 0, height: 0).id("photos")
                     Button { slot = .side } label: { PhotoSlotThumb(slot: .side, picked: slot == .side) }
                         .buttonStyle(.plain)
                     LazyVGrid(columns: [GridItem(.fixed(78)), GridItem(.fixed(78)), GridItem(.fixed(78))], alignment: .leading, spacing: 8) {
@@ -349,7 +367,6 @@ private struct AppearancePane: View {
                     .padding(.vertical, 4)
             }
         }
-        .onAppear { if UserDefaults.standard.bool(forKey: "SimplPickerOpen") { picking = true } }
     }
 
     private func tile(_ r: AppearanceStore.Ready) -> some View {

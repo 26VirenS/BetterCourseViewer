@@ -2,8 +2,8 @@
 # main screens pictured (scripts/dev/mac-shots.sh), the pictures, the build's errors and the app itself pushed to the
 # mac-shots branch to be looked at. Nothing is published here. A push takes the quick set (a dozen pictures, a few
 # minutes) and a newer push cancels the run before it; every screen in light and dark ("full") is taken when a commit's
-# message says [full shots], or by hand: Actions → Mac app → Run workflow → full. (1.3.1: built without an index, in
-# one module; the pictures taken by four copies of the app at once, each as soon as it has settled — mac-shots.sh.)
+# message says [full shots], or by hand: Actions → Mac app → Run workflow → full. (1.3.1: built without an index; the
+# pictures taken by four copies of the app at once, each as soon as it has settled — mac-shots.sh.)
 name: Mac app
 
 on:
@@ -57,10 +57,11 @@ jobs:
           mkdir -p shots
           xcodebuild -project mac/Simpl.xcodeproj -scheme Simpl -configuration Debug -destination 'platform=macOS' \
             -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
-            COMPILER_INDEX_STORE_ENABLE=NO SWIFT_COMPILATION_MODE=wholemodule ONLY_ACTIVE_ARCH=YES build 2>&1 \
+            COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=YES -showBuildTimingSummary build 2>&1 \
             | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
           grep -E "error:" -B2 -A8 build.log | head -600 > shots/build-errors.txt || true
           grep -E "warning:.*mac/Simpl/" build.log | sort -u | head -300 > shots/build-warnings.txt || true
+          sed -n '/Build Timing Summary/,$p' build.log | head -80 > shots/build-timing.txt || true
           grep -q "BUILD SUCCEEDED" build.log || { echo "build failed" > shots/FAILED; cat shots/build-errors.txt | head -300; }
       - name: Mock Canvas
         if: hashFiles('shots/FAILED') == ''
