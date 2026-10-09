@@ -457,6 +457,9 @@
       return U.el('bcv-stats', cards);
     }
     let statIndex = 0;
+    // (2.99.29) the Mac's shorter words, worn by a wide Dashboard's square counters (app.css), the full ones read aloud
+    const STAT_SHORT = { 'Due tomorrow': 'Tomorrow', 'Unread announcements': 'Unread', 'Graded this week': 'Graded' };
+    const shortLabel = (el, lbl) => { if (STAT_SHORT[lbl]) el.dataset.short = STAT_SHORT[lbl]; return el; };
     // each counter's slot for the theme's photo (lib/theme.js CARD_SLOTS): sharp at its bottom-right corner, blurred by a curve from there (app.css)
     const STAT_SLOT = { 'Due today': 'today', 'Next 7 days': 'week', 'Unread announcements': 'unread', Overdue: 'overdue', 'Due tomorrow': 'tomorrow', 'Graded this week': 'graded' };
     function stat(lbl, value, note, icon, color, onOpen) {
@@ -468,7 +471,7 @@
       // the label and the number share the top row (the number on the right, large); the note and the chevron sit below
       const btn = h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''} ${pic?.ink ? 'has-ink' : ''} ${pic?.scene ? 'is-scene' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { ...(pic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(pic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(pic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(pic.sharp) }), '--bcv-veil': BCV.theme.veilBase(app.state?.settings?.appearance?.theme?.accent || '', app.state?.themeImages?.tones?.[slot], 0.4), ...BCV.theme.placeVars(BCV.theme.placeOf(app.state?.themeImages, slot)) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
         ...(pic ? [h('span', { class: 'bcv-stat__pic', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--blur', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--veil', 'aria-hidden': 'true' })] : []),
-        U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
+        U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), shortLabel(U.text('bcv-label bcv-label--inline', lbl, 'span'), lbl), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
       ]);
       // (2.98.97) a moment's rest on a counter opens its box too, as a press does (U.hoverOpens: a mouse only, never while

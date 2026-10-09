@@ -684,6 +684,27 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-stat__noterow { margin-top: 10px; display: flex; align-items: center; gap: 6px; }
 .bcv-stat__note { flex: 1; min-width: 0; font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcv-stat__chev { flex: none; opacity: .7; }
+/* (2.99.29) A wide Dashboard's counters as the Mac draws them: six square cards in a row, the label over a large number
+   and its line under that, in the Mac's order (Due today, Tomorrow, Next 7 days, Overdue, Unread, Graded) and with its
+   shorter words. A narrower column keeps the three-across grid above. */
+@container bcv-main (min-width: 860px) {
+  .bcv-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  .bcv-stats > .bcv-stat { display: flex; flex-direction: column; aspect-ratio: 4 / 3; min-height: 116px; padding: 13px 13px 12px; }
+  .bcv-stats .bcv-stat__head { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 6px; row-gap: 6px; min-height: 0; }
+  .bcv-stats .bcv-stat__head .bcv-label { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bcv-stats .bcv-stat__head .bcv-label[data-short] { font-size: 0; }
+  .bcv-stats .bcv-stat__head .bcv-label[data-short]::after { content: attr(data-short); font-size: 13px; }
+  .bcv-stats .bcv-stat__value { grid-column: 1 / -1; min-width: 0; text-align: left; font-size: 38px; }
+  .bcv-stats .bcv-stat__noterow { margin-top: auto; padding-top: 4px; } /* (at the card's foot: every number at the same height, however many lines its note takes) */
+  .bcv-stats .bcv-stat__note { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #bcv-app .bcv-stats .bcv-stat__chev { display: none; } /* (the id's own svg rule, matched) */
+  .bcv-stats > .bcv-stat[data-stat="today"] { order: 1; }
+  .bcv-stats > .bcv-stat[data-stat="tomorrow"] { order: 2; }
+  .bcv-stats > .bcv-stat[data-stat="week"] { order: 3; }
+  .bcv-stats > .bcv-stat[data-stat="overdue"] { order: 4; }
+  .bcv-stats > .bcv-stat[data-stat="unread"] { order: 5; }
+  .bcv-stats > .bcv-stat[data-stat="graded"] { order: 6; }
+}
 /* the sheet behind a counter */
 .bcv-sheet-ov { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: var(--bcv-scrim); -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); display: flex; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; outline: none; font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; }
 .bcv-sheet-ov * { box-sizing: border-box; }
