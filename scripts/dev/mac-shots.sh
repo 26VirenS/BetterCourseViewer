@@ -67,7 +67,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-02-courses 10 -SimplPlace courses
   shoot light-04-grades 12 -SimplPlace grades
   shoot light-07-inbox 10 -SimplPlace inbox
-  shoot light-07b-inbox-thread 12 -SimplPlace inbox -SimplOpen conversation:first
+  shoot light-07b-inbox-thread 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot light-10-assignment 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
   shoot light-10b-grades-assignment 12 -SimplPlace grades -SimplPush /courses/101/assignments/1001
   shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric
@@ -113,7 +113,7 @@ for MODE in light dark; do
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
   shoot "$MODE-01d-dashboard-counter" 16 -SimplSheet next
-  shoot "$MODE-07b-inbox-thread" 14 -SimplPlace inbox -SimplOpen conversation:first
+  shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
 done

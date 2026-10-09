@@ -1345,27 +1345,33 @@ private struct BarNote: View {
     let maxHeight: CGFloat
 
     var body: some View {
+        // (1.2.3: the box is as tall as its words — at most `maxHeight`, then they scroll — and sits at the bottom of its
+        // room, so a short note never reaches up into the lowest level)
+        ViewThatFits(in: .vertical) {
+            box(words)
+            box(ScrollView { words })
+        }
+        .frame(maxHeight: maxHeight, alignment: .bottom)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Comment: \(text)")
+    }
+
+    private func box(_ content: some View) -> some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: "text.bubble.fill")
                 .font(.sCallout)
                 .foregroundStyle(Color.white.opacity(0.6))
                 .padding(.top, 2)
                 .accessibilityHidden(true)
-            ViewThatFits(in: .vertical) {
-                words
-                ScrollView { words }
-            }
+            content
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .frame(maxHeight: maxHeight)
         .background(Color(red: 24 / 255, green: 24 / 255, blue: 27 / 255).opacity(0.88), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Comment: \(text)")
     }
 
     private var words: some View {

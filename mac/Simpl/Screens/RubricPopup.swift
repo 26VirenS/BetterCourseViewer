@@ -2,8 +2,8 @@ import SwiftUI
 
 // The rubric ring over the window (1.2.3): the web's rubric-ring.js overlay on the Mac. An assignment's page shows its
 // rubric as one row (RubricSummaryRow) and the grade card's rubric button; either brings the ring up over the whole
-// window — sidebar and all — with nothing round it: the window behind dims and blurs, a little right behind the ring
-// and more around it. The ring blooms in and, marked, bends to its marks; a slice, its label or Return opens a
+// window — sidebar and all — with nothing round it: the window behind dims and blurs, so nothing of it
+// reads through. The ring blooms in and, marked, bends to its marks; a slice, its label or Return opens a
 // criterion into its bar (RubricStage.swift); the little ring on the bar, Escape or a press beside it rolls the bar back
 // up; Escape or a press beside the ring (or ×) closes it. Ring or Grid at the top right (RubricPanels.swift).
 
@@ -386,8 +386,8 @@ struct RubricPopupView: View {
     }
 }
 
-/// The window behind the ring, brought out of focus: a little blur everywhere, much more away from the ring (none
-/// right behind it), and a dim deepening towards the edges — a little deeper over a light window.
+/// The window behind the ring, brought out of focus: a thick blur everywhere and a dim deepening towards the edges
+/// — a little deeper over a light window.
 private struct RubricVeils: View {
     let fit: RingFit
     /// How far the veils reach up past the content's top (under the toolbar).
@@ -398,20 +398,12 @@ private struct RubricVeils: View {
         GeometryReader { g in
             let c = CGPoint(x: fit.centre.x, y: fit.centre.y + lift)
             ZStack {
+                // (1.2.3: the page behind is never read through the ring — a thick blur everywhere, and a dim that is
+                // deep enough at the centre for the score and the levels to stand alone)
                 Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.55)
-                Rectangle()
-                    .fill(.regularMaterial)
-                    .mask {
-                        RubricVeils.ellipse([Gradient.Stop(color: .clear, location: 0),
-                                             Gradient.Stop(color: .clear, location: 0.58),
-                                             Gradient.Stop(color: Color.black.opacity(0.7), location: 0.82),
-                                             Gradient.Stop(color: .black, location: 1)],
-                                            at: c, rx: fit.width * 0.6, ry: fit.height * 0.62, cover: g.size)
-                    }
-                RubricVeils.ellipse([Gradient.Stop(color: Color.black.opacity(light ? 0.46 : 0.38), location: 0.5),
-                                     Gradient.Stop(color: Color.black.opacity(light ? 0.7 : 0.64), location: 1)],
+                    .fill(.ultraThickMaterial)
+                RubricVeils.ellipse([Gradient.Stop(color: Color.black.opacity(light ? 0.66 : 0.58), location: 0.4),
+                                     Gradient.Stop(color: Color.black.opacity(light ? 0.82 : 0.78), location: 1)],
                                     at: c, rx: fit.width * 0.66, ry: fit.height * 0.7, cover: g.size)
             }
             .frame(width: g.size.width, height: g.size.height)
