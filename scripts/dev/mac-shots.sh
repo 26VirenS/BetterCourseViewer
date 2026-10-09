@@ -104,6 +104,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   # (1.3) themes, To Do's fixed side column, a narrow window, the setup's nicknames
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
+  shoot light-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
   shoot light-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot light-03-todo 12 -SimplPlace todo
@@ -115,6 +116,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   MODE=dark
   shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
+  shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1

@@ -143,6 +143,12 @@ final class AppearanceStore: ObservableObject {
                 photos = Dictionary(uniqueKeysWithValues: kept.compactMap { k, v in PhotoSlot(rawValue: k).map { ($0, v) } })
             }
         }
+        // (the screenshot suite: -SimplThemePhoto <file> puts that picture, inked, in every place for that run, nothing kept)
+        if let path = d.string(forKey: "SimplThemePhoto"), let raw = NSImage(contentsOfFile: path),
+           let mask = Self.inkMask(raw), let ink = NSImage(data: mask) {
+            images["shot" + Self.inkSuffix] = ink
+            photos = Dictionary(uniqueKeysWithValues: PhotoSlot.allCases.map { ($0, SlotPhoto(source: .upload("shot"), place: $0.defaultPlace)) })
+        }
         Self.accentNow = accentHex.map { NSColor(Color(hex: $0)) }
     }
 
@@ -223,35 +229,53 @@ final class AppearanceStore: ObservableObject {
     @discardableResult
     func take(_ url: URL, into slot: PhotoSlot) -> Bool {
         guard let image = NSImage(contentsOf: url), let name = Self.keep(image) else { return false }
+        if let mask = Self.inkMask(image) { try? mask.write(to: Self.folder.appendingPathComponent(name + Self.inkSuffix), options: .atomic) }
         photos[slot] = SlotPhoto(source: .upload(name), place: slot.defaultPlace)
         savePhotos()
         return true
     }
 
-    /// The picture a photo shows, and whether it is a drawn scene's ink (to be coloured) or a photo as it is.
-    func image(_ photo: SlotPhoto, in slot: PhotoSlot) -> (image: NSImage, ink: Bool)? {
+    /// What a photo's ink is coloured in: a drawn scene in the accent (lib/theme.js SCENE_INK), a photo of the student's
+    /// in the ground lifted a shade (INK_LIFT) — tone on tone, close to what it sits on.
+    enum InkKind { case scene, photo }
+
+    /// The ink a photo shows (a mask: white where the ink goes): a drawn scene's from the asset catalogue, a photo's made
+    /// from it as the web makes it (`inkMask`), kept beside it.
+    func image(_ photo: SlotPhoto, in slot: PhotoSlot) -> (image: NSImage, kind: InkKind)? {
         switch photo.source {
         case .scene(let name):
             let id = "Theme\(name)\(slot.isSide ? "Side" : "Card\(slot.variation)")"
-            if let i = images[id] { return (i, true) }
+            if let i = images[id] { return (i, .scene) }
             guard let i = NSImage(named: id) else { return nil }
             images[id] = i
-            return (i, true)
+            return (i, .scene)
         case .upload(let file):
-            if let i = images[file] { return (i, false) }
-            guard let i = NSImage(contentsOf: Self.folder.appendingPathComponent(file)) else { return nil }
-            images[file] = i
-            return (i, false)
+            let inkFile = file + Self.inkSuffix
+            if let i = images[inkFile] { return (i, .photo) }
+            let inkURL = Self.folder.appendingPathComponent(inkFile)
+            // (a photo kept before 1.3.3 was kept as it is: inked now, once)
+            if !FileManager.default.fileExists(atPath: inkURL.path),
+               let raw = NSImage(contentsOf: Self.folder.appendingPathComponent(file)),
+               let mask = Self.inkMask(raw) {
+                try? mask.write(to: inkURL, options: .atomic)
+            }
+            guard let i = NSImage(contentsOf: inkURL) else { return nil }
+            images[inkFile] = i
+            return (i, .photo)
         }
     }
 
+    private static let inkSuffix = ".ink.png"
+
     private func savePhotos() {
-        guard UserDefaults.standard.string(forKey: "SimplTheme") == nil else { return } // (a screenshot's theme is not kept)
+        // (a screenshot's theme is not kept)
+        guard UserDefaults.standard.string(forKey: "SimplTheme") == nil, UserDefaults.standard.string(forKey: "SimplThemePhoto") == nil else { return }
         let kept = Dictionary(uniqueKeysWithValues: photos.map { ($0.key.rawValue, $0.value) })
         if let data = try? JSONEncoder().encode(kept) { UserDefaults.standard.set(data, forKey: Self.photosKey) }
         // (a photo no place shows any longer is let go)
         let used = Set(photos.values.compactMap { p -> String? in if case .upload(let f) = p.source { return f } else { return nil } })
-        for f in (try? FileManager.default.contentsOfDirectory(atPath: Self.folder.path)) ?? [] where !used.contains(f) {
+        for f in (try? FileManager.default.contentsOfDirectory(atPath: Self.folder.path)) ?? []
+        where !(used.contains(f) || (f.hasSuffix(Self.inkSuffix) && used.contains(String(f.dropLast(Self.inkSuffix.count))))) {
             try? FileManager.default.removeItem(at: Self.folder.appendingPathComponent(f))
             images[f] = nil
         }
@@ -287,6 +311,73 @@ final class AppearanceStore: ObservableObject {
         } catch {
             return nil
         }
+    }
+
+    // MARK: - Ink (lib/theme.js inkOf)
+
+    /// A photo inked down to two tones, as the web inks it: the darkest part of it (below four fifths of Otsu's split)
+    /// and its outlines (Sobel) are the ink, the rest the paper — a PNG mask, white where the ink goes, clear elsewhere,
+    /// which the page colours a shade off what it sits on. Laid out by area (1,000 across for a 16:9 picture).
+    nonisolated static func inkMask(_ image: NSImage, wide: Double = 1000) -> Data? {
+        var rect = NSRect(origin: .zero, size: image.size)
+        guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil), cg.width > 0, cg.height > 0 else { return nil }
+        let ratio = Double(cg.height) / Double(cg.width)
+        let w = max(8, Int((wide * wide * 0.5625 / ratio).squareRoot().rounded()))
+        let h = max(8, Int((Double(w) * ratio).rounded()))
+        let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let src = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        src.interpolationQuality = .high
+        src.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let px = src.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        let n = w * h
+        var lum = [Double](repeating: 0, count: n)
+        for i in 0..<n { lum[i] = 0.2126 * Double(px[i * 4]) + 0.7152 * Double(px[i * 4 + 1]) + 0.0722 * Double(px[i * 4 + 2]) }
+        // a light blur first: grain is not an outline
+        var sm = [Double](repeating: 0, count: n)
+        for y in 0..<h {
+            for x in 0..<w {
+                var a = 0.0
+                for dy in -1...1 { for dx in -1...1 { a += lum[min(h - 1, max(0, y + dy)) * w + min(w - 1, max(0, x + dx))] } }
+                sm[y * w + x] = a / 9
+            }
+        }
+        // Otsu's split: the threshold that keeps the two tones most apart
+        var hist = [Double](repeating: 0, count: 256)
+        for v in sm { hist[min(255, max(0, Int(v.rounded())))] += 1 }
+        var sum = 0.0
+        for t in 0..<256 { sum += Double(t) * hist[t] }
+        var sumB = 0.0, wB = 0.0, best = 0.0, split = 128.0
+        for t in 0..<256 {
+            wB += hist[t]
+            if wB == 0 { continue }
+            let wF = Double(n) - wB
+            if wF == 0 { break }
+            sumB += Double(t) * hist[t]
+            let mB = sumB / wB, mF = (sum - sumB) / wF
+            let v = wB * wF * (mB - mF) * (mB - mF)
+            if v > best { best = v; split = Double(t) }
+        }
+        let deep = split * 0.8 // (the darkest part alone is filled: outlines carry the rest, and the paper stays)
+        guard let out = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let op = out.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        for y in 0..<h {
+            let y0 = max(0, y - 1), y1 = min(h - 1, y + 1)
+            for x in 0..<w {
+                let x0 = max(0, x - 1), x1 = min(w - 1, x + 1)
+                let gx = -sm[y0 * w + x0] - 2 * sm[y * w + x0] - sm[y1 * w + x0] + sm[y0 * w + x1] + 2 * sm[y * w + x1] + sm[y1 * w + x1]
+                let gy = -sm[y0 * w + x0] - 2 * sm[y0 * w + x] - sm[y0 * w + x1] + sm[y1 * w + x0] + 2 * sm[y1 * w + x] + sm[y1 * w + x1]
+                let edge = min(255, max(0, ((gx * gx + gy * gy).squareRoot() - 22) * 3.5))
+                let v = sm[y * w + x]
+                let shape = v < deep ? min(255, (deep - v) * 24) : 0
+                let a = UInt8(max(shape, edge))
+                let o = (y * w + x) * 4
+                op[o] = a; op[o + 1] = a; op[o + 2] = a; op[o + 3] = a // (white, premultiplied by its alpha)
+            }
+        }
+        guard let made = out.makeImage() else { return nil }
+        return NSBitmapImageRep(cgImage: made).representation(using: .png, properties: [:])
     }
 
     // MARK: - Colour arithmetic (lib/theme.js)
@@ -389,6 +480,15 @@ extension Theme {
         }
     }
 
+    /// A photo's ink (lib/theme.js INK_LIFT): the ground it sits on lifted a shade — a touch of white by night, of black
+    /// by day — so the photo reads tone on tone in it.
+    static let photoInk = Color(nsColor: NSColor(name: nil) { appearance in
+        let d = isDark(appearance)
+        let base = d ? darkPage : lightPage
+        let paper = AppearanceStore.accentNow.map { mix(base, $0, d ? 0.1 : 0.12) } ?? base
+        return mix(paper, d ? .white : .black, d ? 0.1 : 0.07)
+    })
+
     /// A drawn scene's ink: the page a third of the way to the accent (lib/theme.js SCENE_INK); Regular, the Mac's own.
     static let ink = Color(nsColor: NSColor(name: nil) { appearance in
         let d = isDark(appearance)
@@ -415,9 +515,9 @@ struct SlotPhotoView: View {
     var body: some View {
         if let photo = store.photos[slot], let pic = store.image(photo, in: slot) {
             GeometryReader { g in
-                PhotoLayer(image: pic.image, ink: pic.ink, place: photo.place, size: g.size)
-                    .blur(radius: frost ? (pic.ink ? 1 : 5) : 0, opaque: true)
-                    .overlay { if frost { Theme.page.opacity(pic.ink ? 0.22 : 0.42) } }
+                PhotoLayer(image: pic.image, kind: pic.kind, place: photo.place, size: g.size)
+                    .blur(radius: frost ? 1 : 0, opaque: true)
+                    .overlay { if frost && pic.kind == .scene { Theme.page.opacity(0.22) } }
                     .frame(width: g.size.width, height: g.size.height)
                     .clipped()
             }
@@ -431,7 +531,7 @@ struct SlotPhotoView: View {
 /// just covers the box. A drawn scene's ink is coloured on its paper.
 struct PhotoLayer: View {
     let image: NSImage
-    let ink: Bool
+    let kind: AppearanceStore.InkKind
     let place: PhotoPlace
     let size: CGSize
 
@@ -442,19 +542,12 @@ struct PhotoLayer: View {
         let ox = place.x / 100 * (size.width - dw), oy = place.y / 100 * (size.height - dh)
         ZStack(alignment: .topLeading) {
             Theme.page
-            if ink {
-                Image(nsImage: image)
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: dw, height: dh)
-                    .offset(x: ox, y: oy)
-            } else {
-                Image(nsImage: image)
-                    .resizable()
-                    .frame(width: dw, height: dh)
-                    .offset(x: ox, y: oy)
-            }
+            Image(nsImage: image)
+                .resizable()
+                .renderingMode(.template)
+                .foregroundStyle(kind == .scene ? Theme.ink : Theme.photoInk)
+                .frame(width: dw, height: dh)
+                .offset(x: ox, y: oy)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipped()
