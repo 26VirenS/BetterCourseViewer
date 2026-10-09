@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The first run: which Canvas to open. The student searches for their school by name — Instructure's listings carried
-/// in the app, and its own "Find my school" lookup for what they lack (SchoolSearch, shared with the iPhone app) — as in
+/// The first run: which Canvas or Brightspace to open. The student searches for their school by name — Instructure's and
+/// (1.2.5) D2L's listings carried in the app, and Instructure's own "Find my school" lookup for what they lack
+/// (SchoolSearch, shared with the iPhone app) — as in
 /// Spotlight: the field keeps the keyboard, ↑ and ↓ move through the schools found, Return opens the one chosen. The
 /// address can still be typed by hand. The sign-in that follows is the school's own page, with the app's own card over
 /// it where the page has a username and password.
@@ -131,7 +132,7 @@ struct SchoolPicker: View {
                     if search.asking && search.results.isEmpty {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("Asking Instructure…").foregroundStyle(.secondary)
+                            Text("Searching…").foregroundStyle(.secondary)
                         }
                         .padding(12)
                     } else if search.results.isEmpty && SchoolSearch.addressLike(query) == nil {

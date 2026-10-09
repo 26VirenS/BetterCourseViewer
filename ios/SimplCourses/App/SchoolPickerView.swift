@@ -1,8 +1,9 @@
 import SwiftUI
 
 #if os(iOS)
-/// First run: which Canvas site to open. (1.6.1) The student searches for their school by name — Instructure's listings,
-/// carried in the app (extension/data/schools.json) so the first letters already find it, and Instructure's own "Find my
+/// First run: which Canvas or Brightspace site to open. (1.6.1) The student searches for their school by name — Instructure's
+/// listings and (Mac 1.2.5) D2L's Brightspace ones, carried in the app (extension/data/schools.json) so the first letters
+/// already find it, and Instructure's own "Find my
 /// school" lookup asked as well when the list carried has few — and presses it; the address can still be typed by hand.
 /// The sign-in that follows is the school's own page, with the app's own form over it where the page has a username and
 /// password.
@@ -46,7 +47,7 @@ struct SchoolPickerView: View {
                             .accessibilityHint("Opens \(s.domain)")
                         }
                         if search.asking {
-                            HStack(spacing: 8) { ProgressView(); Text("Asking Instructure…").foregroundStyle(.secondary) }
+                            HStack(spacing: 8) { ProgressView(); Text("Searching…").foregroundStyle(.secondary) }
                         } else if search.results.isEmpty && SchoolSearch.addressLike(query) == nil {
                             Text("No school by that name. Try another part of its name, or enter its address below.")
                                 .foregroundStyle(.secondary)
@@ -91,7 +92,7 @@ struct SchoolPickerView: View {
 }
 #endif
 
-/// The schools to search: Instructure's listings carried in the app, and its live lookup for what they lack.
+/// The schools to search: Instructure's and D2L's listings carried in the app, and Instructure's live lookup for what they lack.
 @MainActor
 final class SchoolSearch: ObservableObject {
     struct School: Identifiable, Hashable {
