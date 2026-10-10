@@ -376,6 +376,15 @@ struct PreviewCard: View {
                     .font(.sCallout.weight(.semibold))
                     .foregroundStyle(tint)
                     .lineLimit(1)
+                // (1.3.27) Canvas being asked again: a small spinner on this line, not a line of its own — the card no
+                // longer grows and shrinks back as it updates
+                if loading {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .help("Updating from Canvas…")
+                        .accessibilityLabel("Updating")
+                        .transition(.opacity)
+                }
                 Spacer(minLength: 8)
                 // (1.2.15: a close that reads as one — a labelled button, not a faint ×)
                 Button { if inline { WorkPreview.shared.closeInline() } else { WorkPreview.shared.close() } } label: {
@@ -445,12 +454,6 @@ struct PreviewCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 2)
                 .transition(.opacity)
-        } else if loading {
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("Loading…").font(.sCallout).foregroundStyle(.secondary)
-            }
-            .transition(.opacity)
         }
     }
 
