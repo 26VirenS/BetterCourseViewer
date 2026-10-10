@@ -69,7 +69,13 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   in its place, as does Alta's Page in the top bar. (1.3.18) Alta opens on the assignment's overview: the hook reads
   whatever Alta's page reads there (the assignment, its objectives with their estimated questions, found by those fields)
   and the popup shows a start screen — status, due date, the objectives, and Start or Continue, which presses Alta's
-  own — in place of Alta's page; the rail fills from it before the first question. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  own — in place of Alta's page; the rail fills from it before the first question. (1.3.19) A school's Alta can draw
+  its overview without an answer naming the objectives, and its START as a link in a web component: the script runs in
+  every page of the hidden view (Alta's site names are not guessed), finds buttons by their words wherever they are
+  (shadow trees included), and reads the overview from the page's own words when it must (the title, DUE DATE, STATUS,
+  each "Estimated 4 - 9 questions" and the objective under it). *Copy Alta Details* (the popup's More menu) copies what
+  it saw — page addresses without queries, the field names of Alta's answers (never values), the buttons' words — for a
+  school whose Alta still differs. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

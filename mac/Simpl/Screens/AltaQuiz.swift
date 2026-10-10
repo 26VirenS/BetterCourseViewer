@@ -13,6 +13,7 @@ struct AltaQuizScreen: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
+    @State private var copied = false
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -43,6 +44,11 @@ struct AltaQuizScreen: View {
         .background(PageGround())
         .tint(Theme.accent)
         .task { await session.start(engine: engine) }
+        .alert("Alta details copied", isPresented: $copied) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Paste them into a bug report or a message. They hold the addresses of Alta's pages, the names of the fields in its answers and its buttons' words — no answers, nothing of yours.")
+        }
     }
 
     // MARK: The top
@@ -75,6 +81,19 @@ struct AltaQuizScreen: View {
                 .glassButton()
                 .disabled(session.phase == .loading || session.question?.kind == .page)
                 .help(session.showPage ? "Back to the question as Simpl draws it" : "See this step on Alta's own page")
+                Menu {
+                    Button("Copy Alta Details") {
+                        Task {
+                            copyToPasteboard(await session.diagnostics())
+                            copied = true
+                        }
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+                .menuIndicator(.hidden)
+                .glassButton()
+                .help("More")
             }
         }
         .controlSize(.large)
@@ -87,6 +106,8 @@ struct AltaQuizScreen: View {
         var parts = ["Knewton Alta"]
         if let due = session.report?.due ?? session.overview?.due {
             parts.append("Due \(Date(timeIntervalSince1970: due / 1000).formatted(date: .abbreviated, time: .shortened))")
+        } else if let words = session.overview?.dueText, !words.isEmpty {
+            parts.append("Due \(words)")
         }
         if (session.report?.current.source ?? "").uppercased() == "PRACTICE" { parts.append("Practice") }
         return parts.joined(separator: " · ")
@@ -634,7 +655,7 @@ private struct AltaStartCard: View {
         let high = list.compactMap(\.high).reduce(0, +)
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(o?.completed == true ? "Complete" : o?.started == true ? "In progress" : "Not started")
+                Text(o?.statusText ?? (o?.completed == true ? "Complete" : o?.started == true ? "In progress" : "Not started"))
                     .font(.sFootnote.weight(.semibold))
                     .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 10)
@@ -645,6 +666,10 @@ private struct AltaStartCard: View {
                     .tracking(-0.4)
                 if let due = o?.due {
                     Label("Due \(Date(timeIntervalSince1970: due / 1000).formatted(date: .complete, time: .shortened))", systemImage: "calendar")
+                        .font(.sBody)
+                        .foregroundStyle(.secondary)
+                } else if let words = o?.dueText, !words.isEmpty {
+                    Label("Due \(words)", systemImage: "calendar")
                         .font(.sBody)
                         .foregroundStyle(.secondary)
                 }

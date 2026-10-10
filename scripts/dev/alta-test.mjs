@@ -20,17 +20,17 @@ let failed = 0;
 const check = (ok, what) => { console.log(`  ${ok ? '✓' : '✗'} ${what}`); if (!ok) failed++; };
 const SECRETS = ['student-secret-id', 'reg-secret', 'lti-secret', 'school.example', 'correct_answer', 'success_condition', 'valid_response', 'a=3'];
 
-console.log('the Alta popup’s page script, off Alta');
+console.log('the Alta popup’s page script, off the web');
 {
   const posted = [];
   const realFetch = async () => new Response('{}', { headers: { 'content-type': 'application/json' } });
-  const win = { location: { hostname: 'school.instructure.com', pathname: '/courses/1' }, fetch: realFetch, XMLHttpRequest: function () {}, history: {}, addEventListener() {}, webkit: { messageHandlers: { simplAlta: { postMessage: (s) => posted.push(s) } } } };
+  const win = { location: { protocol: 'about:', hostname: '', pathname: 'blank' }, fetch: realFetch, XMLHttpRequest: function () {}, history: {}, addEventListener() {}, webkit: { messageHandlers: { simplAlta: { postMessage: (s) => posted.push(s) } } } };
   win.XMLHttpRequest.prototype = { open() {}, send() {} };
   const open0 = win.XMLHttpRequest.prototype.open;
   win.window = win;
   vm.createContext(win);
   vm.runInContext(source, win);
-  check(posted.length === 0 && win.fetch === realFetch && win.XMLHttpRequest.prototype.open === open0 && !win.__simplAlta, 'on any other site it does nothing: nothing passed, fetch and XHR left as they were');
+  check(posted.length === 0 && win.fetch === realFetch && win.XMLHttpRequest.prototype.open === open0 && !win.__simplAlta, 'on a page that is not a web page (about:blank) it does nothing (it is put only in the popup’s own view, which holds Alta’s launch)');
 }
 
 console.log('\nin Chromium, on the mock’s Alta player');
@@ -48,6 +48,17 @@ try {
   const page = await browser.newPage();
   await page.addInitScript(() => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
   await page.addInitScript({ content: source });
+  // (1.3.19) an overview that names its objectives only in its words, with START a link in a web component
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a2`);
+  await page.waitForTimeout(300);
+  const p2 = await page.evaluate(() => window.__simplAlta.peek());
+  check(p2.start && p2.word === 'START' && p2.overview.name === 'Differentiation Rules 2' && p2.overview.statusText === 'Not started' && p2.overview.dueText === 'Monday, Oct 12 11:59pm PDT',
+    `on an overview drawn in words: Start found inside a web component, and the title, due date and status read (${p2.overview.dueText} · ${p2.overview.statusText})`);
+  check(p2.overview.objectives.length === 2 && p2.overview.objectives[0].name === 'Combine the product and quotient rules' && p2.overview.objectives[0].low === 4 && p2.overview.objectives[0].high === 9 && p2.overview.objectives[1].high === 6,
+    `and its objectives, each under its “Estimated … questions” (${p2.overview.objectives.map((o) => `${o.name} ${o.low}–${o.high}`).join(' · ')})`);
+  const d2 = await page.evaluate(() => window.__simplAlta.diag());
+  check(d2.start === 1 && d2.estimates === 2 && d2.buttons.some((b) => /^a: start$/.test(b)) && !JSON.stringify(d2).includes('lti-secret'), 'Copy Alta Details says what it found: Start, the estimates, the buttons’ words');
+
   // Alta opens on the assignment's overview: its objectives read from whatever Alta's page reads, and Start found
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1`);
   const posts = async () => (await page.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));

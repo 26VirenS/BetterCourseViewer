@@ -25,9 +25,9 @@ enum AltaHook {
     // ALTA-HOOK-BEGIN (scripts/dev/alta-test.mjs reads the script from here)
     static let source = #"""
     (function () {
-      var host = location.hostname || '';
-      var alta = /(^|\.)knewtonalta\.com$/i.test(host) || /(^|\.)knewton\.com$/i.test(host) || location.pathname.indexOf('/mock-alta/') === 0;
-      if (!alta || window.__simplAltaOn) return;
+      // (1.3.19: in every page of the popup's own hidden view, which holds nothing but Alta's launch — Alta's own
+      // site names are not guessed at)
+      if (window.__simplAltaOn || !/^https?:$/.test(location.protocol)) return;
       window.__simplAltaOn = true;
       var post = function (m) { try { window.webkit.messageHandlers.simplAlta.postMessage(JSON.stringify(m)); } catch (e) {} };
       var num = function (v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; };
@@ -107,11 +107,14 @@ enum AltaHook {
         visit(j, 0);
         return out;
       };
+      var jsonSeen = [];
       var looked = function (url, text) {
-        if (/content/i.test(String(url || ''))) return seen(url, text);
         if (typeof text === 'string' && text.length > 3000000) return;
         var j; try { j = typeof text === 'string' ? JSON.parse(text) : text; } catch (e) { return; }
         if (!j || typeof j !== 'object') return;
+        // (for Copy Alta Details: where each answer came from and the names of its fields — never their values)
+        try { jsonSeen.push({ at: new URL(String(url || ''), location.href).pathname.slice(0, 120), keys: Object.keys(j).slice(0, 16) }); if (jsonSeen.length > 40) jsonSeen.shift(); } catch (e) {}
+        if (/content/i.test(String(url || ''))) return seen(url, j);
         var o = scan(j);
         if (o.objectives.length || o.name) post(o);
       };
@@ -161,11 +164,40 @@ enum AltaHook {
         ['input', 'change', 'keyup'].forEach(function (k) { el.dispatchEvent(new Event(k, { bubbles: true })); });
         el.blur();
       };
+      // every element matching, in the page and inside any web component's own (open) tree
+      var deep = function (sel) {
+        var out = [];
+        var walk = function (root) {
+          try {
+            out.push.apply(out, [].slice.call(root.querySelectorAll(sel)));
+            [].slice.call(root.querySelectorAll('*')).forEach(function (el) { if (el.shadowRoot) walk(el.shadowRoot); });
+          } catch (e) {}
+        };
+        walk(document);
+        return out;
+      };
+      var CLICKABLE = 'button, a, [role="button"], input[type="button"], input[type="submit"], [tabindex]';
       var buttons = function (re) {
-        return [].slice.call(document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]')).filter(function (b) {
-          var t = norm(b.innerText || b.value || b.getAttribute('aria-label'));
+        return deep(CLICKABLE).filter(function (b) {
+          var t = norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label'));
           return shown(b) && !b.disabled && b.getAttribute('aria-disabled') !== 'true' && re.test(t);
         });
+      };
+      // (the overview as it reads on the page, when no answer of Alta's named it: its title, DUE DATE, STATUS, and each
+      // "Estimated 4 - 9 questions" with the objective under it)
+      var scrape = function () {
+        var lines = String((document.body && document.body.innerText) || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+        var o = { kind: 'overview', path: location.pathname, name: null, dueText: null, statusText: null, objectives: [] };
+        var h1 = deep('h1')[0];
+        if (h1) o.name = str((h1.innerText || '').trim());
+        lines.forEach(function (l, i) {
+          if (/^due( date)?$/i.test(l)) o.dueText = str(lines.slice(i + 1, i + 3).filter(function (x) { return !/^status$/i.test(x); }).join(' '));
+          if (/^status$/i.test(l)) o.statusText = str(lines[i + 1]);
+          var m = /^estimated\s+(\d+)\s*[-\u2013]\s*(\d+)\s+questions?$/i.exec(l);
+          var name = lines[i + 1];
+          if (m && name && !/^estimated/i.test(name)) o.objectives.push({ id: name, name: str(name), low: +m[1], high: +m[2], topic: str(lines[i - 1]) });
+        });
+        return o;
       };
       var CHECK = /^(check|check answer|check my answer|submit|submit answer)$/;
       var NEXT = /^(next|next question|continue|keep going|next item|try another|try another question|keep practicing|practice more)$/;
@@ -226,7 +258,14 @@ enum AltaHook {
       };
       window.__simplAlta = {
         // the assignment's overview: whether it offers to start (or go on), and pressing that
-        peek: function () { var b = buttons(START)[0]; return { start: !!b, word: b ? (b.innerText || b.value || '').trim() : null }; },
+        peek: function () { var b = buttons(START)[0]; return { start: !!b, word: b ? (b.innerText || b.textContent || b.value || '').trim() : null, overview: scrape() }; },
+        diag: function () {
+          return {
+            at: location.host + location.pathname, top: window.top === window, json: jsonSeen.slice(),
+            buttons: deep(CLICKABLE).filter(shown).slice(0, 50).map(function (b) { return b.tagName.toLowerCase() + ': ' + norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label')).slice(0, 40); }),
+            estimates: scrape().objectives.length, start: buttons(START).length, check: buttons(CHECK).length, next: buttons(NEXT).length
+          };
+        },
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
@@ -323,6 +362,9 @@ struct AltaOverview: Decodable, Equatable {
     struct Objective: Decodable, Equatable { var id: String; var name: String; var low: Double?; var high: Double? }
     var name: String?
     var due: Double?
+    /// (1.3.19) As the page words them, when no answer of Alta's gave them ("Monday, Oct 12 11:59pm PDT", "Not started").
+    var dueText: String?
+    var statusText: String?
     var threshold: Double?
     var percent: Double?
     var status: String?
@@ -382,6 +424,9 @@ final class AltaSession: ObservableObject {
     let launch: AltaLaunch
     let web: WKWebView
     private var frame: WKFrameInfo?
+    /// Every page the hidden view has loaded (Canvas's launch, Alta's pages, any frame in them): asked for Start, and
+    /// for Copy Alta Details.
+    private var frames: [WKFrameInfo] = []
     private var questionKey: String?
     private var names: [String: String] = UserDefaults.standard.dictionary(forKey: AltaSession.namesKey) as? [String: String] ?? [:]
     private static let namesKey = "SimplAltaObjectiveNames"
@@ -448,7 +493,8 @@ final class AltaSession: ObservableObject {
         switch head["kind"] as? String {
         case "page":
             if self.frame == nil { self.frame = frame }
-            if head["assignment"] as? Bool == true { probeStart(frame) }
+            if !frames.contains(where: { $0 === frame }) { frames.append(frame); if frames.count > 12 { frames.removeFirst() } }
+            if phase == .loading || phase == .start { probeStart(frame) }
         case "overview":
             guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
             if self.frame == nil { self.frame = frame }
@@ -495,7 +541,7 @@ final class AltaSession: ObservableObject {
     /// A newer overview kept over the last, its blanks filled from the one before.
     private func merge(_ old: AltaOverview?, _ new: AltaOverview) -> AltaOverview {
         guard let old else { return new }
-        return AltaOverview(name: new.name ?? old.name, due: new.due ?? old.due, threshold: new.threshold ?? old.threshold,
+        return AltaOverview(name: new.name ?? old.name, due: new.due ?? old.due, dueText: new.dueText ?? old.dueText, statusText: new.statusText ?? old.statusText, threshold: new.threshold ?? old.threshold,
                             percent: new.percent ?? old.percent, status: new.status ?? old.status, started: new.started ?? old.started,
                             completed: new.completed ?? old.completed, objectives: new.objectives.isEmpty ? old.objectives : new.objectives)
     }
@@ -508,6 +554,11 @@ final class AltaSession: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
                 guard let self, self.phase == .loading || self.phase == .start else { return }
                 let r = await self.call("return window.__simplAlta ? window.__simplAlta.peek() : null", [:], in: frame) as? [String: Any]
+                // (the overview as the page reads, when Alta's own answers did not name it)
+                if let seen = r?["overview"] as? [String: Any], let data = try? JSONSerialization.data(withJSONObject: seen),
+                   let o = try? JSONDecoder().decode(AltaOverview.self, from: data), !o.objectives.isEmpty || o.name != nil {
+                    withAnimation(Motion.gentle) { self.overview = self.merge(self.overview, o) }
+                }
                 if r?["start"] as? Bool == true {
                     self.watchdog?.cancel()
                     let word = (r?["word"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).capitalized
@@ -521,6 +572,22 @@ final class AltaSession: ObservableObject {
                 }
             }
         }
+    }
+
+    /// (1.3.19) Copy Alta Details: what the page script saw in each page of the hidden view — its address (no query),
+    /// the names of the fields in Alta's answers (never their values), the buttons' words, and which of Start, Check
+    /// and Continue it found — for working out what a school's Alta does differently. Nothing of the student's.
+    func diagnostics() async -> String {
+        var out: [[String: Any]] = [["app": (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?",
+                                     "phase": "\(phase)", "showPage": showPage, "report": report != nil, "overviewObjectives": overview?.objectives.count ?? 0,
+                                     "viewAt": (web.url.map { ($0.host ?? "") + $0.path }) ?? ""]]
+        for f in frames + [nil] {
+            if let d = await run("return window.__simplAlta ? window.__simplAlta.diag() : { script: 'not running', at: location.host + location.pathname }", [:], exactly: f) as? [String: Any] {
+                out.append(d)
+            }
+        }
+        let data = (try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        return String(data: data, encoding: .utf8) ?? ""
     }
 
     /// Start (or Continue): Alta's own button pressed; its first question comes as Alta's page asks for it.
@@ -610,8 +677,12 @@ final class AltaSession: ObservableObject {
     }
 
     private func call(_ js: String, _ args: [String: Any], in at: WKFrameInfo? = nil) async -> Any? {
-        let target = at ?? frame
-        return await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
+        await run(js, args, exactly: at ?? frame)
+    }
+
+    /// The script run in that frame exactly (nil: the main page).
+    private func run(_ js: String, _ args: [String: Any], exactly target: WKFrameInfo?) async -> Any? {
+        await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
             web.callAsyncJavaScript(js, arguments: args, in: target, in: .page) { result in
                 switch result {
                 case .success(let v): go.resume(returning: v)

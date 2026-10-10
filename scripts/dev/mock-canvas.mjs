@@ -1250,6 +1250,13 @@ const server = http.createServer((req, res) => {
         analytics: { percentComplete: 0, statusAndProgress: { status: 'not_started', progress: 0 } },
       }));
     }
+    // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's
+    // naming them), and START a link inside a web component of its own
+    if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/a2$/.test(path)) {
+      altaStep = 0;
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title></head><body><div style="background:#23284a;color:#fff;padding:24px 40px"><h1>Differentiation Rules 2</h1><div>DUE DATE</div><div>Monday, Oct 12</div><div>11:59pm PDT</div><div>STATUS</div><div>Not started</div><alta-start></alta-start></div><main style="padding:20px 40px"><h2>Activity</h2><p>No activity</p><h2>Objectives</h2><div><div>The Product and Quotient Rules</div><div><i>Estimated 4 - 9 questions</i></div><div>Combine the product and quotient rules</div></div><div><div>Derivatives of Trigonometric Functions</div><div><i>Estimated 4 - 6 questions</i></div><div>Find the derivative of a sine or cosine function</div></div></main><script>customElements.define('alta-start', class extends HTMLElement { connectedCallback() { var r = this.attachShadow({ mode: 'open' }); r.innerHTML = '<a href="#" id="go" style="display:inline-block;padding:14px 26px;background:#1b8a9c;color:#fff">START</a>'; r.getElementById('go').onclick = function (e) { e.preventDefault(); location.href = location.pathname.replace(/a2$/, 'a1') + '/practice'; }; } });</script></body></html>`);
+    }
     if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/\w+$/.test(path)) {
       altaStep = 0;
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
