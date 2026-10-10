@@ -169,7 +169,7 @@ try {
     'Alta’s answer box shown alone in the popup’s colours, its own Check moved aside for the popup’s bar');
   check(!(await vis('#report')) && (await left('#instr')) < -5000, 'Alta’s Feedback put away and its More Instruction moved aside for the popup’s bar');
   const s0 = await waitFor((p, k) => k >= n0 && p.kind === 'focus', 'the question found');
-  check(s0.instruct === true, 'the popup is told Alta offers More Instruction');
+  check(s0.instruct === true && s0.lessonToo === false, 'the popup is told Alta offers More Instruction (and that no lesson sits above the question)');
   check((await page.evaluate(() => window.__simplAlta.instruct())).ok, 'the popup’s More Instruction presses Alta’s');
   const d1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.dialog === true, 'Alta’s pop-up');
   check(!!d1 && (await vis('#trouble')) && (await vis('#goback')), 'Alta’s Having trouble? pop-up is shown, and the popup is told (its bar put away under it)');
@@ -196,7 +196,15 @@ try {
   const n4 = (await posts()).length;
   check((await page.evaluate(() => window.__simplAlta.next())).ok, 'the popup’s Continue presses the lesson’s');
   const back = await waitFor((p, k) => k >= n4 && p.kind === 'focus' && p.found && p.hasCheck === true, 'the question again');
-  check(!!back && (await vis('#graph')), 'and the question comes back, with its Check');
+  check(!!back && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('.alta-lesson')), 'and the question comes under the lesson, shown alone with what it asks — the lesson above it hidden');
+  check(back.lessonToo === true, 'the popup is told the lesson is still there (its bar offers View Instruction)');
+  // (1.3.31) View Instruction: the lesson again in the question's place, and back
+  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, view: 'lesson' }));
+  await page.waitForTimeout(300);
+  check((await vis('.alta-lesson')) && !(await vis('#graph')), 'View Instruction shows the lesson again, the question hidden');
+  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, view: 'question' }));
+  await page.waitForTimeout(300);
+  check((await vis('#graph')) && !(await vis('.alta-lesson')), 'Back to Question shows the question again, the lesson hidden');
   // (a button the bar stands for, come inside what is kept — a change the trim otherwise leaves alone — is moved aside)
   await page.evaluate(() => { const b = document.createElement('button'); b.id = 'late'; b.textContent = 'Continue'; document.querySelector('.learnosity-response').appendChild(b); });
   await page.waitForTimeout(1200);

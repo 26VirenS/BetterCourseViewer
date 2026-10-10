@@ -113,7 +113,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   hides a typesetter's own helpers (MathJax 2's `MathJax_Hidden`, `MathJax_Font_Test`: by id or class) or anything
   already invisible — hidden, MathJax could not measure its fonts, waited long and set the maths out wrong; raw maths
   counts MathJax's preview and a busy MathJax queue; the lesson's Continue shows whenever it is on the page, greyed out
-  until Alta's is ready; Copy Alta Details marks greyed-out buttons.
+  until Alta's is ready; Copy Alta Details marks greyed-out buttons. (1.3.31) After a lesson's Continue, Alta puts the
+  question under the lesson on the same page: the popup goes on as soon as the question is there (no wait for a new
+  question from Alta's answers), keeps the question with its own card ("Question…", when its words were not found)
+  and hides the lesson; the bar's View Instruction shows the lesson again in its place and Back to Question the
+  question. Hidden parts are put back only where the page has not changed them since.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 

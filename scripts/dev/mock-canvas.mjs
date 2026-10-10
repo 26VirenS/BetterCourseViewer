@@ -728,8 +728,10 @@ function draw(j) {
     // (View Instruction: a lesson in the question's place — no question in it, only its words and Continue)
     document.getElementById('view').onclick = function () {
       d.remove();
-      document.getElementById('q').innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex"><span class="MathJax_Preview">$$\\\\frac{d}{dx} x^2 = 2x$$</span></p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
-      document.getElementById('lcont').onclick = function () { load(); };
+      // (as Alta does: the lesson above, the question out of sight; on Continue the lesson stays and the question comes under it)
+      var q = document.getElementById('q'), lw = document.createElement('div'); lw.id = 'lessonwrap'; q.parentNode.insertBefore(lw, q); q.style.display = 'none';
+      lw.innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex"><span class="MathJax_Preview">$$\\\\frac{d}{dx} x^2 = 2x$$</span></p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
+      document.getElementById('lcont').onclick = function () { var acts = lw.querySelector('.lesson-actions'); if (acts) acts.remove(); q.style.display = ''; load(); };
       // (its maths typeset a moment later, as MathJax 2 sets it: spans in MathJax's own fonts)
       // (its maths typeset a moment later, as MathJax 2 does: it measures its fonts in hidden helpers of its own in the
       // page first — hidden away by anyone else, it cannot, and sets the maths out wrong)

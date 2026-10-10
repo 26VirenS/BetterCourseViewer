@@ -184,8 +184,15 @@ struct AltaQuizScreen: View {
     private var bar: some View {
         switch session.phase {
         case .answering, .checking:
+            // (1.3.31) the lesson seen again: back to the question
+            if session.altaDrawn && session.lessonView {
+                QuizFloatingBar {
+                    Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward").frame(minWidth: 90) }
+                        .glassButton(prominent: true)
+                        .help("Back to the question")
+                }
             // (1.3.28) a lesson of Alta's: its Continue, back to the question
-            if session.altaLesson {
+            } else if session.altaLesson {
                 QuizFloatingBar {
                     Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
                         .glassButton(prominent: true)
@@ -196,7 +203,11 @@ struct AltaQuizScreen: View {
             // (1.3.23: also under Alta's own answer box, whose Check this presses)
             } else if session.altaDrawn || session.question?.kind != .page {
                 QuizFloatingBar {
-                    if session.altaDrawn && session.altaCanInstruct { instructButton }
+                    if session.altaDrawn && session.altaLessonToo {
+                        Button { session.toggleLesson() } label: { Label("View Instruction", systemImage: "book") }
+                            .glassButton()
+                            .help("See the lesson again")
+                    } else if session.altaDrawn && session.altaCanInstruct { instructButton }
                     Button { session.check() } label: {
                         if session.phase == .checking {
                             ProgressView().controlSize(.small).frame(minWidth: 80)
