@@ -190,7 +190,8 @@ struct AltaQuizScreen: View {
                     Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
                         .glassButton(prominent: true)
                         .keyboardShortcut(.return, modifiers: .command)
-                        .help("Done reading: on with the question")
+                        .disabled(!session.altaCanNext) // (1.3.30: greyed out while Alta's own is — until the lesson is read)
+                        .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
                 }
             // (1.3.23: also under Alta's own answer box, whose Check this presses)
             } else if session.altaDrawn || session.question?.kind != .page {

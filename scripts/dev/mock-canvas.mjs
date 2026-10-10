@@ -728,10 +728,20 @@ function draw(j) {
     // (View Instruction: a lesson in the question's place — no question in it, only its words and Continue)
     document.getElementById('view').onclick = function () {
       d.remove();
-      document.getElementById('q').innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex">$$\\\\frac{d}{dx} x^2 = 2x$$</p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
+      document.getElementById('q').innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex"><span class="MathJax_Preview">$$\\\\frac{d}{dx} x^2 = 2x$$</span></p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
       document.getElementById('lcont').onclick = function () { load(); };
       // (its maths typeset a moment later, as MathJax 2 sets it: spans in MathJax's own fonts)
-      setTimeout(function () { var t = document.querySelector('.tex'); if (t) t.innerHTML = '<span class="mjx-chtml MathJax_CHTML"><span class="mjx-char MJXc-TeX-math-I" style="font-family: serif">x</span></span>'; }, 1500);
+      // (its maths typeset a moment later, as MathJax 2 does: it measures its fonts in hidden helpers of its own in the
+      // page first — hidden away by anyone else, it cannot, and sets the maths out wrong)
+      ['MathJax_Hidden', 'MathJax_Font_Test'].forEach(function (id) { var h = document.createElement('div'); h.id = id; h.textContent = 'MathJax'; h.style.cssText = 'visibility:hidden;position:absolute;top:0;left:0'; document.body.appendChild(h); });
+      window.MathJax = { Hub: { queue: { pending: 1, running: 0 } } };
+      var lc = document.getElementById('lcont'); lc.disabled = true; // (read to the end first)
+      setTimeout(function () { lc.disabled = false; }, 2500);
+      setTimeout(function () {
+        var t = document.querySelector('.tex'), ok = document.getElementById('MathJax_Font_Test').offsetWidth > 0;
+        window.MathJax.Hub.queue.pending = 0;
+        if (t) t.innerHTML = ok ? '<span class="mjx-chtml MathJax_CHTML"><span class="mjx-char MJXc-TeX-math-I" style="font-family: serif">x</span></span>' : '<span class="garbled">garbled</span>';
+      }, 1500);
     };
   };
   document.getElementById('check').onclick = check;

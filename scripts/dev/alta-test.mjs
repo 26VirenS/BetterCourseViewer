@@ -185,8 +185,12 @@ try {
   await page.click('#view');
   const rawSeen = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.raw === true, 'raw maths');
   check(!!rawSeen, 'the lesson’s maths still in its raw words is told (the popup covers it meanwhile)');
+  const greyed = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.nextAny === true && p.next === false, 'a greyed-out Continue');
+  check(!!greyed, 'a lesson’s Continue greyed out until it is read is told (the bar shows Continue, greyed out)');
   const ls = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.found && p.hasCheck === false && p.next === true && p.raw === false, 'the lesson');
-  check(!!ls, 'and told again once it is typeset');
+  check(!!ls, 'and told again once it is typeset and its Continue is ready');
+  check((await page.$('.tex .mjx-chtml')) && !(await page.$('.garbled')) && (await page.$eval('#MathJax_Font_Test', (e) => e.offsetWidth > 0)),
+    'MathJax’s own hidden helpers are left alone, so it measures its fonts and sets the maths out right');
   check(!!ls && (await vis('.alta-lesson')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')) && (await left('#lcont')) < -5000,
     'Alta’s lesson is shown alone (its header, title and objective card hidden, its Feedback put away), its Continue moved aside for the popup’s bar');
   const n4 = (await posts()).length;

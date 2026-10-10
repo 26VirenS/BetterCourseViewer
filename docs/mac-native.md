@@ -109,7 +109,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   fresh trim. (1.3.29) Typeset maths (MathJax 2's `MathJax_CHTML`/`mjx-*`, MathJax 3, KaTeX, MathQuill) is left
   wholly out of the theme's base rule — its own fonts kept, only the text's colour — and maths still in raw TeX in what is
   shown (not MathQuill's hidden copy, MathJax's source or KaTeX's) is covered with "Setting out the maths…" for up to
-  10 s. The bar offers Continue whenever Alta's Continue can be pressed and its Check cannot.
+  10 s. The bar offers Continue whenever Alta's Continue can be pressed and its Check cannot. (1.3.30) The trim never
+  hides a typesetter's own helpers (MathJax 2's `MathJax_Hidden`, `MathJax_Font_Test`: by id or class) or anything
+  already invisible — hidden, MathJax could not measure its fonts, waited long and set the maths out wrong; raw maths
+  counts MathJax's preview and a busy MathJax queue; the lesson's Continue shows whenever it is on the page, greyed out
+  until Alta's is ready; Copy Alta Details marks greyed-out buttons.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 

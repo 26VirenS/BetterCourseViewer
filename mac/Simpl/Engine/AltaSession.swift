@@ -427,6 +427,14 @@ enum AltaHook {
         }
         return null;
       };
+      // (1.3.30) what a page's typesetter keeps out of sight to measure its fonts by (MathJax's MathJax_Hidden,
+      // MathJax_Font_Test…), and anything already invisible: never hidden — hidden, MathJax could not measure, waited
+      // long and set the maths out in the wrong fonts and places
+      var helper = function (el) {
+        var names = (el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '');
+        if (/mathjax|mjx/i.test(names)) return true;
+        try { return getComputedStyle(el).visibility === 'hidden'; } catch (e) { return false; }
+      };
       var keepers = function (iframeToo) {
         var qs = deep(QUESTION).filter(shown);
         if (!qs.length) { var l = lesson(); if (l) qs = [l]; }
@@ -491,7 +499,7 @@ enum AltaHook {
           if (!p || x === document.body || x === document.documentElement) return;
           var kids = (x.parentNode && x.parentNode.host) ? x.parentNode.children : p.children;
           [].forEach.call(kids, function (s) {
-            if (!path.has(s) && !/^(SCRIPT|STYLE|LINK|META|TEMPLATE)$/.test(s.tagName)) want.add(s);
+            if (!path.has(s) && !/^(SCRIPT|STYLE|LINK|META|TEMPLATE)$/.test(s.tagName) && !helper(s)) want.add(s);
           });
         });
         want.forEach(hide);
@@ -507,13 +515,18 @@ enum AltaHook {
       // (1.3.29) raw maths on show: words of TeX in the page's own text, not in a typesetter's keeping (MathQuill's copy
       // of what is typed, MathJax's source, KaTeX's) and not hidden
       var RAWTEX = /\\(begin\{|frac\{|displaystyle|left\(|color\{)/;
+      // (MathJax 2 still at work on the page)
+      var mathjaxBusy = function () {
+        try { var q = window.MathJax && window.MathJax.Hub && window.MathJax.Hub.queue; return !!(q && (q.running || q.pending)); } catch (e) { return false; }
+      };
       var rawIn = function (root) {
+        if (mathjaxBusy()) return true;
         try {
           var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), n, seen = 0;
           while ((n = w.nextNode()) && seen++ < 20000) {
             if (!RAWTEX.test(n.data)) continue;
             var p = n.parentElement;
-            if (!p || p.closest('.mq-math-mode, script, style, textarea, .katex, mjx-container, [class*="mjx" i], [class*="MathJax" i]')) continue;
+            if (!p || p.closest('.mq-math-mode, script, style, textarea, .katex, mjx-container')) continue;
             if (shown(p)) return true;
           }
         } catch (e) {}
@@ -522,7 +535,7 @@ enum AltaHook {
       // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
       var told = '';
       var tell = function (found) {
-        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
+        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, nextAny: controls(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
           dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0,
           // (1.3.29) maths still in its raw words (\\frac{…}, \\begin{align}) in what is shown: its typesetter not done yet
           raw: found && kept.some(rawIn) };
@@ -557,7 +570,7 @@ enum AltaHook {
         diag: function () {
           return {
             at: location.host + location.pathname, top: window.top === window, json: jsonSeen.slice(),
-            buttons: deep(CLICKABLE).filter(shown).slice(0, 50).map(function (b) { return b.tagName.toLowerCase() + ': ' + norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label')).slice(0, 40); }),
+            buttons: deep(CLICKABLE).filter(shown).slice(0, 50).map(function (b) { return b.tagName.toLowerCase() + ': ' + norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label')).slice(0, 40) + (b.disabled || b.getAttribute('aria-disabled') === 'true' ? ' (greyed out)' : ''); }),
             estimates: scrape().objectives.length, start: buttons(START).length, check: buttons(CHECK).length, next: buttons(NEXT).length,
             // (1.3.22) how the page is built round the question — elements and class names only, never words — and
             // what the question shown alone keeps
@@ -764,6 +777,8 @@ final class AltaSession: ObservableObject {
     /// (1.3.28) What Alta's page offers to press: a Check (a question), or only Continue (a lesson).
     @Published private(set) var altaHasCheck = false
     @Published private(set) var altaCanNext = false
+    /// (1.3.30) Alta's Continue is on the page, ready or greyed out (a lesson's, until it is read).
+    @Published private(set) var altaHasNext = false
     /// (1.3.29) The maths on Alta's page is still in its raw words, its typesetter not done: covered meanwhile, for ten
     /// seconds at most.
     @Published private(set) var altaRaw = false
@@ -906,6 +921,7 @@ final class AltaSession: ObservableObject {
                 altaDialog = head["dialog"] as? Bool ?? false
                 altaHasCheck = head["hasCheck"] as? Bool ?? false
                 altaCanNext = head["next"] as? Bool ?? false
+                altaHasNext = head["nextAny"] as? Bool ?? false
                 let raw = head["raw"] as? Bool ?? false
                 if raw && !altaRaw {
                     rawGaveUp = false
@@ -1409,7 +1425,7 @@ final class AltaSession: ObservableObject {
 
     /// (1.3.28) Alta's page shows a lesson: the bar offers Continue. (1.3.29: by what can be pressed — Continue, and no
     /// Check that can be — whatever else is in the page.)
-    var altaLesson: Bool { altaDrawn && altaCanNext && !altaCanCheck }
+    var altaLesson: Bool { altaDrawn && altaHasNext && !altaCanCheck }
 
     /// (1.3.29) The maths being set out: Alta's page covered meanwhile.
     var typesetting: Bool { altaDrawn && altaRaw && !rawGaveUp }
@@ -1460,7 +1476,7 @@ enum AltaTheme {
         let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)" + pad
         // (1.3.29) typeset maths is left wholly as its typesetter sets it — MathJax 2 (its MathJax_CHTML, mjx-chtml, mjx-char
         // spans) and 3 (mjx-container), KaTeX, MathQuill — its own fonts and rules; it only takes the text's colour
-        let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not([class*=\"MathJax\" i]):not([class*=\"MathJax\" i] *):not([class*=\"mjx\" i]):not([class*=\"mjx\" i] *)"
+        let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not([class*=\"MathJax\" i]):not([class*=\"MathJax\" i] *):not([class*=\"mjx\" i]):not([class*=\"mjx\" i] *):not([id*=\"MathJax\" i]):not([id*=\"MathJax\" i] *)"
         return """
         :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); --s-ground: \(ground); }
         html, body { background: transparent !important; color: var(--s-text) !important; }
