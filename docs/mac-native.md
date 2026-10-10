@@ -66,7 +66,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (`AltaHook`, Alta's hosts only) reads a copy of Alta's own `content` answer — never the answer key or who the student
   is — puts the student's answer into Alta's question as a click or typing would, presses Alta's Check and Continue, and
   reads the verdict back. A question the app does not draw (a Desmos graph, a formula, a lesson) shows Alta's own page
-  in its place, as does Alta's Page in the top bar. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  in its place, as does Alta's Page in the top bar. (1.3.18) Alta opens on the assignment's overview: the hook reads
+  whatever Alta's page reads there (the assignment, its objectives with their estimated questions, found by those fields)
+  and the popup shows a start screen — status, due date, the objectives, and Start or Continue, which presses Alta's
+  own — in place of Alta's page; the rail fills from it before the first question. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

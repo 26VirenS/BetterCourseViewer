@@ -21,8 +21,8 @@ PROJ = os.path.join(MAC, 'Simpl.xcodeproj')
 
 NAME = 'Simpl'
 BUNDLE_ID = 'com.simplcourses.mac'
-MARKETING_VERSION = '1.3.17' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
-BUILD = '41' # raised with every release
+MARKETING_VERSION = '1.3.18' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
+BUILD = '42' # raised with every release
 DEPLOYMENT = '14.0'
 
 # The iPhone app's files the Mac app builds too (paths under ios/SimplCourses).

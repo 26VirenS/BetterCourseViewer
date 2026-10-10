@@ -57,7 +57,7 @@ struct AltaQuizScreen: View {
             }
             IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.report?.name ?? session.launch.title)
+                Text(session.report?.name ?? session.overview?.name ?? session.launch.title)
                     .font(.sTitle3)
                     .lineLimit(1)
                 Text(subtitle)
@@ -73,7 +73,7 @@ struct AltaQuizScreen: View {
                     Label(session.showPage ? "Show Question" : "Alta's Page", systemImage: session.showPage ? "list.bullet.rectangle" : "safari")
                 }
                 .glassButton()
-                .disabled(session.report == nil || session.question?.kind == .page)
+                .disabled(session.phase == .loading || session.question?.kind == .page)
                 .help(session.showPage ? "Back to the question as Simpl draws it" : "See this step on Alta's own page")
             }
         }
@@ -85,7 +85,7 @@ struct AltaQuizScreen: View {
 
     private var subtitle: String {
         var parts = ["Knewton Alta"]
-        if let due = session.report?.due {
+        if let due = session.report?.due ?? session.overview?.due {
             parts.append("Due \(Date(timeIntervalSince1970: due / 1000).formatted(date: .abbreviated, time: .shortened))")
         }
         if (session.report?.current.source ?? "").uppercased() == "PRACTICE" { parts.append("Practice") }
@@ -169,6 +169,8 @@ private struct AltaQuestionPane: View {
                 case .failed(let why):
                     ContentUnavailableView("Knewton Alta could not be opened", systemImage: "exclamationmark.triangle", description: Text(why))
                         .frame(maxWidth: .infinity, minHeight: 320)
+                case .start:
+                    AltaStartCard(session: session)
                 case .loading, .moving:
                     if session.report?.completed == true && session.phase == .loading {
                         complete
@@ -483,7 +485,6 @@ private struct AltaRail: View {
                             .font(.sFootnote)
                             .foregroundStyle(.secondary)
                     }
-                    if !r.history.isEmpty { AltaHistoryStrip(steps: r.history) }
                 }
             }
             .padding(.horizontal, 20)
@@ -621,31 +622,77 @@ private struct AltaMasteryBar: View {
     }
 }
 
-/// The last answers, a dot each: right, not right, or a lesson.
-private struct AltaHistoryStrip: View {
-    let steps: [AltaReport.Step]
+/// (1.3.17) The assignment before its first question, as a quiz's intro: whether it is started, when it is due, its
+/// objectives with Alta's estimate of the questions each takes, and Start (or Continue) — Alta's own button, pressed.
+private struct AltaStartCard: View {
+    @ObservedObject var session: AltaSession
 
     var body: some View {
-        let shown = Array(steps.prefix(20))
-        let right = shown.filter { $0.right > 0 && $0.wrong == 0 }.count
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Recent answers · \(right) of \(shown.count) right")
-                .font(.sFootnote)
-                .foregroundStyle(.secondary)
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(10), spacing: 5), count: 10), alignment: .leading, spacing: 5) {
-                ForEach(Array(shown.reversed().enumerated()), id: \.offset) { _, s in
-                    Circle().fill(color(s)).frame(width: 10, height: 10)
+        let o = session.overview
+        let list = o?.objectives ?? []
+        let low = list.compactMap(\.low).reduce(0, +)
+        let high = list.compactMap(\.high).reduce(0, +)
+        VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(o?.completed == true ? "Complete" : o?.started == true ? "In progress" : "Not started")
+                    .font(.sFootnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.accent.opacity(0.14)))
+                Text(o?.name ?? session.launch.title)
+                    .font(.sTitle)
+                    .tracking(-0.4)
+                if let due = o?.due {
+                    Label("Due \(Date(timeIntervalSince1970: due / 1000).formatted(date: .complete, time: .shortened))", systemImage: "calendar")
+                        .font(.sBody)
+                        .foregroundStyle(.secondary)
                 }
             }
+            if !list.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Objectives").font(.sHeadline)
+                        Spacer(minLength: 8)
+                        if high > 0 {
+                            Text(low == high ? "About \(Int(low)) questions in all" : "About \(Int(low))–\(Int(high)) questions in all")
+                                .font(.sFootnote.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.bottom, 12)
+                    ForEach(Array(list.enumerated()), id: \.offset) { k, x in
+                        if k > 0 { Divider().padding(.leading, 40) }
+                        HStack(alignment: .firstTextBaseline, spacing: 14) {
+                            Text("\(k + 1)")
+                                .font(.sCallout.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(Theme.accent)
+                                .frame(width: 26, height: 26)
+                                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent.opacity(0.14)))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(x.name).font(.sBody)
+                                if let l = x.low, let h = x.high, h > 0 {
+                                    Text(l == h ? "About \(Int(l)) questions" : "About \(Int(l))–\(Int(h)) questions")
+                                        .font(.sFootnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 10)
+                    }
+                }
+                .padding(18)
+                .card(radius: 16)
+            }
+            Button { session.begin() } label: {
+                Label(session.startWord, systemImage: "play.fill").frame(minWidth: 140)
+            }
+            .glassButton(prominent: true)
+            .controlSize(.extraLarge)
+            .keyboardShortcut(.defaultAction)
+            .help("Begin with Alta: its first question opens here")
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Recent answers: \(right) of \(shown.count) right")
-    }
-
-    private func color(_ s: AltaReport.Step) -> Color {
-        if s.right > 0 && s.wrong == 0 { return .green }
-        if s.wrong > 0 { return .orange }
-        if s.lessons > 0 { return Theme.accent.opacity(0.5) }
-        return Color.primary.opacity(0.15)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

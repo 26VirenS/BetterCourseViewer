@@ -1104,7 +1104,7 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   const q = url.searchParams;
   const what = q.get('assignment_id') ? `assignment ${q.get('assignment_id')}` : q.get('module_item_id') ? `module item ${q.get('module_item_id')}` : q.get('id') ? `tool ${q.get('id')}` : 'a launch URL';
   // (Mac 1.3.17) Knewton Alta: Unit 2 launches the stand-in for Alta's assignment player
-  if (q.get('assignment_id') === '4003') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1/practice` };
+  if (q.get('assignment_id') === '4003') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1` };
   return { id: q.get('id') || '9', name: 'Resources & Policy', url: `http://localhost:${port}/mock-tool?for=${encodeURIComponent(what)}&course=${m[1]}` };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));
@@ -1236,6 +1236,25 @@ const server = http.createServer((req, res) => {
     if (path === '/mock-alta/api/content') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify(altaContent())); }
     if (path === '/mock-alta/api/next') { altaStep = Math.min(altaStep + 1, ALTA_QUESTIONS.length - 1); res.writeHead(204); return res.end(); }
     if (path === '/mock-alta/api/reset') { altaStep = 0; res.writeHead(204); return res.end(); }
+    // the assignment's overview, where Alta opens: its objectives with their estimates (grouped under topics, as Alta
+    // lists them), when it is due, Not started, and START — read by the page from an answer of its own
+    if (path === '/mock-alta/api/assignment') {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({
+        enrollment: { startedAt: null, completed: false, dueDate: { effectiveDueDate: Date.now() + 2 * 864e5, lateSubmissionEnabled: true }, ltiEnrollment: { resultSourcedId: 'lti-secret' },
+          path: { name: 'Differentiation Rules 2', masteryThreshold: 100, topics: [
+            { name: 'The Product and Quotient Rules', learningObjectives: [{ learningObjectiveId: 'lo1', description: 'Combine the product and quotient rules', estimatedQuestionsLow: 4, estimatedQuestionsHigh: 9 }] },
+            { name: 'Derivatives of Trigonometric Functions', learningObjectives: [{ learningObjectiveId: 'lo2', description: 'Find the derivative of a sine or cosine function', estimatedQuestionsLow: 4, estimatedQuestionsHigh: 6 }] },
+            { name: 'Derivatives of Exponential and Logarithmic Functions with Base e', learningObjectives: [{ learningObjectiveId: 'lo3', description: 'Find the derivative of a natural logarithmic function', estimatedQuestionsLow: 4, estimatedQuestionsHigh: 7 }] },
+          ] } },
+        analytics: { percentComplete: 0, statusAndProgress: { status: 'not_started', progress: 0 } },
+      }));
+    }
+    if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/\w+$/.test(path)) {
+      altaStep = 0;
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}.hero{background:#23284a;color:#fff;padding:24px 40px 40px}.hero h1{font-weight:400}button.start{background:#1b8a9c;color:#fff;border:0;padding:14px 26px;letter-spacing:.1em}</style></head><body><div class="hero"><b>Knewton Alta</b><h1 id="t">…</h1><div>STATUS <span>Not started</span></div><p><button class="start" id="start">START</button> <button>REVIEW INSTRUCTION</button></p></div><main style="padding:20px 40px"><h2>Activity</h2><p>No activity</p><h2>Objectives</h2><div id="objs"></div></main><script>fetch('/mock-alta/api/assignment').then(function(r){return r.json()}).then(function(j){document.getElementById('t').textContent=j.enrollment.path.name;document.getElementById('objs').innerHTML=j.enrollment.path.topics.map(function(t){return '<h3>'+t.name+'</h3>'+t.learningObjectives.map(function(o){return '<p>'+o.description+'</p>'}).join('')}).join('');});document.getElementById('start').onclick=function(){location.href=location.pathname+'/practice';};</script></body></html>`);
+    }
     if (path.startsWith('/mock-alta/')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}#q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn-mcq-option{list-style:none;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}.lrn_correct{outline:3px solid #2e7d32}.lrn_incorrect{outline:3px solid #c62828}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div id="q"></div></main><button id="help">Help</button><script>${ALTA_PLAYER_JS}</script></body></html>`);

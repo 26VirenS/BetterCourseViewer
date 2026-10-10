@@ -83,6 +83,38 @@ enum AltaHook {
         var j; try { j = typeof text === 'string' ? JSON.parse(text) : text; } catch (e) { return; }
         if (j && Array.isArray(j.states) && j.enrollment) post(pick(j));
       };
+      // (the assignment's overview, before it is started or between questions: whatever Alta's page reads that names
+      // the assignment, its objectives with their estimates and the mastery — found by those fields, wherever they sit;
+      // the answer key and the student's identity are passed over, never read)
+      var SKIP = { correct_answer: 1, success_condition: 1, validation: 1, valid_response: 1, ltiEnrollment: 1, userId: 1, registrationId: 1 };
+      var scan = function (j) {
+        var out = { kind: 'overview', path: location.pathname, name: null, due: null, threshold: null, percent: null, status: null, started: null, completed: null, objectives: [] };
+        var had = {};
+        var visit = function (o, depth) {
+          if (!o || typeof o !== 'object' || depth > 7) return;
+          if (Array.isArray(o)) { for (var i = 0; i < o.length && i < 500; i++) visit(o[i], depth + 1); return; }
+          if (typeof o.estimatedQuestionsLow === 'number' || typeof o.estimatedQuestionsHigh === 'number') {
+            var id = str(o.learningObjectiveId || o.loId || o.id), name = str(o.description || o.name || o.title);
+            if (name && !had[id || name]) { had[id || name] = 1; out.objectives.push({ id: id || name, name: name, low: num(o.estimatedQuestionsLow), high: num(o.estimatedQuestionsHigh) }); }
+          }
+          if (o.path && typeof o.path === 'object' && typeof o.path.name === 'string') { out.name = out.name || str(o.path.name); out.threshold = out.threshold || num(o.path.masteryThreshold); }
+          if (o.dueDate && typeof o.dueDate === 'object' && o.dueDate.effectiveDueDate) out.due = out.due || num(o.dueDate.effectiveDueDate);
+          if (typeof o.percentComplete === 'number' && out.percent === null) out.percent = o.percentComplete;
+          if (o.statusAndProgress && typeof o.statusAndProgress === 'object' && !out.status) out.status = str(o.statusAndProgress.status);
+          if (typeof o.completed === 'boolean' && 'startedAt' in o && out.completed === null) { out.completed = o.completed; out.started = !!o.startedAt; }
+          for (var k in o) { if (!SKIP[k] && Object.prototype.hasOwnProperty.call(o, k)) visit(o[k], depth + 1); }
+        };
+        visit(j, 0);
+        return out;
+      };
+      var looked = function (url, text) {
+        if (/content/i.test(String(url || ''))) return seen(url, text);
+        if (typeof text === 'string' && text.length > 3000000) return;
+        var j; try { j = typeof text === 'string' ? JSON.parse(text) : text; } catch (e) { return; }
+        if (!j || typeof j !== 'object') return;
+        var o = scan(j);
+        if (o.objectives.length || o.name) post(o);
+      };
       var fetch0 = window.fetch;
       if (fetch0) {
         window.fetch = function (input) {
@@ -91,7 +123,7 @@ enum AltaHook {
           p.then(function (r) {
             try {
               var at = (r && r.url) || asked;
-              if (r && /json/i.test(r.headers.get('content-type') || '') && /content/i.test(at)) r.clone().text().then(function (t) { seen(at, t); }, function () {});
+              if (r && /json/i.test(r.headers.get('content-type') || '')) r.clone().text().then(function (t) { looked(at, t); }, function () {});
             } catch (e) {}
           }, function () {});
           return p;
@@ -101,11 +133,12 @@ enum AltaHook {
       XMLHttpRequest.prototype.open = function (m, u) { this.__simplUrl = u; return open0.apply(this, arguments); };
       XMLHttpRequest.prototype.send = function () {
         var x = this;
-        if (/content/i.test(String(x.__simplUrl || ''))) {
-          x.addEventListener('load', function () {
-            try { seen(x.responseURL || x.__simplUrl, x.responseType === 'json' ? x.response : (x.responseType === '' || x.responseType === 'text' ? x.responseText : null)); } catch (e) {}
-          });
-        }
+        x.addEventListener('load', function () {
+          try {
+            if (!/json/i.test(x.getResponseHeader('content-type') || '')) return;
+            looked(x.responseURL || x.__simplUrl, x.responseType === 'json' ? x.response : (x.responseType === '' || x.responseType === 'text' ? x.responseText : null));
+          } catch (e) {}
+        });
         return send0.apply(this, arguments);
       };
 
@@ -136,6 +169,7 @@ enum AltaHook {
       };
       var CHECK = /^(check|check answer|check my answer|submit|submit answer)$/;
       var NEXT = /^(next|next question|continue|keep going|next item|try another|try another question|keep practicing|practice more)$/;
+      var START = /^(start|start assignment|continue|continue assignment|resume|keep going|practice|keep practicing|start practicing)$/;
       var answer = function (a) {
         var root = scope(a.responseId), done = 0;
         if (a.type === 'mcq') {
@@ -191,6 +225,9 @@ enum AltaHook {
         }, 300);
       };
       window.__simplAlta = {
+        // the assignment's overview: whether it offers to start (or go on), and pressing that
+        peek: function () { var b = buttons(START)[0]; return { start: !!b, word: b ? (b.innerText || b.value || '').trim() : null }; },
+        begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
         next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
@@ -280,6 +317,20 @@ struct AltaQuestion: Decodable, Equatable {
     var blankCount: Int { (template ?? "").components(separatedBy: "{{response}}").count - 1 }
 }
 
+/// (1.3.17) The assignment's overview, as Alta's page reads it before it is started (or between questions): its name,
+/// when it is due, its objectives with Alta's estimate of the questions each takes, and how far it is mastered.
+struct AltaOverview: Decodable, Equatable {
+    struct Objective: Decodable, Equatable { var id: String; var name: String; var low: Double?; var high: Double? }
+    var name: String?
+    var due: Double?
+    var threshold: Double?
+    var percent: Double?
+    var status: String?
+    var started: Bool?
+    var completed: Bool?
+    var objectives: [Objective]
+}
+
 /// What Alta said of an answer, as its page shows it.
 struct AltaVerdict: Equatable {
     var correct: Bool?
@@ -312,9 +363,13 @@ struct AltaLaunch: Identifiable, Equatable {
 /// One assignment taken in the popup: Alta's page out of sight, what it last said, and the answer being given.
 @MainActor
 final class AltaSession: ObservableObject {
-    enum Phase: Equatable { case loading, answering, checking, feedback, moving, failed(String) }
+    enum Phase: Equatable { case loading, start, answering, checking, feedback, moving, failed(String) }
 
     @Published private(set) var report: AltaReport?
+    /// (1.3.17) The overview Alta opens on: the assignment and its objectives, before a question is asked.
+    @Published private(set) var overview: AltaOverview?
+    /// The word on Alta's own start button (Start, Continue…), for the popup's.
+    @Published private(set) var startWord = "Start"
     @Published private(set) var phase: Phase = .loading
     @Published private(set) var verdict: AltaVerdict?
     /// Alta's own page shown in the question's place: a kind of question the popup does not draw, a lesson, or a step
@@ -391,6 +446,16 @@ final class AltaSession: ObservableObject {
         guard let data = text.data(using: .utf8),
               let head = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         switch head["kind"] as? String {
+        case "page":
+            if self.frame == nil { self.frame = frame }
+            if head["assignment"] as? Bool == true { probeStart(frame) }
+        case "overview":
+            guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
+            if self.frame == nil { self.frame = frame }
+            for x in o.objectives where !x.name.isEmpty && names[x.id] != x.name { names[x.id] = x.name }
+            UserDefaults.standard.set(names, forKey: Self.namesKey)
+            withAnimation(Motion.gentle) { overview = merge(overview, o) }
+            if phase == .loading { probeStart(frame) }
         case "content":
             guard let r = try? JSONDecoder().decode(AltaReport.self, from: data) else { return }
             self.frame = frame
@@ -424,6 +489,47 @@ final class AltaSession: ObservableObject {
             }
         default:
             break
+        }
+    }
+
+    /// A newer overview kept over the last, its blanks filled from the one before.
+    private func merge(_ old: AltaOverview?, _ new: AltaOverview) -> AltaOverview {
+        guard let old else { return new }
+        return AltaOverview(name: new.name ?? old.name, due: new.due ?? old.due, threshold: new.threshold ?? old.threshold,
+                            percent: new.percent ?? old.percent, status: new.status ?? old.status, started: new.started ?? old.started,
+                            completed: new.completed ?? old.completed, objectives: new.objectives.isEmpty ? old.objectives : new.objectives)
+    }
+
+    /// The page is an assignment's overview with Alta's start (or continue) button on it: the popup's start screen,
+    /// asked of the page a moment after it loads, and again in case it draws late.
+    private func probeStart(_ frame: WKFrameInfo) {
+        Task { [weak self] in
+            for wait in [1.2, 3.0, 6.0] {
+                try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                guard let self, self.phase == .loading || self.phase == .start else { return }
+                let r = await self.call("return window.__simplAlta ? window.__simplAlta.peek() : null", [:], in: frame) as? [String: Any]
+                if r?["start"] as? Bool == true {
+                    self.watchdog?.cancel()
+                    let word = (r?["word"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).capitalized
+                    withAnimation(Motion.gentle) {
+                        self.frame = frame
+                        self.startWord = word.isEmpty ? "Start" : word
+                        self.phase = .start
+                        self.showPage = false
+                    }
+                    return
+                }
+            }
+        }
+    }
+
+    /// Start (or Continue): Alta's own button pressed; its first question comes as Alta's page asks for it.
+    func begin() {
+        Task {
+            let pressed = await call("return window.__simplAlta ? window.__simplAlta.begin() : null", [:])
+            guard (pressed as? [String: Any])?["ok"] as? Bool == true else { return fail("Alta's Start button could not be found.") }
+            withAnimation(Motion.gentle) { phase = .moving }
+            watch(seconds: 25)
         }
     }
 
@@ -503,9 +609,10 @@ final class AltaSession: ObservableObject {
         }
     }
 
-    private func call(_ js: String, _ args: [String: Any]) async -> Any? {
-        await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
-            web.callAsyncJavaScript(js, arguments: args, in: frame, in: .page) { result in
+    private func call(_ js: String, _ args: [String: Any], in at: WKFrameInfo? = nil) async -> Any? {
+        let target = at ?? frame
+        return await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
+            web.callAsyncJavaScript(js, arguments: args, in: target, in: .page) { result in
                 switch result {
                 case .success(let v): go.resume(returning: v)
                 case .failure: go.resume(returning: nil)
@@ -519,7 +626,13 @@ final class AltaSession: ObservableObject {
     /// The objectives in Alta's order (the assignment's list, else the progress targets, else the one on screen), each
     /// with its mastery: its target's progress, or full once its status says it is mastered.
     var objectives: [AltaObjective] {
-        guard let r = report else { return [] }
+        guard let r = report else {
+            // (before a question: the overview's objectives, each as mastered as the whole is said to be when it is done)
+            let done = overview?.completed == true
+            return (overview?.objectives ?? []).enumerated().map { k, o in
+                AltaObjective(id: o.id, number: k + 1, name: o.name, mastery: done ? 1 : 0, current: false)
+            }
+        }
         var ids: [String] = r.objectives.compactMap(\.id)
         if ids.isEmpty { ids = r.targets.compactMap(\.id) }
         if ids.isEmpty, let c = r.current.id { ids = [c] }
@@ -536,7 +649,10 @@ final class AltaSession: ObservableObject {
 
     /// The whole assignment's mastery, 0…1.
     var mastery: Double {
-        guard let r = report else { return 0 }
+        guard let r = report else {
+            if overview?.completed == true { return 1 }
+            return min(max((overview?.percent ?? 0) / 100, 0), 1)
+        }
         if r.completed || (r.status ?? "").lowercased() == "complete" { return 1 }
         if let p = r.percent { return min(max(p / 100, 0), 1) }
         if let p = r.progress { return min(max(p, 0), 1) }

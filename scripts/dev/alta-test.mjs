@@ -48,13 +48,22 @@ try {
   const page = await browser.newPage();
   await page.addInitScript(() => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
   await page.addInitScript({ content: source });
-  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1/practice`);
+  // Alta opens on the assignment's overview: its objectives read from whatever Alta's page reads, and Start found
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1`);
   const posts = async () => (await page.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
   const waitFor = async (test, what) => {
     for (let i = 0; i < 60; i++) { const p = (await posts()).filter(test); if (p.length) return p[p.length - 1]; await page.waitForTimeout(100); }
     throw new Error(`no ${what} came`);
   };
   const content = async (type) => waitFor((p) => p.kind === 'content' && p.question?.type === type, `${type} question`);
+
+  const ov = await waitFor((p) => p.kind === 'overview' && p.objectives?.length, 'overview');
+  check(ov.name === 'Differentiation Rules 2' && ov.objectives.length === 3 && ov.objectives[0].id === 'lo1' && ov.objectives[0].name === 'Combine the product and quotient rules' && ov.objectives[0].low === 4 && ov.objectives[0].high === 9 && ov.started === false && ov.percent === 0 && !!ov.due,
+    `the overview: the assignment, its objectives with their estimates, not started, when it is due (${ov.objectives.map((o) => o.name).join(' · ')})`);
+  const peek = await page.evaluate(() => window.__simplAlta.peek());
+  check(peek.start && /start/i.test(peek.word), `Alta’s own Start is found on it (“${peek.word}”)`);
+  check((await page.evaluate(() => window.__simplAlta.begin())).ok, 'and pressed');
+  await page.waitForURL(/\/practice$/);
 
   const c1 = await content('mcq');
   const q1 = c1.question;
