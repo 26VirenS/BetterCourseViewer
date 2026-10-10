@@ -142,6 +142,17 @@ extension Engine {
         return absolute("/\(base)/download?download_frd=1")
     }
 
+    /// (Mac 1.3.12, iPhone 1.7.3) Brightspace's own viewer for a content file it fetches from the topic
+    /// (…/content/7/topics/files/download/9/DirectFileTopicDownload): where it opens when Brightspace will not hand the
+    /// file itself over (a file kept to its viewer, one it cannot find) — the topic as a student sees it there.
+    func schoolViewer(forDownload url: URL) -> URL? {
+        guard onBrightspace else { return nil }
+        let p = url.path.split(separator: "/").map(String.init)
+        guard p.count == 9, p[0] == "d2l", p[1] == "le", p[2] == "content", Engine.numeric(p[3]), p[4] == "topics", p[5] == "files",
+              p[6] == "download", Engine.numeric(p[7]), p[8] == "DirectFileTopicDownload" else { return nil }
+        return absolute("/d2l/le/content/\(p[3])/viewContent/\(p[7])/View")
+    }
+
     /// A hand-in's own address (…/assignments/5/submissions/7): the assignment, opened at its feedback.
     static func isSubmission(_ url: URL) -> Bool {
         let p = url.path.split(separator: "/").map(String.init)

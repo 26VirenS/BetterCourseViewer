@@ -89,7 +89,11 @@ const T = {
     quizzes: [
       { QuizId: 801, Name: 'Midterm Quiz', IsActive: true, DueDate: at(-1, 17, 0), StartDate: at(-3, 8, 0), EndDate: null, GradeItemId: 503, AttemptsAllowed: { IsUnlimited: false, NumberOfAttemptsAllowed: 1 }, SubmissionTimeLimit: { IsEnforced: true, TimeLimitValue: 45 }, Description: { Text: rich('<p>Chapters 1–3.</p>') } },
       { QuizId: 802, Name: 'Chapter 4 Check', IsActive: true, DueDate: at(3, 17, 0), StartDate: null, EndDate: null, GradeItemId: null, AttemptsAllowed: { IsUnlimited: false, NumberOfAttemptsAllowed: 2 }, SubmissionTimeLimit: { IsEnforced: false }, Description: { Text: rich('') } },
+      // (2.99.31) LockDown Browser checks with no grade, both finished: one still open (on the quiz list), one closed (its summary page alone says so)
+      { QuizId: 803, Name: 'LockDown Browser Check', IsActive: true, DueDate: at(-2, 9, 0), StartDate: at(-5, 8, 0), EndDate: at(4, 23, 0), GradeItemId: null, AttemptsAllowed: { IsUnlimited: false, NumberOfAttemptsAllowed: 1 }, SubmissionTimeLimit: { IsEnforced: false }, Description: { Text: rich('') } },
+      { QuizId: 804, Name: 'Proctoring Practice', IsActive: true, DueDate: at(-4, 9, 0), StartDate: at(-9, 8, 0), EndDate: at(-1, 23, 0), GradeItemId: null, AttemptsAllowed: { IsUnlimited: false, NumberOfAttemptsAllowed: 1 }, SubmissionTimeLimit: { IsEnforced: false }, Description: { Text: rich('') } },
     ],
+    taken: { 801: 1, 803: 1, 804: 1 }, // (the student's finished attempts, which Brightspace's quiz pages show and its API does not)
     forums: [{ ForumId: 900, Name: 'Weekly Discussions', Description: rich(''), MustPostToParticipate: false }],
     topics: {
       900: [
@@ -365,7 +369,26 @@ const server = http.createServer((req, res) => {
       if (path === '/d2l/home' || path === '/d2l/home/') return html(res, 200, page('Homepage', null, '<d2l-my-courses></d2l-my-courses><p class="d2l-widget">My Courses</p>'));
       if ((r = path.match(/^\/d2l\/home\/(\d+)\/?$/))) { const c = course(r[1]); return c && !c.closed ? html(res, 200, page(c.name, c.id, '<p class="d2l-widget">Course homepage</p>')) : redirect(res, `/d2l/error/404/log?targetUrl=${encodeURIComponent(path)}`); }
       if (path === '/d2l/lms/dropbox/user/folders_list.d2l') return html(res, 200, page('Assignments', q.get('ou'), `<table id="d2l-folders"><tr><td>${(T[q.get('ou')]?.folders || []).filter((f) => !f.IsHidden).map((f) => esc(f.Name)).join('</td></tr><tr><td>')}</td></tr></table>`));
-      if (path === '/d2l/lms/quizzing/user/quiz_summary.d2l') return html(res, 200, page('Quiz Summary', q.get('ou'), `<p id="d2l-quiz-summary">Summary of quiz ${esc(q.get('qi') || '')}</p><button id="d2l-quiz-start">Start Quiz!</button>`));
+      if (path === '/d2l/lms/quizzing/user/quiz_summary.d2l') {
+        const tq = T[q.get('ou')] || {};
+        const qz = (tq.quizzes || []).find((x) => String(x.QuizId) === q.get('qi'));
+        const allowed = qz?.AttemptsAllowed?.IsUnlimited ? 'Unlimited' : qz?.AttemptsAllowed?.NumberOfAttemptsAllowed ?? 1;
+        return html(res, 200, page('Quiz Summary', q.get('ou'), `<p id="d2l-quiz-summary">Summary of quiz ${esc(q.get('qi') || '')}</p><h3 class="dhdg_2">Attempts</h3><div><label id="z_g">Allowed - ${allowed}, Completed - ${tq.taken?.[q.get('qi')] || 0}</label></div><button id="d2l-quiz-start">Start Quiz!</button>`));
+      }
+      // the quiz list as Brightspace draws it: the quizzes still open, each with its Attempts column (finished / allowed)
+      if (path === '/d2l/lms/quizzing/user/quizzes_list.d2l') {
+        const tq = T[q.get('ou')] || {};
+        const open = (tq.quizzes || []).filter((x) => x.IsActive !== false && !(x.EndDate && Date.parse(x.EndDate) < Date.now()));
+        const rows = open.map((x) => `<tr><td style="width:100%;"><a class="d2l-link" onclick="GoToQuiz(${x.QuizId}, true);;return false;" href="javascript://">${esc(x.Name)}</a></td><td class="d_gn">&nbsp;</td><td class="d_gn d_gc"><label>${tq.taken?.[x.QuizId] || 0}</label><label> / ${x.AttemptsAllowed?.IsUnlimited ? 'Unlimited' : x.AttemptsAllowed?.NumberOfAttemptsAllowed ?? 1}</label></td></tr>`).join('');
+        return html(res, 200, page('Quiz List', q.get('ou'), `<table id="z_b" class="d2l-table d2l-grid"><tr class="d_gh" header><th>Current Quizzes</th><th>Evaluation Status</th><th> Attempts</th></tr>${rows}</table>`));
+      }
+      // a content file as the apps fetch it, from its topic (2.99.31: the mock had none, so it answered 404)
+      if ((r = path.match(/^\/d2l\/le\/content\/(\d+)\/topics\/files\/download\/(\d+)\/DirectFileTopicDownload$/))) {
+        const f = T[r[1]]?.files?.[r[2]];
+        if (!f) return redirect(res, `/d2l/error/404/log?targetUrl=${encodeURIComponent(path)}`);
+        res.writeHead(200, { 'content-type': f.type, 'content-disposition': `attachment; filename="${`topic-${r[2]}.${({ 'application/pdf': 'pdf', 'text/html': 'html' })[f.type] || 'bin'}`}"`, 'cache-control': 'no-store' });
+        return res.end(f.body);
+      }
       if ((r = path.match(/^\/d2l\/le\/content\/(\d+)\/viewContent\/(\d+)\/View$/))) return html(res, 200, page('Content', r[1], `<p id="d2l-content-viewer">Topic ${esc(r[2])}</p>`));
       if ((r = path.match(/^\/d2l\/le\/content\/(\d+)\/fullscreen\/(\d+)\/View$/))) return html(res, 200, `<!DOCTYPE html><html><body><p id="d2l-fullscreen-viewer">Topic ${esc(r[2])}, without the header</p></body></html>`);
       if (path === '/d2l/error/404/log') return html(res, 404, page('Page Not Found', null, `<p id="d2l-404">The page ${esc(q.get('targetUrl') || '')} could not be found.</p>`));

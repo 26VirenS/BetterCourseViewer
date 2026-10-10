@@ -54,6 +54,9 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         var over = false
         /// Why the school would not give it (an error page instead of the file).
         var refused: String?
+        /// (1.3.12) Where to go instead when the school will not give it: the school's own page for it (a Brightspace
+        /// content file its viewer shows but will not hand over), in place of the toast saying it could not be opened.
+        var instead: (() -> Void)?
 
         init(purpose: Purpose, name: String, source: URL?, done: ((Result<URL, Error>) -> Void)?) {
             self.purpose = purpose
@@ -86,7 +89,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     }
 
     /// Fetch the file at `url` for `purpose`; `done` hears where it landed (or why it could not be fetched).
-    func open(_ url: URL, name: String, in webView: WKWebView, for purpose: Purpose, done: ((Result<URL, Error>) -> Void)? = nil) {
+    func open(_ url: URL, name: String, in webView: WKWebView, for purpose: Purpose, done: ((Result<URL, Error>) -> Void)? = nil, instead: (() -> Void)? = nil) {
         onMain {
             if let w = webView.window { self.host = w }
             if let hit = self.cached(url) {
@@ -105,6 +108,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
                 return
             }
             let job = Job(purpose: purpose, name: name, source: url, done: done)
+            job.instead = instead
             if purpose != .quiet { self.follow(job) }
             webView.startDownload(using: URLRequest(url: url)) { [weak self] download in
                 self?.adopt(download, job)
@@ -356,7 +360,8 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             if wasFront { self.follow(nil) }
             if let refused = job.refused {
                 job.done?(.failure(NSError(domain: "Simpl", code: 1, userInfo: [NSLocalizedDescriptionKey: refused])))
-                if wasFront || job.purpose != .quiet { self.failed = "\(job.name) could not be opened. \(refused)" }
+                if let instead = job.instead, !job.cancelled { instead() } // (the school's own page for it, not a toast)
+                else if wasFront || job.purpose != .quiet { self.failed = "\(job.name) could not be opened. \(refused)" }
             } else if job.cancelled || stopped {
                 job.done?(.failure(CancellationError()))
             } else {

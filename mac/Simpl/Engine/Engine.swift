@@ -537,7 +537,11 @@ final class Engine: ObservableObject, ShellListener {
             return
         }
         if let file = fileDownload(for: url) {
-            FilePreview.shared.open(file, name: title.isEmpty ? file.lastPathComponent : title, in: web.webView)
+            let name = title.isEmpty ? file.lastPathComponent : title
+            // (1.3.12) a Brightspace content file Brightspace will not hand over opens in its own viewer instead
+            var instead: (() -> Void)?
+            if let v = schoolViewer(forDownload: file) { instead = { [weak self] in self?.openWebScreen(v.absoluteString, title: name) } }
+            FilePreview.shared.open(file, name: name, in: web.webView, for: .look, instead: instead)
             return
         }
         if let route = nativeRoute(for: url, title: title) {

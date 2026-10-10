@@ -14,12 +14,17 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
     private var destination: URL?
     private var file: URL?
     private var name = "File"
+    /// (1.7.3) Where to go instead when the school will not give the file (a Brightspace content file its viewer shows but
+    /// will not hand over): its own page for it, once this sheet is down. And the error it answered with, once it has.
+    private var instead: (() -> Void)?
+    private var refusedCode: Int?
 
     private var folder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("SimplFiles", isDirectory: true) }
 
     /// Open the file at `url` (a Canvas download address), fetched by the web view.
-    func open(_ url: URL, name: String, in webView: WKWebView) {
+    func open(_ url: URL, name: String, in webView: WKWebView, instead: (() -> Void)? = nil) {
         present(name: name)
+        self.instead = instead
         webView.startDownload(using: URLRequest(url: url)) { [weak self] download in
             self?.adopt(download)
         }
@@ -41,6 +46,8 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
         download = nil
         destination = nil
         file = nil
+        instead = nil
+        refusedCode = nil
         self.name = name
         try? FileManager.default.removeItem(at: folder)
         let vc = FileSheetController(name: name)
@@ -64,6 +71,13 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
     // MARK: WKDownloadDelegate
 
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        // (1.7.3) an error page in place of the file: said, or the school's own page for it — never the error page as the file
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400, download === self.download {
+            refusedCode = http.statusCode
+            completionHandler(nil)
+            refused(http.statusCode)
+            return
+        }
         let fm = FileManager.default
         try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
         var fileName = suggestedFilename.isEmpty ? name : suggestedFilename
@@ -83,8 +97,17 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        guard download === self.download else { return }
+        guard download === self.download, refusedCode == nil else { return }
         sheet?.fail(error.localizedDescription)
+    }
+
+    private func refused(_ code: Int) {
+        guard let go = instead else {
+            sheet?.fail(code == 401 || code == 403 ? "You don’t have access to it." : "The school answered with error \(code).")
+            return
+        }
+        instead = nil
+        if let s = sheet, s.presentingViewController != nil { s.dismiss(animated: true, completion: go) } else { go() }
     }
 
     // MARK: QLPreviewControllerDataSource

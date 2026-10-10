@@ -94,6 +94,11 @@
         await token(true);
         return once(method, path, { ...opts, retried: true });
       }
+      // (2.99.31: a read Brightspace turned away for the moment — too many at once, or busy — asked again, twice at most)
+      if (method === 'GET' && (e.status === 429 || e.status === 503) && (opts.tries || 0) < 2) {
+        await new Promise((r) => setTimeout(r, 1200 * ((opts.tries || 0) + 1)));
+        return call(method, path, { ...opts, tries: (opts.tries || 0) + 1 });
+      }
       throw e;
     }
   }
@@ -182,7 +187,7 @@
 
   // ---- small helpers -------------------------------------------------------------------------------------------
   const rich = (r) => (r && typeof r === 'object' ? (r.Html || r.Text || r.Content || '') : r || '');
-  const iso = (d) => (d ? new Date(d).toISOString() : null);
+  const iso = (d) => { const v = d ? new Date(d) : null; return v && Number.isFinite(v.getTime()) ? v.toISOString() : null; }; // (2.99.31: a date Brightspace wrote oddly is no date, never a throw)
   const t = (d) => (d ? new Date(d).getTime() : NaN);
   const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
   const list = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
@@ -343,15 +348,52 @@
     if (Number(f.AllowableFileType) === 5 && f.CustomAllowableFileTypes) return String(f.CustomAllowableFileTypes).split(/[,;\s]+/).map((x) => x.replace(/^\./, '')).filter(Boolean);
     return [];
   }
+  // ---- quizzes taken (2.99.31) --------------------------------------------------------------------------------
+  // Brightspace's API keeps a student's quiz attempts from the student, so a quiz with no grade (a LockDown Browser
+  // check, one the instructor marks by hand) looked never taken. Its own pages say it: the quiz list, each current quiz
+  // with an Attempts column ("1 / 1": finished, of allowed), and a quiz's summary ("Allowed - 1, Completed - 1").
+  /** The quizzes on a course's quiz list, each with how many times the student finished it. */
+  function takenIn(html) {
+    const out = new Map();
+    for (const row of String(html || '').split(/<tr[\s>]/i).slice(1)) {
+      const id = /GoToQuiz\(\s*(\d+)/.exec(row)?.[1];
+      if (!id) continue;
+      const cells = row.split(/<td[\s>]/i);
+      const last = (cells[cells.length - 1] || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;|&#160;/g, ' ');
+      const m = /(\d+)\s*\/\s*\S/.exec(last);
+      if (m) out.set(id, Number(m[1]));
+    }
+    return out;
+  }
+  /** How many times a quiz was finished, from its summary page ("Allowed - 1, Completed - 1"), or null. */
+  function takenOnPage(html) {
+    const h = String(html || '');
+    const m = /Completed\s*-\s*(\d+)/.exec(h) || /<label[^>]*>[^<]*?-\s*[^,<]*,[^<]*?-\s*(\d+)\s*<\/label>/.exec(h); // (its words, else their shape in another language)
+    return m ? Number(m[1]) : null;
+  }
+  const takenOnList = (ou) => remember(`qtaken:${ou}`, MIN, async () => takenIn(await call('GET', `/d2l/lms/quizzing/user/quizzes_list.d2l?ou=${ou}`).catch(() => '')));
+  const takenOnSummary = (ou, qid) => remember(`qsum:${ou}:${qid}`, 5 * MIN, async () => takenOnPage(await call('GET', `/d2l/lms/quizzing/user/quiz_summary.d2l?qi=${qid}&ou=${ou}`).catch(() => '')));
+  /** How many times the student finished a quiz, or null when it is not known — asked of its summary page only when it
+   *  matters: not on the quiz list (no longer current), no grade to say it was taken, and due or closed by next week. */
+  async function timesTaken(ou, q, value, onList) {
+    const id = String(q.QuizId);
+    if (onList && onList.has(id)) return onList.get(id);
+    if (value && (num(value.PointsNumerator) !== null || String(value.DisplayedGrade || '').trim())) return null;
+    const by = t(q.DueDate) || t(q.EndDate);
+    if (!(by < Date.now() + 7 * 864e5 && by > Date.now() - 180 * 864e5)) return null;
+    return takenOnSummary(ou, id).catch(() => null);
+  }
+
   /** Where a piece of work stands, as Canvas says it on its submission. */
-  function shapeSubmission({ aid, due, points, value, subs = null, feedback = null, takenWhenGraded = false, as = 'online_upload', ou = null, le = PREFER.le }) {
+  function shapeSubmission({ aid, due, points, value, subs = null, feedback = null, takenWhenGraded = false, taken = null, as = 'online_upload', ou = null, le = PREFER.le }) {
     const me = String(page.userId || '');
     const last = subs ? subs.flatMap((s) => list(s.Submissions)).filter((s) => s?.SubmissionDate).sort((a, b) => t(b.SubmissionDate) - t(a.SubmissionDate))[0] : null;
     const graded = !!(value && (num(value.PointsNumerator) !== null || (value.DisplayedGrade && String(value.DisplayedGrade).trim())));
     // (a quiz or a discussion with a grade was taken, or joined: Brightspace gives a student no list of attempts, so the
     // grade's own time stands for when — a quiz is marked as it is handed in)
     const submittedAt = last?.SubmissionDate || (takenWhenGraded && graded ? value.LastModified || value.ReleasedDate || null : null);
-    const submitted = !!submittedAt || !!(subs && subs.some((s) => Number(s.Status) === 1 || Number(s.Status) === 3));
+    // (2.99.31: a quiz finished, as Brightspace's quiz pages count it, is handed in, graded or not)
+    const submitted = !!submittedAt || !!(subs && subs.some((s) => Number(s.Status) === 1 || Number(s.Status) === 3)) || Number(taken) > 0;
     const late = !!(last?.SubmissionDate && due && t(last.SubmissionDate) > t(due)); // (only a hand-in's own time says late: a grade's says nothing of when the quiz was taken)
     const missing = !submitted && !graded && !!(due && t(due) < Date.now());
     const score = num(value?.PointsNumerator);
@@ -365,7 +407,7 @@
       submitted_at: submittedAt, score: score ?? (fb && num(fb.Score) !== null ? num(fb.Score) : null),
       grade: value?.DisplayedGrade ? String(value.DisplayedGrade).trim() : score !== null ? String(score) : null,
       entered_score: score, entered_grade: value?.DisplayedGrade || null, posted_at: value?.ReleasedDate || value?.LastModified || null, graded_at: value?.LastModified || null,
-      late, missing, excused: false, attempt: submitted ? Math.max(1, subs ? subs.flatMap((s) => list(s.Submissions)).length : 1) : null,
+      late, missing, excused: false, attempt: submitted ? Math.max(1, Number(taken) || 0, subs ? subs.flatMap((s) => list(s.Submissions)).length : 1) : null,
       seconds_late: late ? Math.round((t(last.SubmissionDate) - t(due)) / 1000) : 0,
       submission_type: submitted ? as : null,
       // (each file of the hand-in fetched from it, as Brightspace keeps it: the folder's submission, then the file)
@@ -388,7 +430,7 @@
     if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null, subs: await mySubs(ou, f.Id), ou, le: (await versions()).le });
     return a;
   }
-  function quizAssignment(ou, q, gm, { withSub = false } = {}) {
+  async function quizAssignment(ou, q, gm, { withSub = false, onList = null } = {}) {
     const go = q.GradeItemId ? gm.byId.get(String(q.GradeItemId)) : null;
     const points = num(go?.MaxPoints);
     const a = {
@@ -399,7 +441,10 @@
       omit_from_final_grade: !!go?.ExcludeFromFinalGradeCalculation, grade_item_id: q.GradeItemId ? String(q.GradeItemId) : null,
       d2l: { kind: 'quiz', id: String(q.QuizId) },
     };
-    if (withSub) a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value: go ? gm.value.get(String(go.Id)) : null, takenWhenGraded: true, as: 'online_quiz' });
+    if (withSub) {
+      const value = go ? gm.value.get(String(go.Id)) : null;
+      a.submission = shapeSubmission({ aid: a.id, due: a.due_at, points, value, takenWhenGraded: true, taken: await timesTaken(ou, q, value, onList), as: 'online_quiz' });
+    }
     return a;
   }
   function topicAssignment(ou, tp, gm, { withSub = false } = {}) {
@@ -429,10 +474,13 @@
   /** Every piece of work in a course, Canvas's way: one list, each with where it stands when asked. */
   async function assignments(ou, { withSub = false } = {}) {
     const [fs, qs, tps, gm] = await Promise.all([folders(ou), quizzes(ou), allTopics(ou).catch(() => []), gradeMap(ou)]);
+    const onList = withSub && qs.length ? await takenOnList(ou).catch(() => null) : null;
     const out = [];
     const linked = new Set();
     for (const f of fs.filter((x) => !x.IsHidden)) { out.push(await folderAssignment(ou, f, gm, { withSub })); if (f.GradeItemId) linked.add(String(f.GradeItemId)); }
-    for (const q of qs.filter((x) => x.IsActive !== false)) { out.push(quizAssignment(ou, q, gm, { withSub })); if (q.GradeItemId) linked.add(String(q.GradeItemId)); }
+    const live = qs.filter((x) => x.IsActive !== false);
+    out.push(...await Promise.all(live.map((q) => quizAssignment(ou, q, gm, { withSub, onList }))));
+    for (const q of live) if (q.GradeItemId) linked.add(String(q.GradeItemId));
     for (const tp of tps.filter((x) => !x.IsHidden && (x.GradeItemId || x.ScoreOutOf || x.DueDate))) { out.push(topicAssignment(ou, tp, gm, { withSub })); if (tp.GradeItemId) linked.add(String(tp.GradeItemId)); }
     for (const go of gm.objs.filter((o) => !o.IsHidden && !linked.has(String(o.Id)) && o.GradeType !== 'Text' && o.GradeType !== 'Calculated' && o.GradeType !== 'Formula')) {
       const tool = o => o.AssociatedTool && o.AssociatedTool.ToolItemId;
@@ -454,7 +502,7 @@
     if (space === 'quiz') {
       const q = (await quizzes(ou)).find((x) => String(x.QuizId) === id);
       if (!q) throw err('That quiz could not be found.', 404);
-      return quizAssignment(ou, q, gm, { withSub });
+      return quizAssignment(ou, q, gm, { withSub, onList: withSub ? await takenOnList(ou).catch(() => null) : null });
     }
     if (space === 'topic') {
       const tp = (await allTopics(ou)).find((x) => String(x.TopicId) === id);
@@ -557,10 +605,13 @@
       out.push({ context_type: n.course_id ? 'Course' : 'User', course_id: n.course_id || null, context_name: null, plannable_id: n.id, plannable_type: 'planner_note', plannable_date: n.todo_date, plannable: { id: n.id, title: n.title, todo_date: n.todo_date, details: n.details || '' }, planner_override: ovFor('planner_note', n.id), submissions: false, html_url: null, new_activity: false });
     }
     if (onlyMine) return out;
-    const es = (await enrollments()).filter((e) => e.Access?.CanAccess !== false && e.Access?.IsActive !== false);
+    // (2.99.31: the courses the interface lists — every one the student can open, as courses() has them; a course
+    // over before the span asked has nothing in it, and is not asked)
+    const es = (await enrollments()).filter((e) => e.Access?.CanAccess !== false && !(t(e.Access?.EndDate) < from));
     const wanted = codes.filter((c) => c.kind === 'course').map((c) => c.id);
     const ous = es.map((e) => String(e.OrgUnit.Id)).filter((ou) => !wanted.length || wanted.includes(ou));
-    const per = await Promise.all(ous.map(async (ou) => {
+    const per = await Promise.all(ous.map((ou) => courseItems(ou).catch(() => []))); // (one course that will not answer never empties the rest)
+    async function courseItems(ou) {
       const e = es.find((x) => String(x.OrgUnit.Id) === ou);
       const name = e?.OrgUnit?.Name || '';
       const items = [];
@@ -590,7 +641,7 @@
         items.push({ context_type: 'Course', course_id: ou, context_name: name, plannable_id: id, plannable_type: 'announcement', plannable_date: iso(n.StartDate || n.CreatedDate), plannable: { id, title: n.Title, posted_at: iso(n.StartDate || n.CreatedDate) }, submissions: false, planner_override: ovFor('announcement', id), html_url: `/courses/${ou}/discussion_topics/${id}`, new_activity: !l.read[`news:${n.Id}`] });
       }
       return items;
-    }));
+    }
     out.push(...per.flat());
     return out.sort((a, b) => t(a.plannable_date) - t(b.plannable_date));
   }

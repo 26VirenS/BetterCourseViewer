@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.31', date: '2026-10-10', notes: [
+      { kind: 'fixed', title: 'Finished quizzes', body: 'A Brightspace quiz you finished shows as done.', icon: P.check },
+      { kind: 'fixed', title: 'Brightspace To Do', body: 'To Do lists your Brightspace work again.', icon: P.list },
+    ] },
     { version: '2.99.30', date: '2026-10-09', notes: [
       { kind: 'fixed', title: 'Tool assignments', body: 'A tool’s assignment is no longer called closed.', icon: P.check },
     ] },

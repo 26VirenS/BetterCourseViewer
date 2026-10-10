@@ -151,7 +151,7 @@ console.log('\nwork, and where it stands');
 {
   const all = await get('/api/v1/courses/31001/assignments', { include: ['submission'] });
   const by = Object.fromEntries(all.map((a) => [a.id, a]));
-  check(['701', '702', '703', '704', '705', '1000000801', '1000000802', '2000000902', '4000000504'].every((id) => by[id]) && all.length === 9, `every piece of work, one list: the dropbox folders, the quizzes, the graded discussion, the grade item no tool owns — not the hidden folder, the hidden grade item, nor a grade item a tool already lists (${all.length}: ${all.map((a) => a.name).join(', ')})`);
+  check(['701', '702', '703', '704', '705', '1000000801', '1000000802', '1000000803', '1000000804', '2000000902', '4000000504'].every((id) => by[id]) && all.length === 11, `every piece of work, one list: the dropbox folders, the quizzes, the graded discussion, the grade item no tool owns — not the hidden folder, the hidden grade item, nor a grade item a tool already lists (${all.length}: ${all.map((a) => a.name).join(', ')})`);
   check(all.every((a, i) => i === 0 || (new Date(a.due_at || 8.64e15) >= new Date(all[i - 1].due_at || 8.64e15))), 'in the order it is due, undated last');
   const lab1 = by['701'].submission;
   check(lab1.workflow_state === 'graded' && lab1.score === 18 && !lab1.late && !lab1.missing && lab1.attachments[0]?.display_name === 'microscopy.pdf' && /nucleolus/.test(lab1.submission_comments.map((c) => c.comment).join(' ')), `handed in on time and graded, with its file and the instructor’s comments: ${lab1.workflow_state} ${lab1.score}/${by['701'].points_possible}, ${lab1.attachments.map((f) => f.display_name)}`);
@@ -159,6 +159,12 @@ console.log('\nwork, and where it stands');
   check(by['704'].submission.missing === true && by['703'].submission_types.join() === 'online_text_entry' && by['705'].submission_types.join() === 'on_paper', 'a past due date with nothing handed in is missing; a text entry and an on-paper folder say so');
   check(by['1000000801'].submission.workflow_state === 'graded' && !!by['1000000801'].submission.submitted_at && by['1000000801'].submission.submission_type === 'online_quiz' && !by['1000000801'].submission.late && !by['4000000504'].submission.submitted_at, 'a quiz with a grade was taken (the grade’s time stands for when, and says nothing of late); a grade item of its own was handed nothing');
   check(by['1000000801'].submission.score === 41 && by['1000000801'].submission_types.join() === 'online_quiz' && by['1000000802'].allowed_attempts === 2 && by['2000000902'].submission_types.join() === 'discussion_topic' && by['2000000902'].points_possible === 10 && by['4000000504'].submission.score === 9, 'a quiz with its score from the grades, one with two attempts, the graded discussion, the grade item of its own with its score');
+  // (2.99.31) a quiz with no grade the student finished — a LockDown Browser check — is handed in, never missing: the quiz
+  // list's Attempts column says so while it is open, its summary page once it is closed; one not taken is still to do
+  const lock = by['1000000803'].submission, proct = by['1000000804'].submission;
+  check(lock.workflow_state === 'submitted' && !lock.missing && lock.attempt === 1 && proct.workflow_state === 'submitted' && !proct.missing && by['1000000802'].submission.workflow_state === 'unsubmitted', `a finished quiz with no grade is handed in, from Brightspace’s quiz list and its summary page: ${lock.workflow_state}/${lock.missing} · ${proct.workflow_state}/${proct.missing}`);
+  const lockOne = await get('/api/v1/courses/31001/assignments/1000000803', { include: ['submission'] });
+  check(lockOne.submission.workflow_state === 'submitted' && !lockOne.submission.missing, 'and so on its own page');
   const one = await get('/api/v1/courses/31001/assignments/702', { include: ['submission'] });
   check(one.name === 'Lab 2: Osmosis' && /data table/.test(one.description) && one.can_submit === true, 'one folder as an assignment: its instructions, and it can be handed in');
   const mathA = (await get('/api/v1/courses/31003/assignments'))[0];
@@ -269,7 +275,7 @@ console.log('\nthe rest');
   const people = await get('/api/v1/courses/31001/users', { include: ['enrollments'] });
   check(people.length === 4 && people.find((p) => p.name === 'Lena Ortiz').enrollments[0].type === 'TeacherEnrollment' && people.find((p) => p.name === 'Sam Patel').enrollments[0].type === 'StudentEnrollment', 'the classlist, instructors told from students');
   const qs = await get('/api/v1/courses/31001/quizzes');
-  check(qs.length === 2 && qs[0].time_limit === 45 && qs[0].question_count === null && qs[0].allowed_attempts === 1 && qs[0].d2l.page === '/d2l/lms/quizzing/user/quiz_summary.d2l?qi=801&ou=31001', 'the quizzes, with their time limits and attempts — no question count, which Brightspace does not give a student');
+  check(qs.length === 4 && qs[0].time_limit === 45 && qs[0].question_count === null && qs[0].allowed_attempts === 1 && qs[0].d2l.page === '/d2l/lms/quizzing/user/quiz_summary.d2l?qi=801&ou=31001', 'the quizzes, with their time limits and attempts — no question count, which Brightspace does not give a student');
   check((await get('/api/v1/conversations')).length === 0 && (await get('/api/v1/users/self/groups')).length === 0 && (await get('/api/v1/appointment_groups')).length === 0, 'what Brightspace has no such thing for answers empty: the inbox, groups, appointments');
   let unknown = null;
   try { await get('/api/v1/courses/31001/rubrics'); } catch (e) { unknown = e; }
@@ -517,7 +523,7 @@ try {
   const gr = await nc('grades');
   check(!gr.error && gr.rows.some((r) => r.pct === 87.5) && gr.rows.find((r) => r.pct === 87.5)?.cats.length === 2, `Grades: each course’s total and its weighted categories: ${JSON.stringify(gr.rows?.map((r) => `${r.code} ${r.pctText} cats:${r.cats.length}`))}`);
   const td = await nc('todo', { group: 'date' });
-  check(!td.error && td.sections.find((x) => x.title === 'Overdue')?.rows.some((r) => r.title === 'Lab Safety Form') && td.sections.flatMap((x) => x.rows).some((r) => r.title === 'Chapter 4 Check'), `To Do: the work still to do (what is handed in already, above, left out): ${JSON.stringify(td.sections?.map((x) => `${x.title}:${x.rows.map((r) => r.title).join('|')}`))}`);
+  check(!td.error && td.sections.find((x) => x.title === 'Overdue')?.rows.some((r) => r.title === 'Lab Safety Form') && td.sections.flatMap((x) => x.rows).some((r) => r.title === 'Chapter 4 Check') && !td.sections.flatMap((x) => x.rows).some((r) => /LockDown Browser Check|Proctoring Practice/.test(r.title)), `To Do: the work still to do (what is handed in already, above, left out): ${JSON.stringify(td.sections?.map((x) => `${x.title}:${x.rows.map((r) => r.title).join('|')}`))}`);
   const nf = await nc('notifications');
   check(!nf.error && nf.total > 0 && nf.days.flatMap((d) => d.rows).some((r) => /Lab 2 moved to Thursday/.test(r.title)), `Notifications: the news and the grades given: ${JSON.stringify({ total: nf.total, titles: nf.days?.flatMap((d) => d.rows).map((r) => r.title).slice(0, 6) })}`);
   const now = new Date();
