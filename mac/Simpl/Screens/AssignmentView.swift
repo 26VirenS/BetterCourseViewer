@@ -385,10 +385,8 @@ struct AssignmentView: View {
                 HStack(spacing: 10) {
                     ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
                         Button { act(d, step) } label: {
-                            Label(step.title, systemImage: step.symbol)
+                            StepLabel(step: step)
                                 .font(.sHeadline)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                                 .frame(maxWidth: .infinity)
                         }
                         .glassButton(prominent: i == steps.count - 1)
@@ -679,8 +677,8 @@ struct AssignmentView: View {
             let feedback = quizIntro.map { $0.last?.feedback == true } ?? true
             let again = quizIntro?.canStart == true
             var out: [NextStep] = []
-            if feedback { out.append(NextStep(title: "See Feedback", symbol: "text.bubble", help: "See your last attempt’s results", feedback: true)) }
-            if again { out.append(NextStep(title: "New Attempt", symbol: "arrow.counterclockwise", help: "Take this quiz again", again: true)) }
+            if feedback { out.append(NextStep(title: "See Feedback", symbol: "text.bubble", help: "See your last attempt’s results", short: "Feedback", feedback: true)) }
+            if again { out.append(NextStep(title: "New Attempt", symbol: "arrow.counterclockwise", help: "Take this quiz again", short: "Retake", again: true)) }
             if !out.isEmpty { return out }
         }
         // (1.3.10) handed in, and it may be handed in again: what was handed in (its feedback, once there is any) beside
@@ -688,8 +686,8 @@ struct AssignmentView: View {
         if d.canSubmit, d.resubmit == true, hasWork(d) {
             let marked = d.grade != nil || !d.comments.isEmpty
             let look = marked
-                ? NextStep(title: "See Feedback", symbol: "text.bubble", help: "Your work, with your teacher's marks and comments", feedback: true)
-                : NextStep(title: "View Submission", symbol: "doc.text.magnifyingglass", help: "What you handed in", feedback: true)
+                ? NextStep(title: "See Feedback", symbol: "text.bubble", help: "Your work, with your teacher's marks and comments", short: "Feedback", feedback: true)
+                : NextStep(title: "View Submission", symbol: "doc.text.magnifyingglass", help: "What you handed in", short: "Submission", feedback: true)
             if let again = nextStepOne(d) { return [look, again] }
         }
         return nextStepOne(d).map { [$0] } ?? []
@@ -711,7 +709,7 @@ struct AssignmentView: View {
     private func nextStepOne(_ d: AssignmentData) -> NextStep? {
         if d.canSubmit {
             return d.resubmit == true
-                ? NextStep(title: "Hand In Again", symbol: "tray.and.arrow.up.fill", help: "Hand in this assignment again")
+                ? NextStep(title: "Hand In Again", symbol: "tray.and.arrow.up.fill", help: "Hand in this assignment again", short: "Hand In")
                 : NextStep(title: "Hand In", symbol: "tray.and.arrow.up.fill", help: "Hand in this assignment")
         }
         if d.quizUrl != nil { return NextStep(title: "Take Quiz", symbol: "checklist", help: "Take this quiz") }
@@ -835,10 +833,40 @@ struct AssignmentView: View {
 }
 
 /// An assignment's next step, as its button says it: the words, the symbol, the tooltip.
+/// (1.3.15) A next step's symbol and words. The symbol sits in a box of its own, centred on the words, so two steps
+/// with symbols of different shapes (a document, a tray) stand level. A title too long for its half of the column is
+/// said shorter, then without its symbol, rather than cut off ("View Submis…").
+private struct StepLabel: View {
+    let step: NextStep
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            row(step.title, symbol: true)
+            if let s = step.short { row(s, symbol: true) }
+            row(step.short ?? step.title, symbol: false)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(step.title)
+    }
+
+    private func row(_ words: String, symbol: Bool) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            if symbol {
+                Image(systemName: step.symbol)
+                    .imageScale(.medium)
+                    .frame(width: 22, height: 22)
+            }
+            Text(words).lineLimit(1).fixedSize()
+        }
+    }
+}
+
 private struct NextStep {
     let title: String
     let symbol: String
     let help: String
+    /// (1.3.15) Its words when the whole title will not fit beside another step ("Submission" for "View Submission").
+    var short: String?
     /// (1.3.5) A quiz's: its last attempt's feedback, or a new attempt begun (or the one under way gone back to).
     var feedback = false
     var again = false
