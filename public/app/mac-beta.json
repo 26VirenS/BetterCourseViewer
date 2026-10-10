@@ -1,10 +1,10 @@
 {
-  "version": "1.3.31",
-  "url": "https://github.com/26VirenS/BetterCourseViewer/releases/download/mac-v1.3.31/Simpl-Mac-1.3.31.zip",
-  "sha256": "1b1abb804d8cf924a6f90e9e6571d552c81260eba8db35e6a650ab822c75865c",
-  "size": 50812857,
+  "version": "1.3.32",
+  "url": "https://github.com/26VirenS/BetterCourseViewer/releases/download/mac-v1.3.32/Simpl-Mac-1.3.32.zip",
+  "sha256": "eef501e01ed9c6aff0909f5e1d88b1888e8300d54dfbd4c71c706b8624925960",
+  "size": 50834276,
   "minimumOS": "14.0",
-  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/mac-v1.3.31",
-  "published": "2026-10-10T22:57:57Z",
+  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/mac-v1.3.32",
+  "published": "2026-10-10T23:08:19Z",
   "beta": true
 }
