@@ -122,6 +122,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   and its question in one answer, the lesson first: the question is taken as the first state that is a question (not
   a lesson, video or example), from any answer of Alta's carrying states; an answer without the objectives keeps the
   last ones. Copy Alta Details lists each answer's states by purpose / dataType / question type (nothing in them).
+  (1.3.35) Alta keeps the question on the page under a lesson: a lesson newly come above it is shown in its place by
+  the page script itself (it flashed, then the question was kept again), the view passed to the app; the bar has the
+  lesson's Continue and Back to Question. Done with a lesson (its Continue, Back to Question), what is left above in the
+  next 10 s is noted, not shown. The app sends a view only when the student picks one.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment

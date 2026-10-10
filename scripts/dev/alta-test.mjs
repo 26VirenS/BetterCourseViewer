@@ -194,10 +194,13 @@ try {
   check(!!ls, 'and told again once it is typeset and its Continue is ready');
   check((await page.$('.tex .mjx-chtml')) && !(await page.$('.garbled')) && (await page.$eval('#MathJax_Font_Test', (e) => e.offsetWidth > 0)),
     'MathJax’s own hidden helpers are left alone, so it measures its fonts and sets the maths out right');
-  check(!!ls && (await vis('.alta-lesson')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')) && (await left('#lcont')) < -5000,
-    'Alta’s lesson is shown alone (its header, title and objective card hidden, its Feedback put away), its Continue moved aside for the popup’s bar');
+  check(!!ls && ls.view === 'lesson' && (await vis('.alta-lesson')) && !(await vis('#graph')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')) && (await left('#lcont')) < -5000,
+    'Alta’s lesson, come above the question (which stays on the page), is shown in its place by itself — not a flash before the question again — with its Continue moved aside for the popup’s bar');
+  await page.waitForTimeout(1200);
+  check((await vis('.alta-lesson')) && !(await vis('#graph')), 'and it stays shown');
   const n4 = (await posts()).length;
   check((await page.evaluate(() => window.__simplAlta.next())).ok, 'the popup’s Continue presses the lesson’s');
+  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, view: 'question' })); // (as the app asks after it)
   const back = await waitFor((p, k) => k >= n4 && p.kind === 'focus' && p.found && p.hasCheck === true, 'the question again');
   check(!!back && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('.alta-lesson')), 'and the question comes under the lesson, shown alone with what it asks — the lesson above it hidden');
   check(back.lessonToo === true, 'the popup is told the lesson is still there (its bar offers View Instruction)');

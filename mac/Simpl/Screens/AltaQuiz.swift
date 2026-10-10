@@ -187,14 +187,26 @@ struct AltaQuizScreen: View {
             // (1.3.31) the lesson seen again: back to the question
             if session.altaDrawn && session.lessonView {
                 QuizFloatingBar {
-                    Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward").frame(minWidth: 90) }
-                        .glassButton(prominent: true)
-                        .help("Back to the question")
+                    // (1.3.35) the lesson's own Continue, when it has one, and back to the question either way
+                    if session.altaHasNext {
+                        Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward") }
+                            .glassButton()
+                            .help("Back to the question, the lesson kept")
+                        Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
+                            .glassButton(prominent: true)
+                            .keyboardShortcut(.return, modifiers: .command)
+                            .disabled(!session.altaCanNext)
+                            .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
+                    } else {
+                        Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward").frame(minWidth: 90) }
+                            .glassButton(prominent: true)
+                            .help("Back to the question")
+                    }
                 }
             // (1.3.28) a lesson of Alta's: its Continue, back to the question
             } else if session.altaLesson {
                 QuizFloatingBar {
-                    Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
+                    Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
                         .glassButton(prominent: true)
                         .keyboardShortcut(.return, modifiers: .command)
                         .disabled(!session.altaCanNext) // (1.3.30: greyed out while Alta's own is — until the lesson is read)

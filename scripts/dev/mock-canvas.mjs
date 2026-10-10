@@ -730,8 +730,8 @@ function draw(j) {
     document.getElementById('view').onclick = function () {
       fetch('/mock-alta/api/content?assignmentId=a1&lesson=1').then(function (r) { return r.json(); }).then(function (j) { window.__withLesson = j; });
       d.remove();
-      // (as Alta does: the lesson above, the question out of sight; on Continue the lesson stays and the question comes under it)
-      var q = document.getElementById('q'), lw = document.createElement('div'); lw.id = 'lessonwrap'; q.parentNode.insertBefore(lw, q); q.style.display = 'none';
+      // (as Alta does: the lesson above the question, which stays; on Continue the lesson stays above it)
+      var q = document.getElementById('q'), lw = document.createElement('div'); lw.id = 'lessonwrap'; q.parentNode.insertBefore(lw, q); // (the question stays on the page under the lesson, as Alta keeps it)
       lw.innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex"><span class="MathJax_Preview">$$\\\\frac{d}{dx} x^2 = 2x$$</span></p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
       // (Continue asks Alta for nothing: the question came with the lesson)
       document.getElementById('lcont').onclick = function () { var acts = lw.querySelector('.lesson-actions'); if (acts) acts.remove(); q.style.display = ''; if (window.__withLesson) draw(window.__withLesson); else load(); };
