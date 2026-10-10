@@ -710,13 +710,16 @@ function draw(j) {
   var st = j.states[0], c = st.atom.data.content; key = c.validation ? c.validation.valid_response.value : (c.correct_answer && c.correct_answer.value) || null;
   document.getElementById('objective').textContent = st.atom.learningObjective.description;
   meter(j.analytics);
-  var q = document.getElementById('q'), h = '<div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">' + (c.stimulus || '');
+  // (what it asks outside Learnosity's own box, as a school's Alta draws it)
+  var q = document.getElementById('q'), h = '<div class="alta-stimulus">' + (c.stimulus || '') + '</div><div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">';
   if (c.type === 'mcq') h += '<ul class="lrn-mcq-options">' + c.options.map(function (o, k) { return '<li class="lrn-mcq-option"><input type="radio" name="mcq" id="o' + k + '" value="' + o.value + '"><label for="o' + k + '" class="lrn-label">' + o.label.replace(/\\$_/g, '') + '</label></li>'; }).join('') + '</ul>';
   else if (c.type === 'clozetext') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="lrn_cloze_response"><input type="text" class="lrn_cloze_input"></span>' : ''); }).join('');
   else if (c.type === 'clozeformula') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="mq-editable-field"><textarea></textarea><span class="mq-root-block"></span></span>' : ''); }).join('');
   else h += '<div id="graph" style="width:300px;height:300px;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3">Desmos graph</div>';
   q.innerHTML = h + '</div><div id="fb" class="alta-feedback" role="alert" hidden></div><button id="check">Check Answer</button><button id="next" hidden>Next Question</button>';
   document.getElementById('check').onclick = check;
+  // (a graph's Check is greyed out until the graph is touched)
+  if (c.type === 'custom') { document.getElementById('check').disabled = true; document.getElementById('graph').onclick = function () { document.getElementById('check').disabled = false; }; }
   document.getElementById('next').onclick = function () { fetch('/mock-alta/api/next', { method: 'POST' }).then(load); };
 }
 function check() {

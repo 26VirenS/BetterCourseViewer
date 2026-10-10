@@ -357,6 +357,52 @@ enum AltaHook {
       var hide = function (el) { hidden.push({ el: el, d: el.style.getPropertyValue('display'), p: el.style.getPropertyPriority('display') }); el.style.setProperty('display', 'none', 'important'); };
       var unhide = function (h) { if (h.d) h.el.style.setProperty('display', h.d, h.p); else h.el.style.removeProperty('display'); };
       var lift = function () { hidden.forEach(unhide); hidden = []; };
+      // every button with these words on screen, greyed out or not
+      var controls = function (re) {
+        return deep(CLICKABLE).filter(function (b) { return shown(b) && re.test(norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label'))); });
+      };
+      // (1.3.22) where the page shows what the question asks: the words of it the app was given (a run of them between
+      // its maths), found in the page's text
+      var focusHint = '';
+      var asked = function () {
+        var want = norm(focusHint);
+        if (want.length < 8 || !document.body) return null;
+        try {
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), n;
+          while ((n = w.nextNode())) {
+            if (norm(n.data).indexOf(want) >= 0 && n.parentElement && shown(n.parentElement)) return n.parentElement;
+          }
+        } catch (e) {}
+        return null;
+      };
+      // the smallest element holding them all (across web components' own trees)
+      var common = function (els) {
+        if (!els.length) return null;
+        var chain = [];
+        for (var x = els[0]; x; x = parentOf(x)) chain.push(x);
+        var best = 0;
+        for (var i = 1; i < els.length; i++) {
+          var at = -1;
+          for (var y = els[i]; y; y = parentOf(y)) { at = chain.indexOf(y); if (at >= 0) break; }
+          if (at < 0) return null;
+          if (at > best) best = at;
+        }
+        return chain[best];
+      };
+      var label = function (el) {
+        var c = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 4).join('.') : '';
+        return el.tagName.toLowerCase() + (el.id ? '#' + el.id.slice(0, 30) : '') + (c ? '.' + c.slice(0, 80) : '');
+      };
+      var shape = function () {
+        var q = deep(QUESTION).filter(shown)[0];
+        if (!q) return [];
+        var out = [];
+        for (var x = q, i = 0; x && i < 14; x = parentOf(x), i++) {
+          out.push({ el: label(x), kids: [].slice.call(x.children || []).slice(0, 12).map(function (k) { return label(k) + (shown(k) ? '' : ' (unseen)'); }) });
+          if (x === document.body) break;
+        }
+        return out;
+      };
       var keepers = function (iframeToo) {
         var qs = deep(QUESTION).filter(shown);
         if (!qs.length && iframeToo) {
@@ -367,7 +413,16 @@ enum AltaHook {
           if (big) qs = [big];
         }
         if (!qs.length) return [];
-        var more = buttons(CHECK).concat(buttons(NEXT), buttons(HELPERS),
+        // (1.3.22) the question's words and its Check (greyed out until it is answered, but Alta's own to press) are kept
+        // with it: the smallest part of the page holding the question, what it asks and its buttons — unless that is
+        // the whole page, when each is kept on its own
+        var acts = controls(CHECK).concat(controls(NEXT));
+        var asks = asked();
+        var anchors = qs.concat(acts, asks ? [asks] : []);
+        var whole = common(anchors);
+        if (whole && whole !== document.body && whole !== document.documentElement && anchors.length > qs.length) qs = [whole];
+        else qs = qs.concat(acts, asks ? [asks] : []);
+        var more = buttons(HELPERS).concat(
           deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown),
           deep('[role="alert"], [class*="feedback" i]').filter(function (e) { return shown(e) && norm(e.innerText || ''); }));
         var all = qs.concat(more);
@@ -405,6 +460,7 @@ enum AltaHook {
         o = o || {};
         if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); return { found: false }; }
         focusIframe = !!o.iframe;
+        if (typeof o.hint === 'string' && o.hint !== focusHint) { focusHint = o.hint; dirty = true; }
         if (!focused) { focusFirst = true; focused = setInterval(function () { trim(false); }, 500); }
         return { found: trim(true) };
       };
@@ -418,7 +474,10 @@ enum AltaHook {
           return {
             at: location.host + location.pathname, top: window.top === window, json: jsonSeen.slice(),
             buttons: deep(CLICKABLE).filter(shown).slice(0, 50).map(function (b) { return b.tagName.toLowerCase() + ': ' + norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label')).slice(0, 40); }),
-            estimates: scrape().objectives.length, start: buttons(START).length, check: buttons(CHECK).length, next: buttons(NEXT).length
+            estimates: scrape().objectives.length, start: buttons(START).length, check: buttons(CHECK).length, next: buttons(NEXT).length,
+            // (1.3.22) how the page is built round the question — elements and class names only, never words — and
+            // what the question shown alone keeps
+            checkAny: controls(CHECK).length, asked: !!asked(), hidden: hidden.length, shape: shape()
           };
         },
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
@@ -505,8 +564,10 @@ struct AltaQuestion: Decodable, Equatable {
     enum Kind: Equatable { case choice, blanks, dropdowns, text, longText, page }
 
     var kind: Kind {
-        if dataType != nil && dataType != "LEARNOSITY_GENERIC_QUESTION" { return .page } // (a lesson, a video: Alta's to show)
-        if let p = purpose, p != "ASSESSES" { return .page }
+        // (1.3.22: a lesson, a video, an example is Alta's to show — by what Alta calls it; a question of a kind the popup
+        // draws is drawn whatever else Alta's answer says of it)
+        let said = ((dataType ?? "") + " " + (purpose ?? "")).uppercased()
+        if ["INSTRUCT", "LESSON", "VIDEO", "EXAMPLE", "TEACH", "READING"].contains(where: { said.contains($0) }) { return .page }
         switch type ?? "" {
         case "mcq": return options.isEmpty ? .page : .choice
         case "clozetext": return blankCount > 0 ? .blanks : .page
@@ -522,6 +583,16 @@ struct AltaQuestion: Decodable, Equatable {
 
     /// (1.3.20) An answer in maths (Learnosity's formula fields): typed as on a keyboard, put in through MathQuill.
     var isMath: Bool { (type ?? "").lowercased().contains("formula") }
+
+    /// (1.3.22) A run of the words it asks in (the longest between its maths), for finding it on Alta's page.
+    var hint: String {
+        let text = (prompt ?? "")
+            .replacingOccurrences(of: #"\$\$[\s\S]*?\$\$|\$_[\s\S]*?\$_|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|<[^>]+>"#, with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+        let runs = text.components(separatedBy: "\n").map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+        let longest = runs.max { $0.count < $1.count } ?? ""
+        return longest.count >= 8 ? String(longest.prefix(36)) : ""
+    }
 
     /// The blanks in a cloze template ({{response}} each).
     var blankCount: Int { (template ?? "").components(separatedBy: "{{response}}").count - 1 }
@@ -790,13 +861,13 @@ final class AltaSession: ObservableObject {
         var mainFound = false, innerFound = false
         var missed: [WKFrameInfo?] = []
         for f in frames + [nil] {
-            let r = await run(js, ["o": ["on": on, "iframe": false]], exactly: f) as? [String: Any]
+            let r = await run(js, ["o": ["on": on, "iframe": false, "hint": question?.hint ?? ""]], exactly: f) as? [String: Any]
             let found = r?["found"] as? Bool ?? false
             if f?.isMainFrame ?? true { mainFound = mainFound || found } else { innerFound = innerFound || found }
             if !found { missed.append(f) }
         }
         guard on, innerFound, !mainFound else { return }
-        for f in missed { _ = await run(js, ["o": ["on": true, "iframe": true]], exactly: f) }
+        for f in missed { _ = await run(js, ["o": ["on": true, "iframe": true, "hint": question?.hint ?? ""]], exactly: f) }
     }
 
     /// (1.3.21) Alta's whole page as one picture, top to bottom, past what fits on screen: scrolled through a screenful
@@ -943,9 +1014,35 @@ final class AltaSession: ObservableObject {
     /// the names of the fields in Alta's answers (never their values), the buttons' words, and which of Start, Check
     /// and Continue it found — for working out what a school's Alta does differently. Nothing of the student's.
     func diagnostics() async -> String {
-        var out: [[String: Any]] = [["app": (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?",
-                                     "phase": "\(phase)", "showPage": showPage, "report": report != nil, "overviewObjectives": overview?.objectives.count ?? 0,
-                                     "viewAt": (web.url.map { ($0.host ?? "") + $0.path }) ?? ""]]
+        var head: [String: Any] = [:]
+        head["app"] = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?"
+        head["phase"] = "\(phase)"
+        head["showPage"] = showPage
+        head["wholePage"] = wholePage
+        head["report"] = report != nil
+        head["overviewObjectives"] = overview?.objectives.count ?? 0
+        head["viewAt"] = (web.url.map { ($0.host ?? "") + $0.path }) ?? ""
+        // (1.3.22) what kind of question it is and how the popup took it, and the rail — never its answer
+        if let q = question {
+            var d: [String: Any] = [:]
+            d["type"] = q.type ?? ""
+            d["custom"] = q.custom ?? ""
+            d["purpose"] = q.purpose ?? ""
+            d["dataType"] = q.dataType ?? ""
+            d["drawnAs"] = "\(q.kind)"
+            d["blanks"] = q.blankCount
+            d["options"] = q.options.count
+            d["choices"] = q.choices.count
+            d["template"] = q.template != nil
+            d["promptLength"] = (q.prompt ?? "").count
+            d["hintFound"] = !q.hint.isEmpty
+            head["question"] = d
+        }
+        var rail: [[String: Any]] = []
+        for o in objectives { rail.append(["named": !o.name.hasPrefix("Objective "), "mastery": o.mastery]) }
+        head["objectives"] = rail
+        head["mastery"] = mastery
+        var out: [[String: Any]] = [head]
         for f in frames + [nil] {
             if let d = await run("return window.__simplAlta ? window.__simplAlta.diag() : { script: 'not running', at: location.host + location.pathname }", [:], exactly: f) as? [String: Any] {
                 out.append(d)

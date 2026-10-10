@@ -86,7 +86,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Alta's own Check pressed there is heard too. The rail's mastery takes the newest word from any of Alta's answers (a
   checked answer's `statusAndProgress`, not only `content`'s) and from Alta's own progress bars and "Mastery N%". The
   camera button (and More ▸ Take Full-Page Screenshot) scrolls Alta's whole page a screenful at a time, stitches it into
-  one PNG in Downloads and copies it. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  one PNG in Downloads and copies it. (1.3.22) Shown alone, the question keeps the smallest part of the page holding
+  Learnosity's element, Alta's Check/Next (greyed out or not) and the words it asks (found by a run of the prompt's
+  plain text); a question is drawn by its Learnosity type unless Alta calls it a lesson, video or example. Copy Alta
+  Details adds the question's type and how it was drawn, the rail, and the page's elements round the question (class
+  names only). `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

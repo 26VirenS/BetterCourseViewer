@@ -122,11 +122,13 @@ try {
   // (1.3.21) any kind of question: Alta's own, shown alone — the rest of its page hidden, then shown again as it was
   await page.waitForSelector('#graph');
   const styleBefore = await page.$eval('header', (h) => h.getAttribute('style'));
-  const fo = await page.evaluate(() => window.__simplAlta.focus({ on: true }));
+  const fo = await page.evaluate(() => window.__simplAlta.focus({ on: true, hint: 'in the graphing window.' }));
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
   check(fo.found && !(await vis('header')) && !(await vis('#help')) && !(await vis('.obj')) && !(await vis('main > h2')),
     'a question of a kind the popup does not draw is shown alone: Alta’s header, help button and side panels out of sight');
-  check((await vis('#graph')) && (await vis('#check')), 'with the question itself and Alta’s Check still there to use');
+  check((await vis('#graph')) && (await vis('#check')) && (await vis('.alta-stimulus')) && (await page.$eval('#check', (b) => b.disabled)),
+    'with the question, what it asks (outside Learnosity’s box) and Alta’s Check — greyed out until it is answered — still there');
+  await page.click('#graph');
   const said = (await posts()).length;
   await page.click('#check');
   const fp = await waitFor((p, k) => k >= said && p.kind === 'feedback' && /Incorrect/.test(p.text) && p.verdict === 'incorrect', 'a verdict from Alta’s own Check');
