@@ -400,10 +400,10 @@ private struct AltaChoiceStyle: ButtonStyle {
     let on: Bool
 
     func makeBody(configuration: Configuration) -> some View {
-        Body(configuration: configuration, on: on)
+        ChoiceBody(configuration: configuration, on: on)
     }
 
-    private struct Body: View {
+    private struct ChoiceBody: View {
         let configuration: ButtonStyleConfiguration
         let on: Bool
         @State private var hover = false
