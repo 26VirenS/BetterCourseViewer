@@ -714,7 +714,7 @@ function draw(j) {
   var q = document.getElementById('q'), h = '<div class="alta-stimulus">' + (c.stimulus || '') + '</div><div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">';
   if (c.type === 'mcq') h += '<ul class="lrn-mcq-options">' + c.options.map(function (o, k) { return '<li class="lrn-mcq-option"><input type="radio" name="mcq" id="o' + k + '" value="' + o.value + '"><label for="o' + k + '" class="lrn-label">' + o.label.replace(/\\$_/g, '') + '</label></li>'; }).join('') + '</ul>';
   else if (c.type === 'clozetext') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="lrn_cloze_response"><input type="text" class="lrn_cloze_input"></span>' : ''); }).join('');
-  else if (c.type === 'clozeformula') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="mq-editable-field"><textarea></textarea><span class="mq-root-block"></span></span>' : ''); }).join('')
+  else if (c.type === 'clozeformula') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="mq-editable-field mq-math-mode"><textarea></textarea><span class="mq-root-block"></span><span class="mq-selectable" style="position:absolute;clip:rect(1em,1em,1em,1em)">$\\\\frac{1}{2}$</span></span>' : ''); }).join('')
     + '<div class="lrn-formula-keyboard" style="background:#eef0f2;padding:10px;margin-top:10px;display:inline-grid;grid-template-columns:repeat(4,44px);gap:6px;border-radius:6px">' + ['7', '8', '9', '\u00f7', '4', '5', '6', '\u00d7'].map(function (k) { return '<button class="lrn-formula-keyboard-key" style="width:44px;height:44px;border-radius:50%;background:#fff;color:#333;border:1px solid #c9ced3">' + k + '</button>'; }).join('') + '</div>';
   else h += '<div id="graph" style="width:300px;height:300px;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3">Desmos graph</div>';
   q.innerHTML = h + '</div><div id="fb" class="alta-feedback" role="alert" hidden></div><button id="check">Check Answer</button><button id="next" hidden>Next Question</button><button id="report" class="lrn-feedback-button">Feedback</button><button id="instr">More Instruction</button>';
@@ -728,8 +728,10 @@ function draw(j) {
     // (View Instruction: a lesson in the question's place — no question in it, only its words and Continue)
     document.getElementById('view').onclick = function () {
       d.remove();
-      document.getElementById('q').innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
+      document.getElementById('q').innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex">$$\\\\frac{d}{dx} x^2 = 2x$$</p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
       document.getElementById('lcont').onclick = function () { load(); };
+      // (its maths typeset a moment later, as MathJax 2 sets it: spans in MathJax's own fonts)
+      setTimeout(function () { var t = document.querySelector('.tex'); if (t) t.innerHTML = '<span class="mjx-chtml MathJax_CHTML"><span class="mjx-char MJXc-TeX-math-I" style="font-family: serif">x</span></span>'; }, 1500);
     };
   };
   document.getElementById('check').onclick = check;

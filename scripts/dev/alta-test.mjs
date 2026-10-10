@@ -111,6 +111,13 @@ try {
   const putF = await page.evaluate(() => window.__simplAlta.answer({ responseId: 'r-formula', type: 'clozeformula', blanks: ['-14/9'] }));
   const typedF = await page.$eval('#q .mq-editable-field textarea', (x) => x.value);
   check(putF.ok && typedF === '-14/9', `the answer typed in the popup is typed into Alta’s maths field (${typedF})`);
+  // (the mock's own question words are left untypeset; Alta's are typeset — set them plainly for this)
+  await page.evaluate(() => { document.querySelector('.alta-stimulus').textContent = 'Find the derivative at 1.'; });
+  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true }));
+  await page.waitForTimeout(700);
+  const fs = (await posts()).filter((p) => p.kind === 'focus').pop();
+  check(fs && fs.found && fs.raw === false, 'a maths field’s own hidden copy of what is typed ($\\frac{1}{2}$) is not taken for raw maths');
+  await page.evaluate(() => window.__simplAlta.focus({ on: false }));
   await page.evaluate(() => window.__simplAlta.check());
   const fF = await waitFor((p) => p.kind === 'feedback' && /Correct/.test(p.text) && p !== f1, 'a maths verdict');
   check(fF.verdict === 'correct', 'and Alta marks it right');
@@ -176,7 +183,10 @@ try {
   await page.waitForSelector('#view');
   const n3 = (await posts()).length;
   await page.click('#view');
-  const ls = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.found && p.hasCheck === false && p.next === true, 'the lesson');
+  const rawSeen = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.raw === true, 'raw maths');
+  check(!!rawSeen, 'the lesson’s maths still in its raw words is told (the popup covers it meanwhile)');
+  const ls = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.found && p.hasCheck === false && p.next === true && p.raw === false, 'the lesson');
+  check(!!ls, 'and told again once it is typeset');
   check(!!ls && (await vis('.alta-lesson')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')) && (await left('#lcont')) < -5000,
     'Alta’s lesson is shown alone (its header, title and objective card hidden, its Feedback put away), its Continue moved aside for the popup’s bar');
   const n4 = (await posts()).length;

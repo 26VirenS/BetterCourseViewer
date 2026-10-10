@@ -504,11 +504,28 @@ enum AltaHook {
         tell(true);
         return true;
       };
+      // (1.3.29) raw maths on show: words of TeX in the page's own text, not in a typesetter's keeping (MathQuill's copy
+      // of what is typed, MathJax's source, KaTeX's) and not hidden
+      var RAWTEX = /\\(begin\{|frac\{|displaystyle|left\(|color\{)/;
+      var rawIn = function (root) {
+        try {
+          var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), n, seen = 0;
+          while ((n = w.nextNode()) && seen++ < 20000) {
+            if (!RAWTEX.test(n.data)) continue;
+            var p = n.parentElement;
+            if (!p || p.closest('.mq-math-mode, script, style, textarea, .katex, mjx-container, [class*="mjx" i], [class*="MathJax" i]')) continue;
+            if (shown(p)) return true;
+          }
+        } catch (e) {}
+        return false;
+      };
       // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
       var told = '';
       var tell = function (found) {
         var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
-          dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0 };
+          dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0,
+          // (1.3.29) maths still in its raw words (\\frac{…}, \\begin{align}) in what is shown: its typesetter not done yet
+          raw: found && kept.some(rawIn) };
         var said = JSON.stringify(m);
         if (said !== told) { told = said; post(m); }
       };
@@ -747,6 +764,10 @@ final class AltaSession: ObservableObject {
     /// (1.3.28) What Alta's page offers to press: a Check (a question), or only Continue (a lesson).
     @Published private(set) var altaHasCheck = false
     @Published private(set) var altaCanNext = false
+    /// (1.3.29) The maths on Alta's page is still in its raw words, its typesetter not done: covered meanwhile, for ten
+    /// seconds at most.
+    @Published private(set) var altaRaw = false
+    @Published private(set) var rawGaveUp = false
     @Published private(set) var drawsItself = false
     private var css = ""
     @Published private(set) var liveTargets: [String: AltaReport.Target] = [:]
@@ -885,6 +906,16 @@ final class AltaSession: ObservableObject {
                 altaDialog = head["dialog"] as? Bool ?? false
                 altaHasCheck = head["hasCheck"] as? Bool ?? false
                 altaCanNext = head["next"] as? Bool ?? false
+                let raw = head["raw"] as? Bool ?? false
+                if raw && !altaRaw {
+                    rawGaveUp = false
+                    Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: 10_000_000_000)
+                        guard let self, self.altaRaw else { return }
+                        withAnimation(Motion.gentle) { self.rawGaveUp = true }
+                    }
+                }
+                altaRaw = raw
             }
         case "feedback":
             let timedOut = head["timedOut"] as? Bool ?? false
@@ -1376,8 +1407,12 @@ final class AltaSession: ObservableObject {
         return min(max(t?.progress ?? 0, 0), 1)
     }
 
-    /// (1.3.28) Alta's page shows a lesson (no Check, only Continue): the bar offers Continue.
-    var altaLesson: Bool { altaDrawn && altaFound && !altaHasCheck && altaCanNext }
+    /// (1.3.28) Alta's page shows a lesson: the bar offers Continue. (1.3.29: by what can be pressed — Continue, and no
+    /// Check that can be — whatever else is in the page.)
+    var altaLesson: Bool { altaDrawn && altaCanNext && !altaCanCheck }
+
+    /// (1.3.29) The maths being set out: Alta's page covered meanwhile.
+    var typesetting: Bool { altaDrawn && altaRaw && !rawGaveUp }
 
     /// The whole assignment's mastery, 0…1.
     var mastery: Double {
@@ -1423,13 +1458,14 @@ enum AltaTheme {
         // (everything but a graph, a picture or a video takes the popup's ground, lines and type; maths keeps its own type
         // — in :where(), weightless, so the answer box's own rules below win)
         let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)" + pad
-        let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not(.MathJax):not(.MathJax *)"
+        // (1.3.29) typeset maths is left wholly as its typesetter sets it — MathJax 2 (its MathJax_CHTML, mjx-chtml, mjx-char
+        // spans) and 3 (mjx-container), KaTeX, MathQuill — its own fonts and rules; it only takes the text's colour
+        let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not([class*=\"MathJax\" i]):not([class*=\"MathJax\" i] *):not([class*=\"mjx\" i]):not([class*=\"mjx\" i] *)"
         return """
         :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); --s-ground: \(ground); }
         html, body { background: transparent !important; color: var(--s-text) !important; }
         body { margin: 0 !important; padding: 12px 28px 120px !important; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif !important; -webkit-font-smoothing: antialiased; }
-        body :where(*\(others)) { background-color: transparent !important; background-image: none !important; color: inherit !important; border-color: var(--s-line) !important; box-shadow: none !important; text-shadow: none !important; }
-        body :where(*\(others)\(maths)) { font-family: inherit !important; }
+        body :where(*\(others)\(maths)) { background-color: transparent !important; background-image: none !important; color: inherit !important; border-color: var(--s-line) !important; box-shadow: none !important; text-shadow: none !important; font-family: inherit !important; }
         html body a\(others) { color: var(--s-accent) !important; }
         html body ::selection { background: var(--s-accent-soft) !important; }
         html body input[type=text]\(pad), html body input:not([type])\(pad), html body input[type=number]\(pad), html body textarea:not(.mq-textarea *)\(pad), html body select\(pad), html body .mq-editable-field\(pad), html body [contenteditable="true"]\(pad) {

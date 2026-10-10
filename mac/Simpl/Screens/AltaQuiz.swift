@@ -164,6 +164,14 @@ struct AltaQuizScreen: View {
                 AltaQuestionPane(session: session)
                     .transition(.opacity)
             }
+            // (1.3.29) the maths still being set out on Alta's page: covered until it is, not shown as raw words
+            if session.typesetting {
+                ZStack {
+                    PageGround()
+                    ProgressView("Setting out the maths…").font(.sBody)
+                }
+                .transition(.opacity)
+            }
         }
         // (1.3.25: in the bottom right corner)
         .overlay(alignment: .bottomTrailing) {
