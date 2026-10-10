@@ -666,30 +666,63 @@ function recordAnswer(courseId, quizId, subId, raw) {
 }
 
 // ---- API routing ------------------------------------------------------------------------------
-// (Mac 1.3.17) Alta's content answer for the mock assignment player, shaped as captured (Knewton_Alta_Skin_Dev_Reference):
-// three objectives, the second being worked on, 62% mastered. The answer key and the student's ids are in it on purpose.
-const MOCK_ALTA_CONTENT = {
-  assignmentId: 'a1',
-  states: [{
-    atom: {
-      id: { sequenceId: 's1', atomId: 'q1', variationId: 'v1' }, name: 'Graph piecewise functions', purpose: 'ASSESSES', dataType: 'LEARNOSITY_GENERIC_QUESTION',
-      learningObjectiveId: 'lo2',
-      data: { question: '<p>Which function is linear?</p>', content: { type: 'mcq', response_id: 'q1', correct_answer: { value: ['0'] }, success_condition: 'a=1' } },
-      learningObjective: { description: 'Graph piecewise functions', estimatedQuestionsLow: 4, estimatedQuestionsHigh: 10 },
+// (Mac 1.3.17) Alta's content answer for the mock assignment player, shaped as captured (Knewton_Alta_Skin_Dev_Reference),
+// one question a step: a multiple choice, a fill-in-the-blanks, then a Desmos graph (which the app leaves to Alta's
+// page). Three objectives, the second being worked on. The answer key and the student's ids are in it on purpose: the
+// app must never read them.
+let altaStep = 0;
+const ALTA_QUESTIONS = [
+  { lo: 'lo2', name: 'Graph piecewise functions', content: { type: 'mcq', response_id: 'r-mcq', stimulus: '<p>Which function is linear?</p>', options: [{ label: '$_f(x) = 3x + 2$_', value: '0' }, { label: '$_f(x) = x^2 - 1$_', value: '1' }, { label: '$_f(x) = 2^x$_', value: '2' }], correct_answer: { value: ['0'] }, validation: { valid_response: { value: ['0'] } } } },
+  { lo: 'lo2', name: 'Graph piecewise functions', content: { type: 'clozetext', response_id: 'r-cloze', stimulus: '<p>Read the line $$y = 3x + 2$$</p>', template: '<p>Its slope is {{response}} and its y-intercept is {{response}}.</p>', validation: { valid_response: { value: ['3', '2'] } } } },
+  { lo: 'lo3', name: 'Use piecewise functions', content: { type: 'custom', custom_type: 'desmos_blank_graph_question', response_id: 'r-graph', js: 'https://questions-va.learnosity.com/x.js', stimulus: '<p>Plot $_f(x)$_ in the graphing window.</p>', correct_answer: { a: 3 }, success_condition: 'a=3' } },
+];
+function altaContent() {
+  const q = ALTA_QUESTIONS[Math.min(altaStep, ALTA_QUESTIONS.length - 1)];
+  const mastery = [0.62, 0.7, 0.78][Math.min(altaStep, 2)];
+  return {
+    assignmentId: 'a1',
+    states: [{
+      atom: { id: { sequenceId: `s${altaStep}`, atomId: `q${altaStep}`, variationId: 'v1' }, name: q.name, purpose: 'ASSESSES', dataType: 'LEARNOSITY_GENERIC_QUESTION', learningObjectiveId: q.lo,
+        data: { question: '', content: q.content }, learningObjective: { description: q.name, estimatedQuestionsLow: 4, estimatedQuestionsHigh: 10 } },
+      compoundInstance: { id: `ci${altaStep}`, sequenceOrdinal: 1, state: 'SHOWN', type: 'ASSESS', source: 'ASSIGNMENT', userId: 'student-secret-id', registrationId: 'reg-secret' },
+    }],
+    enrollment: {
+      path: { name: 'Linear, Polynomial, and Piecewise Functions', type: 'ADAPTIVE', masteryThreshold: 100, started: true, ended: false,
+        pathLearningObjectives: [{ learningObjectiveId: 'lo1', topicId: 't1', description: 'Identify linear functions' }, { learningObjectiveId: 'lo2', topicId: 't1' }, { learningObjectiveId: 'lo3', topicId: 't2' }] },
+      startedAt: Date.now() - 2 * 864e5, completed: false,
+      dueDate: { effectiveDueDate: Date.now() + 2 * 864e5, lateSubmissionEnabled: true },
+      ltiEnrollment: { resultSourcedId: 'lti-secret', returnUrl: 'https://school.example/return' },
     },
-    compoundInstance: { state: 'SHOWN', type: 'ASSESS', source: 'ASSIGNMENT', userId: 'student-secret-id', registrationId: 'reg-secret' },
-  }],
-  enrollment: {
-    path: { name: 'Linear, Polynomial, and Piecewise Functions', type: 'ADAPTIVE', masteryThreshold: 100, started: true, ended: false,
-      pathLearningObjectives: [{ learningObjectiveId: 'lo1', topicId: 't1', description: 'Identify linear functions' }, { learningObjectiveId: 'lo2', topicId: 't1' }, { learningObjectiveId: 'lo3', topicId: 't2' }] },
-    startedAt: Date.now() - 2 * 864e5, completed: false,
-    dueDate: { effectiveDueDate: Date.now() + 2 * 864e5, lateSubmissionEnabled: true },
-    ltiEnrollment: { resultSourcedId: 'lti-secret', returnUrl: 'https://school.example/return' },
-  },
-  history: { sequences: [{ numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 1 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 0, numInstructional: 1 }] },
-  analytics: { percentComplete: 62, statusAndProgress: { status: 'in_progress', progress: 0.62, targets: [{ target_id: 'lref-lo1', progress: 1, status: 'complete' }, { target_id: 'lref-lo2', progress: 0.55 }, { target_id: 'lref-lo3', progress: 0.3 }] } },
-  stuckLo: null,
-};
+    history: { sequences: [{ numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 1 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 0, numInstructional: 1 }] },
+    analytics: { percentComplete: Math.round(mastery * 100), statusAndProgress: { status: 'in_progress', progress: mastery, targets: [{ target_id: 'lref-lo1', progress: 1, status: 'complete' }, { target_id: 'lref-lo2', progress: 0.55 + altaStep * 0.1 }, { target_id: 'lref-lo3', progress: 0.3 }] } },
+    stuckLo: null,
+  };
+}
+// the player's own script: the question drawn as Learnosity draws one, Check Answer marking it, Next Question asking for the next
+const ALTA_PLAYER_JS = `
+var key = null;
+function draw(j) {
+  var st = j.states[0], c = st.atom.data.content; key = c.validation ? c.validation.valid_response.value : (c.correct_answer && c.correct_answer.value) || null;
+  document.getElementById('objective').textContent = st.atom.learningObjective.description;
+  var q = document.getElementById('q'), h = '<div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">' + (c.stimulus || '');
+  if (c.type === 'mcq') h += '<ul class="lrn-mcq-options">' + c.options.map(function (o, k) { return '<li class="lrn-mcq-option"><input type="radio" name="mcq" id="o' + k + '" value="' + o.value + '"><label for="o' + k + '" class="lrn-label">' + o.label.replace(/\\$_/g, '') + '</label></li>'; }).join('') + '</ul>';
+  else if (c.type === 'clozetext') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="lrn_cloze_response"><input type="text" class="lrn_cloze_input"></span>' : ''); }).join('');
+  else h += '<div id="graph" style="width:300px;height:300px;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3">Desmos graph</div>';
+  q.innerHTML = h + '</div><div id="fb" class="alta-feedback" role="alert" hidden></div><button id="check">Check Answer</button><button id="next" hidden>Next Question</button>';
+  document.getElementById('check').onclick = check;
+  document.getElementById('next').onclick = function () { fetch('/mock-alta/api/next', { method: 'POST' }).then(load); };
+}
+function check() {
+  var given = [].slice.call(document.querySelectorAll('#q input:checked')).map(function (i) { return i.value; });
+  if (!given.length) given = [].slice.call(document.querySelectorAll('#q input[type=text]')).map(function (i) { return i.value.trim(); });
+  var ok = key && JSON.stringify(given) === JSON.stringify(key);
+  var r = document.querySelector('.learnosity-response'); r.classList.add(ok ? 'lrn_correct' : 'lrn_incorrect');
+  var fb = document.getElementById('fb'); fb.hidden = false; fb.textContent = ok ? 'Correct! Nicely done.' : 'Incorrect. A linear function has the form f(x) = mx + b.';
+  document.getElementById('check').hidden = true; document.getElementById('next').hidden = false;
+}
+function load() { return fetch('/mock-alta/api/content?assignmentId=a1').then(function (r) { return r.json(); }).then(draw); }
+load();
+`;
 
 const routes = [];
 const on = (method, re, handler) => routes.push([method, re, handler]);
@@ -1070,6 +1103,8 @@ const homeworkTools = {
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (url, m) => {
   const q = url.searchParams;
   const what = q.get('assignment_id') ? `assignment ${q.get('assignment_id')}` : q.get('module_item_id') ? `module item ${q.get('module_item_id')}` : q.get('id') ? `tool ${q.get('id')}` : 'a launch URL';
+  // (Mac 1.3.17) Knewton Alta: Unit 2 launches the stand-in for Alta's assignment player
+  if (q.get('assignment_id') === '4003') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1/practice` };
   return { id: q.get('id') || '9', name: 'Resources & Policy', url: `http://localhost:${port}/mock-tool?for=${encodeURIComponent(what)}&course=${m[1]}` };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));
@@ -1196,12 +1231,14 @@ const server = http.createServer((req, res) => {
     }
     if (path.startsWith('/cc/')) return ccMock(req, res, path, raw); // (the conversion service, another host altogether)
     // (Mac 1.3.17) a stand-in for a Knewton Alta assignment's player: Alta's shell (its header, Practice, the Current
-    // objective card, a question) and its content answer — fetched by the page as Alta's own is, with an answer key and a
-    // student id in it that the app must never read (scripts/dev/alta-test.mjs checks the page script leaves them be)
-    if (path === '/mock-alta/api/content') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify(MOCK_ALTA_CONTENT)); } // (plain JSON, as Alta sends it: no Canvas guard in front)
+    // objective card) round a question drawn as Learnosity draws one, and Alta's content answer — plain JSON, fetched by
+    // the page as Alta's own is — with Check Answer and Next Question as Alta has them
+    if (path === '/mock-alta/api/content') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify(altaContent())); }
+    if (path === '/mock-alta/api/next') { altaStep = Math.min(altaStep + 1, ALTA_QUESTIONS.length - 1); res.writeHead(204); return res.end(); }
+    if (path === '/mock-alta/api/reset') { altaStep = 0; res.writeHead(204); return res.end(); }
     if (path.startsWith('/mock-alta/')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}.q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn_mcqgroup label{display:block;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}#graph{width:300px;height:300px;margin-top:12px;background:#fff;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div class="q learnosity-item"><p>Which function is linear?</p><div class="lrn_mcqgroup"><label><input type="radio" name="a"> f(x) = 3x + 2</label><label><input type="radio" name="a"> f(x) = x² − 1</label><label><input type="radio" name="a"> f(x) = 2ˣ</label></div><div id="graph">Desmos graph</div><button>Check answer</button></div></main><button id="help">Help</button><script>fetch('/mock-alta/api/content?assignmentId=a1').then(function(r){return r.json()}).then(function(j){document.getElementById('objective').textContent=j.states[0].atom.learningObjective.description;});</script></body></html>`);
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}#q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn-mcq-option{list-style:none;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}.lrn_correct{outline:3px solid #2e7d32}.lrn_incorrect{outline:3px solid #c62828}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div id="q"></div></main><button id="help">Help</button><script>${ALTA_PLAYER_JS}</script></body></html>`);
     }
     // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
     // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.

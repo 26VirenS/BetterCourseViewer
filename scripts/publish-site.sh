@@ -53,6 +53,32 @@ json.dump(feed, open("build/site-sync/public/app/mac-latest.json", "w"), indent=
 print("/app/mac-latest.json → " + version)
 ' "$REPO" || echo "no Simpl for Mac feed written"
   fi
+  # (1.3.17) the beta feed, /app/mac-beta.json, for Macs with Get beta updates on: the newest mac-v* release of all, a
+  # beta (a pre-release) or not — so a beta Mac also moves on to a release newer than its beta
+  BETA_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
+  if [ -n "$BETA_REL" ] && [ "$BETA_REL" != "null" ]; then
+    mkdir -p build/site-sync/public/app
+    printf '%s' "$BETA_REL" | python3 -c '
+import json, sys
+rel, repo = json.loads(sys.stdin.read()), sys.argv[1]
+tag = rel["tag_name"]; version = tag[len("mac-v"):]
+asset = next((a for a in rel.get("assets", []) if a.get("name") == f"Simpl-Mac-{version}.zip"), None)
+if not asset: sys.exit("no zip on " + tag)
+digest = asset.get("digest") or ""
+feed = {
+  "version": version,
+  "url": asset["browser_download_url"],
+  "sha256": digest[7:] if digest.startswith("sha256:") else "",
+  "size": asset.get("size"),
+  "minimumOS": "14.0",
+  "notes": rel.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}",
+  "published": rel.get("published_at"),
+  "beta": bool(rel.get("prerelease")),
+}
+json.dump(feed, open("build/site-sync/public/app/mac-beta.json", "w"), indent=2)
+print("/app/mac-beta.json → " + version + (" (beta)" if feed["beta"] else ""))
+' "$REPO" || echo "no Simpl for Mac beta feed written"
+  fi
 fi
 (
   cd build/site-sync

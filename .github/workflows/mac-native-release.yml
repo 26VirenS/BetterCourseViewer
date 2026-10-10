@@ -5,6 +5,11 @@ name: Simpl for Mac release
 
 on:
   workflow_dispatch:
+    inputs:
+      beta:
+        description: 'Publish as a beta (a pre-release: only Macs with Get beta updates on take it)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -36,6 +41,7 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ github.token }}
+          MAC_BETA: ${{ inputs.beta && '1' || '' }}
         run: bash scripts/release-mac-native.sh
       - name: Keep this build for the next
         if: success()

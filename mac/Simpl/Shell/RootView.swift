@@ -44,6 +44,11 @@ struct RootView: View {
                 .environmentObject(engine)
                 .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
         }
+        .sheet(item: $engine.alta) { a in
+            AltaQuizScreen(launch: a)
+                .environmentObject(engine)
+                .modifier(UpdateHold()) // (nor while an Alta assignment is open)
+        }
         .sheet(isPresented: $engine.setup) {
             SetupScreen()
                 .environmentObject(engine)

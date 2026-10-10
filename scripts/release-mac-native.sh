@@ -124,14 +124,21 @@ echo "✅ $ZIP ($SIZE bytes, sha256 $SHA)"
 
 # ---- the release: a new one, never one replaced ---------------------------------------------------------------
 NOTES="$TMP/notes.md"
+# (1.3.17) a beta (MAC_BETA=1, the workflow's beta switch): a pre-release, which only the beta feed (/app/mac-beta.json)
+# offers — to Macs with Settings ▸ Updates ▸ Get beta updates on; the usual feed passes it over
+BETA_TITLE=""; BETA_FLAG=(); BETA_LINE=""
+if [ -n "${MAC_BETA:-}" ]; then
+  BETA_TITLE=" Beta"; BETA_FLAG=(--prerelease)
+  BETA_LINE=$'\n**This is a beta.** Only Macs with *Settings ▸ Updates ▸ Get beta updates* on are offered it.\n'
+fi
 cat > "$NOTES" <<EOF
-**Simpl for Mac $VERSION** (build $BUILD) — the native Mac app, with Simpl's interface $INTERFACE inside.
-
+**Simpl for Mac $VERSION$BETA_TITLE** (build $BUILD) — the native Mac app, with Simpl's interface $INTERFACE inside.
+$BETA_LINE
 Download **$ZIP_NAME**, open it, and move **Simpl** to Applications. It is signed with the team's Developer ID and notarized by Apple. It needs macOS 14 or later, and runs on Apple silicon and Intel Macs.
 
 This is not the Safari extension: that stays **Simpl Courses** (the \`Simpl-Courses-Mac-…\` download on the web releases).
 
 SHA-256: \`$SHA\`
 EOF
-gh release create "$TAG" "$ZIP" --target "${GITHUB_SHA:-HEAD}" --title "Simpl for Mac $VERSION" --notes-file "$NOTES"
+gh release create "$TAG" "$ZIP" --target "${GITHUB_SHA:-HEAD}" --title "Simpl for Mac $VERSION$BETA_TITLE" --notes-file "$NOTES" ${BETA_FLAG[@]+"${BETA_FLAG[@]}"}
 echo "✅ https://github.com/${GITHUB_REPOSITORY:-26VirenS/BetterCourseViewer}/releases/tag/$TAG"

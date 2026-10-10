@@ -782,6 +782,13 @@ private struct UpdatesPane: View {
                         .foregroundStyle(.secondary)
                 }
                 .disabled(Updater.isDevelopmentRun)
+                Toggle(isOn: $updater.beta) {
+                    Text("Get beta updates").font(.sBody)
+                    Text("Try new features before everyone else. A beta may have rough edges; turn this off to go back to the usual releases when the next one comes out.")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(Updater.isDevelopmentRun)
                 UpdateStatusRow(updater: updater)
                 if let notes {
                     Text(notes)
@@ -1008,7 +1015,7 @@ private struct VersionRow: View {
                     .disabled(busy)
             }
         } label: {
-            Text("Simpl \(release.version)").font(.sBody)
+            Text("Simpl \(release.version)\(release.beta ? " Beta" : "")").font(.sBody)
             if let detail = release.detail {
                 Text(detail).font(.sCallout).foregroundStyle(.secondary)
             }

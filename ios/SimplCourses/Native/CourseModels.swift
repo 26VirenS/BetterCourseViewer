@@ -280,6 +280,10 @@ struct AssignmentData: Codable {
     var quizUrl: String?
     var quizId: String?
     var toolUrl: String?
+    /// (Mac 1.3.17) The site the assignment's tool opens (www.knewtonalta.com: the Alta popup).
+    var toolHost: String?
+    /// (Mac 1.3.17) The tool is Knewton Alta.
+    var alta: Bool?
     var ltiQuiz: Bool?
     var discussionUrl: String?
     var canvasUrl: String?

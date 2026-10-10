@@ -740,7 +740,11 @@ struct AssignmentView: View {
         } else if let u = d.discussionUrl {
             engine.go(u, title: d.title)
         } else if d.toolUrl != nil {
-            engine.openTool(.assignment(course: course, id: id, title: d.title))
+            if d.alta == true {
+                engine.alta = AltaLaunch(course: course, assignment: id, title: d.title) // (1.3.17: Knewton Alta, as a quiz)
+            } else {
+                engine.openTool(.assignment(course: course, id: id, title: d.title))
+            }
         }
     }
 

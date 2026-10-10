@@ -12,6 +12,8 @@ struct AppRelease: Equatable, Identifiable, Sendable {
     var size: Int? = nil
     var notes: String? = nil
     var published: Date? = nil
+    /// (1.3.17) A beta (published on GitHub as a pre-release).
+    var beta = false
     var id: String { version }
 }
 
@@ -47,13 +49,24 @@ final class Updater: ObservableObject {
 
     static let shared = Updater()
 
-    /// The feed: Info.plist's `SimplUpdateFeed` when it names one (a test feed), else the site's.
-    let feedURL: URL = {
-        let fallback = URL(string: "https://simplcourses.com/app/mac-latest.json")!
+    /// The feed: Info.plist's `SimplUpdateFeed` when it names one (a test feed), else the site's — its beta feed
+    /// (1.3.17) for a Mac that asked for betas: the newest version of all, a beta or not.
+    var feedURL: URL {
         let s = (Bundle.main.object(forInfoDictionaryKey: "SimplUpdateFeed") as? String) ?? ""
-        guard !s.isEmpty, !s.hasPrefix("$("), let url = URL(string: s) else { return fallback }
-        return url
-    }()
+        if !s.isEmpty, !s.hasPrefix("$("), let url = URL(string: s) { return url }
+        return beta ? Self.betaFeed : Self.stableFeed
+    }
+    static let stableFeed = URL(string: "https://simplcourses.com/app/mac-latest.json")!
+    static let betaFeed = URL(string: "https://simplcourses.com/app/mac-beta.json")!
+    /// (1.3.17) Betas too (Settings ▸ Updates): the beta feed is read in place of the usual one. Turned off, Simpl stays
+    /// on a beta it has until a release newer than it comes.
+    @Published var beta: Bool = UserDefaults.standard.bool(forKey: "SimplBetaUpdates") {
+        didSet {
+            guard beta != oldValue else { return }
+            UserDefaults.standard.set(beta, forKey: "SimplBetaUpdates")
+            check()
+        }
+    }
     /// Simpl for Mac's releases, for Earlier Versions (each `mac-v<version>`, its zip `Simpl-Mac-<version>.zip`).
     private static let releasesAPI = "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases"
     let interval: TimeInterval = 3600 // (1.2.19: every hour; a check is one small request)
@@ -173,12 +186,19 @@ final class Updater: ObservableObject {
     }
 
     private func read() async {
-        var request = URLRequest(url: feedURL)
-        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.timeoutInterval = 20
+        func ask(_ url: URL) async throws -> (Data, URLResponse) {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            request.timeoutInterval = 20
+            return try await URLSession.shared.data(for: request)
+        }
         let outcome: State
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            var (data, response) = try await ask(feedURL)
+            // (no beta feed yet: the usual one, which is the newest there is)
+            if feedURL == Self.betaFeed, (response as? HTTPURLResponse)?.statusCode == 404 {
+                (data, response) = try await ask(Self.stableFeed)
+            }
             outcome = evaluate(data, response)
         } catch {
             outcome = .failed("Simpl could not reach the update feed: \(error.localizedDescription)")
@@ -221,7 +241,7 @@ final class Updater: ObservableObject {
         let sha = (json["sha256"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let size = (json["size"] as? NSNumber)?.intValue
         let published = (json["published"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
-        return .available(AppRelease(version: version, url: url, sha256: (sha ?? "").isEmpty ? nil : sha, size: size, notes: json["notes"] as? String, published: published))
+        return .available(AppRelease(version: version, url: url, sha256: (sha ?? "").isEmpty ? nil : sha, size: size, notes: json["notes"] as? String, published: published, beta: json["beta"] as? Bool ?? false))
     }
 
     /// 1.10 is newer than 1.9, and 2.0 than 1.12; a missing part counts as 0.
@@ -391,7 +411,7 @@ final class Updater: ObservableObject {
                 var sha: String?
                 if let digest = asset["digest"] as? String, digest.hasPrefix("sha256:") { sha = String(digest.dropFirst(7)) }
                 let published = (r["published_at"] as? String).flatMap { iso.date(from: $0) }
-                out.append(AppRelease(version: version, url: zip, sha256: sha, size: (asset["size"] as? NSNumber)?.intValue, published: published))
+                out.append(AppRelease(version: version, url: zip, sha256: sha, size: (asset["size"] as? NSNumber)?.intValue, published: published, beta: (r["prerelease"] as? Bool) == true))
             }
             if list.count < 100 { break }
         }

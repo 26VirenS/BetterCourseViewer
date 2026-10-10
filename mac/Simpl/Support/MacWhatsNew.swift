@@ -10,7 +10,8 @@ import Foundation
 enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.17", date: "2026-10-10", notes: [
-            ReleaseNote(kind: "new", title: "Alta as a quiz", body: "Knewton Alta shows its objectives and a mastery bar."),
+            ReleaseNote(kind: "new", title: "Alta as a quiz", body: "Open Tool on Alta opens a quiz with objectives and mastery."),
+            ReleaseNote(kind: "new", title: "Beta updates", body: "Settings ▸ Updates can now get beta versions early."),
         ]),
         Release(version: "1.3.16", date: "2026-10-10", notes: [
             ReleaseNote(kind: "improved", title: "Counters open in place", body: "A counter's list opens over its own card, not a corner."),

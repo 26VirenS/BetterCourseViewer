@@ -31,6 +31,8 @@ struct HTMLBlock: NSViewRepresentable {
     let base: URL
     var size: CGFloat = 14
     @Binding var height: CGFloat
+    /// (1.3.17) Maths written as TeX ($$…$$, Alta's $_…$_, \(…\), \[…\]) typeset with the KaTeX the app carries.
+    var math = false
     let onLink: (URL) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -40,6 +42,7 @@ struct HTMLBlock: NSViewRepresentable {
         config.websiteDataStore = .default()
         let ucc = WKUserContentController()
         ucc.add(WeakHandler(context.coordinator), name: "size")
+        if math { for s in TeX.scripts { ucc.addUserScript(s) } } // (before the sizer: it measures the typeset page)
         ucc.addUserScript(WKUserScript(source: HTMLBlock.sizer, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         config.userContentController = ucc
         let v = PassThroughWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 24), configuration: config)
@@ -140,4 +143,38 @@ final class WeakHandler: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         target?.userContentController(userContentController, didReceive: message)
     }
+}
+
+/// (1.3.17) TeX in a page, typeset with the KaTeX the app carries (the extension's own copy, lib/vendor/katex): its
+/// script and its stylesheet put in first, then every $$…$$, $_…$_ (Knewton Alta's inline maths), \[…\] and \(…\) in
+/// the page's text typeset in place. With no KaTeX to hand the TeX stays as written.
+enum TeX {
+    static let folder: URL? = Bundle.main.url(forResource: "extension", withExtension: nil)?.appendingPathComponent("lib/vendor/katex", isDirectory: true)
+
+    static let scripts: [WKUserScript] = {
+        guard let dir = folder,
+              let katex = try? String(contentsOf: dir.appendingPathComponent("katex.min.js"), encoding: .utf8),
+              let css = try? String(contentsOf: dir.appendingPathComponent("katex-css.js"), encoding: .utf8) else { return [] }
+        // (the stylesheet's fonts from the app's own copies: url(fonts/…) pointed at the folder they are in)
+        let fonts = dir.appendingPathComponent("fonts", isDirectory: true).absoluteString
+        let place = "(function(){try{var c=String(self.BCV_KATEX_CSS||'').split('url(fonts/').join('url(\(fonts)');var s=document.createElement('style');s.textContent=c;(document.head||document.documentElement).appendChild(s);}catch(e){}})();"
+        return [
+            WKUserScript(source: css + "\n" + place, injectionTime: .atDocumentEnd, forMainFrameOnly: true),
+            WKUserScript(source: katex, injectionTime: .atDocumentEnd, forMainFrameOnly: true),
+            WKUserScript(source: typeset, injectionTime: .atDocumentEnd, forMainFrameOnly: true),
+        ]
+    }()
+
+    static let typeset = #"""
+    (function () {
+      if (!window.katex || !document.body) return;
+      var dec = function (t) { var x = document.createElement('textarea'); x.innerHTML = t.replace(/<br\s*\/?>/gi, ' '); return x.value; };
+      var tex = function (t, display) { try { return katex.renderToString(dec(t), { displayMode: display, throwOnError: false }); } catch (e) { return t; } };
+      document.body.innerHTML = document.body.innerHTML
+        .replace(/\$\$([\s\S]+?)\$\$/g, function (m, t) { return tex(t, true); })
+        .replace(/\$_([\s\S]+?)\$_/g, function (m, t) { return tex(t, false); })
+        .replace(/\\\[([\s\S]+?)\\\]/g, function (m, t) { return tex(t, true); })
+        .replace(/\\\(([\s\S]+?)\\\)/g, function (m, t) { return tex(t, false); });
+    })();
+    """#
 }

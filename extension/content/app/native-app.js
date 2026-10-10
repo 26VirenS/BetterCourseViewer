@@ -1365,6 +1365,10 @@
       types: here, allowed: (a.allowed_extensions || []).map((x) => String(x).toLowerCase()), canSubmit, why, resubmit: !!sub.submitted_at,
       quizUrl: isQuiz && a.quiz_id ? `/courses/${cid}/quizzes/${a.quiz_id}` : null, quizId: isQuiz && a.quiz_id ? String(a.quiz_id) : null,
       toolUrl: types.includes('external_tool') || ltiQuiz ? `/courses/${cid}/assignments/${aid}?bcv=native` : null, ltiQuiz,
+      // (Mac 1.3.17) the site the tool opens, and whether it is Knewton Alta (its address, or a title that names it, as
+      // hub.js toolNameOf reads one): Alta's assignments open in the Mac's own quiz-style popup
+      toolHost: (() => { try { const u = a.external_tool_tag_attributes?.url; return u ? new URL(u, location.origin).hostname : null; } catch { return null; } })(),
+      alta: (types.includes('external_tool') || ltiQuiz) && (/knewton/i.test(a.external_tool_tag_attributes?.url || '') || /^\s*knewton alta\b/i.test(a.name || '')),
       discussionUrl: a.discussion_topic?.id ? `/courses/${cid}/discussion_topics/${a.discussion_topic.id}` : null,
       canvasUrl: `/courses/${cid}/assignments/${aid}?bcv=native`,
       comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: String(cm.comment || '').trim() || (cm.media_comment ? 'Media comment' : ''), /* (trimmed: Canvas keeps the blank lines round a comment) */ attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),

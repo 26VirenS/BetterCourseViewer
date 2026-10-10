@@ -56,15 +56,18 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
 
-- **Knewton Alta as a quiz (1.3.17, Mac only).** An Alta assignment open in a tool window gets the quiz's frame round
-  Alta's own page (`Shell/AltaSkin.swift`): its objectives as the quiz's tiles (the one being worked on filled, a
-  mastered one ticked, the rest filling as they are mastered) with each by name and its own bar, and a mastery bar where
-  the quiz has its progress, with what is being worked on, about how many questions it takes, the last answers and the
-  due date. On a narrow window both sit in a strip over the page. The page is Alta's, untouched: a script in it
-  (`AltaHook`, Alta's hosts only) reads a copy of Alta's own `content` answer and passes the app only those facts —
-  never the answer key or the student's identity — and nothing is answered, hidden or sent anywhere. The reference:
-  *Knewton Alta Skin: Dev Reference* and its spreadsheet (2026-10-10). `scripts/dev/alta-test.mjs` checks the script;
-  the mock's `/mock-alta/…` page is shot as `21a-alta`.
+- **Knewton Alta as a quiz (1.3.17, Mac only).** Open Tool on a Knewton Alta assignment (the engine's `alta`: its launch
+  address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): the objectives down the left
+  as the quiz's tiles (the one being worked on filled, a mastered one ticked, the rest filling as they are mastered),
+  each by name with its own bar, and the total mastery bar; in the rest, the question drawn by the app — its maths
+  typeset with the KaTeX the app carries, a multiple choice as the quiz's option rows, blanks as fields, drop-downs as
+  menus, a written answer — with Check, Alta's verdict and its words, and Continue. Alta still sets and marks every
+  question: `Engine/AltaSession.swift` keeps Alta open, signed in through Canvas, on a page out of sight; a script in it
+  (`AltaHook`, Alta's hosts only) reads a copy of Alta's own `content` answer — never the answer key or who the student
+  is — puts the student's answer into Alta's question as a click or typing would, presses Alta's Check and Continue, and
+  reads the verdict back. A question the app does not draw (a Desmos graph, a formula, a lesson) shows Alta's own page
+  in its place, as does Alta's Page in the top bar. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running
 
@@ -106,6 +109,11 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   test): `{ "version": "1.2", "url": "<the zip>", "sha256": "<hex>", "size": 41404983, "notes": "…",
   "published": "<ISO 8601>", "minimumOS": "14.0" }`. Only `version` and `url` are required. A version newer
   than the app's `CFBundleShortVersionString` is offered unless its `minimumOS` is above the Mac's macOS.
+- **Betas (1.3.17).** *Settings ▸ Updates ▸ Get beta updates* reads `https://simplcourses.com/app/mac-beta.json`
+  instead (the usual feed when there is none yet): the newest `mac-v*` release of all, a beta or not, with
+  `"beta": true` when it is one. A beta is released with the release workflow's **beta** switch on: a GitHub
+  pre-release, *Simpl for Mac <version> Beta*, which the usual feed passes over (`scripts/publish-site.sh` writes both
+  feeds). Turned off, a Mac stays on the beta it has until a release newer than it comes. Earlier Versions marks betas.
 - **When.** At launch when the last check is more than four hours old, then every four hours (looked at every ten
   minutes and whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check
   for Updates…** or *Check Now* in **Settings ▸ Updates**. The menu opens Settings on Updates when there is a version

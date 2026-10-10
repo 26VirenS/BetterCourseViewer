@@ -1,98 +1,91 @@
-// Simpl for Mac 1.3.17: the Knewton Alta frame's page script (mac/Simpl/Shell/AltaSkin.swift, AltaHook.source), run in
-// a stand-in page. It must pass the app the assignment, its objectives and their mastery from Alta's content answer;
-// never the answer key or who the student is; leave Alta's own requests and answers as they were; and do nothing at all
-// on any page but Alta's.
+// Simpl for Mac 1.3.17: the Knewton Alta popup's page script (mac/Simpl/Engine/AltaSession.swift, AltaHook.source).
+// First in a stand-in page: it does nothing on any site but Alta's. Then in Chromium on the mock's Alta player
+// (scripts/dev/mock-canvas.mjs, /mock-alta/…): it passes the app each question and the objectives' mastery from Alta's
+// content answer, never the answer key or who the student is; it puts an answer given in the popup into Alta's own
+// question, presses Alta's Check and reads the verdict back, and presses Continue for the next question.
 //   node scripts/dev/alta-test.mjs
 import { readFileSync } from 'node:fs';
+import { spawn, execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import vm from 'node:vm';
 
-const swift = readFileSync(new URL('../../mac/Simpl/Shell/AltaSkin.swift', import.meta.url), 'utf8');
+const ROOT = new URL('../../', import.meta.url).pathname;
+const swift = readFileSync(join(ROOT, 'mac/Simpl/Engine/AltaSession.swift'), 'utf8');
 const m = /static let source = #"""\n([\s\S]*?)\n\s*"""#/.exec(swift);
-if (!m) { console.error('AltaHook.source not found in AltaSkin.swift'); process.exit(1); }
+if (!m) { console.error('AltaHook.source not found in AltaSession.swift'); process.exit(1); }
 const source = m[1];
 
 let failed = 0;
 const check = (ok, what) => { console.log(`  ${ok ? '✓' : '✗'} ${what}`); if (!ok) failed++; };
+const SECRETS = ['student-secret-id', 'reg-secret', 'lti-secret', 'school.example', 'correct_answer', 'success_condition', 'valid_response', 'a=3'];
 
-// Alta's content answer, shaped as captured — with an answer key and the student's ids in it on purpose
-const CONTENT = {
-  assignmentId: 'a1',
-  states: [{
-    atom: {
-      name: 'Graph piecewise functions', purpose: 'ASSESSES', dataType: 'LEARNOSITY_GENERIC_QUESTION', learningObjectiveId: 'lo2',
-      data: { question: '<p>Q</p>', content: { type: 'custom', custom_type: 'desmos_blank_graph_question', correct_answer: { a: 3, s_1: 1 }, success_condition: 'a=3' } },
-      learningObjective: { description: 'Graph piecewise functions', estimatedQuestionsLow: 4, estimatedQuestionsHigh: 10 },
-    },
-    compoundInstance: { state: 'SHOWN', type: 'ASSESS', source: 'PRACTICE', userId: 'student-secret-id', registrationId: 'reg-secret' },
-  }],
-  enrollment: {
-    path: { name: 'Linear, Polynomial, and Piecewise Functions', type: 'ADAPTIVE', masteryThreshold: 100, ended: false,
-      pathLearningObjectives: [{ learningObjectiveId: 'lo1', description: 'Identify linear functions' }, { learningObjectiveId: 'lo2' }, { learningObjectiveId: 'lo3' }] },
-    startedAt: 1, completed: false, dueDate: { effectiveDueDate: 1760000000000, lateSubmissionEnabled: true },
-    ltiEnrollment: { resultSourcedId: 'lti-secret', returnUrl: 'https://school.example/return' },
-  },
-  history: { sequences: [{ numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 1 }] },
-  analytics: { percentComplete: 62, statusAndProgress: { status: 'in_progress', progress: 0.62, targets: [{ target_id: 'lref-lo1', progress: 1, status: 'complete' }, { target_id: 'lref-lo2', progress: 0.55 }] } },
-  stuckLo: null,
-};
-const SECRETS = ['student-secret-id', 'reg-secret', 'lti-secret', 'school.example', 'correct_answer', 'success_condition', 'a=3', 's_1'];
-
-/** A page at `href`, the script run in it, Alta's content answer fetched (and asked for by XHR too). What it posted. */
-async function page(href) {
-  const url = new URL(href);
+console.log('the Alta popup’s page script, off Alta');
+{
   const posted = [];
-  const body = JSON.stringify(CONTENT);
-  const realFetch = async (u) => new Response(body, { headers: { 'content-type': 'application/json' } });
-  Object.defineProperty(realFetch, 'name', { value: 'realFetch' });
-  class XHR {
-    constructor() { this.listeners = {}; this.responseType = ''; }
-    open(method, u) { this.u = u; }
-    addEventListener(k, f) { (this.listeners[k] ||= []).push(f); }
-    send() { this.responseText = body; this.responseURL = new URL(this.u, url).href; queueMicrotask(() => (this.listeners.load || []).forEach((f) => f())); }
-  }
-  const history = { pushState() {}, replaceState() {} };
-  const win = {
-    location: { hostname: url.hostname, pathname: url.pathname },
-    fetch: realFetch, XMLHttpRequest: XHR, history, Response, JSON, setTimeout, queueMicrotask,
-    addEventListener() {},
-    webkit: { messageHandlers: { simplAlta: { postMessage: (s) => posted.push(s) } } },
-  };
+  const realFetch = async () => new Response('{}', { headers: { 'content-type': 'application/json' } });
+  const win = { location: { hostname: 'school.instructure.com', pathname: '/courses/1' }, fetch: realFetch, XMLHttpRequest: function () {}, history: {}, addEventListener() {}, webkit: { messageHandlers: { simplAlta: { postMessage: (s) => posted.push(s) } } } };
+  win.XMLHttpRequest.prototype = { open() {}, send() {} };
+  const open0 = win.XMLHttpRequest.prototype.open;
   win.window = win;
   vm.createContext(win);
   vm.runInContext(source, win);
-  const r = await win.fetch(new URL('/learn/api/content?x=1', url).href);
-  const fromAlta = await r.json(); // (what Alta's own page reads from its answer)
-  const x = new win.XMLHttpRequest();
-  x.open('GET', '/learn/api/content?x=2');
-  x.send();
-  await new Promise((done) => setTimeout(done, 20));
-  return { posted, fromAlta, fetchSwapped: win.fetch !== realFetch };
+  check(posted.length === 0 && win.fetch === realFetch && win.XMLHttpRequest.prototype.open === open0 && !win.__simplAlta, 'on any other site it does nothing: nothing passed, fetch and XHR left as they were');
 }
 
-console.log('the Alta frame’s page script');
-{
-  const { posted, fromAlta } = await page('https://www.knewtonalta.com/learn/course/c1/assignment/a1/practice');
-  const content = posted.map((s) => JSON.parse(s)).filter((p) => p.kind === 'content');
-  const where = posted.map((s) => JSON.parse(s)).find((p) => p.kind === 'page');
-  check(where?.assignment === true, 'on an Alta assignment it says the page is an assignment’s player');
-  check(content.length === 2, `Alta’s content answer is read, by fetch and by XHR alike (${content.length})`);
-  const c = content[0] || {};
-  check(c.name === 'Linear, Polynomial, and Piecewise Functions' && c.threshold === 100 && c.percent === 62 && c.status === 'in_progress', 'it passes the assignment, its threshold and its mastery');
-  check(c.objectives?.length === 3 && c.objectives[0].name === 'Identify linear functions' && c.targets?.[1]?.id === 'lo2' && c.targets?.[1]?.progress === 0.55, 'and each objective, with its mastery (lref- taken off the target’s id)');
-  check(c.current?.id === 'lo2' && c.current?.name === 'Graph piecewise functions' && c.current?.low === 4 && c.current?.high === 10 && c.current?.source === 'PRACTICE' && c.current?.item === 'desmos_blank_graph_question', 'and the objective on screen, its estimate, practice mode, and the item’s kind');
-  check(c.history?.length === 2 && c.history[0].right === 1 && c.history[1].wrong === 1, 'and how the last answers went');
-  const all = posted.join('\n');
+console.log('\nin Chromium, on the mock’s Alta player');
+const PORT = 8881;
+const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT)], { stdio: 'ignore' });
+const stop = () => { try { mock.kill(); } catch { /* gone */ } };
+process.on('exit', stop);
+const BASE = `http://localhost:${PORT}`;
+for (let i = 0; i < 50; i++) { try { await fetch(`${BASE}/mock-alta/api/reset`); break; } catch { await new Promise((r) => setTimeout(r, 100)); } }
+await fetch(`${BASE}/mock-alta/api/reset`);
+
+const { chromium } = createRequire(join(execSync('npm root -g').toString().trim(), 'x.js'))('playwright');
+const browser = await chromium.launch();
+try {
+  const page = await browser.newPage();
+  await page.addInitScript(() => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
+  await page.addInitScript({ content: source });
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1/practice`);
+  const posts = async () => (await page.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
+  const waitFor = async (test, what) => {
+    for (let i = 0; i < 60; i++) { const p = (await posts()).filter(test); if (p.length) return p[p.length - 1]; await page.waitForTimeout(100); }
+    throw new Error(`no ${what} came`);
+  };
+  const content = async (type) => waitFor((p) => p.kind === 'content' && p.question?.type === type, `${type} question`);
+
+  const c1 = await content('mcq');
+  const q1 = c1.question;
+  check(c1.name === 'Linear, Polynomial, and Piecewise Functions' && c1.percent === 62 && c1.objectives.length === 3 && c1.targets[1].id === 'lo2' && c1.current.id === 'lo2', 'it passes the assignment, its objectives and their mastery');
+  check(q1.responseId === 'r-mcq' && q1.options.length === 3 && q1.options[0].label === '$_f(x) = 3x + 2$_' && /Which function is linear/.test(q1.prompt) && !q1.multiple, 'and the question: what it asks and its options, as Alta’s answer has them');
+  const put = await page.evaluate(() => window.__simplAlta.answer({ responseId: 'r-mcq', type: 'mcq', picks: [0], labels: ['$_f(x) = 3x + 2$_'], values: ['0'] }));
+  check(put.ok && (await page.isChecked('#o0')) && !(await page.isChecked('#o1')), 'an option picked in the popup is picked in Alta’s question, as a click would');
+  check((await page.evaluate(() => window.__simplAlta.check())).ok, 'Alta’s Check Answer is pressed');
+  const f1 = await waitFor((p) => p.kind === 'feedback', 'verdict');
+  check(f1.verdict === 'correct' && /Correct/.test(f1.text) && f1.next, `Alta’s verdict comes back, with its words, and Continue is there: ${f1.verdict} “${f1.text}”`);
+
+  check((await page.evaluate(() => window.__simplAlta.next())).ok, 'Continue presses Alta’s Next Question');
+  const c2 = await content('clozetext');
+  check(c2.question.template && c2.question.template.split('{{response}}').length === 3 && c2.percent === 70, 'the next question comes as Alta asks for it: two blanks, the mastery moved on');
+  const put2 = await page.evaluate(() => window.__simplAlta.answer({ responseId: 'r-cloze', type: 'clozetext', blanks: ['5', '2'] }));
+  const typed = await page.$$eval('#q input[type=text]', (xs) => xs.map((x) => x.value));
+  check(put2.ok && typed.join() === '5,2', 'the blanks typed in the popup are typed into Alta’s');
+  await page.evaluate(() => window.__simplAlta.check());
+  const f2 = await waitFor((p) => p.kind === 'feedback' && p.verdict === 'incorrect', 'a second verdict');
+  check(f2.verdict === 'incorrect' && /linear function/.test(f2.text), 'a wrong answer comes back wrong, with Alta’s explanation');
+
+  await page.evaluate(() => window.__simplAlta.next());
+  const c3 = await content('custom');
+  check(c3.question.custom === 'desmos_blank_graph_question' && c3.current.id === 'lo3', 'a Desmos graph question is passed as what it is (the popup shows Alta’s page for it)');
+
+  const all = JSON.stringify(await posts());
   const leaked = SECRETS.filter((s) => all.includes(s));
   check(!leaked.length, `never the answer key, the student’s ids or the school’s launch data (${leaked.join(', ') || 'none'})`);
-  check(JSON.stringify(fromAlta) === JSON.stringify(CONTENT), 'Alta’s own page reads its answer whole, as it was sent');
-}
-{
-  const { posted, fetchSwapped } = await page('https://school.instructure.com/courses/1/assignments/2');
-  check(posted.length === 0 && !fetchSwapped, 'on any other site it does nothing: nothing passed, fetch left as it was');
-}
-{
-  const { posted } = await page('http://localhost:8795/mock-alta/learn/course/c1/assignment/a1/practice');
-  check(posted.some((s) => JSON.parse(s).kind === 'content'), 'the mock Alta page the screenshots use counts as Alta');
+} finally {
+  await browser.close();
+  stop();
 }
 
 console.log(failed ? `\n${failed} failed` : '\nAll checks passed.');
