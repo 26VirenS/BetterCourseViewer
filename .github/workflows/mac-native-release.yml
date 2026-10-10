@@ -24,13 +24,14 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      # (1.3.1) the last release's intermediates, unchanged files dated as they were: only what changed is compiled
+      # (1.3.1) the last release's intermediates, unchanged files dated as they were: only what changed is compiled.
+      # (1.3.31) A beta's kept apart from a release proper's: a beta is compiled a file at a time, a release whole.
       - name: The last release build
         uses: actions/cache/restore@v4
         with:
           path: build/mac-native
-          key: mac-release-${{ github.sha }}
-          restore-keys: mac-release-
+          key: mac-release-${{ inputs.beta && 'beta' || 'stable' }}-${{ github.sha }}
+          restore-keys: mac-release-${{ inputs.beta && 'beta' || 'stable' }}-
       - name: Unchanged files keep their dates
         run: python3 scripts/dev/mtime-cache.py restore build/mac-native
       - name: Build, sign, notarize and publish Simpl for Mac
@@ -51,4 +52,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: build/mac-native
-          key: mac-release-${{ github.sha }}
+          key: mac-release-${{ inputs.beta && 'beta' || 'stable' }}-${{ github.sha }}

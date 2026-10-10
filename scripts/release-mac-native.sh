@@ -76,6 +76,7 @@ xcodebuild \
   ENABLE_HARDENED_RUNTIME=YES \
   ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
   COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf \
+  ${MAC_BETA:+SWIFT_COMPILATION_MODE=singlefile} \
   build 2>&1 | tee build-mac-native.log | grep -E "error:|warning: .*mac/Simpl|BUILD (SUCCEEDED|FAILED)" || true
 }
 release_build
@@ -86,6 +87,8 @@ if ! grep -q "BUILD SUCCEEDED" build-mac-native.log && [[ -f build/mac-native/.m
   release_build
 fi
 grep -q "BUILD SUCCEEDED" build-mac-native.log || { grep -E "error:" -B2 -A6 build-mac-native.log | head -200; exit 1; }
+# (1.3.31) A beta is compiled a file at a time (still optimized), so only what changed since the last beta is compiled
+# again — a release proper is still compiled whole-module, all of it each time (minutes longer, a little quicker to run).
 # (CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO: a plain build otherwise asks for the debugger's get-task-allow, which the
 # notary service refuses; the hardened runtime is what notarization needs; both Apple silicon and Intel Macs; no index
 # and no dSYM, which nothing here keeps — 1.3.1, quicker)

@@ -162,6 +162,11 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   `"beta": true` when it is one. A beta is released with the release workflow's **beta** switch on: a GitHub
   pre-release, *Simpl for Mac <version> Beta*, which the usual feed passes over (`scripts/publish-site.sh` writes both
   feeds). Turned off, a Mac stays on the beta it has until a release newer than it comes. Earlier Versions marks betas.
+  (1.3.31) A beta builds quickly: it is compiled a file at a time (`SWIFT_COMPILATION_MODE=singlefile`, still
+  optimized) from the last beta's intermediates (its own cache, `mac-release-beta-…`), so only what changed is compiled;
+  a release proper is still compiled whole-module from its own (`mac-release-stable-…`). A beta needs no wait for the
+  Mac app workflow: the release builds the app itself, so it is dispatched as soon as the change is pushed, and the
+  screenshots come alongside.
 - **When.** At launch when the last check is more than four hours old, then every four hours (looked at every ten
   minutes and whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check
   for Updates…** or *Check Now* in **Settings ▸ Updates**. The menu opens Settings on Updates when there is a version
