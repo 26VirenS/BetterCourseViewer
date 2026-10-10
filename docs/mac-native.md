@@ -129,6 +129,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   background images (a video's poster and play button are drawn so) and leaves video players wholly alone
   (`[class*=video|player|kaltura|vjs]`); while a lesson is what is shown (in the question's place, or alone), the bar
   never offers Check — its Continue (greyed out until Alta's is ready) and Back to Question when there is a question.
+  (1.3.37) Simpler: a lesson above the question is kept with the question under it, top to bottom (found first, its own
+  Continue and words not taken for the question's; the two kept apart, not all between them); no lesson view, View
+  Instruction or Back to Question. Alta's notices with a Dismiss (an objective completed) are put away by it and shown a
+  few seconds at the top of the popup's question area.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment

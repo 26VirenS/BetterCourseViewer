@@ -190,27 +190,26 @@ try {
   check(!!rawSeen, 'the lesson’s maths still in its raw words is told (the popup covers it meanwhile)');
   const greyed = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.nextAny === true && p.next === false, 'a greyed-out Continue');
   check(!!greyed, 'a lesson’s Continue greyed out until it is read is told (the bar shows Continue, greyed out)');
-  const ls = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.found && p.hasCheck === false && p.next === true && p.raw === false, 'the lesson');
+  const ls = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.found && p.next === true && p.raw === false, 'the lesson');
   check(!!ls, 'and told again once it is typeset and its Continue is ready');
   check((await page.$('.tex .mjx-chtml')) && !(await page.$('.garbled')) && (await page.$eval('#MathJax_Font_Test', (e) => e.offsetWidth > 0)),
     'MathJax’s own hidden helpers are left alone, so it measures its fonts and sets the maths out right');
-  check(!!ls && ls.view === 'lesson' && (await vis('.alta-lesson')) && !(await vis('#graph')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')) && (await left('#lcont')) < -5000,
-    'Alta’s lesson, come above the question (which stays on the page), is shown in its place by itself — not a flash before the question again — with its Continue moved aside for the popup’s bar');
+  // (1.3.37) the lesson and the question under it (it stays on the page), shown together, top to bottom
+  check(!!ls && ls.lessonToo === true && (await vis('.alta-lesson')) && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')),
+    'Alta’s lesson and the question under it are shown together, top to bottom (the question with what it asks), Alta’s header and Feedback hidden');
   await page.waitForTimeout(1200);
-  check((await vis('.alta-lesson')) && !(await vis('#graph')), 'and it stays shown');
+  check((await vis('.alta-lesson')) && (await vis('#graph')), 'and they stay so — nothing flashes away');
+  check((await left('#lcont')) >= 0 && (await left('#check')) < -5000, 'the lesson’s own Continue stays in it; the question’s Check is the popup bar’s');
   const n4 = (await posts()).length;
-  check((await page.evaluate(() => window.__simplAlta.next())).ok, 'the popup’s Continue presses the lesson’s');
-  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, view: 'question' })); // (as the app asks after it)
+  check((await page.evaluate(() => window.__simplAlta.next())).ok, 'Continue presses the lesson’s');
   const back = await waitFor((p, k) => k >= n4 && p.kind === 'focus' && p.found && p.hasCheck === true, 'the question again');
-  check(!!back && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('.alta-lesson')), 'and the question comes under the lesson, shown alone with what it asks — the lesson above it hidden');
-  check(back.lessonToo === true, 'the popup is told the lesson is still there (its bar offers View Instruction)');
-  // (1.3.31) View Instruction: the lesson again in the question's place, and back
-  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, view: 'lesson' }));
+  check(!!back && (await vis('#graph')) && (await vis('.alta-stimulus')), 'and the question is there under it, with what it asks');
+  // (1.3.37) a notice of Alta's with a Dismiss: its words to the popup, the notice put away
+  const n5 = (await posts()).length;
+  await page.evaluate(() => { const t = document.createElement('div'); t.className = 'toast-notice'; t.innerHTML = '<span>Awesome, you completed 1 of 3 objectives! Moving on to the next topic!</span><button>DISMISS</button>'; t.querySelector('button').onclick = () => t.remove(); document.body.appendChild(t); });
+  const nt = await waitFor((p, k) => k >= n5 && p.kind === 'notice', 'a notice');
   await page.waitForTimeout(300);
-  check((await vis('.alta-lesson')) && !(await vis('#graph')), 'View Instruction shows the lesson again, the question hidden');
-  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, view: 'question' }));
-  await page.waitForTimeout(300);
-  check((await vis('#graph')) && !(await vis('.alta-lesson')), 'Back to Question shows the question again, the lesson hidden');
+  check(/completed 1 of 3 objectives/.test(nt.text) && !/dismiss/i.test(nt.text) && !(await page.$('.toast-notice')), `Alta’s notice is put away by its Dismiss and its words passed to the popup to show its own way (“${nt.text}”)`);
   // (a button the bar stands for, come inside what is kept — a change the trim otherwise leaves alone — is moved aside)
   await page.evaluate(() => { const b = document.createElement('button'); b.id = 'late'; b.textContent = 'Continue'; document.querySelector('.learnosity-response').appendChild(b); });
   await page.waitForTimeout(1200);

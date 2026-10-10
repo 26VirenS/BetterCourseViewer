@@ -174,6 +174,21 @@ struct AltaQuizScreen: View {
             }
         }
         // (1.3.25: in the bottom right corner)
+        // (1.3.37) Alta's notices (an objective completed…), its own way: a moment at the top, then gone
+        .overlay(alignment: .top) {
+            if let n = session.notice {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+                    Text(n).font(.sCallout.weight(.medium)).lineLimit(2)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassCapsule()
+                .padding(.top, 14)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .accessibilityElement(children: .combine)
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             if (!session.seesWholePage || session.phase == .feedback) && !(session.altaDrawn && session.altaDialog) { bar }
         }
@@ -184,25 +199,15 @@ struct AltaQuizScreen: View {
     private var bar: some View {
         switch session.phase {
         case .answering, .checking:
-            // (1.3.31) the lesson seen again: back to the question. (1.3.36: whenever a lesson is what is shown — never
-            // Check under it: its Continue, greyed out until Alta's is ready, and Back to Question when there is one)
-            if session.altaDrawn && (session.lessonView || session.altaShowingLesson) {
-                let back = session.lessonView || session.altaLessonToo
-                if back || session.altaHasNext {
+            // (1.3.36) a lesson alone on the page: never Check under it — its Continue, greyed out until Alta's is ready
+            if session.altaDrawn && session.altaShowingLesson {
+                if session.altaHasNext {
                     QuizFloatingBar {
-                        if back {
-                            Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward") }
-                                .glassButton(prominent: !session.altaHasNext)
-                                .help("Back to the question, the lesson kept")
-                        }
-                        // (1.3.35) the lesson's own Continue: greyed out while Alta's is, until the lesson is read
-                        if session.altaHasNext {
-                            Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
-                                .glassButton(prominent: true)
-                                .keyboardShortcut(.return, modifiers: .command)
-                                .disabled(!session.altaCanNext)
-                                .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
-                        }
+                        Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
+                            .glassButton(prominent: true)
+                            .keyboardShortcut(.return, modifiers: .command)
+                            .disabled(!session.altaCanNext)
+                            .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
                     }
                 }
             // (1.3.28) a lesson of Alta's: its Continue, back to the question
@@ -217,11 +222,7 @@ struct AltaQuizScreen: View {
             // (1.3.23: also under Alta's own answer box, whose Check this presses)
             } else if session.altaDrawn || session.question?.kind != .page {
                 QuizFloatingBar {
-                    if session.altaDrawn && session.altaLessonToo {
-                        Button { session.toggleLesson() } label: { Label("View Instruction", systemImage: "book") }
-                            .glassButton()
-                            .help("See the lesson again")
-                    } else if session.altaDrawn && session.altaCanInstruct { instructButton }
+                    if session.altaDrawn && session.altaCanInstruct { instructButton }
                     Button { session.check() } label: {
                         if session.phase == .checking {
                             ProgressView().controlSize(.small).frame(minWidth: 80)

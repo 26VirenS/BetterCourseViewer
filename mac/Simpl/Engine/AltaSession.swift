@@ -324,7 +324,7 @@ enum AltaHook {
             if (el && el.matches && el.matches(CLICKABLE)) {
               var said = norm(el.innerText || el.textContent || el.value || el.getAttribute('aria-label'));
               if (!watching && CHECK.test(said)) watch();
-              if (NEXT.test(said)) { focusFirst = true; dirty = true; doneWithLesson(); } // (the next question shown from its top; a lesson's Continue: done with it)
+              if (NEXT.test(said)) { focusFirst = true; dirty = true; } // (the next question shown from its top)
               break;
             }
           }
@@ -481,9 +481,7 @@ enum AltaHook {
         }
         return null;
       };
-      var view = 'question', stacked = null, lessonKey = '', firstTrim = true, quietUntil = 0, lessonAlone = false;
-      // (a lesson on screen or on the page now: Continue pressed then is done with it)
-      var doneWithLesson = function () { if (view === 'lesson' || stacked || lessonAlone) quietUntil = Date.now() + 10000; };
+      var stacked = null, lessonAlone = false;
       var keepers = function (iframeToo) {
         stacked = null;
         var qs = deep(QUESTION).filter(shown), lessonOnly = false;
@@ -497,19 +495,12 @@ enum AltaHook {
           if (big) qs = [big];
         }
         if (!qs.length) return [];
-        if (!lessonOnly) stacked = above(common(qs) || qs[0]);
-        // (1.3.35) a lesson newly come above the question (Alta's View Instruction: the question stays on the page under
-        // it) is what the student asked to see — shown in the question's place; gone, the question again. (Not on the
-        // first look, nor again for the same lesson after its Continue.)
-        var lkey = stacked ? norm(stacked.innerText || '').slice(0, 160) : '';
-        // (done with a lesson — its Continue, Next, Back to Question — what is left above in the next moments is taken
-        // note of, not shown)
-        if (lkey && lkey !== lessonKey && !firstTrim && Date.now() > quietUntil) { view = 'lesson'; focusFirst = true; }
-        if (!lkey && !lessonOnly && view === 'lesson') view = 'question';
-        lessonKey = lkey; firstTrim = false;
         // (1.3.22) the question's words and its Check (greyed out until it is answered, but Alta's own to press) are kept
         // with it: the smallest part of the page holding the question, what it asks and its buttons — unless that is
-        // the whole page, when each is kept on its own. (1.3.31: never words found in a lesson left above it.)
+        // the whole page, when each is kept on its own
+        // (1.3.37) a lesson above the question (Alta's View Instruction: the question stays on the page under it) — found
+        // first, so its own Continue and words are not taken for the question's
+        stacked = lessonOnly ? null : above(common(qs) || qs[0]);
         var acts = controls(CHECK).concat(controls(NEXT)).filter(function (b) { return !(stacked && stacked.contains(b)); });
         var asks = asked();
         if (asks && stacked && stacked.contains(asks)) asks = null;
@@ -521,12 +512,11 @@ enum AltaHook {
           var pre = before(common(qs) || qs[0]);
           if (pre) { var c = common(qs.concat([pre])); if (c && c !== document.body && !(stacked && c.contains(stacked))) qs = [c]; else qs = qs.concat([pre]); }
         }
-        // (1.3.31) the lesson instead, when the student asks to see it again (View Instruction)
-        if (view === 'lesson' && stacked) qs = [stacked];
+        // (the lesson and the question under it, both kept, top to bottom: the student reads, then answers below)
+        if (stacked) qs = [stacked].concat(qs);
         var more = buttons(HELPERS).concat(
           deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown),
-          deep('[role="alert"], [class*="feedback" i]').filter(function (e) { return shown(e) && norm(e.innerText || ''); }))
-          .filter(function (e) { return view === 'lesson' || !(stacked && stacked.contains(e)); });
+          deep('[role="alert"], [class*="feedback" i]').filter(function (e) { return shown(e) && norm(e.innerText || ''); }));
         var all = qs.concat(more);
         // (the outermost of them: one inside another is kept with it)
         return all.filter(function (e, k) { return all.indexOf(e) === k && !all.some(function (o) { return o !== e && o.contains(e); }); });
@@ -573,7 +563,7 @@ enum AltaHook {
         });
         want.forEach(hide);
         if (driven) {
-          controls(CHECK).concat(controls(NEXT), controls(INSTRUCT)).forEach(function (b) { stash(b, OFFSTAGE); });
+          controls(CHECK).concat(controls(NEXT), controls(INSTRUCT)).filter(function (b) { return !(stacked && stacked.contains(b)); }).forEach(function (b) { stash(b, OFFSTAGE); });
           controls(REPORT).forEach(hide);
         }
         if (focusFirst) { focusFirst = false; try { keep[0].scrollIntoView({ block: 'start' }); } catch (x) {} }
@@ -606,7 +596,7 @@ enum AltaHook {
       var tell = function (found) {
         var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, nextAny: controls(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
           dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0,
-          lessonToo: !!stacked, view: view, showingLesson: view === 'lesson' || lessonAlone,
+          lessonToo: !!stacked, showingLesson: lessonAlone,
           // (1.3.29) maths still in its raw words (\\frac{…}, \\begin{align}) in what is shown: its typesetter not done yet
           raw: found && kept.some(rawIn) };
         var said = JSON.stringify(m);
@@ -623,12 +613,10 @@ enum AltaHook {
       };
       var focus = function (o) {
         o = o || {};
-        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); kept = []; theme(null); driven = false; told = ''; firstTrim = true; lessonKey = ''; quietUntil = 0; view = 'question'; return { found: false }; }
+        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); kept = []; theme(null); driven = false; told = ''; return { found: false }; }
         focusIframe = !!o.iframe;
         if (!!o.bar !== driven) { driven = !!o.bar; dirty = true; }
         // (the app's own View Instruction / Back to Question; otherwise the view stays as the page has it)
-        if ((o.view === 'lesson' || o.view === 'question') && o.view !== view) { view = o.view; dirty = true; focusFirst = true; }
-        if (o.view === 'question') quietUntil = Date.now() + 10000;
         theme(typeof o.css === 'string' ? o.css : null);
         if (typeof o.hint === 'string' && o.hint !== focusHint) { focusHint = o.hint; dirty = true; }
         if (!focused) { focusFirst = true; focused = setInterval(function () { trim(false); }, 500); }
@@ -653,7 +641,7 @@ enum AltaHook {
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
-        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; dirty = true; doneWithLesson(); b.click(); return { ok: true }; },
+        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; dirty = true; b.click(); return { ok: true }; },
         instruct: function () { var b = buttons(INSTRUCT)[0]; if (!b) return { ok: false }; dirty = true; b.click(); return { ok: true }; },
         state: verdictNow
       };
@@ -664,6 +652,14 @@ enum AltaHook {
       var dismiss = function () {
         deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open], .modal, [class*="modal" i]').filter(shown).forEach(function (d) {
           deepIn(d, CLICKABLE).filter(function (b) { return shown(b) && GOTIT.test(norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label'))); }).slice(0, 1).forEach(function (b) { b.click(); });
+        });
+        // (1.3.37) Alta's notices with a Dismiss (Awesome, you completed 1 of 3 objectives! Moving on to the next topic!):
+        // their words passed to the popup, which shows them its own way, and the notice put away by its Dismiss
+        deep(CLICKABLE).filter(function (b) { return shown(b) && /^dismiss$/.test(norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label'))); }).slice(0, 2).forEach(function (b) {
+          var box = b.closest('[role="alert"], [role="status"], [class*="toast" i], [class*="snack" i], [class*="notif" i], [class*="banner" i], [class*="message" i]') || b.parentElement;
+          var words = String((box && box.innerText) || '').replace(/\bdismiss\b/ig, '').replace(/\s+/g, ' ').trim().slice(0, 300);
+          if (words) post({ kind: 'notice', text: words });
+          b.click();
         });
       };
       setInterval(dismiss, 700);
@@ -852,13 +848,12 @@ final class AltaSession: ObservableObject {
     @Published private(set) var altaCanNext = false
     /// (1.3.30) Alta's Continue is on the page, ready or greyed out (a lesson's, until it is read).
     @Published private(set) var altaHasNext = false
-    /// (1.3.31) A lesson left above the question on Alta's page (after its Continue): the bar's View Instruction shows
-    /// it again in the question's place, and Back to Question the question.
-    @Published private(set) var altaLessonToo = false
-    @Published private(set) var lessonView = false
-    /// (1.3.36) What is shown is a lesson (in the question's place, or a lesson alone on the page): the bar never offers
-    /// Check for it.
+    /// (1.3.36) What is shown is a lesson alone on the page (no question under it): the bar offers its Continue, never
+    /// Check. (1.3.37: a lesson with the question under it is shown with it, top to bottom.)
     @Published private(set) var altaShowingLesson = false
+    /// (1.3.37) A notice of Alta's (an objective completed…), shown a few seconds at the top of the question.
+    @Published private(set) var notice: String?
+    private var noticeTask: Task<Void, Never>?
     /// (1.3.29) The maths on Alta's page is still in its raw words, its typesetter not done: covered meanwhile, for ten
     /// seconds at most.
     @Published private(set) var altaRaw = false
@@ -989,7 +984,6 @@ final class AltaSession: ObservableObject {
                     altaFound = false
                     altaCanCheck = false
                     altaCanInstruct = false
-                    lessonView = false
                     wholePage = r.question == nil
                     showPage = true
                 }
@@ -1002,6 +996,15 @@ final class AltaSession: ObservableObject {
                 withAnimation(Motion.gentle) { phase = .answering }
                 if altaDrawn { refocus() }
             }
+        case "notice":
+            guard let t = head["text"] as? String, !t.isEmpty else { return }
+            withAnimation(Motion.gentle) { notice = t }
+            noticeTask?.cancel()
+            noticeTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(Motion.gentle) { self?.notice = nil }
+            }
         case "focus":
             withAnimation(Motion.gentle) {
                 altaFound = head["found"] as? Bool ?? false
@@ -1011,9 +1014,7 @@ final class AltaSession: ObservableObject {
                 altaHasCheck = head["hasCheck"] as? Bool ?? false
                 altaCanNext = head["next"] as? Bool ?? false
                 altaHasNext = head["nextAny"] as? Bool ?? false
-                altaLessonToo = head["lessonToo"] as? Bool ?? false
-                lessonView = (head["view"] as? String) == "lesson" // (1.3.35: as the page has it — a lesson come, or gone)
-                altaShowingLesson = head["showingLesson"] as? Bool ?? lessonView
+                altaShowingLesson = head["showingLesson"] as? Bool ?? false
                 // (1.3.31) on from a lesson: the question comes under it on the same page, with no new question from Alta's
                 // answers — the popup goes on with it as soon as it is there
                 if phase == .moving && (head["found"] as? Bool ?? false) && (head["hasCheck"] as? Bool ?? false) {
@@ -1163,14 +1164,12 @@ final class AltaSession: ObservableObject {
         Task { [weak self] in await self?.applyFocus(on) }
     }
 
-    /// `view`: the lesson or the question, when the student asks for one (the bar's View Instruction, Back to Question).
-    private func applyFocus(_ on: Bool, view: String? = nil) async {
+    private func applyFocus(_ on: Bool) async {
         let js = "return window.__simplAlta ? window.__simplAlta.focus(o) : null"
         var mainFound = false, innerFound = false
         var missed: [WKFrameInfo?] = []
         for f in frames + [nil] {
-            var o: [String: Any] = ["on": on, "iframe": false, "hint": question?.hint ?? "", "css": css, "bar": true]
-            if let view { o["view"] = view }
+            let o: [String: Any] = ["on": on, "iframe": false, "hint": question?.hint ?? "", "css": css, "bar": true]
             let r = await run(js, ["o": o], exactly: f) as? [String: Any]
             let found = r?["found"] as? Bool ?? false
             if f?.isMainFrame ?? true { mainFound = mainFound || found } else { innerFound = innerFound || found }
@@ -1178,8 +1177,7 @@ final class AltaSession: ObservableObject {
         }
         guard on, innerFound, !mainFound else { return }
         for f in missed {
-            var o: [String: Any] = ["on": true, "iframe": true, "hint": question?.hint ?? "", "css": css, "bar": true]
-            if let view { o["view"] = view }
+            let o: [String: Any] = ["on": true, "iframe": true, "hint": question?.hint ?? "", "css": css, "bar": true]
             _ = await run(js, ["o": o], exactly: f)
         }
     }
@@ -1445,19 +1443,11 @@ final class AltaSession: ObservableObject {
         }
     }
 
-    /// (1.3.31) View Instruction and Back to Question: the lesson left above the question, or the question.
-    func toggleLesson() {
-        let to = lessonView ? "question" : "lesson"
-        withAnimation(Motion.gentle) { lessonView.toggle() }
-        Task { [weak self] in await self?.applyFocus(true, view: to) }
-    }
-
-    /// (1.3.35) Done with the lesson: its Continue pressed (when it has one), and the question shown.
+    /// (1.3.35) Done with a lesson alone on the page: its Continue pressed; the question comes under it.
     func lessonContinue() {
         Task {
             if altaCanNext { _ = await call("return window.__simplAlta ? window.__simplAlta.next() : null", [:]) }
-            withAnimation(Motion.gentle) { lessonView = false }
-            await applyFocus(true, view: "question")
+            refocus()
         }
     }
 
