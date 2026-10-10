@@ -184,23 +184,25 @@ struct AltaQuizScreen: View {
     private var bar: some View {
         switch session.phase {
         case .answering, .checking:
-            // (1.3.31) the lesson seen again: back to the question
-            if session.altaDrawn && session.lessonView {
-                QuizFloatingBar {
-                    // (1.3.35) the lesson's own Continue, when it has one, and back to the question either way
-                    if session.altaHasNext {
-                        Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward") }
-                            .glassButton()
-                            .help("Back to the question, the lesson kept")
-                        Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
-                            .glassButton(prominent: true)
-                            .keyboardShortcut(.return, modifiers: .command)
-                            .disabled(!session.altaCanNext)
-                            .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
-                    } else {
-                        Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward").frame(minWidth: 90) }
-                            .glassButton(prominent: true)
-                            .help("Back to the question")
+            // (1.3.31) the lesson seen again: back to the question. (1.3.36: whenever a lesson is what is shown — never
+            // Check under it: its Continue, greyed out until Alta's is ready, and Back to Question when there is one)
+            if session.altaDrawn && (session.lessonView || session.altaShowingLesson) {
+                let back = session.lessonView || session.altaLessonToo
+                if back || session.altaHasNext {
+                    QuizFloatingBar {
+                        if back {
+                            Button { session.toggleLesson() } label: { Label("Back to Question", systemImage: "arrow.uturn.backward") }
+                                .glassButton(prominent: !session.altaHasNext)
+                                .help("Back to the question, the lesson kept")
+                        }
+                        // (1.3.35) the lesson's own Continue: greyed out while Alta's is, until the lesson is read
+                        if session.altaHasNext {
+                            Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
+                                .glassButton(prominent: true)
+                                .keyboardShortcut(.return, modifiers: .command)
+                                .disabled(!session.altaCanNext)
+                                .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
+                        }
                     }
                 }
             // (1.3.28) a lesson of Alta's: its Continue, back to the question

@@ -606,7 +606,7 @@ enum AltaHook {
       var tell = function (found) {
         var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, nextAny: controls(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
           dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0,
-          lessonToo: !!stacked, view: view,
+          lessonToo: !!stacked, view: view, showingLesson: view === 'lesson' || lessonAlone,
           // (1.3.29) maths still in its raw words (\\frac{…}, \\begin{align}) in what is shown: its typesetter not done yet
           raw: found && kept.some(rawIn) };
         var said = JSON.stringify(m);
@@ -856,6 +856,9 @@ final class AltaSession: ObservableObject {
     /// it again in the question's place, and Back to Question the question.
     @Published private(set) var altaLessonToo = false
     @Published private(set) var lessonView = false
+    /// (1.3.36) What is shown is a lesson (in the question's place, or a lesson alone on the page): the bar never offers
+    /// Check for it.
+    @Published private(set) var altaShowingLesson = false
     /// (1.3.29) The maths on Alta's page is still in its raw words, its typesetter not done: covered meanwhile, for ten
     /// seconds at most.
     @Published private(set) var altaRaw = false
@@ -1010,6 +1013,7 @@ final class AltaSession: ObservableObject {
                 altaHasNext = head["nextAny"] as? Bool ?? false
                 altaLessonToo = head["lessonToo"] as? Bool ?? false
                 lessonView = (head["view"] as? String) == "lesson" // (1.3.35: as the page has it — a lesson come, or gone)
+                altaShowingLesson = head["showingLesson"] as? Bool ?? lessonView
                 // (1.3.31) on from a lesson: the question comes under it on the same page, with no new question from Alta's
                 // answers — the popup goes on with it as soon as it is there
                 if phase == .moving && (head["found"] as? Bool ?? false) && (head["hasCheck"] as? Bool ?? false) {
@@ -1588,6 +1592,8 @@ enum AltaTheme {
         let bad = dark ? "#FF453A" : "#D70015"
         // (1.3.24) Alta's maths keypad is left as Alta draws it — only turned dark, in dark mode
         let pad = ":not([class*=\"keyboard\" i]):not([class*=\"keyboard\" i] *):not([class*=\"keypad\" i]):not([class*=\"keypad\" i] *)"
+            // (1.3.36) and a video's player — its poster, its play button, its controls — as the player draws it
+            + ":not([class*=\"video\" i]):not([class*=\"video\" i] *):not([class*=\"player\" i]):not([class*=\"player\" i] *):not([class*=\"kaltura\" i]):not([class*=\"kaltura\" i] *):not([class*=\"vjs\" i]):not([class*=\"vjs\" i] *)"
         // (everything but a graph, a picture or a video takes the popup's ground, lines and type; maths keeps its own type
         // — in :where(), weightless, so the answer box's own rules below win)
         let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)" + pad
@@ -1598,7 +1604,7 @@ enum AltaTheme {
         :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); --s-ground: \(ground); }
         html, body { background: transparent !important; color: var(--s-text) !important; }
         body { margin: 0 !important; padding: 12px 28px 120px !important; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif !important; -webkit-font-smoothing: antialiased; }
-        body :where(*\(others)\(maths)) { background-color: transparent !important; background-image: none !important; color: inherit !important; border-color: var(--s-line) !important; box-shadow: none !important; text-shadow: none !important; font-family: inherit !important; }
+        body :where(*\(others)\(maths)) { background-color: transparent !important; color: inherit !important; border-color: var(--s-line) !important; box-shadow: none !important; text-shadow: none !important; font-family: inherit !important; }
         html body a\(others) { color: var(--s-accent) !important; }
         html body ::selection { background: var(--s-accent-soft) !important; }
         html body input[type=text]\(pad), html body input:not([type])\(pad), html body input[type=number]\(pad), html body textarea:not(.mq-textarea *)\(pad), html body select\(pad), html body .mq-editable-field\(pad), html body [contenteditable="true"]\(pad) {
