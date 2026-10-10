@@ -460,6 +460,8 @@ enum AltaHook {
         for (var x = el; x && x !== document.body && x !== document.documentElement; x = parentOf(x)) {
           for (var p = x.previousElementSibling; p; p = p.previousElementSibling) {
             if (!shown(p) || p.querySelector(QUESTION)) continue;
+            // (1.3.33: never the question's own card — "Question", what it asks, long with its maths — taken for a lesson)
+            if (/^\s*question\b/i.test(p.innerText || '')) continue;
             if (norm(p.innerText || '').length > 400) return p;
           }
         }

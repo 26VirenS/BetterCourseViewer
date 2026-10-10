@@ -711,7 +711,8 @@ function draw(j) {
   document.getElementById('objective').textContent = st.atom.learningObjective.description;
   meter(j.analytics);
   // (what it asks outside Learnosity's own box, as a school's Alta draws it)
-  var q = document.getElementById('q'), h = '<div class="alta-stimulus">' + (c.stimulus || '') + '</div><div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">';
+  // (a question's own card: "Question" and what it asks — a graph's at length, as long as a lesson's words)
+  var q = document.getElementById('q'), h = '<div class="alta-stimulus"><h4>Question</h4>' + (c.stimulus || '') + (c.type === 'custom' ? '<p>' + 'Drag the green movable dot across the top part of the graphing window to define the x-coordinate that limits the domain. '.repeat(5) + '</p>' : '') + '</div><div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">';
   if (c.type === 'mcq') h += '<ul class="lrn-mcq-options">' + c.options.map(function (o, k) { return '<li class="lrn-mcq-option"><input type="radio" name="mcq" id="o' + k + '" value="' + o.value + '"><label for="o' + k + '" class="lrn-label">' + o.label.replace(/\\$_/g, '') + '</label></li>'; }).join('') + '</ul>';
   else if (c.type === 'clozetext') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="lrn_cloze_response"><input type="text" class="lrn_cloze_input"></span>' : ''); }).join('');
   else if (c.type === 'clozeformula') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="mq-editable-field mq-math-mode"><textarea></textarea><span class="mq-root-block"></span><span class="mq-selectable" style="position:absolute;clip:rect(1em,1em,1em,1em)">$\\\\frac{1}{2}$</span></span>' : ''); }).join('')
