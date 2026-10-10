@@ -1584,7 +1584,7 @@
     const asub = quiz.assignment_id ? await store.submission(cid, quiz.assignment_id, { force: fresh }).catch(() => null) : null;
     const L = await quizRules();
     Q = Object.assign(Q || { cid, qid, url: `/courses/${cid}/quizzes/${qid}`, questions: [], files: {}, chain: Promise.resolve(), inflight: new Set(), page: null, idx: 0, code: '' }, {
-      info, quiz, subs: subs || [], held: L.heldBack(asub), limit: store.quizAttemptLimit(quiz, subs || []),
+      info, quiz, subs: subs || [], asub, held: L.heldBack(asub), limit: store.quizAttemptLimit(quiz, subs || []),
     });
     if (!Q.sub || Q.sub.workflow_state !== 'untaken') Q.sub = (subs || []).find((s) => s.workflow_state === 'untaken') || null;
     Q.paged = !!quiz.one_question_at_a_time || !!Q.paged;
@@ -1602,6 +1602,48 @@
     if (Q.held) return L.HELD_LINE;
     if (sub && sub.workflow_state === 'untaken') return 'This attempt is still open.';
     return null;
+  }
+  /** (Mac 1.3.32) Every finished attempt, newest first, each with its score (when Canvas shows results) and when it was
+   *  handed in — from the quiz's assignment's submission history — and which one Canvas keeps by the quiz's scoring rule. */
+  function quizAttempts(L, Q, survey) {
+    const { quiz } = Q;
+    const possible = store.fmtPts(quiz.points_possible || 0);
+    const seen = new Set();
+    const hist = (Q.asub?.submission_history || [])
+      .filter((x) => x && Number(x.attempt) > 0 && (x.submitted_at || (x.score !== null && x.score !== undefined)))
+      .sort((a, b) => Number(b.attempt) - Number(a.attempt))
+      .filter((x) => !seen.has(Number(x.attempt)) && seen.add(Number(x.attempt)));
+    const hidden = hist.length ? resultsHidden(L, Q, latestFinished(Q) || hist[0]) : null;
+    const scored = (x) => !survey && !hidden && x.workflow_state !== 'pending_review' && x.score !== null && x.score !== undefined;
+    const rows = hist.map((x) => ({
+      attempt: Number(x.attempt),
+      score: scored(x) ? `${store.fmtPts(x.score)} / ${possible}` : null,
+      when: x.submitted_at ? `Handed in ${U.fmtAtUpper(x.submitted_at)}` : null,
+      why: scored(x) ? '' : (survey ? 'Survey' : hidden ? 'Hidden' : x.workflow_state === 'pending_review' ? 'Waiting to be graded' : ''),
+      kept: false,
+    }));
+    const policy = quiz.scoring_policy || 'keep_highest';
+    const marked = rows.filter((r) => r.score !== null);
+    let keptNote = '';
+    if (marked.length > 1 && !survey) {
+      if (policy === 'keep_latest') { marked[0].kept = true; keptNote = 'Canvas keeps your latest score.'; }
+      else if (policy === 'keep_average') keptNote = 'Canvas keeps the average of your scores.';
+      else {
+        const best = hist.filter(scored).reduce((m, x) => (m === null || Number(x.score) > Number(m.score) ? x : m), null);
+        const row = best && rows.find((r) => r.attempt === Number(best.attempt));
+        if (row) row.kept = true;
+        keptNote = 'Canvas keeps your highest score.';
+      }
+    }
+    return { attempts: rows, keptNote };
+  }
+  /** (Mac 1.3.32) A quiz's own assignment, as the assignment screen reads one: its grade, when it was handed in. */
+  async function quizAssignment({ course, quiz: id } = {}) {
+    const cid = String(course || ''), qid = String(id || '');
+    if (!/^\d+$/.test(cid) || !/^\d+$/.test(qid)) throw new Error('That quiz could not be found.');
+    const q = await store.quiz(cid, qid);
+    if (!q || !q.assignment_id) throw new Error('This quiz has no grade to show.');
+    return assignment({ course: cid, id: q.assignment_id });
   }
   /** Before an attempt: what the quiz is, its rules as lines, and whether (and how) it can be begun. */
   async function quizIntro({ course, quiz: id } = {}) {
@@ -1639,6 +1681,7 @@
       note: Q.sub ? `Started ${U.fmtAtUpper(Q.sub.started_at)} · attempt ${Q.sub.attempt}` : limit.allowed !== null ? (limit.left > 0 ? `Attempt ${limit.used + 1} of ${limit.allowed}` : `${U.plural(limit.used, 'attempt')} used of ${limit.allowed}`) : 'Nothing is submitted until you say so.',
       lockText: quiz.locked_for_user ? (textOf(quiz.lock_explanation || '', 200) || 'This quiz is locked.') : '',
       last: last ? { attempt: Number(last.attempt) || 1, score: lastScore, feedback: !survey && !lastHidden, why: lastHidden || '' } : null,
+      ...quizAttempts(L, Q, survey),
       takeUrl: `${Q.url}/take?bcv=native`,
     };
   }
@@ -2148,7 +2191,7 @@
 
   const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
+    toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
   async function gradeNeeded({ id } = {}) {

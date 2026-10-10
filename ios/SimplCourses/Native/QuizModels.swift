@@ -30,6 +30,16 @@ struct QuizIntro: Decodable {
         var why: String?
     }
 
+    /// (Mac 1.3.32) A finished attempt: its score when Canvas shows results (else why not), when it was handed in, and
+    /// whether it is the one Canvas keeps.
+    struct Attempt: Decodable, Hashable {
+        var attempt: Int
+        var score: String?
+        var when: String?
+        var why: String?
+        var kept: Bool?
+    }
+
     var title: String
     var context: String?
     var color: String?
@@ -48,6 +58,8 @@ struct QuizIntro: Decodable {
     var note: String?
     var lockText: String?
     var last: Last?
+    var attempts: [Attempt]?
+    var keptNote: String?
     var takeUrl: String
 }
 

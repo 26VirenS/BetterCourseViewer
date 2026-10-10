@@ -497,6 +497,16 @@ struct PreviewCard: View {
     /// The assignment (or the page) behind the row, as its own screen reads it: what was kept from last time at once,
     /// then Canvas's answer. Anything else (a quiz, a discussion, an event) shows what its row knows.
     private func load() async {
+        // (1.3.32) a quiz: its own assignment, as the assignment's screen reads it — its grade, when it was handed in —
+        // so a graded quiz shows its score wherever its card is, not only "Graded"
+        if let url = item.url, let ids = quizIds(url) {
+            let args: [String: Any] = ["course": ids.course, "quiz": ids.quiz]
+            if let kept = engine.kept("quizAssignment", args, as: AssignmentData.self) { show(.assignment(kept), animated: false) }
+            loading = true
+            if let fresh = try? await engine.call("quizAssignment", args, as: AssignmentData.self) { show(.assignment(fresh), animated: true) }
+            withAnimation(Motion.gentle) { loading = false }
+            return
+        }
         guard let url = item.url, let route = engine.nativeRoute(for: url, title: item.title) else { return }
         switch route {
         case .assignment(let course, let id):
@@ -515,6 +525,14 @@ struct PreviewCard: View {
             return
         }
         withAnimation(Motion.gentle) { loading = false }
+    }
+
+    /// A Canvas quiz's course and quiz, from its address (…/courses/1/quizzes/2).
+    private func quizIds(_ raw: String) -> (course: String, quiz: String)? {
+        guard let u = engine.absolute(raw), u.host?.lowercased() == engine.web.baseURL.host?.lowercased() else { return nil }
+        let p = u.path.split(separator: "/").map(String.init)
+        guard p.count >= 4, p[0] == "courses", p[2] == "quizzes", Engine.numeric(p[1]), Engine.numeric(p[3]) else { return nil }
+        return (p[1], p[3])
     }
 
     private func show(_ d: PreviewDetails, animated: Bool) {

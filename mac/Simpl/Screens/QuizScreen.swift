@@ -595,7 +595,19 @@ private struct QuizIntroPane: View {
 
     @ViewBuilder
     private var lastAttempt: some View {
-        if let last = intro.last {
+        // (1.3.32) every attempt, newest first, with its score and when it was handed in; the kept one marked
+        if let list = intro.attempts, !list.isEmpty {
+            PageSection(title: list.count == 1 ? "Your Attempt" : "Your Attempts") {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(list, id: \.attempt) { a in attemptRow(a) }
+                    if let note = intro.keptNote, !note.isEmpty {
+                        Text(note)
+                            .font(.sFootnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } else if let last = intro.last {
             PageSection(title: "Your Last Attempt") {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text("Attempt \(last.attempt)")
@@ -614,6 +626,37 @@ private struct QuizIntroPane: View {
                 }
             }
         }
+    }
+
+    private func attemptRow(_ a: QuizIntro.Attempt) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Attempt \(a.attempt)")
+                        .font(.sBody.weight(.semibold))
+                    if a.kept == true {
+                        StatusChip(text: "Kept", tone: "success")
+                    }
+                }
+                if let when = a.when, !when.isEmpty {
+                    Text(when)
+                        .font(.sFootnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
+            if let s = a.score {
+                Text(s)
+                    .font(.sBody.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(a.kept == true ? .primary : .secondary)
+            } else if let why = a.why, !why.isEmpty {
+                Text(why)
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     /// Just the buttons, floating in glass at the foot: an attempt under way, Resume; a finished one with its feedback

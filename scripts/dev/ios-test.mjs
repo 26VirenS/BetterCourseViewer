@@ -390,6 +390,12 @@ try {
   check(!qs1.error && qs1.ok && /Submitted/.test(qs1.title) && /of/.test(qs1.answered), `the attempt handed in from the app, its receipt: ${JSON.stringify(qs1)}`);
   const fb = await nc('quizFeedback', { course: '101', quiz: '9011' });
   check(!fb.error && (fb.hidden || (fb.rows.length >= 6 && fb.rows.every((r) => r.verdict && r.html) && fb.rows.some((r) => r.options?.some((o) => o.mine)) && fb.score !== undefined)), `its feedback for the app, question by question (or why it is held back): ${JSON.stringify({ hidden: fb.hidden, rows: fb.rows?.map((r) => `${r.n}:${r.verdict}:${r.score}`), score: fb.score, error: fb.error })}`);
+  // (Mac 1.3.32) the quiz's intro lists each attempt with its score; a quiz's card reads its own assignment for its grade
+  const qi2 = await nc('quizIntro', { course: '101', quiz: '9011' });
+  const at1 = (qi2.attempts || [])[0];
+  check(!qi2.error && at1 && at1.attempt >= 1 && (at1.score === null ? !!at1.why : /^[\d.]+ \/ [\d.]+$/.test(at1.score)), `a quiz's intro lists its attempts, each with its score (or why it is not shown): ${JSON.stringify({ attempts: qi2.attempts, keptNote: qi2.keptNote, error: qi2.error })}`);
+  const qasg = await nc('quizAssignment', { course: '101', quiz: '9011' });
+  check(!qasg.error && qasg.title === 'Lec06-PreQuiz' && qasg.id === '1011' && !!qasg.status, `a quiz's card reads the quiz's own assignment (its grade and when it was handed in): ${JSON.stringify({ title: qasg.title, id: qasg.id, status: qasg.status, grade: qasg.grade, error: qasg.error })}`);
   const qp = await nc('quizBegin', { course: '101', quiz: '9014' }); // (Lec07: one question at a time, no going back — read from Canvas's own take page)
   const qpa = qp.attempt || {};
   const qn = qpa.questions?.length ? await nc('quizGo', { course: '101', quiz: '9014', move: 'next' }) : null;

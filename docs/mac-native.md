@@ -118,6 +118,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   question from Alta's answers), keeps the question with its own card ("Question…", when its words were not found)
   and hides the lesson; the bar's View Instruction shows the lesson again in its place and Back to Question the
   question. Hidden parts are put back only where the page has not changed them since.
+- **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
+  shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
+  `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
+  (`quizAssignment`), so a graded quiz shows its score wherever its card is, not only "Graded".
   `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
