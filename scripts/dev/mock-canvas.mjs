@@ -666,6 +666,31 @@ function recordAnswer(courseId, quizId, subId, raw) {
 }
 
 // ---- API routing ------------------------------------------------------------------------------
+// (Mac 1.3.17) Alta's content answer for the mock assignment player, shaped as captured (Knewton_Alta_Skin_Dev_Reference):
+// three objectives, the second being worked on, 62% mastered. The answer key and the student's ids are in it on purpose.
+const MOCK_ALTA_CONTENT = {
+  assignmentId: 'a1',
+  states: [{
+    atom: {
+      id: { sequenceId: 's1', atomId: 'q1', variationId: 'v1' }, name: 'Graph piecewise functions', purpose: 'ASSESSES', dataType: 'LEARNOSITY_GENERIC_QUESTION',
+      learningObjectiveId: 'lo2',
+      data: { question: '<p>Which function is linear?</p>', content: { type: 'mcq', response_id: 'q1', correct_answer: { value: ['0'] }, success_condition: 'a=1' } },
+      learningObjective: { description: 'Graph piecewise functions', estimatedQuestionsLow: 4, estimatedQuestionsHigh: 10 },
+    },
+    compoundInstance: { state: 'SHOWN', type: 'ASSESS', source: 'ASSIGNMENT', userId: 'student-secret-id', registrationId: 'reg-secret' },
+  }],
+  enrollment: {
+    path: { name: 'Linear, Polynomial, and Piecewise Functions', type: 'ADAPTIVE', masteryThreshold: 100, started: true, ended: false,
+      pathLearningObjectives: [{ learningObjectiveId: 'lo1', topicId: 't1', description: 'Identify linear functions' }, { learningObjectiveId: 'lo2', topicId: 't1' }, { learningObjectiveId: 'lo3', topicId: 't2' }] },
+    startedAt: Date.now() - 2 * 864e5, completed: false,
+    dueDate: { effectiveDueDate: Date.now() + 2 * 864e5, lateSubmissionEnabled: true },
+    ltiEnrollment: { resultSourcedId: 'lti-secret', returnUrl: 'https://school.example/return' },
+  },
+  history: { sequences: [{ numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 1 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 0, numInstructional: 1 }] },
+  analytics: { percentComplete: 62, statusAndProgress: { status: 'in_progress', progress: 0.62, targets: [{ target_id: 'lref-lo1', progress: 1, status: 'complete' }, { target_id: 'lref-lo2', progress: 0.55 }, { target_id: 'lref-lo3', progress: 0.3 }] } },
+  stuckLo: null,
+};
+
 const routes = [];
 const on = (method, re, handler) => routes.push([method, re, handler]);
 const json = (res, data, status = 200) => {
@@ -1191,6 +1216,14 @@ const server = http.createServer((req, res) => {
     if (path.startsWith('/mock-docviewer/')) { // a stand-in for Canvas's DocViewer (an attachment's preview_url): the file's page with a teacher's mark on it
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>DocViewer</title></head><body style="margin:0;background:#525659;font-family:Lato,Helvetica,sans-serif"><div id="dv-bar" style="position:sticky;top:0;z-index:2;background:#a5a9b2"><div id="dv-toolbar" style="display:flex;align-items:center;gap:6px;height:56px;padding:0 14px;background:#a5a9b2;font-family:Lato,Helvetica,sans-serif"><button style="border:0;background:none;padding:8px">&#x2913;</button><span style="border-left:1px dashed #555;height:30px"></span><span>Page</span><button style="border:0;background:none;padding:8px">&#x2039;</button><input value="1" style="width:40px;height:30px;border:0;background:#111;color:#fff;text-align:center"><button style="border:0;background:none;padding:8px">&#x203A;</button><span>of 2</span><span style="border-left:1px dashed #555;height:30px"></span><button style="border:0;background:none;padding:8px">&minus;</button><span style="text-transform:uppercase">Zoom</span><button style="border:0;background:none;padding:8px">+</button><span style="border-left:1px dashed #555;height:30px"></span><button aria-pressed="true" style="border:0;background:#111;color:#fff;padding:8px 14px">&#x2196;</button><button aria-pressed="false" style="border:0;background:none;padding:8px 14px">T</button><button aria-pressed="false" style="border:0;background:none;padding:8px 14px">&#x270E;</button></div><div id="dv-options" style="height:52px"></div></div><div style="margin:24px auto;width:520px;min-height:640px;background:#fff;padding:48px 56px;box-sizing:border-box;position:relative"><h2 style="margin:0 0 16px">Submitted work</h2><p style="color:#333;line-height:1.6">Three sources, APA. The argument opens with the problem and the evidence for it.</p><div id="docviewer-mark" style="position:absolute;right:-12px;top:120px;background:#ffe9a8;border:1px solid #e0b100;border-radius:6px;padding:10px 12px;width:180px;font-size:13px;color:#4a3b00">Good evidence — cite the second study too.</div></div></body></html>`);
+    }
+    // (Mac 1.3.17) a stand-in for a Knewton Alta assignment's player: Alta's shell (its header, Practice, the Current
+    // objective card, a question) and its content answer — fetched by the page as Alta's own is, with an answer key and a
+    // student id in it that the app must never read (scripts/dev/alta-test.mjs checks the page script leaves them be)
+    if (path === '/mock-alta/api/content') return json(res, MOCK_ALTA_CONTENT);
+    if (path.startsWith('/mock-alta/')) {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}.q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn_mcqgroup label{display:block;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}#graph{width:300px;height:300px;margin-top:12px;background:#fff;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div class="q learnosity-item"><p>Which function is linear?</p><div class="lrn_mcqgroup"><label><input type="radio" name="a"> f(x) = 3x + 2</label><label><input type="radio" name="a"> f(x) = x² − 1</label><label><input type="radio" name="a"> f(x) = 2ˣ</label></div><div id="graph">Desmos graph</div><button>Check answer</button></div></main><button id="help">Help</button><script>fetch('/mock-alta/api/content?assignmentId=a1').then(function(r){return r.json()}).then(function(j){document.getElementById('objective').textContent=j.states[0].atom.learningObjective.description;});</script></body></html>`);
     }
     if (path.startsWith('/api/') || path === '/dashboard/view') return json(res, { errors: [{ message: 'not found' }] }, 404);
     if (/^\/courses\/\w+\/external_tools\/retrieve/.test(path)) { // Canvas's launch of a tool (a course's, an assignment's, a module's): the tool's own page framed, here a line of text

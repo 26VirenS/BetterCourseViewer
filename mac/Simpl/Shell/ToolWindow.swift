@@ -20,11 +20,14 @@ struct ToolWindow: View {
     @ObservedObject private var focus = FocusTimer.shared
     /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it off).
     @AppStorage(ToolDarkPage.key) private var darkPage = true
+    /// (1.3.17) A Knewton Alta assignment in this window: the quiz's frame round it (AltaSkin.swift).
+    @StateObject private var alta = AltaState()
     @State private var url: URL?
     @State private var name = ""
     @State private var error: String?
 
     private var title: String {
+        if alta.active, let n = alta.report?.name, !n.isEmpty { return n } // (an Alta assignment: its own name, as a quiz's)
         if !browser.title.isEmpty { return browser.title }
         if !name.isEmpty { return name }
         return launch?.title ?? lmsName
@@ -36,8 +39,10 @@ struct ToolWindow: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let url {
-                ToolWebView(url: url, browser: browser)
-                    .transition(.opacity)
+                AltaFrame(alta: alta) {
+                    ToolWebView(url: url, browser: browser, scripts: [AltaHook.script], messages: [AltaHook.handler: alta.messages])
+                }
+                .transition(.opacity)
             } else if let error {
                 ContentUnavailableView {
                     Label("The tool could not open", systemImage: "puzzlepiece.extension")
@@ -66,7 +71,7 @@ struct ToolWindow: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .modifier(UpdateHold()) // (1.2.19: no update relaunches Simpl while a tool is open)
         .navigationTitle(title)
-        .navigationSubtitle(browser.current?.host ?? "")
+        .navigationSubtitle(alta.active ? "Knewton Alta · \(Int((alta.mastery * 100).rounded()))% mastered" : (browser.current?.host ?? ""))
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 ControlGroup {
@@ -233,6 +238,8 @@ struct ToolWebView: NSViewRepresentable {
     let browser: ToolBrowser
     /// (1.3.10) Scripts of the page's own put in too (the feedback popup's restyling of Canvas's viewer).
     var scripts: [WKUserScript] = []
+    /// (1.3.17) What the page's scripts may tell the app, by name (an Alta assignment's report).
+    var messages: [String: WKScriptMessageHandler] = [:]
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -244,6 +251,7 @@ struct ToolWebView: NSViewRepresentable {
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
         config.userContentController.addUserScript(ToolDarkPage.script)
         for script in scripts { config.userContentController.addUserScript(script) }
+        for (name, handler) in messages { config.userContentController.add(handler, name: name) }
         let v = WKWebView(frame: .zero, configuration: config)
         v.allowsBackForwardNavigationGestures = true
         v.allowsMagnification = true
@@ -259,6 +267,7 @@ struct ToolWebView: NSViewRepresentable {
 
     static func dismantleNSView(_ v: WKWebView, coordinator: Coordinator) {
         v.stopLoading()
+        v.configuration.userContentController.removeAllScriptMessageHandlers()
         v.navigationDelegate = nil
         v.uiDelegate = nil
     }

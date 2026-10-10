@@ -43,7 +43,7 @@ shoot() {
   local slot
   slot="$(take_slot)"
   local settle=YES
-  case " $* " in *PickerConfirm*|*" tool:"*|*" file:"*|*SimplHandInPreview*) settle=NO ;; esac
+  case " $* " in *PickerConfirm*|*" tool:"*|*" page:"*|*" file:"*|*SimplHandInPreview*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
@@ -86,6 +86,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01-dashboard 12
   shoot light-01d-dashboard-counter 14 -SimplSheet next
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
+  shoot light-21a-alta 18 -SimplOpen page:/mock-alta/learn/course/c1/assignment/a1/practice # (1.3.17: a Knewton Alta assignment as a quiz)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
@@ -156,6 +157,7 @@ for MODE in light dark; do
   shoot "$MODE-19-quiz-question" 18 -SimplOpen quiz:101:9011:take:5
   shoot "$MODE-20-quiz-review" 18 -SimplOpen quiz:101:9011:review
   shoot "$MODE-21-tool" 16 -SimplOpen tool:101:9
+  shoot "$MODE-21a-alta" 18 -SimplOpen page:/mock-alta/learn/course/c1/assignment/a1/practice
   shoot "$MODE-22-setup" 14 -SimplOpen setup
   shoot "$MODE-23-settings" 12 -SimplOpen settings
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask

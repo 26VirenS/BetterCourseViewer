@@ -268,6 +268,8 @@ final class Engine: ObservableObject, ShellListener {
         } else if let t = LaunchOpen.take("tool:") {
             let parts = t.split(separator: ":").map(String.init)
             if parts.count == 2 { tool = .courseTool(course: parts[0], id: parts[1], title: "Tool") }
+        } else if let p = LaunchOpen.take("page:"), let u = absolute(p) {
+            tool = ToolLaunch(title: "Page", args: ["page": u.absoluteString]) // (1.3.17: a page in the tool window, -SimplOpen page:/mock-alta/…)
         } else if LaunchOpen.take("settings") != nil {
             NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         } else if LaunchOpen.take("newtask") != nil {

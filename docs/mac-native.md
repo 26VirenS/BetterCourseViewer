@@ -56,6 +56,16 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
 
+- **Knewton Alta as a quiz (1.3.17, Mac only).** An Alta assignment open in a tool window gets the quiz's frame round
+  Alta's own page (`Shell/AltaSkin.swift`): its objectives as the quiz's tiles (the one being worked on filled, a
+  mastered one ticked, the rest filling as they are mastered) with each by name and its own bar, and a mastery bar where
+  the quiz has its progress, with what is being worked on, about how many questions it takes, the last answers and the
+  due date. On a narrow window both sit in a strip over the page. The page is Alta's, untouched: a script in it
+  (`AltaHook`, Alta's hosts only) reads a copy of Alta's own `content` answer and passes the app only those facts —
+  never the answer key or the student's identity — and nothing is answered, hidden or sent anywhere. The reference:
+  *Knewton Alta Skin: Dev Reference* and its spreadsheet (2026-10-10). `scripts/dev/alta-test.mjs` checks the script;
+  the mock's `/mock-alta/…` page is shot as `21a-alta`.
+
 ## Building and running
 
 ```
