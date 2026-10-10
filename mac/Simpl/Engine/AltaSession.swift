@@ -310,7 +310,7 @@ enum AltaHook {
             if (el && el.matches && el.matches(CLICKABLE)) {
               var said = norm(el.innerText || el.textContent || el.value || el.getAttribute('aria-label'));
               if (!watching && CHECK.test(said)) watch();
-              if (NEXT.test(said)) focusFirst = true; // (the next question shown from its top)
+              if (NEXT.test(said)) { focusFirst = true; dirty = true; } // (the next question shown from its top)
               break;
             }
           }
@@ -437,17 +437,31 @@ enum AltaHook {
         // (the outermost of them: one inside another is kept with it)
         return all.filter(function (e, k) { return all.indexOf(e) === k && !all.some(function (o) { return o !== e && o.contains(e); }); });
       };
-      var focused = null, focusFirst = true, focusIframe = false, dirty = true, quiet = 0;
-      // (worked out again whenever the page changes — a verdict, a pop-up, the next question may come in a part that is
-      // hidden — from the page as it is, all in one go, so nothing flickers)
+      var focused = null, focusFirst = true, focusIframe = false, dirty = true, kept = [], lastFound = false;
+      // (worked out again whenever the page changes outside what is kept — a verdict, a pop-up, the next question may
+      // come in a part that is hidden — from the page as it is, all in one go, so nothing flickers. (1.3.24) Changes
+      // inside the question itself — its maths field's cursor blinking, the student typing — are left alone: worked out
+      // again on each, the page jumped back to its top.)
       try {
-        new MutationObserver(function () { dirty = true; }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-modal', 'disabled', 'aria-disabled'] });
+        new MutationObserver(function (records) {
+          if (dirty) return;
+          for (var i = 0; i < records.length; i++) {
+            var t = records[i].target;
+            if (!kept.some(function (k) { return k === t || k.contains(t); })) { dirty = true; return; }
+          }
+        }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-modal', 'disabled', 'aria-disabled'] });
       } catch (e) {}
       var trim = function (force) {
-        if (!force && !dirty && hidden.length && ++quiet < 6) return true;
-        quiet = 0; dirty = false;
+        if (!force && !dirty && hidden.length) { tell(lastFound); return true; }
+        dirty = false;
+        // (where the student has scrolled to, held through the working out)
+        var spots = [], se = document.scrollingElement || document.documentElement;
+        if (se && se.scrollTop > 0) spots.push([se, se.scrollTop]);
+        kept.forEach(function (k) { for (var x = parentOf(k); x; x = parentOf(x)) if (x.scrollTop > 0 && x !== se) spots.push([x, x.scrollTop]); });
         lift();
         var keep = keepers(focusIframe);
+        kept = keep;
+        lastFound = keep.length > 0;
         if (!keep.length) { tell(false); return false; }
         var path = new Set();
         keep.forEach(function (e) { for (var x = e; x; x = parentOf(x)) path.add(x); });
@@ -463,6 +477,7 @@ enum AltaHook {
         want.forEach(hide);
         if (driven) controls(CHECK).concat(controls(NEXT)).forEach(function (b) { stash(b, OFFSTAGE); });
         if (focusFirst) { focusFirst = false; try { keep[0].scrollIntoView({ block: 'start' }); } catch (x) {} }
+        else spots.forEach(function (s) { if (s[0].scrollTop !== s[1]) s[0].scrollTop = s[1]; });
         tell(true);
         return true;
       };
@@ -484,7 +499,7 @@ enum AltaHook {
       };
       var focus = function (o) {
         o = o || {};
-        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); theme(null); driven = false; told = ''; return { found: false }; }
+        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); kept = []; theme(null); driven = false; told = ''; return { found: false }; }
         focusIframe = !!o.iframe;
         if (!!o.bar !== driven) { driven = !!o.bar; dirty = true; }
         theme(typeof o.css === 'string' ? o.css : null);
@@ -511,7 +526,7 @@ enum AltaHook {
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
-        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; b.click(); return { ok: true }; },
+        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; dirty = true; b.click(); return { ok: true }; },
         state: verdictNow
       };
 
@@ -823,6 +838,7 @@ final class AltaSession: ObservableObject {
             }
             watchdog?.cancel()
             if isNew, let k = key, r.question.map({ $0.kind != .page }) == true { fallBack(k) }
+            if isNew && altaDrawn { refocus() } // (1.3.24: the new question picked out afresh, its Check moved aside)
         case "focus":
             withAnimation(Motion.gentle) {
                 altaFound = head["found"] as? Bool ?? false
@@ -1341,9 +1357,11 @@ enum AltaTheme {
         let line = dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.14)"
         let good = dark ? "#30D158" : "#248A3D"
         let bad = dark ? "#FF453A" : "#D70015"
+        // (1.3.24) Alta's maths keypad is left as Alta draws it — only turned dark, in dark mode
+        let pad = ":not([class*=\"keyboard\" i]):not([class*=\"keyboard\" i] *):not([class*=\"keypad\" i]):not([class*=\"keypad\" i] *)"
         // (everything but a graph, a picture or a video takes the popup's ground, lines and type; maths keeps its own type
         // — in :where(), weightless, so the answer box's own rules below win)
-        let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)"
+        let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)" + pad
         let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not(.MathJax):not(.MathJax *)"
         return """
         :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); }
@@ -1353,7 +1371,7 @@ enum AltaTheme {
         body :where(*\(others)\(maths)) { font-family: inherit !important; }
         html body a\(others) { color: var(--s-accent) !important; }
         html body ::selection { background: var(--s-accent-soft) !important; }
-        html body input[type=text], html body input:not([type]), html body input[type=number], html body textarea:not(.mq-textarea *), html body select, html body .mq-editable-field, html body [contenteditable="true"] {
+        html body input[type=text]\(pad), html body input:not([type])\(pad), html body input[type=number]\(pad), html body textarea:not(.mq-textarea *)\(pad), html body select\(pad), html body .mq-editable-field\(pad), html body [contenteditable="true"]\(pad) {
           background: var(--s-field) !important; color: var(--s-text) !important; border: 1px solid var(--s-line) !important; border-radius: 8px !important; padding: 4px 8px !important; min-height: 30px; outline: none !important; caret-color: var(--s-accent) !important; }
         html body input:not([type=radio]):not([type=checkbox]):focus, html body textarea:not(.mq-textarea *):focus, html body select:focus, html body .mq-editable-field.mq-focused, html body [contenteditable="true"]:focus {
           border-color: var(--s-accent) !important; box-shadow: 0 0 0 3px var(--s-accent-soft) !important; }
@@ -1370,6 +1388,8 @@ enum AltaTheme {
         html body button\(others):hover, html body [role="button"]\(others):hover { border-color: var(--s-dim) !important; }
         html body .lrn_correct, html body .lrn-correct { box-shadow: 0 0 0 2px var(--s-good) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-good) 12%, transparent) !important; }
         html body .lrn_incorrect, html body .lrn-incorrect { box-shadow: 0 0 0 2px var(--s-bad) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-bad) 12%, transparent) !important; }
+        html, body, html body * { overflow-anchor: none !important; }
+        \(dark ? "html body [class*=\"keyboard\" i]:not([class*=\"keyboard\" i] *), html body [class*=\"keypad\" i]:not([class*=\"keypad\" i] *) { filter: invert(0.9) hue-rotate(180deg) !important; }" : "")
         html body .dcg-container { border: 1px solid var(--s-line) !important; border-radius: 12px !important; overflow: hidden !important; }
         \(dark ? "html body img { background: #fff !important; border-radius: 6px !important; }" : "")
         """

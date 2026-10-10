@@ -96,7 +96,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (still pressed, programmatically) and the popup's bar presses them; the page script says when the question is found
   and when its Check is ready. If Alta's box is not found in 6 s, the popup draws the question itself as before. The
   overview's objectives (names, "Estimated N - M questions") are kept per assignment and name the rail's objectives,
-  lined up by the one on screen, and give its estimate. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  lined up by the one on screen, and give its estimate. (1.3.24) The trim is worked out again only for changes outside
+  what is kept (typing, a maths field's blinking cursor no longer re-trim it, which threw the page back to its top), and
+  holds every scrolled ancestor's position through it; Alta's maths keypad (`[class*=keyboard|keypad]`) is left out of
+  the theme, only inverted in dark mode. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

@@ -115,6 +115,22 @@ try {
   const fF = await waitFor((p) => p.kind === 'feedback' && /Correct/.test(p.text) && p !== f1, 'a maths verdict');
   check(fF.verdict === 'correct', 'and Alta marks it right');
 
+  // (1.3.24) shown alone, the page stays where the student scrolled it while they type, and while the page changes
+  await page.setViewportSize({ width: 900, height: 260 });
+  await page.evaluate(() => window.__simplAlta.focus({ on: true, bar: true, css: 'body { padding-bottom: 600px !important; }' }));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.scrollTo(0, 140));
+  const y0 = await page.evaluate(() => window.scrollY);
+  for (let i = 0; i < 6; i++) { await page.evaluate((i) => { document.querySelector('.mq-editable-field').classList.toggle('mq-blink'); document.querySelector('.mq-root-block').textContent = 'x'.repeat(i); }, i); await page.waitForTimeout(250); }
+  const y1 = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => { const d = document.createElement('div'); d.textContent = 'elsewhere'; document.body.appendChild(d); });
+  await page.waitForTimeout(800);
+  const y2 = await page.evaluate(() => window.scrollY);
+  check(y0 === 140 && y1 === 140 && y2 === 140, `typing in the question, and changes elsewhere, leave the page where it was scrolled (${y0} → ${y1} → ${y2})`);
+  check((await page.$$eval('.lrn-formula-keyboard-key', (ks) => ks.length)) === 8, 'Alta’s maths keypad is kept with its question');
+  await page.evaluate(() => window.__simplAlta.focus({ on: false }));
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   await page.evaluate(() => window.__simplAlta.next());
   const c3 = await content('custom');
   check(c3.question.custom === 'desmos_blank_graph_question' && c3.current.id === 'lo3', 'a Desmos graph question is passed as what it is (the popup shows Alta’s own question for it)');
