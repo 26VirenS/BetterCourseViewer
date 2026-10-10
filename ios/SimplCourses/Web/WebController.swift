@@ -27,6 +27,9 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     var onNavigationStart: (() -> Void)?
     var onFinish: ((URL?) -> Void)?
     var onOpenInShell: ((URL) -> Void)?
+    /// (Mac 1.3.13) A page of another site, for the app's own browser window rather than the Mac's browser (the Mac's
+    /// engine sets it; unset, or a link that is not a web page — mail, an app's own — goes to the Mac as before).
+    var onOpenInApp: ((URL) -> Void)?
 
     init(mode: ScriptBundle.Mode) {
         self.mode = mode
@@ -366,6 +369,8 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
 
     /// Another site, in the student's own browser (its own session there); anything else to the system.
     func openExternally(_ url: URL) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        if scheme == "http" || scheme == "https", let inApp = onOpenInApp { inApp(url); return }
         NSWorkspace.shared.open(url)
     }
     #endif

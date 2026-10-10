@@ -148,6 +148,11 @@ extension Engine {
     func schoolViewer(forDownload url: URL) -> URL? {
         guard onBrightspace else { return nil }
         let p = url.path.split(separator: "/").map(String.init)
+        // (Mac 1.3.13, iPhone 1.7.4: the Files section's address too, Brightspace's API for the topic's file —
+        // /d2l/api/le/<version>/<course>/content/topics/<topic>/file)
+        if p.count == 9, p[0] == "d2l", p[1] == "api", p[2] == "le", Engine.numeric(p[4]), p[5] == "content", p[6] == "topics", Engine.numeric(p[7]), p[8] == "file" {
+            return absolute("/d2l/le/content/\(p[4])/viewContent/\(p[7])/View")
+        }
         guard p.count == 9, p[0] == "d2l", p[1] == "le", p[2] == "content", Engine.numeric(p[3]), p[4] == "topics", p[5] == "files",
               p[6] == "download", Engine.numeric(p[7]), p[8] == "DirectFileTopicDownload" else { return nil }
         return absolute("/d2l/le/content/\(p[3])/viewContent/\(p[7])/View")
@@ -220,6 +225,9 @@ extension Engine {
     /// A course file in the phone's own viewer.
     func openFile(_ url: String, name: String) {
         guard let u = absolute(url) else { return }
-        FilePreview.shared.open(u, name: name, in: web.webView)
+        // (a Brightspace file Brightspace will not hand over: its own viewer instead of the error)
+        var instead: (() -> Void)?
+        if let v = schoolViewer(forDownload: u) { instead = { [weak self] in self?.openWebScreen(v.absoluteString, title: name) } }
+        FilePreview.shared.open(u, name: name, in: web.webView, instead: instead)
     }
 }

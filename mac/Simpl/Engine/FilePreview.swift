@@ -88,6 +88,11 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         open(url, name: name, in: webView, for: .look)
     }
 
+    /// (1.3.13) In Quick Look, or — when the school will not give it — wherever `instead` goes.
+    func open(_ url: URL, name: String, in webView: WKWebView, instead: (() -> Void)?) {
+        open(url, name: name, in: webView, for: .look, instead: instead)
+    }
+
     /// Fetch the file at `url` for `purpose`; `done` hears where it landed (or why it could not be fetched).
     func open(_ url: URL, name: String, in webView: WKWebView, for purpose: Purpose, done: ((Result<URL, Error>) -> Void)? = nil, instead: (() -> Void)? = nil) {
         onMain {

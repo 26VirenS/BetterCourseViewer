@@ -112,6 +112,7 @@ final class Engine: ObservableObject, ShellListener {
         web.onFinish = { [weak self] url in self?.pageFinished(url) }
         web.onNavigationStart = { [weak self] in self?.ready = false }
         web.onOpenInShell = { [weak self] url in self?.openWeb(url.absoluteString, title: "") }
+        web.onOpenInApp = { [weak self] url in self?.openBrowser(url) } // (1.3.13: another site in Simpl's own window)
         // the sign-in moving on (its cover lifting, "Stay logged in?" answered): a popup waiting may go up now
         loginWatch = web.login.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { self?.schedulePopups() }
@@ -596,6 +597,12 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func openCanvasPage(_ url: String, title: String) { openWebScreen(url, title: title) }
+
+    /// (1.3.13) A page of another site — a course's link, a link in an announcement — in a browser window of Simpl's
+    /// own (the tool window: Back, Forward, Reload, Share, Open in Browser), never sent off to the Mac's browser.
+    func openBrowser(_ u: URL, title: String = "") {
+        tool = ToolLaunch(title: title.isEmpty ? (u.host ?? "Link") : title, args: ["page": u.absoluteString])
+    }
 
     func openTool(_ t: ToolLaunch) {
         tool = t
