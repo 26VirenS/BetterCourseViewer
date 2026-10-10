@@ -136,6 +136,26 @@ try {
   await page.evaluate(() => window.__simplAlta.focus({ on: false }));
   check((await vis('header')) && (await vis('#help')) && ((await page.$eval('header', (h) => h.getAttribute('style'))) || '') === (styleBefore || '') && (await page.$eval('#mbar', (e) => e.style.width)) === '120px', 'Alta’s Page puts every part back as it was');
 
+  // (1.3.23) every question in Alta's own answer box, in the popup's colours, its Check pressed from the popup's bar
+  await page.evaluate(() => window.__simplAlta.next());
+  await page.waitForFunction(() => { const c = document.getElementById('check'); return c && !c.hidden && c.disabled; });
+  const n0 = (await posts()).length;
+  await page.evaluate(() => window.__simplAlta.focus({ on: true, hint: 'in the graphing window.', bar: true, css: 'body { color: rgb(9, 9, 9) !important; }' }));
+  const left = async (sel) => page.$eval(sel, (b) => b.getBoundingClientRect().left);
+  check((await left('#check')) < -5000 && (await page.$eval('body', (b) => getComputedStyle(b).color)) === 'rgb(9, 9, 9)' && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('header')),
+    'Alta’s answer box shown alone in the popup’s colours, its own Check moved aside for the popup’s bar');
+  const s0 = await waitFor((p, k) => k >= n0 && p.kind === 'focus', 'the question found');
+  check(s0.found && s0.check === false, 'the popup is told the question is found and its Check is not ready (nothing answered yet)');
+  await page.click('#graph');
+  const s1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.check === true, 'Check ready');
+  check(s1.found, 'answered in Alta’s box, the popup is told its Check can be pressed');
+  const n1 = (await posts()).length;
+  check((await page.evaluate(() => window.__simplAlta.check())).ok, 'the popup’s Check presses Alta’s own, moved aside');
+  const v1 = await waitFor((p, k) => k >= n1 && p.kind === 'feedback' && p.verdict === 'incorrect', 'a verdict from the popup’s Check');
+  check(/Incorrect/.test(v1.text) && v1.next && (await left('#next')) < -5000, 'its verdict comes back, with Alta’s Next moved aside for the popup’s Continue');
+  await page.evaluate(() => window.__simplAlta.focus({ on: false }));
+  check(!(await page.$('#simpl-theme')) && (await left('#next')) >= 0 && (await vis('header')), 'Alta’s Page takes the popup’s colours out and puts Next back');
+
   const all = JSON.stringify(await posts());
   const leaked = SECRETS.filter((s) => all.includes(s));
   check(!leaked.length, `never the answer key, the student’s ids or the school’s launch data (${leaked.join(', ') || 'none'})`);

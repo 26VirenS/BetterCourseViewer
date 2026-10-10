@@ -12,6 +12,7 @@ import WebKit
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var scheme
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
     @State private var copied = false
@@ -46,7 +47,11 @@ struct AltaQuizScreen: View {
         .frame(width: ideal.width, height: ideal.height)
         .background(PageGround())
         .tint(Theme.accent)
-        .task { await session.start(engine: engine) }
+        .task {
+            session.appearance(dark: scheme == .dark)
+            await session.start(engine: engine)
+        }
+        .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
         .alert("Screenshot saved", isPresented: Binding(get: { shot != nil }, set: { if !$0 { shot = nil } })) {
             Button("Show in Finder") { if let shot { NSWorkspace.shared.activateFileViewerSelecting([shot]) } }
             Button("OK", role: .cancel) {}
@@ -161,7 +166,7 @@ struct AltaQuizScreen: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if !session.showPage || session.phase == .feedback { bar }
+            if !session.seesWholePage || session.phase == .feedback { bar }
         }
         .animation(Motion.gentle, value: session.showPage)
     }
@@ -170,7 +175,8 @@ struct AltaQuizScreen: View {
     private var bar: some View {
         switch session.phase {
         case .answering, .checking:
-            if session.question?.kind != .page {
+            // (1.3.23: also under Alta's own answer box, whose Check this presses)
+            if session.altaDrawn || session.question?.kind != .page {
                 QuizFloatingBar {
                     Button { session.check() } label: {
                         if session.phase == .checking {
@@ -182,7 +188,7 @@ struct AltaQuizScreen: View {
                     .glassButton(prominent: true)
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!session.canCheck)
-                    .help("Check your answer with Alta")
+                    .help(session.altaDrawn && !session.canCheck && session.phase == .answering ? "Answer the question first" : "Check your answer with Alta")
                 }
             }
         case .feedback:
@@ -541,8 +547,9 @@ private struct AltaRail: View {
                 }
                 Divider()
                 mastery(list)
-                if let r = session.report {
-                    if let low = r.current.low, let high = r.current.high, high > 0 {
+                if session.report != nil {
+                    if let e = session.estimate {
+                        let low = e.low, high = e.high
                         Label(low == high ? "About \(Int(low)) questions on this objective" : "About \(Int(low))–\(Int(high)) questions on this objective", systemImage: "list.number")
                             .font(.sFootnote)
                             .foregroundStyle(.secondary)

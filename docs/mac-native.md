@@ -90,7 +90,13 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Learnosity's element, Alta's Check/Next (greyed out or not) and the words it asks (found by a run of the prompt's
   plain text); a question is drawn by its Learnosity type unless Alta calls it a lesson, video or example. Copy Alta
   Details adds the question's type and how it was drawn, the rail, and the page's elements round the question (class
-  names only). `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  names only). (1.3.23) Every question is answered in Alta's own answer box (Learnosity's maths field, choices, blanks,
+  graphs), shown alone and recoloured by `AltaTheme` (light or dark as the app is, its accent; a weightless `:where()`
+  base so the answer box's rules win; the web view draws no ground of its own). Alta's Check and Next are moved aside
+  (still pressed, programmatically) and the popup's bar presses them; the page script says when the question is found
+  and when its Check is ready. If Alta's box is not found in 6 s, the popup draws the question itself as before. The
+  overview's objectives (names, "Estimated N - M questions") are kept per assignment and name the rail's objectives,
+  lined up by the one on screen, and give its estimate. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

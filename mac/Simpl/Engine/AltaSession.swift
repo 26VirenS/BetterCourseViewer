@@ -354,8 +354,16 @@ enum AltaHook {
       var HELPERS = /^(i don'?t know|help me solve this|view an example|review instruction|show me how|show me|hint|show hint|try again|explain|skip)$/;
       var hidden = [];
       var parentOf = function (el) { return el.parentElement || (el.parentNode && el.parentNode.host) || null; };
-      var hide = function (el) { hidden.push({ el: el, d: el.style.getPropertyValue('display'), p: el.style.getPropertyPriority('display') }); el.style.setProperty('display', 'none', 'important'); };
-      var unhide = function (h) { if (h.d) h.el.style.setProperty('display', h.d, h.p); else h.el.style.removeProperty('display'); };
+      // (each change kept with what it replaced, and put back exactly)
+      var stash = function (el, props) {
+        var h = { el: el, was: {} };
+        Object.keys(props).forEach(function (k) { h.was[k] = [el.style.getPropertyValue(k), el.style.getPropertyPriority(k)]; el.style.setProperty(k, props[k], 'important'); });
+        hidden.push(h);
+      };
+      var hide = function (el) { stash(el, { display: 'none' }); };
+      var unhide = function (h) { Object.keys(h.was).forEach(function (k) { var w = h.was[k]; if (w[0]) h.el.style.setProperty(k, w[0], w[1]); else h.el.style.removeProperty(k); }); };
+      // (1.3.23) Alta's own Check and Next, pressed from the popup's bar: kept working, but off to the side
+      var OFFSTAGE = { position: 'absolute', left: '-10000px', top: '0' };
       var lift = function () { hidden.forEach(unhide); hidden = []; };
       // every button with these words on screen, greyed out or not
       var controls = function (re) {
@@ -433,14 +441,14 @@ enum AltaHook {
       // (worked out again whenever the page changes — a verdict, a pop-up, the next question may come in a part that is
       // hidden — from the page as it is, all in one go, so nothing flickers)
       try {
-        new MutationObserver(function () { dirty = true; }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-modal', 'disabled'] });
+        new MutationObserver(function () { dirty = true; }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-modal', 'disabled', 'aria-disabled'] });
       } catch (e) {}
       var trim = function (force) {
         if (!force && !dirty && hidden.length && ++quiet < 6) return true;
         quiet = 0; dirty = false;
         lift();
         var keep = keepers(focusIframe);
-        if (!keep.length) return false;
+        if (!keep.length) { tell(false); return false; }
         var path = new Set();
         keep.forEach(function (e) { for (var x = e; x; x = parentOf(x)) path.add(x); });
         var want = new Set();
@@ -453,13 +461,33 @@ enum AltaHook {
           });
         });
         want.forEach(hide);
+        if (driven) controls(CHECK).concat(controls(NEXT)).forEach(function (b) { stash(b, OFFSTAGE); });
         if (focusFirst) { focusFirst = false; try { keep[0].scrollIntoView({ block: 'start' }); } catch (x) {} }
+        tell(true);
         return true;
+      };
+      // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
+      var told = '';
+      var tell = function (found) {
+        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0 };
+        var said = JSON.stringify(m);
+        if (said !== told) { told = said; post(m); }
+      };
+      // (1.3.23) Alta's question in the popup's own colours, light or dark: a style sheet of the popup's, put in while the
+      // question is shown alone and taken out after
+      var themeEl = null, driven = false;
+      var theme = function (css) {
+        if (!css) { if (themeEl && themeEl.parentNode) themeEl.parentNode.removeChild(themeEl); themeEl = null; return; }
+        if (!themeEl) { themeEl = document.createElement('style'); themeEl.id = 'simpl-theme'; }
+        if (themeEl.textContent !== css) themeEl.textContent = css;
+        if (!themeEl.isConnected) (document.head || document.documentElement).appendChild(themeEl);
       };
       var focus = function (o) {
         o = o || {};
-        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); return { found: false }; }
+        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); theme(null); driven = false; told = ''; return { found: false }; }
         focusIframe = !!o.iframe;
+        if (!!o.bar !== driven) { driven = !!o.bar; dirty = true; }
+        theme(typeof o.css === 'string' ? o.css : null);
         if (typeof o.hint === 'string' && o.hint !== focusHint) { focusHint = o.hint; dirty = true; }
         if (!focused) { focusFirst = true; focused = setInterval(function () { trim(false); }, 500); }
         return { found: trim(true) };
@@ -601,7 +629,7 @@ struct AltaQuestion: Decodable, Equatable {
 /// (1.3.17) The assignment's overview, as Alta's page reads it before it is started (or between questions): its name,
 /// when it is due, its objectives with Alta's estimate of the questions each takes, and how far it is mastered.
 struct AltaOverview: Decodable, Equatable {
-    struct Objective: Decodable, Equatable { var id: String; var name: String; var low: Double?; var high: Double? }
+    struct Objective: Codable, Equatable { var id: String; var name: String; var low: Double?; var high: Double? }
     var name: String?
     var due: Double?
     /// (1.3.19) As the page words them, when no answer of Alta's gave them ("Monday, Oct 12 11:59pm PDT", "Not started").
@@ -668,6 +696,12 @@ final class AltaSession: ObservableObject {
     /// (1.3.21) The mastery last heard, from wherever Alta said it (a question's answer, a checked answer's, the bars
     /// on its page), 0…1: the whole, and each objective's by its id.
     @Published private(set) var livePercent: Double?
+    /// (1.3.23) Alta's own question, answered in its own answer box: whether it is found on the page, and whether its
+    /// Check (pressed from the popup's bar) can be pressed yet. Drawn by the popup itself only when it is not found.
+    @Published private(set) var altaFound = false
+    @Published private(set) var altaCanCheck = false
+    @Published private(set) var drawsItself = false
+    private var css = ""
     @Published private(set) var liveTargets: [String: AltaReport.Target] = [:]
     @Published var picks: Set<Int> = []
     @Published var blanks: [String] = []
@@ -698,6 +732,7 @@ final class AltaSession: ObservableObject {
         relay = r
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
         web.isInspectable = true
+        web.setValue(false, forKey: "drawsBackground") // (1.3.23: Alta's question on the popup's own ground)
         r.session = self
     }
 
@@ -705,6 +740,7 @@ final class AltaSession: ObservableObject {
     /// nothing in a while (a start screen, a sign-in) is shown as it is.
     func start(engine: Engine) async {
         guard web.url == nil else { return }
+        if let data = UserDefaults.standard.data(forKey: knownKey), let list = try? JSONDecoder().decode([AltaOverview.Objective].self, from: data) { known = list }
         phase = .loading
         if let p = launch.page, let u = engine.absolute(p) {
             web.load(URLRequest(url: u))
@@ -757,6 +793,7 @@ final class AltaSession: ObservableObject {
             withAnimation(Motion.gentle) {
                 overview = merge(overview, o)
                 hear(percent: o.percent.map { $0 / 100 } ?? o.progress, targets: o.targets ?? [])
+                keep(o.objectives)
             }
             if phase == .loading && (!o.objectives.isEmpty || o.name != nil) { probeStart(frame) }
         case "content":
@@ -776,11 +813,21 @@ final class AltaSession: ObservableObject {
                     drops = Array(repeating: "", count: r.question?.choices.count ?? 0)
                     verdict = nil
                     phase = .answering
+                    // (1.3.23) every question in Alta's own answer box, in the popup's colours; a lesson, Alta's page
+                    drawsItself = false
+                    altaFound = false
+                    altaCanCheck = false
                     wholePage = r.question == nil
-                    showPage = r.question.map { $0.kind == .page } ?? true
+                    showPage = true
                 }
             }
             watchdog?.cancel()
+            if isNew, let k = key, r.question.map({ $0.kind != .page }) == true { fallBack(k) }
+        case "focus":
+            withAnimation(Motion.gentle) {
+                altaFound = head["found"] as? Bool ?? false
+                altaCanCheck = head["check"] as? Bool ?? false
+            }
         case "feedback":
             let timedOut = head["timedOut"] as? Bool ?? false
             // (1.3.21: also when Alta's own Check was pressed, on a question shown as Alta's)
@@ -813,6 +860,32 @@ final class AltaSession: ObservableObject {
         }
     }
 
+    /// (1.3.23) The assignment's objectives as its overview lists them — names and Alta's estimates — kept for this
+    /// assignment, so a popup opened straight onto a question still has them.
+    @Published private(set) var known: [AltaOverview.Objective] = []
+    private var knownKey: String { "SimplAltaObjectives.\(launch.course).\(launch.assignment)" }
+
+    private func keep(_ list: [AltaOverview.Objective]) {
+        guard !list.isEmpty, list.count >= known.count, list != known else { return }
+        known = list
+        if let data = try? JSONEncoder().encode(list) { UserDefaults.standard.set(data, forKey: knownKey) }
+    }
+
+    private static func same(_ a: String?, _ b: String?) -> Bool {
+        guard let a, let b else { return false }
+        let x = a.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), y = b.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return !x.isEmpty && x == y
+    }
+
+    /// (1.3.23) Alta's estimate of the questions the objective being worked on takes, as its overview says it ("Estimated
+    /// 4 - 9 questions"), else as the question's answer has it.
+    var estimate: (low: Double, high: Double)? {
+        guard let c = report?.current else { return nil }
+        if let o = known.first(where: { $0.id == c.id || Self.same($0.name, c.name) }), let l = o.low, let h = o.high, h > 0 { return (l, h) }
+        if let l = c.low, let h = c.high, h > 0 { return (l, h) }
+        return nil
+    }
+
     /// A newer overview kept over the last, its blanks filled from the one before.
     private func merge(_ old: AltaOverview?, _ new: AltaOverview) -> AltaOverview {
         guard let old else { return new }
@@ -838,11 +911,34 @@ final class AltaSession: ObservableObject {
     /// Alta's whole page is on screen (Alta's Page), rather than the question.
     var seesWholePage: Bool { showPage && wholePage }
 
+    /// (1.3.23) The question is answered in Alta's own answer box, shown alone in the popup's colours.
+    var altaDrawn: Bool { showPage && !wholePage }
+
+    /// Alta's answer box not found in a while (a page the popup cannot pick the question out of): the popup draws the
+    /// question itself, as before, when it is a kind it can draw.
+    private func fallBack(_ key: String) {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard let self, self.questionKey == key, !self.altaFound, self.altaDrawn, self.phase == .answering else { return }
+            withAnimation(Motion.gentle) { self.drawsItself = true; self.showPage = false }
+        }
+    }
+
+    /// (1.3.23) The popup's colours for Alta's question: light or dark as the app is, with its accent.
+    func appearance(dark: Bool) {
+        let accent = (AppearanceStore.accentNow ?? .controlAccentColor).usingColorSpace(.sRGB) ?? .systemBlue
+        let hex = String(format: "#%02X%02X%02X", Int(accent.redComponent * 255), Int(accent.greenComponent * 255), Int(accent.blueComponent * 255))
+        let next = AltaTheme.css(dark: dark, accent: hex)
+        guard next != css else { return }
+        css = next
+        if altaDrawn { refocus() }
+    }
+
     /// Alta's Page, and back to the question: as the popup draws it, or as Alta's own, shown alone.
     func togglePage() {
         if seesWholePage {
             wholePage = false
-            showPage = question?.kind == .page
+            showPage = !drawsItself && phase != .start && phase != .loading
         } else {
             wholePage = true
             showPage = true
@@ -861,13 +957,13 @@ final class AltaSession: ObservableObject {
         var mainFound = false, innerFound = false
         var missed: [WKFrameInfo?] = []
         for f in frames + [nil] {
-            let r = await run(js, ["o": ["on": on, "iframe": false, "hint": question?.hint ?? ""]], exactly: f) as? [String: Any]
+            let r = await run(js, ["o": ["on": on, "iframe": false, "hint": question?.hint ?? "", "css": css, "bar": true]], exactly: f) as? [String: Any]
             let found = r?["found"] as? Bool ?? false
             if f?.isMainFrame ?? true { mainFound = mainFound || found } else { innerFound = innerFound || found }
             if !found { missed.append(f) }
         }
         guard on, innerFound, !mainFound else { return }
-        for f in missed { _ = await run(js, ["o": ["on": true, "iframe": true, "hint": question?.hint ?? ""]], exactly: f) }
+        for f in missed { _ = await run(js, ["o": ["on": true, "iframe": true, "hint": question?.hint ?? "", "css": css, "bar": true]], exactly: f) }
     }
 
     /// (1.3.21) Alta's whole page as one picture, top to bottom, past what fits on screen: scrolled through a screenful
@@ -993,7 +1089,7 @@ final class AltaSession: ObservableObject {
                 // (the overview as the page reads, when Alta's own answers did not name it)
                 if let seen = r?["overview"] as? [String: Any], let data = try? JSONSerialization.data(withJSONObject: seen),
                    let o = try? JSONDecoder().decode(AltaOverview.self, from: data), !o.objectives.isEmpty || o.name != nil {
-                    withAnimation(Motion.gentle) { self.overview = self.merge(self.overview, o) }
+                    withAnimation(Motion.gentle) { self.overview = self.merge(self.overview, o); self.keep(o.objectives) }
                 }
                 if r?["start"] as? Bool == true {
                     self.watchdog?.cancel()
@@ -1074,6 +1170,7 @@ final class AltaSession: ObservableObject {
     var question: AltaQuestion? { report?.question }
 
     var canCheck: Bool {
+        if altaDrawn { return phase == .answering && altaFound && altaCanCheck }
         guard phase == .answering, let q = question else { return false }
         switch q.kind {
         case .choice: return !picks.isEmpty
@@ -1094,7 +1191,18 @@ final class AltaSession: ObservableObject {
 
     /// The answer put into Alta's question, then Alta's Check pressed; what Alta says comes back as feedback.
     func check() {
-        guard canCheck, let q = question else { return }
+        guard canCheck else { return }
+        // (1.3.23) answered in Alta's own box: only its Check to press
+        if altaDrawn {
+            phase = .checking
+            Task {
+                let pressed = await call("return window.__simplAlta ? window.__simplAlta.check() : null", [:])
+                guard (pressed as? [String: Any])?["ok"] as? Bool == true else { return fail("Alta's Check button could not be found.") }
+                watch(seconds: 15)
+            }
+            return
+        }
+        guard let q = question else { return }
         phase = .checking
         var a: [String: Any] = ["responseId": q.responseId ?? "", "type": q.type ?? ""]
         switch q.kind {
@@ -1172,12 +1280,18 @@ final class AltaSession: ObservableObject {
         if ids.isEmpty, let c = r.current.id { ids = [c] }
         var seen = Set<String>()
         ids = ids.filter { seen.insert($0).inserted }
+        let here = r.current.id.flatMap { ids.firstIndex(of: $0) }
+        let there = known.firstIndex { Self.same($0.name, r.current.name) }
+        let aligned = known.count == ids.count || (here != nil && here == there)
         return ids.enumerated().map { k, id in
             // (1.3.21) the newest word on it, from any of Alta's answers or its page's bars, over the question's
             let p = Self.level(liveTargets[id] ?? r.targets.first { $0.id == id })
-            // (1.3.20) a name from the overview by its place when Alta's answers name only the objective on screen
-            let byPlace = (overview?.objectives.count == ids.count) ? overview?.objectives[k].name : nil
-            let named = r.objectives.first { $0.id == id }?.name ?? (r.current.id == id ? r.current.name : nil) ?? names[id] ?? byPlace
+            // (1.3.20) a name from the overview by its place when Alta's answers name only the objective on screen —
+            // (1.3.23) the overview's list (kept for the assignment) lined up by the objective on screen when the two
+            // lists differ in length
+            let byPlace = aligned && known.indices.contains(k) ? known[k].name : nil
+            let byId = known.first { $0.id == id }?.name
+            let named = r.objectives.first { $0.id == id }?.name ?? (r.current.id == id ? r.current.name : nil) ?? names[id] ?? byId ?? byPlace
             return AltaObjective(id: id, number: k + 1, name: named ?? "Objective \(k + 1)", mastery: p, current: r.current.id == id)
         }
     }
@@ -1212,5 +1326,52 @@ final class AltaRelay: NSObject, WKScriptMessageHandler {
         guard let text = message.body as? String else { return }
         let frame = message.frameInfo
         MainActor.assumeIsolated { session?.take(text, frame: frame) }
+    }
+}
+
+/// (1.3.23) Alta's question in the popup's own colours: its answer box (Learnosity's own — its maths field, its choices,
+/// its blanks, its graph) kept as Alta draws it and works it, recoloured light or dark as the app is, with the app's
+/// accent and type, on the popup's own ground. Only colours, borders and type are changed, never what Alta's page does.
+enum AltaTheme {
+    static func css(dark: Bool, accent: String) -> String {
+        let text = dark ? "#F2F2F7" : "#1D1D1F"
+        let dim = dark ? "rgba(235,235,245,0.62)" : "rgba(60,60,67,0.62)"
+        let field = dark ? "rgba(255,255,255,0.07)" : "#FFFFFF"
+        let card = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.035)"
+        let line = dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.14)"
+        let good = dark ? "#30D158" : "#248A3D"
+        let bad = dark ? "#FF453A" : "#D70015"
+        // (everything but a graph, a picture or a video takes the popup's ground, lines and type; maths keeps its own type
+        // — in :where(), weightless, so the answer box's own rules below win)
+        let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)"
+        let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not(.MathJax):not(.MathJax *)"
+        return """
+        :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); }
+        html, body { background: transparent !important; color: var(--s-text) !important; }
+        body { margin: 0 !important; padding: 12px 28px 120px !important; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif !important; -webkit-font-smoothing: antialiased; }
+        body :where(*\(others)) { background-color: transparent !important; background-image: none !important; color: inherit !important; border-color: var(--s-line) !important; box-shadow: none !important; text-shadow: none !important; }
+        body :where(*\(others)\(maths)) { font-family: inherit !important; }
+        html body a\(others) { color: var(--s-accent) !important; }
+        html body ::selection { background: var(--s-accent-soft) !important; }
+        html body input[type=text], html body input:not([type]), html body input[type=number], html body textarea:not(.mq-textarea *), html body select, html body .mq-editable-field, html body [contenteditable="true"] {
+          background: var(--s-field) !important; color: var(--s-text) !important; border: 1px solid var(--s-line) !important; border-radius: 8px !important; padding: 4px 8px !important; min-height: 30px; outline: none !important; caret-color: var(--s-accent) !important; }
+        html body input:not([type=radio]):not([type=checkbox]):focus, html body textarea:not(.mq-textarea *):focus, html body select:focus, html body .mq-editable-field.mq-focused, html body [contenteditable="true"]:focus {
+          border-color: var(--s-accent) !important; box-shadow: 0 0 0 3px var(--s-accent-soft) !important; }
+        html body .mq-editable-field .mq-cursor { border-left: 1.5px solid var(--s-accent) !important; }
+        html body .mq-editable-field .mq-selection, html body .mq-editable-field .mq-selection * { background: var(--s-accent-soft) !important; }
+        html body .mq-math-mode .mq-empty { background: var(--s-line) !important; }
+        html body input[type=radio], html body input[type=checkbox] { accent-color: var(--s-accent) !important; background: none !important; box-shadow: none !important; }
+        html body .lrn-mcq-option, html body .lrn_mcqgroup > li, html body .lrn-mcq-options > li {
+          background: var(--s-card) !important; border: 1px solid var(--s-line) !important; border-radius: 12px !important; padding: 10px 14px !important; margin: 8px 0 !important; list-style: none !important; }
+        html body .lrn-mcq-option:has(input:checked), html body .lrn_mcqgroup > li:has(input:checked), html body .lrn-mcq-options > li:has(input:checked) {
+          border-color: var(--s-accent) !important; background: var(--s-accent-soft) !important; }
+        html body button\(others), html body [role="button"]\(others), html body .lrn_btn\(others) {
+          background: var(--s-card) !important; color: var(--s-text) !important; border: 1px solid var(--s-line) !important; border-radius: 999px !important; padding: 6px 14px !important; font-weight: 600 !important; }
+        html body button\(others):hover, html body [role="button"]\(others):hover { border-color: var(--s-dim) !important; }
+        html body .lrn_correct, html body .lrn-correct { box-shadow: 0 0 0 2px var(--s-good) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-good) 12%, transparent) !important; }
+        html body .lrn_incorrect, html body .lrn-incorrect { box-shadow: 0 0 0 2px var(--s-bad) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-bad) 12%, transparent) !important; }
+        html body .dcg-container { border: 1px solid var(--s-line) !important; border-radius: 12px !important; overflow: hidden !important; }
+        \(dark ? "html body img { background: #fff !important; border-radius: 6px !important; }" : "")
+        """
     }
 }
