@@ -250,7 +250,7 @@ private struct AltaQuestionPane: View {
 
     @ViewBuilder
     private func prompt(_ q: AltaQuestion) -> some View {
-        let html = (q.kind == .blanks || q.kind == .dropdowns) ? (q.prompt ?? "") + AltaQuestionPane.marked(q.template ?? "") : (q.prompt ?? "")
+        let html = (q.kind == .blanks || q.kind == .dropdowns) ? (q.prompt ?? "") + AltaQuestionPane.marked(q.template ?? "", math: q.isMath) : (q.prompt ?? "")
         if !html.isEmpty {
             HTMLBlock(html: html, base: TeX.folder ?? engine.web.baseURL, size: 18, height: $promptHeight, math: true) { url in engine.openLink(url) }
                 .frame(height: promptHeight)
@@ -258,8 +258,11 @@ private struct AltaQuestionPane: View {
     }
 
     /// A cloze template with its blanks numbered (①, ②…) in place, for the fields under it.
-    static func marked(_ template: String) -> String {
-        let parts = template.components(separatedBy: "{{response}}")
+    static func marked(_ template: String, math: Bool = false) -> String {
+        // (1.3.20) a maths template (k'(1) = {{response}}) is TeX: the words round each blank typeset as maths
+        let raw = template.components(separatedBy: "{{response}}")
+        let parts = math && !template.contains("<") && !template.contains("$") && !template.contains("\\(")
+            ? raw.map { $0.trimmingCharacters(in: .whitespaces).isEmpty ? $0 : "$_\($0)$_" } : raw
         guard parts.count > 1 else { return template }
         var out = parts[0]
         for k in 1..<parts.count {
@@ -276,6 +279,11 @@ private struct AltaQuestionPane: View {
     @ViewBuilder
     private func answer(_ q: AltaQuestion) -> some View {
         let locked = session.phase != .answering
+        if q.isMath && (q.kind == .blanks || q.kind == .text) {
+            Label("Type maths as on a keyboard: / for a fraction, ^ for a power, sqrt(x) for a root, pi for π.", systemImage: "keyboard")
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+        }
         switch q.kind {
         case .choice:
             VStack(spacing: 6) {
@@ -302,7 +310,7 @@ private struct AltaQuestionPane: View {
                             .font(.sTitle3.weight(.semibold))
                             .foregroundStyle(Theme.accent)
                             .frame(width: 28)
-                        TextField("Your answer", text: $session.blanks[k])
+                        TextField(q.isMath ? "Type your answer, like -3/2" : "Your answer", text: $session.blanks[k])
                             .textFieldStyle(.roundedBorder)
                             .font(.sBody)
                             .disabled(locked)
@@ -329,7 +337,7 @@ private struct AltaQuestionPane: View {
                 }
             }
         case .text:
-            TextField("Your answer", text: $session.blanks[0])
+            TextField(q.isMath ? "Type your answer, like -3/2" : "Your answer", text: $session.blanks[0])
                 .textFieldStyle(.roundedBorder)
                 .font(.sBody)
                 .disabled(locked)

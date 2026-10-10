@@ -165,6 +165,17 @@ enum AltaHook {
         el.blur();
       };
       // every element matching, in the page and inside any web component's own (open) tree
+      var deepIn = function (start, sel) {
+        var out = [];
+        var walk = function (root) {
+          try {
+            out.push.apply(out, [].slice.call(root.querySelectorAll(sel)));
+            [].slice.call(root.querySelectorAll('*')).forEach(function (el) { if (el.shadowRoot) walk(el.shadowRoot); });
+          } catch (e) {}
+        };
+        walk(start);
+        return out;
+      };
       var deep = function (sel) {
         var out = [];
         var walk = function (root) {
@@ -219,6 +230,27 @@ enum AltaHook {
           if (!hit.some(Boolean)) hit = inputs.map(function (inp, k) { return (a.picks || []).indexOf(k) >= 0; });
           inputs.forEach(function (inp, k) { if (hit[k] !== inp.checked) { inp.click(); } if (hit[k]) done++; });
         }
+        // (1.3.20) a maths answer (Learnosity's formula fields, MathQuill underneath): typed into each field as the keys
+        // would — "/" a fraction, "^" a power — through MathQuill when the page offers it, else its own text box
+        if (/formula/i.test(a.type || '') && Array.isArray(a.blanks) && a.blanks.length) {
+          var mqs = deepIn(root, '.mq-editable-field');
+          var MQ = null;
+          try { MQ = window.MathQuill && window.MathQuill.getInterface ? window.MathQuill.getInterface(2) : null; } catch (e) {}
+          a.blanks.forEach(function (v, k) {
+            var f = mqs[k]; if (!f) return;
+            var api = null;
+            try { api = MQ && MQ.MathField ? MQ.MathField(f) : null; } catch (e) {}
+            if (api && api.latex) { try { api.latex(''); api.typedText(String(v)); api.blur && api.blur(); done++; return; } catch (e) {} }
+            var ta = f.querySelector('textarea'); if (!ta) return;
+            ta.focus();
+            var ok = false;
+            try { ok = document.execCommand('insertText', false, String(v)); } catch (e) {}
+            if (!ok) put(ta, String(v));
+            ta.blur();
+            done++;
+          });
+          return { ok: done > 0, filled: done };
+        }
         if (Array.isArray(a.blanks) && a.blanks.length) {
           var fields = [].slice.call(root.querySelectorAll('input[type=text], input:not([type]), textarea'));
           a.blanks.forEach(function (v, k) { if (fields[k]) { put(fields[k], v); done++; } });
@@ -272,6 +304,16 @@ enum AltaHook {
         next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         state: verdictNow
       };
+
+      // (1.3.20) Alta's welcome pop-ups (Welcome to your adaptive assignment!, Assignments adapt to you…): put away as they
+      // come, by their own Got it — only a Got it inside a dialog, never anything of the assignment's
+      var GOTIT = /^(got it|ok, got it|okay, got it)$/;
+      var dismiss = function () {
+        deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open], .modal, [class*="modal" i]').filter(shown).forEach(function (d) {
+          deepIn(d, CLICKABLE).filter(function (b) { return shown(b) && GOTIT.test(norm(b.innerText || b.textContent || b.value || b.getAttribute('aria-label'))); }).slice(0, 1).forEach(function (b) { b.click(); });
+        });
+      };
+      setInterval(dismiss, 700);
 
       // where the page is: an assignment's player, or another of Alta's pages
       var where = function () { post({ kind: 'page', path: location.pathname, assignment: /\/assignment\//.test(location.pathname) }); };
@@ -345,12 +387,18 @@ struct AltaQuestion: Decodable, Equatable {
         switch type ?? "" {
         case "mcq": return options.isEmpty ? .page : .choice
         case "clozetext": return blankCount > 0 ? .blanks : .page
+        // (1.3.20) maths typed into blanks (k′(1) = ▢), or into one field: the student types it as on a keyboard
+        case "clozeformula", "clozeformulaV2": return blankCount > 0 ? .blanks : .text
+        case "formula", "formulaV2": return .text
         case "clozedropdown": return !choices.isEmpty && blankCount == choices.count ? .dropdowns : .page
         case "shorttext": return .text
         case "plaintext", "longtext", "longtextV2": return .longText
         default: return .page // (a graph, a formula, a drag and drop, a custom widget: Alta's own)
         }
     }
+
+    /// (1.3.20) An answer in maths (Learnosity's formula fields): typed as on a keyboard, put in through MathQuill.
+    var isMath: Bool { (type ?? "").lowercased().contains("formula") }
 
     /// The blanks in a cloze template ({{response}} each).
     var blankCount: Int { (template ?? "").components(separatedBy: "{{response}}").count - 1 }
@@ -713,7 +761,9 @@ final class AltaSession: ObservableObject {
             let t = r.targets.first { $0.id == id }
             let mastered = ["complete", "completed", "mastered", "done"].contains((t?.status ?? "").lowercased())
             let p = mastered ? 1 : min(max(t?.progress ?? 0, 0), 1)
-            let named = r.objectives.first { $0.id == id }?.name ?? (r.current.id == id ? r.current.name : nil) ?? names[id]
+            // (1.3.20) a name from the overview by its place when Alta's answers name only the objective on screen
+            let byPlace = (overview?.objectives.count == ids.count) ? overview?.objectives[k].name : nil
+            let named = r.objectives.first { $0.id == id }?.name ?? (r.current.id == id ? r.current.name : nil) ?? names[id] ?? byPlace
             return AltaObjective(id: id, number: k + 1, name: named ?? "Objective \(k + 1)", mastery: p, current: r.current.id == id)
         }
     }

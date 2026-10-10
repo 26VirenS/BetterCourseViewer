@@ -75,7 +75,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (shadow trees included), and reads the overview from the page's own words when it must (the title, DUE DATE, STATUS,
   each "Estimated 4 - 9 questions" and the objective under it). *Copy Alta Details* (the popup's More menu) copies what
   it saw — page addresses without queries, the field names of Alta's answers (never values), the buttons' words — for a
-  school whose Alta still differs. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  school whose Alta still differs. (1.3.20) Maths answers (Learnosity's formula fields, `clozeformula`, `formulaV2`) are
+  drawn too: the template's words typeset round a field the student types in as on a keyboard (/, ^, sqrt), put into
+  Alta's field through MathQuill (its API when the page offers it, else its own text box). Alta's welcome pop-ups are put
+  away by their own Got it (only inside a dialog). Objective names missing from Alta's answers come from the overview, by
+  place. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

@@ -75,6 +75,8 @@ try {
   check(peek.start && /start/i.test(peek.word), `Alta’s own Start is found on it (“${peek.word}”)`);
   check((await page.evaluate(() => window.__simplAlta.begin())).ok, 'and pressed');
   await page.waitForURL(/\/practice$/);
+  await page.waitForTimeout(1600);
+  check(!(await page.$('#welcome')), 'Alta’s welcome pop-up is put away by its own Got it');
 
   const c1 = await content('mcq');
   const q1 = c1.question;
@@ -95,6 +97,17 @@ try {
   await page.evaluate(() => window.__simplAlta.check());
   const f2 = await waitFor((p) => p.kind === 'feedback' && p.verdict === 'incorrect', 'a second verdict');
   check(f2.verdict === 'incorrect' && /linear function/.test(f2.text), 'a wrong answer comes back wrong, with Alta’s explanation');
+
+  // (1.3.20) a maths answer typed into Learnosity's formula field (MathQuill's own text box underneath)
+  await page.evaluate(() => window.__simplAlta.next());
+  const cf = await content('clozeformula');
+  check(cf.question.template === "k'(1) = {{response}}", 'a maths question comes with its template, k′(1) = ▢');
+  const putF = await page.evaluate(() => window.__simplAlta.answer({ responseId: 'r-formula', type: 'clozeformula', blanks: ['-14/9'] }));
+  const typedF = await page.$eval('#q .mq-editable-field textarea', (x) => x.value);
+  check(putF.ok && typedF === '-14/9', `the answer typed in the popup is typed into Alta’s maths field (${typedF})`);
+  await page.evaluate(() => window.__simplAlta.check());
+  const fF = await waitFor((p) => p.kind === 'feedback' && /Correct/.test(p.text) && p !== f1, 'a maths verdict');
+  check(fF.verdict === 'correct', 'and Alta marks it right');
 
   await page.evaluate(() => window.__simplAlta.next());
   const c3 = await content('custom');

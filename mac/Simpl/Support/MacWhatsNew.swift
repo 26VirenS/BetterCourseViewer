@@ -9,6 +9,10 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.20", date: "2026-10-10", notes: [
+            ReleaseNote(kind: "new", title: "Maths answers in Alta", body: "Type maths answers in the popup, like -14/9."),
+            ReleaseNote(kind: "fixed", title: "No Alta pop-ups", body: "Alta's welcome pop-ups are dismissed for you."),
+        ]),
         Release(version: "1.3.19", date: "2026-10-10", notes: [
             ReleaseNote(kind: "fixed", title: "Alta start screen", body: "Alta's objectives and Start show in the popup again."),
         ]),

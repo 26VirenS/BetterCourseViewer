@@ -674,6 +674,7 @@ let altaStep = 0;
 const ALTA_QUESTIONS = [
   { lo: 'lo2', name: 'Graph piecewise functions', content: { type: 'mcq', response_id: 'r-mcq', stimulus: '<p>Which function is linear?</p>', options: [{ label: '$_f(x) = 3x + 2$_', value: '0' }, { label: '$_f(x) = x^2 - 1$_', value: '1' }, { label: '$_f(x) = 2^x$_', value: '2' }], correct_answer: { value: ['0'] }, validation: { valid_response: { value: ['0'] } } } },
   { lo: 'lo2', name: 'Graph piecewise functions', content: { type: 'clozetext', response_id: 'r-cloze', stimulus: '<p>Read the line $$y = 3x + 2$$</p>', template: '<p>Its slope is {{response}} and its y-intercept is {{response}}.</p>', validation: { valid_response: { value: ['3', '2'] } } } },
+  { lo: 'lo1', name: 'Combine the product and quotient rules', content: { type: 'clozeformula', response_id: 'r-formula', stimulus: '<p>Let $_k(x) = \\frac{x^2 \\cdot f(x)}{2x+1}$_. Find $_k\'(1)$_, given that $$f(1) = -2,\\ f\'(1) = -2.$$</p>', template: "k'(1) = {{response}}", validation: { valid_response: { value: ['-14/9'] } } } },
   { lo: 'lo3', name: 'Use piecewise functions', content: { type: 'custom', custom_type: 'desmos_blank_graph_question', response_id: 'r-graph', js: 'https://questions-va.learnosity.com/x.js', stimulus: '<p>Plot $_f(x)$_ in the graphing window.</p>', correct_answer: { a: 3 }, success_condition: 'a=3' } },
 ];
 function altaContent() {
@@ -707,6 +708,7 @@ function draw(j) {
   var q = document.getElementById('q'), h = '<div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">' + (c.stimulus || '');
   if (c.type === 'mcq') h += '<ul class="lrn-mcq-options">' + c.options.map(function (o, k) { return '<li class="lrn-mcq-option"><input type="radio" name="mcq" id="o' + k + '" value="' + o.value + '"><label for="o' + k + '" class="lrn-label">' + o.label.replace(/\\$_/g, '') + '</label></li>'; }).join('') + '</ul>';
   else if (c.type === 'clozetext') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="lrn_cloze_response"><input type="text" class="lrn_cloze_input"></span>' : ''); }).join('');
+  else if (c.type === 'clozeformula') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="mq-editable-field"><textarea></textarea><span class="mq-root-block"></span></span>' : ''); }).join('');
   else h += '<div id="graph" style="width:300px;height:300px;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3">Desmos graph</div>';
   q.innerHTML = h + '</div><div id="fb" class="alta-feedback" role="alert" hidden></div><button id="check">Check Answer</button><button id="next" hidden>Next Question</button>';
   document.getElementById('check').onclick = check;
@@ -714,7 +716,7 @@ function draw(j) {
 }
 function check() {
   var given = [].slice.call(document.querySelectorAll('#q input:checked')).map(function (i) { return i.value; });
-  if (!given.length) given = [].slice.call(document.querySelectorAll('#q input[type=text]')).map(function (i) { return i.value.trim(); });
+  if (!given.length) given = [].slice.call(document.querySelectorAll('#q input[type=text], #q .mq-editable-field textarea')).map(function (i) { return i.value.trim(); });
   var ok = key && JSON.stringify(given) === JSON.stringify(key);
   var r = document.querySelector('.learnosity-response'); r.classList.add(ok ? 'lrn_correct' : 'lrn_incorrect');
   var fb = document.getElementById('fb'); fb.hidden = false; fb.textContent = ok ? 'Correct! Nicely done.' : 'Incorrect. A linear function has the form f(x) = mx + b.';
@@ -1264,7 +1266,7 @@ const server = http.createServer((req, res) => {
     }
     if (path.startsWith('/mock-alta/')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}#q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn-mcq-option{list-style:none;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}.lrn_correct{outline:3px solid #2e7d32}.lrn_incorrect{outline:3px solid #c62828}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div id="q"></div></main><button id="help">Help</button><script>${ALTA_PLAYER_JS}</script></body></html>`);
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}#q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn-mcq-option{list-style:none;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}.lrn_correct{outline:3px solid #2e7d32}.lrn_incorrect{outline:3px solid #c62828}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div id="q"></div></main><button id="help">Help</button><div id="welcome" role="dialog" aria-modal="true" style="position:fixed;inset:20% 25%;background:#fff;border:1px solid #ccc;padding:24px">Welcome to your adaptive assignment!<br><button id="gotit" style="margin-top:20px">GOT IT</button></div><script>document.getElementById('gotit').onclick=function(){document.getElementById('welcome').remove();};</script><script>${ALTA_PLAYER_JS}</script></body></html>`);
     }
     // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
     // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.
