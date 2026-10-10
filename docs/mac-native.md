@@ -118,7 +118,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   question from Alta's answers), keeps the question with its own card ("Question…", when its words were not found)
   and hides the lesson; the bar's View Instruction shows the lesson again in its place and Back to Question the
   question. Hidden parts are put back only where the page has not changed them since. (1.3.33) The question's own card
-  (beginning "Question", long with its maths) is never taken for the lesson above it.
+  (beginning "Question", long with its maths) is never taken for the lesson above it. (1.3.34) Alta may send a lesson
+  and its question in one answer, the lesson first: the question is taken as the first state that is a question (not
+  a lesson, video or example), from any answer of Alta's carrying states; an answer without the objectives keeps the
+  last ones. Copy Alta Details lists each answer's states by purpose / dataType / question type (nothing in them).
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment

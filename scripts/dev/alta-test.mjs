@@ -183,6 +183,9 @@ try {
   await page.waitForSelector('#view');
   const n3 = (await posts()).length;
   await page.click('#view');
+  // (1.3.34) the lesson and its question come in one answer, the lesson first: the question is the one passed
+  const both = await waitFor((p, k) => k >= n3 && p.kind === 'content' && p.withLesson === true, 'the lesson with its question');
+  check(both.question && both.question.type === 'custom' && both.question.purpose === 'ASSESSES', `when Alta sends a lesson and its question together, the question is the one the popup takes (${both.question && both.question.type})`);
   const rawSeen = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.raw === true, 'raw maths');
   check(!!rawSeen, 'the lesson’s maths still in its raw words is told (the popup covers it meanwhile)');
   const greyed = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.nextAny === true && p.next === false, 'a greyed-out Continue');

@@ -53,9 +53,16 @@ enum AltaHook {
         }
         return q;
       };
+      // (1.3.34) which of the states Alta sends is a question to answer — not a lesson, a video, an example
+      var isQuestion = function (s) {
+        var a = (s && s.atom) || {}, c = (a.data && a.data.content) || {};
+        return !!c.type && !/INSTRUCT|LESSON|VIDEO|EXAMPLE|TEACH|READING/.test(String((a.dataType || '') + ' ' + (a.purpose || '')).toUpperCase());
+      };
       var pick = function (j) {
         var e = j.enrollment || {}, p = e.path || {}, d = e.dueDate || {}, a = j.analytics || {}, sp = a.statusAndProgress || {};
-        var st = (j.states || [])[0] || {}, atom = st.atom || {}, ci = st.compoundInstance || {}, lo = atom.learningObjective || {};
+        // (1.3.34) Alta may send a lesson and its question together, the lesson first: the question is the one answered
+        var states = Array.isArray(j.states) ? j.states : [];
+        var st = states.filter(isQuestion)[0] || states[0] || {}, atom = st.atom || {}, ci = st.compoundInstance || {}, lo = atom.learningObjective || {};
         return {
           kind: 'content', path: location.pathname,
           name: str(p.name), pathType: str(p.type), threshold: num(p.masteryThreshold),
@@ -71,17 +78,19 @@ enum AltaHook {
             id: str(atom.learningObjectiveId), name: str(lo.description || atom.name),
             low: num(lo.estimatedQuestionsLow), high: num(lo.estimatedQuestionsHigh), source: str(ci.source)
           },
-          question: (j.states || []).length ? question(atom, ci) : null,
+          question: states.length ? question(atom, ci) : null,
+          withLesson: states.some(function (s) { return s && s.atom && !isQuestion(s); }),
           history: (j.history && Array.isArray(j.history.sequences) ? j.history.sequences : []).slice(0, 40).map(function (s) {
             return { right: num(s.numCorrectResponses) || 0, wrong: num(s.numIncorrectResponses) || 0, skipped: num(s.numSkippedAssessments) || 0, lessons: num(s.numInstructional) || 0 };
           }),
           stuck: j.stuckLo !== null && j.stuckLo !== undefined
         };
       };
+      // (1.3.34: whatever answer of Alta's carries states with atoms, at whatever address)
+      var hasStates = function (j) { return !!j && Array.isArray(j.states) && j.states.some(function (s) { return s && s.atom; }); };
       var seen = function (url, text) {
-        if (!/content/i.test(String(url || ''))) return;
         var j; try { j = typeof text === 'string' ? JSON.parse(text) : text; } catch (e) { return; }
-        if (j && Array.isArray(j.states) && j.enrollment) post(pick(j));
+        if (hasStates(j)) post(pick(j));
       };
       // (the assignment's overview, before it is started or between questions: whatever Alta's page reads that names
       // the assignment, its objectives with their estimates and the mastery — found by those fields, wherever they sit;
@@ -125,8 +134,13 @@ enum AltaHook {
         var j; try { j = typeof text === 'string' ? JSON.parse(text) : text; } catch (e) { return; }
         if (!j || typeof j !== 'object') return;
         // (for Copy Alta Details: where each answer came from and the names of its fields — never their values)
-        try { jsonSeen.push({ at: new URL(String(url || ''), location.href).pathname.slice(0, 120), keys: Object.keys(j).slice(0, 16) }); if (jsonSeen.length > 40) jsonSeen.shift(); } catch (e) {}
-        if (/content/i.test(String(url || '')) && Array.isArray(j.states) && j.enrollment) return seen(url, j);
+        // (1.3.34: and the kind of each state it carries — purpose / dataType / question type — never what is in it)
+        try {
+          jsonSeen.push({ at: new URL(String(url || ''), location.href).pathname.slice(0, 120), keys: Object.keys(j).slice(0, 16),
+            states: Array.isArray(j.states) ? j.states.slice(0, 6).map(function (s) { var a = (s && s.atom) || {}, c = (a.data && a.data.content) || {}; return [str(a.purpose), str(a.dataType), str(c.type)].join(' / '); }) : undefined });
+          if (jsonSeen.length > 40) jsonSeen.shift();
+        } catch (e) {}
+        if (hasStates(j)) return seen(url, j);
         var o = scan(j);
         if (o.objectives.length || o.name || o.targets.length || o.percent !== null || o.progress !== null) post(o);
       };
@@ -930,7 +944,15 @@ final class AltaSession: ObservableObject {
             }
             if phase == .loading && (!o.objectives.isEmpty || o.name != nil) { probeStart(frame) }
         case "content":
-            guard let r = try? JSONDecoder().decode(AltaReport.self, from: data) else { return }
+            guard var r = try? JSONDecoder().decode(AltaReport.self, from: data) else { return }
+            // (1.3.34) an answer that carries the question but not the assignment's objectives: the last ones kept
+            if let old = report {
+                if r.objectives.isEmpty { r.objectives = old.objectives }
+                if r.targets.isEmpty { r.targets = old.targets }
+                if r.name == nil { r.name = old.name }
+                if r.due == nil { r.due = old.due }
+                if r.threshold == nil { r.threshold = old.threshold }
+            }
             self.frame = frame
             remember(r)
             let key = r.question?.key

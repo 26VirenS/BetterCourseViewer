@@ -707,7 +707,7 @@ function altaAnalytics(mastery) {
 const ALTA_PLAYER_JS = `
 var key = null;
 function draw(j) {
-  var st = j.states[0], c = st.atom.data.content; key = c.validation ? c.validation.valid_response.value : (c.correct_answer && c.correct_answer.value) || null;
+  var st = j.states.filter(function (s) { return s.atom.purpose === 'ASSESSES'; })[0] || j.states[0], c = st.atom.data.content; key = c.validation ? c.validation.valid_response.value : (c.correct_answer && c.correct_answer.value) || null;
   document.getElementById('objective').textContent = st.atom.learningObjective.description;
   meter(j.analytics);
   // (what it asks outside Learnosity's own box, as a school's Alta draws it)
@@ -728,11 +728,13 @@ function draw(j) {
     document.getElementById('goback').onclick = function () { d.remove(); };
     // (View Instruction: a lesson in the question's place — no question in it, only its words and Continue)
     document.getElementById('view').onclick = function () {
+      fetch('/mock-alta/api/content?assignmentId=a1&lesson=1').then(function (r) { return r.json(); }).then(function (j) { window.__withLesson = j; });
       d.remove();
       // (as Alta does: the lesson above, the question out of sight; on Continue the lesson stays and the question comes under it)
       var q = document.getElementById('q'), lw = document.createElement('div'); lw.id = 'lessonwrap'; q.parentNode.insertBefore(lw, q); q.style.display = 'none';
       lw.innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p><p class="tex"><span class="MathJax_Preview">$$\\\\frac{d}{dx} x^2 = 2x$$</span></p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
-      document.getElementById('lcont').onclick = function () { var acts = lw.querySelector('.lesson-actions'); if (acts) acts.remove(); q.style.display = ''; load(); };
+      // (Continue asks Alta for nothing: the question came with the lesson)
+      document.getElementById('lcont').onclick = function () { var acts = lw.querySelector('.lesson-actions'); if (acts) acts.remove(); q.style.display = ''; if (window.__withLesson) draw(window.__withLesson); else load(); };
       // (its maths typeset a moment later, as MathJax 2 sets it: spans in MathJax's own fonts)
       // (its maths typeset a moment later, as MathJax 2 does: it measures its fonts in hidden helpers of its own in the
       // page first — hidden away by anyone else, it cannot, and sets the maths out wrong)
@@ -1278,7 +1280,12 @@ const server = http.createServer((req, res) => {
     // (Mac 1.3.17) a stand-in for a Knewton Alta assignment's player: Alta's shell (its header, Practice, the Current
     // objective card) round a question drawn as Learnosity draws one, and Alta's content answer — plain JSON, fetched by
     // the page as Alta's own is — with Check Answer and Next Question as Alta has them
-    if (path === '/mock-alta/api/content') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify(altaContent())); }
+    if (path === '/mock-alta/api/content') {
+      // (with lesson=1: the lesson and its question in one answer, the lesson first — as View Instruction has Alta send them)
+      const j = altaContent();
+      if (url.searchParams.get('lesson') === '1') j.states.unshift({ atom: { id: { atomId: 'lesson1' }, name: 'Combine the product and quotient rules', purpose: 'INSTRUCTS', dataType: 'INSTRUCTIONAL_CONTENT', data: { question: '', content: { type: 'html', html: '<p>A lesson.</p>' } } }, compoundInstance: { id: 'cil', sequenceOrdinal: 1, type: 'INSTRUCT', source: 'ASSIGNMENT' } });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify(j));
+    }
     if (path === '/mock-alta/api/next') { altaStep = Math.min(altaStep + 1, ALTA_QUESTIONS.length - 1); res.writeHead(204); return res.end(); }
     if (path === '/mock-alta/api/reset') { altaStep = 0; altaGain = 0; res.writeHead(204); return res.end(); }
     if (path === '/mock-alta/api/answer') {
