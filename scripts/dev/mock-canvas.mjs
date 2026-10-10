@@ -718,7 +718,14 @@ function draw(j) {
     + '<div class="lrn-formula-keyboard" style="background:#eef0f2;padding:10px;margin-top:10px;display:inline-grid;grid-template-columns:repeat(4,44px);gap:6px;border-radius:6px">' + ['7', '8', '9', '\u00f7', '4', '5', '6', '\u00d7'].map(function (k) { return '<button class="lrn-formula-keyboard-key" style="width:44px;height:44px;border-radius:50%;background:#fff;color:#333;border:1px solid #c9ced3">' + k + '</button>'; }).join('') + '</div>';
   else h += '<div id="graph" style="width:300px;height:300px;border:1px solid #ccc;display:grid;place-items:center;color:#2d70b3">Desmos graph</div>';
   q.innerHTML = h + '</div><div id="fb" class="alta-feedback" role="alert" hidden></div><button id="check">Check Answer</button><button id="next" hidden>Next Question</button><button id="report" class="lrn-feedback-button">Feedback</button><button id="instr">More Instruction</button>';
-  document.getElementById('instr').onclick = function () { document.getElementById('fb').hidden = false; document.getElementById('fb').textContent = 'A lesson on this objective.'; };
+  // (More Instruction asks first, in a pop-up of its own, as Alta does: Having trouble? GO BACK / VIEW INSTRUCTION)
+  document.getElementById('instr').onclick = function () {
+    var d = document.createElement('div'); d.id = 'trouble'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+    d.style.cssText = 'position:fixed;inset:10% 15%;background:#fff;padding:24px;border:1px solid #ccc';
+    d.innerHTML = '<h2>Having trouble?</h2><p>We have instructional material for this objective.</p><button id="goback">GO BACK</button> <button id="view">VIEW INSTRUCTION</button>';
+    document.body.appendChild(d);
+    document.getElementById('goback').onclick = function () { d.remove(); };
+  };
   document.getElementById('check').onclick = check;
   // (a graph's Check is greyed out until the graph is touched)
   if (c.type === 'custom') { document.getElementById('check').disabled = true; document.getElementById('graph').onclick = function () { document.getElementById('check').disabled = false; }; }

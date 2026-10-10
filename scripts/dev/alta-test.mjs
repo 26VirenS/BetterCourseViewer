@@ -163,8 +163,13 @@ try {
   check(!(await vis('#report')) && (await left('#instr')) < -5000, 'Alta’s Feedback put away and its More Instruction moved aside for the popup’s bar');
   const s0 = await waitFor((p, k) => k >= n0 && p.kind === 'focus', 'the question found');
   check(s0.instruct === true, 'the popup is told Alta offers More Instruction');
-  check((await page.evaluate(() => window.__simplAlta.instruct())).ok && /A lesson/.test(await page.$eval('#fb', (e) => e.textContent)), 'the popup’s More Instruction presses Alta’s');
-  await page.evaluate(() => { const f = document.getElementById('fb'); f.hidden = true; f.textContent = ''; });
+  check((await page.evaluate(() => window.__simplAlta.instruct())).ok, 'the popup’s More Instruction presses Alta’s');
+  const d1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.dialog === true, 'Alta’s pop-up');
+  check(!!d1 && (await vis('#trouble')) && (await vis('#goback')), 'Alta’s Having trouble? pop-up is shown, and the popup is told (its bar put away under it)');
+  const n2 = (await posts()).length;
+  await page.click('#goback');
+  const d0 = await waitFor((p, k) => k >= n2 && p.kind === 'focus' && p.dialog === false, 'the pop-up closed');
+  check(!!d0 && !(await page.$('#trouble')), 'Go Back closes it, and the popup is told');
   check(s0.found && s0.check === false, 'the popup is told the question is found and its Check is not ready (nothing answered yet)');
   await page.click('#graph');
   const s1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.check === true, 'Check ready');

@@ -101,7 +101,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   holds every scrolled ancestor's position through it; Alta's maths keypad (`[class*=keyboard|keypad]`) is left out of
   the theme, only inverted in dark mode (1.3.24 was not released; it went out in 1.3.25). (1.3.25) Alta's Feedback
   button is put away and its More Instruction moved aside, pressed from the popup's bar beside Check; the bar sits in the
-  bottom right corner. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  bottom right corner. (1.3.26) Alta's pop-ups (More Instruction's Having trouble?) take the app's page colour as
+  their ground (resolved light or dark at the time), so the question no longer shows through; the bar is put away while
+  one is open. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

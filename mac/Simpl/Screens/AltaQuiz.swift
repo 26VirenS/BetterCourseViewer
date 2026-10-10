@@ -167,7 +167,7 @@ struct AltaQuizScreen: View {
         }
         // (1.3.25: in the bottom right corner)
         .overlay(alignment: .bottomTrailing) {
-            if !session.seesWholePage || session.phase == .feedback { bar }
+            if (!session.seesWholePage || session.phase == .feedback) && !(session.altaDrawn && session.altaDialog) { bar }
         }
         .animation(Motion.gentle, value: session.showPage)
     }

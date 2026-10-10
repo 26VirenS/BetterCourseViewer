@@ -490,7 +490,8 @@ enum AltaHook {
       // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
       var told = '';
       var tell = function (found) {
-        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0 };
+        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0,
+          dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0 };
         var said = JSON.stringify(m);
         if (said !== told) { told = said; post(m); }
       };
@@ -724,6 +725,8 @@ final class AltaSession: ObservableObject {
     @Published private(set) var altaCanCheck = false
     /// (1.3.25) Alta offers More Instruction (pressed from the popup's bar).
     @Published private(set) var altaCanInstruct = false
+    /// (1.3.26) A pop-up of Alta's is open over its question (Having trouble?): the popup's bar is put away under it.
+    @Published private(set) var altaDialog = false
     @Published private(set) var drawsItself = false
     private var css = ""
     @Published private(set) var liveTargets: [String: AltaReport.Target] = [:]
@@ -854,6 +857,7 @@ final class AltaSession: ObservableObject {
                 altaFound = head["found"] as? Bool ?? false
                 altaCanCheck = head["check"] as? Bool ?? false
                 altaCanInstruct = head["instruct"] as? Bool ?? false
+                altaDialog = head["dialog"] as? Bool ?? false
             }
         case "feedback":
             let timedOut = head["timedOut"] as? Bool ?? false
@@ -953,9 +957,17 @@ final class AltaSession: ObservableObject {
 
     /// (1.3.23) The popup's colours for Alta's question: light or dark as the app is, with its accent.
     func appearance(dark: Bool) {
-        let accent = (AppearanceStore.accentNow ?? .controlAccentColor).usingColorSpace(.sRGB) ?? .systemBlue
-        let hex = String(format: "#%02X%02X%02X", Int(accent.redComponent * 255), Int(accent.greenComponent * 255), Int(accent.blueComponent * 255))
-        let next = AltaTheme.css(dark: dark, accent: hex)
+        // (the app's own colours as they are drawn now, light or dark: its accent, and its page — the ground of Alta's
+        // pop-ups)
+        func hex(_ c: NSColor) -> String {
+            var out = "#000000"
+            NSAppearance(named: dark ? .darkAqua : .aqua)?.performAsCurrentDrawingAppearance {
+                let s = c.usingColorSpace(.sRGB) ?? .black
+                out = String(format: "#%02X%02X%02X", Int((s.redComponent * 255).rounded()), Int((s.greenComponent * 255).rounded()), Int((s.blueComponent * 255).rounded()))
+            }
+            return out
+        }
+        let next = AltaTheme.css(dark: dark, accent: hex(AppearanceStore.accentNow ?? .controlAccentColor), ground: hex(NSColor(Theme.page)))
         guard next != css else { return }
         css = next
         if altaDrawn { refocus() }
@@ -1368,7 +1380,7 @@ final class AltaRelay: NSObject, WKScriptMessageHandler {
 /// its blanks, its graph) kept as Alta draws it and works it, recoloured light or dark as the app is, with the app's
 /// accent and type, on the popup's own ground. Only colours, borders and type are changed, never what Alta's page does.
 enum AltaTheme {
-    static func css(dark: Bool, accent: String) -> String {
+    static func css(dark: Bool, accent: String, ground: String) -> String {
         let text = dark ? "#F2F2F7" : "#1D1D1F"
         let dim = dark ? "rgba(235,235,245,0.62)" : "rgba(60,60,67,0.62)"
         let field = dark ? "rgba(255,255,255,0.07)" : "#FFFFFF"
@@ -1383,7 +1395,7 @@ enum AltaTheme {
         let others = ":not(.dcg-container):not(.dcg-container *):not(svg):not(svg *):not(img):not(canvas):not(video):not(iframe)" + pad
         let maths = ":not(.mq-math-mode):not(.mq-math-mode *):not(.katex):not(.katex *):not(mjx-container):not(mjx-container *):not(.MathJax):not(.MathJax *)"
         return """
-        :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); }
+        :root { color-scheme: \(dark ? "dark" : "light"); --s-text: \(text); --s-dim: \(dim); --s-field: \(field); --s-card: \(card); --s-line: \(line); --s-accent: \(accent); --s-accent-soft: color-mix(in srgb, \(accent) 22%, transparent); --s-good: \(good); --s-bad: \(bad); --s-ground: \(ground); }
         html, body { background: transparent !important; color: var(--s-text) !important; }
         body { margin: 0 !important; padding: 12px 28px 120px !important; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif !important; -webkit-font-smoothing: antialiased; }
         body :where(*\(others)) { background-color: transparent !important; background-image: none !important; color: inherit !important; border-color: var(--s-line) !important; box-shadow: none !important; text-shadow: none !important; }
@@ -1408,6 +1420,7 @@ enum AltaTheme {
         html body .lrn_correct, html body .lrn-correct { box-shadow: 0 0 0 2px var(--s-good) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-good) 12%, transparent) !important; }
         html body .lrn_incorrect, html body .lrn-incorrect { box-shadow: 0 0 0 2px var(--s-bad) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-bad) 12%, transparent) !important; }
         html, body, html body * { overflow-anchor: none !important; }
+        html body [role="dialog"], html body [role="alertdialog"], html body [aria-modal="true"], html body dialog[open] { background: var(--s-ground) !important; border-radius: 14px !important; box-shadow: 0 18px 60px rgba(0,0,0,0.35) !important; }
         \(dark ? "html body [class*=\"keyboard\" i]:not([class*=\"keyboard\" i] *), html body [class*=\"keypad\" i]:not([class*=\"keypad\" i] *) { filter: invert(0.9) hue-rotate(180deg) !important; }" : "")
         html body .dcg-container { border: 1px solid var(--s-line) !important; border-radius: 12px !important; overflow: hidden !important; }
         \(dark ? "html body img { background: #fff !important; border-radius: 6px !important; }" : "")
