@@ -43,7 +43,7 @@ struct HTMLBlock: NSViewRepresentable {
         let ucc = WKUserContentController()
         ucc.add(WeakHandler(context.coordinator), name: "size")
         if math { for s in TeX.scripts { ucc.addUserScript(s) } } // (before the sizer: it measures the typeset page)
-        ucc.addUserScript(WKUserScript(source: HTMLBlock.sizer, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        ucc.addUserScript(WKUserScript(source: math ? HTMLBlock.mathSizer : HTMLBlock.sizer, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         config.userContentController = ucc
         let v = PassThroughWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 24), configuration: config)
         v.setValue(false, forKey: "drawsBackground") // (the card shows through)
@@ -69,6 +69,17 @@ struct HTMLBlock: NSViewRepresentable {
     (function(){var last=0;function post(){var h=Math.ceil(document.documentElement.getBoundingClientRect().height);if(h!==last){last=h;window.webkit.messageHandlers.size.postMessage(h);}}
     try{new ResizeObserver(post).observe(document.documentElement);}catch(e){}
     window.addEventListener('load',post);document.querySelectorAll('img').forEach(function(i){i.addEventListener('load',post);});post();})();
+    """
+
+    /// (1.3.17) For typeset maths: the height of everything in it, KaTeX's struts and raised exponents (which reach past
+    /// their boxes) included, and never a scroll bar — a bar narrowing the page made it taller, and measured again,
+    /// and so on. A font arriving later still moves it.
+    static let mathSizer = """
+    (function(){var st=document.createElement('style');st.textContent='html,body{overflow:hidden!important}';(document.head||document.documentElement).appendChild(st);
+    var last=0;function post(){var b=document.body;var h=Math.ceil(Math.max(b?b.scrollHeight:0,b?b.getBoundingClientRect().height:0));if(h!==last){last=h;window.webkit.messageHandlers.size.postMessage(h);}}
+    try{new ResizeObserver(post).observe(document.body||document.documentElement);}catch(e){}
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(post);
+    window.addEventListener('load',post);post();})();
     """
 
     static func page(_ body: String, size: CGFloat) -> String {
@@ -114,6 +125,9 @@ struct HTMLBlock: NSViewRepresentable {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == "size", let n = message.body as? NSNumber else { return }
             let h = max(CGFloat(truncating: n), 8)
+            if parent.math, UserDefaults.standard.string(forKey: "SimplShotFile") != nil { // (the screenshot suite: what each maths block measured)
+                NSLog("[tex] %.0f pt: %@", Double(h), String(parent.html.prefix(48)))
+            }
             if abs(h - parent.height) > 0.5 {
                 DispatchQueue.main.async { self.parent.height = h }
             }
