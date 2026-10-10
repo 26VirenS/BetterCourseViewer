@@ -103,8 +103,9 @@ struct DashboardView: View {
     // MARK: - Counters
 
     /// The counters in rows (six across where they fit, else three or two). (1.2.8) A counter opened grows out of its own
-    /// tile into a panel that floats over the page — as wide as a panel needs, not the page — from the tile's corner
-    /// (its right one for a tile near the page's right edge); nothing under it moves.
+    /// tile into a panel that floats over the page — as wide as a panel needs, not the page — over its tile, placed by
+    /// where the tile is (1.3.16): the left-most tile's panel from its left edge, the right-most's from its right, one in
+    /// the middle centred on it; nothing under it moves.
     private func counters(_ d: Today) -> some View {
         let cols = width >= 900 ? 6 : (width >= 520 ? 3 : 2)
         let list = DashboardView.ordered(d.counters)
@@ -121,7 +122,10 @@ struct DashboardView: View {
                 if let key = open, let c = list.first(where: { $0.key == key }), let a = anchors[key] {
                     let tile = g[a]
                     let w = min(DashCounterPanel.width, g.size.width)
-                    let x = tile.minX + w <= g.size.width + 0.5 ? tile.minX : max(0, tile.maxX - w)
+                    // (1.3.16) placed by where its tile sits across the row: the first tile's panel from its left edge,
+                    // the last one's from its right, one between them centred on it in step — kept on the page
+                    let along = g.size.width > tile.width ? min(max((tile.minX) / (g.size.width - tile.width), 0), 1) : 0
+                    let x = min(max(tile.minX + (tile.width - w) * along, 0), max(0, g.size.width - w))
                     DashCounterPanel(counter: c, value: value(c), note: note(c), width: w, close: { setOpen(nil) },
                                      onHeight: { h in
                                          if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
