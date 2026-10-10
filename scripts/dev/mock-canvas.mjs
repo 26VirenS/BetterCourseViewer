@@ -671,6 +671,7 @@ function recordAnswer(courseId, quizId, subId, raw) {
 // page). Three objectives, the second being worked on. The answer key and the student's ids are in it on purpose: the
 // app must never read them.
 let altaStep = 0;
+let altaGain = 0; // (each checked answer moves the mastery on, as Alta's answer to it says — its content is not asked again)
 const ALTA_QUESTIONS = [
   { lo: 'lo2', name: 'Graph piecewise functions', content: { type: 'mcq', response_id: 'r-mcq', stimulus: '<p>Which function is linear?</p>', options: [{ label: '$_f(x) = 3x + 2$_', value: '0' }, { label: '$_f(x) = x^2 - 1$_', value: '1' }, { label: '$_f(x) = 2^x$_', value: '2' }], correct_answer: { value: ['0'] }, validation: { valid_response: { value: ['0'] } } } },
   { lo: 'lo2', name: 'Graph piecewise functions', content: { type: 'clozetext', response_id: 'r-cloze', stimulus: '<p>Read the line $$y = 3x + 2$$</p>', template: '<p>Its slope is {{response}} and its y-intercept is {{response}}.</p>', validation: { valid_response: { value: ['3', '2'] } } } },
@@ -679,7 +680,7 @@ const ALTA_QUESTIONS = [
 ];
 function altaContent() {
   const q = ALTA_QUESTIONS[Math.min(altaStep, ALTA_QUESTIONS.length - 1)];
-  const mastery = [0.62, 0.7, 0.78][Math.min(altaStep, 2)];
+  const mastery = [0.62, 0.7, 0.78][Math.min(altaStep, 2)] + altaGain;
   return {
     assignmentId: 'a1',
     states: [{
@@ -695,9 +696,12 @@ function altaContent() {
       ltiEnrollment: { resultSourcedId: 'lti-secret', returnUrl: 'https://school.example/return' },
     },
     history: { sequences: [{ numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 1 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 1, numIncorrectResponses: 0 }, { numCorrectResponses: 0, numIncorrectResponses: 0, numInstructional: 1 }] },
-    analytics: { percentComplete: Math.round(mastery * 100), statusAndProgress: { status: 'in_progress', progress: mastery, targets: [{ target_id: 'lref-lo1', progress: 1, status: 'complete' }, { target_id: 'lref-lo2', progress: 0.55 + altaStep * 0.1 }, { target_id: 'lref-lo3', progress: 0.3 }] } },
+    analytics: altaAnalytics(mastery),
     stuckLo: null,
   };
+}
+function altaAnalytics(mastery) {
+  return { percentComplete: Math.round(mastery * 100), statusAndProgress: { status: 'in_progress', progress: mastery, targets: [{ target_id: 'lref-lo1', progress: 1, status: 'complete' }, { target_id: 'lref-lo2', progress: Math.round((0.55 + altaStep * 0.1 + altaGain) * 100) / 100 }, { target_id: 'lref-lo3', progress: 0.3 }] } };
 }
 // the player's own script: the question drawn as Learnosity draws one, Check Answer marking it, Next Question asking for the next
 const ALTA_PLAYER_JS = `
@@ -705,6 +709,7 @@ var key = null;
 function draw(j) {
   var st = j.states[0], c = st.atom.data.content; key = c.validation ? c.validation.valid_response.value : (c.correct_answer && c.correct_answer.value) || null;
   document.getElementById('objective').textContent = st.atom.learningObjective.description;
+  meter(j.analytics);
   var q = document.getElementById('q'), h = '<div class="learnosity-response question-' + c.response_id + ' lrn_' + c.type + '">' + (c.stimulus || '');
   if (c.type === 'mcq') h += '<ul class="lrn-mcq-options">' + c.options.map(function (o, k) { return '<li class="lrn-mcq-option"><input type="radio" name="mcq" id="o' + k + '" value="' + o.value + '"><label for="o' + k + '" class="lrn-label">' + o.label.replace(/\\$_/g, '') + '</label></li>'; }).join('') + '</ul>';
   else if (c.type === 'clozetext') h += c.template.split('{{response}}').map(function (p, k, all) { return p + (k < all.length - 1 ? '<span class="lrn_cloze_response"><input type="text" class="lrn_cloze_input"></span>' : ''); }).join('');
@@ -721,6 +726,11 @@ function check() {
   var r = document.querySelector('.learnosity-response'); r.classList.add(ok ? 'lrn_correct' : 'lrn_incorrect');
   var fb = document.getElementById('fb'); fb.hidden = false; fb.textContent = ok ? 'Correct! Nicely done.' : 'Incorrect. A linear function has the form f(x) = mx + b.';
   document.getElementById('check').hidden = true; document.getElementById('next').hidden = false;
+  fetch('/mock-alta/api/answer', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (j) { meter(j.analytics); });
+}
+function meter(a) {
+  var b = document.getElementById('mbar'); b.setAttribute('aria-valuenow', a.percentComplete); b.firstChild.style.width = a.percentComplete + '%';
+  document.getElementById('mpct').textContent = a.percentComplete + '%';
 }
 function load() { return fetch('/mock-alta/api/content?assignmentId=a1').then(function (r) { return r.json(); }).then(draw); }
 load();
@@ -1237,7 +1247,13 @@ const server = http.createServer((req, res) => {
     // the page as Alta's own is — with Check Answer and Next Question as Alta has them
     if (path === '/mock-alta/api/content') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify(altaContent())); }
     if (path === '/mock-alta/api/next') { altaStep = Math.min(altaStep + 1, ALTA_QUESTIONS.length - 1); res.writeHead(204); return res.end(); }
-    if (path === '/mock-alta/api/reset') { altaStep = 0; res.writeHead(204); return res.end(); }
+    if (path === '/mock-alta/api/reset') { altaStep = 0; altaGain = 0; res.writeHead(204); return res.end(); }
+    if (path === '/mock-alta/api/answer') {
+      altaGain = Math.round((altaGain + 0.04) * 100) / 100;
+      const mastery = [0.62, 0.7, 0.78][Math.min(altaStep, 2)] + altaGain;
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ result: 'recorded', analytics: altaAnalytics(mastery) }));
+    }
     // the assignment's overview, where Alta opens: its objectives with their estimates (grouped under topics, as Alta
     // lists them), when it is due, Not started, and START — read by the page from an answer of its own
     if (path === '/mock-alta/api/assignment') {
@@ -1255,18 +1271,18 @@ const server = http.createServer((req, res) => {
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's
     // naming them), and START a link inside a web component of its own
     if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/a2$/.test(path)) {
-      altaStep = 0;
+      altaStep = 0; altaGain = 0;
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title></head><body><div style="background:#23284a;color:#fff;padding:24px 40px"><h1>Differentiation Rules 2</h1><div>DUE DATE</div><div>Monday, Oct 12</div><div>11:59pm PDT</div><div>STATUS</div><div>Not started</div><alta-start></alta-start></div><main style="padding:20px 40px"><h2>Activity</h2><p>No activity</p><h2>Objectives</h2><div><div>The Product and Quotient Rules</div><div><i>Estimated 4 - 9 questions</i></div><div>Combine the product and quotient rules</div></div><div><div>Derivatives of Trigonometric Functions</div><div><i>Estimated 4 - 6 questions</i></div><div>Find the derivative of a sine or cosine function</div></div></main><script>customElements.define('alta-start', class extends HTMLElement { connectedCallback() { var r = this.attachShadow({ mode: 'open' }); r.innerHTML = '<a href="#" id="go" style="display:inline-block;padding:14px 26px;background:#1b8a9c;color:#fff">START</a>'; r.getElementById('go').onclick = function (e) { e.preventDefault(); location.href = location.pathname.replace(/a2$/, 'a1') + '/practice'; }; } });</script></body></html>`);
     }
     if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/\w+$/.test(path)) {
-      altaStep = 0;
+      altaStep = 0; altaGain = 0;
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}.hero{background:#23284a;color:#fff;padding:24px 40px 40px}.hero h1{font-weight:400}button.start{background:#1b8a9c;color:#fff;border:0;padding:14px 26px;letter-spacing:.1em}</style></head><body><div class="hero"><b>Knewton Alta</b><h1 id="t">…</h1><div>STATUS <span>Not started</span></div><p><button class="start" id="start">START</button> <button>REVIEW INSTRUCTION</button></p></div><main style="padding:20px 40px"><h2>Activity</h2><p>No activity</p><h2>Objectives</h2><div id="objs"></div></main><script>fetch('/mock-alta/api/assignment').then(function(r){return r.json()}).then(function(j){document.getElementById('t').textContent=j.enrollment.path.name;document.getElementById('objs').innerHTML=j.enrollment.path.topics.map(function(t){return '<h3>'+t.name+'</h3>'+t.learningObjectives.map(function(o){return '<p>'+o.description+'</p>'}).join('')}).join('');});document.getElementById('start').onclick=function(){location.href=location.pathname+'/practice';};</script></body></html>`);
     }
     if (path.startsWith('/mock-alta/')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}#q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn-mcq-option{list-style:none;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}.lrn_correct{outline:3px solid #2e7d32}.lrn_incorrect{outline:3px solid #c62828}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div id="q"></div></main><button id="help">Help</button><div id="welcome" role="dialog" aria-modal="true" style="position:fixed;inset:20% 25%;background:#fff;border:1px solid #ccc;padding:24px">Welcome to your adaptive assignment!<br><button id="gotit" style="margin-top:20px">GOT IT</button></div><script>document.getElementById('gotit').onclick=function(){document.getElementById('welcome').remove();};</script><script>${ALTA_PLAYER_JS}</script></body></html>`);
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Practice</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header{height:56px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#00284e;color:#fff}header a{color:#fff}main{max-width:720px;margin:24px auto;padding:0 20px}.obj{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:16px;border:1px solid #d7dde3}#q{background:#fff;border-radius:8px;padding:18px;border:1px solid #d7dde3}.lrn-mcq-option{list-style:none;padding:10px 12px;border:1px solid #c9d1d9;border-radius:6px;margin:8px 0}.lrn_correct{outline:3px solid #2e7d32}.lrn_incorrect{outline:3px solid #c62828}#help{position:fixed;right:20px;bottom:20px;border-radius:24px;padding:12px 18px;background:#00284e;color:#fff;border:0}</style></head><body><header><a href="#">&#8592; MATH 021</a><b>Practice</b><span style="margin-left:auto">MASTERY <span id="mpct">0%</span></span><div id="mbar" role="progressbar" aria-label="Mastery" aria-valuenow="0" aria-valuemax="100" style="width:120px;height:8px;background:#335;border-radius:4px"><div style="height:8px;background:#5ce0c6;border-radius:4px;width:0"></div></div></header><main><div class="obj"><small>Current objective</small><div id="objective">…</div></div><h2>Question</h2><div id="q"></div></main><button id="help">Help</button><div id="welcome" role="dialog" aria-modal="true" style="position:fixed;inset:20% 25%;background:#fff;border:1px solid #ccc;padding:24px">Welcome to your adaptive assignment!<br><button id="gotit" style="margin-top:20px">GOT IT</button></div><script>document.getElementById('gotit').onclick=function(){document.getElementById('welcome').remove();};</script><script>${ALTA_PLAYER_JS}</script></body></html>`);
     }
     // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
     // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.

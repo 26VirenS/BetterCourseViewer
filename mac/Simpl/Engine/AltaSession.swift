@@ -6,8 +6,8 @@ import WebKit
 // (AltaQuiz.swift) with the objectives and the total mastery down the left and the question in the rest, drawn by the
 // app. Alta itself still sets each question and marks each answer: it is open, signed in through Canvas, on a page the
 // popup keeps out of sight; the student's answer is put into Alta's own question there and Alta's own Check pressed,
-// and what Alta says back is shown. A question the popup cannot draw itself (a graph, a formula, a lesson) shows Alta's
-// own page in its place.
+// and what Alta says back is shown. A question of any other kind (a graph, a drag and drop, a widget) is Alta's own,
+// shown alone in its place (1.3.21); a lesson, Alta's own page.
 
 /// The page's side: a script in every frame of the hidden page that, on Alta's pages only, reads a copy of Alta's own
 /// `content` answer as Alta's page receives it, and passes the app the assignment, its objectives and their mastery,
@@ -88,8 +88,14 @@ enum AltaHook {
       // the answer key and the student's identity are passed over, never read)
       var SKIP = { correct_answer: 1, success_condition: 1, validation: 1, valid_response: 1, ltiEnrollment: 1, userId: 1, registrationId: 1 };
       var scan = function (j) {
-        var out = { kind: 'overview', path: location.pathname, name: null, due: null, threshold: null, percent: null, status: null, started: null, completed: null, objectives: [] };
-        var had = {};
+        var out = { kind: 'overview', path: location.pathname, name: null, due: null, threshold: null, percent: null, progress: null, status: null, started: null, completed: null, objectives: [], targets: [] };
+        var had = {}, hadT = {};
+        // (1.3.21) each objective's mastery, in whatever answer of Alta's carries it (a checked answer's, not only
+        // the question's): its progress target, by the objective's id
+        var target = function (t) {
+          var id = str(String(t.target_id || t.targetId || '').replace(/^lref-/, ''));
+          if (id && !hadT[id] && typeof t.progress === 'number') { hadT[id] = 1; out.targets.push({ id: id, progress: t.progress, status: str(t.status) }); }
+        };
         var visit = function (o, depth) {
           if (!o || typeof o !== 'object' || depth > 7) return;
           if (Array.isArray(o)) { for (var i = 0; i < o.length && i < 500; i++) visit(o[i], depth + 1); return; }
@@ -100,7 +106,13 @@ enum AltaHook {
           if (o.path && typeof o.path === 'object' && typeof o.path.name === 'string') { out.name = out.name || str(o.path.name); out.threshold = out.threshold || num(o.path.masteryThreshold); }
           if (o.dueDate && typeof o.dueDate === 'object' && o.dueDate.effectiveDueDate) out.due = out.due || num(o.dueDate.effectiveDueDate);
           if (typeof o.percentComplete === 'number' && out.percent === null) out.percent = o.percentComplete;
-          if (o.statusAndProgress && typeof o.statusAndProgress === 'object' && !out.status) out.status = str(o.statusAndProgress.status);
+          if (o.statusAndProgress && typeof o.statusAndProgress === 'object') {
+            var sp = o.statusAndProgress;
+            if (!out.status) out.status = str(sp.status);
+            if (out.progress === null && typeof sp.progress === 'number') out.progress = sp.progress;
+            if (Array.isArray(sp.targets)) sp.targets.forEach(function (t) { if (t && typeof t === 'object') target(t); });
+          }
+          if (o.target_id || o.targetId) target(o);
           if (typeof o.completed === 'boolean' && 'startedAt' in o && out.completed === null) { out.completed = o.completed; out.started = !!o.startedAt; }
           for (var k in o) { if (!SKIP[k] && Object.prototype.hasOwnProperty.call(o, k)) visit(o[k], depth + 1); }
         };
@@ -114,9 +126,9 @@ enum AltaHook {
         if (!j || typeof j !== 'object') return;
         // (for Copy Alta Details: where each answer came from and the names of its fields — never their values)
         try { jsonSeen.push({ at: new URL(String(url || ''), location.href).pathname.slice(0, 120), keys: Object.keys(j).slice(0, 16) }); if (jsonSeen.length > 40) jsonSeen.shift(); } catch (e) {}
-        if (/content/i.test(String(url || ''))) return seen(url, j);
+        if (/content/i.test(String(url || '')) && Array.isArray(j.states) && j.enrollment) return seen(url, j);
         var o = scan(j);
-        if (o.objectives.length || o.name) post(o);
+        if (o.objectives.length || o.name || o.targets.length || o.percent !== null || o.progress !== null) post(o);
       };
       var fetch0 = window.fetch;
       if (fetch0) {
@@ -281,6 +293,7 @@ enum AltaHook {
         if (watching) clearInterval(watching);
         var t0 = Date.now();
         watching = setInterval(function () {
+          if (focused) trim(false); // (Alta's verdict, in sight before it is read, when the question is shown alone)
           var s = verdictNow();
           if (s.verdict || s.next || Date.now() - t0 > 12000) {
             clearInterval(watching); watching = null;
@@ -288,7 +301,117 @@ enum AltaHook {
           }
         }, 300);
       };
+      // (1.3.21) Alta's own Check pressed on its page (a question the popup does not draw): its verdict read back too
+      document.addEventListener('click', function (e) {
+        try {
+          var path = e.composedPath ? e.composedPath() : [e.target];
+          for (var i = 0; i < path.length && i < 8; i++) {
+            var el = path[i];
+            if (el && el.matches && el.matches(CLICKABLE)) {
+              var said = norm(el.innerText || el.textContent || el.value || el.getAttribute('aria-label'));
+              if (!watching && CHECK.test(said)) watch();
+              if (NEXT.test(said)) focusFirst = true; // (the next question shown from its top)
+              break;
+            }
+          }
+        } catch (x) {}
+      }, true);
+
+      // (1.3.21) the mastery as Alta's page shows it: its progress bars (Mastery, each objective's) and a percentage by
+      // the word Mastery — passed whenever it changes, so the popup's rail moves when Alta's does
+      var meter = function () {
+        var bars = deep('[role="progressbar"], progress, meter').filter(shown).map(function (b) {
+          var now = num(b.getAttribute('aria-valuenow') !== null ? b.getAttribute('aria-valuenow') : b.value);
+          var max = num(b.getAttribute('aria-valuemax') !== null ? b.getAttribute('aria-valuemax') : b.max) || 100;
+          if (now === null) return null;
+          var by = b.getAttribute('aria-labelledby'), named = by ? document.getElementById(by.split(' ')[0]) : null;
+          var label = norm(b.getAttribute('aria-label') || (named && named.innerText) || b.title || '');
+          return { label: label.slice(0, 160), value: Math.max(0, Math.min(1, now / max)) };
+        }).filter(Boolean).slice(0, 30);
+        var lines = String((document.body && document.body.innerText) || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+        var percent = null;
+        lines.forEach(function (l, i) {
+          if (percent !== null || !/^(total |overall |assignment )?mastery\b/i.test(l)) return;
+          var m = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(l) || /^(\d{1,3}(?:\.\d+)?)\s*%$/.exec(lines[i + 1] || '');
+          if (m) percent = Math.min(100, +m[1]);
+        });
+        if (percent === null) bars.forEach(function (b) { if (percent === null && /mastery/.test(b.label)) percent = Math.round(b.value * 1000) / 10; });
+        return { percent: percent, bars: bars };
+      };
+      var lastMeter = '';
+      setInterval(function () {
+        var m = meter();
+        if (m.percent === null && !m.bars.length) return;
+        var s = JSON.stringify(m);
+        if (s !== lastMeter) { lastMeter = s; post({ kind: 'meter', percent: m.percent, bars: m.bars }); }
+      }, 1500);
+
+      // (1.3.21) Any kind of question in the popup: a question the popup does not draw itself (a graph, a drag and drop,
+      // a widget of any kind) is Alta's own, shown alone — Alta's page with everything but the question, its buttons
+      // (Check, Next, help) and what Alta says of it (its verdict, its pop-ups) put out of sight. Nothing is taken out
+      // of the page; it is only hidden, and shown again as it was for Alta's Page.
+      var QUESTION = '.learnosity-item, .lrn-assess-item, .lrn_widget, .learnosity-response, .lrn-question, .lrn_question';
+      var HELPERS = /^(i don'?t know|help me solve this|view an example|review instruction|show me how|show me|hint|show hint|try again|explain|skip)$/;
+      var hidden = [];
+      var parentOf = function (el) { return el.parentElement || (el.parentNode && el.parentNode.host) || null; };
+      var hide = function (el) { hidden.push({ el: el, d: el.style.getPropertyValue('display'), p: el.style.getPropertyPriority('display') }); el.style.setProperty('display', 'none', 'important'); };
+      var unhide = function (h) { if (h.d) h.el.style.setProperty('display', h.d, h.p); else h.el.style.removeProperty('display'); };
+      var lift = function () { hidden.forEach(unhide); hidden = []; };
+      var keepers = function (iframeToo) {
+        var qs = deep(QUESTION).filter(shown);
+        if (!qs.length && iframeToo) {
+          var big = deep('iframe').filter(shown).sort(function (a, b) {
+            var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+            return rb.width * rb.height - ra.width * ra.height;
+          })[0];
+          if (big) qs = [big];
+        }
+        if (!qs.length) return [];
+        var more = buttons(CHECK).concat(buttons(NEXT), buttons(HELPERS),
+          deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown),
+          deep('[role="alert"], [class*="feedback" i]').filter(function (e) { return shown(e) && norm(e.innerText || ''); }));
+        var all = qs.concat(more);
+        // (the outermost of them: one inside another is kept with it)
+        return all.filter(function (e, k) { return all.indexOf(e) === k && !all.some(function (o) { return o !== e && o.contains(e); }); });
+      };
+      var focused = null, focusFirst = true, focusIframe = false, dirty = true, quiet = 0;
+      // (worked out again whenever the page changes — a verdict, a pop-up, the next question may come in a part that is
+      // hidden — from the page as it is, all in one go, so nothing flickers)
+      try {
+        new MutationObserver(function () { dirty = true; }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-modal', 'disabled'] });
+      } catch (e) {}
+      var trim = function (force) {
+        if (!force && !dirty && hidden.length && ++quiet < 6) return true;
+        quiet = 0; dirty = false;
+        lift();
+        var keep = keepers(focusIframe);
+        if (!keep.length) return false;
+        var path = new Set();
+        keep.forEach(function (e) { for (var x = e; x; x = parentOf(x)) path.add(x); });
+        var want = new Set();
+        path.forEach(function (x) {
+          var p = parentOf(x);
+          if (!p || x === document.body || x === document.documentElement) return;
+          var kids = (x.parentNode && x.parentNode.host) ? x.parentNode.children : p.children;
+          [].forEach.call(kids, function (s) {
+            if (!path.has(s) && !/^(SCRIPT|STYLE|LINK|META|TEMPLATE)$/.test(s.tagName)) want.add(s);
+          });
+        });
+        want.forEach(hide);
+        if (focusFirst) { focusFirst = false; try { keep[0].scrollIntoView({ block: 'start' }); } catch (x) {} }
+        return true;
+      };
+      var focus = function (o) {
+        o = o || {};
+        if (!o.on) { if (focused) clearInterval(focused); focused = null; lift(); return { found: false }; }
+        focusIframe = !!o.iframe;
+        if (!focused) { focusFirst = true; focused = setInterval(function () { trim(false); }, 500); }
+        return { found: trim(true) };
+      };
+
       window.__simplAlta = {
+        focus: focus,
+        meter: meter,
         // the assignment's overview: whether it offers to start (or go on), and pressing that
         peek: function () { var b = buttons(START)[0]; return { start: !!b, word: b ? (b.innerText || b.textContent || b.value || '').trim() : null, overview: scrape() }; },
         diag: function () {
@@ -301,7 +424,7 @@ enum AltaHook {
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
-        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
+        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; b.click(); return { ok: true }; },
         state: verdictNow
       };
 
@@ -415,6 +538,9 @@ struct AltaOverview: Decodable, Equatable {
     var statusText: String?
     var threshold: Double?
     var percent: Double?
+    /// (1.3.21) The whole's progress (0…1) and each objective's, from any answer of Alta's that carries them.
+    var progress: Double?
+    var targets: [AltaReport.Target]?
     var status: String?
     var started: Bool?
     var completed: Bool?
@@ -464,7 +590,14 @@ final class AltaSession: ObservableObject {
     @Published private(set) var verdict: AltaVerdict?
     /// Alta's own page shown in the question's place: a kind of question the popup does not draw, a lesson, or a step
     /// the popup could not take — and whenever the student asks to see it.
-    @Published var showPage = false
+    @Published var showPage = false { didSet { if showPage != oldValue { refocus() } } }
+    /// (1.3.21) Alta's whole page, as it is (Alta's Page); otherwise, for a question the popup does not draw, Alta's
+    /// own question shown alone.
+    @Published var wholePage = false { didSet { if wholePage != oldValue { refocus() } } }
+    /// (1.3.21) The mastery last heard, from wherever Alta said it (a question's answer, a checked answer's, the bars
+    /// on its page), 0…1: the whole, and each objective's by its id.
+    @Published private(set) var livePercent: Double?
+    @Published private(set) var liveTargets: [String: AltaReport.Target] = [:]
     @Published var picks: Set<Int> = []
     @Published var blanks: [String] = []
     @Published var drops: [String] = []
@@ -526,6 +659,7 @@ final class AltaSession: ObservableObject {
             guard !Task.isCancelled, let self else { return }
             if self.phase == .loading || self.phase == .moving || self.phase == .checking {
                 withAnimation(Motion.gentle) {
+                    self.wholePage = true
                     self.showPage = true
                     if self.phase == .checking { self.phase = .answering }
                 }
@@ -543,13 +677,17 @@ final class AltaSession: ObservableObject {
             if self.frame == nil { self.frame = frame }
             if !frames.contains(where: { $0 === frame }) { frames.append(frame); if frames.count > 12 { frames.removeFirst() } }
             if phase == .loading || phase == .start { probeStart(frame) }
+            if showPage && !wholePage { refocus() } // (a new page of Alta's: its question shown alone again)
         case "overview":
             guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
             if self.frame == nil { self.frame = frame }
             for x in o.objectives where !x.name.isEmpty && names[x.id] != x.name { names[x.id] = x.name }
             UserDefaults.standard.set(names, forKey: Self.namesKey)
-            withAnimation(Motion.gentle) { overview = merge(overview, o) }
-            if phase == .loading { probeStart(frame) }
+            withAnimation(Motion.gentle) {
+                overview = merge(overview, o)
+                hear(percent: o.percent.map { $0 / 100 } ?? o.progress, targets: o.targets ?? [])
+            }
+            if phase == .loading && (!o.objectives.isEmpty || o.name != nil) { probeStart(frame) }
         case "content":
             guard let r = try? JSONDecoder().decode(AltaReport.self, from: data) else { return }
             self.frame = frame
@@ -558,6 +696,7 @@ final class AltaSession: ObservableObject {
             let isNew = key != questionKey
             withAnimation(Motion.gentle) {
                 report = r
+                hear(percent: r.percent.map { $0 / 100 } ?? r.progress, targets: r.targets)
                 if isNew {
                     questionKey = key
                     picks = []
@@ -566,21 +705,38 @@ final class AltaSession: ObservableObject {
                     drops = Array(repeating: "", count: r.question?.choices.count ?? 0)
                     verdict = nil
                     phase = .answering
+                    wholePage = r.question == nil
                     showPage = r.question.map { $0.kind == .page } ?? true
                 }
             }
             watchdog?.cancel()
         case "feedback":
-            guard phase == .checking else { return }
+            let timedOut = head["timedOut"] as? Bool ?? false
+            // (1.3.21: also when Alta's own Check was pressed, on a question shown as Alta's)
+            guard phase == .checking || (phase == .answering && !timedOut) else { return }
             watchdog?.cancel()
             let v = head["verdict"] as? String
-            let timedOut = head["timedOut"] as? Bool ?? false
             withAnimation(Motion.gentle) {
                 verdict = AltaVerdict(correct: v == "correct" ? true : (v == "incorrect" ? false : nil),
                                       text: (head["text"] as? String) ?? "", canContinue: head["next"] as? Bool ?? false)
                 phase = .feedback
-                if timedOut { showPage = true } // (Alta said nothing the popup could read: its page, as it is)
+                if timedOut { wholePage = true; showPage = true } // (Alta said nothing the popup could read: its page, as it is)
             }
+        case "meter":
+            // (1.3.21) Alta's page's own mastery bars: the whole's, and each objective's by its name
+            let percent = head["percent"] as? Double
+            var found: [AltaReport.Target] = []
+            let named = objectives
+            for b in head["bars"] as? [[String: Any]] ?? [] {
+                guard let label = b["label"] as? String, let value = b["value"] as? Double, !label.isEmpty else { continue }
+                if let o = named.first(where: { o in
+                    let n = o.name.lowercased()
+                    return !o.name.hasPrefix("Objective ") && n.count > 3 && (label.contains(n) || n.contains(label))
+                }) {
+                    found.append(AltaReport.Target(id: o.id, progress: value, status: nil))
+                }
+            }
+            withAnimation(Motion.gentle) { hear(percent: percent.map { $0 / 100 }, targets: found) }
         default:
             break
         }
@@ -590,8 +746,169 @@ final class AltaSession: ObservableObject {
     private func merge(_ old: AltaOverview?, _ new: AltaOverview) -> AltaOverview {
         guard let old else { return new }
         return AltaOverview(name: new.name ?? old.name, due: new.due ?? old.due, dueText: new.dueText ?? old.dueText, statusText: new.statusText ?? old.statusText, threshold: new.threshold ?? old.threshold,
-                            percent: new.percent ?? old.percent, status: new.status ?? old.status, started: new.started ?? old.started,
+                            percent: new.percent ?? old.percent, progress: new.progress ?? old.progress, targets: new.targets ?? old.targets,
+                            status: new.status ?? old.status, started: new.started ?? old.started,
                             completed: new.completed ?? old.completed, objectives: new.objectives.isEmpty ? old.objectives : new.objectives)
+    }
+
+    /// (1.3.21) Mastery heard: the newest word on it kept, whichever of Alta's answers or bars it came in (as a fraction,
+    /// or as Alta's percent).
+    private func hear(percent: Double?, targets: [AltaReport.Target]) {
+        let unit = { (p: Double) in min(max(p > 1 ? p / 100 : p, 0), 1) }
+        if let p = percent { livePercent = unit(p) }
+        for t in targets {
+            guard let id = t.id, !id.isEmpty else { continue }
+            liveTargets[id] = AltaReport.Target(id: id, progress: t.progress.map(unit), status: t.status ?? liveTargets[id]?.status)
+        }
+    }
+
+    // MARK: Alta's page in the popup
+
+    /// Alta's whole page is on screen (Alta's Page), rather than the question.
+    var seesWholePage: Bool { showPage && wholePage }
+
+    /// Alta's Page, and back to the question: as the popup draws it, or as Alta's own, shown alone.
+    func togglePage() {
+        if seesWholePage {
+            wholePage = false
+            showPage = question?.kind == .page
+        } else {
+            wholePage = true
+            showPage = true
+        }
+    }
+
+    /// (1.3.21) Alta's own question shown alone in Alta's page, or the page as it is: asked of each page of the hidden
+    /// view. Where the question is in a page within the page, the outer page keeps only that inner page.
+    private func refocus() {
+        let on = showPage && !wholePage
+        Task { [weak self] in await self?.applyFocus(on) }
+    }
+
+    private func applyFocus(_ on: Bool) async {
+        let js = "return window.__simplAlta ? window.__simplAlta.focus(o) : null"
+        var mainFound = false, innerFound = false
+        var missed: [WKFrameInfo?] = []
+        for f in frames + [nil] {
+            let r = await run(js, ["o": ["on": on, "iframe": false]], exactly: f) as? [String: Any]
+            let found = r?["found"] as? Bool ?? false
+            if f?.isMainFrame ?? true { mainFound = mainFound || found } else { innerFound = innerFound || found }
+            if !found { missed.append(f) }
+        }
+        guard on, innerFound, !mainFound else { return }
+        for f in missed { _ = await run(js, ["o": ["on": true, "iframe": true]], exactly: f) }
+    }
+
+    /// (1.3.21) Alta's whole page as one picture, top to bottom, past what fits on screen: scrolled through a screenful
+    /// at a time and put together — saved to Downloads and copied, to send at once. Alta's page is shown whole while it
+    /// is taken, then put back as it was.
+    func fullPageShot() async -> URL? {
+        let wasShown = showPage, wasWhole = wholePage
+        withAnimation(Motion.gentle) { wholePage = true; showPage = true }
+        await applyFocus(false)
+        defer {
+            withAnimation(Motion.gentle) { wholePage = wasWhole; showPage = wasShown }
+            refocus()
+        }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        let measure = """
+        var se = document.scrollingElement || document.documentElement, best = null, area = 0;
+        if (se.scrollHeight > innerHeight + 8) best = se;
+        else [].forEach.call(document.querySelectorAll('*'), function (el) {
+          if (el.scrollHeight <= el.clientHeight + 8 || el.clientHeight < 120) return;
+          if (!/(auto|scroll|overlay)/.test(getComputedStyle(el).overflowY)) return;
+          var r = el.getBoundingClientRect(); if (r.width * r.height > area) { area = r.width * r.height; best = el; }
+        });
+        window.__simplShot = { el: best, was: best ? best.scrollTop : 0, fixed: [] };
+        if (!best) return { total: 0, vh: innerHeight };
+        var r = best === se ? { top: 0 } : best.getBoundingClientRect();
+        return { total: best.scrollHeight, view: best === se ? innerHeight : best.clientHeight, top: Math.max(0, r.top), vh: innerHeight };
+        """
+        // (from the second screenful on, what stays put on screen — a header, a button — is hidden, so it shows once)
+        let scroll = """
+        var s = window.__simplShot; if (!s || !s.el) return 0;
+        if (y > 0 && !s.fixed.length) [].forEach.call(document.querySelectorAll('*'), function (el) {
+          var p = getComputedStyle(el).position;
+          if (p === 'fixed' || p === 'sticky') { s.fixed.push([el, el.style.visibility]); el.style.visibility = 'hidden'; }
+        });
+        s.el.scrollTop = y; return s.el.scrollTop;
+        """
+        let restore = """
+        var s = window.__simplShot; if (!s || !s.el) return 0;
+        s.fixed.forEach(function (f) { f[0].style.visibility = f[1]; }); s.el.scrollTop = s.was; window.__simplShot = null; return 1;
+        """
+        guard let m = await run(measure, [:], exactly: nil) as? [String: Any] else { return nil }
+        let vh = (m["vh"] as? Double) ?? Double(web.bounds.height)
+        let total = (m["total"] as? Double) ?? 0
+        let view = (m["view"] as? Double) ?? vh
+        let top = (m["top"] as? Double) ?? 0
+        var tiles: [(offset: Double, image: CGImage)] = []
+        if total > view + 1 {
+            var y = 0.0
+            for _ in 0..<60 {
+                let at = (await run(scroll, ["y": y], exactly: nil) as? Double) ?? y
+                if let last = tiles.last, at <= last.offset { break }
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard let image = await snapshot() else { break }
+                tiles.append((at, image))
+                if at + view >= total - 1 { break }
+                y = at + view
+            }
+            _ = await run(restore, [:], exactly: nil)
+        } else if let image = await snapshot() {
+            tiles = [(0, image)]
+        }
+        guard let first = tiles.first?.image else { return nil }
+        let scale = Double(first.width) / max(Double(web.bounds.width), 1)
+        let px = { (v: Double) in Int((v * scale).rounded()) }
+        // the first screenful to the foot of the scrolling part; each next screenful's new rows under it; the foot of
+        // the last screenful below the scrolling part
+        let foot = min(top + view, vh)
+        let span = (tiles.last?.offset ?? 0) - (tiles.first?.offset ?? 0)
+        let height = px(vh + span)
+        guard let ctx = CGContext(data: nil, width: first.width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: first.width, height: height))
+        func place(_ image: CGImage, from y0: Double, to y1: Double, at yTop: Double) {
+            let crop = CGRect(x: 0, y: px(y0), width: image.width, height: min(px(y1) - px(y0), image.height - px(y0)))
+            guard crop.height > 0, let part = image.cropping(to: crop) else { return }
+            ctx.draw(part, in: CGRect(x: 0, y: height - px(yTop) - part.height, width: part.width, height: part.height))
+        }
+        place(first, from: 0, to: foot, at: 0)
+        for k in tiles.indices.dropFirst() {
+            let d = tiles[k].offset - tiles[k - 1].offset
+            place(tiles[k].image, from: foot - d, to: foot, at: foot + tiles[k - 1].offset - tiles[0].offset)
+        }
+        if let last = tiles.last { place(last.image, from: foot, to: vh, at: foot + span) }
+        guard let whole = ctx.makeImage() else { return nil }
+        let rep = NSBitmapImageRep(cgImage: whole)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let stamp: String = {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+            return f.string(from: Date())
+        }()
+        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
+        let file = downloads.appendingPathComponent("Simpl Alta Page \(stamp).png")
+        do { try png.write(to: file) } catch { return nil }
+        NSPasteboard.general.clearContents()
+        let picture = NSImage(cgImage: whole, size: NSSize(width: Double(whole.width) / scale, height: Double(whole.height) / scale))
+        NSPasteboard.general.writeObjects([file as NSURL, picture] as [NSPasteboardWriting])
+        return file
+    }
+
+    /// What the hidden view shows now, at the screen's own sharpness.
+    private func snapshot() async -> CGImage? {
+        await withCheckedContinuation { (go: CheckedContinuation<CGImage?, Never>) in
+            let config = WKSnapshotConfiguration()
+            config.afterScreenUpdates = true
+            web.takeSnapshot(with: config) { image, _ in
+                go.resume(returning: image?.cgImage(forProposedRect: nil, context: nil, hints: nil))
+            }
+        }
     }
 
     /// The page is an assignment's overview with Alta's start (or continue) button on it: the popup's start screen,
@@ -720,6 +1037,7 @@ final class AltaSession: ObservableObject {
         withAnimation(Motion.gentle) {
             verdict = AltaVerdict(correct: nil, text: why + " Alta's own page is shown so you can go on there.", canContinue: false)
             phase = .answering
+            wholePage = true
             showPage = true
         }
     }
@@ -749,7 +1067,7 @@ final class AltaSession: ObservableObject {
             // (before a question: the overview's objectives, each as mastered as the whole is said to be when it is done)
             let done = overview?.completed == true
             return (overview?.objectives ?? []).enumerated().map { k, o in
-                AltaObjective(id: o.id, number: k + 1, name: o.name, mastery: done ? 1 : 0, current: false)
+                AltaObjective(id: o.id, number: k + 1, name: o.name, mastery: done ? 1 : Self.level(liveTargets[o.id]), current: false)
             }
         }
         var ids: [String] = r.objectives.compactMap(\.id)
@@ -758,9 +1076,8 @@ final class AltaSession: ObservableObject {
         var seen = Set<String>()
         ids = ids.filter { seen.insert($0).inserted }
         return ids.enumerated().map { k, id in
-            let t = r.targets.first { $0.id == id }
-            let mastered = ["complete", "completed", "mastered", "done"].contains((t?.status ?? "").lowercased())
-            let p = mastered ? 1 : min(max(t?.progress ?? 0, 0), 1)
+            // (1.3.21) the newest word on it, from any of Alta's answers or its page's bars, over the question's
+            let p = Self.level(liveTargets[id] ?? r.targets.first { $0.id == id })
             // (1.3.20) a name from the overview by its place when Alta's answers name only the objective on screen
             let byPlace = (overview?.objectives.count == ids.count) ? overview?.objectives[k].name : nil
             let named = r.objectives.first { $0.id == id }?.name ?? (r.current.id == id ? r.current.name : nil) ?? names[id] ?? byPlace
@@ -768,13 +1085,21 @@ final class AltaSession: ObservableObject {
         }
     }
 
+    /// An objective's mastery, 0…1: its progress, or full once its status says it is mastered.
+    private static func level(_ t: AltaReport.Target?) -> Double {
+        if ["complete", "completed", "mastered", "done"].contains((t?.status ?? "").lowercased()) { return 1 }
+        return min(max(t?.progress ?? 0, 0), 1)
+    }
+
     /// The whole assignment's mastery, 0…1.
     var mastery: Double {
         guard let r = report else {
             if overview?.completed == true { return 1 }
+            if let p = livePercent { return p }
             return min(max((overview?.percent ?? 0) / 100, 0), 1)
         }
         if r.completed || (r.status ?? "").lowercased() == "complete" { return 1 }
+        if let p = livePercent { return p }
         if let p = r.percent { return min(max(p / 100, 0), 1) }
         if let p = r.progress { return min(max(p, 0), 1) }
         let list = objectives

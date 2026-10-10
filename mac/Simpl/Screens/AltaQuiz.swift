@@ -6,14 +6,17 @@ import WebKit
 /// assignment's name across the top; down the left, its objectives as the quiz's question tiles — the one being worked
 /// on filled, a mastered one ticked, the others filling as they are mastered — with each by name, and the total
 /// mastery bar; in the rest, the question, drawn by the app, with Check and then Alta's verdict and Continue in the
-/// floating bar at the foot. A question the app does not draw itself (a graph, a formula, a lesson) shows Alta's own
-/// page in its place. AltaSession.swift keeps Alta open out of sight and talks to it.
+/// floating bar at the foot. A question the app does not draw itself (a graph, a drag and drop, any other kind) shows
+/// Alta's own question in its place, alone (1.3.21), and a lesson Alta's own page. AltaSession.swift keeps Alta open
+/// out of sight and talks to it.
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
     @State private var copied = false
+    @State private var shooting = false
+    @State private var shot: URL?
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -44,6 +47,12 @@ struct AltaQuizScreen: View {
         .background(PageGround())
         .tint(Theme.accent)
         .task { await session.start(engine: engine) }
+        .alert("Screenshot saved", isPresented: Binding(get: { shot != nil }, set: { if !$0 { shot = nil } })) {
+            Button("Show in Finder") { if let shot { NSWorkspace.shared.activateFileViewerSelecting([shot]) } }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Alta's whole page, top to bottom, is in Downloads as “\(shot?.lastPathComponent ?? "")” and copied, ready to paste into a message.")
+        }
         .alert("Alta details copied", isPresented: $copied) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -74,14 +83,27 @@ struct AltaQuizScreen: View {
             Spacer(minLength: 8)
             GlassGroup(spacing: 8) {
                 Button {
-                    withAnimation(Motion.gentle) { session.showPage.toggle() }
+                    withAnimation(Motion.gentle) { session.togglePage() }
                 } label: {
-                    Label(session.showPage ? "Show Question" : "Alta's Page", systemImage: session.showPage ? "list.bullet.rectangle" : "safari")
+                    Label(session.seesWholePage ? "Show Question" : "Alta's Page", systemImage: session.seesWholePage ? "list.bullet.rectangle" : "safari")
                 }
                 .glassButton()
-                .disabled(session.phase == .loading || session.question?.kind == .page)
-                .help(session.showPage ? "Back to the question as Simpl draws it" : "See this step on Alta's own page")
+                .disabled(session.phase == .loading && !session.seesWholePage)
+                .help(session.seesWholePage ? "Back to the question" : "See this step on Alta's whole page")
+                Button { takeShot() } label: {
+                    if shooting {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Screenshot", systemImage: "camera.viewfinder")
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .glassButton()
+                .disabled(shooting)
+                .help("Take a screenshot of Alta's whole page, top to bottom, to send at once")
                 Menu {
+                    Button("Take Full-Page Screenshot") { takeShot() }
+                        .disabled(shooting)
                     Button("Copy Alta Details") {
                         Task {
                             copyToPasteboard(await session.diagnostics())
@@ -100,6 +122,17 @@ struct AltaQuizScreen: View {
         .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
+    }
+
+    /// (1.3.21) Alta's whole page as one picture: saved to Downloads and copied.
+    private func takeShot() {
+        guard !shooting else { return }
+        shooting = true
+        Task {
+            let file = await session.fullPageShot()
+            shooting = false
+            if let file { shot = file } else { NSSound.beep() }
+        }
     }
 
     private var subtitle: String {

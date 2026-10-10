@@ -87,10 +87,16 @@ try {
   check((await page.evaluate(() => window.__simplAlta.check())).ok, 'Alta’s Check Answer is pressed');
   const f1 = await waitFor((p) => p.kind === 'feedback', 'verdict');
   check(f1.verdict === 'correct' && /Correct/.test(f1.text) && f1.next, `Alta’s verdict comes back, with its words, and Continue is there: ${f1.verdict} “${f1.text}”`);
+  // (1.3.21) the mastery moves when Alta's answer to the check says so — its question is not asked for again
+  const moved = await waitFor((p) => p.kind === 'overview' && p.percent === 66, 'progress after the check');
+  check(moved.targets.length === 3 && moved.targets[1].id === 'lo2' && moved.targets[1].progress === 0.59 && moved.progress === 0.66,
+    `after a check, the mastery Alta’s answer to it carries is passed: ${moved.percent}%, the objective on screen at ${moved.targets[1].progress}`);
+  const bar = await waitFor((p) => p.kind === 'meter' && p.percent === 66, 'Alta’s mastery bar');
+  check(bar.bars.some((b) => b.label === 'mastery' && Math.abs(b.value - 0.66) < 1e-9), `and Alta’s own mastery bar is read as it moves (${bar.percent}%)`);
 
   check((await page.evaluate(() => window.__simplAlta.next())).ok, 'Continue presses Alta’s Next Question');
   const c2 = await content('clozetext');
-  check(c2.question.template && c2.question.template.split('{{response}}').length === 3 && c2.percent === 70, 'the next question comes as Alta asks for it: two blanks, the mastery moved on');
+  check(c2.question.template && c2.question.template.split('{{response}}').length === 3 && c2.percent === 74, 'the next question comes as Alta asks for it: two blanks, the mastery moved on');
   const put2 = await page.evaluate(() => window.__simplAlta.answer({ responseId: 'r-cloze', type: 'clozetext', blanks: ['5', '2'] }));
   const typed = await page.$$eval('#q input[type=text]', (xs) => xs.map((x) => x.value));
   check(put2.ok && typed.join() === '5,2', 'the blanks typed in the popup are typed into Alta’s');
@@ -111,7 +117,22 @@ try {
 
   await page.evaluate(() => window.__simplAlta.next());
   const c3 = await content('custom');
-  check(c3.question.custom === 'desmos_blank_graph_question' && c3.current.id === 'lo3', 'a Desmos graph question is passed as what it is (the popup shows Alta’s page for it)');
+  check(c3.question.custom === 'desmos_blank_graph_question' && c3.current.id === 'lo3', 'a Desmos graph question is passed as what it is (the popup shows Alta’s own question for it)');
+
+  // (1.3.21) any kind of question: Alta's own, shown alone — the rest of its page hidden, then shown again as it was
+  await page.waitForSelector('#graph');
+  const styleBefore = await page.$eval('header', (h) => h.getAttribute('style'));
+  const fo = await page.evaluate(() => window.__simplAlta.focus({ on: true }));
+  const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
+  check(fo.found && !(await vis('header')) && !(await vis('#help')) && !(await vis('.obj')) && !(await vis('main > h2')),
+    'a question of a kind the popup does not draw is shown alone: Alta’s header, help button and side panels out of sight');
+  check((await vis('#graph')) && (await vis('#check')), 'with the question itself and Alta’s Check still there to use');
+  const said = (await posts()).length;
+  await page.click('#check');
+  const fp = await waitFor((p, k) => k >= said && p.kind === 'feedback' && /Incorrect/.test(p.text) && p.verdict === 'incorrect', 'a verdict from Alta’s own Check');
+  check(!!fp && (await vis('#fb')), 'Alta’s own Check pressed there is heard, and its verdict stays in sight');
+  await page.evaluate(() => window.__simplAlta.focus({ on: false }));
+  check((await vis('header')) && (await vis('#help')) && ((await page.$eval('header', (h) => h.getAttribute('style'))) || '') === (styleBefore || '') && (await page.$eval('#mbar', (e) => e.style.width)) === '120px', 'Alta’s Page puts every part back as it was');
 
   const all = JSON.stringify(await posts());
   const leaked = SECRETS.filter((s) => all.includes(s));

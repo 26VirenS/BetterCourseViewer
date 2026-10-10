@@ -79,7 +79,14 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   drawn too: the template's words typeset round a field the student types in as on a keyboard (/, ^, sqrt), put into
   Alta's field through MathQuill (its API when the page offers it, else its own text box). Alta's welcome pop-ups are put
   away by their own Got it (only inside a dialog). Objective names missing from Alta's answers come from the overview, by
-  place. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  place. (1.3.21, a beta) Any other kind of question (a graph, a drag and drop, any widget) is Alta's own, shown alone:
+  the page script hides (inline `display: none`, put back exactly) everything off the paths from Learnosity's question
+  element, Check/Next/help buttons, dialogs and feedback up to the body, worked out again whenever the page changes; a
+  question inside an inner frame leaves its outer page holding only that frame. *Alta's Page* shows the page whole.
+  Alta's own Check pressed there is heard too. The rail's mastery takes the newest word from any of Alta's answers (a
+  checked answer's `statusAndProgress`, not only `content`'s) and from Alta's own progress bars and "Mastery N%". The
+  camera button (and More ▸ Take Full-Page Screenshot) scrolls Alta's whole page a screenful at a time, stitches it into
+  one PNG in Downloads and copies it. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running
