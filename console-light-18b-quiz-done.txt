@@ -1,0 +1,44 @@
+[Simpl Courses] tab bar (0.0, 791.0, 402.0, 83.0) → not found
+_UITabBarAuxiliaryView 319,791 62x62 r0
+  _UITabBarPlatterView 319,791 62x62 r?
+    ContentView 319,791 62x62 r0
+      _UITabButton 319,791 62x62 r0
+        UIImageView 336,809 28x27 r0
+_UITabBarPlatterView 21,791 290x62 r?
+  SelectedContentView 21,791 290x62 r0
+    _UITabButton 25,795 76x54 r0
+      UIImageView 49,800 29x29 r0
+      Label 48,830 30x12 r0
+    _UITabButton 94,795 76x54 r0
+      UIImageView 115,800 33x29 r0
+      Label 111,830 41x12 r0
+    _UITabButton 162,795 76x54 r0
+      UIImageView 184,801 32x27 r0
+      Label 186,830 29x12 r0
+    _UITabButton 231,795 76x54 r0
+      UIImageView 252,802 35x25 r0
+      Label 251,830 36x12 r0
+  _UILiquidLensView 25,795 76x54 r?
+    UIView 25,795 76x54 r0
+      _UITabSelectionView 25,795 76x54 r?
+      ClearGlassView 25,795 76x54 r?
+        UIView 25,795 76x54 r0
+          SDFView 25,795 76x54 r0
+          _UIPortalView 25,795 76x54 r?
+        UIView 25,795 76x54 r?
+  ContentView 21,791 290x62 r0
+    _UITabButton 25,795 76x54 r0
+      UIImageView 49,800 29x29 r0
+      Label 48,830 30x12 r0
+    _UITabButton 94,795 76x54 r0
+      UIImageView 115,800 33x29 r0
+      Label 112,830 41x12 r0
+    _UITabButton 162,795 76x54 r0
+      UIImageView 184,801 32x27 r0
+      Label 186,830 28x12 r0
+    _UITabButton 231,795 76x54 r0
+      UIImageView 252,802 35x25 r0
+      Label 251,830 36x12 r0
+  DestOutView 21,791 76x54 r?
+IOSurfaceClientSetSurfaceNotify failed e00002c7
+com.simplcourses.app: 27883
