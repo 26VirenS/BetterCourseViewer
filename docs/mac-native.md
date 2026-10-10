@@ -103,7 +103,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   button is put away and its More Instruction moved aside, pressed from the popup's bar beside Check; the bar sits in the
   bottom right corner. (1.3.26) Alta's pop-ups (More Instruction's Having trouble?) take the app's page colour as
   their ground (resolved light or dark at the time), so the question no longer shows through; the bar is put away while
-  one is open. `scripts/dev/alta-test.mjs` drives the mock's Alta player
+  one is open. (1.3.28; 1.3.27 went out in it) Alta's lessons (More Instruction ▸ View Instruction) are shown alone like
+  a question — the smallest part holding the lesson's words and its Continue, else the nearest part round Continue with
+  something to read — and the bar offers Continue; any of Alta's buttons the bar stands for still in sight brings a
+  fresh trim. `scripts/dev/alta-test.mjs` drives the mock's Alta player
   (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running

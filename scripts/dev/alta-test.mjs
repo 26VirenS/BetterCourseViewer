@@ -170,6 +170,24 @@ try {
   await page.click('#goback');
   const d0 = await waitFor((p, k) => k >= n2 && p.kind === 'focus' && p.dialog === false, 'the pop-up closed');
   check(!!d0 && !(await page.$('#trouble')), 'Go Back closes it, and the popup is told');
+
+  // (1.3.28) View Instruction: Alta's lesson, shown alone like a question, with Continue for the popup's bar
+  await page.evaluate(() => window.__simplAlta.instruct());
+  await page.waitForSelector('#view');
+  const n3 = (await posts()).length;
+  await page.click('#view');
+  const ls = await waitFor((p, k) => k >= n3 && p.kind === 'focus' && p.found && p.hasCheck === false && p.next === true, 'the lesson');
+  check(!!ls && (await vis('.alta-lesson')) && !(await vis('header')) && !(await vis('.obj')) && !(await vis('#lfeedback')) && (await left('#lcont')) < -5000,
+    'Alta’s lesson is shown alone (its header, title and objective card hidden, its Feedback put away), its Continue moved aside for the popup’s bar');
+  const n4 = (await posts()).length;
+  check((await page.evaluate(() => window.__simplAlta.next())).ok, 'the popup’s Continue presses the lesson’s');
+  const back = await waitFor((p, k) => k >= n4 && p.kind === 'focus' && p.found && p.hasCheck === true, 'the question again');
+  check(!!back && (await vis('#graph')), 'and the question comes back, with its Check');
+  // (a button the bar stands for, come inside what is kept — a change the trim otherwise leaves alone — is moved aside)
+  await page.evaluate(() => { const b = document.createElement('button'); b.id = 'late'; b.textContent = 'Continue'; document.querySelector('.learnosity-response').appendChild(b); });
+  await page.waitForTimeout(1200);
+  check((await left('#late')) < -5000, 'a Continue that comes inside the question later is moved aside for the bar too');
+  await page.evaluate(() => document.getElementById('late').remove());
   check(s0.found && s0.check === false, 'the popup is told the question is found and its Check is not ready (nothing answered yet)');
   await page.click('#graph');
   const s1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.check === true, 'Check ready');

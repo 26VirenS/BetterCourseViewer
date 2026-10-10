@@ -414,8 +414,22 @@ enum AltaHook {
         }
         return out;
       };
+      // (1.3.28) a lesson of Alta's (More Instruction ▸ View Instruction): no question in it, only what it teaches and
+      // its Continue — the smallest part holding its words and Continue, else the nearest part round Continue with
+      // something to read in it
+      var lesson = function () {
+        var go = controls(NEXT)[0];
+        if (!go) return null;
+        var asks = asked();
+        if (asks) { var c = common([asks, go]); if (c && c !== document.body && c !== document.documentElement) return c; }
+        for (var x = parentOf(go); x && x !== document.body && x !== document.documentElement; x = parentOf(x)) {
+          if (norm(x.innerText || '').length > 400) return x;
+        }
+        return null;
+      };
       var keepers = function (iframeToo) {
         var qs = deep(QUESTION).filter(shown);
+        if (!qs.length) { var l = lesson(); if (l) qs = [l]; }
         if (!qs.length && iframeToo) {
           var big = deep('iframe').filter(shown).sort(function (a, b) {
             var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
@@ -455,6 +469,9 @@ enum AltaHook {
         }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-modal', 'disabled', 'aria-disabled'] });
       } catch (e) {}
       var trim = function (force) {
+        // (a button of Alta's still in sight that the popup's bar stands for — new content came inside what is kept, a
+        // lesson in a question's place — is worked out again too)
+        if (!force && !dirty && driven && lastFound && controls(CHECK).concat(controls(NEXT), controls(INSTRUCT), controls(REPORT)).some(function (b) { return b.style.getPropertyValue('left') !== '-10000px' && b.style.getPropertyValue('display') !== 'none'; })) dirty = true;
         if (!force && !dirty && hidden.length) { tell(lastFound); return true; }
         dirty = false;
         // (where the student has scrolled to, held through the working out)
@@ -490,7 +507,7 @@ enum AltaHook {
       // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
       var told = '';
       var tell = function (found) {
-        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0,
+        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
           dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0 };
         var said = JSON.stringify(m);
         if (said !== told) { told = said; post(m); }
@@ -727,6 +744,9 @@ final class AltaSession: ObservableObject {
     @Published private(set) var altaCanInstruct = false
     /// (1.3.26) A pop-up of Alta's is open over its question (Having trouble?): the popup's bar is put away under it.
     @Published private(set) var altaDialog = false
+    /// (1.3.28) What Alta's page offers to press: a Check (a question), or only Continue (a lesson).
+    @Published private(set) var altaHasCheck = false
+    @Published private(set) var altaCanNext = false
     @Published private(set) var drawsItself = false
     private var css = ""
     @Published private(set) var liveTargets: [String: AltaReport.Target] = [:]
@@ -852,12 +872,19 @@ final class AltaSession: ObservableObject {
             watchdog?.cancel()
             if isNew, let k = key, r.question.map({ $0.kind != .page }) == true { fallBack(k) }
             if isNew && altaDrawn { refocus() } // (1.3.24: the new question picked out afresh, its Check moved aside)
+            // (1.3.28) back from a lesson to the same question: on with it
+            if !isNew && phase == .moving {
+                withAnimation(Motion.gentle) { phase = .answering }
+                if altaDrawn { refocus() }
+            }
         case "focus":
             withAnimation(Motion.gentle) {
                 altaFound = head["found"] as? Bool ?? false
                 altaCanCheck = head["check"] as? Bool ?? false
                 altaCanInstruct = head["instruct"] as? Bool ?? false
                 altaDialog = head["dialog"] as? Bool ?? false
+                altaHasCheck = head["hasCheck"] as? Bool ?? false
+                altaCanNext = head["next"] as? Bool ?? false
             }
         case "feedback":
             let timedOut = head["timedOut"] as? Bool ?? false
@@ -1348,6 +1375,9 @@ final class AltaSession: ObservableObject {
         if ["complete", "completed", "mastered", "done"].contains((t?.status ?? "").lowercased()) { return 1 }
         return min(max(t?.progress ?? 0, 0), 1)
     }
+
+    /// (1.3.28) Alta's page shows a lesson (no Check, only Continue): the bar offers Continue.
+    var altaLesson: Bool { altaDrawn && altaFound && !altaHasCheck && altaCanNext }
 
     /// The whole assignment's mastery, 0…1.
     var mastery: Double {

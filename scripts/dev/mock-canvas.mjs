@@ -725,6 +725,12 @@ function draw(j) {
     d.innerHTML = '<h2>Having trouble?</h2><p>We have instructional material for this objective.</p><button id="goback">GO BACK</button> <button id="view">VIEW INSTRUCTION</button>';
     document.body.appendChild(d);
     document.getElementById('goback').onclick = function () { d.remove(); };
+    // (View Instruction: a lesson in the question's place — no question in it, only its words and Continue)
+    document.getElementById('view').onclick = function () {
+      d.remove();
+      document.getElementById('q').innerHTML = '<div class="alta-lesson"><h3>Combine the Product and the Quotient Rule</h3><p>' + 'Now, let us look at a function that will require both the product rule and the quotient rule to differentiate. '.repeat(5) + '</p></div><div class="lesson-actions"><button id="lfeedback" class="lrn-feedback-button">Feedback</button><button id="lcont">Continue</button></div>';
+      document.getElementById('lcont').onclick = function () { load(); };
+    };
   };
   document.getElementById('check').onclick = check;
   // (a graph's Check is greyed out until the graph is touched)
