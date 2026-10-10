@@ -58,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
         }
         Shot.armIfAsked()
+        MoveToApplications.offerIfNeeded() // (1.3.13: opened from Downloads or a disk image, an offer to move to Applications)
         Updater.shared.start() // (1.2: the update feed at launch and every hour (1.2.19); nothing in a development run)
     }
 
