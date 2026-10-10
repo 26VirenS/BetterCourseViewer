@@ -165,7 +165,8 @@ struct AltaQuizScreen: View {
                     .transition(.opacity)
             }
         }
-        .overlay(alignment: .bottom) {
+        // (1.3.25: in the bottom right corner)
+        .overlay(alignment: .bottomTrailing) {
             if !session.seesWholePage || session.phase == .feedback { bar }
         }
         .animation(Motion.gentle, value: session.showPage)
@@ -178,6 +179,7 @@ struct AltaQuizScreen: View {
             // (1.3.23: also under Alta's own answer box, whose Check this presses)
             if session.altaDrawn || session.question?.kind != .page {
                 QuizFloatingBar {
+                    if session.altaDrawn && session.altaCanInstruct { instructButton }
                     Button { session.check() } label: {
                         if session.phase == .checking {
                             ProgressView().controlSize(.small).frame(minWidth: 80)
@@ -194,6 +196,7 @@ struct AltaQuizScreen: View {
         case .feedback:
             QuizFloatingBar {
                 if let v = session.verdict { AltaVerdictChip(verdict: v) }
+                if session.altaDrawn && session.altaCanInstruct { instructButton }
                 Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
                     .glassButton(prominent: true)
                     .keyboardShortcut(.return, modifiers: .command)
@@ -202,6 +205,15 @@ struct AltaQuizScreen: View {
         default:
             EmptyView()
         }
+    }
+}
+
+extension AltaQuizScreen {
+    /// (1.3.25) Alta's More Instruction, beside Check.
+    fileprivate var instructButton: some View {
+        Button { session.instruct() } label: { Label("More Instruction", systemImage: "book") }
+            .glassButton()
+            .help("Have Alta teach this objective")
     }
 }
 

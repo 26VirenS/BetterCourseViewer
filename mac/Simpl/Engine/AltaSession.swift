@@ -281,7 +281,7 @@ enum AltaHook {
         var any = function (sel) { return [].slice.call(document.querySelectorAll(sel)).some(shown); };
         var bad = any('.lrn_incorrect, .lrn-incorrect, [class*="incorrect" i]');
         var good = any('.lrn_correct, .lrn-correct');
-        var boxes = [].slice.call(document.querySelectorAll('[class*="feedback" i], [role="alert"], [aria-live]')).filter(shown);
+        var boxes = [].slice.call(document.querySelectorAll('[class*="feedback" i], [role="alert"], [aria-live]')).filter(function (b) { return shown(b) && !b.matches(CLICKABLE); });
         var text = boxes.map(function (b) { return (b.innerText || '').trim(); }).filter(Boolean).join('\n').slice(0, 1200);
         var v = null;
         if (bad || /\b(incorrect|not quite|try again|not correct)\b/i.test(text)) v = 'incorrect';
@@ -364,6 +364,9 @@ enum AltaHook {
       var unhide = function (h) { Object.keys(h.was).forEach(function (k) { var w = h.was[k]; if (w[0]) h.el.style.setProperty(k, w[0], w[1]); else h.el.style.removeProperty(k); }); };
       // (1.3.23) Alta's own Check and Next, pressed from the popup's bar: kept working, but off to the side
       var OFFSTAGE = { position: 'absolute', left: '-10000px', top: '0' };
+      // (1.3.25) Alta's More Instruction, pressed from the popup's bar too; its Feedback (a report to Alta) put away
+      var INSTRUCT = /^(more instruction)$/;
+      var REPORT = /^(feedback)$/;
       var lift = function () { hidden.forEach(unhide); hidden = []; };
       // every button with these words on screen, greyed out or not
       var controls = function (re) {
@@ -475,7 +478,10 @@ enum AltaHook {
           });
         });
         want.forEach(hide);
-        if (driven) controls(CHECK).concat(controls(NEXT)).forEach(function (b) { stash(b, OFFSTAGE); });
+        if (driven) {
+          controls(CHECK).concat(controls(NEXT), controls(INSTRUCT)).forEach(function (b) { stash(b, OFFSTAGE); });
+          controls(REPORT).forEach(hide);
+        }
         if (focusFirst) { focusFirst = false; try { keep[0].scrollIntoView({ block: 'start' }); } catch (x) {} }
         else spots.forEach(function (s) { if (s[0].scrollTop !== s[1]) s[0].scrollTop = s[1]; });
         tell(true);
@@ -484,7 +490,7 @@ enum AltaHook {
       // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
       var told = '';
       var tell = function (found) {
-        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0 };
+        var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0 };
         var said = JSON.stringify(m);
         if (said !== told) { told = said; post(m); }
       };
@@ -527,6 +533,7 @@ enum AltaHook {
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
         next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; dirty = true; b.click(); return { ok: true }; },
+        instruct: function () { var b = buttons(INSTRUCT)[0]; if (!b) return { ok: false }; dirty = true; b.click(); return { ok: true }; },
         state: verdictNow
       };
 
@@ -715,6 +722,8 @@ final class AltaSession: ObservableObject {
     /// Check (pressed from the popup's bar) can be pressed yet. Drawn by the popup itself only when it is not found.
     @Published private(set) var altaFound = false
     @Published private(set) var altaCanCheck = false
+    /// (1.3.25) Alta offers More Instruction (pressed from the popup's bar).
+    @Published private(set) var altaCanInstruct = false
     @Published private(set) var drawsItself = false
     private var css = ""
     @Published private(set) var liveTargets: [String: AltaReport.Target] = [:]
@@ -832,6 +841,7 @@ final class AltaSession: ObservableObject {
                     drawsItself = false
                     altaFound = false
                     altaCanCheck = false
+                    altaCanInstruct = false
                     wholePage = r.question == nil
                     showPage = true
                 }
@@ -843,6 +853,7 @@ final class AltaSession: ObservableObject {
             withAnimation(Motion.gentle) {
                 altaFound = head["found"] as? Bool ?? false
                 altaCanCheck = head["check"] as? Bool ?? false
+                altaCanInstruct = head["instruct"] as? Bool ?? false
             }
         case "feedback":
             let timedOut = head["timedOut"] as? Bool ?? false
@@ -1240,6 +1251,14 @@ final class AltaSession: ObservableObject {
             let pressed = await call("return window.__simplAlta ? window.__simplAlta.check() : null", [:])
             guard (pressed as? [String: Any])?["ok"] as? Bool == true else { return fail("Alta's Check button could not be found.") }
             watch(seconds: 15)
+        }
+    }
+
+    /// (1.3.25) Alta's More Instruction pressed: what it teaches comes as Alta's page shows it.
+    func instruct() {
+        Task {
+            let pressed = await call("return window.__simplAlta ? window.__simplAlta.instruct() : null", [:])
+            guard (pressed as? [String: Any])?["ok"] as? Bool == true else { return fail("Alta's More Instruction button could not be found.") }
         }
     }
 

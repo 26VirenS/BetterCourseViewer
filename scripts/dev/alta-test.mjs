@@ -160,7 +160,11 @@ try {
   const left = async (sel) => page.$eval(sel, (b) => b.getBoundingClientRect().left);
   check((await left('#check')) < -5000 && (await page.$eval('body', (b) => getComputedStyle(b).color)) === 'rgb(9, 9, 9)' && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('header')),
     'Alta’s answer box shown alone in the popup’s colours, its own Check moved aside for the popup’s bar');
+  check(!(await vis('#report')) && (await left('#instr')) < -5000, 'Alta’s Feedback put away and its More Instruction moved aside for the popup’s bar');
   const s0 = await waitFor((p, k) => k >= n0 && p.kind === 'focus', 'the question found');
+  check(s0.instruct === true, 'the popup is told Alta offers More Instruction');
+  check((await page.evaluate(() => window.__simplAlta.instruct())).ok && /A lesson/.test(await page.$eval('#fb', (e) => e.textContent)), 'the popup’s More Instruction presses Alta’s');
+  await page.evaluate(() => { const f = document.getElementById('fb'); f.hidden = true; f.textContent = ''; });
   check(s0.found && s0.check === false, 'the popup is told the question is found and its Check is not ready (nothing answered yet)');
   await page.click('#graph');
   const s1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.check === true, 'Check ready');
