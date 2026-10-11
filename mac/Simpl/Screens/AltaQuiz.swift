@@ -234,7 +234,7 @@ struct AltaQuizScreen: View {
             if !session.pageShown && session.cover == nil && !session.opening && session.failure == nil {
                 ZStack {
                     PageGround()
-                    ProgressView().controlSize(.regular)
+                    AltaSkeleton()
                 }
                 .transition(.opacity)
             }
@@ -395,6 +395,57 @@ private struct AltaStartScreen: View {
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: 18, height: 18)
+    }
+}
+
+/// (1.3.68) While Alta's page is out of sight (loading, or between one part and the next): the question's shape — a
+/// glass panel for what it asks and one for its answer, their lines pulsing gently — where the question will be.
+private struct AltaSkeleton: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dim = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 32) {
+            panel {
+                bar(width: 150, height: 22)
+                VStack(alignment: .leading, spacing: 10) {
+                    bar(width: nil, height: 13)
+                    bar(width: nil, height: 13)
+                    bar(width: 260, height: 13)
+                }
+            }
+            panel {
+                bar(width: 190, height: 14)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(0.07))
+                    .frame(height: 64)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: 860)
+        .padding(.horizontal, 40)
+        .padding(.top, 34)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .opacity(dim ? 0.55 : 1)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { dim = true }
+        }
+        .accessibilityLabel("Loading the question")
+    }
+
+    private func panel<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 18) { content() }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassCard(radius: 22)
+    }
+
+    private func bar(width: CGFloat?, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+            .fill(Color.primary.opacity(0.1))
+            .frame(maxWidth: width ?? .infinity)
+            .frame(width: width, height: height)
     }
 }
 

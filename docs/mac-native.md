@@ -244,6 +244,12 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool with its site, where it is found, and a button for each course it is in, opening it there (by its tab, else an
   assignment, else a module item; Knewton Alta and Macmillan in their own popups). A filter on the page narrows them
   (not a toolbar search field: the window's toolbar has the app's own, and a second one crashed it).
+  (1.3.68) Alta: a large picture or canvas (at least 140 × 100) counts as a graph too, and in dark mode each graph sits on
+  a white card of its own (drawn in dark ink for a white page, its ground clear, it was lost on dark glass). A question
+  is shown once Alta has finished drawing it — nothing changed on the page for 350 ms, no maths or answer box still
+  loading, its pictures in — or after 2.5 seconds at most, a pending showing called off if the part goes again; until
+  then the popup shows a skeleton of the question (`AltaSkeleton`: a glass panel for what it asks and one for its
+  answer, their lines pulsing gently, still under Reduce Motion).
 
 ## Building and running
 

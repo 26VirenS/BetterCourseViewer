@@ -119,11 +119,11 @@ try {
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
   // (1.3.62) a graph drawn into a part (Learnosity's JSXGraph box, its labels in it) and a large SVG are marked to be
   // turned back whole in dark mode; a small icon is not
-  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg>'); });
+  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg><img id="gimg" alt="" style="display:block;width:220px;height:150px">'); });
   await page.waitForTimeout(600);
-  check(await page.evaluate(() => { const g = document.querySelector('.lrn_graphplotting'); return g.hasAttribute('data-simpl-pic') && !g.querySelector('[data-simpl-pic]') && document.getElementById('plot').hasAttribute('data-simpl-pic') && !document.getElementById('icon').hasAttribute('data-simpl-pic'); }),
+  check(await page.evaluate(() => { const g = document.querySelector('.lrn_graphplotting'); return g.hasAttribute('data-simpl-pic') && !g.querySelector('[data-simpl-pic]') && document.getElementById('plot').hasAttribute('data-simpl-pic') && document.getElementById('gimg').hasAttribute('data-simpl-pic') && !document.getElementById('icon').hasAttribute('data-simpl-pic'); }),
     'a graph’s box (with its labels) and a large drawing are marked to keep their own colours in dark mode; an icon is not');
-  await page.evaluate(() => { document.querySelector('.lrn_graphplotting').remove(); document.getElementById('plot').remove(); document.getElementById('icon').remove(); });
+  await page.evaluate(() => { document.querySelector('.lrn_graphplotting').remove(); document.getElementById('plot').remove(); document.getElementById('icon').remove(); document.getElementById('gimg').remove(); });
   await page.waitForTimeout(400);
   // (1.3.60) each part a centred column no wider than 860 points
   const vw = await page.evaluate(() => innerWidth);

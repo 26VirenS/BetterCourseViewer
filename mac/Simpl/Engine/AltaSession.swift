@@ -279,7 +279,10 @@ enum AltaHook {
           + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] :is(img, picture, video, canvas, iframe, object, embed):not([data-simpl-pic] *) { filter: invert(1) hue-rotate(180deg) !important; }\n'
           // (1.3.62) and its graphs and drawings — a graph's box (Learnosity's, JSXGraph's) and any large SVG — turned back
           // whole, labels and all, so they read as Alta draws them
-          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] [data-simpl-pic] { filter: invert(1) hue-rotate(180deg) !important; }\n';
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] [data-simpl-pic] { filter: invert(1) hue-rotate(180deg) !important; }\n'
+          // (1.3.68) on a white card of its own: a graph is drawn in dark ink for a white page, its ground left clear —
+          // on dark glass its lines and numbers were lost
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] [data-simpl-pic] { background-color: #fff !important; border-radius: 10px !important; box-shadow: 0 0 0 6px #fff !important; }\n';
         var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
         var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
         var title = function (sec) { var h = sec.querySelector('[class*="compound-header"] h2, [class*="compound-header"] h3, h2[class*="content-title"]'); return h ? txt(h) : ''; };
@@ -330,11 +333,12 @@ enum AltaHook {
         var PIC = /jxgbox|graphplotting|lrn_graph|lrn-graph|lrn_chart|lrn-chart|highcharts|desmos/i;
         var pics = function (keep) {
           keep.forEach(function (k) {
-            [].forEach.call(k.querySelectorAll('div, svg'), function (el) {
+            [].forEach.call(k.querySelectorAll('div, svg, img, canvas'), function (el) {
               if (el.closest('[data-simpl-pic]')) return;
               var c = typeof el.className === 'string' ? el.className : ((el.className && el.className.baseVal) || '');
               var big = false;
-              if (el.tagName.toLowerCase() === 'svg') { var r = el.getBoundingClientRect(); big = r.width >= 140 && r.height >= 100; }
+              // (1.3.68: a large picture or canvas too — a graph is often an image)
+              if (/^(svg|img|canvas)$/.test(el.tagName.toLowerCase())) { var r = el.getBoundingClientRect(); big = r.width >= 140 && r.height >= 100; }
               if (PIC.test(c) || big) mark(el, 'data-simpl-pic');
             });
           });
@@ -517,7 +521,7 @@ enum AltaHook {
             r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
             report(r.state, r);
             publish();
-            reveal(r.state);
+            revealSteady(r.state);
             return;
           }
           if (r.state === 'overview') {
@@ -532,6 +536,9 @@ enum AltaHook {
           // (1.3.62) on Alta's learn page between parts, out of sight (the app's Loading) for as long as Alta may take,
           // never Alta's page as it is in the meantime
           var between = !!document.querySelector('[class*="learn-flow-body"]');
+          // (a part about to be shown, gone again: not shown after all)
+          if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+          steadySince = 0;
           if (between) veilAgain();
           var wait = between ? 8000 : (wasQuestion ? 1500 : 8000);
           if (Date.now() - badSince < wait) { schedule(wait - (Date.now() - badSince) + 20); return; }
@@ -541,7 +548,23 @@ enum AltaHook {
           reveal('as it is');
         };
         var schedule = function (ms) { if (timer) clearTimeout(timer); timer = setTimeout(tick, typeof ms === 'number' ? ms : 120); };
-        try { new MutationObserver(function () { schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
+        // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
+        // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile
+        var lastChange = Date.now(), steadyTimer = null, steadySince = 0;
+        var revealSteady = function (state) {
+          if (!steadySince) steadySince = Date.now();
+          var quiet = Date.now() - lastChange;
+          var pending = !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
+            || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; });
+          if ((quiet >= 350 && !pending) || Date.now() - steadySince > 2500) {
+            steadySince = 0;
+            reveal(state);
+            return;
+          }
+          if (steadyTimer) clearTimeout(steadyTimer);
+          steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, 120);
+        };
+        try { new MutationObserver(function () { lastChange = Date.now(); schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
         schedule();
       }
 
