@@ -170,23 +170,56 @@ struct AltaQuizScreen: View {
     private var page: some View {
         ZStack {
             // (1.3.49) Alta's question laid on Liquid Glass: its page draws no ground of its own (the page script clears
-            // the page's, its parts' and the question card's), so the glass behind is the card; everything in it is
-            // drawn by Alta. (1.3.50) The glass is the app's own, light or dark: in dark mode the page script turns the
-            // question's colours over (light words on the dark glass). Alta's page as it is (not recognised): edge to
-            // edge, on white.
-            let glassy = session.focused
-            AltaPageHost(web: session.web)
-                .padding(glassy ? 12 : 0)
-                .background {
-                    if glassy {
-                        Rectangle().fill(Color.clear)
-                            .glassCard(radius: 22, tint: scheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
-                    } else {
-                        Color.white
+            // the page's, its parts' and the question card's), and everything in it is drawn by Alta. (1.3.50) The glass is
+            // the app's own, light or dark: in dark mode the page script turns the question's colours over. (1.3.53) A
+            // glass panel behind each part — what it asks, its answer, a lesson — where the page lays it out: the page as
+            // tall as its question and the popup scrolling it, the panels scrolling with it. Alta's page as it is (not
+            // recognised): edge to edge, on white, scrolling itself. (The page is always in the same place in the views,
+            // so it is never taken out and put back.)
+            GeometryReader { g in
+                let split = session.split
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical) {
+                        ZStack(alignment: .topLeading) {
+                            Color.clear.frame(width: 1, height: 1).id("altaTop")
+                            if split {
+                                ForEach(session.panels) { p in
+                                    Rectangle().fill(Color.clear)
+                                        .glassCard(radius: 22, tint: scheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
+                                        .frame(width: p.rect.width + 32, height: p.rect.height + 32)
+                                        .offset(x: p.rect.minX - 16, y: p.rect.minY - 16)
+                                        .transition(.opacity)
+                                }
+                            }
+                            AltaPageHost(web: session.web, forwardScroll: split)
+                                .frame(width: g.size.width, height: split ? max(session.pageHeight, g.size.height) : g.size.height)
+                                .background { if !session.focused { Color.white } }
+                        }
+                        .frame(width: g.size.width, alignment: .topLeading)
+                        .padding(.bottom, split ? 96 : 0)
                     }
+                    .scrollDisabled(!split)
+                    .scrollIndicators(split ? .automatic : .hidden)
+                    .onChange(of: session.panelGen) { _, _ in proxy.scrollTo("altaTop", anchor: .top) }
                 }
-                .padding(glassy ? 18 : 0)
-                .animation(Motion.gentle, value: glassy)
+                .animation(Motion.gentle, value: split)
+            }
+            // (1.3.53) the parts' buttons, whatever they say, as the app's own — Alta's main one prominent, a greyed-out
+            // one greyed out — each pressing Alta's
+            .overlay(alignment: .bottomTrailing) {
+                if session.focused && !session.buttons.isEmpty && session.dialog == nil {
+                    QuizFloatingBar {
+                        ForEach(session.buttons) { b in
+                            Button { session.pressButton(b.id) } label: { Text(b.label).frame(minWidth: 70) }
+                                .glassButton(prominent: b.primary)
+                                .disabled(!b.enabled)
+                                .keyboardShortcut(b.primary ? KeyboardShortcut(.return, modifiers: .command) : nil)
+                                .help(b.enabled ? "\(b.label) (Alta's own button)" : "Not ready yet: answer the question first")
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
             if let why = session.failure {
                 ZStack {
                     PageGround()
@@ -206,9 +239,14 @@ struct AltaQuizScreen: View {
 /// Alta's page in the popup: the session's own web view.
 private struct AltaPageHost: NSViewRepresentable {
     let web: WKWebView
+    var forwardScroll = false
 
-    func makeNSView(context: Context) -> WKWebView { web }
-    func updateNSView(_ v: WKWebView, context: Context) {}
+    func makeNSView(context: Context) -> WKWebView {
+        (web as? AltaWebView)?.forwardsScroll = forwardScroll
+        return web
+    }
+
+    func updateNSView(_ v: WKWebView, context: Context) { (v as? AltaWebView)?.forwardsScroll = forwardScroll }
 }
 
 // MARK: - The rail

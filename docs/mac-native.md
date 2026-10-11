@@ -104,6 +104,15 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the pop-up's buttons, each pressing Alta's (`__simplDialog.press`); Escape presses its Close / Got it / OK, else gives
   the pop-up back to the page. A changed pop-up (a next step) is pictured again. The page's sprite sheets (an `<svg>` of
   symbols) are never hidden by the focus: a pop-up's picture draws from one.
+  (1.3.53) Two glass panels, the question's words and its answer (a lesson: one): the hook tells the app each kept
+  part's question and answer boxes (the card's children before and from the one holding Learnosity's box, which gets a
+  gap above it — `data-simpl-answer`) in the page's own coordinates, and the page's height. The app sizes the page to
+  that height inside its own scroll view, a native glass panel behind each box, and the page hands its scrolling to the
+  popup (`AltaWebView.forwardsScroll`); a new question scrolls back to the top. Every button in the parts' button bars
+  (`[class*=button-bar]`), whatever it says, goes to the app — its words, Alta's main one (`primary` in its class),
+  whether it can be pressed — and the bars are put away (`data-simpl-bar`): the app shows them as its own glass buttons
+  (the main one prominent, ⌘↩) and presses Alta's (`__simplButtons.press`). A sprite sheet kept for its symbols makes
+  the parts round it that hold nothing else kept take no room (`data-simpl-thin`): Alta's banner held one.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

@@ -1342,7 +1342,7 @@ body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#eef1f4}
 <span class="lrn_math_editable mq-editable-field mq-math-mode"><span class="mq-textarea"><textarea id="answer"></textarea></span><span class="mq-root-block mq-empty"></span></span>
 <div class="lrn-formula-keyboard"><button class="lrn_btn">7</button><button class="lrn_btn">8</button><button class="lrn_btn">9</button></div></div></div>
 </div></div></div></div>
-<div class="button-bar__container___H_Vc_"><button id="fb">Feedback</button><button id="more">More Instruction</button><button id="submit">Submit</button></div></div></div>
+<div class="button-bar__container___H_Vc_"><button id="fb">Feedback</button><button id="more">More Instruction</button><button id="submit" class="theme__button___eBgiZ button__button-primary___3wyIF" disabled>Submit</button></div></div></div>
 <button class="index__label___2iFff" id="attr">Content attribution<span>- Opens a dialog</span></button></section>
 </div></div></div></div></div></main></div></div></div></div></div></div>
 <iframe class="x-origin-frame" style="display:none" src="about:blank"></iframe>

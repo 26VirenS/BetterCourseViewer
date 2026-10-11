@@ -215,7 +215,12 @@ enum AltaHook {
         var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *) { display: none !important; }\n'
           + 'html[data-simpl-q] [data-simpl-hide] { display: none !important; }\n'
           + 'html[data-simpl-q] [data-simpl-path]:not(html):not(body) { padding-top: 0 !important; margin-top: 0 !important; }\n'
-          + 'html[data-simpl-q] body { padding-top: 16px !important; }\n'
+          + 'html[data-simpl-q] body { padding: 18px 28px 40px !important; }\n'
+          // (1.3.53) Alta's own button bars put away — the app shows their buttons as its own — and a gap between a
+          // question's words and its answer, for the two glass panels behind them
+          + 'html[data-simpl-q] [data-simpl-bar] { display: none !important; }\n'
+          + 'html[data-simpl-q] [data-simpl-answer] { margin-top: 48px !important; }\n'
+          + 'html[data-simpl-q] [data-simpl-thin] { height: 0 !important; min-height: 0 !important; max-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 0 !important; overflow: hidden !important; }\n'
           // (1.3.49) laid on the popup's Liquid Glass: the page, the parts round the question and the question's own card
           // draw no ground, shadow or outline of their own — the glass behind the page is the card. Everything in it
           // (what it asks, its maths, Learnosity's answer box and keypad, Alta's buttons) is drawn as Alta draws it.
@@ -271,6 +276,7 @@ enum AltaHook {
           document.documentElement.removeAttribute('data-simpl-q');
         };
         var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
+        var sprite = function (e) { return e.tagName && e.tagName.toLowerCase() === 'svg' && !!e.querySelector('symbol, defs') && !e.closest('section'); };
         var apply = function (keep) {
           if (keep.length === keptNow.length && keep.every(function (k, i) { return k === keptNow[i] && k.isConnected; }) && document.documentElement.hasAttribute('data-simpl-q')) return;
           unmark();
@@ -278,7 +284,13 @@ enum AltaHook {
             mark(k, 'data-simpl-keep');
             for (var x = k.parentElement; x && x !== document.documentElement; x = x.parentElement) mark(x, 'data-simpl-path');
           });
+          // (1.3.53) a sprite sheet kept only for the symbols it holds, and the parts round it that hold nothing else kept
+          // (Alta's banner), drawn but taking no room
+          var real = new Set();
+          keep.forEach(function (k) { if (!sprite(k)) for (var x = k; x; x = x.parentElement) real.add(x); });
+          keep.forEach(function (k) { if (sprite(k)) for (var x = k; x && !real.has(x); x = x.parentElement) mark(x, 'data-simpl-thin'); });
           keptNow = keep;
+          gen++;
           var st = document.getElementById('simpl-focus');
           if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; (document.head || document.documentElement).appendChild(st); }
           if (st.textContent !== FOCUS) st.textContent = FOCUS;
@@ -288,6 +300,77 @@ enum AltaHook {
         // (1.3.50) light or dark as the app is: the app sets window.__simplDark (before the page, and again when it changes)
         var dark = function () { if (document.documentElement) document.documentElement.toggleAttribute('data-simpl-dark', !!window.__simplDark); };
         window.__simplFocusDark = dark;
+        // ---- (1.3.53) the parts' panels and their buttons, for the app ----
+        // Each part kept is a card: what a question asks (its heading and words) and its answer (Learnosity's box and
+        // what follows) are told to the app as two panels — a lesson as one — in the page's own coordinates, with the
+        // page's height, so the app lays a glass panel behind each and scrolls the page itself. And every button in the
+        // parts' button bars, whatever it says, is told to the app — its words, whether Alta makes it the main one,
+        // whether it can be pressed — and the bars put away: the app shows them as its own and presses Alta's.
+        var gen = 0, lastPanels = '', lastButtons = '', buttonEls = [];
+        var cards = function () { return keptNow.filter(function (k) { return k.matches && k.matches('section[class*="compound__compound"]'); }); };
+        var cardOf = function (sec) { return sec.querySelector('[class*="content-card"], [class*="theme__card"]') || sec; };
+        var visible = function (e) { var cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden' && !e.hidden; };
+        var bars = function () {
+          var out = [];
+          cards().forEach(function (sec) {
+            [].forEach.call(sec.querySelectorAll('[class*="button-bar"]'), function (bar) {
+              mark(bar, 'data-simpl-bar');
+              [].forEach.call(bar.querySelectorAll('button, [role="button"], a[href]'), function (b) {
+                var label = String(b.textContent || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+                if (!label || !visible(b) || /^feedback$/i.test(label)) return;
+                out.push({ el: b, label: label.slice(0, 40), primary: /primary/i.test(String(b.className || '')),
+                  enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true' });
+              });
+            });
+          });
+          return out;
+        };
+        var box = function (els) {
+          var r = null;
+          els.forEach(function (e) {
+            var b = e.getBoundingClientRect();
+            if (b.width === 0 && b.height === 0) return;
+            r = r ? { l: Math.min(r.l, b.left), t: Math.min(r.t, b.top), r: Math.max(r.r, b.right), b: Math.max(r.b, b.bottom) } : { l: b.left, t: b.top, r: b.right, b: b.bottom };
+          });
+          return r;
+        };
+        var panels = function () {
+          var out = [];
+          cards().forEach(function (sec) {
+            var kids = [].slice.call(cardOf(sec).children).filter(function (k) { return !k.hasAttribute('data-simpl-bar') && !k.hasAttribute('data-simpl-hide') && visible(k); });
+            var at = -1;
+            for (var i = 0; i < kids.length; i++) { if (kids[i].querySelector('.lrn_widget, .lrn_qr, .learnosity-item, [class*="learnosity"]')) { at = i; break; } }
+            if (at > 0) {
+              mark(kids[at], 'data-simpl-answer');
+              var q = box(kids.slice(0, at)), a = box(kids.slice(at));
+              if (q) out.push(['question', q]);
+              if (a) out.push(['answer', a]);
+            } else {
+              var w = box(kids);
+              if (w) out.push([at === 0 ? 'answer' : 'lesson', w]);
+            }
+          });
+          var sx = window.scrollX || 0, sy = window.scrollY || 0;
+          return out.map(function (p) {
+            return { kind: p[0], x: Math.round(p[1].l + sx), y: Math.round(p[1].t + sy), w: Math.round(p[1].r - p[1].l), h: Math.round(p[1].b - p[1].t) };
+          });
+        };
+        var publish = function () {
+          var on = document.documentElement.hasAttribute('data-simpl-q');
+          var bs = on ? bars() : [];
+          buttonEls = bs.map(function (b) { return b.el; });
+          var bsSaid = JSON.stringify(bs.map(function (b) { return { label: b.label, primary: b.primary, enabled: b.enabled }; }));
+          if (bsSaid !== lastButtons) { lastButtons = bsSaid; post({ kind: 'buttons', items: JSON.parse(bsSaid) }); }
+          var ps = on ? panels() : [];
+          var bottom = ps.reduce(function (m, p) { return Math.max(m, p.y + p.h); }, 0);
+          var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen });
+          if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
+        };
+        setInterval(publish, 350);
+        window.addEventListener('resize', function () { publish(); });
+        window.__simplButtons = {
+          press: function (i) { var b = buttonEls[i]; if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); setTimeout(publish, 60); return true; }
+        };
         var told = '', badSince = 0, timer = null, wasQuestion = false;
         var report = function (state, r) {
           if (state === told) return;
@@ -359,15 +442,17 @@ enum AltaHook {
             apply(r.keep.concat(extra));
             r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
             report(r.state, r);
+            publish();
             return;
           }
-          if (r.state === 'overview') { badSince = 0; wasQuestion = false; unmark(); report('overview', r); return; }
+          if (r.state === 'overview') { badSince = 0; wasQuestion = false; unmark(); report('overview', r); publish(); return; }
           // (not recognised: a moment's grace — Alta between one part and the next — then its page as it is)
           if (!badSince) badSince = Date.now();
           var wait = wasQuestion ? 1500 : 8000;
           if (Date.now() - badSince < wait) { schedule(wait - (Date.now() - badSince) + 20); return; }
           unmark();
           report(r.state, r);
+          publish();
         };
         var schedule = function (ms) { if (timer) clearTimeout(timer); timer = setTimeout(tick, typeof ms === 'number' ? ms : 120); };
         try { new MutationObserver(function () { schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
@@ -435,6 +520,32 @@ struct AltaObjective: Identifiable, Equatable {
 
 /// What opens the popup: an Alta assignment (its course and id: the app asks Canvas for its launch), or a page of
 /// Alta's own (the screenshot suite's mock).
+/// (1.3.53) Alta's page, its scrolling handed to the popup while the popup scrolls it (the page as tall as its question,
+/// the glass panels behind its parts scrolling with it).
+final class AltaWebView: WKWebView {
+    var forwardsScroll = false
+
+    override func scrollWheel(with event: NSEvent) {
+        if forwardsScroll, let outer = enclosingScrollView { outer.scrollWheel(with: event) } else { super.scrollWheel(with: event) }
+    }
+}
+
+/// (1.3.53) A part of Alta's question as the page lays it out (in its own coordinates): what it asks, its answer, or a
+/// lesson — a glass panel behind each.
+struct AltaPanel: Identifiable, Equatable {
+    let id: Int
+    let kind: String
+    let rect: CGRect
+}
+
+/// (1.3.53) One of the buttons in Alta's button bars, whatever it says: shown as the app's own, pressing Alta's.
+struct AltaButton: Identifiable, Equatable {
+    let id: Int
+    let label: String
+    let primary: Bool
+    let enabled: Bool
+}
+
 /// (1.3.51) A pop-up of Alta's, shown as the Mac's own: its title, words and buttons, and a picture of it as Alta draws it.
 struct AltaDialog: Identifiable {
     let id = UUID()
@@ -492,6 +603,20 @@ final class AltaSession: ObservableObject {
 
     /// (1.3.49) Alta's question (or lesson) is shown alone: laid on Liquid Glass.
     var focused: Bool { focusState == "question" || focusState == "lesson" }
+    /// (1.3.53) The parts' panels, the page's height, which question they are of (a new one scrolls back to the top),
+    /// and the parts' buttons.
+    @Published private(set) var panels: [AltaPanel] = []
+    @Published private(set) var pageHeight: CGFloat = 0
+    @Published private(set) var panelGen = 0
+    @Published private(set) var buttons: [AltaButton] = []
+
+    /// The question laid on glass panels, one behind each part, the popup scrolling the page.
+    var split: Bool { focused && !panels.isEmpty && pageHeight > 0 }
+
+    func pressButton(_ index: Int) {
+        Task { _ = await run("return window.__simplButtons ? window.__simplButtons.press(\(index)) : null", in: nil) }
+    }
+
     /// (1.3.51) Alta's pop-up open, shown as the Mac's own sheet.
     @Published var dialog: AltaDialog?
     private var dialogTask: Task<Void, Never>?
@@ -538,7 +663,7 @@ final class AltaSession: ObservableObject {
         let r = AltaRelay()
         config.userContentController.add(r, name: AltaHook.handler)
         relay = r
-        web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
+        web = AltaWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
         web.isInspectable = true
         web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
         r.session = self
@@ -578,6 +703,24 @@ final class AltaSession: ObservableObject {
             frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
             frames.append(frame)
             if frames.count > 30 { frames.removeFirst() }
+        case "panels":
+            guard frame.isMainFrame else { return }
+            let list = (head["panels"] as? [[String: Any]] ?? []).enumerated().compactMap { k, p -> AltaPanel? in
+                guard let x = (p["x"] as? NSNumber)?.doubleValue, let y = (p["y"] as? NSNumber)?.doubleValue,
+                      let w = (p["w"] as? NSNumber)?.doubleValue, let h = (p["h"] as? NSNumber)?.doubleValue, w > 0, h > 0 else { return nil }
+                return AltaPanel(id: k, kind: p["kind"] as? String ?? "", rect: CGRect(x: x, y: y, width: w, height: h))
+            }
+            let height = CGFloat((head["height"] as? NSNumber)?.doubleValue ?? 0)
+            let g = (head["gen"] as? NSNumber)?.intValue ?? 0
+            if list != panels { panels = list }
+            if height != pageHeight { pageHeight = height }
+            if g != panelGen { panelGen = g }
+        case "buttons":
+            guard frame.isMainFrame else { return }
+            let list = (head["items"] as? [[String: Any]] ?? []).enumerated().map { k, b in
+                AltaButton(id: k, label: b["label"] as? String ?? "", primary: b["primary"] as? Bool ?? false, enabled: b["enabled"] as? Bool ?? true)
+            }
+            if list != buttons { withAnimation(Motion.snappy) { buttons = list } }
         case "dialog":
             guard frame.isMainFrame else { return }
             guard head["open"] as? Bool == true else {

@@ -83,9 +83,30 @@ try {
   check(!!fq && fq.shape === null, 'Alta’s learn page is recognised: one part, headed Question, with Learnosity’s answer box');
   const hiddenAll = !(await vis('header')) && !(await vis('h1')) && !(await vis('.jss179')) && !(await vis('.knewcons__knewcons___e3wUn')) && !(await vis('#embedded-messaging')) && !(await vis('.back-to-top-mount')) && !(await vis('#skip-to-main'));
   check(hiddenAll, 'the app bar, title and mastery, Current objective card, banner, chat and Back to Top are hidden');
-  check((await vis('#asks')) && (await vis('#answer')) && (await vis('.lrn-formula-keyboard')) && (await vis('#more')) && (await vis('#submit')) && (await vis('.content-title__heading___1PTj4')),
-    'the question stays whole: its heading, what it asks, Learnosity’s answer box and keypad, More Instruction and Submit');
+  check((await vis('#asks')) && (await vis('#answer')) && (await vis('.lrn-formula-keyboard')) && (await vis('.content-title__heading___1PTj4')),
+    'the question stays whole: its heading, what it asks, Learnosity’s answer box and keypad (its buttons go to the app’s bar)');
   check(!(await vis('#fb')) && !(await vis('#attr')), 'Alta’s Feedback (a report to Alta) and Content attribution are put away');
+  // (1.3.53) every button in the parts' bars, whatever it says, to the app — its words, Alta's main one, whether it can be
+  // pressed — the bar put away; and the question's words and its answer as two panels, in the page's coordinates
+  const bt = await waitFor((p) => p.kind === 'buttons' && p.items.length, 'the buttons');
+  check(JSON.stringify(bt.items) === JSON.stringify([{ label: 'More Instruction', primary: false, enabled: true }, { label: 'Submit', primary: true, enabled: false }]) && !(await vis('#more')) && !(await vis('#submit')),
+    `the bar's buttons go to the app, whatever they say — Submit Alta's main one, greyed out — and Alta's bar is put away (${JSON.stringify(bt.items)})`);
+  await page.evaluate(() => { document.getElementById('submit').disabled = false; });
+  const bt2 = await waitFor((p) => p.kind === 'buttons' && p.items[1] && p.items[1].enabled === true, 'Submit ready');
+  check(!!bt2, 'when Alta’s Submit can be pressed, the app is told');
+  await page.evaluate(() => { window.__pressed = ''; document.getElementById('more').onclick = () => { window.__pressed = 'more'; }; });
+  check((await page.evaluate(() => window.__simplButtons.press(0))) && (await page.evaluate(() => window.__pressed)) === 'more', 'the app’s button presses Alta’s');
+  await page.evaluate(() => { document.getElementById('submit').disabled = true; });
+  const pn = await waitFor((p) => p.kind === 'panels' && p.panels.length === 2, 'the panels');
+  const [pq, pa] = pn.panels;
+  check(pq.kind === 'question' && pa.kind === 'answer' && pq.y < pa.y && pa.y - (pq.y + pq.h) >= 40 && pn.height >= pa.y + pa.h && pq.w > 200,
+    `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
+  // (a sprite sheet in a part that holds nothing else kept — Alta's banner — draws but takes no room)
+  await page.evaluate(() => { document.querySelector('.knewcons__knewcons___e3wUn').insertAdjacentHTML('beforeend', '<svg id="sp2" style="position:absolute;width:0;height:0"><defs><symbol id="s2"><circle r="3"/></symbol></defs></svg>'); });
+  await page.waitForTimeout(600);
+  check(await page.evaluate(() => { const k = document.querySelector('.knewcons__knewcons___e3wUn'); return k.hasAttribute('data-simpl-thin') && k.getBoundingClientRect().height === 0 && getComputedStyle(document.getElementById('sp2')).display !== 'none'; }),
+    'a sprite sheet inside Alta’s banner is kept, the banner round it taking no room');
+  await page.evaluate(() => document.getElementById('sp2').remove());
   check(await page.evaluate(() => getComputedStyle(document.getElementById('MathJax_Hidden')).display !== 'none' && getComputedStyle(document.getElementById('MathJax_Hidden').parentElement).display !== 'none'), 'MathJax’s own hidden helper is never hidden (it measures its fonts by it)');
   const top = await page.$eval('#qsec', (e) => Math.round(e.getBoundingClientRect().top));
   check(top < 60, `the question sits at the top, no gap above it (${top}px)`);
@@ -145,7 +166,8 @@ try {
   // a lesson alone (its Continue): kept too
   await page.evaluate(() => { const q = document.getElementById('qsec'); window.__q = q; q.remove(); document.querySelector('#lsec .theme__card___3E6YM').insertAdjacentHTML('beforeend', '<div class="button-bar__container___H_Vc_"><button>Feedback</button><button id="cont">Continue</button></div>'); });
   const fl = await waitFor((p, k) => k >= nl && p.kind === 'focus' && p.state === 'lesson', 'a lesson recognised');
-  check(!!fl && (await vis('#lsec')) && (await vis('#cont')) && !(await vis('header')) && !(await vis('h1')), 'a lesson alone is shown alone, with its Continue, the header hidden');
+  const lb = await waitFor((p, k) => k >= nl && p.kind === 'buttons' && p.items.some((b) => b.label === 'Continue'), 'the lesson’s Continue');
+  check(!!fl && !!lb && (await vis('#lsec')) && !(await vis('header')) && !(await vis('h1')), 'a lesson alone is shown alone, the header hidden, its Continue given to the app');
   // not recognised (Alta's learn page with no part in it): Alta's page back as it is, after a moment, and why
   const nb = (await posts()).length;
   await page.evaluate(() => { window.__l = document.getElementById('lsec'); window.__flow = window.__l.parentElement; window.__l.remove(); });
