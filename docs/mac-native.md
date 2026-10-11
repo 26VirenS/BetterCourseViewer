@@ -104,6 +104,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the pop-up's buttons, each pressing Alta's (`__simplDialog.press`); Escape presses its Close / Got it / OK, else gives
   the pop-up back to the page. A changed pop-up (a next step) is pictured again. The page's sprite sheets (an `<svg>` of
   symbols) are never hidden by the focus: a pop-up's picture draws from one.
+  (1.3.54) A pop-up's picture leaves out its buttons (the sheet has them): hidden for that moment
+  (`html[data-simpl-dialog-shot]`) and the row of them at its foot cropped off (`__simplDialog.rect`).
   (1.3.53) Two glass panels, the question's words and its answer (a lesson: one): the hook tells the app each kept
   part's question and answer boxes (the card's children before and from the one holding Learnosity's box, which gets a
   gap above it — `data-simpl-answer`) in the page's own coordinates, and the page's height. The app sizes the page to
@@ -143,6 +145,24 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   apart), so VSEPR shapes come out; SceneKit with camera control and click-to-select; ball and stick, space filling or
   sticks; lone pairs, labels, turning by itself; its formula (Hill order), molar mass, counts, valence check, polarity
   (from bond dipoles and lone pairs) and the selected atom's shape and bond angles as the model has them.
+  (1.3.54) The Lewis builder is a graph (`LGraph`: atoms with positions, bonds with orders, a charge), made by the quick
+  way (the old central-atom screen, which builds the graph) or drawn (`LewisEditorCanvas`: click to place an atom bonded
+  to the one selected, drag between atoms to bond, click a bond to cycle its order — the orders then the student's own,
+  until Auto bonds —, move, erase, tidy): chains, branches, rings, two-atom molecules, any main-group element.
+  `LewisSolver` places the electrons for any graph: total valence electrons less the charge; every bond-order assignment
+  the atoms allow (each atom's most bonds from its most electrons: 2 for H and He, 4 Be, 6 B and Al, 8 in period 2, 12
+  below); outer atoms filled first (the more electronegative first), then inner, then inner past eight, an odd electron
+  on the least electronegative atom with room; formal charges; ranked by octets kept (strict octet: none past eight
+  either), then the sum of formal charges, like charges side by side, and negative charge on electronegative atoms.
+  The best tie are resonance structures (drawn side by side with ↔, their average bond orders listed), close runners-up
+  minor contributors. Group 1 and 2 metals with nonmetals are ionic (cations; monoatomic anions to their octets; the rest
+  of the charge on the polyatomic anion), each ion in brackets with its charge, as is any charged molecule. Every atom's
+  octet, formal charge and VSEPR shape; polarity from the molecule built in 3D (`MoleculeModel.load(graph:structure:)`,
+  which the builder's Open in 3D also uses); warnings (period 2 over eight, hydrogen with two bonds, electrons that do not
+  fit, unconnected atoms); notes instead of a structure for transition metals and diborane, and beside O₂'s. Formulas
+  in conventional order (Hill for carbon compounds; else by electronegativity, H first or after a group 13–15 element).
+  The table's colour views and its kinds' chips are glass buttons (the chips tinted their colour), the trend arrows are
+  always shown for a property with a trend, and the search sits in the tool's header, left of the pin (`PTSearch`).
   `scripts/dev/mac-shots.sh` pictures the table coloured by electronegativity with its trends, carbon's and iron's pages,
   the Lewis maker and the builder (`-SimplPTColour`, `-SimplPTTrends`, `-SimplPTElement`, `-SimplPTPage`,
   `-SimplPTMolecule`).
