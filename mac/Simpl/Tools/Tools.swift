@@ -358,6 +358,7 @@ struct ToolScreen: View {
                 .padding(.bottom, 12)
                 .frame(maxWidth: 1480 + 80)
                 .frame(maxWidth: .infinity)
+                .zIndex(2) // (1.3.64: what opens under it — the Periodic Table's search results — over the tool)
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }

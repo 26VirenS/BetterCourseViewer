@@ -223,6 +223,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   The Dashboard's opened counter is 440 points wide, and a click anywhere in the app but its panel folds it back.
   (1.3.63) The Lewis builder's steppers are pressable over each button's whole square (a plain button is pressed only
   where it draws, and a minus sign is a thin line).
+  (1.3.64) The header's search lists what it finds under the field (up to seven: each element's tile, name, number and
+  kind; ↑ ↓ to move, Return or a press to open it, `PTSearch.pick`), over the tool. The tour ticks a step off when it is
+  done ("Nice", green) and waits 1.6 seconds (2.2 after the last) before the next.
 
 ## Building and running
 

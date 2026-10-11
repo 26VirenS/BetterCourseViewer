@@ -143,6 +143,7 @@ struct PTTourOverlay: View {
     let origin: CGPoint
     let size: CGSize
     let stuck: Bool
+    var done = false
     let next: () -> Void
     @ObservedObject private var frames = PTTourFrames.shared
     @State private var cardSize = CGSize(width: PTTourCard.width, height: 170)
@@ -168,7 +169,7 @@ struct PTTourOverlay: View {
                 .offset(x: hole.minX, y: hole.minY)
                 .shadow(color: Theme.accent.opacity(0.6), radius: 10)
                 .allowsHitTesting(false)
-            PTTourCard(step: step, arrow: below ? .top : .bottom, arrowAt: arrowAt, stuck: stuck, next: next, cardSize: $cardSize)
+            PTTourCard(step: step, arrow: below ? .top : .bottom, arrowAt: arrowAt, stuck: stuck, done: done, next: next, cardSize: $cardSize)
                 .offset(x: x, y: y)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -186,6 +187,7 @@ struct PTTourCard: View {
     let arrow: TourArrow
     let arrowAt: CGFloat
     let stuck: Bool
+    var done = false
     let next: () -> Void
     @Binding var cardSize: CGSize
 
@@ -201,16 +203,29 @@ struct PTTourCard: View {
                 .font(.sCallout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 7) {
-                Image(systemName: symbol(s.gesture))
-                    .font(.sCallout.weight(.semibold))
-                    .symbolEffect(.pulse, options: .repeating)
-                Text(s.doing).font(.sCallout.weight(.semibold))
+            // (what to do, its gesture pulsing; 1.3.64: done, a green tick in its place for a moment)
+            Group {
+                if done {
+                    HStack(spacing: 7) {
+                        Image(systemName: "checkmark.circle.fill").font(.sCallout.weight(.semibold))
+                        Text(step == count - 1 ? "All done" : "Nice").font(.sCallout.weight(.semibold))
+                    }
+                    .foregroundStyle(.green)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                } else {
+                    HStack(spacing: 7) {
+                        Image(systemName: symbol(s.gesture))
+                            .font(.sCallout.weight(.semibold))
+                            .symbolEffect(.pulse, options: .repeating)
+                        Text(s.doing).font(.sCallout.weight(.semibold))
+                    }
+                    .foregroundStyle(Theme.accent)
+                    .transition(.opacity)
+                }
             }
-            .foregroundStyle(Theme.accent)
             .padding(.top, 2)
             HStack(spacing: 10) {
-                ProgressView(value: Double(step + 1), total: Double(count))
+                ProgressView(value: Double(step + (done ? 1 : 0)), total: Double(count))
                     .progressViewStyle(.linear)
                     .tint(Theme.accent)
                     .frame(maxWidth: 90)

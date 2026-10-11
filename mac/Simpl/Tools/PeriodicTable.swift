@@ -326,6 +326,8 @@ struct PeriodicTableTool: View {
     @AppStorage("simpl.ptTourSeen") private var tourSeen = false
     @State private var tourStep: Int?
     @State private var tourStuck = false
+    /// (1.3.64) the step's thing done: its card says so for a moment before the next comes
+    @State private var tourDone = false
     @ObservedObject private var tourWord = PTTour.shared
 
     private var matches: Set<Int>? {
@@ -361,8 +363,8 @@ struct PeriodicTableTool: View {
             // (1.3.61) the guided tour: the tool dimmed, the step's control lit, its card beside it
             .overlay(alignment: .topLeading) {
                 if let i = tourStep {
-                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size, stuck: tourStuck,
-                                  next: { nextTour(i) })
+                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size, stuck: tourStuck && !tourDone,
+                                  done: tourDone, next: { nextTour(i) })
                         .transition(.opacity)
                 }
             }
@@ -374,6 +376,13 @@ struct PeriodicTableTool: View {
             if open != nil { withAnimation(Motion.gentle) { open = nil } }
         }
         .onChange(of: nav.tourAsked) { _, _ in tour(0) }
+        // (1.3.64) an element picked from the search's results: opened
+        .onChange(of: search.pickedCount) { _, _ in
+            guard let n = search.picked, let e = PeriodicTable.byNumber(n) else { return }
+            search.query = ""
+            anchor = .center
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = e }
+        }
         // (the tour's step, done: watched for in what the tool shows and what it is told)
         .onChange(of: hovered?.number) { _, _ in checkTour() }
         .onChange(of: colouring) { _, _ in checkTour() }
@@ -418,6 +427,7 @@ struct PeriodicTableTool: View {
         PTTour.shared.active = true
         PTTour.shared.clearEvent()
         tourStuck = false
+        tourDone = false
         withAnimation(Motion.gentle) {
             tourStep = i
             if i == 0 {
@@ -463,8 +473,10 @@ struct PeriodicTableTool: View {
         case .event(let e): done = PTTour.shared.event == e
         case .typed: done = !search.query.trimmingCharacters(in: .whitespaces).isEmpty
         }
-        guard done else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + (i == PTTourStep.all.count - 1 ? 1.2 : 0.45)) {
+        guard done, !tourDone else { return }
+        withAnimation(Motion.snappy) { tourDone = true }
+        // (1.3.64) a breath after it is done — the card ticked — before the next step comes
+        DispatchQueue.main.asyncAfter(deadline: .now() + (i == PTTourStep.all.count - 1 ? 2.2 : 1.6)) {
             guard tourStep == i else { return }
             nextTour(i)
         }
@@ -732,6 +744,14 @@ final class PTSearch: ObservableObject {
     @Published var query = ""
     /// Raised by Return in the field: the table opens the first element it finds.
     @Published var submitted = 0
+    /// (1.3.64) An element picked from the field's results: the table opens it.
+    @Published private(set) var picked: Int?
+    @Published private(set) var pickedCount = 0
+
+    func pick(_ number: Int) {
+        picked = number
+        pickedCount += 1
+    }
 }
 
 /// The search field in the Periodic Table's header.
@@ -749,6 +769,10 @@ struct PTHeaderControls: View {
     @ObservedObject private var search = PTSearch.shared
     @State private var searching = false
     @FocusState private var focused: Bool
+    /// (1.3.64) the result the arrow keys are on
+    @State private var lit = 0
+
+    private var results: [PTElement] { Array(PeriodicTable.find(search.query).prefix(7)) }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -762,6 +786,13 @@ struct PTHeaderControls: View {
         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: searching)
         .onChange(of: focused) { _, f in
             if !f && search.query.isEmpty { searching = false }
+        }
+        .onAppear {
+            // (the screenshot suite: -SimplPTSearch ne, the search open with its results)
+            if let q = UserDefaults.standard.string(forKey: "SimplPTSearch"), !q.isEmpty {
+                searching = true
+                search.query = q
+            }
         }
     }
 
@@ -802,8 +833,14 @@ struct PTHeaderControls: View {
                     .font(.sBody)
                     .focused($focused)
                     .frame(width: 210)
-                    .onSubmit { search.submitted += 1 }
+                    .onSubmit {
+                        let r = results
+                        if r.indices.contains(lit) { choose(r[lit]) } else { search.submitted += 1 }
+                    }
                     .onExitCommand { close() }
+                    .onKeyPress(.downArrow) { lit = min(lit + 1, max(results.count - 1, 0)); return .handled }
+                    .onKeyPress(.upArrow) { lit = max(lit - 1, 0); return .handled }
+                    .onChange(of: search.query) { _, _ in lit = 0 }
                 Button(action: close) { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
                     .buttonStyle(.plain)
                     .help("Close the search")
@@ -811,6 +848,14 @@ struct PTHeaderControls: View {
             .padding(.horizontal, 14)
             .frame(height: 34)
             .glassCard(radius: 17, interactive: true)
+            .overlay(alignment: .topTrailing) {
+                if !search.query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    resultList
+                        .fixedSize()
+                        .offset(y: 44)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                }
+            }
             .transition(.scale(scale: 0.6, anchor: .trailing).combined(with: .opacity))
             .help("Light the elements that match; Return opens the first")
         } else {
@@ -826,6 +871,53 @@ struct PTHeaderControls: View {
             .help("Search the elements (⌘F)")
             .transition(.scale(scale: 0.6, anchor: .trailing).combined(with: .opacity))
         }
+    }
+
+    /// (1.3.64) What the search finds, under the field: each element's tile, name, number and kind; the one the arrow
+    /// keys are on lit; a press (or Return) opens it.
+    private var resultList: some View {
+        let r = results
+        return VStack(alignment: .leading, spacing: 2) {
+            if r.isEmpty {
+                Text("No element matches “\(search.query.trimmingCharacters(in: .whitespaces))”")
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+            }
+            ForEach(Array(r.enumerated()), id: \.element.number) { k, e in
+                Button { choose(e) } label: {
+                    HStack(spacing: 10) {
+                        Text(e.symbol)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(e.kind.color.opacity(0.85), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(e.name).font(.sBody.weight(.semibold))
+                            Text("\(e.number) · \(e.kind.label)").font(.sCaption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .frame(width: 284, alignment: .leading)
+                    .background(k == lit ? Theme.accent.opacity(0.16) : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { inside in if inside { lit = k } }
+            }
+        }
+        .padding(6)
+        .glassCard(radius: 16)
+        .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+        .animation(Motion.snappy, value: lit)
+    }
+
+    private func choose(_ e: PTElement) {
+        search.pick(e.number)
+        close()
     }
 
     private func close() {

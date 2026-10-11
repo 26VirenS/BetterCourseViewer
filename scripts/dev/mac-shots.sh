@@ -134,6 +134,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   # (1.3.59) the tour, at its Draw your own step; (1.3.61) and at its first, the table's carbon lit
   SIZE=1440x920 shoot light-55h-ptable-tour 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 4
   SIZE=1440x920 shoot light-55i-ptable-tour-start 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 0
+  # (1.3.64) the header's search open, with what it finds
+  SIZE=1440x920 shoot light-55j-ptable-search 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category -SimplPTSearch ne
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   SIZE=1440x920 shoot dark-55e-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
