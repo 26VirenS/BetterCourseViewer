@@ -130,19 +130,54 @@ struct DeveloperMenu: View {
 
 struct DeveloperView: View {
     @EnvironmentObject private var model: AppModel
-    @ObservedObject private var dev = DevMode.shared
+    @State private var page: Page? = .overview
+
+    enum Page: String, CaseIterable, Identifiable {
+        case overview, updates, engine, popups, interface, preferences
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .overview: return "Overview"
+            case .updates: return "Updates"
+            case .engine: return "Engine"
+            case .popups: return "Alta & Macmillan"
+            case .interface: return "Interface"
+            case .preferences: return "Preferences"
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .overview: return "info.circle"
+            case .updates: return "arrow.down.circle"
+            case .engine: return "terminal"
+            case .popups: return "brain.head.profile"
+            case .interface: return "macwindow"
+            case .preferences: return "list.bullet.rectangle"
+            }
+        }
+    }
 
     var body: some View {
-        TabView {
-            DevOverview().tabItem { Label("Overview", systemImage: "info.circle") }
-            DevUpdates().tabItem { Label("Updates", systemImage: "arrow.down.circle") }
-            DevEngine(engine: model.engine).tabItem { Label("Engine", systemImage: "terminal") }
-            DevPopups().tabItem { Label("Alta & Macmillan", systemImage: "brain.head.profile") }
-            DevInterface(engine: model.engine).tabItem { Label("Interface", systemImage: "macwindow") }
-            DevDefaults().tabItem { Label("Preferences", systemImage: "list.bullet.rectangle") }
+        NavigationSplitView {
+            List(Page.allCases, selection: $page) { p in
+                Label(p.title, systemImage: p.symbol).tag(p)
+            }
+            .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
+        } detail: {
+            Group {
+                switch page ?? .overview {
+                case .overview: DevOverview()
+                case .updates: DevUpdates()
+                case .engine: DevEngine(engine: model.engine)
+                case .popups: DevPopups()
+                case .interface: DevInterface(engine: model.engine)
+                case .preferences: DevDefaults()
+                }
+            }
+            .navigationTitle("Developer") // (the title Leave Developer Mode finds it by)
+            .navigationSubtitle((page ?? .overview).title)
         }
-        .padding(12)
-        .frame(minWidth: 720, minHeight: 520)
+        .frame(minWidth: 760, minHeight: 520)
     }
 }
 
