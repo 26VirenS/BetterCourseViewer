@@ -61,7 +61,9 @@ svg { flex: none; }
 .accent { color: var(--accent); }
 
 /* ---- nav: a strip of material the page scrolls under ----------------------------------------------------- */
-.nav { position: fixed; inset: 0 0 auto; z-index: 50; padding-top: env(safe-area-inset-top); background: color-mix(in srgb, var(--bg) 0%, transparent); transition: background-color 240ms ease; }
+.nav { position: fixed; inset: 0 0 auto; z-index: 50; padding-top: env(safe-area-inset-top); background: color-mix(in srgb, var(--bg) 0%, transparent);
+  -webkit-backdrop-filter: saturate(100%) blur(0px); backdrop-filter: saturate(100%) blur(0px);
+  transition: background-color 240ms ease, -webkit-backdrop-filter 240ms ease, backdrop-filter 240ms ease; }
 .nav::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: var(--hair); opacity: 0; transition: opacity 240ms ease; }
 .nav[data-scrolled] { background: color-mix(in srgb, var(--bg) 74%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
 .nav[data-scrolled]::after { opacity: 1; }
@@ -264,10 +266,14 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   .stage__enter { animation: stage-in 1300ms var(--ease-out) 520ms both; }
   @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
   /* the word turning over: the old one lifts away and blurs, the new one rises in; the box eases between widths */
-  .js .rot { transition: width 700ms var(--ease-in-out); clip-path: inset(-1em -.06em -1em -.06em); }
-  .rot__word { transition: opacity 600ms var(--ease-out), transform 700ms var(--ease-out), filter 600ms var(--ease-out); }
+  .js .rot { transition: width 480ms var(--ease-in-out); clip-path: inset(-1em -.06em -1em -.06em); }
+  .js .rot.is-resizing { transition: none; }
+  /* a picture still loading when its frame arrives fades in once it has, instead of popping in */
+  .js img.is-loading { opacity: 0; }
+  .js img.is-loaded { transition: opacity 500ms var(--ease-out); }
+  .rot__word { transition: opacity 380ms var(--ease-out), transform 460ms var(--ease-out), filter 380ms var(--ease-out); }
   .rot__word.is-in { transform: translate(-50%, .32em); filter: blur(6px); transition: none; }
-  .rot__word.is-out { opacity: 0; transform: translate(-50%, -.32em); filter: blur(6px); transition-duration: 450ms; }
+  .rot__word.is-out { opacity: 0; transform: translate(-50%, -.32em); filter: blur(6px); transition-duration: 280ms; }
   @keyframes stage-in { from { opacity: 0; transform: translateY(60px); } }
 
   /* the window lies back and comes flat as the page scrolls toward it */
@@ -292,6 +298,8 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   .macdl__opt, .macdl[data-dir="up"] .macdl__opt { transform: none; transition: opacity 160ms ease, background-color 160ms ease; }
   .macdl[data-open] .macdl__opt { transition-delay: 0s; }
   .macdl__chev, .btn, .link svg, .hero__new svg { transition: none; }
+  .js img.is-loading { opacity: 0; }
+  .js img.is-loaded { transition: opacity 200ms ease; }
 }
 </style>
 
@@ -601,7 +609,16 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     reveals.forEach((el) => io.observe(el));
   } else reveals.forEach((el) => el.classList.add('is-in'));
 
-  // "Make ___ Simpl.": every 2.4s the next subject rises in as the last lifts away, the box easing to its width;
+  // the interface pictures load lazily: one not loaded yet stays clear, then fades in when it arrives
+  for (const img of document.querySelectorAll('.win img[loading="lazy"], .phone img[loading="lazy"]')) {
+    if (img.complete && img.naturalWidth) continue;
+    img.classList.add('is-loading');
+    const done = () => { img.classList.add('is-loaded'); img.classList.remove('is-loading'); };
+    img.addEventListener('load', done, { once: true });
+    img.addEventListener('error', done, { once: true });
+  }
+
+  // "Make ___ Simpl.": every 1.7s the next subject rises in as the last lifts away, the box easing to its width;
   // still for reduced motion, paused while the page is hidden or the title is off screen
   const rot = document.querySelector('[data-rot]');
   if (rot && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -623,12 +640,19 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       size.textContent = to.textContent;
       fit();
     };
-    const tick = () => { if (seen && !document.hidden) turn(); timer = setTimeout(tick, 2400); };
+    const tick = () => { if (seen && !document.hidden) turn(); timer = setTimeout(tick, 1700); };
     fit();
-    addEventListener('resize', fit, { passive: true });
+    // (while the window is being resized the box follows at once, then eases again)
+    let settle = 0;
+    addEventListener('resize', () => {
+      rot.classList.add('is-resizing');
+      fit();
+      clearTimeout(settle);
+      settle = setTimeout(() => rot.classList.remove('is-resizing'), 150);
+    }, { passive: true });
     if (document.fonts) document.fonts.ready.then(fit);
     if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => { seen = e.isIntersecting; }).observe(rot);
-    timer = setTimeout(tick, 2200);
+    timer = setTimeout(tick, 1500);
   }
 
   // Download for Mac: the button opens into its two choices — downward when the page has room below it, else upward
