@@ -1,0 +1,121 @@
+# Liquid Glass on Windows: the candidates found online, built for Windows and published as a pre-release of their own
+# (windows-glass-r<run>) to try on a real PC. Nothing here touches Simpl's own builds, releases or update feeds (those
+# read mac-v* releases only). See windows-glass/README.md.
+name: Windows Liquid Glass
+
+on:
+  push:
+    branches: [claude/windows-liquid-glass]
+    paths:
+      - 'windows-glass/**'
+      - '.github/workflows/windows-glass.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-glass
+  cancel-in-progress: true
+
+env:
+  # pinned: the exact code that was looked at
+  LIQUIDIMGUI_REPO: https://github.com/charlie-x/liquidImgui.git
+  LIQUIDIMGUI_SHA: 1f6f0225035c5602690d62749e4256200da8d7a1
+  AURORA_REPO: https://github.com/VeiQiuLab/AuroraGlass.git
+  AURORA_SHA: 9355428a4a04f27a01b8e34fec90b7bfde2f0cf6
+
+jobs:
+  liquidimgui:
+    name: liquidImgui (Direct3D 11, live desktop refraction)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch liquidImgui
+        shell: bash
+        run: |
+          git init -q src && cd src
+          git remote add origin "$LIQUIDIMGUI_REPO"
+          git fetch -q --depth 1 origin "$LIQUIDIMGUI_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Build (Release, x64)
+        shell: bash
+        run: |
+          cmake -S src -B build -A x64
+          cmake --build build --config Release --parallel
+      - name: Package
+        shell: bash
+        run: |
+          out=dist/LiquidGlass-liquidImgui
+          mkdir -p "$out"
+          cp build/Release/liquidDX11.exe "$out/LiquidGlass.exe"
+          cp -R src/data "$out/data"
+          cp src/LICENSE.txt "$out/LICENSE-imgui.txt"
+          cp src/examples/example_win32_directx11/LICENSE "$out/LICENSE.txt"
+          cp src/examples/example_win32_directx11/THIRD-PARTY-NOTICES.md "$out/"
+          cp windows-glass/liquidimgui-README.txt "$out/README-FIRST.txt"
+          (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-liquidImgui-win64.zip LiquidGlass-liquidImgui >/dev/null)
+          ls -la LiquidGlass-liquidImgui-win64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiquidGlass-liquidImgui-win64
+          path: LiquidGlass-liquidImgui-win64.zip
+
+  aurora:
+    name: AuroraGlass (Direct3D 11 SDK, interactive demo)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    continue-on-error: true # (a second candidate: the first is published whatever becomes of this one)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch AuroraGlass
+        shell: bash
+        run: |
+          git init -q src && cd src
+          git remote add origin "$AURORA_REPO"
+          git fetch -q --depth 1 origin "$AURORA_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Build its demos (Release, x64)
+        shell: bash
+        run: |
+          cmake -S src -B build -A x64
+          cmake --build build --config Release --target P3_Interactive_Smoke
+          cmake --build build --config Release --target P4_Motion_Smoke || echo "P4_Motion_Smoke did not build"
+      - name: Package
+        shell: bash
+        run: |
+          out=dist/LiquidGlass-AuroraGlass
+          mkdir -p "$out"
+          cp -R build/Release/. "$out/"
+          find "$out" \( -name '*.pdb' -o -name '*.ilk' -o -name '*.lib' -o -name '*.exp' \) -delete
+          cp src/LICENSE "$out/LICENSE.txt"
+          cp windows-glass/aurora-README.txt "$out/README-FIRST.txt"
+          (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-AuroraGlass-win64.zip LiquidGlass-AuroraGlass >/dev/null)
+          ls -la LiquidGlass-AuroraGlass-win64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiquidGlass-AuroraGlass-win64
+          path: LiquidGlass-AuroraGlass-win64.zip
+
+  publish:
+    name: Publish the pre-release
+    needs: [liquidimgui, aurora]
+    if: always() && needs.liquidimgui.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: zips
+          merge-multiple: true
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="windows-glass-r${{ github.run_number }}"
+          ls -la zips
+          gh release create "$tag" zips/*.zip --target "${{ github.sha }}" --prerelease \
+            --title "Liquid Glass on Windows — showcase r${{ github.run_number }}" \
+            --notes-file windows-glass/RELEASE_NOTES.md
+          echo "https://github.com/${{ github.repository }}/releases/tag/$tag"
