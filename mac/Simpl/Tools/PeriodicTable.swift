@@ -620,7 +620,7 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         centre
-                            .frame(height: max(380, min(560, g.size.height * 0.6)))
+                            .frame(height: max(460, min(640, g.size.height * 0.75)))
                         HStack(alignment: .top, spacing: 18) {
                             left.frame(maxWidth: .infinity, alignment: .topLeading)
                             right.frame(maxWidth: .infinity, alignment: .topLeading)

@@ -198,22 +198,73 @@ struct LGraph: Equatable {
         return out
     }
 
-    /// Laid out afresh: a tree from the busiest atom, then springs along the bonds and every atom pushing the others away.
+    /// The smallest ring (three to eight atoms), in order round it, if there is one.
+    func smallestRing() -> [Int]? {
+        var best: [Int]?
+        for b in bonds {
+            // (the shortest way from one end of the bond to the other without it)
+            var prev: [Int: Int] = [b.a: b.a]
+            var queue = [b.a]
+            while !queue.isEmpty {
+                let x = queue.removeFirst()
+                for e in bonds where (e.a == x || e.b == x) && e.id != b.id {
+                    let y = e.other(x)
+                    if prev[y] == nil {
+                        prev[y] = x
+                        queue.append(y)
+                    }
+                }
+            }
+            guard prev[b.b] != nil else { continue }
+            var path = [b.b]
+            while let last = path.last, last != b.a, let p = prev[last] { path.append(p) }
+            if path.count >= 3 && path.count <= 8 && path.count < (best?.count ?? 99) { best = path }
+        }
+        return best
+    }
+
+    /// Laid out afresh: a ring (if any) as a regular polygon, branches pointing away from where they come from, then
+    /// springs along the bonds and every atom pushing the others away.
     mutating func tidy() {
         guard !atoms.isEmpty else { return }
+        let bondLength: CGFloat = 78
+        let ring = smallestRing()
         var placed: [Int: CGPoint] = [:]
+        var heading: [Int: Double] = [:]
         let byDegree = atoms.sorted { degree($0.id) > degree($1.id) }
         var offset: CGFloat = 0
         for start in byDegree where placed[start.id] == nil {
-            placed[start.id] = CGPoint(x: offset, y: 0)
-            var queue = [start.id]
+            var queue: [Int] = []
+            let part = Set(components().first { $0.contains(start.id) } ?? [start.id])
+            if let ring, part.contains(ring[0]) {
+                let m = Double(ring.count)
+                let radius = bondLength / CGFloat(2 * sin(Double.pi / m))
+                for (k, id) in ring.enumerated() {
+                    let t = -Double.pi / 2 + Double(k) * 2 * .pi / m
+                    placed[id] = CGPoint(x: offset + radius * CGFloat(cos(t)), y: radius * CGFloat(sin(t)))
+                    heading[id] = t
+                    queue.append(id)
+                }
+            } else {
+                placed[start.id] = CGPoint(x: offset, y: 0)
+                queue.append(start.id)
+            }
             while !queue.isEmpty {
                 let x = queue.removeFirst()
                 let next = bonds.filter { $0.a == x || $0.b == x }.map { $0.other(x) }.filter { placed[$0] == nil }
+                let c = Double(next.count)
                 for (k, y) in next.enumerated() {
-                    let a = Double(k) / Double(max(next.count, 1)) * 2 * .pi + Double(x) * 0.7
+                    var t: Double
+                    if let h = heading[x] {
+                        let step = 2 * Double.pi / (c + 1)
+                        t = h + (Double(k) - (c - 1) / 2) * step
+                    } else {
+                        let first: Double = next.count % 2 == 0 ? 0 : -Double.pi / 2
+                        t = first + Double(k) * 2 * .pi / c
+                    }
                     let p = placed[x] ?? .zero
-                    placed[y] = CGPoint(x: p.x + 70 * CGFloat(cos(a)), y: p.y + 70 * CGFloat(sin(a)))
+                    placed[y] = CGPoint(x: p.x + bondLength * CGFloat(cos(t)), y: p.y + bondLength * CGFloat(sin(t)))
+                    heading[y] = t
                     queue.append(y)
                 }
             }
@@ -1082,24 +1133,44 @@ struct LewisStructureCanvas: View {
     let graph: LGraph
     let structure: LStructure?
     let result: LResult
+    /// The largest scale it is drawn at (smaller when it would not fit).
     var scale: CGFloat = 1
     var selected: Int?
     /// A bond being drawn: from an atom to the pointer.
     var preview: (CGPoint, CGPoint)?
+    /// A fixed view (scale and middle) instead of one fitted to the drawing: the editor's, held still while it is used.
+    var view: Fit?
 
-    /// The structure's middle, for a small picture drawn centred.
-    private var middle: CGPoint {
-        guard !graph.atoms.isEmpty else { return .zero }
-        let xs = graph.atoms.map(\.pos.x), ys = graph.atoms.map(\.pos.y)
-        let x0: CGFloat = xs.min() ?? 0, x1: CGFloat = xs.max() ?? 0
-        let y0: CGFloat = ys.min() ?? 0, y1: CGFloat = ys.max() ?? 0
-        return CGPoint(x: (x0 + x1) / 2, y: (y0 + y1) / 2)
+    struct Fit: Equatable {
+        var scale: CGFloat
+        var centre: CGPoint
+    }
+
+    /// The scale and middle that fit a drawing in a size: drawn round its own origin at full scale when it fits there
+    /// (so drawing atoms one by one doesn't shift it), otherwise centred on its atoms and shrunk to fit.
+    static func fit(_ g: LGraph, _ size: CGSize, maxScale: CGFloat) -> Fit {
+        guard !g.atoms.isEmpty, size.width > 1, size.height > 1 else { return Fit(scale: maxScale, centre: .zero) }
+        // (room round the atoms for their lone electrons, brackets and charges)
+        let pad: CGFloat = 52
+        var x0 = CGFloat.infinity, x1 = -CGFloat.infinity, y0 = CGFloat.infinity, y1 = -CGFloat.infinity
+        for a in g.atoms {
+            x0 = min(x0, a.pos.x - pad)
+            x1 = max(x1, a.pos.x + pad)
+            y0 = min(y0, a.pos.y - pad)
+            y1 = max(y1, a.pos.y + pad)
+        }
+        x1 += 14
+        let halfW: CGFloat = size.width / 2 / maxScale, halfH: CGFloat = size.height / 2 / maxScale
+        if x0 >= -halfW && x1 <= halfW && y0 >= -halfH && y1 <= halfH { return Fit(scale: maxScale, centre: .zero) }
+        let sx: CGFloat = size.width / (x1 - x0), sy: CGFloat = size.height / (y1 - y0)
+        return Fit(scale: min(maxScale, sx, sy), centre: CGPoint(x: (x0 + x1) / 2, y: (y0 + y1) / 2))
     }
 
     var body: some View {
         Canvas { ctx, size in
-            LewisStructureCanvas.draw(&ctx, size: size, graph: graph, structure: structure, result: result, scale: scale,
-                                      centre: scale < 1 ? middle : .zero, selected: selected, preview: preview)
+            let f = view ?? LewisStructureCanvas.fit(graph, size, maxScale: scale)
+            LewisStructureCanvas.draw(&ctx, size: size, graph: graph, structure: structure, result: result, scale: f.scale,
+                                      centre: f.centre, selected: selected, preview: preview)
         }
     }
 
@@ -1146,7 +1217,8 @@ struct LewisStructureCanvas: View {
             }
             ctx.draw(Text(a.symbol).font(.system(size: 30 * scale, weight: .bold)).foregroundColor(LChem.color(a.symbol)), at: p)
             guard let s else { continue }
-            if let fc = s.formal[a.id], fc != 0 {
+            let alone = r.ions.contains { $0.atoms == [a.id] && $0.charge != 0 }
+            if let fc = s.formal[a.id], fc != 0, !alone {
                 let t = (fc > 0 ? "+" : "−") + (abs(fc) > 1 ? "\(abs(fc))" : "")
                 ctx.draw(Text(t).font(.system(size: 13 * max(scale, 0.7), weight: .bold)).foregroundColor(.secondary),
                          at: CGPoint(x: p.x + 20 * scale, y: p.y - 19 * scale))
@@ -1231,6 +1303,8 @@ struct LewisEditorCanvas: View {
     @State private var dragFrom: Int?
     @State private var dragAt: CGPoint?
     @State private var moving: Int?
+    /// The view held still while the pointer is down, so what is under it doesn't move.
+    @State private var held: LewisStructureCanvas.Fit?
 
     private var preview: (CGPoint, CGPoint)? {
         guard let id = dragFrom, let a = graph.atom(id), let p = dragAt else { return nil }
@@ -1240,7 +1314,8 @@ struct LewisEditorCanvas: View {
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-            LewisStructureCanvas(graph: graph, structure: structure, result: result, scale: 1, selected: selected, preview: preview)
+            LewisStructureCanvas(graph: graph, structure: structure, result: result, scale: 1, selected: selected, preview: preview,
+                                 view: held ?? LewisStructureCanvas.fit(graph, size, maxScale: 1))
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
@@ -1250,8 +1325,13 @@ struct LewisEditorCanvas: View {
         }
     }
 
-    /// From the view's points to the drawing's (its centre the origin).
-    private func local(_ p: CGPoint, _ size: CGSize) -> CGPoint { CGPoint(x: p.x - size.width / 2, y: p.y - size.height / 2) }
+    /// From the view's points to the drawing's.
+    private func local(_ p: CGPoint, _ size: CGSize) -> CGPoint {
+        let f = held ?? LewisStructureCanvas.fit(graph, size, maxScale: 1)
+        let x: CGFloat = f.centre.x + (p.x - size.width / 2) / f.scale
+        let y: CGFloat = f.centre.y + (p.y - size.height / 2) / f.scale
+        return CGPoint(x: x, y: y)
+    }
 
     private func atomAt(_ p: CGPoint) -> Int? {
         var best: (Int, CGFloat)?
@@ -1276,6 +1356,7 @@ struct LewisEditorCanvas: View {
     }
 
     private func changed(_ v: DragGesture.Value, _ size: CGSize) {
+        if held == nil { held = LewisStructureCanvas.fit(graph, size, maxScale: 1) }
         guard hypot(v.translation.width, v.translation.height) > 4 else { return }
         let start = local(v.startLocation, size), now = local(v.location, size)
         if tool == .move || !editable {
@@ -1294,6 +1375,7 @@ struct LewisEditorCanvas: View {
         dragFrom = nil
         dragAt = nil
         moving = nil
+        held = nil
         if wasMoving { return }
         if click {
             if let id = atomAt(start) {
