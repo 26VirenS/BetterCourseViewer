@@ -363,6 +363,14 @@ struct PeriodicTableTool: View {
                 anchor = .center
                 open = e
             }
+            // (the screenshot suite: -SimplPTColour, -SimplPTTrends, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
+            let d = UserDefaults.standard
+            if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
+            if d.bool(forKey: "SimplPTTrends") { trends = true }
+            if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { page = v }
+            if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
+            let n = d.integer(forKey: "SimplPTElement")
+            if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
         }
     }
 
