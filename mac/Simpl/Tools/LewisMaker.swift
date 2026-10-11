@@ -150,6 +150,16 @@ struct LGraph: Equatable {
     var atoms: [LAtom] = []
     var bonds: [LBond] = []
     var charge = 0
+
+    /// (1.3.65) What the electrons depend on — its atoms, bonds, charge and whether its orders are the student's — and
+    /// not where it is drawn: a molecule moved about is not worked out again.
+    var topologyKey: String {
+        var k = "\(charge)|\(manual)|"
+        for a in atoms { k += "\(a.id)\(a.symbol)," }
+        k += "|"
+        for b in bonds { k += "\(b.id):\(b.a)-\(b.b)x\(b.order)," }
+        return k
+    }
     /// The bonds' orders set by hand (a bond's order cycled): its electrons placed round them, as they are.
     var manual = false
     var nextID = 1
@@ -317,6 +327,13 @@ struct LStructure: Equatable {
 
     func bondSum(_ g: LGraph, _ id: Int) -> Int { g.bonds.filter { $0.a == id || $0.b == id }.map { orders[$0.id] ?? 1 }.reduce(0, +) }
     func electrons(_ g: LGraph, _ id: Int) -> Int { 2 * bondSum(g, id) + (lone[id] ?? 0) }
+
+    /// (1.3.65) Its bond orders and lone electrons, as a key.
+    var key: String {
+        let o = orders.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
+        let l = lone.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
+        return o + "|" + l
+    }
 }
 
 /// An ion of an ionic compound, or the whole of a charged molecule: its atoms, drawn in brackets with its charge.
@@ -592,15 +609,38 @@ enum LGeometry {
         return (g.degree(id), l / 2 + l % 2)
     }
 
-    /// The molecule built in 3D (MoleculeModel's VSEPR forces), for its polarity.
+    /// The molecule built in 3D (MoleculeModel's VSEPR forces), for its polarity — (1.3.65) once for each molecule and
+    /// structure: it was built again every time the builder drew.
     static func dipole(_ g: LGraph, _ s: LStructure) -> Double {
+        let key = g.topologyKey + "|" + s.key
+        if let d = dipoles[key] { return d }
         let m = MoleculeModel(empty: true)
         m.load(graph: g, structure: s)
+        if dipoles.count > 300 { dipoles.removeAll() }
+        dipoles[key] = m.dipole
         return m.dipole
     }
+
+    private static var dipoles: [String: Double] = [:]
 }
 
 // MARK: - The builder
+
+/// (1.3.65) The last molecule's electrons, kept: worked out again only when its atoms, bonds or charge, or the ranking,
+/// change.
+final class LewisMemo {
+    private var key = ""
+    private var last = LResult()
+
+    func result(_ g: LGraph, _ mode: LewisSolver.Mode) -> LResult {
+        let k = g.topologyKey + "|\(mode)"
+        if k != key {
+            key = k
+            last = LewisSolver.solve(g, mode: mode)
+        }
+        return last
+    }
+}
 
 struct LewisMaker: View {
     var openIn3D: (LGraph, LStructure) -> Void
@@ -631,11 +671,13 @@ struct LewisMaker: View {
     @State private var charge = 0
     @State private var preset: String? = "H₂O"
     @ObservedObject private var tour = PTTour.shared
+    @State private var memo = LewisMemo()
 
     private static let outers = ["H", "O", "N", "C", "F", "Cl", "Br", "I", "S"]
 
     var body: some View {
-        let r = LewisSolver.solve(graph, mode: mode)
+        // (1.3.65) worked out when the molecule or the ranking changes, not each time the builder draws
+        let r = memo.result(graph, mode)
         PTWorkLayout {
             controls
         } centre: {

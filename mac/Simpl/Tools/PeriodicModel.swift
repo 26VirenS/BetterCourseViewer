@@ -124,7 +124,9 @@ enum PTColouring: String, CaseIterable, Identifiable {
     }
 
     /// The value as the cell and the card show it.
-    func text(_ e: PTElement) -> String {
+    func text(_ e: PTElement) -> String { PTColouring.texts[self]?[e.number] ?? makeText(e) }
+
+    private func makeText(_ e: PTElement) -> String {
         switch self {
         case .category: return e.kind.label
         case .block: return "\(e.block)-block"
@@ -144,10 +146,17 @@ enum PTColouring: String, CaseIterable, Identifiable {
     /// Spread over a log scale (density, ionization: a few run far above the rest).
     private var logScale: Bool { self == .density }
 
-    private var range: (Double, Double) {
-        let vs = PeriodicTable.elements.compactMap { value($0) }.map { logScale ? log10(max($0, 1e-4)) : $0 }
-        return (vs.min() ?? 0, vs.max() ?? 1)
-    }
+    /// (1.3.65) Each view's scale, worked out once — it was worked out again for every cell, every time the table drew.
+    private static let ranges: [PTColouring: (Double, Double)] = {
+        var out: [PTColouring: (Double, Double)] = [:]
+        for c in PTColouring.allCases {
+            let vs = PeriodicTable.elements.compactMap { c.value($0) }.map { c.logScale ? log10(max($0, 1e-4)) : $0 }
+            out[c] = (vs.min() ?? 0, vs.max() ?? 1)
+        }
+        return out
+    }()
+
+    private var range: (Double, Double) { PTColouring.ranges[self] ?? (0, 1) }
 
     /// Where a value falls on the scale, 0…1.
     func fraction(_ e: PTElement) -> Double? {
@@ -157,8 +166,17 @@ enum PTColouring: String, CaseIterable, Identifiable {
         return hi > lo ? min(max((x - lo) / (hi - lo), 0), 1) : 0.5
     }
 
-    var lowText: String { PeriodicTable.elements.compactMap { value($0) }.min().map { PTColouring.short($0) } ?? "" }
-    var highText: String { PeriodicTable.elements.compactMap { value($0) }.max().map { PTColouring.short($0) } ?? "" }
+    private static let ends: [PTColouring: (String, String)] = {
+        var out: [PTColouring: (String, String)] = [:]
+        for c in PTColouring.allCases {
+            let vs = PeriodicTable.elements.compactMap { c.value($0) }
+            out[c] = (vs.min().map { PTColouring.short($0) } ?? "", vs.max().map { PTColouring.short($0) } ?? "")
+        }
+        return out
+    }()
+
+    var lowText: String { PTColouring.ends[self]?.0 ?? "" }
+    var highText: String { PTColouring.ends[self]?.1 ?? "" }
 
     /// The colour of a fraction of the scale: deep blue (low) through teal and green to amber and red (high).
     static func ramp(_ t: Double) -> Color {
@@ -173,8 +191,31 @@ enum PTColouring: String, CaseIterable, Identifiable {
     static let blockColors: [String: String] = ["s": "#c0392b", "p": "#c9a227", "d": "#2e86c1", "f": "#27ae60"]
     static let stateColors: [String: String] = ["Solid": "#5d6d7e", "Liquid": "#2e86c1", "Gas": "#17a589"]
 
+    /// (1.3.65) Every element's colour and words under every view, made once (a cell asks for them each time it draws).
+    private static let colours: [PTColouring: [Int: Color]] = {
+        var out: [PTColouring: [Int: Color]] = [:]
+        for c in PTColouring.allCases {
+            var m: [Int: Color] = [:]
+            for e in PeriodicTable.elements { m[e.number] = c.makeColor(e) }
+            out[c] = m
+        }
+        return out
+    }()
+
+    private static let texts: [PTColouring: [Int: String]] = {
+        var out: [PTColouring: [Int: String]] = [:]
+        for c in PTColouring.allCases {
+            var m: [Int: String] = [:]
+            for e in PeriodicTable.elements { m[e.number] = c.makeText(e) }
+            out[c] = m
+        }
+        return out
+    }()
+
     /// An element's colour under this view.
-    func color(_ e: PTElement) -> Color {
+    func color(_ e: PTElement) -> Color { PTColouring.colours[self]?[e.number] ?? makeColor(e) }
+
+    private func makeColor(_ e: PTElement) -> Color {
         switch self {
         case .category: return e.kind.color
         case .block: return Color(hex: PTColouring.blockColors[e.block] ?? "#8e8e93")
@@ -249,7 +290,18 @@ enum PTConfig {
     }
 
     /// Every subshell, the noble-gas core written out, in order of n then l.
+    /// (1.3.65) each element's subshells worked out once (an element's page asks for them many times as it draws)
+    private static var subshellCache: [Int: [PTSubshell]] = [:]
+    private static var valenceCache: [Int: [PTSubshell]] = [:]
+
     static func subshells(of e: PTElement) -> [PTSubshell] {
+        if let c = subshellCache[e.number] { return c }
+        let out = makeSubshells(e)
+        subshellCache[e.number] = out
+        return out
+    }
+
+    private static func makeSubshells(_ e: PTElement) -> [PTSubshell] {
         var all = expand(e.config, depth: 0)
         var merged: [String: PTSubshell] = [:]
         for s in all { merged[s.id] = PTSubshell(n: s.n, l: s.l, count: (merged[s.id]?.count ?? 0) + s.count) }
@@ -268,8 +320,11 @@ enum PTConfig {
 
     /// The outer subshells (those written after the noble-gas core).
     static func valence(of e: PTElement) -> [PTSubshell] {
+        if let c = valenceCache[e.number] { return c }
         let p = parts(e.config)
-        return p.subs.isEmpty ? subshells(of: e) : p.subs
+        let out = p.subs.isEmpty ? subshells(of: e) : p.subs
+        valenceCache[e.number] = out
+        return out
     }
 
     static func superscript(_ n: Int) -> String {

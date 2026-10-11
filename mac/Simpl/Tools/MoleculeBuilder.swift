@@ -618,6 +618,8 @@ struct MoleculeSceneView: NSViewRepresentable {
     final class Coordinator: NSObject {
         var model: MoleculeModel
         var framing = -1
+        /// (1.3.65) what the model was last drawn from: drawn again only when it changes
+        var drawn: Drawn?
         weak var view: SCNView?
         private var resume: DispatchWorkItem?
         init(model: MoleculeModel) { self.model = model }
@@ -706,10 +708,28 @@ struct MoleculeSceneView: NSViewRepresentable {
         update(v, context.coordinator)
     }
 
+    /// (1.3.65) Everything the model's picture is made from.
+    struct Drawn: Equatable {
+        let atoms: [MBAtom]
+        let bonds: [MBBond]
+        let lonePairs: [MBLonePair]
+        let style: MoleculeModel.Style
+        let labels: Bool
+        let showLone: Bool
+        let selected: Int?
+    }
+
     private func update(_ v: SCNView, _ c: Coordinator) {
         guard let root = v.scene?.rootNode, let spin = root.childNode(withName: "spin", recursively: false) else { return }
-        spin.childNodes.forEach { $0.removeFromParentNode() }
-        spin.addChildNode(MoleculeScene.node(model))
+        // (1.3.65) the atoms, bonds and lone pairs built again only when something they are made from has changed — not
+        // each time the builder draws (turning on or off, a hover, the facts beside it)
+        let now = Drawn(atoms: model.atoms, bonds: model.bonds, lonePairs: model.lonePairs, style: model.style,
+                        labels: model.showLabels, showLone: model.showLonePairs, selected: model.selected)
+        if c.drawn != now {
+            c.drawn = now
+            spin.childNodes.forEach { $0.removeFromParentNode() }
+            spin.addChildNode(MoleculeScene.node(model))
+        }
         if model.autoRotate {
             if spin.action(forKey: "turn") == nil { spin.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 14)), forKey: "turn") }
         } else {

@@ -226,6 +226,13 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (1.3.64) The header's search lists what it finds under the field (up to seven: each element's tile, name, number and
   kind; ↑ ↓ to move, Return or a press to open it, `PTSearch.pick`), over the tool. The tour ticks a step off when it is
   done ("Nice", green) and waits 1.6 seconds (2.2 after the last) before the next.
+  (1.3.65) Faster: each colour view's scale, and every element's colour and words under every view, are made once (the
+  scale was worked out over all 118 elements for every cell each time the table drew); an element is looked up by its
+  number; a cell is drawn again only when its element, size, view or marks change (`PTCell` Equatable); the Lewis
+  builder works out a molecule's electrons only when its atoms, bonds, charge or the ranking change, not when it is
+  moved about or the builder draws (`LewisMemo`, `LGraph.topologyKey`), and its polarity (a 3D build and 900 steps of
+  relaxing) once for each molecule and structure; the 3D builder's picture is built again only when what it is made of
+  changes; an element's subshells are worked out once; the tour's controls' places are told only while the tour is on.
 
 ## Building and running
 

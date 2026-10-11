@@ -87,10 +87,17 @@ final class PTTour: ObservableObject {
 final class PTTourFrames: ObservableObject {
     static let shared = PTTourFrames()
     @Published private(set) var frames: [String: CGRect] = [:]
+    /// (1.3.65) kept quietly while the tour is off (scrolling moves them all the time), told only while it is on
+    private var quiet: [String: CGRect] = [:]
 
     func set(_ id: String, _ rect: CGRect?) {
-        if frames[id] != rect { frames[id] = rect }
+        guard quiet[id] != rect else { return }
+        quiet[id] = rect
+        if PTTour.shared.active { frames[id] = rect }
     }
+
+    /// The tour beginning: where everything is now.
+    func wake() { if frames != quiet { frames = quiet } }
 }
 
 private struct TourTarget: ViewModifier {

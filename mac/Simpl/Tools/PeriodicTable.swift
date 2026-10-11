@@ -94,7 +94,9 @@ enum PeriodicTable {
                          melt: num(11), boil: num(12), density: num(13), found: str(14), x: x, y: y, summary: str(17) ?? "")
     }
 
-    static func byNumber(_ n: Int) -> PTElement? { elements.first { $0.number == n } }
+    /// (1.3.65) by number, looked up rather than searched for
+    private static let numbered: [Int: PTElement] = Dictionary(elements.map { ($0.number, $0) }, uniquingKeysWith: { a, _ in a })
+    static func byNumber(_ n: Int) -> PTElement? { numbered[n] }
 
     /// What a search finds, best first: a symbol, name or number exactly; then ones starting with it; then names holding it.
     static func find(_ q: String) -> [PTElement] {
@@ -157,6 +159,7 @@ struct PTGrid: View {
                     let x = CGFloat(e.x - 1) * (cell + gap)
                     let y = rowY(e.y, cell: cell, gap: gap)
                     PTCell(element: e, cell: cell, compact: compact, colouring: colouring, dimmed: dim(e), matched: matches?.contains(e.number) ?? false)
+                        .equatable()
                         .frame(width: cell, height: cell)
                         .tourTarget(!compact && e.number == 6 ? "ptCarbon" : nil)
                         .offset(x: x, y: y)
@@ -194,7 +197,14 @@ struct PTGrid: View {
 }
 
 /// One element's square: its number, symbol and — as the table is coloured — its name or its value.
-private struct PTCell: View {
+/// (1.3.65) Equatable: a cell whose element, size, view and marks are as they were is not drawn again when the table is
+/// (a hover elsewhere, the preview changing).
+private struct PTCell: View, Equatable {
+    static func == (a: PTCell, b: PTCell) -> Bool {
+        a.element.number == b.element.number && a.cell == b.cell && a.compact == b.compact && a.colouring == b.colouring
+            && a.dimmed == b.dimmed && a.matched == b.matched
+    }
+
     let element: PTElement
     let cell: CGFloat
     let compact: Bool
@@ -425,6 +435,7 @@ struct PeriodicTableTool: View {
         guard PTTourStep.all.indices.contains(i) else { return }
         let s = PTTourStep.all[i]
         PTTour.shared.active = true
+        PTTourFrames.shared.wake()
         PTTour.shared.clearEvent()
         tourStuck = false
         tourDone = false
