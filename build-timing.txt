@@ -1,0 +1,33 @@
+Build Timing Summary
+
+SwiftCompile (5 tasks) | 10.985 seconds
+
+SwiftEmitModule (1 task) | 4.674 seconds
+
+SwiftDriver (1 task) | 2.005 seconds
+
+Ld (3 tasks) | 1.437 seconds
+
+CodeSign (3 tasks) | 0.467 seconds
+
+RegisterWithLaunchServices (1 task) | 0.436 seconds
+
+ExtractAppIntentsMetadata (1 task) | 0.092 seconds
+
+CopySwiftLibs (1 task) | 0.066 seconds
+
+SwiftDriver Compilation (1 task) | 0.056 seconds
+
+ConstructStubExecutorLinkFileList (1 task) | 0.056 seconds
+
+ProcessInfoPlistFile (1 task) | 0.018 seconds
+
+Copy (3 tasks) | 0.016 seconds
+
+SwiftDriver Compilation Requirements (1 task) | 0.003 seconds
+
+Validate (1 task) | 0.001 seconds
+
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'Simpl' from project 'Simpl')
+** BUILD SUCCEEDED **
+

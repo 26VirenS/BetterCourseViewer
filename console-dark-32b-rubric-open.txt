@@ -1,0 +1,2 @@
+2026-10-11 00:42:38.569 Simpl[24173:64876] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/com.simplcourses.mac.savedState
+2026-10-11 00:42:42.600 Simpl[24173:64876] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
