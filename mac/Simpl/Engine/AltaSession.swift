@@ -215,7 +215,12 @@ enum AltaHook {
         var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *) { display: none !important; }\n'
           + 'html[data-simpl-q] [data-simpl-hide] { display: none !important; }\n'
           + 'html[data-simpl-q] [data-simpl-path]:not(html):not(body) { padding-top: 0 !important; margin-top: 0 !important; }\n'
-          + 'html[data-simpl-q] body { padding-top: 16px !important; }\n';
+          + 'html[data-simpl-q] body { padding-top: 16px !important; }\n'
+          // (1.3.49) laid on the popup's Liquid Glass: the page, the parts round the question and the question's own card
+          // draw no ground, shadow or outline of their own — the glass behind the page is the card. Everything in it
+          // (what it asks, its maths, Learnosity's answer box and keypad, Alta's buttons) is drawn as Alta draws it.
+          + 'html[data-simpl-q], html[data-simpl-q] body, html[data-simpl-q] [data-simpl-path] { background: transparent !important; box-shadow: none !important; }\n'
+          + 'html[data-simpl-q] section[data-simpl-keep], html[data-simpl-q] section[data-simpl-keep] > [class*="card"], html[data-simpl-q] section[data-simpl-keep] > [class*="card"]::before, html[data-simpl-q] section[data-simpl-keep] > [class*="card"]::after { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }\n';
         var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
         var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
         var title = function (sec) { var h = sec.querySelector('[class*="compound-header"] h2, [class*="compound-header"] h3, h2[class*="content-title"]'); return h ? txt(h) : ''; };
@@ -270,7 +275,8 @@ enum AltaHook {
           });
           keptNow = keep;
           var st = document.getElementById('simpl-focus');
-          if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; st.textContent = FOCUS; (document.head || document.documentElement).appendChild(st); }
+          if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; (document.head || document.documentElement).appendChild(st); }
+          if (st.textContent !== FOCUS) st.textContent = FOCUS;
           document.documentElement.setAttribute('data-simpl-q', '');
         };
         var told = '', badSince = 0, timer = null, wasQuestion = false;
@@ -403,6 +409,8 @@ final class AltaSession: ObservableObject {
     /// (1.3.47) How Alta's page is shown: "question" or "lesson" (its parts alone), "overview", or — not recognised —
     /// "unknown" / "none", when it is shown as it is.
     @Published private(set) var focusState = ""
+    /// (1.3.49) Alta's question (or lesson) is shown alone: laid on Liquid Glass.
+    var focused: Bool { focusState == "question" || focusState == "lesson" }
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
     @Published private(set) var errorLogs: [String] = []
 
@@ -419,6 +427,7 @@ final class AltaSession: ObservableObject {
         relay = r
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
         web.isInspectable = true
+        web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
         r.session = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
             let done = !w.isLoading && w.url != nil

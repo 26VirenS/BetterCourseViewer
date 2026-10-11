@@ -87,6 +87,12 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Continue: every part of the learn page is now kept — a question, a lesson, or a lesson above the question — so
   Alta's header stays hidden through lessons; only a learn page with no part (or a page that is not one) is given back
   as it is.
+  (1.3.49) The question (or lesson) is laid on Liquid Glass and still drawn wholly by Alta: while it is shown alone, the
+  focus style sheet clears the ground and shadow of the page, of every ancestor of the parts kept and of each part's
+  card, and the web view draws no background of its own, so the popup's glass panel (`glassCard`, radius 22, light even
+  in dark mode — as Alta's dark text and white answer boxes need — and whiter there) is the card. Nothing inside the part
+  is restyled: its words, MathJax, Learnosity's answer box and keypad, Alta's buttons. Alta's page as it is (not
+  recognised) is shown edge to edge on white, with its own ground.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

@@ -90,6 +90,14 @@ try {
   const top = await page.$eval('#qsec', (e) => Math.round(e.getBoundingClientRect().top));
   check(top < 60, `the question sits at the top, no gap above it (${top}px)`);
   check(await page.evaluate(() => { const q = document.getElementById('qsec'); return q.getAttribute('style') === null && !document.querySelector('[style*="-10000px"]'); }), 'nothing of Alta’s is moved or restyled: only hidden by marks and a style sheet');
+  // (1.3.49) laid on the popup's glass: no ground of the page's, its parts' or the question card's — Alta's own answer box keeps its
+  const clear = await page.evaluate(() => {
+    const bg = (el) => getComputedStyle(el).backgroundColor, sh = (el) => getComputedStyle(el).boxShadow;
+    const card = document.querySelector('#qsec > .theme__card___3E6YM');
+    return { html: bg(document.documentElement), body: bg(document.body), path: [...document.querySelectorAll('[data-simpl-path]')].every((e) => bg(e) === 'rgba(0, 0, 0, 0)'), card: bg(card), cardShadow: sh(card) };
+  });
+  check(clear.html === 'rgba(0, 0, 0, 0)' && clear.body === 'rgba(0, 0, 0, 0)' && clear.path && clear.card === 'rgba(0, 0, 0, 0)' && clear.cardShadow === 'none',
+    `the page, the parts round the question and its card draw no ground, so the popup’s glass shows through (${JSON.stringify(clear)})`);
   // typing and scrolling are left alone
   await page.setViewportSize({ width: 900, height: 200 });
   await page.evaluate(() => window.scrollTo(0, 120));
@@ -119,8 +127,8 @@ try {
   await page.waitForTimeout(400);
   check(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q')), 'a moment’s grace first (Alta between parts)');
   const bad = await waitFor((p, k) => k >= nb && p.kind === 'focus' && p.state === 'unknown', 'the page not recognised');
-  check((await vis('header')) && (await vis('h1')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))),
-    'then Alta’s page is given back as it is');
+  check((await vis('header')) && (await vis('h1')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && (await page.evaluate(() => getComputedStyle(document.body).backgroundColor)) === 'rgb(238, 241, 244)',
+    'then Alta’s page is given back as it is, its own ground too');
   check(/no part/.test(bad.reason) && bad.shape.buttons.includes('back to top') && Array.isArray(bad.shape.flow) && !JSON.stringify(bad.shape).includes('derivative of f'),
     `and the app is told why, with what the page held — its makeup, its buttons — never the question (“${bad.reason}”)`);
   const nr = (await posts()).length;

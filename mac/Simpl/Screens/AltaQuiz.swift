@@ -10,6 +10,7 @@ import WebKit
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var scheme
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
     @State private var saving = false
@@ -160,7 +161,24 @@ struct AltaQuizScreen: View {
 
     private var page: some View {
         ZStack {
+            // (1.3.49) Alta's question laid on Liquid Glass: its page draws no ground of its own (the page script clears
+            // the page's, its parts' and the question card's), so the glass behind is the card; everything in it is
+            // drawn by Alta. The glass is light even in dark mode, as Alta's dark text and white answer boxes need, and
+            // whiter in dark mode, over the dark popup. Alta's page as it is (not recognised): edge to edge, on white.
+            let glassy = session.focused
             AltaPageHost(web: session.web)
+                .padding(glassy ? 12 : 0)
+                .background {
+                    if glassy {
+                        Rectangle().fill(Color.clear)
+                            .glassCard(radius: 22, tint: Color.white.opacity(scheme == .dark ? 0.6 : 0.3))
+                            .environment(\.colorScheme, .light)
+                    } else {
+                        Color.white
+                    }
+                }
+                .padding(glassy ? 18 : 0)
+                .animation(Motion.gentle, value: glassy)
             if let why = session.failure {
                 ZStack {
                     PageGround()
