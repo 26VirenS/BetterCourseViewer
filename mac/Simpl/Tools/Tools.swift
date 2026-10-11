@@ -431,6 +431,8 @@ struct ToolHeader: View {
             } label: {
                 Label(tools.isPinned(kind) ? "Pinned" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.fill" : "pin")
                     .font(.sCallout.weight(.medium))
+                    // (1.3.62) the Periodic Table's header full of its own controls: its pin a symbol alone
+                    .labelStyle(SquishLabel(squished: kind == .ptable))
             }
             .glassButton(prominent: tools.isPinned(kind))
             .tint(kind.color)

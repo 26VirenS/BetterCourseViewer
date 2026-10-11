@@ -752,14 +752,28 @@ struct PTHeaderControls: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            // (their words where the header has room — and the search is shut — else their symbols)
+            ViewThatFits(in: .horizontal) {
+                pages(squished: searching)
+                pages(squished: true)
+            }
+            searchControl.tourTarget("ptSearch")
+        }
+        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: searching)
+        .onChange(of: focused) { _, f in
+            if !f && search.query.isEmpty { searching = false }
+        }
+    }
+
+    private func pages(squished: Bool) -> some View {
+        HStack(spacing: 8) {
             GlassGroup(spacing: 6) {
                 HStack(spacing: 6) {
                     ForEach(PeriodicTableTool.Page.allCases) { p in
                         Button {
                             withAnimation(Motion.gentle) { nav.page = p }
                         } label: {
-                            Label(p.label, systemImage: p.symbol)
-                                .labelStyle(SquishLabel(squished: searching))
+                            Label(p.label, systemImage: p.symbol).labelStyle(SquishLabel(squished: squished))
                         }
                         .glassButton(prominent: nav.page == p)
                         .controlSize(.large)
@@ -769,17 +783,13 @@ struct PTHeaderControls: View {
                 }
             }
             Button { nav.tourAsked += 1 } label: {
-                Label("Tour", systemImage: "questionmark.circle").labelStyle(SquishLabel(squished: searching))
+                Label("Tour", systemImage: "questionmark.circle").labelStyle(SquishLabel(squished: squished))
             }
             .glassButton()
             .controlSize(.large)
             .help("A short tour of the table and its builders")
-            searchControl.tourTarget("ptSearch")
         }
-        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: searching)
-        .onChange(of: focused) { _, f in
-            if !f && search.query.isEmpty { searching = false }
-        }
+        .fixedSize()
     }
 
     @ViewBuilder
@@ -826,7 +836,7 @@ struct PTHeaderControls: View {
 }
 
 /// A label that draws in to its symbol alone when room is wanted.
-private struct SquishLabel: LabelStyle {
+struct SquishLabel: LabelStyle {
     let squished: Bool
 
     func makeBody(configuration: Configuration) -> some View {
