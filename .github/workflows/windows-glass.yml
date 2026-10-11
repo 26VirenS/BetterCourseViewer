@@ -61,7 +61,7 @@ jobs:
           ls -la LiquidGlass-liquidImgui-win64.zip
       - name: Does it start? (run for a while, a picture of the screen)
         shell: pwsh
-        run: ./windows-glass/ci/smoke.ps1 -Exe dist/LiquidGlass-liquidImgui/LiquidGlass.exe -Shot shot-liquidimgui.png
+        run: ./windows-glass/ci/smoke.ps1 -Exe dist/LiquidGlass-liquidImgui/LiquidGlass.exe -Shot shot-liquidimgui.png -Keys "{F11}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
