@@ -5,19 +5,13 @@ import WebKit
 /// (1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (QuizScreen): Close and the
 /// assignment's name across the top; down the left, its objectives as the quiz's question tiles — the one being worked
 /// on filled, a mastered one ticked, the others filling as they are mastered — with each by name, and the total
-/// mastery bar; in the rest, the question, drawn by the app, with Check and then Alta's verdict and Continue in the
-/// floating bar at the foot. A question the app does not draw itself (a graph, a drag and drop, any other kind) shows
-/// Alta's own question in its place, alone (1.3.21), and a lesson Alta's own page. AltaSession.swift keeps Alta open
-/// out of sight and talks to it.
+/// mastery bar. (1.3.45) In the rest, Alta's own page, as it is: the student works on it there. AltaSession.swift reads
+/// the objectives and their mastery from it.
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var scheme
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
-    @State private var copied = false
-    @State private var shooting = false
-    @State private var shot: URL?
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -40,29 +34,14 @@ struct AltaQuizScreen: View {
                 AltaRail(session: session)
                     .frame(width: ideal.width >= 960 ? 290 : 240)
                 Divider()
-                questionArea
+                page
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(width: ideal.width, height: ideal.height)
         .background(PageGround())
         .tint(Theme.accent)
-        .task {
-            session.appearance(dark: scheme == .dark)
-            await session.start(engine: engine)
-        }
-        .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
-        .alert("Screenshot saved", isPresented: Binding(get: { shot != nil }, set: { if !$0 { shot = nil } })) {
-            Button("Show in Finder") { if let shot { NSWorkspace.shared.activateFileViewerSelecting([shot]) } }
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Alta's whole page, top to bottom, is in Downloads as “\(shot?.lastPathComponent ?? "")” and copied, ready to paste into a message.")
-        }
-        .alert("Alta details copied", isPresented: $copied) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Paste them into a bug report or a message. They hold the addresses of Alta's pages, the names of the fields in its answers and its buttons' words — no answers, nothing of yours.")
-        }
+        .task { await session.start(engine: engine) }
     }
 
     // MARK: The top
@@ -86,58 +65,11 @@ struct AltaQuizScreen: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            GlassGroup(spacing: 8) {
-                Button {
-                    withAnimation(Motion.gentle) { session.togglePage() }
-                } label: {
-                    Label(session.seesWholePage ? "Show Question" : "Alta's Page", systemImage: session.seesWholePage ? "list.bullet.rectangle" : "safari")
-                }
-                .glassButton()
-                .disabled(session.phase == .loading && !session.seesWholePage)
-                .help(session.seesWholePage ? "Back to the question" : "See this step on Alta's whole page")
-                Button { takeShot() } label: {
-                    if shooting {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label("Screenshot", systemImage: "camera.viewfinder")
-                    }
-                }
-                .labelStyle(.iconOnly)
-                .glassButton()
-                .disabled(shooting)
-                .help("Take a screenshot of Alta's whole page, top to bottom, to send at once")
-                Menu {
-                    Button("Take Full-Page Screenshot") { takeShot() }
-                        .disabled(shooting)
-                    Button("Copy Alta Details") {
-                        Task {
-                            copyToPasteboard(await session.diagnostics())
-                            copied = true
-                        }
-                    }
-                } label: {
-                    Label("More", systemImage: "ellipsis.circle")
-                }
-                .menuIndicator(.hidden)
-                .glassButton()
-                .help("More")
-            }
         }
         .controlSize(.large)
         .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
-    }
-
-    /// (1.3.21) Alta's whole page as one picture: saved to Downloads and copied.
-    private func takeShot() {
-        guard !shooting else { return }
-        shooting = true
-        Task {
-            let file = await session.fullPageShot()
-            shooting = false
-            if let file { shot = file } else { NSSound.beep() }
-        }
     }
 
     private var subtitle: String {
@@ -151,456 +83,33 @@ struct AltaQuizScreen: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: The question
+    // MARK: Alta's page
 
-    private var questionArea: some View {
+    private var page: some View {
         ZStack {
-            // Alta's page, always in the same place (so it is never loaded again): out of sight unless shown
-            // (1.3.43) Alta's question laid on Liquid Glass: the page draws no ground of its own, so the glass behind it is
-            // its card; Alta's whole page (Alta's Page) edge to edge, as it is
             AltaPageHost(web: session.web)
-                .clipShape(RoundedRectangle(cornerRadius: session.altaDrawn ? 22 : 0, style: .continuous))
-                .background {
-                    if session.altaDrawn {
-                        Rectangle().fill(Color.clear).glassCard(radius: 22)
-                    }
-                }
-                .padding(session.altaDrawn ? 18 : 0)
-                .opacity(session.showPage ? 1 : 0)
-                .allowsHitTesting(session.showPage)
-                .accessibilityHidden(!session.showPage)
-            if !session.showPage {
-                AltaQuestionPane(session: session)
-                    .transition(.opacity)
-            }
-            // (1.3.29) the maths still being set out on Alta's page: covered until it is, not shown as raw words
-            if session.typesetting {
+            if let why = session.failure {
                 ZStack {
                     PageGround()
-                    ProgressView("Setting out the maths…").font(.sBody)
+                    ContentUnavailableView("Knewton Alta could not be opened", systemImage: "exclamationmark.triangle", description: Text(why))
+                }
+            } else if session.opening {
+                ZStack {
+                    PageGround()
+                    ProgressView("Opening Knewton Alta…").font(.sBody)
                 }
                 .transition(.opacity)
             }
         }
-        // (1.3.25: in the bottom right corner)
-        // (1.3.37) Alta's notices (an objective completed…), its own way: a moment at the top, then gone
-        .overlay(alignment: .top) {
-            if let n = session.notice {
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
-                    Text(n).font(.sCallout.weight(.medium)).lineLimit(2)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassCapsule()
-                .padding(.top, 14)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .accessibilityElement(children: .combine)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if (!session.seesWholePage || session.phase == .feedback) && !(session.altaDrawn && session.altaDialog) { bar }
-        }
-        .animation(Motion.gentle, value: session.showPage)
-    }
-
-    @ViewBuilder
-    private var bar: some View {
-        switch session.phase {
-        case .answering, .checking:
-            // (1.3.36) a lesson alone on the page: never Check under it — its Continue, greyed out until Alta's is ready
-            if session.altaDrawn && session.altaShowingLesson {
-                if session.altaHasNext {
-                    QuizFloatingBar {
-                        Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
-                            .glassButton(prominent: true)
-                            .keyboardShortcut(.return, modifiers: .command)
-                            .disabled(!session.altaCanNext)
-                            .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
-                    }
-                }
-            // (1.3.28) a lesson of Alta's: its Continue, back to the question
-            } else if session.altaLesson {
-                QuizFloatingBar {
-                    Button { session.lessonContinue() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
-                        .glassButton(prominent: true)
-                        .keyboardShortcut(.return, modifiers: .command)
-                        .disabled(!session.altaCanNext) // (1.3.30: greyed out while Alta's own is — until the lesson is read)
-                        .help(session.altaCanNext ? "Done reading: on with the question" : "Read the lesson to the end first")
-                }
-            // (1.3.23: also under Alta's own answer box, whose Check this presses)
-            } else if session.altaDrawn || session.question?.kind != .page {
-                QuizFloatingBar {
-                    if session.altaDrawn && session.altaCanInstruct { instructButton }
-                    Button { session.check() } label: {
-                        if session.phase == .checking {
-                            ProgressView().controlSize(.small).frame(minWidth: 80)
-                        } else {
-                            Label("Check", systemImage: "checkmark.circle").frame(minWidth: 80)
-                        }
-                    }
-                    .glassButton(prominent: true)
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!session.canCheck)
-                    .help(session.altaDrawn && !session.canCheck && session.phase == .answering ? "Answer the question first" : "Check your answer with Alta")
-                }
-            }
-        case .feedback:
-            QuizFloatingBar {
-                if let v = session.verdict { AltaVerdictChip(verdict: v) }
-                if session.altaDrawn && session.altaCanInstruct { instructButton }
-                // (1.3.44) Alta's "Try again?" with no Continue of its own: another go at the same question
-                if session.wantsRetry {
-                    Button { session.next() } label: { Label("Try Again", systemImage: "arrow.counterclockwise").frame(minWidth: 90) }
-                        .glassButton(prominent: true)
-                        .keyboardShortcut(.return, modifiers: .command)
-                        .help("Answer the same question again")
-                } else {
-                    Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
-                        .glassButton(prominent: true)
-                        .keyboardShortcut(.return, modifiers: .command)
-                        .help("On to what Alta gives next")
-                }
-            }
-        default:
-            EmptyView()
-        }
     }
 }
 
-extension AltaQuizScreen {
-    /// (1.3.25) Alta's More Instruction, beside Check.
-    fileprivate var instructButton: some View {
-        Button { session.instruct() } label: { Label("More Instruction", systemImage: "book") }
-            .glassButton()
-            .help("Have Alta teach this objective")
-    }
-}
-
-/// Alta's page in the popup: the session's own web view, put where the question is.
+/// Alta's page in the popup: the session's own web view.
 private struct AltaPageHost: NSViewRepresentable {
     let web: WKWebView
 
     func makeNSView(context: Context) -> WKWebView { web }
     func updateNSView(_ v: WKWebView, context: Context) {}
-}
-
-// MARK: - The question pane
-
-/// The question as the quiz draws one: its heading, what it asks (its maths typeset), and its answer — option rows, blanks
-/// or a written answer — with what Alta said once it is checked.
-private struct AltaQuestionPane: View {
-    @ObservedObject var session: AltaSession
-    @EnvironmentObject private var engine: Engine
-    @State private var promptHeight: CGFloat = 24
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                switch session.phase {
-                case .failed(let why):
-                    ContentUnavailableView("Knewton Alta could not be opened", systemImage: "exclamationmark.triangle", description: Text(why))
-                        .frame(maxWidth: .infinity, minHeight: 320)
-                case .start:
-                    AltaStartCard(session: session)
-                case .loading, .moving:
-                    if session.report?.completed == true && session.phase == .loading {
-                        complete
-                    } else {
-                        ProgressView(session.phase == .moving ? "Getting the next question…" : "Opening Knewton Alta…")
-                            .font(.sBody)
-                            .frame(maxWidth: .infinity, minHeight: 320)
-                    }
-                default:
-                    if let q = session.question {
-                        header
-                        prompt(q)
-                        answer(q)
-                        if session.phase == .feedback, let v = session.verdict, !v.text.isEmpty {
-                            AltaVerdictCard(verdict: v)
-                        }
-                    } else if session.report?.completed == true {
-                        complete
-                    }
-                }
-            }
-            .frame(maxWidth: QuizLayout.column, alignment: .leading)
-            .padding(.horizontal, 56)
-            .padding(.top, 30)
-            .padding(.bottom, QuizLayout.barClearance)
-            .frame(maxWidth: .infinity)
-        }
-        .background(PageGround())
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("Question")
-                    .font(.sTitle)
-                    .tracking(-0.4)
-                if let name = session.report?.current.name, !name.isEmpty {
-                    Text(name)
-                        .font(.sBody)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                if (session.report?.current.source ?? "").uppercased() == "PRACTICE" {
-                    Text("Practice")
-                        .font(.sFootnote.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Theme.accent.opacity(0.14)))
-                }
-            }
-            Divider()
-        }
-    }
-
-    @ViewBuilder
-    private func prompt(_ q: AltaQuestion) -> some View {
-        let html = (q.kind == .blanks || q.kind == .dropdowns) ? (q.prompt ?? "") + AltaQuestionPane.marked(q.template ?? "", math: q.isMath) : (q.prompt ?? "")
-        if !html.isEmpty {
-            HTMLBlock(html: html, base: TeX.folder ?? engine.web.baseURL, size: 18, height: $promptHeight, math: true) { url in engine.openLink(url) }
-                .frame(height: promptHeight)
-        }
-    }
-
-    /// A cloze template with its blanks numbered (①, ②…) in place, for the fields under it.
-    static func marked(_ template: String, math: Bool = false) -> String {
-        // (1.3.20) a maths template (k'(1) = {{response}}) is TeX: the words round each blank typeset as maths
-        let raw = template.components(separatedBy: "{{response}}")
-        let parts = math && !template.contains("<") && !template.contains("$") && !template.contains("\\(")
-            ? raw.map { $0.trimmingCharacters(in: .whitespaces).isEmpty ? $0 : "$_\($0)$_" } : raw
-        guard parts.count > 1 else { return template }
-        var out = parts[0]
-        for k in 1..<parts.count {
-            out += "<span style=\"display:inline-block;min-width:2.2em;padding:0 6px;border-bottom:2px solid -apple-system-control-accent;text-align:center;font-weight:600;color:-apple-system-control-accent\">\(blankMark(k))</span>" + parts[k]
-        }
-        return "<div style=\"margin-top:12px\">\(out)</div>"
-    }
-
-    static func blankMark(_ k: Int) -> String {
-        let marks = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
-        return k >= 1 && k <= marks.count ? marks[k - 1] : "(\(k))"
-    }
-
-    @ViewBuilder
-    private func answer(_ q: AltaQuestion) -> some View {
-        let locked = session.phase != .answering
-        if q.isMath && (q.kind == .blanks || q.kind == .text) {
-            Label("Type maths as on a keyboard: / for a fraction, ^ for a power, sqrt(x) for a root, pi for π.", systemImage: "keyboard")
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
-        }
-        switch q.kind {
-        case .choice:
-            VStack(spacing: 6) {
-                ForEach(Array(q.options.enumerated()), id: \.offset) { k, o in
-                    let on = session.picks.contains(k)
-                    Button { session.toggle(k) } label: {
-                        AltaOptionRow(letter: String(Character(UnicodeScalar(UInt8(65 + min(k, 25))))), html: o.label, on: on, multiple: q.multiple)
-                    }
-                    .buttonStyle(AltaChoiceStyle(on: on))
-                    .disabled(locked)
-                    .keyboardShortcut(KeyEquivalent(Character(String(min(k + 1, 9)))), modifiers: []) // (1–9 pick, as in a quiz)
-                }
-            }
-            if q.multiple {
-                Text("Choose every answer that applies.")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-            }
-        case .blanks:
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(session.blanks.indices, id: \.self) { k in
-                    HStack(spacing: 12) {
-                        Text(AltaQuestionPane.blankMark(k + 1))
-                            .font(.sTitle3.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
-                            .frame(width: 28)
-                        TextField(q.isMath ? "Type your answer, like -3/2" : "Your answer", text: $session.blanks[k])
-                            .textFieldStyle(.roundedBorder)
-                            .font(.sBody)
-                            .disabled(locked)
-                            .onSubmit { session.check() }
-                    }
-                }
-            }
-        case .dropdowns:
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(session.drops.indices, id: \.self) { k in
-                    HStack(spacing: 12) {
-                        Text(AltaQuestionPane.blankMark(k + 1))
-                            .font(.sTitle3.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
-                            .frame(width: 28)
-                        Picker("Blank \(k + 1)", selection: $session.drops[k]) {
-                            Text("Select…").tag("")
-                            ForEach(q.choices.indices.contains(k) ? q.choices[k] : [], id: \.self) { c in Text(c).tag(c) }
-                        }
-                        .labelsHidden()
-                        .frame(maxWidth: 360, alignment: .leading)
-                        .disabled(locked)
-                    }
-                }
-            }
-        case .text:
-            TextField(q.isMath ? "Type your answer, like -3/2" : "Your answer", text: $session.blanks[0])
-                .textFieldStyle(.roundedBorder)
-                .font(.sBody)
-                .disabled(locked)
-                .onSubmit { session.check() }
-        case .longText:
-            TextEditor(text: $session.blanks[0])
-                .font(.sBody)
-                .frame(minHeight: 160)
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
-                .disabled(locked)
-        case .page:
-            EmptyView()
-        }
-    }
-
-    private var complete: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(Theme.accent)
-            Text("Assignment complete")
-                .font(.sTitle2)
-            Text("Every objective is mastered. Alta keeps your score; you can keep practicing.")
-                .font(.sBody)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Keep Practicing") { session.next() }
-                .glassButton(prominent: true)
-                .controlSize(.large)
-        }
-        .frame(maxWidth: .infinity, minHeight: 320)
-    }
-}
-
-/// An option's row, as the quiz's: its mark (a radio, or a box where several apply), its letter and its words.
-private struct AltaOptionRow: View {
-    let letter: String
-    let html: String
-    let on: Bool
-    let multiple: Bool
-    @EnvironmentObject private var engine: Engine
-    @State private var height: CGFloat = 22
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            AltaMark(on: on, multiple: multiple)
-            Text(letter)
-                .font(.sBody.weight(.semibold))
-                .foregroundStyle(on ? Theme.accent : Color.secondary)
-                .frame(minWidth: 18)
-            HTMLBlock(html: html, base: TeX.folder ?? engine.web.baseURL, size: 15, height: $height, math: true) { _ in }
-                .frame(height: height)
-                .allowsHitTesting(false)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-}
-
-/// A radio or a box as the Mac draws one.
-private struct AltaMark: View {
-    let on: Bool
-    let multiple: Bool
-
-    var body: some View {
-        let tint = Theme.accent
-        ZStack {
-            if multiple {
-                let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
-                shape.fill(on ? tint : Color(nsColor: .controlBackgroundColor))
-                shape.strokeBorder(on ? tint : Color.secondary.opacity(0.55), lineWidth: 1)
-                if on { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white) }
-            } else {
-                Circle().fill(on ? tint : Color(nsColor: .controlBackgroundColor))
-                Circle().strokeBorder(on ? tint : Color.secondary.opacity(0.55), lineWidth: 1)
-                if on { Circle().fill(Color.white).frame(width: 7, height: 7) }
-            }
-        }
-        .frame(width: 18, height: 18)
-        .animation(Motion.snappy, value: on)
-        .accessibilityHidden(true)
-    }
-}
-
-/// An option's row as a button: a soft wash under the pointer, the colour's once picked.
-private struct AltaChoiceStyle: ButtonStyle {
-    let on: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        ChoiceBody(configuration: configuration, on: on)
-    }
-
-    private struct ChoiceBody: View {
-        let configuration: ButtonStyleConfiguration
-        let on: Bool
-        @State private var hover = false
-
-        var body: some View {
-            let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-            let fill: Color = on ? Theme.accent.opacity(configuration.isPressed ? 0.22 : 0.14)
-                : (configuration.isPressed ? Color.primary.opacity(0.08) : Color.primary.opacity(hover ? 0.045 : 0))
-            configuration.label
-                .background(shape.fill(fill))
-                .contentShape(shape)
-                .animation(Motion.hover, value: hover)
-                .animation(Motion.snappy, value: on)
-                .onHover { hover = $0 }
-        }
-    }
-}
-
-/// Alta's verdict in the bar: right, not right, or checked.
-private struct AltaVerdictChip: View {
-    let verdict: AltaVerdict
-
-    private var word: String { verdict.correct == true ? "Correct" : verdict.correct == false ? "Not quite" : "Checked" }
-    private var symbol: String { verdict.correct == true ? "checkmark.circle.fill" : verdict.correct == false ? "xmark.circle.fill" : "checkmark.circle" }
-    private var color: Color { verdict.correct == true ? .green : verdict.correct == false ? .orange : .secondary }
-
-    var body: some View {
-        Label(word, systemImage: symbol)
-            .font(.sBody.weight(.semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .glassCapsule(tint: color.opacity(0.25))
-    }
-}
-
-/// What Alta wrote back under the question (its explanation, a worked step), as it showed it.
-private struct AltaVerdictCard: View {
-    let verdict: AltaVerdict
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(verdict.correct == true ? "Correct" : verdict.correct == false ? "Not quite" : "From Alta",
-                  systemImage: verdict.correct == true ? "checkmark.circle.fill" : verdict.correct == false ? "xmark.circle.fill" : "info.circle")
-                .font(.sHeadline)
-                .foregroundStyle(verdict.correct == true ? Color.green : verdict.correct == false ? Color.orange : Color.secondary)
-            Text(verdict.text)
-                .font(.sBody)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .card(radius: 14)
-    }
 }
 
 // MARK: - The rail
@@ -760,84 +269,5 @@ private struct AltaMasteryBar: View {
         .animation(Motion.fill, value: value)
         .accessibilityLabel("Mastery")
         .accessibilityValue("\(Int((value * 100).rounded())) percent")
-    }
-}
-
-/// (1.3.17) The assignment before its first question, as a quiz's intro: whether it is started, when it is due, its
-/// objectives with Alta's estimate of the questions each takes, and Start (or Continue) — Alta's own button, pressed.
-private struct AltaStartCard: View {
-    @ObservedObject var session: AltaSession
-
-    var body: some View {
-        let o = session.overview
-        let list = o?.objectives ?? []
-        let low = list.compactMap(\.low).reduce(0, +)
-        let high = list.compactMap(\.high).reduce(0, +)
-        VStack(alignment: .leading, spacing: 26) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(o?.statusText ?? (o?.completed == true ? "Complete" : o?.started == true ? "In progress" : "Not started"))
-                    .font(.sFootnote.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Theme.accent.opacity(0.14)))
-                Text(o?.name ?? session.launch.title)
-                    .font(.sTitle)
-                    .tracking(-0.4)
-                if let due = o?.due {
-                    Label("Due \(Date(timeIntervalSince1970: due / 1000).formatted(date: .complete, time: .shortened))", systemImage: "calendar")
-                        .font(.sBody)
-                        .foregroundStyle(.secondary)
-                } else if let words = o?.dueText, !words.isEmpty {
-                    Label("Due \(words)", systemImage: "calendar")
-                        .font(.sBody)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if !list.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Objectives").font(.sHeadline)
-                        Spacer(minLength: 8)
-                        if high > 0 {
-                            Text(low == high ? "About \(Int(low)) questions in all" : "About \(Int(low))–\(Int(high)) questions in all")
-                                .font(.sFootnote.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.bottom, 12)
-                    ForEach(Array(list.enumerated()), id: \.offset) { k, x in
-                        if k > 0 { Divider().padding(.leading, 40) }
-                        HStack(alignment: .firstTextBaseline, spacing: 14) {
-                            Text("\(k + 1)")
-                                .font(.sCallout.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(Theme.accent)
-                                .frame(width: 26, height: 26)
-                                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent.opacity(0.14)))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(x.name).font(.sBody)
-                                if let l = x.low, let h = x.high, h > 0 {
-                                    Text(l == h ? "About \(Int(l)) questions" : "About \(Int(l))–\(Int(h)) questions")
-                                        .font(.sFootnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 10)
-                    }
-                }
-                .padding(18)
-                .card(radius: 16)
-            }
-            Button { session.begin() } label: {
-                Label(session.startWord, systemImage: "play.fill").frame(minWidth: 140)
-            }
-            .glassButton(prominent: true)
-            .controlSize(.extraLarge)
-            .keyboardShortcut(.defaultAction)
-            .help("Begin with Alta: its first question opens here")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

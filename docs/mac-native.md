@@ -56,109 +56,24 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
 
-- **Knewton Alta as a quiz (1.3.17, Mac only).** Open Tool on a Knewton Alta assignment (the engine's `alta`: its launch
-  address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): the objectives down the left
-  as the quiz's tiles (the one being worked on filled, a mastered one ticked, the rest filling as they are mastered),
-  each by name with its own bar, and the total mastery bar; in the rest, the question drawn by the app — its maths
-  typeset with the KaTeX the app carries, a multiple choice as the quiz's option rows, blanks as fields, drop-downs as
-  menus, a written answer — with Check, Alta's verdict and its words, and Continue. Alta still sets and marks every
-  question: `Engine/AltaSession.swift` keeps Alta open, signed in through Canvas, on a page out of sight; a script in it
-  (`AltaHook`, Alta's hosts only) reads a copy of Alta's own `content` answer — never the answer key or who the student
-  is — puts the student's answer into Alta's question as a click or typing would, presses Alta's Check and Continue, and
-  reads the verdict back. A question the app does not draw (a Desmos graph, a formula, a lesson) shows Alta's own page
-  in its place, as does Alta's Page in the top bar. (1.3.18) Alta opens on the assignment's overview: the hook reads
-  whatever Alta's page reads there (the assignment, its objectives with their estimated questions, found by those fields)
-  and the popup shows a start screen — status, due date, the objectives, and Start or Continue, which presses Alta's
-  own — in place of Alta's page; the rail fills from it before the first question. (1.3.19) A school's Alta can draw
-  its overview without an answer naming the objectives, and its START as a link in a web component: the script runs in
-  every page of the hidden view (Alta's site names are not guessed), finds buttons by their words wherever they are
-  (shadow trees included), and reads the overview from the page's own words when it must (the title, DUE DATE, STATUS,
-  each "Estimated 4 - 9 questions" and the objective under it). *Copy Alta Details* (the popup's More menu) copies what
-  it saw — page addresses without queries, the field names of Alta's answers (never values), the buttons' words — for a
-  school whose Alta still differs. (1.3.20) Maths answers (Learnosity's formula fields, `clozeformula`, `formulaV2`) are
-  drawn too: the template's words typeset round a field the student types in as on a keyboard (/, ^, sqrt), put into
-  Alta's field through MathQuill (its API when the page offers it, else its own text box). Alta's welcome pop-ups are put
-  away by their own Got it (only inside a dialog). Objective names missing from Alta's answers come from the overview, by
-  place. (1.3.21, a beta) Any other kind of question (a graph, a drag and drop, any widget) is Alta's own, shown alone:
-  the page script hides (inline `display: none`, put back exactly) everything off the paths from Learnosity's question
-  element, Check/Next/help buttons, dialogs and feedback up to the body, worked out again whenever the page changes; a
-  question inside an inner frame leaves its outer page holding only that frame. *Alta's Page* shows the page whole.
-  Alta's own Check pressed there is heard too. The rail's mastery takes the newest word from any of Alta's answers (a
-  checked answer's `statusAndProgress`, not only `content`'s) and from Alta's own progress bars and "Mastery N%". The
-  camera button (and More ▸ Take Full-Page Screenshot) scrolls Alta's whole page a screenful at a time, stitches it into
-  one PNG in Downloads and copies it. (1.3.22) Shown alone, the question keeps the smallest part of the page holding
-  Learnosity's element, Alta's Check/Next (greyed out or not) and the words it asks (found by a run of the prompt's
-  plain text); a question is drawn by its Learnosity type unless Alta calls it a lesson, video or example. Copy Alta
-  Details adds the question's type and how it was drawn, the rail, and the page's elements round the question (class
-  names only). (1.3.23) Every question is answered in Alta's own answer box (Learnosity's maths field, choices, blanks,
-  graphs), shown alone and recoloured by `AltaTheme` (light or dark as the app is, its accent; a weightless `:where()`
-  base so the answer box's rules win; the web view draws no ground of its own). Alta's Check and Next are moved aside
-  (still pressed, programmatically) and the popup's bar presses them; the page script says when the question is found
-  and when its Check is ready. If Alta's box is not found in 6 s, the popup draws the question itself as before. The
-  overview's objectives (names, "Estimated N - M questions") are kept per assignment and name the rail's objectives,
-  lined up by the one on screen, and give its estimate. (1.3.24) The trim is worked out again only for changes outside
-  what is kept (typing, a maths field's blinking cursor no longer re-trim it, which threw the page back to its top), and
-  holds every scrolled ancestor's position through it; Alta's maths keypad (`[class*=keyboard|keypad]`) is left out of
-  the theme, only inverted in dark mode (1.3.24 was not released; it went out in 1.3.25). (1.3.25) Alta's Feedback
-  button is put away and its More Instruction moved aside, pressed from the popup's bar beside Check; the bar sits in the
-  bottom right corner. (1.3.26) Alta's pop-ups (More Instruction's Having trouble?) take the app's page colour as
-  their ground (resolved light or dark at the time), so the question no longer shows through; the bar is put away while
-  one is open. (1.3.28; 1.3.27 went out in it) Alta's lessons (More Instruction ▸ View Instruction) are shown alone like
-  a question — the smallest part holding the lesson's words and its Continue, else the nearest part round Continue with
-  something to read — and the bar offers Continue; any of Alta's buttons the bar stands for still in sight brings a
-  fresh trim. (1.3.29) Typeset maths (MathJax 2's `MathJax_CHTML`/`mjx-*`, MathJax 3, KaTeX, MathQuill) is left
-  wholly out of the theme's base rule — its own fonts kept, only the text's colour — and maths still in raw TeX in what is
-  shown (not MathQuill's hidden copy, MathJax's source or KaTeX's) is covered with "Setting out the maths…" for up to
-  10 s. The bar offers Continue whenever Alta's Continue can be pressed and its Check cannot. (1.3.30) The trim never
-  hides a typesetter's own helpers (MathJax 2's `MathJax_Hidden`, `MathJax_Font_Test`: by id or class) or anything
-  already invisible — hidden, MathJax could not measure its fonts, waited long and set the maths out wrong; raw maths
-  counts MathJax's preview and a busy MathJax queue; the lesson's Continue shows whenever it is on the page, greyed out
-  until Alta's is ready; Copy Alta Details marks greyed-out buttons. (1.3.31) After a lesson's Continue, Alta puts the
-  question under the lesson on the same page: the popup goes on as soon as the question is there (no wait for a new
-  question from Alta's answers), keeps the question with its own card ("Question…", when its words were not found)
-  and hides the lesson; the bar's View Instruction shows the lesson again in its place and Back to Question the
-  question. Hidden parts are put back only where the page has not changed them since. (1.3.33) The question's own card
-  (beginning "Question", long with its maths) is never taken for the lesson above it. (1.3.34) Alta may send a lesson
-  and its question in one answer, the lesson first: the question is taken as the first state that is a question (not
-  a lesson, video or example), from any answer of Alta's carrying states; an answer without the objectives keeps the
-  last ones. Copy Alta Details lists each answer's states by purpose / dataType / question type (nothing in them).
-  (1.3.35) Alta keeps the question on the page under a lesson: a lesson newly come above it is shown in its place by
-  the page script itself (it flashed, then the question was kept again), the view passed to the app; the bar has the
-  lesson's Continue and Back to Question. Done with a lesson (its Continue, Back to Question), what is left above in the
-  next 10 s is noted, not shown. The app sends a view only when the student picks one. (1.3.36) The theme keeps
-  background images (a video's poster and play button are drawn so) and leaves video players wholly alone
-  (`[class*=video|player|kaltura|vjs]`); while a lesson is what is shown (in the question's place, or alone), the bar
-  never offers Check — its Continue (greyed out until Alta's is ready) and Back to Question when there is a question.
-  (1.3.37) Simpler: a lesson above the question is kept with the question under it, top to bottom (found first, its own
-  Continue and words not taken for the question's; the two kept apart, not all between them); no lesson view, View
-  Instruction or Back to Question. Alta's notices with a Dismiss (an objective completed) are put away by it and shown a
-  few seconds at the top of the popup's question area. (1.3.38, from a real Copy Alta Details) Alta's page has inner
-  pages with no question (Learnosity's helper, a Wiley chat): their "not found" came after the page's "found", so the
-  popup thought the question gone and drew it itself; an inner page now never says the question is missing, and the
-  app hears "not found" only from the main page. Alta's question card is a "Question" header, what it asks, and the
-  answer with its buttons, each a part of its own: the card is kept whole (the nearest part round the answer beginning
-  "Question"), and a lesson is looked for above the card, never in it. (1.3.39) Alta keeps each attempt's verdict on the
-  page (Answer 1: That's incorrect… Answer 2: Perfect…): the verdict read is the newest mark or words on the page that
-  came after Check was pressed (a snapshot taken before the click), and Alta's own words count ("Perfect", "paying
-  off", "mistakes are part of learning"). (1.3.40) The top padding and margin of the page's parts round the kept
-  question (room for Alta's hidden header, title and objective card) are taken in, put back with the rest.
-  (1.3.41) A lesson is looked for only close round the question's card (it and two parts up — where Alta puts one,
-  in the same flow), never in anything naming "Current objective" or the mastery: Alta's top, long with an
-  objective's words, was taken for a lesson and kept. Copy Alta Details names what is taken for a lesson. (1.3.42, from
-  a real Copy Alta Details) The question's words are looked for within its card when it has one, and never in the
-  Current objective card: "Find the derivative of…" was found there first, and everything from it down was kept.
-  (1.3.43) Alta's question is laid on Liquid Glass: the hidden view sits inset in a glass panel (`glassCard`, radius
-  22, clipped to it), its page drawing no ground of its own; Alta's own card outline (`[class*=card]`) is taken away.
-  Alta's Page is still edge to edge, as it is.
-  (1.3.44) A wrong answer Alta wants tried again ("Sorry, that's incorrect. Try again?") has no Next: the bar offers
-  Try Again (Alta's own Try Again pressed if it has one) and the same question is answered again in its box. Before,
-  Continue found no Next to press and fell back to Alta's whole page.
+- **Knewton Alta (1.3.17, Mac only; cut back in 1.3.45).** Open Tool on a Knewton Alta assignment (the engine's
+  `alta`: its launch address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): Close and
+  the assignment's name, due date and Practice across the top; down the left, its objectives as the quiz's question
+  tiles (the one on screen filled, a mastered one ticked) with each by name and its own bar, the total mastery bar, and
+  Alta's estimate of the questions the current objective takes; in the rest, Alta's own page, as it is, signed in
+  through Canvas — the student works on it there. `Engine/AltaSession.swift` only reads: a script in every frame of
+  the popup's page (`AltaHook`) reads a copy of Alta's own answers as its page receives them (the assignment, its
+  objectives, each one's progress target, the objective on screen; never the question, the answer key or who the
+  student is), the overview's words ("Estimated 4 - 9 questions" and the objective under each) and Alta's own mastery
+  bars. Objective names missing from Alta's answers come from the overview (kept per assignment), by id or by place.
+  1.3.17–1.3.44 also drew each question in the popup, pressed Alta's Check and Continue, read its verdicts, picked the
+  question out of Alta's page and restyled it; 1.3.45 took all of that out (the releases stay up for a rollback).
+  `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
+  as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
   (`quizAssignment`), so a graded quiz shows its score wherever its card is, not only "Graded".
-  `scripts/dev/alta-test.mjs` drives the mock's Alta player
-  (`/mock-alta/…`) through it in Chromium; the popup is shot as `21a-alta`.
 
 ## Building and running
 
