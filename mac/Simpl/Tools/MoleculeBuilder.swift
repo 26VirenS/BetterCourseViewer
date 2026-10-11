@@ -667,7 +667,7 @@ struct MoleculeSceneView: NSViewRepresentable {
         if c.framing != model.framing, let cam = root.childNode(withName: "camera", recursively: false) {
             c.framing = model.framing
             let extent = model.atoms.map { simd_length($0.pos) }.max() ?? 1
-            cam.position = SCNVector3(0, 0, CGFloat(max(5, extent * 3.2 + 4)))
+            cam.position = SCNVector3(0, 0, CGFloat(max(3.6, extent * 2.3 + 2.4)))
             cam.eulerAngles = SCNVector3(0, 0, 0)
             spin.eulerAngles = SCNVector3(0, 0, 0)
             v.pointOfView = cam
@@ -681,7 +681,7 @@ enum MoleculeScene {
 
     static func radius(_ s: String, _ style: MoleculeModel.Style) -> Double {
         switch style {
-        case .ballStick: return 0.2 + 0.25 * MBChem.covalent(s)
+        case .ballStick: return 0.24 + 0.36 * MBChem.covalent(s)
         case .spaceFill: return MBChem.vdw(s) * 0.9
         case .sticks: return 0.13
         }

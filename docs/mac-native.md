@@ -111,6 +111,33 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
   (`quizAssignment`), so a graded quiz shows its score wherever its card is, not only "Graded".
 
+- **The full Periodic Table (1.3.52, Mac only).** `Tools/PeriodicTable.swift`: the table can be coloured by its kind,
+  electronegativity, atomic radius, ionization energy, electron affinity, melting or boiling point, density (log scale),
+  orbital block or state (`PTColouring`, `Tools/PeriodicModel.swift`), with the scale, each cell's value and, for the
+  properties with a simple trend, arrows across a period and up a group. The table's empty top shows the element under
+  the pointer only; a press opens the element's page (`Tools/PeriodicDetail.swift`), grown out of its square (a scale
+  transition anchored there): its atom in SceneKit (`Tools/Atom3D.swift`: the nucleus's protons and neutrons, at most 72
+  drawn, each shell a ring with its electrons going round) or its orbitals (each subshell's, side by side, lobes in two
+  phase colours, an empty one faint; the f shapes simplified), all turned and zoomed with the mouse; its facts; how it
+  ranks among all elements; its successive ionization energies (log scale, the jump into the core marked); its
+  configuration in full with orbital boxes (Hund's rule); where it sits; its neighbours; and its story. ← → step through
+  the elements, ⌘[ goes back. The extra data (ionization energies, affinity, radii, shells, CPK colours, appearance,
+  molar heat, named by) is `Tools/PeriodicExtraData.swift`, from the same Periodic-Table-JSON. The pin's small table
+  shows the element under the pointer and opens the full table on its page when pressed.
+  The *Lewis structure maker* (`Tools/LewisMaker.swift`): a central atom, the atoms round it and a charge give the
+  structure — single bonds to the centre, outer octets with lone pairs, the rest on the centre, outer lone pairs turned
+  into multiple bonds until the centre has its octet (B and Be left short), and from period 3 down bonds added while
+  that lowers the formal charges — and from it the electron groups, VSEPR shape and angle, polarity, formal charges and
+  octets, drawn on a canvas; *Open in 3D builder* hands it over. The *molecule builder* (`Tools/MoleculeBuilder.swift`):
+  atoms added to the selected one with a chosen bond order, hydrogen filled in, presets; shaped by forces (bond springs,
+  each atom's bonds and lone pairs — points of their own — pushing apart, lone pairs harder, non-bonded atoms kept
+  apart), so VSEPR shapes come out; SceneKit with camera control and click-to-select; ball and stick, space filling or
+  sticks; lone pairs, labels, turning by itself; its formula (Hill order), molar mass, counts, valence check, polarity
+  (from bond dipoles and lone pairs) and the selected atom's shape and bond angles as the model has them.
+  `scripts/dev/mac-shots.sh` pictures the table coloured by electronegativity with its trends, carbon's and iron's pages,
+  the Lewis maker and the builder (`-SimplPTColour`, `-SimplPTTrends`, `-SimplPTElement`, `-SimplPTPage`,
+  `-SimplPTMolecule`).
+
 ## Building and running
 
 ```
