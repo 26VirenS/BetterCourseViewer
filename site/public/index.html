@@ -137,6 +137,16 @@ svg { flex: none; }
 .hero__title { margin: 18px auto 0; font: 700 clamp(56px, 10.2vw, 116px)/1 var(--font-display); letter-spacing: -.045em; text-wrap: balance; }
 .hero__title .w { display: inline-block; }
 .hero__title .w + .w { margin-left: .22em; }
+/* "Make ___ Simpl.": the middle word turns over through subjects, each its own colour; its box eases to each word's
+   width (set by the script) so the words either side glide rather than jump */
+.hero__title { font-size: clamp(50px, 7.8vw, 98px); }
+.rot { position: relative; text-align: center; white-space: nowrap; }
+.rot__size { visibility: hidden; }
+.rot__word { position: absolute; left: 50%; top: 0; transform: translateX(-50%); color: var(--c); opacity: 0; }
+.rot__word.is-on { opacity: 1; }
+@media (prefers-color-scheme: dark) { .rot__word { color: var(--cd); } }
+@media (max-width: 720px) { .hero__title .w.rot { display: block; margin: 0 auto; } .hero__title .rot + .w { margin-left: 0; } }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .hero .sub { margin-top: 18px; }
 .hero .cta { margin-top: 34px; }
 .hero__fine { margin: 18px 0 0; font-size: 14px; color: var(--text-3); letter-spacing: 0; }
@@ -253,6 +263,11 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   .hero__fine { animation-delay: 580ms; }
   .stage__enter { animation: stage-in 1300ms var(--ease-out) 520ms both; }
   @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+  /* the word turning over: the old one lifts away and blurs, the new one rises in; the box eases between widths */
+  .js .rot { transition: width 700ms var(--ease-in-out); clip-path: inset(-1em -.06em -1em -.06em); }
+  .rot__word { transition: opacity 600ms var(--ease-out), transform 700ms var(--ease-out), filter 600ms var(--ease-out); }
+  .rot__word.is-in { transform: translate(-50%, .32em); filter: blur(6px); transition: none; }
+  .rot__word.is-out { opacity: 0; transform: translate(-50%, -.32em); filter: blur(6px); transition-duration: 450ms; }
   @keyframes stage-in { from { opacity: 0; transform: translateY(60px); } }
 
   /* the window lies back and comes flat as the page scrolls toward it */
@@ -326,7 +341,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   <section class="hero">
     <div class="wrap">
       <a class="hero__new" href="#more"><b>New</b> Simpl for Brightspace <svg aria-hidden="true"><use href="#i-fwd"/></svg></a>
-      <h1 class="hero__title"><span class="w" style="--i:0">Learning</span> <span class="w" style="--i:1">made</span> <span class="w" style="--i:2"><span class="accent">Simpl.</span></span></h1>
+      <h1 class="hero__title"><span class="w" style="--i:0">Make<span class="sr"> learning</span></span> <span class="w rot" style="--i:1" aria-hidden="true" data-rot><span class="rot__size">Learning</span><span class="rot__word is-on" style="--c:#d97a00;--cd:#ffb340">Learning</span><span class="rot__word" style="--c:#5856d6;--cd:#7d7aff">Math</span><span class="rot__word" style="--c:#1f9d48;--cd:#30d158">Science</span><span class="rot__word" style="--c:#a05a1c;--cd:#e0a66a">History</span><span class="rot__word" style="--c:#d70f4f;--cd:#ff6482">English</span><span class="rot__word" style="--c:#0a84b8;--cd:#64d2ff">Chemistry</span><span class="rot__word" style="--c:#4d8c0c;--cd:#a3e635">Biology</span><span class="rot__word" style="--c:#8a3fb5;--cd:#c77dff">Physics</span><span class="rot__word" style="--c:#d4380d;--cd:#ff7a45">Spanish</span><span class="rot__word" style="--c:#0f8f84;--cd:#40c8b4">Homework</span></span> <span class="w" style="--i:2"><span class="accent">Simpl.</span></span></h1>
       <p class="sub">Canvas and Brightspace, made simple.</p>
       <div class="cta">
         <a class="btn btn--blue" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
@@ -585,6 +600,36 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     }, { rootMargin: '0px 0px -10% 0px', threshold: 0.15 });
     reveals.forEach((el) => io.observe(el));
   } else reveals.forEach((el) => el.classList.add('is-in'));
+
+  // "Make ___ Simpl.": every 2.4s the next subject rises in as the last lifts away, the box easing to its width;
+  // still for reduced motion, paused while the page is hidden or the title is off screen
+  const rot = document.querySelector('[data-rot]');
+  if (rot && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const words = [...rot.querySelectorAll('.rot__word')];
+    const size = rot.querySelector('.rot__size');
+    let at = 0, seen = true, timer = 0;
+    const fit = () => { rot.style.width = `${words[at].offsetWidth}px`; };
+    const turn = () => {
+      const from = words[at];
+      at = (at + 1) % words.length;
+      const to = words[at];
+      from.classList.remove('is-on');
+      from.classList.add('is-out');
+      to.classList.remove('is-out');
+      to.classList.add('is-in');
+      to.getBoundingClientRect(); // (the start position takes before the move to it)
+      to.classList.remove('is-in');
+      to.classList.add('is-on');
+      size.textContent = to.textContent;
+      fit();
+    };
+    const tick = () => { if (seen && !document.hidden) turn(); timer = setTimeout(tick, 2400); };
+    fit();
+    addEventListener('resize', fit, { passive: true });
+    if (document.fonts) document.fonts.ready.then(fit);
+    if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => { seen = e.isIntersecting; }).observe(rot);
+    timer = setTimeout(tick, 2200);
+  }
 
   // Download for Mac: the button opens into its two choices — downward when the page has room below it, else upward
   const choosers = [...document.querySelectorAll('[data-macdl]')];
