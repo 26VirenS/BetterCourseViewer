@@ -12,6 +12,7 @@ enum MacWhatsNew {
         Release(version: "1.3.58", date: "2026-10-11", notes: [
             ReleaseNote(kind: "fixed", title: "Tidy builder controls", body: "The builders' left column fits its space, nothing cut off."),
             ReleaseNote(kind: "improved", title: "3D models turn", body: "A 3D molecule turns slowly from the start."),
+            ReleaseNote(kind: "improved", title: "Atoms in two columns", body: "The atoms round the centre in a compact grid."),
         ]),
         Release(version: "1.3.57", date: "2026-10-11", notes: [
             ReleaseNote(kind: "fixed", title: "Even element facts", body: "Every fact box one size; the atom's card its own height."),

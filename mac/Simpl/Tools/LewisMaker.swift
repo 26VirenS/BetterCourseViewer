@@ -693,21 +693,13 @@ struct LewisMaker: View {
                 buildQuick()
             }
             heading("Surrounding atoms")
-            VStack(spacing: 0) {
+            // (1.3.58) two columns of small cards: the element (a dot of its colour, the symbol in the text colour so a
+            // dark one stays readable) and its count
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(Self.outers, id: \.self) { s in
-                    HStack {
-                        Text(s).font(.sCallout.weight(.bold)).foregroundStyle(LChem.color(s))
-                        Spacer()
-                        stepper(value: counts[s] ?? 0, min: 0, max: 6) { v in
-                            counts[s] = v
-                            buildQuick()
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 12)
+                    outerCell(s)
                 }
             }
-            .card(radius: 14)
         }
     }
 
@@ -749,13 +741,32 @@ struct LewisMaker: View {
         }
     }
 
+    private func outerCell(_ s: String) -> some View {
+        let n = counts[s] ?? 0
+        let colour: Color = LChem.color(s)
+        return HStack(spacing: 6) {
+            Circle().fill(colour).frame(width: 7, height: 7)
+            Text(s).font(.sCallout.weight(.bold)).frame(minWidth: 18, alignment: .leading)
+            Spacer(minLength: 2)
+            stepper(value: n, min: 0, max: 6) { v in
+                counts[s] = v
+                buildQuick()
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .background(n > 0 ? Theme.accent.opacity(0.12) : Color.primary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
     private func stepper(value: Int, min lo: Int, max hi: Int, set: @escaping (Int) -> Void) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Button { set(Swift.max(lo, value - 1)) } label: { Image(systemName: "minus").frame(width: 22, height: 22) }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                 .disabled(value <= lo)
-            Text(value > 0 && lo < 0 ? "+\(value)" : "\(value)").font(.sCallout.monospacedDigit().weight(.semibold)).frame(width: 26)
+            Text(value > 0 && lo < 0 ? "+\(value)" : "\(value)").font(.sCallout.monospacedDigit().weight(.semibold)).frame(width: 20)
             Button { set(Swift.min(hi, value + 1)) } label: { Image(systemName: "plus").frame(width: 22, height: 22) }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
