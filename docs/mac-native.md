@@ -242,7 +242,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   courses — each course's own tabs, and the tools found only in its assignments and module items (native-app.js
   `externalTools`: one row a tool, named as the web's search names it, hub.js `toolNameOf`, else by its site) — a card a
   tool with its site, where it is found, and a button for each course it is in, opening it there (by its tab, else an
-  assignment, else a module item; Knewton Alta and Macmillan in their own popups). A filter narrows them.
+  assignment, else a module item; Knewton Alta and Macmillan in their own popups). A filter on the page narrows them
+  (not a toolbar search field: the window's toolbar has the app's own, and a second one crashed it).
 
 ## Building and running
 

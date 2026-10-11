@@ -41,7 +41,18 @@ struct ExternalToolsView: View {
                         .background(PageGround())
                 } else {
                     Page {
-                        ScreenHeading(title: "External Tools", sub: d.sub ?? "")
+                        HStack(alignment: .bottom, spacing: 16) {
+                            ScreenHeading(title: "External Tools", sub: d.sub ?? "")
+                            Spacer(minLength: 12)
+                            // (the filter on the page: the window's toolbar already has the app's own search field)
+                            HStack(spacing: 6) {
+                                Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
+                                TextField("Filter tools", text: $query).textFieldStyle(.plain).frame(width: 180)
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                        }
                         let shown = filtered(d.rows)
                         if shown.isEmpty {
                             Text("No tool matches “\(query)”.").font(.sBody).foregroundStyle(.secondary)
@@ -57,7 +68,6 @@ struct ExternalToolsView: View {
             }
         }
         .navigationTitle("External Tools")
-        .searchable(text: $query, placement: .toolbar, prompt: "Filter tools")
         .task(id: engine.dataVersion) { await load() }
     }
 
