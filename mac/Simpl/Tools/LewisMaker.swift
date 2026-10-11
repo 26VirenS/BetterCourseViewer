@@ -398,7 +398,11 @@ enum LewisSolver {
                 if e > LChem.maxElectrons(a.symbol) && LChem.period(a.symbol) > 2 { r.warnings.append("\(a.symbol) has \(e) electrons round it, more than it can hold.") }
             }
             if g.manual {
-                let placed = g.atoms.map { s.lone[$0.id] ?? 0 }.reduce(0, +) + 2 * g.bonds.map { s.orders[$0.id] ?? 1 }.reduce(0, +)
+                var lonePlaced = 0
+                for a in g.atoms { lonePlaced += s.lone[a.id] ?? 0 }
+                var bondPlaced = 0
+                for b in g.bonds { bondPlaced += s.orders[b.id] ?? 1 }
+                let placed: Int = lonePlaced + 2 * bondPlaced
                 if placed != r.totalElectrons { r.warnings.append("Electrons drawn: \(placed); the molecule has \(r.totalElectrons).") }
             }
         }
@@ -434,7 +438,9 @@ enum LewisSolver {
                 return
             }
             let e = edges[k]
-            let cap = min(3, (maxBonds[e.a] ?? 4) - (sums[e.a] ?? 0) + 1, (maxBonds[e.b] ?? 4) - (sums[e.b] ?? 0) + 1)
+            let roomA: Int = (maxBonds[e.a] ?? 4) - (sums[e.a] ?? 0) + 1
+            let roomB: Int = (maxBonds[e.b] ?? 4) - (sums[e.b] ?? 0) + 1
+            let cap = min(3, roomA, roomB)
             for o in 1...max(1, cap) {
                 if 2 * (used + o - 1) > total - 2 * edges.count { break }
                 orders[k] = o
@@ -1085,7 +1091,9 @@ struct LewisStructureCanvas: View {
     private var middle: CGPoint {
         guard !graph.atoms.isEmpty else { return .zero }
         let xs = graph.atoms.map(\.pos.x), ys = graph.atoms.map(\.pos.y)
-        return CGPoint(x: ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2, y: ((ys.min() ?? 0) + (ys.max() ?? 0)) / 2)
+        let x0: CGFloat = xs.min() ?? 0, x1: CGFloat = xs.max() ?? 0
+        let y0: CGFloat = ys.min() ?? 0, y1: CGFloat = ys.max() ?? 0
+        return CGPoint(x: (x0 + x1) / 2, y: (y0 + y1) / 2)
     }
 
     var body: some View {
@@ -1096,7 +1104,9 @@ struct LewisStructureCanvas: View {
     }
 
     static func point(_ p: CGPoint, _ size: CGSize, _ scale: CGFloat, _ centre: CGPoint) -> CGPoint {
-        CGPoint(x: size.width / 2 + (p.x - centre.x) * scale, y: size.height / 2 + (p.y - centre.y) * scale)
+        let x: CGFloat = size.width / 2 + (p.x - centre.x) * scale
+        let y: CGFloat = size.height / 2 + (p.y - centre.y) * scale
+        return CGPoint(x: x, y: y)
     }
 
     static func draw(_ ctx: inout GraphicsContext, size: CGSize, graph g: LGraph, structure s: LStructure?, result r: LResult, scale: CGFloat,
@@ -1121,8 +1131,10 @@ struct LewisStructureCanvas: View {
             let offsets: [CGFloat] = order <= 1 ? [0] : (order == 2 ? [-gap, gap] : [-gap * 1.6, 0, gap * 1.6])
             for o in offsets {
                 var path = Path()
-                path.move(to: CGPoint(x: p.x + ux * atomR - uy * o, y: p.y + uy * atomR + ux * o))
-                path.addLine(to: CGPoint(x: q.x - ux * atomR - uy * o, y: q.y - uy * atomR + ux * o))
+                let ax: CGFloat = ux * atomR - uy * o, ay: CGFloat = uy * atomR + ux * o
+                let bx: CGFloat = -ux * atomR - uy * o, by: CGFloat = -uy * atomR + ux * o
+                path.move(to: CGPoint(x: p.x + ax, y: p.y + ay))
+                path.addLine(to: CGPoint(x: q.x + bx, y: q.y + by))
                 ctx.stroke(path, with: .color(.primary.opacity(0.75)), style: StrokeStyle(lineWidth: 2.4 * line, lineCap: .round))
             }
         }
@@ -1163,7 +1175,8 @@ struct LewisStructureCanvas: View {
             let pts = ion.atoms.compactMap { at($0) }
             guard let minX = pts.map(\.x).min(), let maxX = pts.map(\.x).max(), let minY = pts.map(\.y).min(), let maxY = pts.map(\.y).max() else { continue }
             let pad: CGFloat = 36 * scale
-            let rect = CGRect(x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad)
+            let w: CGFloat = maxX - minX + 2 * pad, h: CGFloat = maxY - minY + 2 * pad
+            let rect = CGRect(x: minX - pad, y: minY - pad, width: w, height: h)
             if ion.atoms.count > 1 || ion.charge < 0 {
                 var path = Path()
                 path.move(to: CGPoint(x: rect.minX + 7, y: rect.minY))
@@ -1254,7 +1267,8 @@ struct LewisEditorCanvas: View {
             guard let x = graph.atom(b.a)?.pos, let y = graph.atom(b.b)?.pos else { continue }
             let dx = y.x - x.x, dy = y.y - x.y
             let l2 = max(dx * dx + dy * dy, 0.01)
-            let t = max(0, min(1, ((p.x - x.x) * dx + (p.y - x.y) * dy) / l2))
+            let dot: CGFloat = (p.x - x.x) * dx + (p.y - x.y) * dy
+            let t: CGFloat = max(0, min(1, dot / l2))
             let c = CGPoint(x: x.x + t * dx, y: x.y + t * dy)
             if hypot(c.x - p.x, c.y - p.y) < 8 && t > 0.15 && t < 0.85 { return b.id }
         }
