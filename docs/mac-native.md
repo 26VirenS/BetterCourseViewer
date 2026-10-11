@@ -68,6 +68,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   bars. Objective names missing from Alta's answers come from the overview (kept per assignment), by id or by place.
   1.3.17–1.3.44 also drew each question in the popup, pressed Alta's Check and Continue, read its verdicts, picked the
   question out of Alta's page and restyled it; 1.3.45 took all of that out (the releases stay up for a rollback).
+  (1.3.46) *Save Page Code* (top right) writes every bit of Alta's page code to one text file in Downloads: for the page
+  and each frame that ran the page script (each says so with a `frame` message), its HTML from `outerHTML`, each open
+  web component's own tree, the text of every `script[src]` and stylesheet it loads (fetched by the page; one that
+  cannot be read says why) and any style rules a script put in by hand. Addresses are written without their queries.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

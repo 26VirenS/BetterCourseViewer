@@ -12,6 +12,8 @@ struct AltaQuizScreen: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
+    @State private var saving = false
+    @State private var saved: URL?
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -42,6 +44,12 @@ struct AltaQuizScreen: View {
         .background(PageGround())
         .tint(Theme.accent)
         .task { await session.start(engine: engine) }
+        .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
+            Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Every bit of Alta's page code — the page, each frame in it, and the scripts and style sheets they load — is in Downloads as “\(saved?.lastPathComponent ?? "")”.")
+        }
     }
 
     // MARK: The top
@@ -65,11 +73,34 @@ struct AltaQuizScreen: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
+            // (1.3.46) all of Alta's page code, to one text file
+            GlassGroup(spacing: 8) {
+                Button { saveCode() } label: {
+                    if saving {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Save Page Code", systemImage: "curlybraces")
+                    }
+                }
+                .glassButton()
+                .disabled(saving || session.opening || session.failure != nil)
+                .help("Save every bit of Alta's page code — the page, its frames, their scripts and style sheets — to a text file in Downloads")
+            }
         }
         .controlSize(.large)
         .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
+    }
+
+    private func saveCode() {
+        guard !saving else { return }
+        saving = true
+        Task {
+            let file = await session.savePageCode()
+            saving = false
+            if let file { saved = file } else { NSSound.beep() }
+        }
     }
 
     private var subtitle: String {

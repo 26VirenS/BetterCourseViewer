@@ -15,6 +15,9 @@ const swift = readFileSync(join(ROOT, 'mac/Simpl/Engine/AltaSession.swift'), 'ut
 const m = /static let source = #"""\n([\s\S]*?)\n\s*"""#/.exec(swift);
 if (!m) { console.error('AltaHook.source not found in AltaSession.swift'); process.exit(1); }
 const source = m[1];
+const c = /static let collect = #"""\n([\s\S]*?)\n\s*"""#/.exec(swift);
+if (!c) { console.error('the Save Page Code script was not found in AltaSession.swift'); process.exit(1); }
+const collect = c[1];
 
 let failed = 0;
 const check = (ok, what) => { console.log(`  ${ok ? '✓' : '✗'} ${what}`); if (!ok) failed++; };
@@ -61,6 +64,17 @@ try {
     `on an overview drawn in words: its title, due date and status read (${w2.dueText} · ${w2.statusText})`);
   check(w2.objectives.length === 2 && w2.objectives[0].name === 'Combine the product and quotient rules' && w2.objectives[0].low === 4 && w2.objectives[0].high === 9 && w2.objectives[1].high === 6,
     `and its objectives, each under its “Estimated … questions” (${w2.objectives.map((o) => `${o.name} ${o.low}–${o.high}`).join(' · ')})`);
+
+  // (1.3.46) Save Page Code: the page's HTML, its web components' own trees, and each script and style sheet it loads
+  const code = await page.evaluate(`(async () => { ${collect} })()`);
+  check(code.url === `${BASE}/mock-alta/learn/course/c1/assignment/a2` && /^<!DOCTYPE html>\n<html/.test(code.html) && code.html.includes('Differentiation Rules 2'),
+    `Save Page Code takes the page’s whole HTML, its address without a query (${code.html.length} characters)`);
+  check(code.shadows.length >= 1 && code.shadows.some((s) => /START/.test(s.html)), `and each web component’s own tree (${code.shadows.map((s) => s.host).join(', ')})`);
+  await page.evaluate(() => { const s = document.createElement('script'); s.src = '/mock-alta/api/assignment?x=1'; document.head.appendChild(s); const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'http://127.0.0.1:9/gone.css'; document.head.appendChild(l); });
+  const code2 = await page.evaluate(`(async () => { ${collect} })()`);
+  const js = code2.files.find((f) => f.kind === 'script'), css = code2.files.find((f) => f.kind === 'style sheet');
+  check(js && js.url.endsWith('/mock-alta/api/assignment') && /Differentiation Rules 2/.test(js.text) && css && !css.text && !!css.error && css.url === 'http://127.0.0.1:9/gone.css',
+    `and the text of each script and style sheet it loads, or why one could not be read (${js?.url} · ${css?.error})`);
 
   // Alta opens on the assignment's overview: its objectives read from whatever Alta's page reads
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1`);

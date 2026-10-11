@@ -26,6 +26,8 @@ enum AltaHook {
       if (window.__simplAltaOn || !/^https?:$/.test(location.protocol)) return;
       window.__simplAltaOn = true;
       var post = function (m) { try { window.webkit.messageHandlers.simplAlta.postMessage(JSON.stringify(m)); } catch (e) {} };
+      // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there)
+      post({ kind: 'frame' });
       var num = function (v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; };
       var str = function (v) { return typeof v === 'string' && v ? v.slice(0, 600) : (typeof v === 'number' ? String(v) : null); };
 
@@ -292,6 +294,8 @@ final class AltaSession: ObservableObject {
     private static let namesKey = "SimplAltaObjectiveNames"
     private let relay: AltaRelay
     private var loading: NSKeyValueObservation?
+    /// (1.3.46) Each frame in Alta's page that has run the page script (the page itself is asked as the main frame).
+    private var frames: [WKFrameInfo] = []
 
     init(launch: AltaLaunch) {
         self.launch = launch
@@ -333,10 +337,16 @@ final class AltaSession: ObservableObject {
 
     // MARK: What the page says
 
-    func take(_ text: String) {
+    func take(_ text: String, frame: WKFrameInfo) {
         guard let data = text.data(using: .utf8),
               let head = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         switch head["kind"] as? String {
+        case "frame":
+            guard !frame.isMainFrame else { return }
+            let key = frame.request.url?.absoluteString ?? ""
+            frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
+            frames.append(frame)
+            if frames.count > 30 { frames.removeFirst() }
         case "overview":
             guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
             for x in o.objectives where !x.name.isEmpty && names[x.id] != x.name { names[x.id] = x.name }
@@ -487,6 +497,98 @@ final class AltaSession: ObservableObject {
         let list = objectives
         return list.isEmpty ? 0 : list.map(\.mastery).reduce(0, +) / Double(list.count)
     }
+
+    // MARK: Save Page Code
+
+    /// (1.3.46) Every bit of code of Alta's page as it is now — the page and each frame in it: its HTML (with any web
+    /// component's own tree), and the scripts and style sheets it loads — in one text file in Downloads, shown in Finder.
+    /// Addresses are written without their queries (a launch's tokens ride in them).
+    func savePageCode() async -> URL? {
+        let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?"
+        var out = "Simpl for Mac \(version): Knewton Alta page code, saved \(Date().formatted(date: .complete, time: .standard))\n"
+        var seen = Set<String>()
+        var count = 0
+        let targets: [WKFrameInfo?] = [nil] + frames.map { Optional($0) }
+        for f in targets {
+            guard let r = await run(Self.collect, in: f) as? [String: Any] else { continue }
+            let url = r["url"] as? String ?? "?"
+            let html = r["html"] as? String ?? ""
+            guard seen.insert(url + "#" + String(html.count)).inserted else { continue }
+            count += 1
+            out += "\n\n" + String(repeating: "=", count: 100) + "\n"
+            out += "PAGE \(count)\(f == nil ? " (the popup's page)" : " (a frame in it)"): \(url)\n"
+            out += "Title: \(r["title"] as? String ?? "")\n" + String(repeating: "=", count: 100) + "\n"
+            out += "\n---- HTML ----\n" + html + "\n"
+            for sh in r["shadows"] as? [[String: Any]] ?? [] {
+                out += "\n---- WEB COMPONENT'S OWN TREE: \(sh["host"] as? String ?? "") ----\n" + (sh["html"] as? String ?? "") + "\n"
+            }
+            for file in r["files"] as? [[String: Any]] ?? [] {
+                let kind = (file["kind"] as? String ?? "file").uppercased()
+                out += "\n---- \(kind): \(file["url"] as? String ?? "") ----\n"
+                if let t = file["text"] as? String { out += t + "\n" } else { out += "(could not be read: \(file["error"] as? String ?? "unknown"))\n" }
+            }
+        }
+        guard count > 0 else { return nil }
+        let stamp: String = {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+            return f.string(from: Date())
+        }()
+        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
+        let file = downloads.appendingPathComponent("Simpl Alta Code \(stamp).txt")
+        do { try out.write(to: file, atomically: true, encoding: .utf8) } catch { return nil }
+        return file
+    }
+
+    /// Run in one page: its HTML, its web components' own trees, and the text of each script and style sheet it loads.
+    private static let collect = #"""
+    var strip = function (u) { try { var x = new URL(u, location.href); return x.origin + x.pathname; } catch (e) { return String(u || '').split('?')[0]; } };
+    var shadows = [];
+    var walk = function (root, path) {
+      [].forEach.call(root.querySelectorAll('*'), function (el) {
+        if (!el.shadowRoot) return;
+        var p = path + ' > ' + el.tagName.toLowerCase() + (el.id ? '#' + el.id : '');
+        shadows.push({ host: p, html: el.shadowRoot.innerHTML });
+        walk(el.shadowRoot, p);
+      });
+    };
+    walk(document, '');
+    var want = [], had = {};
+    var add = function (kind, u) { if (u && !had[u]) { had[u] = 1; want.push([kind, u]); } };
+    [].forEach.call(document.querySelectorAll('script[src]'), function (s) { add('script', s.src); });
+    [].forEach.call(document.querySelectorAll('link[rel~="stylesheet"][href]'), function (l) { add('style sheet', l.href); });
+    var read = function (w) {
+      var late = new Promise(function (_, no) { setTimeout(function () { no(new Error('timed out')); }, 15000); });
+      return Promise.race([fetch(w[1]).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }), late])
+        .then(function (t) { return { kind: w[0], url: strip(w[1]), text: t }; }, function (e) { return { kind: w[0], url: strip(w[1]), error: String((e && e.message) || e) }; });
+    };
+    var files = await Promise.all(want.map(read));
+    // (style rules a script put in by hand, which no file holds)
+    [].forEach.call(document.styleSheets, function (sh) {
+      if (sh.href) return;
+      try {
+        var own = sh.ownerNode && (sh.ownerNode.textContent || '').trim();
+        if (own) return;
+        var t = [].map.call(sh.cssRules, function (r) { return r.cssText; }).join('\n');
+        if (t) files.push({ kind: 'style rules put in by a script', url: strip(location.href), text: t });
+      } catch (e) {}
+    });
+    return { url: strip(location.href), title: document.title, html: '<!DOCTYPE html>\n' + document.documentElement.outerHTML, shadows: shadows, files: files };
+    """#
+
+    /// The script run in that frame (nil: the main page); what it gives back, or nil.
+    private func run(_ js: String, in frame: WKFrameInfo?) async -> Any? {
+        await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
+            web.callAsyncJavaScript(js, arguments: [:], in: frame, in: .page) { result in
+                switch result {
+                case .success(let v): go.resume(returning: v)
+                case .failure: go.resume(returning: nil)
+                }
+            }
+        }
+    }
 }
 
 /// The page's messages, to the session (held weakly: the web view's controller keeps its handlers).
@@ -495,6 +597,7 @@ final class AltaRelay: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let text = message.body as? String else { return }
-        MainActor.assumeIsolated { session?.take(text) }
+        let frame = message.frameInfo
+        MainActor.assumeIsolated { session?.take(text, frame: frame) }
     }
 }
