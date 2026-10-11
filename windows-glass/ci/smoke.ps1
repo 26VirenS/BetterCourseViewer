@@ -5,6 +5,14 @@ Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 $dir = Split-Path -Parent (Resolve-Path $Exe)
 $p = Start-Process -FilePath (Resolve-Path $Exe) -WorkingDirectory $dir -PassThru
 Start-Sleep -Seconds $Seconds
+# (its window in front of the runner's own consoles, for the picture)
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public static class W { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c); }
+"@
+$p.Refresh()
+if ($p.MainWindowHandle -ne [IntPtr]::Zero) { [W]::ShowWindow($p.MainWindowHandle, 9) | Out-Null; [W]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; Start-Sleep -Seconds 2 }
+Write-Host "main window: $($p.MainWindowTitle) ($($p.MainWindowHandle))"
 $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
 $g = [System.Drawing.Graphics]::FromImage($bmp)

@@ -42,7 +42,8 @@ jobs:
       - name: Build (Release, x64)
         shell: bash
         run: |
-          cmake -S src -B build -A x64
+          # (a windowed app, not a console one: no empty terminal window opens beside it)
+          cmake -S src -B build -A x64 -DCMAKE_EXE_LINKER_FLAGS="/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup"
           cmake --build build --config Release --parallel
       - name: Package
         shell: bash
