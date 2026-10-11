@@ -1673,6 +1673,8 @@ enum AltaTheme {
         html body .lrn_correct, html body .lrn-correct { box-shadow: 0 0 0 2px var(--s-good) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-good) 12%, transparent) !important; }
         html body .lrn_incorrect, html body .lrn-incorrect { box-shadow: 0 0 0 2px var(--s-bad) !important; border-radius: 10px !important; background: color-mix(in srgb, var(--s-bad) 12%, transparent) !important; }
         html, body, html body * { overflow-anchor: none !important; }
+        html body [class*="card" i]\(others) { border-color: transparent !important; box-shadow: none !important; }
+        body { padding-top: 22px !important; }
         html body [role="dialog"], html body [role="alertdialog"], html body [aria-modal="true"], html body dialog[open] { background: var(--s-ground) !important; border-radius: 14px !important; box-shadow: 0 18px 60px rgba(0,0,0,0.35) !important; }
         \(dark ? "html body [class*=\"keyboard\" i]:not([class*=\"keyboard\" i] *), html body [class*=\"keypad\" i]:not([class*=\"keypad\" i] *) { filter: invert(0.9) hue-rotate(180deg) !important; }" : "")
         html body .dcg-container { border: 1px solid var(--s-line) !important; border-radius: 12px !important; overflow: hidden !important; }

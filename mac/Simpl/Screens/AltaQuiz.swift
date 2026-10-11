@@ -156,7 +156,16 @@ struct AltaQuizScreen: View {
     private var questionArea: some View {
         ZStack {
             // Alta's page, always in the same place (so it is never loaded again): out of sight unless shown
+            // (1.3.43) Alta's question laid on Liquid Glass: the page draws no ground of its own, so the glass behind it is
+            // its card; Alta's whole page (Alta's Page) edge to edge, as it is
             AltaPageHost(web: session.web)
+                .clipShape(RoundedRectangle(cornerRadius: session.altaDrawn ? 22 : 0, style: .continuous))
+                .background {
+                    if session.altaDrawn {
+                        Rectangle().fill(Color.clear).glassCard(radius: 22)
+                    }
+                }
+                .padding(session.altaDrawn ? 18 : 0)
                 .opacity(session.showPage ? 1 : 0)
                 .allowsHitTesting(session.showPage)
                 .accessibilityHidden(!session.showPage)

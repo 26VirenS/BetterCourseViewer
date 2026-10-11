@@ -147,6 +147,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   objective's words, was taken for a lesson and kept. Copy Alta Details names what is taken for a lesson. (1.3.42, from
   a real Copy Alta Details) The question's words are looked for within its card when it has one, and never in the
   Current objective card: "Find the derivative of…" was found there first, and everything from it down was kept.
+  (1.3.43) Alta's question is laid on Liquid Glass: the hidden view sits inset in a glass panel (`glassCard`, radius
+  22, clipped to it), its page drawing no ground of its own; Alta's own card outline (`[class*=card]`) is taken away.
+  Alta's Page is still edge to edge, as it is.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
