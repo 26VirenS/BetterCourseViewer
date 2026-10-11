@@ -497,12 +497,16 @@ enum AltaHook {
       // (1.3.31) a lesson left above the question on Alta's page (after its Continue, the question comes under it): the
       // part before the question, at any level up, with much to read and no question in it
       var above = function (el) {
-        for (var x = el; x && x !== document.body && x !== document.documentElement; x = parentOf(x)) {
+        // (1.3.41: only close round the question's card — where Alta puts a lesson, in the same flow — never Alta's top:
+        // the course, the title, the mastery, the Current objective card)
+        for (var x = el, lv = 0; x && lv < 3 && x !== document.body && x !== document.documentElement; x = parentOf(x), lv++) {
           for (var p = x.previousElementSibling; p; p = p.previousElementSibling) {
             if (!shown(p) || p.querySelector(QUESTION)) continue;
+            var t = p.innerText || '';
             // (1.3.33: never the question's own card — "Question", what it asks, long with its maths — taken for a lesson)
-            if (/^\s*question\b/i.test(p.innerText || '')) continue;
-            if (norm(p.innerText || '').length > 400) return p;
+            if (/^\s*question\b/i.test(t)) continue;
+            if (/current objective|assignment mastery|objective mastery/i.test(t)) continue;
+            if (norm(t).length > 400) return p;
           }
         }
         return null;
@@ -674,7 +678,9 @@ enum AltaHook {
             estimates: scrape().objectives.length, start: buttons(START).length, check: buttons(CHECK).length, next: buttons(NEXT).length,
             // (1.3.22) how the page is built round the question — elements and class names only, never words — and
             // what the question shown alone keeps
-            checkAny: controls(CHECK).length, asked: !!asked(), hidden: hidden.length, shape: shape()
+            checkAny: controls(CHECK).length, asked: !!asked(), hidden: hidden.length, shape: shape(),
+            // (1.3.41) what is taken for a lesson above the question, if anything (its element, its length — no words)
+            lesson: stacked ? label(stacked) + ' (' + norm(stacked.innerText || '').length + ' chars)' : null
           };
         },
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
