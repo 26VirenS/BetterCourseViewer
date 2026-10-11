@@ -50,6 +50,10 @@ struct AltaQuizScreen: View {
             await session.start(engine: engine)
         }
         .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
+        // (1.3.51) Alta's pop-ups as the Mac's own sheet: Alta's picture of it, its buttons the Mac's
+        .sheet(item: Binding(get: { session.dialog }, set: { if $0 == nil && session.dialog != nil { session.dialogDismissed() } })) { d in
+            AltaDialogSheet(dialog: d, press: { i in session.pressDialog(i) }, giveBack: { session.dialogDismissed() })
+        }
         .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
             Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
             Button("OK", role: .cancel) {}
@@ -364,5 +368,57 @@ private struct AltaMasteryBar: View {
         .animation(Motion.fill, value: value)
         .accessibilityLabel("Mastery")
         .accessibilityValue("\(Int((value * 100).rounded())) percent")
+    }
+}
+
+/// (1.3.51) A pop-up of Alta's as a sheet of the Mac's: Alta's own picture of it, and its buttons as the Mac's — each
+/// pressing Alta's. Escape presses its Close, Got it or OK, if it has one, else gives the pop-up back to the page.
+private struct AltaDialogSheet: View {
+    let dialog: AltaDialog
+    let press: (Int) -> Void
+    let giveBack: () -> Void
+
+    private var cancelIndex: Int? {
+        dialog.buttons.firstIndex { ["close", "cancel", "got it", "ok", "okay", "dismiss", "no thanks", "not now", "done"].contains($0.lowercased()) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 26)
+                Text(dialog.title.isEmpty ? "Knewton Alta" : dialog.title).font(.sHeadline)
+                Spacer()
+            }
+            if let picture = dialog.picture {
+                Image(nsImage: picture)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: min(picture.size.width, 640), maxHeight: min(picture.size.height, 560))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(maxWidth: .infinity)
+            } else if !dialog.text.isEmpty {
+                Text(dialog.text).font(.sBody).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                if cancelIndex == nil {
+                    Button("Show in Alta's Page", action: giveBack)
+                        .keyboardShortcut(.cancelAction)
+                }
+                ForEach(Array(dialog.buttons.enumerated()), id: \.offset) { i, label in
+                    if i == cancelIndex {
+                        Button(label) { press(i) }.keyboardShortcut(.cancelAction)
+                    } else if i == dialog.buttons.count - 1 {
+                        Button(label) { press(i) }.keyboardShortcut(.defaultAction)
+                    } else {
+                        Button(label) { press(i) }
+                    }
+                }
+            }
+            .controlSize(.large)
+        }
+        .padding(22)
+        .frame(minWidth: 380, maxWidth: 700)
     }
 }

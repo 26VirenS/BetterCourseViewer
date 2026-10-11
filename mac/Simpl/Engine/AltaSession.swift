@@ -294,14 +294,67 @@ enum AltaHook {
           told = state;
           post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: /^(question|lesson|overview)$/.test(state) ? null : shape(r || {}) });
         };
+        // ---- (1.3.51) Alta's pop-ups as the Mac's own: each one open passed to the app — its title, words and buttons,
+        // and where it is, for a picture of it as Alta draws it — and hidden in the page while the app shows it; the
+        // app's buttons press Alta's ----
+        var dialogSig = '', dialogEl = null;
+        var dialogNow = function () {
+          var ds = all('[role="dialog"], [role="alertdialog"], dialog[open]').filter(function (d) {
+            return shown(d) && (txt(d).length > 0 || d.querySelector('button, svg, img'));
+          });
+          return ds[ds.length - 1] || null;
+        };
+        var dialogButtons = function (d) {
+          return [].slice.call(d.querySelectorAll('button, [role="button"], a[href]')).filter(shown).map(function (b) {
+            return { el: b, label: String(b.innerText || b.textContent || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim() };
+          }).filter(function (x) { return x.label; });
+        };
+        var dialogStyle = function () {
+          if (document.getElementById('simpl-dialog')) return;
+          var st = document.createElement('style');
+          st.id = 'simpl-dialog';
+          st.textContent = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }';
+          (document.head || document.documentElement).appendChild(st);
+        };
+        var dialogTick = function () {
+          var d = dialogNow();
+          if (!d) {
+            if (dialogSig) {
+              dialogSig = ''; dialogEl = null;
+              document.documentElement.removeAttribute('data-simpl-native-dialog');
+              post({ kind: 'dialog', open: false });
+            }
+            return;
+          }
+          var bs = dialogButtons(d);
+          var title = '', by = d.getAttribute('aria-labelledby');
+          if (by) { var t = document.getElementById(by.split(' ')[0]); if (t) title = txt(t); }
+          var sig = txt(d).slice(0, 4000) + '|' + bs.map(function (x) { return x.label; }).join('|') + '|' + d.innerHTML.length;
+          if (sig === dialogSig && d === dialogEl) return;
+          dialogSig = sig; dialogEl = d;
+          dialogStyle();
+          var holder = d.closest('.MuiModal-root, [role="presentation"]') || d;
+          holder.setAttribute('data-simpl-dialog', '');
+          post({ kind: 'dialog', open: true, title: title.slice(0, 200), text: txt(d).slice(0, 2000), buttons: bs.map(function (x) { return x.label.slice(0, 60); }) });
+        };
+        setInterval(dialogTick, 600);
+        window.__simplDialog = {
+          // (shown in the page — for its picture, or given back — or hidden while the app shows it)
+          show: function (on) { document.documentElement.toggleAttribute('data-simpl-native-dialog', !on); return true; },
+          rect: function () { if (!dialogEl) return null; var r = dialogEl.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; },
+          press: function (i) { if (!dialogEl) return false; var b = dialogButtons(dialogEl)[i]; if (!b) return false; b.el.click(); return true; }
+        };
         var tick = function () {
           timer = null;
+          dialogTick();
           var r = read();
           if (r.state === 'question' || r.state === 'lesson') {
             badSince = 0; wasQuestion = true;
             // (Alta's pop-ups and MathJax's helpers kept with it; its Feedback — a report to Alta — and its Content
             // attribution link put away)
+            // (1.3.51: and the page's sprite sheets — an <svg> of symbols its pictures draw from, a pop-up's among them)
             var extra = all('[role="dialog"], [role="alertdialog"], body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message')
+              .concat(all('svg').filter(function (g) { return g.querySelector('symbol, defs'); }))
               .filter(function (e) { return !r.keep.some(function (k) { return k.contains(e); }); });
             apply(r.keep.concat(extra));
             r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
@@ -382,6 +435,15 @@ struct AltaObjective: Identifiable, Equatable {
 
 /// What opens the popup: an Alta assignment (its course and id: the app asks Canvas for its launch), or a page of
 /// Alta's own (the screenshot suite's mock).
+/// (1.3.51) A pop-up of Alta's, shown as the Mac's own: its title, words and buttons, and a picture of it as Alta draws it.
+struct AltaDialog: Identifiable {
+    let id = UUID()
+    var title: String
+    var text: String
+    var buttons: [String]
+    var picture: NSImage?
+}
+
 struct AltaLaunch: Identifiable, Equatable {
     let id = UUID()
     let course: String
@@ -430,6 +492,38 @@ final class AltaSession: ObservableObject {
 
     /// (1.3.49) Alta's question (or lesson) is shown alone: laid on Liquid Glass.
     var focused: Bool { focusState == "question" || focusState == "lesson" }
+    /// (1.3.51) Alta's pop-up open, shown as the Mac's own sheet.
+    @Published var dialog: AltaDialog?
+    private var dialogTask: Task<Void, Never>?
+
+    /// A picture of Alta's pop-up as it draws it, shown in the page for the moment it is taken.
+    private func dialogPicture() async -> NSImage? {
+        _ = await run("return window.__simplDialog ? window.__simplDialog.show(true) : null", in: nil)
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        guard let r = await run("return window.__simplDialog ? window.__simplDialog.rect() : null", in: nil) as? [String: Any],
+              let x = (r["x"] as? NSNumber)?.doubleValue, let y = (r["y"] as? NSNumber)?.doubleValue,
+              let w = (r["w"] as? NSNumber)?.doubleValue, let h = (r["h"] as? NSNumber)?.doubleValue, w > 4, h > 4 else { return nil }
+        let rect = CGRect(x: x, y: y, width: w, height: h).intersection(web.bounds)
+        guard !rect.isEmpty else { return nil }
+        return await withCheckedContinuation { (go: CheckedContinuation<NSImage?, Never>) in
+            let config = WKSnapshotConfiguration()
+            config.rect = rect
+            config.afterScreenUpdates = true
+            web.takeSnapshot(with: config) { image, _ in go.resume(returning: image) }
+        }
+    }
+
+    /// One of the pop-up's buttons, pressed in Alta's own.
+    func pressDialog(_ index: Int) {
+        Task { _ = await run("return window.__simplDialog ? window.__simplDialog.press(\(index)) : null", in: nil) }
+    }
+
+    /// The Mac's sheet put away without a button: Alta's pop-up given back to the page.
+    func dialogDismissed() {
+        dialog = nil
+        Task { _ = await run("return window.__simplDialog ? window.__simplDialog.show(true) : null", in: nil) }
+    }
+
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
     @Published private(set) var errorLogs: [String] = []
 
@@ -484,6 +578,33 @@ final class AltaSession: ObservableObject {
             frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
             frames.append(frame)
             if frames.count > 30 { frames.removeFirst() }
+        case "dialog":
+            guard frame.isMainFrame else { return }
+            guard head["open"] as? Bool == true else {
+                dialogTask?.cancel()
+                withAnimation(Motion.gentle) { dialog = nil }
+                return
+            }
+            let title = head["title"] as? String ?? ""
+            let text = head["text"] as? String ?? ""
+            let buttons = head["buttons"] as? [String] ?? []
+            dialogTask?.cancel()
+            dialogTask = Task { [weak self] in
+                // (its opening fade done, a picture of it as Alta draws it — then hidden in the page, the Mac's shown)
+                try? await Task.sleep(nanoseconds: 380_000_000)
+                guard let self, !Task.isCancelled else { return }
+                let picture = await self.dialogPicture()
+                guard !Task.isCancelled else { return }
+                _ = await self.run("return window.__simplDialog ? window.__simplDialog.show(false) : null", in: nil)
+                if self.dialog != nil {
+                    self.dialog?.title = title
+                    self.dialog?.text = text
+                    self.dialog?.buttons = buttons
+                    self.dialog?.picture = picture
+                } else {
+                    self.dialog = AltaDialog(title: title, text: text, buttons: buttons, picture: picture)
+                }
+            }
         case "focus":
             guard frame.isMainFrame else { return }
             let state = head["state"] as? String ?? ""

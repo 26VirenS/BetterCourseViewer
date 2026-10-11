@@ -117,7 +117,25 @@ try {
   await page.evaluate(() => window.mockDialog());
   await page.waitForTimeout(400);
   check((await vis('#vi')) && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'a pop-up of Alta’s (Having trouble?) is shown over the question');
-  await page.evaluate(() => document.getElementById('dlg').remove());
+  // (1.3.51) Alta's pop-ups as the Mac's own: passed to the app (its words and buttons), hidden in the page on the app's word, its
+  // buttons pressed from the app
+  const dlg = await waitFor((p) => p.kind === 'dialog' && p.open === true, 'the pop-up passed to the app');
+  check(/Having trouble/.test(dlg.text) && dlg.buttons.join() === 'VIEW INSTRUCTION' && (await page.evaluate(() => document.getElementById('dlg').hasAttribute('data-simpl-dialog'))),
+    `an open pop-up of Alta's is passed to the app, its words and buttons (${JSON.stringify(dlg.buttons)})`);
+  const rect = await page.evaluate(() => window.__simplDialog.rect());
+  await page.evaluate(() => window.__simplDialog.show(false));
+  check(rect && rect.w > 10 && rect.h > 10 && (await page.evaluate(() => getComputedStyle(document.querySelector('#dlg [role=dialog]')).visibility)) === 'hidden',
+    'the app is told where it is (for its picture of it), and it is hidden in the page while the app shows it');
+  await page.evaluate(() => { document.getElementById('vi').onclick = () => document.getElementById('dlg').remove(); });
+  const np = (await posts()).length;
+  check(await page.evaluate(() => window.__simplDialog.press(0)), 'the app’s button presses Alta’s');
+  await waitFor((p, k) => k >= np && p.kind === 'dialog' && p.open === false, 'the pop-up gone');
+  check(!(await page.$('#dlg')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))), 'and when it closes, the app is told and the page left as it was');
+  // (the page's sprite sheet — an svg of symbols its pictures, a pop-up's among them, draw from — is never hidden)
+  await page.evaluate(() => { const d = document.createElement('div'); d.innerHTML = '<svg id="sprite" style="position:absolute;width:0;height:0"><defs><symbol id="intro"><circle r="5"/></symbol></defs></svg>'; document.body.appendChild(d); });
+  await page.waitForTimeout(500);
+  check(await page.evaluate(() => getComputedStyle(document.getElementById('sprite')).display !== 'none' && getComputedStyle(document.getElementById('sprite').parentElement).display !== 'none'), 'the page’s sprite sheet is kept, so its pictures draw');
+  await page.evaluate(() => document.getElementById('sprite').parentElement.remove());
   // (1.3.48) a lesson (More Instruction) above the question: both kept, Alta's header and the rest still hidden
   const nl = (await posts()).length;
   await page.evaluate(() => window.mockLesson());
