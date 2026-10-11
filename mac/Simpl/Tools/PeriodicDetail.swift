@@ -56,9 +56,10 @@ struct PTElementPage: View {
     private var columns: some View {
         if width >= 1000 {
             HStack(alignment: .top, spacing: 18) {
+                // (each card its own height: the cards stretch only to match each other side by side)
                 VStack(spacing: 18) {
-                    modelCard
-                    configCard
+                    modelCard.fixedSize(horizontal: false, vertical: true)
+                    configCard.fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(width: 430)
                 right
@@ -74,8 +75,8 @@ struct PTElementPage: View {
             }
         } else {
             VStack(spacing: 18) {
-                modelCard
-                configCard
+                modelCard.fixedSize(horizontal: false, vertical: true)
+                configCard.fixedSize(horizontal: false, vertical: true)
                 right
             }
         }
@@ -306,10 +307,12 @@ struct PTElementPage: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(k).font(.sCaption).foregroundStyle(.secondary)
             Text(v).font(.system(size: 19, weight: .semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.6)
-            if let sub, sub != "—" { Text(sub).font(.sCaption2).foregroundStyle(.secondary) }
+            // (a line kept for the note under the value whether there is one or not, so every box is the same size)
+            let note = sub.flatMap { $0 == "—" ? nil : $0 }
+            Text(note ?? " ").font(.sCaption2).foregroundStyle(.secondary).opacity(note == nil ? 0 : 1)
         }
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .card(radius: 14)
     }
 

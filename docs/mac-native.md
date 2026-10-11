@@ -173,6 +173,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   as regular polygons, and an ion's charge is drawn in plain digits and signs, full size.
   (1.3.56) An element's page picks its layout from its measured width (wide past 1000 points, a middle width from 620): the atom and its electron configuration side
   by side, as tall as each other, its facts below, instead of the atom stretched across the page.
+  (1.3.57) Elsewhere each card keeps its own height (the wide layout no longer stretches the atom's card to the facts'
+  column), and every fact box is one size (the line for a note under the value is kept, empty, where there is none).
 
 ## Building and running
 
