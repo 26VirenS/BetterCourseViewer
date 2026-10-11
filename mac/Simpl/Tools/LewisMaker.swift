@@ -698,6 +698,7 @@ struct LewisMaker: View {
                 central = s
                 buildQuick()
             }
+            .tourTarget("lewisCentre")
             heading("Surrounding atoms")
             // (1.3.58) two columns of small cards: the element (a dot of its colour, the symbol in the text colour so a
             // dark one stays readable) and its count
@@ -906,6 +907,7 @@ struct LewisMaker: View {
             .padding(12)
         }
         .card(radius: 20)
+        .tourTarget("lewisCanvas")
     }
 
     /// The resonance structures side by side, ↔ between them; a press shows one large.
@@ -931,6 +933,7 @@ struct LewisMaker: View {
             .padding(.horizontal, 14)
         }
         .frame(height: 118)
+        .tourTarget("lewisResonance")
     }
 
     // MARK: Facts

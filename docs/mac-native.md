@@ -204,6 +204,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   topic's estimate) are the assignment's list: the rail's on the start screen, and the names lined up with Alta's answers
   once a question is on, so none is left as "Objective 3". A detail's second line of another kind (Grade's "Last
   updated…") is shown as a note under its value.
+  (1.3.61) The tour is a guided one: each step dims the tool and cuts a spotlight round the control it is about (the
+  table's carbon, shown as if pointed at; the colour views; an element's 3D atom; the Lewis builder's centre atom, its
+  drawing and its resonance; the 3D viewer; the search in the header), ringed, its card beside it pointing at it — the
+  hole and the card moving from step to step. Controls name themselves to it with `tourTarget` (their place on screen,
+  kept in `PTTourFrames`).
 
 ## Building and running
 

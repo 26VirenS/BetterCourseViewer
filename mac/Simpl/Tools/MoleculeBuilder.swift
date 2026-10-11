@@ -461,6 +461,7 @@ struct MoleculeBuilder: View {
                     .padding(12)
             }
             .card(radius: 20)
+            .tourTarget("molViewer")
         } right: {
             facts
         }

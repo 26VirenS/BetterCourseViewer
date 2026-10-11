@@ -218,6 +218,7 @@ struct PTElementPage: View {
         .padding(16)
         .frame(maxHeight: .infinity, alignment: .top)
         .card(radius: 20)
+        .tourTarget("ptModel")
     }
 
     private func legend(_ name: String, _ color: Color) -> some View {

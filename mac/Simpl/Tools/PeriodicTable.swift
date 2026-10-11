@@ -158,6 +158,7 @@ struct PTGrid: View {
                     let y = rowY(e.y, cell: cell, gap: gap)
                     PTCell(element: e, cell: cell, compact: compact, colouring: colouring, dimmed: dim(e), matched: matches?.contains(e.number) ?? false)
                         .frame(width: cell, height: cell)
+                        .tourTarget(!compact && e.number == 6 ? "ptCarbon" : nil)
                         .offset(x: x, y: y)
                         .onTapGesture { pick(e, CGRect(x: origin.x + x, y: origin.y + y, width: cell, height: cell)) }
                         .onHover { inside in hover(inside ? e : nil) }
@@ -358,12 +359,12 @@ struct PeriodicTableTool: View {
                 }
             }
             .frame(width: root.size.width, height: root.size.height, alignment: .top)
-            .overlay(alignment: .bottom) {
+            // (1.3.61) the guided tour: the tool dimmed, the step's control lit, its card beside it
+            .overlay(alignment: .topLeading) {
                 if let i = tourStep {
-                    PTTourCard(step: i, back: { tour(i - 1) }, next: { i + 1 < PTTourStep.all.count ? tour(i + 1) : endTour() },
-                               skip: endTour)
-                        .padding(.bottom, 26)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size,
+                                  back: { tour(i - 1) }, next: { i + 1 < PTTourStep.all.count ? tour(i + 1) : endTour() }, skip: endTour)
+                        .transition(.opacity)
                 }
             }
         }
@@ -406,6 +407,7 @@ struct PeriodicTableTool: View {
             tourStep = i
             colouring = s.colouring
             search.query = ""
+            hovered = s.hover.flatMap { PeriodicTable.byNumber($0) }
             if let n = s.element, let e = PeriodicTable.byNumber(n) {
                 anchor = .center
                 open = e
@@ -555,6 +557,7 @@ struct PeriodicTableTool: View {
             }
             .padding(.vertical, 2)
         }
+        .tourTarget("ptColours")
     }
 
     /// The table with its trend arrows — (1.3.54) always, for a property with a simple trend: across the top, the trend
@@ -715,6 +718,7 @@ struct PTHeaderSearch: View {
             .font(.sBody)
             .controlSize(.large)
             .frame(width: 240)
+            .tourTarget("ptSearch")
             .onSubmit { search.submitted += 1 }
             .help("Light the elements that match; Return opens the first")
     }
