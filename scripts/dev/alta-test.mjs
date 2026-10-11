@@ -168,6 +168,9 @@ try {
   check((await left('#check')) < -5000 && (await page.$eval('body', (b) => getComputedStyle(b).color)) === 'rgb(9, 9, 9)' && (await vis('#graph')) && (await vis('.alta-stimulus')) && !(await vis('header')),
     'Alta’s answer box shown alone in the popup’s colours, its own Check moved aside for the popup’s bar');
   check(!(await vis('#report')) && (await left('#instr')) < -5000, 'Alta’s Feedback put away and its More Instruction moved aside for the popup’s bar');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const qTop = await page.evaluate(() => document.querySelector('#q').getBoundingClientRect().top);
+  check(qTop < 20, `no empty band above the question: the room its page keeps at the top for what is hidden is taken in (${Math.round(qTop)}px from the top)`);
   const s0 = await waitFor((p, k) => k >= n0 && p.kind === 'focus', 'the question found');
   check(s0.instruct === true && s0.lessonToo === false, 'the popup is told Alta offers More Instruction (and that no lesson sits above the question)');
   // (1.3.38) an inner page with no question in it (a chat widget) never says the question is missing

@@ -589,6 +589,15 @@ enum AltaHook {
           });
         });
         want.forEach(hide);
+        // (1.3.40) the room the page's parts round the question keep at their top for what is hidden (Alta's header, its
+        // title, the objective card) taken in too: the question at the top, no empty band above it
+        path.forEach(function (x) {
+          if (x === document.body || x === document.documentElement || keep.indexOf(x) >= 0) return;
+          try {
+            var cs = getComputedStyle(x);
+            if (parseFloat(cs.paddingTop) > 0 || parseFloat(cs.marginTop) > 0) stash(x, { 'padding-top': '0px', 'margin-top': '0px' });
+          } catch (e) {}
+        });
         if (driven) {
           controls(CHECK).concat(controls(NEXT), controls(INSTRUCT)).filter(function (b) { return !(stacked && stacked.contains(b)); }).forEach(function (b) { stash(b, OFFSTAGE); });
           controls(REPORT).forEach(hide);

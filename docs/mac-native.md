@@ -140,7 +140,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   "Question"), and a lesson is looked for above the card, never in it. (1.3.39) Alta keeps each attempt's verdict on the
   page (Answer 1: That's incorrect… Answer 2: Perfect…): the verdict read is the newest mark or words on the page that
   came after Check was pressed (a snapshot taken before the click), and Alta's own words count ("Perfect", "paying
-  off", "mistakes are part of learning").
+  off", "mistakes are part of learning"). (1.3.40) The top padding and margin of the page's parts round the kept
+  question (room for Alta's hidden header, title and objective card) are taken in, put back with the rest.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
