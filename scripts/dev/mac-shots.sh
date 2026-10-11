@@ -121,7 +121,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   shoot light-22-setup 14 -SimplOpen setup
   shoot light-53-whats-new 12 -SimplOpen whatsnew
-  shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25
+  shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
   # (1.3.52) the full Periodic Table: coloured by electronegativity with its trend arrows; an element's page; the Lewis
   # maker; the 3D molecule builder
   SIZE=1440x920 shoot light-55-ptable-trends 14 -SimplPlace tools -SimplTool ptable -SimplPTColour electronegativity
@@ -130,6 +130,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset Benzene
   SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NaNO₃"
   SIZE=1440x920 shoot light-55d-ptable-molecule 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Ethanol
+  # (1.3.59) the tour, at its Draw your own step
+  SIZE=1440x920 shoot light-55h-ptable-tour 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 4
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   SIZE=1440x920 shoot dark-55e-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
@@ -195,7 +197,7 @@ shoot light-33-rubric-grid 16 -SimplPlace course:104 -SimplPush /courses/104/ass
 shoot light-34-files-preview 14 -SimplPlace section:courses/101:files -SimplOpen file:f1
 shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptable"
 shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
-shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable
+shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
 shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
 SIZE=940x820 shoot light-40-narrow-dashboard 14
 SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades

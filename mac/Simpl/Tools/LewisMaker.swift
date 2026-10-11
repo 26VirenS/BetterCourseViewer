@@ -630,6 +630,7 @@ struct LewisMaker: View {
     @State private var counts: [String: Int] = ["H": 2]
     @State private var charge = 0
     @State private var preset: String? = "H₂O"
+    @ObservedObject private var tour = PTTour.shared
 
     private static let outers = ["H", "O", "N", "C", "F", "Cl", "Br", "I", "S"]
 
@@ -646,6 +647,11 @@ struct LewisMaker: View {
             if graph.atoms.isEmpty { buildQuick() }
             // (the screenshot suite: -SimplLewisPreset "NO₃⁻")
             if let p = UserDefaults.standard.string(forKey: "SimplLewisPreset") { load(p) }
+            // (the tour's preset, when it opens the builder at a step)
+            if let p = tour.lewisPreset { load(p) }
+        }
+        .onChange(of: tour.lewisNonce) { _, _ in
+            if let p = tour.lewisPreset { load(p) }
         }
         .onChange(of: graph) { _, _ in shown = 0 }
     }

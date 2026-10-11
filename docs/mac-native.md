@@ -183,6 +183,14 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   bent, ammonia a fan under its lone pair, ClF₃ a T, SF₄ a seesaw, XeF₄ a cross).
   (1.3.58) The work layout's side columns hold their content to the column's width (less room for the scroller), the
   Lewis ranking's choices are short (Octet rule, Formal charge) so it fits, and the 3D builder turns by itself from the start.
+  (1.3.59) A short tour (`PeriodicTour.swift`) the first time the full table opens, and from its Tour button: a glass
+  card at the bottom, a line a step, each step setting the tool to what it shows (the table, a colour view, carbon's
+  page, the Lewis builder's quick and drawn ways and NO₃⁻'s resonance through `PTTour`, the 3D builder, search); Return
+  for next, Esc to skip, seen once (`simpl.ptTourSeen`). In the 3D builder the selected atom is ringed (a torus that
+  faces the viewer) instead of a see-through shell that fought the spheres round it, the symbols sit on each sphere's
+  near side and are hidden behind nearer atoms, turning by itself is a button at the viewer's top right, and handling
+  the model (drag, scroll, pinch) pauses the turning until three seconds after the last touch. Alta's glass panels all
+  take the widest panel's width, so the question's and the answer's edges line up.
 
 ## Building and running
 

@@ -183,11 +183,15 @@ struct AltaQuizScreen: View {
                         ZStack(alignment: .topLeading) {
                             Color.clear.frame(width: 1, height: 1).id("altaTop")
                             if split {
+                                // (1.3.59) every panel as wide as the widest: one column of panels, the question's and
+                                // the answer's edges in line, each as tall as its own content
+                                let left: CGFloat = session.panels.map(\.rect.minX).min() ?? 0
+                                let right: CGFloat = session.panels.map(\.rect.maxX).max() ?? 0
                                 ForEach(session.panels) { p in
                                     Rectangle().fill(Color.clear)
                                         .glassCard(radius: 22, tint: scheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
-                                        .frame(width: p.rect.width + 32, height: p.rect.height + 32)
-                                        .offset(x: p.rect.minX - 16, y: p.rect.minY - 16)
+                                        .frame(width: right - left + 32, height: p.rect.height + 32)
+                                        .offset(x: left - 16, y: p.rect.minY - 16)
                                         .transition(.opacity)
                                 }
                             }

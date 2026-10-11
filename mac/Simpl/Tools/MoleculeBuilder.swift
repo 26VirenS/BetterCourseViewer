@@ -441,6 +441,15 @@ struct MoleculeBuilder: View {
                         Text(model.title).font(.sCallout).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    // (1.3.59) turning by itself, on or off, at the viewer's top right
+                    Button {
+                        withAnimation(Motion.snappy) { model.autoRotate.toggle() }
+                    } label: {
+                        Label(model.autoRotate ? "Turning" : "Still", systemImage: model.autoRotate ? "rotate.3d" : "pause")
+                            .font(.sCallout.weight(.medium))
+                    }
+                    .glassButton(prominent: model.autoRotate)
+                    .help(model.autoRotate ? "Stop the model turning by itself" : "Let the model turn by itself")
                 }
                 .padding(16)
                 MoleculeSceneView(model: model)
@@ -520,7 +529,6 @@ struct MoleculeBuilder: View {
             .labelsHidden()
             Toggle("Show lone pairs", isOn: $model.showLonePairs)
             Toggle("Show atom labels", isOn: $model.showLabels)
-            Toggle("Turn by itself", isOn: $model.autoRotate)
             }
         }
         .font(.sCallout)
@@ -592,6 +600,17 @@ struct MoleculeBuilder: View {
 
 // MARK: - The 3D view
 
+/// (1.3.59) The molecule's view, telling when it is handled (dragged, scrolled, pinched) so turning by itself can wait.
+final class MoleculeSCNView: SCNView {
+    var handled: (() -> Void)?
+    override func mouseDown(with event: NSEvent) { handled?(); super.mouseDown(with: event) }
+    override func mouseDragged(with event: NSEvent) { handled?(); super.mouseDragged(with: event) }
+    override func rightMouseDragged(with event: NSEvent) { handled?(); super.rightMouseDragged(with: event) }
+    override func scrollWheel(with event: NSEvent) { handled?(); super.scrollWheel(with: event) }
+    override func magnify(with event: NSEvent) { handled?(); super.magnify(with: event) }
+    override func rotate(with event: NSEvent) { handled?(); super.rotate(with: event) }
+}
+
 struct MoleculeSceneView: NSViewRepresentable {
     @ObservedObject var model: MoleculeModel
 
@@ -599,7 +618,21 @@ struct MoleculeSceneView: NSViewRepresentable {
         var model: MoleculeModel
         var framing = -1
         weak var view: SCNView?
+        private var resume: DispatchWorkItem?
         init(model: MoleculeModel) { self.model = model }
+
+        /// The model handled: its turning paused, taken up again three seconds after the last touch.
+        func handled() {
+            guard let spin = view?.scene?.rootNode.childNode(withName: "spin", recursively: false) else { return }
+            spin.isPaused = true
+            resume?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, let spin = self.view?.scene?.rootNode.childNode(withName: "spin", recursively: false) else { return }
+                spin.isPaused = false
+            }
+            resume = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
+        }
 
         @objc func click(_ g: NSClickGestureRecognizer) {
             guard let v = view else { return }
@@ -620,7 +653,8 @@ struct MoleculeSceneView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
     func makeNSView(context: Context) -> SCNView {
-        let v = SCNView(frame: .zero)
+        let v = MoleculeSCNView(frame: .zero)
+        v.handled = { [weak coordinator = context.coordinator] in coordinator?.handled() }
         v.allowsCameraControl = true
         v.autoenablesDefaultLighting = false
         v.antialiasingMode = .multisampling4X
@@ -710,19 +744,15 @@ enum MoleculeScene {
             let r = radius(a.symbol, m.style)
             let sphere = SCNSphere(radius: CGFloat(r))
             sphere.segmentCount = 36
-            let mat = AtomScene.material(MBChem.color(a.symbol))
-            if m.selected == a.id { mat.emission.contents = selectedColor.withAlphaComponent(0.35) }
-            sphere.materials = [mat]
+            sphere.materials = [AtomScene.material(MBChem.color(a.symbol))]
             let n = SCNNode(geometry: sphere)
             n.name = "atom-\(a.id)"
             n.position = vec(a.pos)
-            if m.selected == a.id {
-                let halo = SCNSphere(radius: CGFloat(r * 1.28 + 0.05))
-                halo.materials = [AtomScene.material(selectedColor, alpha: 0.28)]
-                n.addChildNode(SCNNode(geometry: halo))
-            }
+            // (1.3.59) the selected atom ringed, the ring always facing the viewer — not a see-through shell, which
+            // fought the spheres round it and broke into jagged patches
+            if m.selected == a.id { n.addChildNode(ring(radius: r, color: selectedColor)) }
             if m.showLabels && m.style != .sticks {
-                n.addChildNode(label(a.symbol, size: max(0.32, r * 0.75), dark: a.symbol == "H" || a.symbol == "F" || a.symbol == "Cl"))
+                n.addChildNode(label(a.symbol, size: max(0.32, r * 0.75), radius: r, dark: a.symbol == "H" || a.symbol == "F" || a.symbol == "Cl"))
             }
             root.addChildNode(n)
         }
@@ -771,21 +801,39 @@ enum MoleculeScene {
         return root
     }
 
-    /// An atom's symbol, always facing the camera and drawn over its sphere.
-    static func label(_ s: String, size: Double, dark: Bool) -> SCNNode {
+    /// A ring round an atom, facing the viewer: the selected atom's mark.
+    static func ring(radius r: Double, color: NSColor) -> SCNNode {
+        let torus = SCNTorus(ringRadius: CGFloat(r * 1.18 + 0.04), pipeRadius: CGFloat(max(0.018, r * 0.05)))
+        torus.ringSegmentCount = 72
+        let mat = SCNMaterial()
+        mat.diffuse.contents = color
+        mat.lightingModel = .constant
+        torus.materials = [mat]
+        let n = SCNNode(geometry: torus)
+        // (a torus lies flat in x–z; stood up to face along z, which the billboard turns to the camera)
+        n.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
+        let holder = SCNNode()
+        holder.addChildNode(n)
+        holder.constraints = [SCNBillboardConstraint()]
+        return holder
+    }
+
+    /// An atom's symbol, always facing the camera, on the near side of its sphere — so it shows on its own atom and
+    /// is hidden, like the atom, behind nearer ones (1.3.59: it was drawn over everything).
+    static func label(_ s: String, size: Double, radius r: Double, dark: Bool) -> SCNNode {
         let text = SCNText(string: s, extrusionDepth: 0)
         text.font = NSFont.systemFont(ofSize: 1, weight: .bold)
         text.flatness = 0.02
         let mat = SCNMaterial()
         mat.diffuse.contents = dark ? NSColor(white: 0.12, alpha: 1) : NSColor.white
         mat.lightingModel = .constant
-        mat.readsFromDepthBuffer = false
         mat.writesToDepthBuffer = false
         text.materials = [mat]
         let n = SCNNode(geometry: text)
         let (lo, hi) = n.boundingBox
         n.pivot = SCNMatrix4MakeTranslation((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, 0)
         n.scale = SCNVector3(CGFloat(size), CGFloat(size), CGFloat(size))
+        n.position = SCNVector3(0, 0, CGFloat(r * 1.03))
         n.renderingOrder = 10
         let holder = SCNNode()
         holder.addChildNode(n)

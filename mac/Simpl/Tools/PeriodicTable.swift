@@ -319,6 +319,9 @@ struct PeriodicTableTool: View {
     @State private var category: String?
     @State private var colouring: PTColouring = .category
     @StateObject private var molecule = MoleculeModel()
+    /// (1.3.59) The tour: seen once, on the first opening; the step shown, if it is on.
+    @AppStorage("simpl.ptTourSeen") private var tourSeen = false
+    @State private var tourStep: Int?
 
     private var matches: Set<Int>? {
         let q = search.query.trimmingCharacters(in: .whitespaces)
@@ -355,6 +358,14 @@ struct PeriodicTableTool: View {
                 }
             }
             .frame(width: root.size.width, height: root.size.height, alignment: .top)
+            .overlay(alignment: .bottom) {
+                if let i = tourStep {
+                    PTTourCard(step: i, back: { tour(i - 1) }, next: { i + 1 < PTTourStep.all.count ? tour(i + 1) : endTour() },
+                               skip: endTour)
+                        .padding(.bottom, 26)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
         }
         .coordinateSpace(name: "ptRoot")
         // (1.3.54) the search, in the tool's header: Return opens the first element it finds
@@ -376,6 +387,45 @@ struct PeriodicTableTool: View {
             if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
             let n = d.integer(forKey: "SimplPTElement")
             if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
+            // (the tour: its step for the screenshot suite, -SimplPTTour 5; else on the first opening, and not while
+            // the suite pictures the tool)
+            let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset"].contains { d.object(forKey: $0) != nil }
+            if d.object(forKey: "SimplPTTour") != nil {
+                tour(min(max(d.integer(forKey: "SimplPTTour"), 0), PTTourStep.all.count - 1))
+            } else if !tourSeen && !shot {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { tour(0) }
+            }
+        }
+    }
+
+    /// The tour at a step: the tool set to what that step shows.
+    private func tour(_ i: Int) {
+        guard PTTourStep.all.indices.contains(i) else { return }
+        let s = PTTourStep.all[i]
+        withAnimation(Motion.gentle) {
+            tourStep = i
+            colouring = s.colouring
+            search.query = ""
+            if let n = s.element, let e = PeriodicTable.byNumber(n) {
+                anchor = .center
+                open = e
+            } else {
+                open = nil
+                page = s.page
+            }
+        }
+        if let m = s.molecule { molecule.loadPreset(m) }
+        PTTour.shared.showLewis(s.lewis)
+    }
+
+    private func endTour() {
+        tourSeen = true
+        PTTour.shared.showLewis(nil)
+        withAnimation(Motion.gentle) {
+            tourStep = nil
+            open = nil
+            page = .table
+            colouring = .category
         }
     }
 
@@ -398,6 +448,10 @@ struct PeriodicTableTool: View {
                 }
             }
             Spacer(minLength: 0)
+            Button { tour(0) } label: { Label("Tour", systemImage: "questionmark.circle") }
+                .glassButton()
+                .controlSize(.large)
+                .help("A short tour of the table and its builders")
         }
     }
 
