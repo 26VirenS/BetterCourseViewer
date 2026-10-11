@@ -2108,10 +2108,13 @@
     const ungraded = new Map((m.ungraded || []).map((g) => [String(g.id), g]));
     // each group keeps its own colour while scores are tried (the web screen greys its rings instead)
     if (!entry.colors) entry.colors = new Map((store.gradeModel(entry.groups, entry.c, {}, false, false, [], { ownWeights: entry.own }).legend || []).map((g) => [String(g.id), g.color]));
+    // (Mac 1.3.69) each group's share of the grade, for the breakdown bar the web draws (weighted courses only)
+    const bar = new Map((m.weightBar || []).map((w) => [String(w.id), w]));
     const groups = (entry.groups || []).map((g) => {
       const l = legend.get(String(g.id));
       const u = ungraded.get(String(g.id));
-      return { id: String(g.id), name: g.name || 'Assignments', weightText: l?.weightText || (u?.weightText ? `${u.weightText} of grade` : ''), value: l ? l.value : 'ungraded', pct: l?.pct ?? null, detail: l?.detail || '', color: entry.colors.get(String(g.id)) || l?.color || null };
+      const w = bar.get(String(g.id));
+      return { id: String(g.id), name: g.name || 'Assignments', weightText: l?.weightText || (u?.weightText ? `${u.weightText} of grade` : ''), value: l ? l.value : 'ungraded', pct: l?.pct ?? null, detail: l?.detail || '', color: entry.colors.get(String(g.id)) || l?.color || null, weight: w ? Number(w.weight) || 0 : null, graded: w ? !!w.graded : l ? true : false };
     });
     const rows = (m.rows || []).map((r) => ({
       id: String(r.id), name: r.name, groupId: String(r.groupId), possible: Number(r.possible) || 0, earned: r.earned, effective: r.effective, hypothetical: !!r.hypothetical, added: !!r.added, badge: r.badge || '', dropped: !!r.dropped, grade: r.grade || null, counted: r.counted !== false,

@@ -448,6 +448,9 @@ private struct GradeCourseDetail: View {
             CardHeading(text: "Assignment Groups", trailing: detail?.weighted == true ? "Weighted" : nil)
             if let d = detail, !d.groups.isEmpty {
                 let colors = gradeGroupColors(d.groups)
+                if d.weighted == true {
+                    GradeWeightBar(groups: d.groups, colors: colors).padding(.bottom, 2)
+                }
                 ForEach(d.groups) { g in
                     CategoryLine(name: g.name, weight: g.weightText, value: g.value, pct: g.pct, color: colors[g.id] ?? Color.secondary, key: "grades-detail:\(row.id)#\(g.id)")
                 }
@@ -768,6 +771,89 @@ private struct CourseGradeCard: View {
                 }
             }
         }
+    }
+}
+
+/// (1.3.69) A weighted course's grade broken down, as the web draws it: one bar, a piece a group, each as wide as its
+/// share of the grade — filled in its colour once something in it is graded, a dashed outline until then. A piece
+/// pointed at says its group and share, the others fading back.
+struct GradeWeightBar: View {
+    let groups: [CGGroup]
+    let colors: [String: Color]
+    @State private var hovered: String?
+
+    private var bearing: [CGGroup] { groups.filter { ($0.weight ?? 0) > 0 } }
+
+    var body: some View {
+        let parts = bearing
+        if parts.isEmpty {
+            Text("No assignment group carries weight yet.")
+                .font(.sFootnote)
+                .foregroundStyle(.tertiary)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                GeometryReader { geo in
+                    let gap: CGFloat = 3
+                    let total = parts.reduce(0) { $0 + ($1.weight ?? 0) }
+                    let room = max(0, geo.size.width - gap * CGFloat(parts.count - 1))
+                    HStack(spacing: gap) {
+                        ForEach(parts) { g in
+                            piece(g).frame(width: max(4, room * CGFloat((g.weight ?? 0) / max(total, 0.0001))))
+                        }
+                    }
+                }
+                .frame(height: 14)
+                caption(parts)
+            }
+            .animation(Motion.hover, value: hovered)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Grade breakdown: " + parts.map { "\($0.name) \(Self.percent($0.weight ?? 0))" }.joined(separator: ", "))
+        }
+    }
+
+    @ViewBuilder
+    private func piece(_ g: CGGroup) -> some View {
+        let color = colors[g.id] ?? Color.secondary
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        Group {
+            if g.graded == true {
+                shape.fill(color.gradient)
+            } else {
+                shape.strokeBorder(color.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .background(shape.fill(color.opacity(0.08)))
+            }
+        }
+        .opacity(hovered == nil || hovered == g.id ? 1 : 0.35)
+        .contentShape(shape)
+        .onHover { on in
+            if on { hovered = g.id } else if hovered == g.id { hovered = nil }
+        }
+        .help("\(g.name) · \(Self.percent(g.weight ?? 0)) of grade\(g.graded == true ? "" : " · nothing graded yet")")
+    }
+
+    /// Under the bar: the group pointed at (its share and score), else what the dashes mean when any piece has them.
+    @ViewBuilder
+    private func caption(_ parts: [CGGroup]) -> some View {
+        if let id = hovered, let g = parts.first(where: { $0.id == id }) {
+            HStack(spacing: 6) {
+                Circle().fill(colors[g.id] ?? Color.secondary).frame(width: 7, height: 7)
+                Text(g.name).font(.sFootnote.weight(.semibold)).lineLimit(1)
+                Text("\(Self.percent(g.weight ?? 0)) of grade · \(g.graded == true ? (g.value ?? "—") : "nothing graded yet")")
+                    .font(.sFootnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .transition(.opacity)
+        } else if parts.contains(where: { $0.graded != true }) {
+            Text("Dashed: nothing graded there yet.")
+                .font(.sFootnote)
+                .foregroundStyle(.tertiary)
+                .transition(.opacity)
+        }
+    }
+
+    static func percent(_ w: Double) -> String {
+        w.rounded() == w ? "\(Int(w))%" : String(format: "%.1f%%", w)
     }
 }
 
@@ -1137,6 +1223,8 @@ struct CourseGradesView: View {
             CardHeading(text: "Assignment Groups", trailing: d.weighted == true ? "Weighted" : nil)
             if d.groups.isEmpty {
                 EmptyNote(text: "No assignment groups.", symbol: "square.stack")
+            } else if d.weighted == true {
+                GradeWeightBar(groups: d.groups, colors: colors).padding(.top, 2)
             }
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(d.groups) { g in

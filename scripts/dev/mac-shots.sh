@@ -89,6 +89,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
   shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
   shoot light-21d-macmillan 20 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
+  shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
+  shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview

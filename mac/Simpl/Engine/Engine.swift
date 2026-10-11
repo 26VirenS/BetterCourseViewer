@@ -3,6 +3,11 @@ import Combine
 import SwiftUI
 import WebKit
 
+extension Notification.Name {
+    /// (1.3.69) A window more of Simpl, on the place named in `object` (`Engine.place(named:)`).
+    static let simplOpenWindow = Notification.Name("Simpl.openWindow")
+}
+
 /// What the bridge hears from the page about the app's own chrome (extension/content/app/native-app.js).
 @MainActor
 protocol ShellListener: AnyObject {
@@ -43,6 +48,10 @@ final class Engine: ObservableObject, ShellListener {
 
     let host: String
     let web: WebController
+    /// (1.3.69) Another window's engine: the main window's, whose page answers this one's screens — this one keeps only
+    /// where its own window is (its place, Back and Forward, its search, its sheets). Nil: the main window's own.
+    private(set) var primary: Engine?
+    private var mirrors: Set<AnyCancellable> = []
     /// The window's bottom layer: where the web view lives, under everything.
     let hostView = EngineView()
 
@@ -123,7 +132,36 @@ final class Engine: ObservableObject, ShellListener {
         }
     }
 
+    /// (1.3.69) A window more (File ▸ New Window, a row's Open in New Window): its own place, Back and Forward, search and
+    /// sheets; the same school, page and answers as the main window's — what it knows, this one shows as it changes.
+    init(sharing main: Engine, at place: Place? = nil) {
+        host = main.host
+        web = main.web
+        answers = main.answers
+        follow(main)
+        if let place { nav.replace(place) }
+    }
+
+    /// The main window's engine followed (again, when the main window was closed and opened afresh: a new engine).
+    func follow(_ engine: Engine) {
+        let main = engine.primary ?? engine
+        guard main !== self, main !== primary else { return }
+        primary = main
+        mirrors = []
+        main.$phase.sink { [weak self] v in self?.phase = v }.store(in: &mirrors)
+        main.$snapshot.sink { [weak self] v in self?.snapshot = v }.store(in: &mirrors)
+        main.$lms.sink { [weak self] v in self?.lms = v }.store(in: &mirrors)
+        main.$dataVersion.sink { [weak self] v in self?.dataVersion = v }.store(in: &mirrors)
+        main.$countsLive.sink { [weak self] v in self?.countsLive = v }.store(in: &mirrors)
+        main.$coursesLive.sink { [weak self] v in self?.coursesLive = v }.store(in: &mirrors)
+        main.$courses.sink { [weak self] v in self?.courses = v }.store(in: &mirrors)
+        main.$groups.sink { [weak self] v in self?.groups = v }.store(in: &mirrors)
+        main.$sections.sink { [weak self] v in self?.sections = v }.store(in: &mirrors)
+        main.$refreshing.sink { [weak self] v in self?.refreshing = v }.store(in: &mirrors)
+    }
+
     func start() {
+        guard primary == nil else { return } // (a window more: the main window's page is already there)
         web.loadIfNeeded()
         openOnKept()
         // a page that never says (a school's sign-in on another host, a page that failed): shown as it is
@@ -233,6 +271,7 @@ final class Engine: ObservableObject, ShellListener {
     /// (1.2.8) Signed out: the window shows the school's sign-in page at once — not the app's screens over it — and the
     /// next account starts afresh (nothing of this one's kept, shown or remembered, its first steps run again).
     func signedOut() {
+        if let primary { nav.replace(.dashboard); primary.signedOut(); return }
         answers.clear()
         ready = false
         openedOnKept = false
@@ -278,6 +317,9 @@ final class Engine: ObservableObject, ShellListener {
         } else if let a = LaunchOpen.take("macmillan:") {
             let parts = a.split(separator: ":").map(String.init) // (1.3.66: -SimplOpen macmillan:104:4005)
             if parts.count == 2 { macmillan = AltaLaunch(course: parts[0], assignment: parts[1], title: "Macmillan Learning") }
+        } else if let w = LaunchOpen.take("window:") {
+            // (1.3.69: -SimplOpen window:grades, a window more on that place)
+            NotificationCenter.default.post(name: .simplOpenWindow, object: w)
         } else if LaunchOpen.take("settings") != nil {
             NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         } else if LaunchOpen.take("newtask") != nil {
@@ -306,6 +348,27 @@ final class Engine: ObservableObject, ShellListener {
         // web extension's; seen once its sheet is really up)
         if let wn = MacWhatsNew.due() {
             queuePopup(.whatsNew(wn))
+        }
+    }
+
+    /// (1.3.69) A place's name, as `place(named:)` reads it (a window more opens on it).
+    static func name(of place: Place) -> String {
+        switch place {
+        case .dashboard: return "dashboard"
+        case .courses: return "courses"
+        case .todo: return "todo"
+        case .calendar: return "calendar"
+        case .grades: return "grades"
+        case .notifications: return "notifications"
+        case .inbox: return "inbox"
+        case .tools: return "tools"
+        case .externalTools: return "externaltools"
+        case .groups: return "groups"
+        case .search(let q): return "search:\(q)"
+        case .home(let ctx):
+            let parts = ctx.split(separator: "/").map(String.init)
+            return parts.count == 2 ? "\(parts[0] == "groups" ? "group" : "course"):\(parts[1])" : "dashboard"
+        case .section(let ctx, let kind): return "section:\(ctx):\(kind)"
         }
     }
 
@@ -370,6 +433,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func refreshSnapshot() async {
+        if let primary { await primary.refreshSnapshot(); return }
         if let s = try? await call("snapshot", as: Snapshot.self) {
             snapshot = s
             if !countsLive { withAnimation(Motion.gentle) { countsLive = true } }
@@ -379,6 +443,7 @@ final class Engine: ObservableObject, ShellListener {
 
     /// The sidebar's courses and groups, read again.
     func loadSidebar() async {
+        if let primary { await primary.loadSidebar(); return }
         if let c = try? await call("courses", as: CoursesData.self) {
             withAnimation(Motion.gentle) {
                 courses = c.rows
@@ -393,6 +458,7 @@ final class Engine: ObservableObject, ShellListener {
     /// A course's sections, as its home lists them (looked up once, when its row in the sidebar is opened; what was kept
     /// from last time shown meanwhile).
     func loadSections(_ ctx: String) async {
+        if let primary { await primary.loadSections(ctx); return }
         guard !sectionsRead.contains(ctx) else { return }
         if sections[ctx] == nil, let h = kept("home", ["ctx": ctx], as: HomeData.self) { sections[ctx] = h.sections }
         if let h = try? await call("home", ["ctx": ctx], as: HomeData.self) {
@@ -404,6 +470,7 @@ final class Engine: ObservableObject, ShellListener {
 
     /// Something changed under the screens (a tick, a hand-in): they read again, and so do the counts and reminders.
     func changed() {
+        if let primary { primary.changed(); return } // (every window reads again)
         dataVersion += 1
         Task { await refreshSnapshot() }
         Task { await Reminders.shared.reschedule(self) }
@@ -414,6 +481,7 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var refreshing = false
 
     func refresh() {
+        if let primary { primary.refresh(); return }
         guard !refreshing else { return }
         refreshing = true
         Task {
@@ -434,6 +502,7 @@ final class Engine: ObservableObject, ShellListener {
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready (a page load
     /// under way), and tries once more if the page went away mid-call.
     func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async throws -> T {
+        if let primary { return try await primary.call(name, args, as: type) } // (a window more: the main window's page answers)
         Shot.began() // (the screenshot suite's picture waits for the page's answers: Support/Shot.swift)
         defer { Shot.ended() }
         var lastError: Error = EngineError.notReady(lmsName)

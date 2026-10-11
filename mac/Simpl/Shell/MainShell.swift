@@ -224,6 +224,7 @@ struct WebFallback: View {
 
 struct Sidebar: View {
     @EnvironmentObject private var engine: Engine
+    @Environment(\.openWindow) private var openWindow
     @State private var open: Set<String> = []
 
     /// A course's sections before its home has said which it has.
@@ -265,25 +266,33 @@ struct Sidebar: View {
                 Label("Dashboard", systemImage: "square.grid.2x2")
                     .tourSpot(.dashboardRow)
                     .tag(Place.dashboard)
+                    .windowMenu(Place.dashboard)
                 Label("To Do", systemImage: "checklist").tag(Place.todo)
+                    .windowMenu(Place.todo)
                 Label("Calendar", systemImage: "calendar").tag(Place.calendar)
+                    .windowMenu(Place.calendar)
                 Label("Grades", systemImage: "chart.bar.xaxis")
                     .tourSpot(.gradesRow)
                     .tag(Place.grades)
+                    .windowMenu(Place.grades)
                 Label("Notifications", systemImage: "bell")
                     .badge(engine.countsLive ? (engine.snapshot?.notifUnread ?? 0) : 0) // (1.2: never a count from before)
                     .tag(Place.notifications)
+                    .windowMenu(Place.notifications)
                 if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
                     Label("Inbox", systemImage: "tray")
                         .badge(engine.countsLive ? (engine.snapshot?.inboxUnread ?? 0) : 0)
                         .tag(Place.inbox)
+                        .windowMenu(Place.inbox)
                 }
                 Label("Tools", systemImage: "wrench.and.screwdriver") // (1.2)
                     .tourSpot(.toolsRow)
                     .tag(Place.tools)
+                    .windowMenu(Place.tools)
                 if !engine.onBrightspace { // (1.3.67: Canvas's external tools)
                     Label("External Tools", systemImage: "puzzlepiece.extension")
                         .tag(Place.externalTools)
+                        .windowMenu(Place.externalTools)
                 }
             }
             Section("Courses") {
@@ -294,11 +303,13 @@ struct Sidebar: View {
                             Label(s.label, systemImage: Glyph.section(s.kind))
                                 .padding(.leading, 20)
                                 .tag(Place.section("courses/\(course.id)", s.kind))
+                                .windowMenu(Place.section("courses/\(course.id)", s.kind))
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
                 }
                 Label("All Courses", systemImage: "books.vertical").tag(Place.courses)
+                    .windowMenu(Place.courses)
                 if !engine.onBrightspace, !engine.groups.isEmpty {
                     // (1.2) the groups in this section under one row of their own, as a course's sections are under it:
                     // a press opens all of them, the chevron lists them here — never each one pinned to the sidebar
@@ -313,6 +324,7 @@ struct Sidebar: View {
                             }
                             .padding(.leading, 20)
                             .tag(Place.home("groups/\(g.id)"))
+                            .windowMenu(Place.home("groups/\(g.id)"))
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
@@ -346,6 +358,7 @@ struct Sidebar: View {
             .help(open.contains("groups") ? "Hide groups" : "Show groups")
         }
         .tag(Place.groups)
+        .windowMenu(Place.groups)
     }
 
     private func courseRow(_ c: CourseRow) -> some View {
@@ -383,6 +396,8 @@ struct Sidebar: View {
         .onHover { on in if on { MacTour.shared.did(.courseHover) } } // (the tour's "Hover over a course")
         .tag(Place.home(ctx))
         .contextMenu {
+            Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: .home(ctx))) } // (1.3.69)
+            Divider()
             Button("Open in \(engine.lmsName)") { if let u = engine.canvasURL(for: .home(ctx)) { engine.openWebScreen(u.absoluteString, title: c.code) } }
             Button("Copy Link") { if let u = engine.canvasURL(for: .home(ctx)) { copyToPasteboard(u.absoluteString) } }
         }
@@ -395,6 +410,22 @@ struct Sidebar: View {
     private func sections(_ ctx: String) -> [SectionLink] {
         (engine.sections[ctx] ?? Sidebar.defaultSections).filter { $0.kind != "home" }
     }
+}
+
+/// (1.3.69) A sidebar row's menu: its place in a window of its own.
+private struct WindowMenu: ViewModifier {
+    let place: Place
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: place)) }
+        }
+    }
+}
+
+private extension View {
+    func windowMenu(_ place: Place) -> some View { modifier(WindowMenu(place: place)) }
 }
 
 /// Who is signed in, at the sidebar's foot, with what was under the avatar on the web: Settings, What's New, the Canvas

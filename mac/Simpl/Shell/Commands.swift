@@ -4,11 +4,12 @@ import SwiftUI
 /// The menu bar: File ▸ New Task and New Message; View ▸ Reload (Canvas asked afresh) with the sidebar's and the
 /// toolbar's own items; a Go menu as a browser's (Back, Forward, each place in the sidebar by number, each course);
 /// Simpl ▸ Change School; Edit ▸ Search Commands (⌘K: the search field on "/"); Help ▸ Take the Tour, What's New and
-/// Canvas in the browser. Each acts on the main window's engine.
+/// Canvas in the browser; (1.3.69) File ▸ New Window. Each acts on the focused window's engine.
 struct SimplCommands: Commands {
     @ObservedObject var session: AppSession
     @FocusedObject private var focused: Engine?
     @ObservedObject private var model = AppModel.shared
+    @Environment(\.openWindow) private var openWindow
 
     /// The main window's engine: the focused one, else the one the app keeps (a menu used from Settings or a tool's window).
     private var engine: Engine? { focused ?? model.engine }
@@ -28,6 +29,11 @@ struct SimplCommands: Commands {
         }
 
         CommandGroup(replacing: .newItem) {
+            // (1.3.69) another window of Simpl, on the place this one shows (⌘N stays New Task, as it has been)
+            Button("New Window") { openWindow(id: "window", value: Engine.name(of: engine?.nav.current.place ?? .dashboard)) }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(!ready)
+            Divider()
             Button("New Task") { engine?.newTask = true }
                 .keyboardShortcut("n")
                 .disabled(!ready)

@@ -404,6 +404,9 @@ struct CGGroup: Codable, Identifiable, Hashable {
     var pct: Double?
     var detail: String?
     var color: String?
+    /// (Mac 1.3.69) Its share of the grade, in percent, in a weighted course (nil: it carries none, or the course is by points).
+    var weight: Double?
+    var graded: Bool?
 }
 
 struct CourseGradesData: Codable {

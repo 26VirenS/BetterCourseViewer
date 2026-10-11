@@ -10,8 +10,8 @@ struct RootView: View {
     @ObservedObject private var reminders = Reminders.shared
     @ObservedObject private var files = FilePreview.shared
     @ObservedObject private var appearance = AppearanceStore.shared
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     init(host: String) {
         self.host = host
@@ -36,47 +36,16 @@ struct RootView: View {
         .overlay(alignment: .bottom) { FileToast(files: files) }
         .environmentObject(engine)
         .focusedSceneObject(engine)
-        .sheet(item: $engine.whatsNew) { item in
-            WhatsNewSheet(data: item.data) { MacWhatsNew.markSeen() }
-        }
-        .sheet(item: $engine.quiz) { q in
-            QuizScreen(launch: q)
-                .environmentObject(engine)
-                .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
-        }
-        .sheet(item: $engine.alta) { a in
-            AltaQuizScreen(launch: a)
-                .environmentObject(engine)
-                .modifier(UpdateHold()) // (nor while an Alta assignment is open)
-        }
-        .sheet(item: $engine.macmillan) { a in
-            MacmillanScreen(launch: a)
-                .environmentObject(engine)
-                .modifier(UpdateHold()) // (1.3.66: nor while a Macmillan assignment is open)
-        }
-        .sheet(isPresented: $engine.setup) {
-            SetupScreen()
-                .environmentObject(engine)
-        }
-        .sheet(isPresented: $engine.newTask) {
-            NewTaskSheet()
-                .environmentObject(engine)
-        }
-        .sheet(isPresented: $engine.newMessage) {
-            ComposeSheet()
-                .environmentObject(engine)
-        }
-        .onChange(of: engine.tool) { _, t in
-            guard let t else { return }
-            openWindow(id: "tool", value: t)
-            engine.tool = nil
-        }
+        .modifier(EngineSheets(engine: engine))
         .onChange(of: session.showSettings) { _, show in
             guard show else { return }
             session.showSettings = false
             openSettings()
         }
         .onReceive(NotificationCenter.default.publisher(for: .simplOpenSetup)) { _ in engine.setup = true }
+        .onReceive(NotificationCenter.default.publisher(for: .simplOpenWindow)) { n in
+            openWindow(id: "window", value: n.object as? String ?? "dashboard")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
             engine.signedOut() // (back to the sign-in page, shown; nothing of this account's for the next)
         }
@@ -99,6 +68,52 @@ struct RootView: View {
         guard engine.phase == .native, let url = reminders.opening else { return }
         reminders.opening = nil
         engine.openWeb(url, title: "")
+    }
+}
+
+/// A window's sheets — What's New, a quiz, an Alta or a Macmillan assignment, the setup, a new task or message — and
+/// the tool windows it opens: the main window's and (1.3.69) each window more's, over its own window.
+struct EngineSheets: ViewModifier {
+    @ObservedObject var engine: Engine
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $engine.whatsNew) { item in
+                WhatsNewSheet(data: item.data) { MacWhatsNew.markSeen() }
+            }
+            .sheet(item: $engine.quiz) { q in
+                QuizScreen(launch: q)
+                    .environmentObject(engine)
+                    .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
+            }
+            .sheet(item: $engine.alta) { a in
+                AltaQuizScreen(launch: a)
+                    .environmentObject(engine)
+                    .modifier(UpdateHold()) // (nor while an Alta assignment is open)
+            }
+            .sheet(item: $engine.macmillan) { a in
+                MacmillanScreen(launch: a)
+                    .environmentObject(engine)
+                    .modifier(UpdateHold()) // (1.3.66: nor while a Macmillan assignment is open)
+            }
+            .sheet(isPresented: $engine.setup) {
+                SetupScreen()
+                    .environmentObject(engine)
+            }
+            .sheet(isPresented: $engine.newTask) {
+                NewTaskSheet()
+                    .environmentObject(engine)
+            }
+            .sheet(isPresented: $engine.newMessage) {
+                ComposeSheet()
+                    .environmentObject(engine)
+            }
+            .onChange(of: engine.tool) { _, t in
+                guard let t else { return }
+                openWindow(id: "tool", value: t)
+                engine.tool = nil
+            }
     }
 }
 

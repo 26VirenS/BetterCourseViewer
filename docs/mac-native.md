@@ -250,6 +250,15 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   loading, its pictures in — or after 2.5 seconds at most, a pending showing called off if the part goes again; until
   then the popup shows a skeleton of the question (`AltaSkeleton`: a glass panel for what it asks and one for its
   answer, their lines pulsing gently, still under Reduce Motion).
+  (1.3.69) More than one window: File ▸ New Window (⌥⌘N; ⌘N stays New Task) opens another window of Simpl on the
+  place the focused one shows, and a sidebar row's menu has Open in New Window. A window more (`MoreWindow`) keeps its
+  own place, Back and Forward, search and sheets, but runs on the main window's engine (`Engine(sharing:)`: its calls go
+  to the main window's page, and the sidebar, the counts and `dataVersion` follow it), so a change in one window shows
+  in all; signing in stays in the main window. The menu bar acts on the focused window's engine. Grades: a weighted
+  course's Assignment Groups card (the course's Grades and the Grades page's course detail) starts with the web's
+  breakdown bar — a piece a group, as wide as its share of the grade, filled in its colour once something in it is
+  graded, dashed until then; a piece pointed at names its group, share and score (`GradeWeightBar`; each group's
+  `weight` and `graded` from native-app.js `courseGrades`, from the grade model's `weightBar`).
 
 ## Building and running
 

@@ -5,7 +5,8 @@ import UserNotifications
 /// Simpl for Mac: a Mac app of its own, not a Safari extension. As in the iPhone app, the student's Canvas runs in a web
 /// view underneath (the extension's own scripts in it, signed in on the school's real sign-in page) and answers what
 /// the app shows; the window over it is the Mac's own — a sidebar, a toolbar with Back, Forward and Search, menus,
-/// sheets, popovers, Quick Look, a Settings window and a window for each external tool.
+/// sheets, popovers, Quick Look, a Settings window, a window for each external tool and (1.3.69) as many windows of
+/// Simpl itself as the student opens.
 @main
 struct SimplApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -24,6 +25,17 @@ struct SimplApp: App {
         .windowToolbarStyle(.unified)
         .commands { SimplCommands(session: session) }
         .handlesExternalEvents(matching: ["*"]) // (a simpl:// link comes to the main window)
+
+        // (1.3.69) a window more of Simpl, on a place of its own (File ▸ New Window, a row's Open in New Window)
+        WindowGroup("Simpl", id: "window", for: String.self) { $place in
+            MoreWindow(place: place)
+                .environmentObject(session)
+                .environmentObject(model)
+        }
+        .defaultSize(width: 1240, height: 840)
+        .windowResizability(.contentMinSize)
+        .windowToolbarStyle(.unified)
+        .handlesExternalEvents(matching: []) // (a simpl:// link goes to the main window, never a new one)
 
         // an external tool, or a page of Canvas's own the app does not draw: a window of its own each
         WindowGroup("Canvas", id: "tool", for: ToolLaunch.self) { $launch in
