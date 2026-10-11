@@ -774,14 +774,16 @@ struct LewisMaker: View {
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    /// (1.3.63: each button pressable over its whole square — a plain button is pressed only where it draws, and a minus
+    /// sign is a thin line)
     private func stepper(value: Int, min lo: Int, max hi: Int, set: @escaping (Int) -> Void) -> some View {
         HStack(spacing: 4) {
-            Button { set(Swift.max(lo, value - 1)) } label: { Image(systemName: "minus").frame(width: 22, height: 22) }
+            Button { set(Swift.max(lo, value - 1)) } label: { Image(systemName: "minus").frame(width: 22, height: 22).contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                 .disabled(value <= lo)
             Text(value > 0 && lo < 0 ? "+\(value)" : "\(value)").font(.sCallout.monospacedDigit().weight(.semibold)).frame(width: 20)
-            Button { set(Swift.min(hi, value + 1)) } label: { Image(systemName: "plus").frame(width: 22, height: 22) }
+            Button { set(Swift.min(hi, value + 1)) } label: { Image(systemName: "plus").frame(width: 22, height: 22).contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                 .disabled(value >= hi)

@@ -221,6 +221,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   between parts (the app's Loading) for as long as Alta may take — never shown as it is in the meantime — the page's own
   ground cleared while it is out of sight, and a new page's glass panels and buttons put away at once.
   The Dashboard's opened counter is 440 points wide, and a click anywhere in the app but its panel folds it back.
+  (1.3.63) The Lewis builder's steppers are pressable over each button's whole square (a plain button is pressed only
+  where it draws, and a minus sign is a thin line).
 
 ## Building and running
 
