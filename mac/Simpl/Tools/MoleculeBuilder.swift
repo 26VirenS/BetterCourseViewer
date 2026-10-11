@@ -624,6 +624,7 @@ struct MoleculeSceneView: NSViewRepresentable {
 
         /// The model handled: its turning paused, taken up again three seconds after the last touch.
         func handled() {
+            PTTour.shared.did(.turned)
             guard let spin = view?.scene?.rootNode.childNode(withName: "spin", recursively: false) else { return }
             spin.isPaused = true
             resume?.cancel()

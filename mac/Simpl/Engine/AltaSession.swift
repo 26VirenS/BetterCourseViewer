@@ -32,15 +32,25 @@ enum AltaHook {
       // cover as the start screen, or (not recognised) as it is — so it never flashes in before its question; the app
       // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
       var reveal = function () {};
+      var veilAgain = function () {};
       if (window.top === window) {
-        var revealed = false;
+        var showing = false;
+        var veils = /knewton|alta/i.test(location.hostname + location.pathname);
         reveal = function (how) {
           if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
-          if (!revealed) { revealed = true; post({ kind: 'shown', how: how || '' }); }
+          if (!showing) { showing = true; post({ kind: 'shown', how: how || '' }); }
         };
-        if (/knewton|alta/i.test(location.hostname + location.pathname)) {
-          // (see-through rather than hidden: still laid out and read as it shows — its words, their lines — just not seen)
-          var VEIL = 'html:not([data-simpl-shown]) body { opacity: 0 !important; }';
+        // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
+        veilAgain = function () {
+          if (!veils || !showing) return;
+          if (document.documentElement) document.documentElement.removeAttribute('data-simpl-shown');
+          showing = false;
+          post({ kind: 'hidden' });
+        };
+        if (veils) {
+          // (see-through rather than hidden: still laid out and read as it shows — its words, their lines — just not seen;
+          // 1.3.62: and the page's own ground cleared too, so a light one of Alta's never flashes through)
+          var VEIL = 'html:not([data-simpl-shown]) body { opacity: 0 !important; }\nhtml:not([data-simpl-shown]), html:not([data-simpl-shown]) body { background: transparent !important; }';
           try {
             var veil = new CSSStyleSheet();
             veil.replaceSync(VEIL);
@@ -266,7 +276,10 @@ enum AltaHook {
           // dark, hues kept (inverted, then turned half round the colour wheel) — and its pictures, videos and graphs
           // turned back, so they keep their own colours. Alta still draws it all; only its colours are turned.
           + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] { filter: invert(1) hue-rotate(180deg) !important; }\n'
-          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] :is(img, picture, video, canvas, iframe, object, embed) { filter: invert(1) hue-rotate(180deg) !important; }\n';
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] :is(img, picture, video, canvas, iframe, object, embed):not([data-simpl-pic] *) { filter: invert(1) hue-rotate(180deg) !important; }\n'
+          // (1.3.62) and its graphs and drawings — a graph's box (Learnosity's, JSXGraph's) and any large SVG — turned back
+          // whole, labels and all, so they read as Alta draws them
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] [data-simpl-pic] { filter: invert(1) hue-rotate(180deg) !important; }\n';
         var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
         var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
         var title = function (sec) { var h = sec.querySelector('[class*="compound-header"] h2, [class*="compound-header"] h3, h2[class*="content-title"]'); return h ? txt(h) : ''; };
@@ -312,6 +325,20 @@ enum AltaHook {
           document.documentElement.removeAttribute('data-simpl-q');
         };
         var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
+        // (1.3.62) a graph or drawing in a part: a graph's box by its name, or an SVG at least 140 × 100 — the outermost
+        // one, so its labels go with it (graphs are drawn after the part, so this is looked for at every pass)
+        var PIC = /jxgbox|graphplotting|lrn_graph|lrn-graph|lrn_chart|lrn-chart|highcharts|desmos/i;
+        var pics = function (keep) {
+          keep.forEach(function (k) {
+            [].forEach.call(k.querySelectorAll('div, svg'), function (el) {
+              if (el.closest('[data-simpl-pic]')) return;
+              var c = typeof el.className === 'string' ? el.className : ((el.className && el.className.baseVal) || '');
+              var big = false;
+              if (el.tagName.toLowerCase() === 'svg') { var r = el.getBoundingClientRect(); big = r.width >= 140 && r.height >= 100; }
+              if (PIC.test(c) || big) mark(el, 'data-simpl-pic');
+            });
+          });
+        };
         var sprite = function (e) { return e.tagName && e.tagName.toLowerCase() === 'svg' && !!e.querySelector('symbol, defs') && !e.closest('section'); };
         var apply = function (keep) {
           if (keep.length === keptNow.length && keep.every(function (k, i) { return k === keptNow[i] && k.isConnected; }) && document.documentElement.hasAttribute('data-simpl-q')) return;
@@ -486,6 +513,7 @@ enum AltaHook {
               .concat(all('svg').filter(function (g) { return g.querySelector('symbol, defs'); }))
               .filter(function (e) { return !r.keep.some(function (k) { return k.contains(e); }); });
             apply(r.keep.concat(extra));
+            pics(r.keep);
             r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
             report(r.state, r);
             publish();
@@ -501,7 +529,11 @@ enum AltaHook {
           }
           // (not recognised: a moment's grace — Alta between one part and the next — then its page as it is)
           if (!badSince) badSince = Date.now();
-          var wait = wasQuestion ? 1500 : 8000;
+          // (1.3.62) on Alta's learn page between parts, out of sight (the app's Loading) for as long as Alta may take,
+          // never Alta's page as it is in the meantime
+          var between = !!document.querySelector('[class*="learn-flow-body"]');
+          if (between) veilAgain();
+          var wait = between ? 8000 : (wasQuestion ? 1500 : 8000);
           if (Date.now() - badSince < wait) { schedule(wait - (Date.now() - badSince) + 20); return; }
           unmark();
           report(r.state, r);
@@ -878,7 +910,12 @@ final class AltaSession: ObservableObject {
         case "frame":
             // (1.3.60) a new page: kept out of sight in it until it is laid out
             if frame.isMainFrame {
-                if pageShown { withAnimation(Motion.gentle) { pageShown = false } }
+                // (1.3.62: and the last page's glass panels and buttons put away with it)
+                withAnimation(Motion.gentle) {
+                    pageShown = false
+                    panels = []
+                    buttons = []
+                }
                 return
             }
             let key = frame.request.url?.absoluteString ?? ""
@@ -945,6 +982,9 @@ final class AltaSession: ObservableObject {
         case "shown":
             guard frame.isMainFrame else { return }
             withAnimation(Motion.gentle) { pageShown = true }
+        case "hidden":
+            guard frame.isMainFrame else { return }
+            withAnimation(Motion.gentle) { pageShown = false }
         case "cover":
             guard frame.isMainFrame else { return }
             if head["none"] as? Bool == true {

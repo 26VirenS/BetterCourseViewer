@@ -52,8 +52,8 @@ try {
   await page.addInitScript(() => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
   await page.addInitScript({ content: source });
   const posts = async () => (await page.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
-  const waitFor = async (test, what) => {
-    for (let i = 0; i < 60; i++) { const p = (await posts()).filter(test); if (p.length) return p[p.length - 1]; await page.waitForTimeout(100); }
+  const waitFor = async (test, what, tries = 60) => {
+    for (let i = 0; i < tries; i++) { const p = (await posts()).filter(test); if (p.length) return p[p.length - 1]; await page.waitForTimeout(100); }
     throw new Error(`no ${what} came`);
   };
 
@@ -117,6 +117,14 @@ try {
   const [pq, pa] = pn.panels;
   check(pq.kind === 'question' && pa.kind === 'answer' && pq.y < pa.y && pa.y - (pq.y + pq.h) >= 40 && pn.height >= pa.y + pa.h && pq.w > 200,
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
+  // (1.3.62) a graph drawn into a part (Learnosity's JSXGraph box, its labels in it) and a large SVG are marked to be
+  // turned back whole in dark mode; a small icon is not
+  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg>'); });
+  await page.waitForTimeout(600);
+  check(await page.evaluate(() => { const g = document.querySelector('.lrn_graphplotting'); return g.hasAttribute('data-simpl-pic') && !g.querySelector('[data-simpl-pic]') && document.getElementById('plot').hasAttribute('data-simpl-pic') && !document.getElementById('icon').hasAttribute('data-simpl-pic'); }),
+    'a graph’s box (with its labels) and a large drawing are marked to keep their own colours in dark mode; an icon is not');
+  await page.evaluate(() => { document.querySelector('.lrn_graphplotting').remove(); document.getElementById('plot').remove(); document.getElementById('icon').remove(); });
+  await page.waitForTimeout(400);
   // (1.3.60) each part a centred column no wider than 860 points
   const vw = await page.evaluate(() => innerWidth);
   check(pq.w <= 861 && pa.w <= 861 && (vw < 900 || Math.abs((pq.x + pq.w / 2) - vw / 2) < 40),
@@ -203,7 +211,12 @@ try {
   await page.evaluate(() => { window.__l = document.getElementById('lsec'); window.__flow = window.__l.parentElement; window.__l.remove(); });
   await page.waitForTimeout(400);
   check(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q')), 'a moment’s grace first (Alta between parts)');
-  const bad = await waitFor((p, k) => k >= nb && p.kind === 'focus' && p.state === 'unknown', 'the page not recognised');
+  // (1.3.62) and through it, out of sight (the app's Loading), never Alta's page as it is — the next part laid out as soon
+  // as it comes, or (here, none) Alta's page as it is after a while
+  const hid = await waitFor((p, k) => k >= nb && p.kind === 'hidden', 'out of sight between parts');
+  check(!!hid && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-shown'))) && (await page.evaluate(() => getComputedStyle(document.body).opacity)) === '0',
+    'between parts the page is out of sight, the app told (its Loading shown)');
+  const bad = await waitFor((p, k) => k >= nb && p.kind === 'focus' && p.state === 'unknown', 'the page not recognised', 110);
   check((await vis('header')) && (await vis('h1')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && (await page.evaluate(() => getComputedStyle(document.body).backgroundColor)) === 'rgb(238, 241, 244)',
     'then Alta’s page is given back as it is, its own ground too');
   check(/no part/.test(bad.reason) && bad.shape.buttons.includes('back to top') && Array.isArray(bad.shape.flow) && !JSON.stringify(bad.shape).includes('derivative of f'),

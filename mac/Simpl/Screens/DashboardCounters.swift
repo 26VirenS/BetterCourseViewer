@@ -142,7 +142,7 @@ struct DashCounterTile: View {
 /// double-click opens it); an overdue one the student has let go can be cleared.
 struct DashCounterPanel: View {
     /// (1.2.8) How wide a panel opens (narrower only on a narrower page).
-    static let width: CGFloat = 520
+    static let width: CGFloat = 440 // (1.3.62: was 520)
 
     let counter: Counter
     let value: Int?

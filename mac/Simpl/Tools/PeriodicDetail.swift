@@ -52,6 +52,7 @@ struct PTElementPage: View {
         .onKeyPress(.rightArrow) { step(1); return .handled }
         .onAppear { focused = true }
         .onChange(of: e.number) { _, _ in subshellID = nil }
+        .onChange(of: orbitals) { _, on in if on { PTTour.shared.did(.orbitals) } }
     }
 
     /// (1.3.56) By the page's width (measured, as text that wraps would make a fitting test think nothing fits): wide,

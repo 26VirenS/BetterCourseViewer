@@ -312,7 +312,9 @@ struct PeriodicTableTool: View {
         var symbol: String { self == .table ? "square.grid.3x3" : (self == .lewis ? "circle.grid.cross" : "atom") }
     }
 
-    @State private var page: Page = .table
+    /// (1.3.62) which page is shown, chosen in the tool's header
+    @ObservedObject private var nav = PTNav.shared
+    private var page: Page { nav.page }
     @State private var open: PTElement?
     @State private var anchor: UnitPoint = .center
     @State private var hovered: PTElement?
@@ -323,6 +325,8 @@ struct PeriodicTableTool: View {
     /// (1.3.59) The tour: seen once, on the first opening; the step shown, if it is on.
     @AppStorage("simpl.ptTourSeen") private var tourSeen = false
     @State private var tourStep: Int?
+    @State private var tourStuck = false
+    @ObservedObject private var tourWord = PTTour.shared
 
     private var matches: Set<Int>? {
         let q = search.query.trimmingCharacters(in: .whitespaces)
@@ -341,16 +345,11 @@ struct PeriodicTableTool: View {
                     .zIndex(1)
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
-                        pages
-                            .padding(.horizontal, 40)
-                            .padding(.bottom, 10)
-                            .frame(maxWidth: 1480 + 80, alignment: .leading)
-                            .frame(maxWidth: .infinity)
                         switch page {
                         case .table: table(root.size)
                         case .lewis: LewisMaker { graph, structure in
                             molecule.load(graph: graph, structure: structure)
-                            withAnimation(Motion.gentle) { page = .molecules }
+                            withAnimation(Motion.gentle) { nav.page = .molecules }
                         }
                         case .molecules: MoleculeBuilder(model: molecule)
                         }
@@ -362,14 +361,26 @@ struct PeriodicTableTool: View {
             // (1.3.61) the guided tour: the tool dimmed, the step's control lit, its card beside it
             .overlay(alignment: .topLeading) {
                 if let i = tourStep {
-                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size,
-                                  back: { tour(i - 1) }, next: { i + 1 < PTTourStep.all.count ? tour(i + 1) : endTour() }, skip: endTour)
+                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size, stuck: tourStuck,
+                                  next: { nextTour(i) })
                         .transition(.opacity)
                 }
             }
         }
         .coordinateSpace(name: "ptRoot")
         // (1.3.54) the search, in the tool's header: Return opens the first element it finds
+        // (1.3.62) a page chosen in the header while an element is open: back from it to that page; Tour asked for there
+        .onChange(of: nav.page) { _, _ in
+            if open != nil { withAnimation(Motion.gentle) { open = nil } }
+        }
+        .onChange(of: nav.tourAsked) { _, _ in tour(0) }
+        // (the tour's step, done: watched for in what the tool shows and what it is told)
+        .onChange(of: hovered?.number) { _, _ in checkTour() }
+        .onChange(of: colouring) { _, _ in checkTour() }
+        .onChange(of: open?.number) { _, _ in checkTour() }
+        .onChange(of: nav.page) { _, _ in checkTour() }
+        .onChange(of: search.query) { _, _ in checkTour() }
+        .onChange(of: tourWord.events) { _, _ in checkTour() }
         .onChange(of: search.submitted) { _, _ in
             guard let m = PeriodicTable.find(search.query).first else { return }
             search.query = ""
@@ -384,7 +395,7 @@ struct PeriodicTableTool: View {
             // (the screenshot suite: -SimplPTColour, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
             let d = UserDefaults.standard
             if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
-            if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { page = v }
+            if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { nav.page = v }
             if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
             let n = d.integer(forKey: "SimplPTElement")
             if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
@@ -399,62 +410,76 @@ struct PeriodicTableTool: View {
         }
     }
 
-    /// The tour at a step: the tool set to what that step shows.
+    /// The tour at a step: the tool set to what the step needs (the page its control is on, an element's page, a
+    /// preset), and nothing yet done for it.
     private func tour(_ i: Int) {
         guard PTTourStep.all.indices.contains(i) else { return }
         let s = PTTourStep.all[i]
+        PTTour.shared.active = true
+        PTTour.shared.clearEvent()
+        tourStuck = false
         withAnimation(Motion.gentle) {
             tourStep = i
-            colouring = s.colouring
-            search.query = ""
-            hovered = s.hover.flatMap { PeriodicTable.byNumber($0) }
+            if i == 0 {
+                colouring = .category
+                search.query = ""
+                hovered = nil
+            }
             if let n = s.element, let e = PeriodicTable.byNumber(n) {
-                anchor = .center
-                open = e
-            } else {
+                if open == nil { anchor = .center; open = e }
+            } else if ["ptGrid", "ptColours"].contains(s.target) {
                 open = nil
-                page = s.page
+                nav.page = .table
+            } else if s.target.hasPrefix("lewis") {
+                open = nil
+                if nav.page != .lewis { nav.page = .lewis }
+            } else if s.target == "molViewer" {
+                open = nil
+                if nav.page != .molecules { nav.page = .molecules }
+            } else if s.target.hasPrefix("ptPage") {
+                open = nil
             }
         }
         if let m = s.molecule { molecule.loadPreset(m) }
-        PTTour.shared.showLewis(s.lewis)
+        // (Draw asked for from the quick way: the quick way's water first)
+        if s.target == "lewisWay" { PTTour.shared.showLewis("H₂O") }
+        if let l = s.lewis { PTTour.shared.showLewis(l) }
+        // (a step left undone a while: a Next, to go on without it)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            if tourStep == i { withAnimation(Motion.gentle) { tourStuck = true } }
+        }
+        checkTour()
     }
 
+    /// The step's thing done: on to the next, or the tour ended after the last.
+    private func checkTour() {
+        guard let i = tourStep, PTTourStep.all.indices.contains(i) else { return }
+        let done: Bool
+        switch PTTourStep.all[i].act {
+        case .hover: done = hovered != nil
+        case .colour: done = colouring != .category
+        case .open: done = open != nil
+        case .page(let p): done = nav.page == p && open == nil
+        case .event(let e): done = PTTour.shared.event == e
+        case .typed: done = !search.query.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        guard done else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (i == PTTourStep.all.count - 1 ? 1.2 : 0.45)) {
+            guard tourStep == i else { return }
+            nextTour(i)
+        }
+    }
+
+    private func nextTour(_ i: Int) {
+        if i + 1 < PTTourStep.all.count { tour(i + 1) } else { endTour() }
+    }
+
+    /// The tour over (its last step done): not again on its own; the tool left as it is.
     private func endTour() {
         tourSeen = true
+        PTTour.shared.active = false
         PTTour.shared.showLewis(nil)
-        withAnimation(Motion.gentle) {
-            tourStep = nil
-            open = nil
-            page = .table
-            colouring = .category
-        }
-    }
-
-    // MARK: The pages
-
-    private var pages: some View {
-        HStack(spacing: 8) {
-            GlassGroup(spacing: 6) {
-                HStack(spacing: 6) {
-                ForEach(Page.allCases) { p in
-                    Button {
-                        withAnimation(Motion.gentle) { page = p }
-                    } label: {
-                        Label(p.label, systemImage: p.symbol)
-                    }
-                    .glassButton(prominent: page == p)
-                    .controlSize(.large)
-                    .help(p == .table ? "The periodic table" : (p == .lewis ? "Draw a molecule's Lewis structure" : "Build a molecule and turn it in 3D"))
-                }
-                }
-            }
-            Spacer(minLength: 0)
-            Button { tour(0) } label: { Label("Tour", systemImage: "questionmark.circle") }
-                .glassButton()
-                .controlSize(.large)
-                .help("A short tour of the table and its builders")
-        }
+        withAnimation(Motion.gentle) { tourStep = nil }
     }
 
     // MARK: The table
@@ -467,6 +492,7 @@ struct PeriodicTableTool: View {
                 PTGrid(shown: hovered, matches: matches, category: colouring == .category ? category : nil, colouring: colouring,
                        pick: { e, rect in openElement(e, from: rect, in: size) },
                        hover: { e in hovered = e })
+                .tourTarget("ptGrid")
             }
             .frame(maxWidth: 1300)
             Text("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.")
@@ -709,17 +735,104 @@ final class PTSearch: ObservableObject {
 }
 
 /// The search field in the Periodic Table's header.
-struct PTHeaderSearch: View {
+/// (1.3.62) Which page of the full Periodic Table is shown — chosen in the tool's header — and the tour asked for there.
+final class PTNav: ObservableObject {
+    static let shared = PTNav()
+    @Published var page: PeriodicTableTool.Page = .table
+    @Published var tourAsked = 0
+}
+
+/// (1.3.62) The Periodic Table's controls in the tool's header: its pages (Table, Lewis structures, Molecule builder),
+/// Tour, and search — a glass button that opens into a search field, the pages drawing in to their symbols to make room.
+struct PTHeaderControls: View {
+    @ObservedObject private var nav = PTNav.shared
     @ObservedObject private var search = PTSearch.shared
+    @State private var searching = false
+    @FocusState private var focused: Bool
 
     var body: some View {
-        TextField("Symbol, name or number", text: $search.query)
-            .textFieldStyle(.roundedBorder)
-            .font(.sBody)
+        HStack(spacing: 8) {
+            GlassGroup(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(PeriodicTableTool.Page.allCases) { p in
+                        Button {
+                            withAnimation(Motion.gentle) { nav.page = p }
+                        } label: {
+                            Label(p.label, systemImage: p.symbol)
+                                .labelStyle(SquishLabel(squished: searching))
+                        }
+                        .glassButton(prominent: nav.page == p)
+                        .controlSize(.large)
+                        .help(p == .table ? "The periodic table" : (p == .lewis ? "Draw a molecule's Lewis structure" : "Build a molecule and turn it in 3D"))
+                        .tourTarget(p == .lewis ? "ptPageLewis" : (p == .molecules ? "ptPageMolecules" : nil))
+                    }
+                }
+            }
+            Button { nav.tourAsked += 1 } label: {
+                Label("Tour", systemImage: "questionmark.circle").labelStyle(SquishLabel(squished: searching))
+            }
+            .glassButton()
             .controlSize(.large)
-            .frame(width: 240)
-            .tourTarget("ptSearch")
-            .onSubmit { search.submitted += 1 }
+            .help("A short tour of the table and its builders")
+            searchControl.tourTarget("ptSearch")
+        }
+        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: searching)
+        .onChange(of: focused) { _, f in
+            if !f && search.query.isEmpty { searching = false }
+        }
+    }
+
+    @ViewBuilder
+    private var searchControl: some View {
+        if searching {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Symbol, name or number", text: $search.query)
+                    .textFieldStyle(.plain)
+                    .font(.sBody)
+                    .focused($focused)
+                    .frame(width: 210)
+                    .onSubmit { search.submitted += 1 }
+                    .onExitCommand { close() }
+                Button(action: close) { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    .buttonStyle(.plain)
+                    .help("Close the search")
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .glassCard(radius: 17, interactive: true)
+            .transition(.scale(scale: 0.6, anchor: .trailing).combined(with: .opacity))
             .help("Light the elements that match; Return opens the first")
+        } else {
+            Button {
+                searching = true
+                DispatchQueue.main.async { focused = true }
+            } label: {
+                Image(systemName: "magnifyingglass").frame(width: 18)
+            }
+            .glassButton()
+            .controlSize(.large)
+            .keyboardShortcut("f", modifiers: .command)
+            .help("Search the elements (⌘F)")
+            .transition(.scale(scale: 0.6, anchor: .trailing).combined(with: .opacity))
+        }
+    }
+
+    private func close() {
+        search.query = ""
+        focused = false
+        searching = false
+    }
+}
+
+/// A label that draws in to its symbol alone when room is wanted.
+private struct SquishLabel: LabelStyle {
+    let squished: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon
+            if !squished { configuration.title.transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading))) }
+        }
     }
 }

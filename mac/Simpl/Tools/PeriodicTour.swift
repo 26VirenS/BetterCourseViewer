@@ -1,112 +1,84 @@
 import SwiftUI
 
-/// (1.3.59) A short tour of the full Periodic Table, shown the first time it opens (and from its Tour button), each step
-/// setting the tool to what it describes — the table, a colour view, an element's page, the Lewis builder's quick and
-/// drawn ways and its resonance, the 3D builder, search. (1.3.61) A guided tour: each step dims the tool and lights the
-/// control it is about — a spotlight cut round it, ringed — with its card beside it, pointing at it.
+/// (1.3.59) A short tour of the full Periodic Table, shown the first time it opens (and from its Tour button).
+/// (1.3.61) Each step dims the tool and lights the control it is about. (1.3.62) As the app's own tour (Shell/Tour.swift)
+/// is: each step asks for one thing — hover an element, pick a colour view, open an element, see its orbitals, go to the
+/// Lewis builder, choose a preset, draw, look at a resonance structure, go to the 3D builder, turn the model, search —
+/// and moves on by itself once it is done, its card (the app tour's: where it is, what it is, what to do, a bar for how
+/// far) pointing at the control. A Next shows only if a step is left undone a while.
 struct PTTourStep {
-    let symbol: String
+    enum Act {
+        case hover, colour, open, typed
+        case page(PeriodicTableTool.Page)
+        case event(PTTourEvent)
+    }
+    enum Gesture { case click, hover, drag, type }
+
     let title: String
     let text: String
+    /// What to do, said with the gesture it takes.
+    let doing: String
+    var gesture: Gesture = .click
+    let act: Act
     /// The control the step lights (`tourTarget`).
-    var target: String
-    /// An element shown as if pointed at (the table's preview).
-    var hover: Int? = nil
-    var page: PeriodicTableTool.Page = .table
-    var colouring: PTColouring = .category
+    let target: String
+    /// What the tool is set to when the step comes: an element's page, the Lewis builder's preset, the 3D builder's.
     var element: Int? = nil
     var lewis: String? = nil
     var molecule: String? = nil
 
     static let all: [PTTourStep] = [
-        PTTourStep(symbol: "hand.point.up.left", title: "Point at an element",
-                   text: "Its card shows up top. Click it to open its page.", target: "ptCarbon", hover: 6),
-        PTTourStep(symbol: "paintpalette", title: "Colour by a property",
-                   text: "Pick a view. The arrows show its trend.", target: "ptColours", colouring: .electronegativity),
-        PTTourStep(symbol: "atom", title: "Every element, in 3D",
-                   text: "Drag to turn the atom; Orbitals shows their shapes. ← → step through.", target: "ptModel", element: 6),
-        PTTourStep(symbol: "circle.grid.cross", title: "Lewis structures",
-                   text: "Pick a centre atom and what surrounds it.", target: "lewisCentre", page: .lewis, lewis: "H₂O"),
-        PTTourStep(symbol: "pencil", title: "Draw your own",
-                   text: "Click to place, drag to bond, click a bond to change it.", target: "lewisCanvas", page: .lewis, lewis: "Benzene"),
-        PTTourStep(symbol: "arrow.left.arrow.right", title: "Resonance",
-                   text: "Every equivalent structure, side by side. Click one to see it large.", target: "lewisResonance",
-                   page: .lewis, lewis: "NO₃⁻"),
-        PTTourStep(symbol: "rotate.3d", title: "Build it in 3D",
-                   text: "Drag to turn, scroll to zoom, click an atom. Spin on or off up here.", target: "molViewer",
-                   page: .molecules, molecule: "Ethanol"),
-        PTTourStep(symbol: "magnifyingglass", title: "Find anything",
-                   text: "A symbol, name or number. Return opens it.", target: "ptSearch"),
+        PTTourStep(title: "The periodic table", text: "Point at any element to see its card up top.",
+                   doing: "Hover an element", gesture: .hover, act: .hover, target: "ptGrid"),
+        PTTourStep(title: "Colour by a property", text: "Each view colours the table; arrows show its trend.",
+                   doing: "Click Electronegativity", act: .colour, target: "ptColours"),
+        PTTourStep(title: "Every element, in depth", text: "Its page has a 3D atom, its electrons and every fact.",
+                   doing: "Click an element", act: .open, target: "ptGrid"),
+        PTTourStep(title: "Orbitals", text: "See the shapes its electrons fill. Drag to turn it.",
+                   doing: "Click Orbitals", act: .event(.orbitals), target: "ptModel", element: 6),
+        PTTourStep(title: "Lewis structures", text: "Draw any molecule's bonds and lone pairs.",
+                   doing: "Click Lewis structures", act: .page(.lewis), target: "ptPageLewis"),
+        PTTourStep(title: "Start from a preset", text: "Or pick a centre atom and what surrounds it.",
+                   doing: "Choose a preset", act: .event(.preset), target: "lewisPreset"),
+        PTTourStep(title: "Draw your own", text: "Place atoms, drag to bond, click a bond to change it.",
+                   doing: "Click Draw", act: .event(.draw), target: "lewisWay"),
+        PTTourStep(title: "Resonance", text: "Equivalent structures sit side by side.",
+                   doing: "Click a structure", act: .event(.resonance), target: "lewisResonance", lewis: "NO₃⁻"),
+        PTTourStep(title: "Build it in 3D", text: "Open in 3D sends any Lewis structure here too.",
+                   doing: "Click Molecule builder", act: .page(.molecules), target: "ptPageMolecules"),
+        PTTourStep(title: "Turn it", text: "Scroll to zoom; click an atom for its shape.",
+                   doing: "Drag the model", gesture: .drag, act: .event(.turned), target: "molViewer", molecule: "Ethanol"),
+        PTTourStep(title: "Find anything", text: "A symbol, name or number; Return opens it.",
+                   doing: "Search for an element", gesture: .type, act: .typed, target: "ptSearch"),
     ]
 }
 
-/// What the tour asks of the Lewis builder, which keeps its own state: a preset to load, raised each step.
+/// (1.3.62) What a step may wait for that the tool's own state does not show.
+enum PTTourEvent: Equatable { case orbitals, preset, draw, resonance, turned }
+
+/// The tour's word with the parts that keep their own state: a preset for the Lewis builder, and what was just done.
 final class PTTour: ObservableObject {
     static let shared = PTTour()
     @Published var lewisPreset: String?
     @Published var lewisNonce = 0
+    /// Whether the tour is on (nothing done is told it otherwise).
+    var active = false
+    @Published private(set) var event: PTTourEvent?
+    @Published private(set) var events = 0
 
     func showLewis(_ name: String?) {
         lewisPreset = name
         if name != nil { lewisNonce += 1 }
     }
-}
 
-/// The tour's card: the step's sign, title and line; dots for where it is; Skip, Back and Next (Return) or Done.
-struct PTTourCard: View {
-    let step: Int
-    let back: () -> Void
-    let next: () -> Void
-    let skip: () -> Void
-    var width: CGFloat = 440
-
-    var body: some View {
-        let s = PTTourStep.all[step]
-        let last = step == PTTourStep.all.count - 1
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: s.symbol)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(s.title).font(.sBody.weight(.semibold))
-                    Text(s.text).font(.sCallout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                .id(step)
-                .transition(.opacity)
-                Spacer(minLength: 0)
-            }
-            HStack(spacing: 10) {
-                HStack(spacing: 5) {
-                    ForEach(PTTourStep.all.indices, id: \.self) { i in
-                        Capsule()
-                            .fill(i == step ? Theme.accent : Color.primary.opacity(0.18))
-                            .frame(width: i == step ? 16 : 6, height: 6)
-                    }
-                }
-                Spacer(minLength: 8)
-                if !last {
-                    Button("Skip", action: skip)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                        .keyboardShortcut(.cancelAction)
-                }
-                if step > 0 {
-                    Button("Back", action: back).glassButton()
-                }
-                Button(last ? "Done" : "Next", action: next)
-                    .glassButton(prominent: true)
-                    .keyboardShortcut(.defaultAction)
-            }
-            .font(.sCallout.weight(.medium))
-        }
-        .padding(16)
-        .frame(width: width)
-        .glassCard(radius: 20)
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+    /// Something a step may be waiting for, done in the tool.
+    func did(_ e: PTTourEvent) {
+        guard active else { return }
+        event = e
+        events += 1
     }
+
+    func clearEvent() { event = nil }
 }
 
 // MARK: - Where the tour's controls are
@@ -164,16 +136,16 @@ private struct Spotlight: Shape {
 }
 
 /// The guided tour over the tool: the dim with its spotlight, a ring round the control, and the step's card beside it
-/// (under it when there is room, else over it), its arrow pointing at the control. `origin` is the tool's top left in
-/// the window's coordinates; `size` the tool's size.
+/// (under it when there is room, else over it), its arrow pointing at the control. Presses go through to the tool, so
+/// what the step asks can be done. `origin` is the tool's top left in the window's coordinates; `size` the tool's size.
 struct PTTourOverlay: View {
     let step: Int
     let origin: CGPoint
     let size: CGSize
-    let back: () -> Void
+    let stuck: Bool
     let next: () -> Void
-    let skip: () -> Void
     @ObservedObject private var frames = PTTourFrames.shared
+    @State private var cardSize = CGSize(width: PTTourCard.width, height: 170)
 
     var body: some View {
         let s = PTTourStep.all[step]
@@ -181,12 +153,11 @@ struct PTTourOverlay: View {
         // (the control in the tool's coordinates, a little room round it; none yet: a small hole at the middle)
         let hole: CGRect = global.map { $0.offsetBy(dx: -origin.x, dy: -origin.y).insetBy(dx: -8, dy: -8) }
             ?? CGRect(x: size.width / 2 - 1, y: size.height / 2 - 1, width: 2, height: 2)
-        let cardW: CGFloat = 380
-        let cardH: CGFloat = 150
-        let below = hole.maxY + cardH + 24 < size.height || hole.minY - cardH - 24 < 0
-        let x = min(max(hole.midX - cardW / 2, 16), max(16, size.width - cardW - 16))
-        let y = below ? min(hole.maxY + 16, size.height - cardH - 8) : max(hole.minY - cardH - 16, 8)
-        let arrowX = min(max(hole.midX - x, 28), cardW - 28)
+        let w = PTTourCard.width, h = cardSize.height
+        let below = hole.maxY + h + 16 < size.height || hole.minY - h - 16 < 0
+        let x = min(max(hole.midX - w / 2, 16), max(16, size.width - w - 16))
+        let y = below ? min(hole.maxY + 10, size.height - h - 8) : max(hole.minY - h - 10, 8)
+        let arrowAt = hole.midX - x
         ZStack(alignment: .topLeading) {
             Spotlight(hole: hole)
                 .fill(Color.black.opacity(0.42), style: FillStyle(eoFill: true))
@@ -197,34 +168,86 @@ struct PTTourOverlay: View {
                 .offset(x: hole.minX, y: hole.minY)
                 .shadow(color: Theme.accent.opacity(0.6), radius: 10)
                 .allowsHitTesting(false)
-            VStack(spacing: 0) {
-                if below { arrow(up: true).offset(x: arrowX - cardW / 2) }
-                PTTourCard(step: step, back: back, next: next, skip: skip, width: cardW)
-                if !below { arrow(up: false).offset(x: arrowX - cardW / 2) }
-            }
-            .frame(width: cardW)
-            .offset(x: x, y: below ? y - 10 : y)
+            PTTourCard(step: step, arrow: below ? .top : .bottom, arrowAt: arrowAt, stuck: stuck, next: next, cardSize: $cardSize)
+                .offset(x: x, y: y)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .animation(.spring(response: 0.45, dampingFraction: 0.88), value: hole)
         .animation(.spring(response: 0.45, dampingFraction: 0.88), value: step)
     }
-
-    private func arrow(up: Bool) -> some View {
-        Triangle()
-            .fill(.regularMaterial)
-            .frame(width: 22, height: 11)
-            .rotationEffect(.degrees(up ? 0 : 180))
-    }
 }
 
-private struct Triangle: Shape {
-    func path(in r: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: r.midX, y: r.minY))
-        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
-        p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
-        p.closeSubpath()
-        return p
+/// The tour's card, as the app tour's: where it is ("3 of 11"), what it is, what to do with its gesture pulsing, and a
+/// bar for how far — a Next only when the step has been left undone a while (or is the last's Done).
+struct PTTourCard: View {
+    static let width: CGFloat = 300
+
+    let step: Int
+    let arrow: TourArrow
+    let arrowAt: CGFloat
+    let stuck: Bool
+    let next: () -> Void
+    @Binding var cardSize: CGSize
+
+    var body: some View {
+        let s = PTTourStep.all[step]
+        let count = PTTourStep.all.count
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(step + 1) of \(count)")
+                .font(.sFootnote.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+            Text(s.title).font(.sHeadline)
+            Text(s.text)
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 7) {
+                Image(systemName: symbol(s.gesture))
+                    .font(.sCallout.weight(.semibold))
+                    .symbolEffect(.pulse, options: .repeating)
+                Text(s.doing).font(.sCallout.weight(.semibold))
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.top, 2)
+            HStack(spacing: 10) {
+                ProgressView(value: Double(step + 1), total: Double(count))
+                    .progressViewStyle(.linear)
+                    .tint(Theme.accent)
+                    .frame(maxWidth: 90)
+                Spacer(minLength: 6)
+                if stuck {
+                    Button("Next", action: next)
+                        .buttonStyle(.plain)
+                        .font(.sFootnote.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .id(step)
+        .padding(18)
+        .frame(width: PTTourCard.width, alignment: .leading)
+        .background {
+            GeometryReader { p in
+                Color.clear
+                    .onAppear { cardSize = p.size }
+                    .onChange(of: p.size) { _, n in cardSize = n }
+            }
+        }
+        .padding(arrow == .top ? EdgeInsets(top: CalloutMetrics.length, leading: 0, bottom: 0, trailing: 0)
+                                : EdgeInsets(top: 0, leading: 0, bottom: CalloutMetrics.length, trailing: 0))
+        .glass(CalloutShape(arrow: arrow, at: arrowAt))
+        .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Tour, step \(step + 1) of \(count): \(s.title). \(s.doing)")
+    }
+
+    private func symbol(_ g: PTTourStep.Gesture) -> String {
+        switch g {
+        case .click: return "cursorarrow.click"
+        case .hover: return "cursorarrow.rays"
+        case .drag: return "hand.draw"
+        case .type: return "keyboard"
+        }
     }
 }

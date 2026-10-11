@@ -665,8 +665,14 @@ struct LewisMaker: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .tourTarget("lewisWay")
+            .onChange(of: way) { _, w in if w == .draw { PTTour.shared.did(.draw) } }
             heading("Preset")
-            PresetMenu(sections: LewisPresets.sections, selected: preset) { name in load(name) }
+            PresetMenu(sections: LewisPresets.sections, selected: preset) { name in
+                load(name)
+                PTTour.shared.did(.preset)
+            }
+            .tourTarget("lewisPreset")
             if way == .quick { quickControls } else { drawControls }
             heading("Charge")
             HStack {
@@ -697,6 +703,7 @@ struct LewisMaker: View {
             LElementPicker(selected: central) { s in
                 central = s
                 buildQuick()
+                PTTour.shared.did(.preset)
             }
             .tourTarget("lewisCentre")
             heading("Surrounding atoms")
@@ -916,7 +923,10 @@ struct LewisMaker: View {
             HStack(spacing: 6) {
                 ForEach(r.structures.indices, id: \.self) { k in
                     if k > 0 { Text("↔").font(.system(size: 18, weight: .semibold)).foregroundStyle(.secondary) }
-                    Button { withAnimation(Motion.snappy) { shown = k } } label: {
+                    Button {
+                        withAnimation(Motion.snappy) { shown = k }
+                        PTTour.shared.did(.resonance)
+                    } label: {
                         VStack(spacing: 2) {
                             LewisStructureCanvas(graph: graph, structure: r.structures[k], result: r, scale: 0.42, selected: nil, preview: nil)
                                 .frame(width: 130, height: 92)

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Dashboard: the day at a glance, as Simpl's web Dashboard has it (1.2). Six counters, each growing in place into a
@@ -13,6 +14,9 @@ struct DashboardView: View {
     @AppStorage("SimplDashView") private var chosen: DashView = .list // (1.2.1: List unless another is picked)
     @State private var counts: TodayCounts?
     @State private var open: String?
+    /// (1.3.62) Where the opened counter's panel is, in the window, and the watch for a click anywhere else in the app.
+    @State private var panelFrame: CGRect = .zero
+    @State private var clickWatch: Any?
     /// (1.2.8) The opened counter's panel, as tall as what it lists (measured).
     @State private var panelHeight: CGFloat = 0
     @State private var sheetAsked = false
@@ -136,6 +140,14 @@ struct DashboardView: View {
                     .dashMorph(key, in: morph, enabled: !reduceMotion)
                     .frame(width: w, height: panelHeight > 0 ? panelHeight : max(tile.height, 160), alignment: .topLeading)
                     .tourSpot(.counterPanel)
+                    .background {
+                        GeometryReader { p in
+                            let f = p.frame(in: .global)
+                            Color.clear
+                                .onAppear { panelFrame = f }
+                                .onChange(of: f) { _, n in panelFrame = n }
+                        }
+                    }
                     .shadow(color: Color.black.opacity(0.18), radius: 24, y: 10)
                     .id(key)
                     .transition(.opacity)
@@ -146,6 +158,7 @@ struct DashboardView: View {
             }
         }
         .zIndex(1) // (over the page below it)
+        .onDisappear { watchClicks(false) }
     }
 
     private func counterRow(_ row: [Counter], cols: Int) -> some View {
@@ -229,6 +242,23 @@ struct DashboardView: View {
         if key != open { panelHeight = 0 } // (a new panel is measured afresh)
         withAnimation(reduceMotion ? .easeInOut(duration: 0.18) : Motion.gentle) { open = key }
         if key != nil { MacTour.shared.did(.counterOpened) } // (the tour's "The cards open")
+        watchClicks(key != nil)
+    }
+
+    /// (1.3.62) While a counter is open, a click anywhere in the app but its panel — the sidebar, the toolbar, the page —
+    /// folds it back (the click still does what it does; on another counter, that one opens).
+    private func watchClicks(_ on: Bool) {
+        if on, clickWatch == nil {
+            clickWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { e in
+                guard open != nil, let view = e.window?.contentView else { return e }
+                let p = CGPoint(x: e.locationInWindow.x, y: view.bounds.height - e.locationInWindow.y)
+                if !panelFrame.insetBy(dx: -2, dy: -2).contains(p) { setOpen(nil) }
+                return e
+            }
+        } else if !on, let w = clickWatch {
+            NSEvent.removeMonitor(w)
+            clickWatch = nil
+        }
     }
 
     // MARK: - The view and the side column

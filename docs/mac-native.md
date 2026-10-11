@@ -209,6 +209,18 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   drawing and its resonance; the 3D viewer; the search in the header), ringed, its card beside it pointing at it — the
   hole and the card moving from step to step. Controls name themselves to it with `tourTarget` (their place on screen,
   kept in `PTTourFrames`).
+  (1.3.62) The tour is interactive, as the app's own (Shell/Tour.swift): each step asks for one thing — hover an
+  element, pick a colour view, open an element, see its orbitals, go to the Lewis builder, choose a preset, draw, click a
+  resonance structure, go to the 3D builder, drag the model, search — and moves on by itself once it is done, its card
+  the app tour's (where it is, what it is, what to do with its gesture pulsing, a bar for how far, its arrow on the
+  card's glass), a Next only if a step is left undone twelve seconds. The pages (Table, Lewis structures, Molecule
+  builder), Tour and search are in the tool's header (`PTHeaderControls`, `PTNav`): search a glass button that opens
+  into a field (⌘F), the pages drawing in to their symbols to make room; the header shows the table's name alone.
+  In dark mode, Alta's graphs and drawings (a graph's box by its name — Learnosity's, JSXGraph's — or an SVG at least
+  140 × 100, marked `data-simpl-pic`) are turned back whole, labels and all. Alta's page goes out of sight again
+  between parts (the app's Loading) for as long as Alta may take — never shown as it is in the meantime — the page's own
+  ground cleared while it is out of sight, and a new page's glass panels and buttons put away at once.
+  The Dashboard's opened counter is 440 points wide, and a click anywhere in the app but its panel folds it back.
 
 ## Building and running
 

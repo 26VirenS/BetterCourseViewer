@@ -415,14 +415,17 @@ struct ToolHeader: View {
                 Text(kind.name)
                     .font(.sTitle)
                     .lineLimit(1)
-                Text(kind.note)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                // (1.3.62) the Periodic Table's header its name alone
+                if kind != .ptable {
+                    Text(kind.note)
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 12)
             // (1.3.54) the Periodic Table's search, left of its pin
-            if kind == .ptable { PTHeaderSearch() }
+            if kind == .ptable { PTHeaderControls() }
             Button {
                 tools.togglePin(kind)
             } label: {
