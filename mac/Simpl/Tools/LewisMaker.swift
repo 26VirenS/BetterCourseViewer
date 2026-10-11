@@ -659,8 +659,8 @@ struct LewisMaker: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            heading("Presets")
-            FlowChips(items: LewisPresets.all.map(\.name), selected: preset) { name in load(name) }
+            heading("Preset")
+            PresetMenu(sections: LewisPresets.sections, selected: preset) { name in load(name) }
             if way == .quick { quickControls } else { drawControls }
             heading("Charge")
             HStack {
@@ -688,7 +688,7 @@ struct LewisMaker: View {
     private var quickControls: some View {
         VStack(alignment: .leading, spacing: 14) {
             heading("Central atom")
-            elementGrid(selected: central) { s in
+            LElementPicker(selected: central) { s in
                 central = s
                 buildQuick()
             }
@@ -714,7 +714,7 @@ struct LewisMaker: View {
     private var drawControls: some View {
         VStack(alignment: .leading, spacing: 14) {
             heading("Element")
-            elementGrid(selected: element) { s in
+            LElementPicker(selected: element) { s in
                 element = s
                 // (an atom selected takes the element picked)
                 if let id = selected, let i = graph.atoms.firstIndex(where: { $0.id == id }) {
@@ -746,31 +746,6 @@ struct LewisMaker: View {
                 }
             }
             .controlSize(.small)
-        }
-    }
-
-    /// The main-group elements as a small table.
-    private func elementGrid(selected sel: String, pick: @escaping (String) -> Void) -> some View {
-        VStack(spacing: 4) {
-            ForEach(LChem.palette.indices, id: \.self) { row in
-                HStack(spacing: 4) {
-                    ForEach(LChem.palette[row].indices, id: \.self) { col in
-                        if let s = LChem.palette[row][col] {
-                            Button { pick(s) } label: {
-                                Text(s)
-                                    .font(.system(size: 11.5, weight: .bold))
-                                    .foregroundStyle(sel == s ? Color.white : LChem.color(s))
-                                    .frame(maxWidth: .infinity, minHeight: 24)
-                                    .background(sel == s ? Theme.accent : Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .help(LChem.element(s)?.name ?? s)
-                        } else {
-                            Color.clear.frame(maxWidth: .infinity, minHeight: 24)
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -1082,6 +1057,25 @@ enum LewisPresets {
         }
     }
 
+    /// The presets in groups, for the dropdown.
+    static let sections: [(String, [String])] = {
+        let special = ["B₂H₆", "Fe(CO)₅"], ionic = ["NaCl", "MgCl₂", "NaNO₃"]
+        var simple: [String] = [], two: [String] = [], bigger: [String] = [], ions: [String] = [], radicals: [String] = []
+        var ionicOut: [String] = [], specialOut: [String] = []
+        for p in all {
+            if special.contains(p.name) { specialOut.append(p.name) }
+            else if ionic.contains(p.name) { ionicOut.append(p.name) }
+            else if p.name.contains("radical") { radicals.append(p.name) }
+            else if p.charge != 0 { ions.append(p.name) }
+            else if p.quick != nil { simple.append(p.name) }
+            else if p.atoms.count <= 2 { two.append(p.name) }
+            else { bigger.append(p.name) }
+        }
+        let groups: [(String, [String])] = [("Simple molecules", simple), ("Two atoms", two), ("Bigger molecules", bigger), ("Ions", ions),
+                                         ("Radicals", radicals), ("Ionic compounds", ionicOut), ("Special cases", specialOut)]
+        return groups.filter { !$0.1.isEmpty }
+    }()
+
     static let all: [Preset] = [
         Preset(name: "H₂O", quick: ("O", ["H", "H"])),
         Preset(name: "CO₂", quick: ("C", ["O", "O"])),
@@ -1261,7 +1255,11 @@ struct LewisStructureCanvas: View {
                 path.addLine(to: CGPoint(x: rect.maxX - 7, y: rect.maxY))
                 ctx.stroke(path, with: .color(.secondary), lineWidth: 1.6)
             }
-            ctx.draw(Text(LChem.chargeText(ion.charge)).font(.system(size: 17 * max(scale, 0.7), weight: .bold)).foregroundColor(.primary),
+            // (plain digits and signs: superscript ones draw too small to read)
+            let q = ion.charge
+            let sign: String = q > 0 ? "+" : "−"
+            let qt: String = (abs(q) > 1 ? "\(abs(q))" : "") + sign
+            ctx.draw(Text(qt).font(.system(size: 19 * max(scale, 0.7), weight: .bold)).foregroundColor(.primary),
                      at: CGPoint(x: rect.maxX + 10, y: rect.minY + 4))
         }
     }
@@ -1429,62 +1427,89 @@ struct LewisEditorCanvas: View {
     }
 }
 
-/// Chips that wrap onto as many lines as they need.
-struct FlowChips: View {
-    let items: [String]
+/// (1.3.55) A dropdown of presets in named groups, showing the one loaded (or a placeholder for one's own).
+struct PresetMenu: View {
+    let sections: [(String, [String])]
     let selected: String?
-    let tap: (String) -> Void
+    var placeholder = "Your own"
+    let pick: (String) -> Void
 
     var body: some View {
-        FlowLayout(spacing: 6) {
-            ForEach(items, id: \.self) { item in
-                Button { tap(item) } label: {
-                    Text(item)
-                        .font(.sCallout.weight(.semibold))
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 5)
-                        .foregroundStyle(selected == item ? Color.white : Color.primary)
-                        .background(selected == item ? Theme.accent : Color.primary.opacity(0.08), in: Capsule())
+        Menu {
+            ForEach(sections.indices, id: \.self) { k in
+                Section(sections[k].0) {
+                    ForEach(sections[k].1, id: \.self) { name in
+                        Button { pick(name) } label: { item(name) }
+                    }
                 }
-                .buttonStyle(.plain)
             }
+        } label: {
+            Text(selected ?? placeholder)
         }
+        .controlSize(.large)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func item(_ name: String) -> some View {
+        if name == selected { Label(name, systemImage: "checkmark") } else { Text(name) }
     }
 }
 
-/// Views laid left to right, onto a new line when the next would not fit.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
+/// (1.3.55) An element shown as a card (symbol, name, valence electrons, how many it can hold) with a menu of the
+/// main-group elements, group by group, to change it.
+struct LElementPicker: View {
+    let selected: String
+    let pick: (String) -> Void
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 300
-        var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0, widest: CGFloat = 0
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > 0 && x + s.width > width {
-                x = 0
-                y += line + spacing
-                line = 0
+    /// The palette's columns as groups: 1, 2, then 13 to 18.
+    static let groups: [(String, [String])] = {
+        let names = ["Group 1", "Group 2", "Group 13", "Group 14", "Group 15", "Group 16", "Group 17", "Group 18"]
+        var out: [(String, [String])] = []
+        for (col, name) in names.enumerated() {
+            var members: [String] = []
+            for row in LChem.palette where col < row.count {
+                if let s = row[col] { members.append(s) }
             }
-            x += s.width + spacing
-            line = max(line, s.height)
-            widest = max(widest, x - spacing)
+            out.append((name, members))
         }
-        return CGSize(width: min(width, widest), height: y + line)
+        return out
+    }()
+
+    private func name(_ s: String) -> String { LChem.element(s)?.name ?? s }
+
+    var body: some View {
+        let colour: Color = LChem.color(selected)
+        let detail: String = "\(LChem.valence(selected)) valence e⁻ · holds up to \(LChem.maxElectrons(selected))"
+        HStack(spacing: 12) {
+            Text(selected)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(colour)
+                .frame(width: 44, height: 44)
+                .background(colour.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name(selected)).font(.sBody.weight(.semibold))
+                Text(detail).font(.sCaption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            Menu("Change") {
+                ForEach(Self.groups.indices, id: \.self) { k in
+                    Section(Self.groups[k].0) {
+                        ForEach(Self.groups[k].1, id: \.self) { s in
+                            Button { pick(s) } label: { item(s) }
+                        }
+                    }
+                }
+            }
+            .fixedSize()
+        }
+        .padding(10)
+        .card(radius: 14)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, line: CGFloat = 0
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + s.width > bounds.maxX {
-                x = bounds.minX
-                y += line + spacing
-                line = 0
-            }
-            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
-            x += s.width + spacing
-            line = max(line, s.height)
-        }
+    @ViewBuilder
+    private func item(_ s: String) -> some View {
+        let text = "\(s)  \(name(s))"
+        if s == selected { Label(text, systemImage: "checkmark") } else { Text(text) }
     }
 }

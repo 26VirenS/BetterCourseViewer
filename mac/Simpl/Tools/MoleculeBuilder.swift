@@ -69,6 +69,10 @@ final class MoleculeModel: ObservableObject {
 
     static let presets = ["Water", "Ammonia", "Methane", "Carbon dioxide", "Formaldehyde", "Ethylene", "Acetylene", "Ethanol",
                           "Acetic acid", "Hydrogen peroxide", "Benzene", "Sulfur hexafluoride"]
+    static let presetSections: [(String, [String])] = [
+        ("Small molecules", ["Water", "Ammonia", "Methane", "Carbon dioxide", "Formaldehyde", "Hydrogen peroxide", "Sulfur hexafluoride"]),
+        ("Carbon compounds", ["Ethylene", "Acetylene", "Ethanol", "Acetic acid", "Benzene"]),
+    ]
 
     init(empty: Bool = false) { if !empty { loadPreset("Water") } }
 
@@ -459,8 +463,9 @@ struct MoleculeBuilder: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: 14) {
             Group {
-            heading("Presets")
-            FlowChips(items: MoleculeModel.presets, selected: model.title) { name in
+            heading("Preset")
+            PresetMenu(sections: MoleculeModel.presetSections,
+                       selected: MoleculeModel.presets.contains(model.title) ? model.title : nil) { name in
                 withAnimation(Motion.snappy) { model.loadPreset(name) }
             }
             heading("Add atom")

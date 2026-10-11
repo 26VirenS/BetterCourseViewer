@@ -166,6 +166,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `scripts/dev/mac-shots.sh` pictures the table coloured by electronegativity with its trends, carbon's and iron's pages,
   the Lewis maker and the builder (`-SimplPTColour`, `-SimplPTTrends`, `-SimplPTElement`, `-SimplPTPage`,
   `-SimplPTMolecule`).
+  (1.3.55) The Lewis and 3D builders' presets are one grouped dropdown each (`PresetMenu`; `LewisPresets.sections`,
+  `MoleculeModel.presetSections`) instead of rows of chips, and an element (the central atom, or the one to draw) is a
+  card — symbol, name, valence electrons, most it holds — with a Change menu of the main-group elements by group
+  (`LElementPicker`). Drawings fit their space (shrunk and centred, held still while the pointer is down), rings start
+  as regular polygons, and an ion's charge is drawn in plain digits and signs, full size.
 
 ## Building and running
 

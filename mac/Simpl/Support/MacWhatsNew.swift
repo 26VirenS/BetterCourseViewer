@@ -9,6 +9,11 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.55", date: "2026-10-11", notes: [
+            ReleaseNote(kind: "improved", title: "Presets in a menu", body: "Lewis and 3D presets sit in one tidy grouped menu."),
+            ReleaseNote(kind: "improved", title: "Easier atom picking", body: "Pick the central atom from a menu, group by group."),
+            ReleaseNote(kind: "fixed", title: "Readable ion charges", body: "An ion's charge, like Na⁺'s, is drawn full size."),
+        ]),
         Release(version: "1.3.54", date: "2026-10-11", notes: [
             ReleaseNote(kind: "new", title: "Draw any molecule", body: "Chains, rings and pairs: draw it, the bonds sort out."),
             ReleaseNote(kind: "new", title: "Resonance and radicals", body: "Every resonance structure, odd electrons, ions."),
