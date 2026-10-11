@@ -315,14 +315,13 @@ struct PeriodicTableTool: View {
     @State private var open: PTElement?
     @State private var anchor: UnitPoint = .center
     @State private var hovered: PTElement?
-    @State private var query = ""
+    @ObservedObject private var search = PTSearch.shared
     @State private var category: String?
     @State private var colouring: PTColouring = .category
-    @State private var trends = false
     @StateObject private var molecule = MoleculeModel()
 
     private var matches: Set<Int>? {
-        let q = query.trimmingCharacters(in: .whitespaces)
+        let q = search.query.trimmingCharacters(in: .whitespaces)
         return q.isEmpty ? nil : Set(PeriodicTable.find(q).map(\.number))
     }
 
@@ -345,8 +344,8 @@ struct PeriodicTableTool: View {
                             .frame(maxWidth: .infinity)
                         switch page {
                         case .table: table(root.size)
-                        case .lewis: LewisMaker { lewis in
-                            molecule.load(lewis: lewis)
+                        case .lewis: LewisMaker { graph, structure in
+                            molecule.load(graph: graph, structure: structure)
                             withAnimation(Motion.gentle) { page = .molecules }
                         }
                         case .molecules: MoleculeBuilder(model: molecule)
@@ -358,15 +357,21 @@ struct PeriodicTableTool: View {
             .frame(width: root.size.width, height: root.size.height, alignment: .top)
         }
         .coordinateSpace(name: "ptRoot")
+        // (1.3.54) the search, in the tool's header: Return opens the first element it finds
+        .onChange(of: search.submitted) { _, _ in
+            guard let m = PeriodicTable.find(search.query).first else { return }
+            search.query = ""
+            anchor = .center
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = m }
+        }
         .onAppear {
             if let raw = ToolsCenter.shared.takeInfo("element"), let n = Int(raw), let e = PeriodicTable.byNumber(n) {
                 anchor = .center
                 open = e
             }
-            // (the screenshot suite: -SimplPTColour, -SimplPTTrends, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
+            // (the screenshot suite: -SimplPTColour, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
             let d = UserDefaults.standard
             if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
-            if d.bool(forKey: "SimplPTTrends") { trends = true }
             if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { page = v }
             if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
             let n = d.integer(forKey: "SimplPTElement")
@@ -426,22 +431,12 @@ struct PeriodicTableTool: View {
 
     private var top: some View {
         HStack(alignment: .center, spacing: 16) {
-            TextField("Symbol, name or number", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .font(.sBody)
-                .controlSize(.large)
-                .frame(width: 260)
-                .onSubmit {
-                    if let m = PeriodicTable.find(query).first {
-                        query = ""
-                        anchor = .center
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = m }
-                    }
-                }
             if colouring == .category {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(PTCategory.all) { c in legendChip(c) }
+                    GlassGroup(spacing: 6) {
+                        HStack(spacing: 6) {
+                            ForEach(PTCategory.all) { c in legendChip(c) }
+                        }
                     }
                     .padding(.vertical, 2)
                 }
@@ -488,42 +483,31 @@ struct PeriodicTableTool: View {
         }
     }
 
+    /// (1.3.54) What the table is coloured by, as glass buttons (the one chosen prominent).
     private var colourBar: some View {
-        HStack(spacing: 12) {
-            Text("Colour by").font(.sCallout).foregroundStyle(.secondary)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            GlassGroup(spacing: 6) {
+                HStack(spacing: 6) {
                     ForEach(PTColouring.allCases) { c in
                         Button {
                             withAnimation(Motion.gentle) { colouring = c }
                         } label: {
-                            Text(c.label)
-                                .font(.sCaption.weight(colouring == c ? .semibold : .regular))
-                                .padding(.horizontal, 11)
-                                .padding(.vertical, 6)
-                                .background(colouring == c ? Color.primary.opacity(0.14) : Color.clear, in: Capsule())
-                                .contentShape(Capsule())
+                            Text(c.label).font(.sCallout.weight(colouring == c ? .semibold : .regular))
                         }
-                        .buttonStyle(.plain)
+                        .glassButton(prominent: colouring == c)
+                        .help("Colour the table by \(c.label.lowercased())")
                     }
                 }
-                .padding(4)
-                .background(Color.primary.opacity(0.05), in: Capsule())
             }
-            Toggle("Trend arrows", isOn: $trends.animation(Motion.gentle))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .font(.sCallout)
-                .disabled(colouring.trend == nil)
-                .help(colouring.trend == nil ? "\(colouring.label) has no simple trend across the table" : "Show how \(colouring.label.lowercased()) changes across the table")
+            .padding(.vertical, 2)
         }
     }
 
-    /// The table with its trend arrows, when they are on: across the top, the trend across a period; down the side, the
-    /// trend in a group.
+    /// The table with its trend arrows — (1.3.54) always, for a property with a simple trend: across the top, the trend
+    /// across a period; down the side, the trend in a group.
     @ViewBuilder
     private func trendWrap<G: View>(@ViewBuilder _ grid: () -> G) -> some View {
-        if trends, let t = colouring.trend {
+        if let t = colouring.trend {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
                     if t.across < 0 { Image(systemName: "arrow.left").font(.system(size: 13, weight: .bold)) }
@@ -558,21 +542,18 @@ struct PeriodicTableTool: View {
         }
     }
 
+    /// (1.3.54) A kind's chip, in glass of its colour: filled when it lights its elements.
     private func legendChip(_ c: PTCategory) -> some View {
         let on = category == c.key
         return Button {
             withAnimation(Motion.snappy) { category = on ? nil : c.key }
         } label: {
             HStack(spacing: 6) {
-                Circle().fill(c.color).frame(width: 9, height: 9)
+                Circle().fill(on ? Color.white : c.color).frame(width: 9, height: 9)
                 Text(c.label).font(.sCaption.weight(.medium))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(c.color.opacity(on ? 0.3 : 0.1), in: Capsule())
-            .overlay(Capsule().strokeBorder(on ? c.color : Color.clear, lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .glassChip(c.color, on: on)
         .help(on ? "Show every kind" : "Light the \(c.label.lowercased()) elements")
     }
 }
@@ -653,5 +634,28 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
         .padding(.bottom, 24)
         .frame(maxWidth: 1480 + 80)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// (1.3.54) The Periodic Table's search, kept here so the tool's header can hold its field (left of the pin).
+final class PTSearch: ObservableObject {
+    static let shared = PTSearch()
+    @Published var query = ""
+    /// Raised by Return in the field: the table opens the first element it finds.
+    @Published var submitted = 0
+}
+
+/// The search field in the Periodic Table's header.
+struct PTHeaderSearch: View {
+    @ObservedObject private var search = PTSearch.shared
+
+    var body: some View {
+        TextField("Symbol, name or number", text: $search.query)
+            .textFieldStyle(.roundedBorder)
+            .font(.sBody)
+            .controlSize(.large)
+            .frame(width: 240)
+            .onSubmit { search.submitted += 1 }
+            .help("Light the elements that match; Return opens the first")
     }
 }

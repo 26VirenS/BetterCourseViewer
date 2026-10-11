@@ -124,9 +124,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25
   # (1.3.52) the full Periodic Table: coloured by electronegativity with its trend arrows; an element's page; the Lewis
   # maker; the 3D molecule builder
-  SIZE=1440x920 shoot light-55-ptable-trends 14 -SimplPlace tools -SimplTool ptable -SimplPTColour electronegativity -SimplPTTrends YES
+  SIZE=1440x920 shoot light-55-ptable-trends 14 -SimplPlace tools -SimplTool ptable -SimplPTColour electronegativity
   SIZE=1440x920 shoot light-55b-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6
-  SIZE=1440x920 shoot light-55c-ptable-lewis 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis
+  SIZE=1440x920 shoot light-55c-ptable-lewis 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NO₃⁻"
+  SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset Benzene
+  SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NaNO₃"
   SIZE=1440x920 shoot light-55d-ptable-molecule 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Ethanol
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark

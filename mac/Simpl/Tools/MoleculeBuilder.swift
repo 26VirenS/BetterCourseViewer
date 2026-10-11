@@ -14,6 +14,8 @@ struct MBAtom: Identifiable, Equatable {
     let id: Int
     var symbol: String
     var pos: SIMD3<Double>
+    /// (1.3.54) Its lone electrons as the Lewis builder placed them (else worked out from its bonds).
+    var lone: Int? = nil
 }
 
 struct MBBond: Identifiable, Equatable {
@@ -36,7 +38,7 @@ enum MBChem {
     static func usual(_ s: String) -> Int { allowed[s]?.first ?? 4 }
     static func most(_ s: String) -> Int { allowed[s]?.max() ?? 4 }
     static func element(_ s: String) -> PTElement? { PeriodicTable.elements.first { $0.symbol == s } }
-    static func valence(_ s: String) -> Int { Lewis.valence[s] ?? element(s)?.valenceElectrons ?? 4 }
+    static func valence(_ s: String) -> Int { LChem.valence(s) }
     static func covalent(_ s: String) -> Double { (element(s)?.extra?.covalent ?? 75) / 100 }
     static func vdw(_ s: String) -> Double { (element(s)?.extra?.vanDerWaals ?? 170) / 100 }
     static func color(_ s: String) -> NSColor { s == "H" ? NSColor(white: 0.95, alpha: 1) : NSColor(ptHex: element(s)?.extra?.cpk ?? "c8c8c8") }
@@ -68,7 +70,7 @@ final class MoleculeModel: ObservableObject {
     static let presets = ["Water", "Ammonia", "Methane", "Carbon dioxide", "Formaldehyde", "Ethylene", "Acetylene", "Ethanol",
                           "Acetic acid", "Hydrogen peroxide", "Benzene", "Sulfur hexafluoride"]
 
-    init() { loadPreset("Water") }
+    init(empty: Bool = false) { if !empty { loadPreset("Water") } }
 
     // MARK: Questions
 
@@ -77,6 +79,7 @@ final class MoleculeModel: ObservableObject {
     func neighbours(_ id: Int) -> [Int] { bonds.compactMap { $0.a == id ? $0.b : ($0.b == id ? $0.a : nil) } }
 
     func lonePairCount(_ a: MBAtom) -> Int {
+        if let l = a.lone { return l / 2 }
         if a.symbol == "H" || a.symbol == "B" { return 0 }
         return max(0, (MBChem.valence(a.symbol) - bondSum(a.id)) / 2)
     }
@@ -140,10 +143,7 @@ final class MoleculeModel: ObservableObject {
     /// The shape round an atom, by its bonded atoms and lone pairs.
     func shape(at id: Int) -> String {
         guard let a = atom(id) else { return "" }
-        let s = LewisStructure(central: a.symbol, centralLonePairs: lonePairCount(a), radical: false,
-                               terminals: neighbours(id).enumerated().map { LewisAtom(id: $0.offset, symbol: atom($0.element)?.symbol ?? "H", bond: 1, lonePairs: 0) },
-                               charge: 0, valenceTotal: 0, centralFormal: 0, problem: nil)
-        return s.shape.name
+        return LChem.shape(bonded: neighbours(id).count, lone: lonePairCount(a)).name
     }
 
     // MARK: Changes
@@ -296,14 +296,24 @@ final class MoleculeModel: ObservableObject {
         framing += 1
     }
 
-    func load(lewis s: LewisStructure) {
+    /// (1.3.54) The Lewis builder's molecule: its atoms where they were drawn (lifted into 3D), its bonds with their
+    /// orders, each atom's lone electrons as placed — then shaped.
+    func load(graph g: LGraph, structure st: LStructure) {
         clear()
-        title = s.formula
-        let c = MBAtom(id: nextID, symbol: s.central, pos: .zero)
-        nextID += 1
-        atoms.append(c)
-        for t in s.terminals { place(t.symbol, on: c.id, order: t.bond) }
-        selected = c.id
+        title = LChem.formula(g.atoms.map(\.symbol), charge: g.charge)
+        var map: [Int: Int] = [:]
+        for a in g.atoms {
+            let z = sin(Double(a.id) * 1.7) * 0.4
+            atoms.append(MBAtom(id: nextID, symbol: a.symbol, pos: SIMD3(Double(a.pos.x) / 55, -Double(a.pos.y) / 55, z), lone: st.lone[a.id] ?? 0))
+            map[a.id] = nextID
+            nextID += 1
+        }
+        for b in g.bonds {
+            guard let x = map[b.a], let y = map[b.b] else { continue }
+            bonds.append(MBBond(id: nextID, a: x, b: y, order: st.orders[b.id] ?? b.order))
+            nextID += 1
+        }
+        selected = atoms.first?.id
         relax(iterations: 900)
         framing += 1
     }

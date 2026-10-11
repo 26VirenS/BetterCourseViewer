@@ -392,12 +392,13 @@ enum AltaHook {
             return { el: b, label: String(b.innerText || b.textContent || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim() };
           }).filter(function (x) { return x.label; });
         };
+        var DIALOG_CSS = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }\n'
+          // (1.3.54) its picture taken without its buttons — the app's sheet has them as its own
+          + 'html[data-simpl-dialog-shot] [data-simpl-dialog] :is(button, [role="button"]) { visibility: hidden !important; }\n';
         var dialogStyle = function () {
-          if (document.getElementById('simpl-dialog')) return;
-          var st = document.createElement('style');
-          st.id = 'simpl-dialog';
-          st.textContent = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }';
-          (document.head || document.documentElement).appendChild(st);
+          var st = document.getElementById('simpl-dialog');
+          if (!st) { st = document.createElement('style'); st.id = 'simpl-dialog'; (document.head || document.documentElement).appendChild(st); }
+          if (st.textContent !== DIALOG_CSS) st.textContent = DIALOG_CSS;
         };
         var dialogTick = function () {
           var d = dialogNow();
@@ -424,7 +425,16 @@ enum AltaHook {
         window.__simplDialog = {
           // (shown in the page — for its picture, or given back — or hidden while the app shows it)
           show: function (on) { document.documentElement.toggleAttribute('data-simpl-native-dialog', !on); return true; },
-          rect: function () { if (!dialogEl) return null; var r = dialogEl.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; },
+          // (its picture: buttons hidden for the moment it is taken, and the row of them at its foot cropped off)
+          shot: function (on) { document.documentElement.toggleAttribute('data-simpl-dialog-shot', !!on); return true; },
+          rect: function () {
+            if (!dialogEl) return null;
+            var r = dialogEl.getBoundingClientRect(), bottom = r.bottom;
+            var low = dialogButtons(dialogEl).map(function (b) { return b.el.getBoundingClientRect(); })
+              .filter(function (b) { return b.height > 0 && b.top > r.top + r.height * 0.5; });
+            if (low.length) bottom = Math.min.apply(null, low.map(function (b) { return b.top; })) - 6;
+            return { x: r.left, y: r.top, w: r.width, h: Math.max(24, bottom - r.top) };
+          },
           press: function (i) { if (!dialogEl) return false; var b = dialogButtons(dialogEl)[i]; if (!b) return false; b.el.click(); return true; }
         };
         var tick = function () {
@@ -623,8 +633,9 @@ final class AltaSession: ObservableObject {
 
     /// A picture of Alta's pop-up as it draws it, shown in the page for the moment it is taken.
     private func dialogPicture() async -> NSImage? {
-        _ = await run("return window.__simplDialog ? window.__simplDialog.show(true) : null", in: nil)
+        _ = await run("return window.__simplDialog ? (window.__simplDialog.show(true), window.__simplDialog.shot(true)) : null", in: nil)
         try? await Task.sleep(nanoseconds: 80_000_000)
+        defer { Task { _ = await run("return window.__simplDialog ? window.__simplDialog.shot(false) : null", in: nil) } }
         guard let r = await run("return window.__simplDialog ? window.__simplDialog.rect() : null", in: nil) as? [String: Any],
               let x = (r["x"] as? NSNumber)?.doubleValue, let y = (r["y"] as? NSNumber)?.doubleValue,
               let w = (r["w"] as? NSNumber)?.doubleValue, let h = (r["h"] as? NSNumber)?.doubleValue, w > 4, h > 4 else { return nil }

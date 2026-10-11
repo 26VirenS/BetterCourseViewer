@@ -421,6 +421,8 @@ struct ToolHeader: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 12)
+            // (1.3.54) the Periodic Table's search, left of its pin
+            if kind == .ptable { PTHeaderSearch() }
             Button {
                 tools.togglePin(kind)
             } label: {

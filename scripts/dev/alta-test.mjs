@@ -143,6 +143,16 @@ try {
   const dlg = await waitFor((p) => p.kind === 'dialog' && p.open === true, 'the pop-up passed to the app');
   check(/Having trouble/.test(dlg.text) && dlg.buttons.join() === 'VIEW INSTRUCTION' && (await page.evaluate(() => document.getElementById('dlg').hasAttribute('data-simpl-dialog'))),
     `an open pop-up of Alta's is passed to the app, its words and buttons (${JSON.stringify(dlg.buttons)})`);
+  // (1.3.54) its picture taken without its buttons: hidden for that moment, the row at its foot cropped off
+  const full = await page.evaluate(() => document.querySelector('#dlg [role=dialog]').getBoundingClientRect().height);
+  await page.evaluate(() => window.__simplDialog.shot(true));
+  const hiddenBtn = await page.evaluate(() => getComputedStyle(document.getElementById('vi')).visibility);
+  await page.evaluate(() => window.__simplDialog.shot(false));
+  check(hiddenBtn === 'hidden' && (await page.evaluate(() => getComputedStyle(document.getElementById('vi')).visibility)) === 'visible', 'for its picture, the pop-up’s own buttons are hidden for that moment');
+  await page.evaluate(() => { const d = document.querySelector('#dlg [role=dialog]'); d.style.paddingBottom = '10px'; d.insertAdjacentHTML('afterbegin', '<p style="height:120px;margin:0">Welcome to your adaptive assignment!</p>'); });
+  const cropped = await page.evaluate(() => window.__simplDialog.rect());
+  const btnTop = await page.evaluate(() => document.getElementById('vi').getBoundingClientRect().top - document.querySelector('#dlg [role=dialog]').getBoundingClientRect().top);
+  check(cropped.h <= btnTop && cropped.h > 100, `and its picture stops above the row of buttons at its foot (${cropped.h} px of ${Math.round(full + 120)}, buttons at ${Math.round(btnTop)})`);
   const rect = await page.evaluate(() => window.__simplDialog.rect());
   await page.evaluate(() => window.__simplDialog.show(false));
   check(rect && rect.w > 10 && rect.h > 10 && (await page.evaluate(() => getComputedStyle(document.querySelector('#dlg [role=dialog]')).visibility)) === 'hidden',

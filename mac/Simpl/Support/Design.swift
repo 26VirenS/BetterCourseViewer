@@ -45,6 +45,16 @@ extension View {
         glass(Capsule(), tint: tint, interactive: interactive)
     }
 
+    /// (1.3.54) A chip drawn in glass tinted with its colour (macOS 26), filled with it when on; bordered before.
+    @ViewBuilder
+    func glassChip(_ color: Color, on: Bool) -> some View {
+        if #available(macOS 26.0, *) {
+            if on { self.buttonStyle(.glassProminent).tint(color) } else { self.buttonStyle(.glass).tint(color.opacity(0.5)) }
+        } else {
+            self.buttonStyle(.bordered).tint(on ? color : color.opacity(0.6))
+        }
+    }
+
     /// A button drawn in glass (macOS 26), prominent in the accent if asked; bordered before.
     @ViewBuilder
     func glassButton(prominent: Bool = false) -> some View {
