@@ -269,6 +269,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   indeterminate bar, something `aria-busy`, or words saying it is loading, stay out of sight (the popup's skeleton) for
   up to 20 seconds, and a question with something still loading in it waits up to 4 seconds before it shows; the
   overview waits the same way. The haze behind the quiz popups' floating buttons is a blurred capsule, with no edges.
+  (1.3.71) 1.3.70 as a release proper (the betas 1.3.66–1.3.70 for every Mac): a beta's release is never edited into
+  a release, so the same code goes out again under the next version.
 
 ## Building and running
 
