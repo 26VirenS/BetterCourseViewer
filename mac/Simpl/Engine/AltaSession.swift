@@ -291,24 +291,39 @@ enum AltaHook {
         }
         return { ok: done > 0, filled: done };
       };
-      var verdictNow = function () {
-        var any = function (sel) { return [].slice.call(document.querySelectorAll(sel)).some(shown); };
-        var bad = any('.lrn_incorrect, .lrn-incorrect, [class*="incorrect" i]');
-        var good = any('.lrn_correct, .lrn-correct');
-        var boxes = [].slice.call(document.querySelectorAll('[class*="feedback" i], [role="alert"], [aria-live]')).filter(function (b) { return shown(b) && !b.matches(CLICKABLE); });
-        var text = boxes.map(function (b) { return (b.innerText || '').trim(); }).filter(Boolean).join('\n').slice(0, 1200);
-        var v = null;
-        if (bad || /\b(incorrect|not quite|try again|not correct)\b/i.test(text)) v = 'incorrect';
-        else if (good || /\b(correct|well done|great job|nice work)\b/i.test(text)) v = 'correct';
-        return { verdict: v, text: text, next: buttons(NEXT).length > 0, check: buttons(CHECK).length > 0 };
+      // (1.3.39) what Alta says of an answer: the newest word on the page — Alta keeps each attempt's verdict (Answer 1:
+      // That's incorrect… Answer 2: Perfect…), so any "incorrect" in sight is no verdict on the last; and only what came
+      // after Check was pressed (`was`: the marks and words there before, with their words then)
+      var BADWORDS = /\b(incorrect|not quite|try again|not correct|wrong|mistakes? (are|is) part of learning)\b/i;
+      var GOODWORDS = /\b(correct|perfect|well done|great job|nice work|excellent|paying off|nailed it|you got it|exactly right)\b/i;
+      var verdictMarks = function () {
+        var marks = [].slice.call(document.querySelectorAll('.lrn_incorrect, .lrn-incorrect, .lrn_correct, .lrn-correct, [class*="correct" i]')).filter(shown).map(function (e) {
+          var c = String(e.getAttribute('class') || '');
+          return { el: e, verdict: /incorrect|wrong/i.test(c) ? 'incorrect' : 'correct', text: '' };
+        });
+        var boxes = [].slice.call(document.querySelectorAll('[class*="feedback" i], [role="alert"], [aria-live]')).filter(function (b) { return shown(b) && !b.matches(CLICKABLE); }).map(function (b) {
+          var t = (b.innerText || '').trim();
+          return { el: b, verdict: BADWORDS.test(t) ? 'incorrect' : (GOODWORDS.test(t) ? 'correct' : null), text: t };
+        }).filter(function (x) { return x.text; });
+        return marks.concat(boxes);
+      };
+      var snapshot = function () { var m = new Map(); verdictMarks().forEach(function (x) { m.set(x.el, x.text); }); return m; };
+      var verdictNow = function (was) {
+        var all = verdictMarks().filter(function (x) { return !was || !was.has(x.el) || was.get(x.el) !== x.text; });
+        all.sort(function (a, b) { return a.el === b.el ? 0 : (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1); });
+        var said = all.filter(function (x) { return x.verdict; });
+        var last = said[said.length - 1] || null;
+        var words = all.filter(function (x) { return x.text; });
+        var text = (last && last.text) || (words.length ? words[words.length - 1].text : '');
+        return { verdict: last ? last.verdict : null, text: text.slice(0, 1200), next: buttons(NEXT).length > 0, check: buttons(CHECK).length > 0 };
       };
       var watching = null;
-      var watch = function () {
+      var watch = function (before) {
         if (watching) clearInterval(watching);
-        var t0 = Date.now();
+        var t0 = Date.now(), was = before || snapshot();
         watching = setInterval(function () {
           if (focused) trim(false); // (Alta's verdict, in sight before it is read, when the question is shown alone)
-          var s = verdictNow();
+          var s = verdictNow(was);
           if (s.verdict || s.next || Date.now() - t0 > 12000) {
             clearInterval(watching); watching = null;
             post({ kind: 'feedback', verdict: s.verdict, text: s.text, next: s.next, timedOut: !s.verdict && !s.next });
@@ -655,10 +670,10 @@ enum AltaHook {
         },
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
-        check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; b.click(); watch(); return { ok: true }; },
+        check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; var was = snapshot(); b.click(); watch(was); return { ok: true }; },
         next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; dirty = true; b.click(); return { ok: true }; },
         instruct: function () { var b = buttons(INSTRUCT)[0]; if (!b) return { ok: false }; dirty = true; b.click(); return { ok: true }; },
-        state: verdictNow
+        state: function () { return verdictNow(); }
       };
 
       // (1.3.20) Alta's welcome pop-ups (Welcome to your adaptive assignment!, Assignments adapt to you…): put away as they

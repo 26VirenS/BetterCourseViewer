@@ -137,7 +137,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   popup thought the question gone and drew it itself; an inner page now never says the question is missing, and the
   app hears "not found" only from the main page. Alta's question card is a "Question" header, what it asks, and the
   answer with its buttons, each a part of its own: the card is kept whole (the nearest part round the answer beginning
-  "Question"), and a lesson is looked for above the card, never in it.
+  "Question"), and a lesson is looked for above the card, never in it. (1.3.39) Alta keeps each attempt's verdict on the
+  page (Answer 1: That's incorrect… Answer 2: Perfect…): the verdict read is the newest mark or words on the page that
+  came after Check was pressed (a snapshot taken before the click), and Alta's own words count ("Perfect", "paying
+  off", "mistakes are part of learning").
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment

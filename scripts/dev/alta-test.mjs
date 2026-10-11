@@ -216,6 +216,19 @@ try {
   const nt = await waitFor((p, k) => k >= n5 && p.kind === 'notice', 'a notice');
   await page.waitForTimeout(300);
   check(/completed 1 of 3 objectives/.test(nt.text) && !/dismiss/i.test(nt.text) && !(await page.$('.toast-notice')), `Alta’s notice is put away by its Dismiss and its words passed to the popup to show its own way (“${nt.text}”)`);
+  // (1.3.39) a second attempt: Alta keeps the first's "incorrect" on the page and adds the second's verdict under it
+  await page.evaluate(() => {
+    document.querySelectorAll('#check').forEach((c) => { c.dataset.was = c.hidden ? '1' : ''; c.hidden = true; });
+    const box = document.createElement('div'); box.id = 'atts';
+    box.innerHTML = '<p>Answer 1:</p><div class="feedback-msg">That\'s incorrect - mistakes are part of learning. Keep trying!</div><div class="answer-incorrect">f\'(x) = …</div><button id="sub2">Submit</button>';
+    document.querySelector('.alta-answer').appendChild(box);
+    document.getElementById('sub2').onclick = () => setTimeout(() => { box.insertAdjacentHTML('beforeend', '<p>Answer 2:</p><div class="feedback-msg">Perfect. Your hard work is paying off</div><div class="answer-correct">f\'(x) = …</div>'); }, 300);
+  });
+  const n6 = (await posts()).length;
+  check((await page.evaluate(() => window.__simplAlta.check())).ok, 'a second attempt is checked');
+  const v2 = await waitFor((p, k) => k >= n6 && p.kind === 'feedback', 'the second verdict');
+  check(v2.verdict === 'correct' && /Perfect/.test(v2.text), `the second attempt's verdict is the newest one — correct — not the first attempt's "incorrect" still on the page (${v2.verdict}: “${v2.text}”)`);
+  await page.evaluate(() => { document.getElementById('atts').remove(); document.querySelectorAll('#check').forEach((c) => { c.hidden = c.dataset.was === '1'; }); });
   // (a button the bar stands for, come inside what is kept — a change the trim otherwise leaves alone — is moved aside)
   await page.evaluate(() => { const b = document.createElement('button'); b.id = 'late'; b.textContent = 'Continue'; document.querySelector('.learnosity-response').appendChild(b); });
   await page.waitForTimeout(1200);
