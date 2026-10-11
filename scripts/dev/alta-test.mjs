@@ -145,6 +145,8 @@ try {
   // (1.3.21) any kind of question: Alta's own, shown alone — the rest of its page hidden, then shown again as it was
   await page.waitForSelector('#graph');
   const styleBefore = await page.$eval('header', (h) => h.getAttribute('style'));
+  // (1.3.42) the Current objective card's words begin as the question's do — they are never taken for what it asks
+  await page.evaluate(() => { document.getElementById('objective').textContent = 'Read a plot in the graphing window.'; });
   const fo = await page.evaluate(() => window.__simplAlta.focus({ on: true, hint: 'in the graphing window.' }));
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
   check(fo.found && !(await vis('header')) && !(await vis('#help')) && !(await vis('.obj')) && !(await vis('main > h2')),

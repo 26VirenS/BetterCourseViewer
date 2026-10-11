@@ -411,13 +411,22 @@ enum AltaHook {
       // (1.3.22) where the page shows what the question asks: the words of it the app was given (a run of them between
       // its maths), found in the page's text
       var focusHint = '';
-      var asked = function () {
+      // (1.3.42: within `root` — the question's card, when there is one — and never in the Current objective card, whose
+      // words can begin as the question's do: "Find the derivative of…")
+      var objectiveCard = function (el) {
+        for (var a = el, i = 0; a && i < 4 && a !== document.body; a = parentOf(a), i++) {
+          var t = a.innerText || '';
+          if (t.length < 600 && /current objective/i.test(t)) return true;
+        }
+        return false;
+      };
+      var asked = function (root) {
         var want = norm(focusHint);
         if (want.length < 8 || !document.body) return null;
         try {
-          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), n;
+          var w = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT), n;
           while ((n = w.nextNode())) {
-            if (norm(n.data).indexOf(want) >= 0 && n.parentElement && shown(n.parentElement)) return n.parentElement;
+            if (norm(n.data).indexOf(want) >= 0 && n.parentElement && shown(n.parentElement) && !objectiveCard(n.parentElement)) return n.parentElement;
           }
         } catch (e) {}
         return null;
@@ -531,9 +540,10 @@ enum AltaHook {
         // (1.3.37) a lesson above the question (Alta's View Instruction: the question stays on the page under it) — found
         // first, so its own Continue and words are not taken for the question's
         // (looked for above the question's whole card, so what the question asks is never taken for a lesson)
-        stacked = lessonOnly ? null : above(card(common(qs) || qs[0]) || common(qs) || qs[0]);
+        var qcard = lessonOnly ? null : card(common(qs) || qs[0]);
+        stacked = lessonOnly ? null : above(qcard || common(qs) || qs[0]);
         var acts = controls(CHECK).concat(controls(NEXT)).filter(function (b) { return !(stacked && stacked.contains(b)); });
-        var asks = asked();
+        var asks = qcard ? asked(qcard) : asked();
         if (asks && stacked && stacked.contains(asks)) asks = null;
         var anchors = qs.concat(acts, asks ? [asks] : []);
         var whole = common(anchors);

@@ -144,7 +144,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   question (room for Alta's hidden header, title and objective card) are taken in, put back with the rest.
   (1.3.41) A lesson is looked for only close round the question's card (it and two parts up — where Alta puts one,
   in the same flow), never in anything naming "Current objective" or the mastery: Alta's top, long with an
-  objective's words, was taken for a lesson and kept. Copy Alta Details names what is taken for a lesson.
+  objective's words, was taken for a lesson and kept. Copy Alta Details names what is taken for a lesson. (1.3.42, from
+  a real Copy Alta Details) The question's words are looked for within its card when it has one, and never in the
+  Current objective card: "Find the derivative of…" was found there first, and everything from it down was kept.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
