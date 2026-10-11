@@ -416,9 +416,9 @@ struct MoleculeBuilder: View {
     private static let palette = ["H", "C", "N", "O", "F", "Cl", "Br", "I", "S", "P", "B", "Si"]
 
     var body: some View {
-        HStack(alignment: .top, spacing: 18) {
-            ScrollView { controls.padding(.bottom, 20) }
-                .frame(width: 290)
+        PTWorkLayout {
+            controls
+        } centre: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Text(model.formula.isEmpty ? "Empty" : model.formula).font(.system(size: 22, weight: .bold))
@@ -437,14 +437,9 @@ struct MoleculeBuilder: View {
                     .padding(12)
             }
             .card(radius: 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            ScrollView { facts.padding(.bottom, 20) }
-                .frame(width: 300)
+        } right: {
+            facts
         }
-        .padding(.horizontal, 40)
-        .padding(.bottom, 24)
-        .frame(maxWidth: 1480 + 80)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func heading(_ t: String) -> some View {

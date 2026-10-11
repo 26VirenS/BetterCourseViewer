@@ -73,6 +73,7 @@ struct PTElementPage: View {
                 .help("Back to the table (⌘[)")
             Spacer()
             GlassGroup(spacing: 6) {
+                HStack(spacing: 6) {
                 Button { step(-1) } label: { Image(systemName: "chevron.left") }
                     .glassButton()
                     .disabled(e.number <= 1)
@@ -85,6 +86,7 @@ struct PTElementPage: View {
                     .glassButton()
                     .disabled(e.number >= PeriodicTable.elements.count)
                     .help("The element after (→)")
+                }
             }
             .controlSize(.large)
         }

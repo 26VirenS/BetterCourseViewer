@@ -379,6 +379,7 @@ struct PeriodicTableTool: View {
     private var pages: some View {
         HStack(spacing: 8) {
             GlassGroup(spacing: 6) {
+                HStack(spacing: 6) {
                 ForEach(Page.allCases) { p in
                     Button {
                         withAnimation(Motion.gentle) { page = p }
@@ -388,6 +389,7 @@ struct PeriodicTableTool: View {
                     .glassButton(prominent: page == p)
                     .controlSize(.large)
                     .help(p == .table ? "The periodic table" : (p == .lewis ? "Draw a molecule's Lewis structure" : "Build a molecule and turn it in 3D"))
+                }
                 }
             }
             Spacer(minLength: 0)
@@ -612,5 +614,44 @@ struct PeriodicTableCompact: View {
     private var line: String {
         if let e = over ?? found.first { return e.line }
         return query.trimmingCharacters(in: .whitespaces).isEmpty ? "" : "No element"
+    }
+}
+
+/// (1.3.52) The Lewis maker's and the molecule builder's layout: on a wide window, the controls, the drawing and the facts
+/// side by side; on a narrower one, the drawing across the top and the controls and facts side by side under it.
+struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
+    @ViewBuilder var left: Left
+    @ViewBuilder var centre: Centre
+    @ViewBuilder var right: Right
+
+    var body: some View {
+        GeometryReader { g in
+            if g.size.width >= 1100 {
+                HStack(alignment: .top, spacing: 18) {
+                    ScrollView { left.padding(.bottom, 20) }
+                        .frame(width: 280)
+                    centre
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ScrollView { right.padding(.bottom, 20) }
+                        .frame(width: 300)
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        centre
+                            .frame(height: max(380, min(560, g.size.height * 0.6)))
+                        HStack(alignment: .top, spacing: 18) {
+                            left.frame(maxWidth: .infinity, alignment: .topLeading)
+                            right.frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                    }
+                    .padding(.bottom, 24)
+                }
+            }
+        }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 24)
+        .frame(maxWidth: 1480 + 80)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

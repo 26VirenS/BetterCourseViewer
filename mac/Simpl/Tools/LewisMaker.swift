@@ -172,9 +172,14 @@ enum Lewis {
     static let centrals = ["C", "N", "O", "S", "P", "B", "Be", "Si", "Cl", "Xe", "I", "Se"]
     static let outers = ["H", "O", "N", "C", "F", "Cl", "Br", "I", "S"]
 
+    /// An atom's CPK colour — the primary colour for the pale ones (hydrogen, sulfur's yellow, boron's pink…), which do
+    /// not read on a light page — and carbon's gray as the primary colour too.
     static func color(_ s: String) -> Color {
         if s == "H" || s == "C" { return .primary }
-        return PeriodicTable.elements.first { $0.symbol == s }?.cpkColor ?? .primary
+        guard let hex = PeriodicTable.elements.first(where: { $0.symbol == s })?.extra?.cpk, let v = UInt32(hex, radix: 16) else { return .primary }
+        let r = Double((v >> 16) & 0xff) / 255, g = Double((v >> 8) & 0xff) / 255, b = Double(v & 0xff) / 255
+        if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 { return .primary }
+        return Color(red: r, green: g, blue: b)
     }
 }
 
@@ -190,18 +195,13 @@ struct LewisMaker: View {
     private var structure: LewisStructure { Lewis.solve(central: central, around: around, charge: charge) }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 18) {
-            ScrollView { controls.padding(.bottom, 20) }
-                .frame(width: 290)
+        PTWorkLayout {
+            controls
+        } centre: {
             drawing
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            ScrollView { facts.padding(.bottom, 20) }
-                .frame(width: 300)
+        } right: {
+            facts
         }
-        .padding(.horizontal, 40)
-        .padding(.bottom, 24)
-        .frame(maxWidth: 1480 + 80)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: Controls
