@@ -191,6 +191,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   near side and are hidden behind nearer atoms, turning by itself is a button at the viewer's top right, and handling
   the model (drag, scroll, pinch) pauses the turning until three seconds after the last touch. Alta's glass panels all
   take the widest panel's width, so the question's and the answer's edges line up.
+  Alta's assignment cover (its page before it is started) is the popup's own start screen on Liquid Glass: the hook
+  reads it (`kind: 'cover'`: the name, the header's Due Date, Status and Grade, its note, its Start as Alta words it,
+  Review Instruction, and the objectives by topic with each topic's estimate and each objective's mastery) and the
+  popup shows a glass card with the name, details, note and a large Start (Return) and Review Instruction, and a glass
+  card of the objectives — each Start or Review pressing Alta's own (`window.__simplCover`). Alta's page waits under it.
 
 ## Building and running
 

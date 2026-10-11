@@ -1152,6 +1152,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   const what = q.get('assignment_id') ? `assignment ${q.get('assignment_id')}` : q.get('module_item_id') ? `module item ${q.get('module_item_id')}` : q.get('id') ? `tool ${q.get('id')}` : 'a launch URL';
   // (Mac 1.3.17) Knewton Alta: Unit 2 launches the stand-in for Alta's assignment player
   if (q.get('assignment_id') === '4003') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1` };
+  // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
+  if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a4/cover` };
   return { id: q.get('id') || '9', name: 'Resources & Policy', url: `http://localhost:${port}/mock-tool?for=${encodeURIComponent(what)}&course=${m[1]}` };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));
@@ -1359,6 +1361,27 @@ window.mockDialog = function () { var d = document.createElement('div'); d.class
     }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's
     // naming them), and START a link inside a web component of its own
+    // (1.3.59) an assignment's cover as Alta draws it (built from a real page's structure, its words and ids made up):
+    // a header with the name, Due Date, Status and Grade, a note, Start and Review Instruction; the objectives by topic
+    if (path === '/mock-alta/learn/course/c1/assignment/a4/cover') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      const lo = (name, pct) => `<li class="theme__listItem___8iNOO" data-bi="learning-objective-list-item"><span class="theme__item___HElyz"><div class="learning-objective-list-item__listItemContainer___1AXLG" data-test="lo-list-item"><div class="jss69" aria-label="${pct}% mastered" data-test="lo-master-indicator" role="img"><svg width="20" height="20"></svg></div><div><p class="learning-objective-list-item__description___c85Tg">${name}</p></div></div><span class="theme__right___3Ghe-"><a data-bi="related-instruction" href="#">i</a></span></span></li>`;
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Limits at a Point - Knewton</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}header.bar{height:56px;background:#00284e}main{max-width:900px;margin:0 auto;padding:24px}.cover{background:#23284a;color:#fff;padding:24px}.btn{display:inline-block;padding:12px 22px;background:#1b8a9c;color:#fff;text-decoration:none}</style></head><body><div id="react-page"><header class="theme__appBar___3pHuB bar"></header><div class="container"><div id="app"><main role="main"><div class="main__mainInner___3DVrk">
+<div class="cover-header__assignmentHeader___2IB2m cover" data-test="cover-header" aria-live="assertive"><div class="header__heading___N6dBf"><div><h1 class="header__headerTitle___1dCMa">Limits at a Point</h1></div></div>
+<div class="header-details__container___1OfQP">
+<div class="header-details__subheadingContainer___3ZXIT"><div class="header-details__heading___3XhDU"><h2 class="header-details__headingText___1sjNm">Due Date</h2></div><div class="header-details__headingDetails___vXpUo"><div><p>Monday, Oct 12</p><p>11:59pm PDT</p></div></div></div>
+<div class="header-details__subheadingContainer___3ZXIT"><div class="header-details__heading___3XhDU"><h2 class="header-details__headingText___1sjNm">Status</h2></div><div class="header-details__headingDetails___vXpUo"><p>Not started</p></div></div>
+<div class="header-details__subheadingContainer___3ZXIT"><div class="header-details__heading___3XhDU"><h2 class="header-details__headingText___1sjNm">Grade</h2></div><div class="header-details__headingDetails___vXpUo"><div><p>No credit</p><button type="button">?</button></div></div></div>
+</div>
+<div><p>Complete by 11:59pm today to earn 100% additional credit.</p></div>
+<div><a data-bi="cover-header-button" data-test="cover-header-button" href="/mock-alta/learn/course/c1/assignment/a3" class="btn button__button-primary___x"><span><svg width="10" height="10"></svg></span><span class="button__button-label-primary___13Gt6">Start</span></a> <a data-bi="review-instruction-btn" href="#review" class="btn"><span class="button__button-label-bordered-light___2pyS0">Review Instruction</span></a></div>
+</div>
+<div class="page__child___2M9Bq"><h2>Activity</h2><h3>No activity</h3><p>Activity will be displayed here once the assignment is started.</p></div>
+<h2>Objectives</h2><div data-react-toolbox="card" class="theme__card___3E6YM topics__topics___3mF9m" data-test="topics-los">
+<h3 class="heading__size-h5___XSw8y">The Limit of a Function</h3><p class="paragraph__size-small___1JqED">Estimated 6 - 12 questions</p><ul class="theme__list___2_jGx">${lo('Estimate a limit from a table', 0)}${lo('Estimate a limit from a graph', 40)}</ul><hr aria-hidden="true">
+<h3 class="heading__size-h5___XSw8y">One-Sided Limits</h3><p class="paragraph__size-small___1JqED">Estimated 3 - 5 questions</p><ul class="theme__list___2_jGx">${lo('Find a one-sided limit', 100)}</ul></div>
+</div></main></div></div></div></body></html>`);
+    }
     if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/a2$/.test(path)) {
       altaStep = 0; altaGain = 0;
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });

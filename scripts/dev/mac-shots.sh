@@ -87,6 +87,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01d-dashboard-counter 14 -SimplSheet next
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
+  shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
@@ -169,6 +170,7 @@ for MODE in light dark; do
   shoot "$MODE-20-quiz-review" 18 -SimplOpen quiz:101:9011:review
   shoot "$MODE-21-tool" 16 -SimplOpen tool:101:9
   shoot "$MODE-21a-alta" 20 -SimplOpen alta:104:4003
+  shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
   shoot "$MODE-22-setup" 14 -SimplOpen setup
   shoot "$MODE-23-settings" 12 -SimplOpen settings
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask

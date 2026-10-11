@@ -224,6 +224,12 @@ struct AltaQuizScreen: View {
                     .transition(.opacity)
                 }
             }
+            // (1.3.59) the assignment's cover as the popup's own start screen, on Liquid Glass: its name and details,
+            // its objectives by topic, and a clear Start (pressing Alta's); Alta's page waits under it
+            if let c = session.cover, !session.focused, session.dialog == nil, session.failure == nil, !session.opening {
+                AltaStartScreen(cover: c, start: { session.startCover() }, review: { session.reviewCover() })
+                    .transition(.opacity)
+            }
             if let why = session.failure {
                 ZStack {
                     PageGround()
@@ -237,6 +243,147 @@ struct AltaQuizScreen: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// (1.3.59) The assignment's start screen: a glass card with its name, its details (due, status, grade) and its note,
+/// a large Start (named as Alta names it — Start, Continue, Resume) and Review Instruction; under it a glass card of its
+/// objectives by topic, each topic's estimate beside it and each objective's mastery as a small ring.
+private struct AltaStartScreen: View {
+    let cover: AltaCover
+    let start: () -> Void
+    let review: () -> Void
+    @State private var going = false
+
+    private var startLabel: String {
+        let t = cover.start.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? "Start" : t.lowercased().capitalized
+    }
+
+    private var objectiveCount: Int { cover.topics.reduce(0) { $0 + $1.objectives.count } }
+
+    var body: some View {
+        ZStack {
+            PageGround()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    if !cover.topics.isEmpty { objectives }
+                }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 28)
+                .frame(maxWidth: 780)
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("ASSIGNMENT").font(.system(size: 11.5, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
+                Text(cover.name.isEmpty ? "Knewton Alta" : cover.name)
+                    .font(.system(size: 30, weight: .bold))
+                    .tracking(-0.4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !cover.details.isEmpty {
+                HStack(alignment: .top, spacing: 28) {
+                    ForEach(cover.details, id: \.self) { d in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(d.label.uppercased()).font(.system(size: 10.5, weight: .semibold)).tracking(0.5).foregroundStyle(.secondary)
+                            Text(d.value).font(.sBody.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            if !cover.note.isEmpty {
+                Label(cover.note, systemImage: "sparkles")
+                    .font(.sCallout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 12) {
+                Button {
+                    going = true
+                    start()
+                    // (back to the button if Alta's page did not move on)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 8) { going = false }
+                } label: {
+                    HStack(spacing: 8) {
+                        if going { ProgressView().controlSize(.small) } else { Image(systemName: "play.fill") }
+                        Text(startLabel)
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(minWidth: 150, minHeight: 30)
+                }
+                .glassButton(prominent: true)
+                .controlSize(.extraLarge)
+                .keyboardShortcut(.defaultAction)
+                .disabled(going)
+                .help("\(startLabel) the assignment (Return)")
+                if cover.review {
+                    Button(action: review) { Label("Review Instruction", systemImage: "book") }
+                        .glassButton()
+                        .controlSize(.large)
+                        .help("Alta's instruction for these objectives")
+                }
+            }
+            .padding(.top, 4)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(radius: 26)
+    }
+
+    private var objectives: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Objectives").font(.system(size: 18, weight: .semibold))
+                Spacer()
+                Text("\(objectiveCount) to master").font(.sCallout).foregroundStyle(.secondary)
+            }
+            ForEach(Array(cover.topics.enumerated()), id: \.offset) { k, t in
+                if k > 0 { Divider() }
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(t.name).font(.sBody.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        if !t.estimate.isEmpty {
+                            Text(t.estimate)
+                                .font(.sCaption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 3)
+                                .background(Color.primary.opacity(0.07), in: Capsule())
+                        }
+                    }
+                    ForEach(t.objectives, id: \.self) { o in
+                        HStack(spacing: 12) {
+                            ring(o.mastery ?? 0)
+                            Text(o.name).font(.sCallout).fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            if let m = o.mastery {
+                                Text("\(Int((m * 100).rounded()))%").font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(radius: 26)
+    }
+
+    private func ring(_ v: Double) -> some View {
+        ZStack {
+            Circle().stroke(Color.primary.opacity(0.14), lineWidth: 3)
+            Circle().trim(from: 0, to: max(0.001, min(v, 1)))
+                .stroke(v >= 0.999 ? Color.green : Theme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .frame(width: 18, height: 18)
     }
 }
 

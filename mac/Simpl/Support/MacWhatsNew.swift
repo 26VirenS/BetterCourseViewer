@@ -10,6 +10,7 @@ import Foundation
 enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.59", date: "2026-10-11", notes: [
+            ReleaseNote(kind: "new", title: "Alta start screen", body: "Objectives and a clear Start, on Liquid Glass."),
             ReleaseNote(kind: "new", title: "A quick tour", body: "A short tour of the table and its builders."),
             ReleaseNote(kind: "improved", title: "Spin control", body: "Turn on or off at the viewer's corner; pauses while held."),
             ReleaseNote(kind: "fixed", title: "Cleaner 3D models", body: "A clean selection ring; labels hide behind nearer atoms."),

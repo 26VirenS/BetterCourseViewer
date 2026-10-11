@@ -76,6 +76,22 @@ try {
   check(js && js.url.endsWith('/mock-alta/api/assignment') && /Differentiation Rules 2/.test(js.text) && css && !css.text && !!css.error && css.url === 'http://127.0.0.1:9/gone.css',
     `and the text of each script and style sheet it loads, or why one could not be read (${js?.url} · ${css?.error})`);
 
+  // (1.3.59) the assignment's cover, read for the popup's own start screen: its name, details, note, Start and Review
+  // Instruction, and its objectives by topic with each topic's estimate and each objective's mastery
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a4/cover`);
+  const cv = await waitFor((p) => p.kind === 'cover' && !p.none, 'the cover');
+  check(!!cv && cv.name === 'Limits at a Point' && cv.details.length === 3 && cv.details[0].label === 'Due Date' && cv.details[0].value === 'Monday, Oct 12 11:59pm PDT'
+    && cv.details[1].value === 'Not started' && cv.details[2].label === 'Grade',
+    `the cover read: its name and details (${cv && cv.details.map((d) => d.label + ': ' + d.value).join(' · ')})`);
+  check(!!cv && cv.note === 'Complete by 11:59pm today to earn 100% additional credit.' && cv.start === 'Start' && cv.review === true,
+    `its note, its Start as Alta words it, and Review Instruction (${cv && cv.start})`);
+  check(!!cv && cv.topics.length === 2 && cv.topics[0].name === 'The Limit of a Function' && cv.topics[0].estimate === '6\u201312 questions'
+    && JSON.stringify(cv.topics.map((t) => t.objectives.map((o) => o.mastery))) === JSON.stringify([[0, 0.4], [1]]) && cv.topics[1].objectives[0].name === 'Find a one-sided limit',
+    `its objectives by topic, each topic's estimate, each objective's mastery (${cv && cv.topics.map((t) => t.name + ' ' + t.estimate + ' [' + t.objectives.map((o) => o.name).join(', ') + ']').join(' · ')})`);
+  check(await page.evaluate(() => window.__simplCover.start()), 'the app\'s Start presses Alta\'s');
+  await page.waitForURL(/assignment\/a3$/, { timeout: 8000 }).catch(() => {});
+  check(/assignment\/a3$/.test(page.url()), 'and Alta moves on to the assignment');
+
   // (1.3.47) Alta's question alone, on its learn page as it is really built: everything else hidden
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);

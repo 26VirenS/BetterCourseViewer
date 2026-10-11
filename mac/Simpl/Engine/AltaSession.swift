@@ -468,6 +468,79 @@ enum AltaHook {
         try { new MutationObserver(function () { schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
         schedule();
       }
+
+      // (1.3.59) the assignment's cover — Alta's page before it is started: its name, its details (Due Date, Status,
+      // Grade), its note, its Start (whatever it is called: Start, Continue, Resume) and Review Instruction, and its
+      // objectives by topic, each topic's estimate and each objective's mastery — passed when it changes, for the
+      // popup's own start screen; its Start and Review Instruction pressed in Alta's page when the popup's are
+      if (window.top === window) {
+        var cs = function (v) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, 300); };
+        var vis = function (el) { if (!el) return false; var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        var GO = /^(start|start assignment|continue|continue assignment|resume|keep going|keep practicing|start practicing)$/i;
+        var startEl = function () {
+          var a = document.querySelector('[data-test="cover-header-button"]');
+          if (vis(a)) return a;
+          return [].slice.call(document.querySelectorAll('a, button, [role="button"]')).filter(function (b) { return vis(b) && GO.test(cs(b.innerText || b.textContent)); })[0] || null;
+        };
+        var reviewEl = function () {
+          var a = document.querySelector('[data-bi="review-instruction-btn"]');
+          if (vis(a)) return a;
+          return [].slice.call(document.querySelectorAll('a, button')).filter(function (b) { return vis(b) && /^review instruction$/i.test(cs(b.innerText || b.textContent)); })[0] || null;
+        };
+        var coverRead = function () {
+          var head = document.querySelector('[data-test="cover-header"]');
+          var go = startEl();
+          // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page)
+          if (document.querySelector('[class*="learn-flow-body"], section[class*="compound__compound"]')) return null;
+          if (!head && !(go && /estimated\s+\d+/i.test(cs(document.body && document.body.innerText)))) return null;
+          var o = { kind: 'cover', name: '', details: [], note: '', start: go ? cs(go.innerText || go.textContent) : '', review: !!reviewEl(), topics: [] };
+          var h1 = (head && head.querySelector('h1')) || document.querySelector('h1');
+          o.name = h1 ? cs(h1.innerText || h1.textContent) : '';
+          if (head) {
+            [].forEach.call(head.querySelectorAll('[class*="subheadingContainer"]'), function (c) {
+              var k = c.querySelector('h2, h3'), v = c.querySelector('[class*="headingDetails"]');
+              if (k && v) o.details.push({ label: cs(k.innerText || k.textContent), value: cs((v.innerText || v.textContent || '').split('\n').join(' ')) });
+            });
+            [].forEach.call(head.querySelectorAll('p'), function (q) {
+              var t = cs(q.innerText || q.textContent);
+              if (!o.note && /credit|complete by|late/i.test(t) && !o.details.some(function (d) { return d.value.indexOf(t) >= 0; })) o.note = t;
+            });
+          }
+          var card = document.querySelector('[data-test="topics-los"]');
+          if (card) {
+            var topic = null;
+            [].forEach.call(card.querySelectorAll('h3, p, [data-test="lo-list-item"]'), function (el) {
+              if (el.tagName === 'H3') { topic = { name: cs(el.innerText || el.textContent), estimate: '', objectives: [] }; o.topics.push(topic); return; }
+              if (!topic) return;
+              if (el.matches('[data-test="lo-list-item"]')) {
+                var d = el.querySelector('[class*="description"]') || el.querySelector('p');
+                var m = el.querySelector('[data-test="lo-master-indicator"]');
+                var pc = m && /(\d{1,3})\s*%/.exec(m.getAttribute('aria-label') || '');
+                if (d) topic.objectives.push({ name: cs(d.innerText || d.textContent), mastery: pc ? Math.min(100, +pc[1]) / 100 : null });
+                return;
+              }
+              if (el.closest('[data-test="lo-list-item"]')) return;
+              var t = cs(el.innerText || el.textContent);
+              var e = /^estimated\s+(\d+)\s*[-\u2013]\s*(\d+)\s+questions?$/i.exec(t);
+              if (e) topic.estimate = e[1] + '\u2013' + e[2] + ' questions';
+            });
+          }
+          return o;
+        };
+        var lastCover = '';
+        var coverTick = function () {
+          var o = coverRead();
+          var s = o ? JSON.stringify(o) : 'none';
+          if (s === lastCover) return;
+          lastCover = s;
+          post(o || { kind: 'cover', none: true });
+        };
+        setInterval(coverTick, 700);
+        window.__simplCover = {
+          start: function () { var a = startEl(); if (!a) return false; a.click(); return true; },
+          review: function () { var a = reviewEl(); if (!a) return false; a.click(); return true; }
+        };
+      }
     })();
     """#
     // ALTA-HOOK-END
@@ -516,6 +589,20 @@ struct AltaOverview: Decodable, Equatable {
     var started: Bool?
     var completed: Bool?
     var objectives: [Objective]
+}
+
+/// (1.3.59) The assignment's cover as Alta's page shows it before it is started: its name, its details, its note, what
+/// its Start says, whether it offers Review Instruction, and its objectives by topic.
+struct AltaCover: Decodable, Equatable {
+    struct Detail: Decodable, Equatable, Hashable { let label: String; let value: String }
+    struct Objective: Decodable, Equatable, Hashable { let name: String; let mastery: Double? }
+    struct Topic: Decodable, Equatable, Hashable { let name: String; let estimate: String; let objectives: [Objective] }
+    var name: String
+    var details: [Detail]
+    var note: String
+    var start: String
+    var review: Bool
+    var topics: [Topic]
 }
 
 /// One objective as the popup shows it.
@@ -622,6 +709,19 @@ final class AltaSession: ObservableObject {
 
     /// The question laid on glass panels, one behind each part, the popup scrolling the page.
     var split: Bool { focused && !panels.isEmpty && pageHeight > 0 }
+
+    /// (1.3.59) The assignment's cover, while Alta's page shows it: the popup's start screen.
+    @Published private(set) var cover: AltaCover?
+
+    /// The cover's Start (or Continue, Resume), pressed in Alta's page.
+    func startCover() {
+        Task { _ = await run("return window.__simplCover ? window.__simplCover.start() : null", in: nil) }
+    }
+
+    /// The cover's Review Instruction, pressed in Alta's page.
+    func reviewCover() {
+        Task { _ = await run("return window.__simplCover ? window.__simplCover.review() : null", in: nil) }
+    }
 
     func pressButton(_ index: Int) {
         Task { _ = await run("return window.__simplButtons ? window.__simplButtons.press(\(index)) : null", in: nil) }
@@ -771,6 +871,14 @@ final class AltaSession: ObservableObject {
                 errorLogs.append(entry)
                 if errorLogs.count > 50 { errorLogs.removeFirst() }
             }
+        case "cover":
+            guard frame.isMainFrame else { return }
+            if head["none"] as? Bool == true {
+                if cover != nil { withAnimation(Motion.gentle) { cover = nil } }
+                return
+            }
+            guard let c = try? JSONDecoder().decode(AltaCover.self, from: data) else { return }
+            withAnimation(Motion.gentle) { cover = c }
         case "overview":
             guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
             for x in o.objectives where !x.name.isEmpty && names[x.id] != x.name { names[x.id] = x.name }
