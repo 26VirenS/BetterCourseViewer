@@ -124,17 +124,18 @@ enum PeriodicTable {
 }
 
 /// The table drawn: each element in its place (rows 1–7, the lanthanides and actinides under them after a gap), in its
-/// kind's colour; the elements a search or a kind leaves out dimmed; and, in the space the table leaves at its top, the
-/// element picked.
+/// colour for what the table is coloured by; the elements a search or a kind leaves out dimmed; and, in the space the
+/// table leaves at its top, the element under the pointer (1.3.51: only while the pointer is on it — a press opens it).
 struct PTGrid: View {
-    let selected: PTElement?
+    /// The element in the table's empty top: the one under the pointer.
+    let shown: PTElement?
     let matches: Set<Int>?
     let category: String?
+    var colouring: PTColouring = .category
     var compact = false
-    let pick: (PTElement) -> Void
+    /// A press on an element, with its square's frame in the "ptRoot" space (the full table opens it from there).
+    let pick: (PTElement, CGRect) -> Void
     var hover: (PTElement?) -> Void = { _ in }
-    /// A press on the picked element's card (the pin's: the whole table opened on it).
-    var card: (PTElement) -> Void = { _ in }
 
     private let gapRow: CGFloat = 0.45
 
@@ -144,20 +145,21 @@ struct PTGrid: View {
             let byWidth = (geo.size.width - 17 * gap) / 18
             let byHeight = (geo.size.height - 8 * gap) / (9 + gapRow)
             let cell = max(8, min(byWidth, byHeight))
+            let origin = geo.frame(in: .named("ptRoot")).origin
             ZStack(alignment: .topLeading) {
-                if let e = selected {
-                    PTCornerCard(element: e, cell: cell)
+                if let e = shown {
+                    PTCornerCard(element: e, cell: cell, colouring: colouring)
                         .frame(width: 10 * (cell + gap) - gap, height: 3 * (cell + gap) - gap)
-                        .contentShape(Rectangle())
-                        .onTapGesture { card(e) }
-                        .help(compact ? "Open \(e.name) in the Periodic Table" : "")
                         .offset(x: 2 * (cell + gap), y: 0)
+                        .allowsHitTesting(false)
                 }
                 ForEach(PeriodicTable.elements) { e in
-                    PTCell(element: e, cell: cell, compact: compact, selected: selected == e, dimmed: dim(e), matched: matches?.contains(e.number) ?? false)
+                    let x = CGFloat(e.x - 1) * (cell + gap)
+                    let y = rowY(e.y, cell: cell, gap: gap)
+                    PTCell(element: e, cell: cell, compact: compact, colouring: colouring, dimmed: dim(e), matched: matches?.contains(e.number) ?? false)
                         .frame(width: cell, height: cell)
-                        .offset(x: CGFloat(e.x - 1) * (cell + gap), y: rowY(e.y, cell: cell, gap: gap))
-                        .onTapGesture { pick(e) }
+                        .offset(x: x, y: y)
+                        .onTapGesture { pick(e, CGRect(x: origin.x + x, y: origin.y + y, width: cell, height: cell)) }
                         .onHover { inside in hover(inside ? e : nil) }
                 }
                 if !compact {
@@ -166,6 +168,7 @@ struct PTGrid: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .animation(Motion.hover, value: shown?.number)
         }
         .aspectRatio(18 / (9 + gapRow), contentMode: .fit)
     }
@@ -189,18 +192,20 @@ struct PTGrid: View {
     }
 }
 
-/// One element's square.
+/// One element's square: its number, symbol and — as the table is coloured — its name or its value.
 private struct PTCell: View {
     let element: PTElement
     let cell: CGFloat
     let compact: Bool
-    let selected: Bool
+    let colouring: PTColouring
     let dimmed: Bool
     let matched: Bool
     @State private var hover = false
 
     var body: some View {
-        let color = element.kind.color
+        let color = colouring.color(element)
+        // (a property's scale is drawn solid, its words white; a kind's colour washed, as before)
+        let solid = colouring != .category
         let shape = RoundedRectangle(cornerRadius: max(2, cell * 0.14), style: .continuous)
         VStack(spacing: 0) {
             if !compact && cell >= 34 {
@@ -211,9 +216,9 @@ private struct PTCell: View {
             }
             Text(element.symbol)
                 .font(.system(size: cell * (compact ? 0.48 : 0.36), weight: .bold))
-            if !compact && cell >= 52 {
-                Text(element.name)
-                    .font(.system(size: cell * 0.14))
+            if !compact && cell >= 48 {
+                Text(colouring == .category ? element.name : colouring.text(element))
+                    .font(.system(size: cell * 0.14).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .opacity(0.8)
@@ -222,14 +227,15 @@ private struct PTCell: View {
         .padding(.horizontal, compact ? 0 : cell * 0.08)
         .padding(.vertical, compact ? 0 : cell * 0.05)
         .frame(width: cell, height: cell)
-        .foregroundStyle(selected ? Color.white : Color.primary)
-        .background(shape.fill(selected ? color : color.opacity(hover ? 0.42 : (matched ? 0.5 : 0.24))))
-        .overlay(shape.strokeBorder(selected || matched ? color : Color.clear, lineWidth: selected ? 0 : 1.5))
+        .foregroundStyle(solid ? Color.white : Color.primary)
+        .background(shape.fill(solid ? color.opacity(hover ? 1 : 0.88) : color.opacity(hover ? 0.42 : (matched ? 0.5 : 0.24))))
+        .overlay(shape.strokeBorder(matched ? (solid ? Color.white : color) : Color.clear, lineWidth: 1.5))
         .opacity(dimmed ? 0.22 : 1)
-        .scaleEffect(hover && !compact ? 1.06 : 1)
+        .scaleEffect(hover && !compact ? 1.08 : 1)
         .zIndex(hover ? 1 : 0)
         .animation(Motion.hover, value: hover)
         .animation(Motion.snappy, value: dimmed)
+        .animation(Motion.gentle, value: colouring)
         .contentShape(shape)
         .onHover { hover = $0 }
         .help("\(element.name) · \(element.number)")
@@ -239,13 +245,15 @@ private struct PTCell: View {
     }
 }
 
-/// The element picked, in the space at the table's top: its symbol large, its number, name, kind and mass.
+/// The element under the pointer, in the space at the table's top: its symbol large, its number, name, kind and mass,
+/// its electrons and — the table coloured by a property — its value.
 private struct PTCornerCard: View {
     let element: PTElement
     let cell: CGFloat
+    var colouring: PTColouring = .category
 
     var body: some View {
-        let color = element.kind.color
+        let color = colouring.color(element)
         HStack(spacing: cell * 0.3) {
             VStack(spacing: 0) {
                 Text("\(element.number)")
@@ -267,14 +275,20 @@ private struct PTCornerCard: View {
                     .minimumScaleFactor(0.5)
                 Text("\(element.kind.label) · \(element.massText) u")
                     .font(.system(size: max(11, cell * 0.26)))
-                    .foregroundStyle(color)
+                    .foregroundStyle(element.kind.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(element.config)
+                Text(PTConfig.pretty(element))
                     .font(.system(size: max(10.5, cell * 0.24)).monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                if colouring.scaled {
+                    Text("\(colouring.label): \(colouring.text(element))\(colouring.unit.isEmpty || colouring.value(element) == nil ? "" : " \(colouring.unit)")")
+                        .font(.system(size: max(10.5, cell * 0.24), weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -286,15 +300,26 @@ private struct PTCornerCard: View {
 
 // MARK: - The table as a tool
 
-/// Periodic table: every element in its place, coloured by its kind, with the one picked large in the table's empty
-/// corner and its facts under the table — group, period and block, its state at room temperature, its electrons, its
-/// electronegativity, melting and boiling points, density, who found it — and a line about it. A search by symbol, name or
-/// number lights the matches (Return picks the first); the legend lights a kind; the arrow keys walk the table.
+/// (1.3.51) The full Periodic Table: the table, coloured by any of its properties (with the scale, each cell's value and,
+/// if asked, the trend arrows), the element under the pointer in its empty top, and a press opening the element's own
+/// page, grown out of its square; and beside the table, the Lewis structure maker and the 3D molecule builder.
 struct PeriodicTableTool: View {
-    @State private var selected: PTElement?
+    enum Page: String, CaseIterable, Identifiable {
+        case table, lewis, molecules
+        var id: String { rawValue }
+        var label: String { self == .table ? "Table" : (self == .lewis ? "Lewis structures" : "Molecule builder") }
+        var symbol: String { self == .table ? "square.grid.3x3" : (self == .lewis ? "circle.grid.cross" : "atom") }
+    }
+
+    @State private var page: Page = .table
+    @State private var open: PTElement?
+    @State private var anchor: UnitPoint = .center
+    @State private var hovered: PTElement?
     @State private var query = ""
     @State private var category: String?
-    @FocusState private var tableFocused: Bool
+    @State private var colouring: PTColouring = .category
+    @State private var trends = false
+    @StateObject private var molecule = MoleculeModel()
 
     private var matches: Set<Int>? {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -302,31 +327,91 @@ struct PeriodicTableTool: View {
     }
 
     var body: some View {
-        ToolPage(spacing: 18) {
+        GeometryReader { root in
+            ZStack(alignment: .top) {
+                if let e = open {
+                    PTElementPage(element: e, close: close, go: { n in
+                        if let next = PeriodicTable.byNumber(n) { withAnimation(Motion.gentle) { open = next } }
+                    })
+                    .transition(.asymmetric(insertion: .scale(scale: 0.06, anchor: anchor).combined(with: .opacity),
+                                            removal: .scale(scale: 0.06, anchor: anchor).combined(with: .opacity)))
+                    .zIndex(1)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        pages
+                            .padding(.horizontal, 40)
+                            .padding(.bottom, 10)
+                            .frame(maxWidth: 1480 + 80, alignment: .leading)
+                            .frame(maxWidth: .infinity)
+                        switch page {
+                        case .table: table(root.size)
+                        case .lewis: LewisMaker { lewis in
+                            molecule.load(lewis: lewis)
+                            withAnimation(Motion.gentle) { page = .molecules }
+                        }
+                        case .molecules: MoleculeBuilder(model: molecule)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .frame(width: root.size.width, height: root.size.height, alignment: .top)
+        }
+        .coordinateSpace(name: "ptRoot")
+        .onAppear {
+            if let raw = ToolsCenter.shared.takeInfo("element"), let n = Int(raw), let e = PeriodicTable.byNumber(n) {
+                anchor = .center
+                open = e
+            }
+        }
+    }
+
+    // MARK: The pages
+
+    private var pages: some View {
+        HStack(spacing: 8) {
+            GlassGroup(spacing: 6) {
+                ForEach(Page.allCases) { p in
+                    Button {
+                        withAnimation(Motion.gentle) { page = p }
+                    } label: {
+                        Label(p.label, systemImage: p.symbol)
+                    }
+                    .glassButton(prominent: page == p)
+                    .controlSize(.large)
+                    .help(p == .table ? "The periodic table" : (p == .lewis ? "Draw a molecule's Lewis structure" : "Build a molecule and turn it in 3D"))
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: The table
+
+    private func table(_ size: CGSize) -> some View {
+        ToolPage(spacing: 14) {
             top
-            PTGrid(selected: selected, matches: matches, category: category) { e in
-                withAnimation(Motion.snappy) { selected = e }
-                tableFocused = true
+            colourBar
+            trendWrap {
+                PTGrid(shown: hovered, matches: matches, category: colouring == .category ? category : nil, colouring: colouring,
+                       pick: { e, rect in openElement(e, from: rect, in: size) },
+                       hover: { e in hovered = e })
             }
             .frame(maxWidth: 1300)
-            .focusable()
-            .focused($tableFocused)
-            .focusEffectDisabled()
-            .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
-                walk(press.key)
-            }
-            if let e = selected {
-                PTFacts(element: e)
-                    .transition(.opacity)
-            } else {
-                Text("Press an element, or type its symbol, name or number.")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.")
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
         }
-        .onAppear {
-            if let raw = ToolsCenter.shared.takeInfo("element"), let n = Int(raw) { selected = PeriodicTable.byNumber(n) }
-        }
+    }
+
+    private func openElement(_ e: PTElement, from rect: CGRect, in size: CGSize) {
+        anchor = UnitPoint(x: size.width > 0 ? rect.midX / size.width : 0.5, y: size.height > 0 ? rect.midY / size.height : 0.5)
+        hovered = nil
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = e }
+    }
+
+    private func close() {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) { open = nil }
     }
 
     private var top: some View {
@@ -338,16 +423,128 @@ struct PeriodicTableTool: View {
                 .frame(width: 260)
                 .onSubmit {
                     if let m = PeriodicTable.find(query).first {
-                        withAnimation(Motion.snappy) { selected = m }
                         query = ""
+                        anchor = .center
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = m }
                     }
                 }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(PTCategory.all) { c in legendChip(c) }
+            if colouring == .category {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(PTCategory.all) { c in legendChip(c) }
+                    }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
+            } else if colouring.scaled {
+                scale
+            } else {
+                keyChips
             }
+        }
+        .animation(Motion.gentle, value: colouring)
+    }
+
+    /// The scale of the property the table is coloured by: lowest to highest.
+    private var scale: some View {
+        HStack(spacing: 10) {
+            Text(colouring.label).font(.sCallout.weight(.semibold))
+            Text(colouring.lowText).font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
+            LinearGradient(colors: (0...8).map { PTColouring.ramp(Double($0) / 8) }, startPoint: .leading, endPoint: .trailing)
+                .frame(height: 8)
+                .clipShape(Capsule())
+                .frame(minWidth: 160, maxWidth: 360)
+            Text(colouring.highText).font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
+            if !colouring.unit.isEmpty {
+                Text(colouring.unit).font(.sCaption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// The blocks' or the states' colours.
+    private var keyChips: some View {
+        let keys: [(String, String)] = colouring == .block
+            ? [("s", "s-block"), ("p", "p-block"), ("d", "d-block"), ("f", "f-block")].map { ($0.1, PTColouring.blockColors[$0.0] ?? "") }
+            : [("Solid", "Solid"), ("Liquid", "Liquid"), ("Gas", "Gas")].map { ($0.1, PTColouring.stateColors[$0.0] ?? "") }
+        return HStack(spacing: 6) {
+            ForEach(keys.indices, id: \.self) { i in
+                HStack(spacing: 6) {
+                    Circle().fill(Color(hex: keys[i].1)).frame(width: 9, height: 9)
+                    Text(keys[i].0).font(.sCaption.weight(.medium))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(hex: keys[i].1).opacity(0.18), in: Capsule())
+            }
+        }
+    }
+
+    private var colourBar: some View {
+        HStack(spacing: 12) {
+            Text("Colour by").font(.sCallout).foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(PTColouring.allCases) { c in
+                        Button {
+                            withAnimation(Motion.gentle) { colouring = c }
+                        } label: {
+                            Text(c.label)
+                                .font(.sCaption.weight(colouring == c ? .semibold : .regular))
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 6)
+                                .background(colouring == c ? Color.primary.opacity(0.14) : Color.clear, in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(4)
+                .background(Color.primary.opacity(0.05), in: Capsule())
+            }
+            Toggle("Trend arrows", isOn: $trends.animation(Motion.gentle))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .font(.sCallout)
+                .disabled(colouring.trend == nil)
+                .help(colouring.trend == nil ? "\(colouring.label) has no simple trend across the table" : "Show how \(colouring.label.lowercased()) changes across the table")
+        }
+    }
+
+    /// The table with its trend arrows, when they are on: across the top, the trend across a period; down the side, the
+    /// trend in a group.
+    @ViewBuilder
+    private func trendWrap<G: View>(@ViewBuilder _ grid: () -> G) -> some View {
+        if trends, let t = colouring.trend {
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    if t.across < 0 { Image(systemName: "arrow.left").font(.system(size: 13, weight: .bold)) }
+                    Rectangle().frame(height: 2)
+                    Text(t.acrossWords).font(.sCaption.weight(.semibold)).fixedSize()
+                    Rectangle().frame(height: 2)
+                    if t.across > 0 { Image(systemName: "arrow.right").font(.system(size: 13, weight: .bold)) }
+                }
+                .foregroundStyle(Color.yellow)
+                .padding(.leading, 30)
+                grid()
+                    .padding(.leading, 30)
+                    .overlay(alignment: .leading) {
+                        VStack(spacing: 4) {
+                            if t.up > 0 { Image(systemName: "arrow.up").font(.system(size: 13, weight: .bold)) }
+                            Rectangle().frame(width: 2)
+                            Text(t.upWords)
+                                .font(.sCaption.weight(.semibold))
+                                .fixedSize()
+                                .rotationEffect(.degrees(-90))
+                                .frame(width: 16, height: 140)
+                            Rectangle().frame(width: 2)
+                            if t.up < 0 { Image(systemName: "arrow.down").font(.system(size: 13, weight: .bold)) }
+                        }
+                        .frame(width: 20)
+                        .foregroundStyle(Color.yellow)
+                    }
+            }
+            .transition(.opacity)
+        } else {
+            grid()
         }
     }
 
@@ -368,85 +565,15 @@ struct PeriodicTableTool: View {
         .buttonStyle(.plain)
         .help(on ? "Show every kind" : "Light the \(c.label.lowercased()) elements")
     }
-
-    private func walk(_ key: KeyEquivalent) -> KeyPress.Result {
-        guard let e = selected ?? PeriodicTable.byNumber(1) else { return .ignored }
-        guard selected != nil else {
-            selected = e
-            return .handled
-        }
-        let dx = key == .leftArrow ? -1 : (key == .rightArrow ? 1 : 0)
-        let dy = key == .upArrow ? -1 : (key == .downArrow ? 1 : 0)
-        if let n = PeriodicTable.step(from: e, dx: dx, dy: dy) {
-            withAnimation(Motion.snappy) { selected = n }
-        }
-        return .handled
-    }
-}
-
-/// The picked element's facts, under the table: as many to a row as the window has room for, then its line and where to
-/// read more.
-private struct PTFacts: View {
-    let element: PTElement
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], alignment: .leading, spacing: 14) {
-                fact("Group · period · block", "\(element.group.map { "Group \($0)" } ?? "No group") · Period \(element.period) · \(element.block)-block")
-                fact("At room temperature", element.phase.isEmpty ? "—" : element.phase)
-                fact("Electrons", element.config.isEmpty ? "—" : element.config)
-                fact("Electronegativity", element.en.map { PTElement.trim($0) } ?? "—")
-                fact("Melts · boils", "\(PTElement.celsius(element.melt)) · \(PTElement.celsius(element.boil))")
-                fact("Density", element.densityText)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(element.summary)
-                    .font(.sBody)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-            }
-            HStack(spacing: 14) {
-                if let found = element.found, !found.isEmpty {
-                    Label("Found by \(found)", systemImage: "sparkle.magnifyingglass")
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                }
-                if let url = URL(string: "https://en.wikipedia.org/wiki/\(element.name)") {
-                    Link(destination: url) {
-                        Label("Wikipedia", systemImage: "arrow.up.right.square")
-                    }
-                    .font(.sCallout)
-                }
-            }
-        }
-        .id(element.number)
-    }
-
-    private func fact(_ k: String, _ v: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(k.uppercased())
-                .font(.system(size: 11.5, weight: .semibold))
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
-            Text(v)
-                .font(.sHeadline)
-                .textSelection(.enabled)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card(radius: 16, tint: element.kind.color)
-    }
 }
 
 /// The table's pin, opened: the whole table, small, with a search that lights the matches and a line naming the element
-/// under the pointer (or the first match). (1.3.5) A press on an element shows its card in the table's empty top, there
-/// in the pin; a press on the card opens the whole table on it.
+/// under the pointer (or the first match). (1.3.51) The element under the pointer shows in the table's empty top; a
+/// press opens the whole table on its page.
 struct PeriodicTableCompact: View {
     var openFull: ([String: String]) -> Void
     @State private var query = ""
     @State private var over: PTElement?
-    @State private var picked: PTElement?
 
     private var found: [PTElement] { PeriodicTable.find(query) }
 
@@ -457,30 +584,25 @@ struct PeriodicTableCompact: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.sCallout)
                     .frame(width: 160)
-                    .onSubmit { if let e = found.first { pick(e) } }
+                    .onSubmit { if let e = found.first { openFull(["element": String(e.number)]) } }
                 Text(line)
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            PTGrid(selected: picked, matches: query.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Set(found.map(\.number)), category: nil, compact: true,
-                   pick: { e in pick(e) }, hover: { e in over = e }, card: { e in openFull(["element": String(e.number)]) })
+            PTGrid(shown: over, matches: query.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Set(found.map(\.number)), category: nil, compact: true,
+                   pick: { e, _ in openFull(["element": String(e.number)]) }, hover: { e in over = e })
         }
         // (the screenshot suite: -SimplPinElement 25 shows that element's card)
         .onAppear {
             let n = UserDefaults.standard.integer(forKey: "SimplPinElement")
-            if n > 0, picked == nil { picked = PeriodicTable.byNumber(n) }
+            if n > 0, over == nil { over = PeriodicTable.byNumber(n) }
         }
     }
 
-    /// An element shown in the card (pressed again: put away).
-    private func pick(_ e: PTElement) {
-        withAnimation(Motion.snappy) { picked = picked == e ? nil : e }
-    }
-
     private var line: String {
-        if let e = over ?? picked ?? found.first { return e.line }
+        if let e = over ?? found.first { return e.line }
         return query.trimmingCharacters(in: .whitespaces).isEmpty ? "" : "No element"
     }
 }
