@@ -12,6 +12,8 @@ struct PTElementPage: View {
     @State private var orbitals = false
     @State private var subshellID: String?
     @FocusState private var focused: Bool
+    /// The page's width inside its margins, which picks the layout.
+    @State private var width: CGFloat = 0
 
     private var e: PTElement { element }
     private var valenceSubs: [PTSubshell] { PTConfig.valence(of: e) }
@@ -23,38 +25,17 @@ struct PTElementPage: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 title
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 18) {
-                        VStack(spacing: 18) {
-                            modelCard
-                            configCard
-                        }
-                        .frame(width: 430)
-                        right
-                    }
-                    .frame(minWidth: 1000)
-                    // (1.3.56) a middle width: the atom and its electrons side by side, as tall as each other, the
-                    // facts below them, rather than the atom stretched across the page
-                    VStack(spacing: 18) {
-                        HStack(alignment: .top, spacing: 18) {
-                            modelCard.frame(minWidth: 340, maxWidth: .infinity)
-                            configCard.frame(minWidth: 320, maxWidth: .infinity)
-                        }
-                        .fixedSize(horizontal: false, vertical: true)
-                        right
-                    }
-                    .frame(minWidth: 700)
-                    VStack(spacing: 18) {
-                        modelCard
-                        configCard
-                        right
-                    }
-                }
+                columns
             }
             .padding(.horizontal, 40)
             .padding(.top, 8)
             .padding(.bottom, 40)
             .frame(maxWidth: 1480, alignment: .leading)
+            .background(GeometryReader { g in
+                Color.clear
+                    .onAppear { width = g.size.width - 80 }
+                    .onChange(of: g.size.width) { _, w in width = w - 80 }
+            })
             .frame(maxWidth: .infinity)
             .id(e.number)
             .transition(.opacity)
@@ -66,6 +47,38 @@ struct PTElementPage: View {
         .onKeyPress(.rightArrow) { step(1); return .handled }
         .onAppear { focused = true }
         .onChange(of: e.number) { _, _ in subshellID = nil }
+    }
+
+    /// (1.3.56) By the page's width (measured, as text that wraps would make a fitting test think nothing fits): wide,
+    /// the atom and its electrons in a column beside the facts; middle, the atom and its electrons side by side, as
+    /// tall as each other, the facts below; narrow, one column.
+    @ViewBuilder
+    private var columns: some View {
+        if width >= 1000 {
+            HStack(alignment: .top, spacing: 18) {
+                VStack(spacing: 18) {
+                    modelCard
+                    configCard
+                }
+                .frame(width: 430)
+                right
+            }
+        } else if width >= 620 {
+            VStack(spacing: 18) {
+                HStack(alignment: .top, spacing: 18) {
+                    modelCard.frame(maxWidth: .infinity)
+                    configCard.frame(maxWidth: .infinity)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                right
+            }
+        } else {
+            VStack(spacing: 18) {
+                modelCard
+                configCard
+                right
+            }
+        }
     }
 
     private func step(_ d: Int) {

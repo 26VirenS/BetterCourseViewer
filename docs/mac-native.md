@@ -171,7 +171,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   card — symbol, name, valence electrons, most it holds — with a Change menu of the main-group elements by group
   (`LElementPicker`). Drawings fit their space (shrunk and centred, held still while the pointer is down), rings start
   as regular polygons, and an ion's charge is drawn in plain digits and signs, full size.
-  (1.3.56) An element's page has a middle width too (700 to 1000 points): the atom and its electron configuration side
+  (1.3.56) An element's page picks its layout from its measured width (wide past 1000 points, a middle width from 620): the atom and its electron configuration side
   by side, as tall as each other, its facts below, instead of the atom stretched across the page.
 
 ## Building and running
