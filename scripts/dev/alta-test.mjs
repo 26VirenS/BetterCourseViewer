@@ -103,18 +103,28 @@ try {
   await page.waitForTimeout(400);
   check((await vis('#vi')) && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'a pop-up of Alta’s (Having trouble?) is shown over the question');
   await page.evaluate(() => document.getElementById('dlg').remove());
-  // not recognised (a part of another kind beside the question): Alta's page back as it is, after a moment, and why
-  const nb = (await posts()).length;
+  // (1.3.48) a lesson (More Instruction) above the question: both kept, Alta's header and the rest still hidden
+  const nl = (await posts()).length;
   await page.evaluate(() => window.mockLesson());
+  await page.waitForTimeout(500);
+  check((await vis('#lsec')) && (await vis('#asks')) && !(await vis('header')) && !(await vis('h1')) && !(await vis('.jss179')),
+    'a lesson above the question is shown with it, Alta’s header, title and objective card still hidden');
+  // a lesson alone (its Continue): kept too
+  await page.evaluate(() => { const q = document.getElementById('qsec'); window.__q = q; q.remove(); document.querySelector('#lsec .theme__card___3E6YM').insertAdjacentHTML('beforeend', '<div class="button-bar__container___H_Vc_"><button>Feedback</button><button id="cont">Continue</button></div>'); });
+  const fl = await waitFor((p, k) => k >= nl && p.kind === 'focus' && p.state === 'lesson', 'a lesson recognised');
+  check(!!fl && (await vis('#lsec')) && (await vis('#cont')) && !(await vis('header')) && !(await vis('h1')), 'a lesson alone is shown alone, with its Continue, the header hidden');
+  // not recognised (Alta's learn page with no part in it): Alta's page back as it is, after a moment, and why
+  const nb = (await posts()).length;
+  await page.evaluate(() => { window.__l = document.getElementById('lsec'); window.__flow = window.__l.parentElement; window.__l.remove(); });
   await page.waitForTimeout(400);
   check(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q')), 'a moment’s grace first (Alta between parts)');
   const bad = await waitFor((p, k) => k >= nb && p.kind === 'focus' && p.state === 'unknown', 'the page not recognised');
-  check((await vis('header')) && (await vis('h1')) && (await vis('#lsec')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))),
+  check((await vis('header')) && (await vis('h1')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))),
     'then Alta’s page is given back as it is');
-  check(/another part/.test(bad.reason) && bad.shape.titles.join() === 'Instruction,Question' && bad.shape.buttons.includes('submit') && !JSON.stringify(bad.shape).includes('derivative of f'),
-    `and the app is told why, with what the page held — its parts’ titles, its buttons — never the question (“${bad.reason}”)`);
+  check(/no part/.test(bad.reason) && bad.shape.buttons.includes('back to top') && Array.isArray(bad.shape.flow) && !JSON.stringify(bad.shape).includes('derivative of f'),
+    `and the app is told why, with what the page held — its makeup, its buttons — never the question (“${bad.reason}”)`);
   const nr = (await posts()).length;
-  await page.evaluate(() => window.mockUnlesson());
+  await page.evaluate(() => { window.__flow.appendChild(window.__q); });
   await waitFor((p, k) => k >= nr && p.kind === 'focus' && p.state === 'question', 'the question again');
   check(!(await vis('header')) && (await vis('#asks')), 'when the page is a question again, it is shown alone again');
 

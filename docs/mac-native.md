@@ -83,6 +83,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   and posts why with the page's makeup (parts' titles, classes, buttons' words; never the question), which the popup
   keeps as *Error Logs* (top right, shown once there is one), to copy or save with the page code. The overview (Start,
   "Estimated … questions") is shown as it is without a log. `/mock-alta/…/assignment/a3` is that learn page.
+  (1.3.48) A lesson (More Instruction) is a part of the same kind, headed with the lesson's name, with Feedback and
+  Continue: every part of the learn page is now kept — a question, a lesson, or a lesson above the question — so
+  Alta's header stays hidden through lessons; only a learn page with no part (or a page that is not one) is given back
+  as it is.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

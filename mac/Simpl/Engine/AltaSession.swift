@@ -203,12 +203,13 @@ enum AltaHook {
       }, 1500);
 
       // ---- (1.3.47) Alta's question alone: the rest of Alta's page hidden ----
-      // Alta's learn page as it is built (its saved page code): the question is one `section.compound__compound` in
-      // `.learn-flow-body`, a card headed "Question" holding what it asks, Learnosity's answer box and Alta's own
-      // buttons (Feedback, More Instruction, Submit). Only that section is kept — with Alta's pop-ups and MathJax's own
-      // helpers, which it measures its fonts by — and everything else is hidden by a style sheet, by marks on the
-      // elements kept and their ancestors (nothing is moved or restyled, so typing and scrolling are left alone).
-      // Anything not recognised — a part of another kind, two parts, no part — gives Alta's page back as it is, after a
+      // Alta's learn page as it is built (its saved page code): each part is a `section.compound__compound` in
+      // `.learn-flow-body` — a question (a card headed "Question": what it asks, Learnosity's answer box, Alta's
+      // Feedback / More Instruction / Submit) or (1.3.48) a lesson (More Instruction: a card headed with the lesson's
+      // name, its Feedback / Continue). Those parts are kept — with Alta's pop-ups and MathJax's own helpers, which it
+      // measures its fonts by — and everything else (Alta's header, title, mastery, objective card…) is hidden by a style
+      // sheet, by marks on the elements kept and their ancestors (nothing is moved or restyled, so typing and scrolling
+      // are left alone). Anything not recognised — no part, or not a learn page — gives Alta's page back as it is, after a
       // moment's grace (Alta between parts), and the app is told why, for its Error Logs.
       if (window.top === window) {
         var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *) { display: none !important; }\n'
@@ -227,7 +228,7 @@ enum AltaHook {
           try { return readNow(); } finally { if (on) document.documentElement.setAttribute('data-simpl-q', ''); }
         };
         var readNow = function () {
-          var flows = all('[class*="learn-flow-body"]').filter(shown);
+          var flows = all('[class*="learn-flow-body"]'); // (there, even empty: Alta's learn page with no part)
           var parts = all('section[class*="compound__compound"]').filter(shown);
           if (!flows.length && !parts.length) {
             var overview = /estimated\s+\d+\s*[-–]\s*\d+\s+questions?/i.test(txt(document.body))
@@ -235,10 +236,11 @@ enum AltaHook {
             return { state: overview ? 'overview' : 'none', reason: 'nothing on the page is a part of Alta\'s learn page' };
           }
           var titles = parts.map(title);
+          // (1.3.48) every part of the learn page is kept — a question, or a lesson (More Instruction: a part headed with
+          // the lesson's name, its Continue), or a lesson above the question — Alta's header and the rest hidden
           var qs = parts.filter(function (p, i) { return /^question$/i.test(titles[i]) && p.querySelector('.lrn_widget, .learnosity-item, .lrn_qr, [class*="learnosity__"]'); });
-          if (qs.length === 1 && parts.length === 1) return { state: 'question', keep: qs[0], titles: titles };
-          return { state: 'unknown', titles: titles,
-            reason: !parts.length ? 'Alta\'s learn page shows no part' : qs.length ? 'the question has another part beside it' : (parts.length > 1 ? 'several parts, none a question' : 'a part of a kind not known') };
+          if (parts.length) return { state: qs.length ? 'question' : 'lesson', keep: parts, titles: titles };
+          return { state: 'unknown', titles: titles, reason: 'Alta\'s learn page shows no part' };
         };
         var lab = function (el) { var c = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''; return el.tagName.toLowerCase() + (el.id ? '#' + el.id.slice(0, 40) : '') + (c ? '.' + c.slice(0, 90) : ''); };
         // (what the page holds, for the Error Logs: its parts' titles and makeup, its buttons' words — never an answer)
@@ -275,20 +277,20 @@ enum AltaHook {
         var report = function (state, r) {
           if (state === told) return;
           told = state;
-          post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: state === 'question' || state === 'overview' ? null : shape(r || {}) });
+          post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: /^(question|lesson|overview)$/.test(state) ? null : shape(r || {}) });
         };
         var tick = function () {
           timer = null;
           var r = read();
-          if (r.state === 'question') {
+          if (r.state === 'question' || r.state === 'lesson') {
             badSince = 0; wasQuestion = true;
             // (Alta's pop-ups and MathJax's helpers kept with it; its Feedback — a report to Alta — and its Content
             // attribution link put away)
             var extra = all('[role="dialog"], [role="alertdialog"], body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message')
-              .filter(function (e) { return !r.keep.contains(e); });
-            apply([r.keep].concat(extra));
-            [].forEach.call(r.keep.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); });
-            report('question', r);
+              .filter(function (e) { return !r.keep.some(function (k) { return k.contains(e); }); });
+            apply(r.keep.concat(extra));
+            r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
+            report(r.state, r);
             return;
           }
           if (r.state === 'overview') { badSince = 0; wasQuestion = false; unmark(); report('overview', r); return; }
@@ -398,8 +400,8 @@ final class AltaSession: ObservableObject {
     private var loading: NSKeyValueObservation?
     /// (1.3.46) Each frame in Alta's page that has run the page script (the page itself is asked as the main frame).
     private var frames: [WKFrameInfo] = []
-    /// (1.3.47) How Alta's page is shown: "question" (its question alone), "overview", or — not recognised — "unknown" /
-    /// "none", when it is shown as it is.
+    /// (1.3.47) How Alta's page is shown: "question" or "lesson" (its parts alone), "overview", or — not recognised —
+    /// "unknown" / "none", when it is shown as it is.
     @Published private(set) var focusState = ""
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
     @Published private(set) var errorLogs: [String] = []
@@ -458,7 +460,7 @@ final class AltaSession: ObservableObject {
             guard frame.isMainFrame else { return }
             let state = head["state"] as? String ?? ""
             withAnimation(Motion.gentle) { focusState = state }
-            guard state != "question" && state != "overview" else { return }
+            guard !["question", "lesson", "overview"].contains(state) else { return }
             var entry = "\(Date().formatted(date: .abbreviated, time: .standard)) — Alta's page shown as it is: \(head["reason"] as? String ?? "not recognised") [\(state)]"
             if let sh = head["shape"], !(sh is NSNull), let d = try? JSONSerialization.data(withJSONObject: sh, options: [.prettyPrinted, .sortedKeys]),
                let t = String(data: d, encoding: .utf8) { entry += "\n" + t }
