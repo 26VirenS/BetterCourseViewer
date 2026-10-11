@@ -259,6 +259,16 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   breakdown bar — a piece a group, as wide as its share of the grade, filled in its colour once something in it is
   graded, dashed until then; a piece pointed at names its group, share and score (`GradeWeightBar`; each group's
   `weight` and `graded` from native-app.js `courseGrades`, from the grade model's `weightBar`).
+  (1.3.70) Alta: a graph in what a question asks, larger than 300 × 220, is drawn small (`data-simpl-mini`, a CSS zoom
+  measured on its drawing, not its box); a click on it, or the Enlarge button the popup lays beside it, opens it large
+  in a floating window of its own (`AltaGraphWindow`: a picture of it taken at its own size, so it is sharp), which goes
+  when the question is answered (Alta's main button pressed), another part comes, the page goes out of sight, or the
+  popup closes. In dark mode graphs are now turned over with the question by default (light lines on the dark glass);
+  the sun button beside a graph, or Light in its window, gives Alta's own colours on a white card, remembered
+  (`SimplAltaGraphsLight`). Loading is recognised: a page, or parts that are all a spinner, a skeleton, an
+  indeterminate bar, something `aria-busy`, or words saying it is loading, stay out of sight (the popup's skeleton) for
+  up to 20 seconds, and a question with something still loading in it waits up to 4 seconds before it shows; the
+  overview waits the same way. The haze behind the quiz popups' floating buttons is a blurred capsule, with no edges.
 
 ## Building and running
 

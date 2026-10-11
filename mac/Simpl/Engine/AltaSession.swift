@@ -276,13 +276,19 @@ enum AltaHook {
           // dark, hues kept (inverted, then turned half round the colour wheel) — and its pictures, videos and graphs
           // turned back, so they keep their own colours. Alta still draws it all; only its colours are turned.
           + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] { filter: invert(1) hue-rotate(180deg) !important; }\n'
-          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] :is(img, picture, video, canvas, iframe, object, embed):not([data-simpl-pic] *) { filter: invert(1) hue-rotate(180deg) !important; }\n'
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] :is(img, picture, video, canvas, iframe, object, embed):not([data-simpl-pic]):not([data-simpl-pic] *) { filter: invert(1) hue-rotate(180deg) !important; }\n'
           // (1.3.62) and its graphs and drawings — a graph's box (Learnosity's, JSXGraph's) and any large SVG — turned back
           // whole, labels and all, so they read as Alta draws them
-          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] [data-simpl-pic] { filter: invert(1) hue-rotate(180deg) !important; }\n'
+          // (1.3.70: only when asked for — the popup's Light button; by default a graph's colours are turned over with
+          // the rest of the part, light lines on the dark glass)
+          + 'html[data-simpl-q][data-simpl-dark][data-simpl-pics-light] section[data-simpl-keep] [data-simpl-pic] { filter: invert(1) hue-rotate(180deg) !important; }\n'
           // (1.3.68) on a white card of its own: a graph is drawn in dark ink for a white page, its ground left clear —
           // on dark glass its lines and numbers were lost
-          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] [data-simpl-pic] { background-color: #fff !important; border-radius: 10px !important; box-shadow: 0 0 0 6px #fff !important; }\n';
+          + 'html[data-simpl-q][data-simpl-dark][data-simpl-pics-light] section[data-simpl-keep] [data-simpl-pic] { background-color: #fff !important; border-radius: 10px !important; box-shadow: 0 0 0 6px #fff !important; }\n'
+          // (1.3.70) a graph in what a question asks drawn small — the popup's button by it, or a click on it, opens it
+          // large in a window of its own
+          + 'html[data-simpl-q] [data-simpl-mini] { zoom: var(--simpl-zoom, 1) !important; width: fit-content !important; cursor: zoom-in !important; border-radius: 10px !important; outline: 2px solid transparent !important; outline-offset: 6px !important; transition: outline-color .18s ease !important; }\n'
+          + 'html[data-simpl-q] [data-simpl-mini]:hover { outline-color: rgba(10, 132, 255, .55) !important; }\n';
         var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
         var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
         var title = function (sec) { var h = sec.querySelector('[class*="compound-header"] h2, [class*="compound-header"] h3, h2[class*="content-title"]'); return h ? txt(h) : ''; };
@@ -343,6 +349,48 @@ enum AltaHook {
             });
           });
         };
+        // (1.3.70) the small graphs: a graph in what a question asks (not one to answer on), larger than 300 × 220, drawn
+        // at a zoom that brings it down to that
+        var MINI_W = 300, MINI_H = 220, picEls = [];
+        var minis = function () {
+          picEls = all('[data-simpl-keep] [data-simpl-mini]');
+          all('[data-simpl-keep] [data-simpl-pic]').forEach(function (el) {
+            if (el.hasAttribute('data-simpl-mini') || el.closest('[data-simpl-answer], [class*="lrn_response"]')) return;
+            // (its drawing's size, not its box's: a graph's box is often a block as wide as the part, its drawing far less)
+            var r = el.getBoundingClientRect();
+            if (!/^(svg|img|canvas)$/i.test(el.tagName)) {
+              var inner = [].slice.call(el.querySelectorAll('svg, canvas, img')).map(function (x) { return x.getBoundingClientRect(); }).filter(function (b) { return b.width > 0 && b.height > 0; });
+              if (inner.length) r = { width: Math.max.apply(null, inner.map(function (b) { return b.width; })), height: Math.max.apply(null, inner.map(function (b) { return b.height; })) };
+            }
+            if (r.width < MINI_W + 60 && r.height < MINI_H + 60) return;
+            var z = Math.min(MINI_W / r.width, MINI_H / r.height);
+            el.style.setProperty('--simpl-zoom', String(Math.round(z * 1000) / 1000));
+            mark(el, 'data-simpl-mini');
+            picEls.push(el);
+          });
+          picEls = picEls.filter(function (el) { return el.isConnected && el.hasAttribute('data-simpl-mini'); });
+        };
+        document.addEventListener('click', function (e) {
+          if (!document.documentElement.hasAttribute('data-simpl-q')) return;
+          var p = e.target && e.target.closest ? e.target.closest('[data-simpl-mini]') : null;
+          if (!p) return;
+          e.preventDefault(); e.stopPropagation();
+          var i = picEls.indexOf(p);
+          if (i >= 0) post({ kind: 'picOpen', i: i });
+        }, true);
+        window.__simplPic = {
+          // (where a small graph is now, in the view, and how far it is drawn down — for its picture, large)
+          rect: function (i) { var el = picEls[i]; if (!el || !el.isConnected) return null; var r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, z: parseFloat(el.style.getPropertyValue('--simpl-zoom')) || 1 }; }
+        };
+        // (1.3.70) a loading page or part — a spinner, a skeleton, an indeterminate bar, something marked busy, or words
+        // saying it is loading — is recognised as such: kept out of sight (the popup's skeleton) until it is done
+        var BUSY = '[aria-busy="true"], [role="progressbar"]:not([aria-valuenow]), [class*="spinner" i], [class*="loader" i], [class*="skeleton" i], [class*="shimmer" i], [class*="loading" i], .MuiCircularProgress-root, .MuiLinearProgress-root, .MathJax_Processing';
+        var busy = function (root) {
+          if (!root) return false;
+          if ([].some.call(root.querySelectorAll(BUSY), function (b) { return shown(b) && !b.closest('[data-simpl-pic]'); })) return true;
+          var t = norm(root.innerText || '');
+          return t.length < 120 && /^(loading|please wait|one moment|just a moment|preparing)\b/.test(t);
+        };
         var sprite = function (e) { return e.tagName && e.tagName.toLowerCase() === 'svg' && !!e.querySelector('symbol, defs') && !e.closest('section'); };
         var apply = function (keep) {
           if (keep.length === keptNow.length && keep.every(function (k, i) { return k === keptNow[i] && k.isConnected; }) && document.documentElement.hasAttribute('data-simpl-q')) return;
@@ -365,7 +413,11 @@ enum AltaHook {
           dark();
         };
         // (1.3.50) light or dark as the app is: the app sets window.__simplDark (before the page, and again when it changes)
-        var dark = function () { if (document.documentElement) document.documentElement.toggleAttribute('data-simpl-dark', !!window.__simplDark); };
+        var dark = function () {
+          if (!document.documentElement) return;
+          document.documentElement.toggleAttribute('data-simpl-dark', !!window.__simplDark);
+          document.documentElement.toggleAttribute('data-simpl-pics-light', !!window.__simplPicsLight); // (1.3.70)
+        };
         window.__simplFocusDark = dark;
         // ---- (1.3.53) the parts' panels and their buttons, for the app ----
         // Each part kept is a card: what a question asks (its heading and words) and its answer (Learnosity's box and
@@ -429,8 +481,11 @@ enum AltaHook {
           var bsSaid = JSON.stringify(bs.map(function (b) { return { label: b.label, primary: b.primary, enabled: b.enabled }; }));
           if (bsSaid !== lastButtons) { lastButtons = bsSaid; post({ kind: 'buttons', items: JSON.parse(bsSaid) }); }
           var ps = on ? panels() : [];
+          if (on) minis(); else picEls = [];
           var bottom = ps.reduce(function (m, p) { return Math.max(m, p.y + p.h); }, 0);
-          var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen });
+          var sx0 = window.scrollX || 0, sy0 = window.scrollY || 0;
+          var pr = picEls.map(function (el) { var r = el.getBoundingClientRect(); return { x: Math.round(r.left + sx0), y: Math.round(r.top + sy0), w: Math.round(r.width), h: Math.round(r.height) }; });
+          var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr });
           if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
         };
         setInterval(publish, 350);
@@ -438,7 +493,7 @@ enum AltaHook {
         window.__simplButtons = {
           press: function (i) { var b = buttonEls[i]; if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); setTimeout(publish, 60); return true; }
         };
-        var told = '', badSince = 0, timer = null, wasQuestion = false;
+        var told = '', badSince = 0, timer = null, wasQuestion = false, loadingSince = 0;
         var report = function (state, r) {
           if (state === told) return;
           told = state;
@@ -508,6 +563,20 @@ enum AltaHook {
           timer = null;
           dialogTick();
           var r = read();
+          // (1.3.70) a loading page, or parts that are all still loading: out of sight, waited for (twenty seconds at
+          // most, then shown as it is)
+          var loadingNow = r.keep ? r.keep.every(function (k) { return busy(k) && !k.querySelector('.lrn_widget, .lrn_qr, .learnosity-item') && norm(k.innerText || '').length < 200; })
+            : (r.state !== 'overview' && busy(document.body));
+          if (loadingNow) {
+            if (!loadingSince) loadingSince = Date.now();
+            if (Date.now() - loadingSince < 20000) {
+              if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+              steadySince = 0; badSince = 0;
+              veilAgain();
+              schedule(250);
+              return;
+            }
+          } else loadingSince = 0;
           if (r.state === 'question' || r.state === 'lesson') {
             badSince = 0; wasQuestion = true;
             // (Alta's pop-ups and MathJax's helpers kept with it; its Feedback — a report to Alta — and its Content
@@ -528,7 +597,7 @@ enum AltaHook {
             badSince = 0; wasQuestion = false; unmark(); report('overview', r); publish();
             // (the cover read first, so the app's start screen is up before the page would show)
             if (window.__simplCoverNow) window.__simplCoverNow();
-            reveal('overview');
+            revealSteady('overview');
             return;
           }
           // (not recognised: a moment's grace — Alta between one part and the next — then its page as it is)
@@ -554,9 +623,11 @@ enum AltaHook {
         var revealSteady = function (state) {
           if (!steadySince) steadySince = Date.now();
           var quiet = Date.now() - lastChange;
-          var pending = !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
+          var spinning = state === 'overview' ? busy(document.body) : [].some.call(document.querySelectorAll('[data-simpl-keep]'), busy);
+          var pending = spinning || !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
             || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; });
-          if ((quiet >= 350 && !pending) || Date.now() - steadySince > 2500) {
+          // (1.3.70: as long as four seconds while something in it still says it is loading)
+          if ((quiet >= 350 && !pending) || Date.now() - steadySince > (spinning ? 4000 : 2500)) {
             steadySince = 0;
             reveal(state);
             return;
@@ -753,6 +824,105 @@ struct AltaPanel: Identifiable, Equatable {
     let rect: CGRect
 }
 
+/// (1.3.70) A small graph in what a question asks, where the page lays it (its own coordinates).
+struct AltaPic: Identifiable, Equatable {
+    let id: Int
+    let rect: CGRect
+}
+
+/// (1.3.70) A question's graph, large, in a window of its own over the popup: moved and sized as the student likes,
+/// its colours dark or as Alta draws them (the same choice as the question's), and put away when the question is
+/// answered or gone, or the popup closed.
+@MainActor
+final class AltaGraphWindow: NSObject, NSWindowDelegate {
+    static let shared = AltaGraphWindow()
+    private var panel: NSPanel?
+    private let model = Model()
+
+    final class Model: ObservableObject {
+        @Published var image: NSImage?
+        @Published var light = false
+        weak var session: AltaSession?
+    }
+
+    func show(_ image: NSImage, title: String, session: AltaSession) {
+        model.image = image
+        model.session = session
+        model.light = session.picsLight
+        if let panel {
+            panel.title = title
+            panel.orderFront(nil)
+            return
+        }
+        let fit = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1200, height: 800)
+        var size = image.size
+        let k = min(1, (fit.width * 0.6) / max(size.width, 1), (fit.height * 0.6) / max(size.height, 1))
+        size = CGSize(width: max(320, size.width * k + 32), height: max(260, size.height * k + 80))
+        let p = NSPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable, .utilityWindow, .fullSizeContentView], backing: .buffered, defer: false)
+        p.title = title
+        p.titlebarAppearsTransparent = true
+        p.isFloatingPanel = true
+        p.level = .floating
+        p.hidesOnDeactivate = true
+        p.isMovableByWindowBackground = true
+        p.isReleasedWhenClosed = false
+        p.delegate = self
+        p.contentView = NSHostingView(rootView: AltaGraphView(model: model))
+        p.center()
+        p.orderFront(nil)
+        panel = p
+    }
+
+    func light(_ on: Bool) { model.light = on }
+
+    func close() {
+        guard let p = panel else { return }
+        panel = nil
+        p.delegate = nil
+        p.close()
+        model.image = nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        panel = nil
+        model.session?.picWindowClosed()
+    }
+}
+
+private struct AltaGraphView: View {
+    @ObservedObject var model: AltaGraphWindow.Model
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let light = model.light
+        ZStack(alignment: .topTrailing) {
+            (scheme == .dark && !light ? Color(white: 0.11) : Color.white)
+                .ignoresSafeArea()
+            if let image = model.image {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .padding(EdgeInsets(top: 36, leading: 14, bottom: 14, trailing: 14))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if scheme == .dark, let session = model.session {
+                // (dark by default; Light brings back Alta's own colours on white, here and in the question)
+                Button { session.setPicsLight(!light) } label: {
+                    Label(light ? "Dark" : "Light", systemImage: light ? "moon" : "sun.max")
+                }
+                .glassButton()
+                .controlSize(.small)
+                .padding(.top, 6)
+                .padding(.trailing, 10)
+                .help(light ? "Show the graph in dark colours" : "Show the graph in its own light colours")
+            }
+        }
+        .frame(minWidth: 280, minHeight: 220)
+        .animation(Motion.gentle, value: light)
+    }
+}
+
 /// (1.3.53) One of the buttons in Alta's button bars, whatever it says: shown as the app's own, pressing Alta's.
 struct AltaButton: Identifiable, Equatable {
     let id: Int
@@ -811,10 +981,59 @@ final class AltaSession: ObservableObject {
     func appearance(dark: Bool) {
         let ucc = web.configuration.userContentController
         ucc.removeAllUserScripts()
-        ucc.addUserScript(WKUserScript(source: "window.__simplDark = \(dark);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        ucc.addUserScript(WKUserScript(source: "window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         ucc.addUserScript(AltaHook.script)
-        web.evaluateJavaScript("window.__simplDark = \(dark); if (window.__simplFocusDark) window.__simplFocusDark();", completionHandler: nil)
+        web.evaluateJavaScript("window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight); if (window.__simplFocusDark) window.__simplFocusDark();", completionHandler: nil)
+        isDark = dark
     }
+    private var isDark = false
+
+    // MARK: (1.3.70) The question's graphs: small, opened large in a window of their own
+
+    /// Where each small graph is in the page (its own coordinates), for the button by it.
+    @Published private(set) var pics: [AltaPic] = []
+    /// In dark mode a graph's colours are turned over with the question's (light lines on the dark glass) unless the
+    /// student asks for them as Alta draws them (on a white card): kept for every assignment.
+    @Published private(set) var picsLight = UserDefaults.standard.bool(forKey: AltaSession.picsLightKey)
+    private static let picsLightKey = "SimplAltaGraphsLight"
+    /// The graph open in its window, by its place among the small ones.
+    private var picOpen: Int?
+
+    func setPicsLight(_ on: Bool) {
+        picsLight = on
+        UserDefaults.standard.set(on, forKey: Self.picsLightKey)
+        AltaGraphWindow.shared.light(on)
+        appearance(dark: isDark)
+        if let i = picOpen { Task { try? await Task.sleep(nanoseconds: 120_000_000); await openPic(i) } }
+    }
+
+    /// The graph, large, in its window: a picture of it as the page draws it now, at its own size (WebKit draws it
+    /// afresh at that scale, so it is sharp).
+    func openPic(_ i: Int) async {
+        guard let r = await run("return window.__simplPic ? window.__simplPic.rect(\(i)) : null", in: nil) as? [String: Any],
+              let x = (r["x"] as? NSNumber)?.doubleValue, let y = (r["y"] as? NSNumber)?.doubleValue,
+              let w = (r["w"] as? NSNumber)?.doubleValue, let h = (r["h"] as? NSNumber)?.doubleValue, w > 4, h > 4 else { return }
+        let z = max(0.05, (r["z"] as? NSNumber)?.doubleValue ?? 1)
+        let rect = CGRect(x: x - 4, y: y - 4, width: w + 8, height: h + 8).intersection(web.bounds)
+        guard !rect.isEmpty else { return }
+        let image: NSImage? = await withCheckedContinuation { (go: CheckedContinuation<NSImage?, Never>) in
+            let config = WKSnapshotConfiguration()
+            config.rect = rect
+            config.snapshotWidth = NSNumber(value: Double(rect.width) / z)
+            config.afterScreenUpdates = true
+            web.takeSnapshot(with: config) { image, _ in go.resume(returning: image) }
+        }
+        guard let image else { return }
+        picOpen = i
+        AltaGraphWindow.shared.show(image, title: launch.title, session: self)
+    }
+
+    /// The question answered or gone: its graph's window goes with it.
+    func closePic() {
+        picOpen = nil
+        AltaGraphWindow.shared.close()
+    }
+    fileprivate func picWindowClosed() { picOpen = nil }
 
     /// (1.3.49) Alta's question (or lesson) is shown alone: laid on Liquid Glass.
     var focused: Bool { focusState == "question" || focusState == "lesson" }
@@ -846,6 +1065,8 @@ final class AltaSession: ObservableObject {
     }
 
     func pressButton(_ index: Int) {
+        // (1.3.70: the question answered — Submit, Continue — its graph's window put away)
+        if buttons.first(where: { $0.id == index })?.primary == true { closePic() }
         Task { _ = await run("return window.__simplButtons ? window.__simplButtons.press(\(index)) : null", in: nil) }
     }
 
@@ -938,7 +1159,9 @@ final class AltaSession: ObservableObject {
                     pageShown = false
                     panels = []
                     buttons = []
+                    pics = []
                 }
+                closePic()
                 return
             }
             let key = frame.request.url?.absoluteString ?? ""
@@ -954,9 +1177,15 @@ final class AltaSession: ObservableObject {
             }
             let height = CGFloat((head["height"] as? NSNumber)?.doubleValue ?? 0)
             let g = (head["gen"] as? NSNumber)?.intValue ?? 0
+            let ps = (head["pics"] as? [[String: Any]] ?? []).enumerated().compactMap { k, p -> AltaPic? in
+                guard let x = (p["x"] as? NSNumber)?.doubleValue, let y = (p["y"] as? NSNumber)?.doubleValue,
+                      let w = (p["w"] as? NSNumber)?.doubleValue, let h = (p["h"] as? NSNumber)?.doubleValue, w > 0, h > 0 else { return nil }
+                return AltaPic(id: k, rect: CGRect(x: x, y: y, width: w, height: h))
+            }
             if list != panels { panels = list }
             if height != pageHeight { pageHeight = height }
-            if g != panelGen { panelGen = g }
+            if ps != pics { pics = ps }
+            if g != panelGen { panelGen = g; closePic() } // (another question: the last one's graph window goes)
         case "buttons":
             guard frame.isMainFrame else { return }
             let list = (head["items"] as? [[String: Any]] ?? []).enumerated().map { k, b in
@@ -1008,6 +1237,10 @@ final class AltaSession: ObservableObject {
         case "hidden":
             guard frame.isMainFrame else { return }
             withAnimation(Motion.gentle) { pageShown = false }
+            closePic() // (Alta between parts: the question gone)
+        case "picOpen":
+            guard frame.isMainFrame, let i = (head["i"] as? NSNumber)?.intValue else { return }
+            Task { await openPic(i) }
         case "cover":
             guard frame.isMainFrame else { return }
             if head["none"] as? Bool == true {

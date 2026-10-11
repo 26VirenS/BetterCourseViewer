@@ -50,6 +50,7 @@ struct AltaQuizScreen: View {
             await session.start(engine: engine)
         }
         .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
+        .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
         // (1.3.51) Alta's pop-ups as the Mac's own sheet: Alta's picture of it, its buttons the Mac's
         .sheet(item: Binding(get: { session.dialog }, set: { if $0 == nil && session.dialog != nil { session.dialogDismissed() } })) { d in
             AltaDialogSheet(dialog: d, press: { i in session.pressDialog(i) }, giveBack: { session.dialogDismissed() })
@@ -198,6 +199,15 @@ struct AltaQuizScreen: View {
                             AltaPageHost(web: session.web, forwardScroll: split)
                                 .frame(width: g.size.width, height: split ? max(session.pageHeight, g.size.height) : g.size.height)
                                 .background { if !session.focused && session.pageShown && session.cover == nil { Color.white } }
+                            // (1.3.70) by each small graph: open it large in a window of its own, and (dark mode) Light
+                            // or Dark for the graphs' colours
+                            if split && session.pageShown {
+                                ForEach(session.pics) { pic in
+                                    AltaPicControls(session: session, index: pic.id, dark: scheme == .dark)
+                                        .offset(x: pic.rect.maxX + 10, y: pic.rect.minY)
+                                        .transition(.opacity)
+                                }
+                            }
                         }
                         .frame(width: g.size.width, alignment: .topLeading)
                         .padding(.bottom, split ? 96 : 0)
@@ -251,6 +261,33 @@ struct AltaQuizScreen: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// (1.3.70) Beside a small graph: Enlarge (its own window) and, in dark mode, Light or Dark for the graphs' colours.
+private struct AltaPicControls: View {
+    @ObservedObject var session: AltaSession
+    let index: Int
+    let dark: Bool
+
+    var body: some View {
+        GlassGroup(spacing: 6) {
+            VStack(spacing: 6) {
+                Button { Task { await session.openPic(index) } } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 16, height: 16)
+                }
+                .glassButton()
+                .help("Open the graph large, in a window you can move")
+                if dark {
+                    Button { session.setPicsLight(!session.picsLight) } label: {
+                        Image(systemName: session.picsLight ? "moon" : "sun.max").frame(width: 16, height: 16)
+                    }
+                    .glassButton()
+                    .help(session.picsLight ? "Graphs in dark colours" : "Graphs in their own light colours")
+                }
+            }
+        }
+        .controlSize(.small)
     }
 }
 

@@ -363,7 +363,14 @@ struct QuizFloatingBar<Content: View>: View {
         .padding(.top, 30)
         .padding(.bottom, 20)
         .background {
-            LinearGradient(colors: [Theme.page.opacity(0), Theme.page.opacity(0.88)], startPoint: .top, endPoint: .bottom)
+            // (1.3.70) a soft haze behind the buttons, not a box: no edge of its own anywhere, so it never cuts across
+            // what is under it (a graph, a picture)
+            Capsule()
+                .fill(Theme.page.opacity(0.5))
+                .padding(.horizontal, 6)
+                .padding(.top, 18)
+                .padding(.bottom, 8)
+                .blur(radius: 18)
                 .allowsHitTesting(false)
         }
     }

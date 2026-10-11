@@ -119,11 +119,29 @@ try {
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
   // (1.3.62) a graph drawn into a part (Learnosity's JSXGraph box, its labels in it) and a large SVG are marked to be
   // turned back whole in dark mode; a small icon is not
-  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg><img id="gimg" alt="" style="display:block;width:220px;height:150px">'); });
+  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg><img id="gimg" alt="" style="display:block;width:220px;height:150px"><svg id="big" width="640" height="420"></svg>'); });
   await page.waitForTimeout(600);
   check(await page.evaluate(() => { const g = document.querySelector('.lrn_graphplotting'); return g.hasAttribute('data-simpl-pic') && !g.querySelector('[data-simpl-pic]') && document.getElementById('plot').hasAttribute('data-simpl-pic') && document.getElementById('gimg').hasAttribute('data-simpl-pic') && !document.getElementById('icon').hasAttribute('data-simpl-pic'); }),
     'a graph’s box (with its labels) and a large drawing are marked to keep their own colours in dark mode; an icon is not');
-  await page.evaluate(() => { document.querySelector('.lrn_graphplotting').remove(); document.getElementById('plot').remove(); document.getElementById('icon').remove(); document.getElementById('gimg').remove(); });
+  // (1.3.70) a large graph in what the question asks is drawn small (300 × 220 at most), its place told to the app for the
+  // button by it, and a click on it asks the app to open it large; its rect and zoom are there for the picture
+  const nm = (await posts()).length;
+  const mini = await page.evaluate(() => { const b = document.getElementById('big'); const r = b.getBoundingClientRect(); return { on: b.hasAttribute('data-simpl-mini'), w: r.width, h: r.height, z: b.style.getPropertyValue('--simpl-zoom') }; });
+  const pm = await waitFor((p, k) => k >= nm && p.kind === 'panels' && Array.isArray(p.pics) && p.pics.length === 1, 'the small graph’s place', 30).catch(() => null) || (await posts()).filter((p) => p.kind === 'panels').pop();
+  check(mini.on && mini.w <= 302 && mini.h <= 222 && +mini.z < 1 && pm?.pics?.length === 1 && Math.abs(pm.pics[0].w - mini.w) < 2,
+    `a large graph is drawn small, its place told to the app (${JSON.stringify({ mini, pics: pm?.pics })})`);
+  await page.click('#big');
+  const po = await waitFor((p) => p.kind === 'picOpen', 'the graph asked open', 20);
+  const pr = await page.evaluate(() => window.__simplPic.rect(0));
+  check(po.i === 0 && pr && pr.w <= 302 && pr.z < 1, `a click on it asks the app to open it large, with where it is and its zoom (${JSON.stringify(pr)})`);
+  // (1.3.70) dark mode: graphs dark by default (turned over with the question), as Alta draws them on Light
+  await page.evaluate(() => { window.__simplDark = true; window.__simplPicsLight = false; window.__simplFocusDark(); });
+  const gDark = await page.evaluate(() => getComputedStyle(document.getElementById('gimg')).filter);
+  await page.evaluate(() => { window.__simplPicsLight = true; window.__simplFocusDark(); });
+  const gLight = await page.evaluate(() => ({ f: getComputedStyle(document.getElementById('gimg')).filter, bg: getComputedStyle(document.getElementById('gimg')).backgroundColor }));
+  await page.evaluate(() => { window.__simplDark = false; window.__simplPicsLight = false; window.__simplFocusDark(); });
+  check(gDark === 'none' && /invert\(1\)/.test(gLight.f) && gLight.bg === 'rgb(255, 255, 255)', `in dark mode a graph is dark by default, and on Light as Alta draws it on white (${gDark} → ${gLight.f})`);
+  await page.evaluate(() => { document.querySelector('.lrn_graphplotting').remove(); document.getElementById('plot').remove(); document.getElementById('icon').remove(); document.getElementById('gimg').remove(); document.getElementById('big').remove(); });
   await page.waitForTimeout(400);
   // (1.3.60) each part a centred column no wider than 860 points
   const vw = await page.evaluate(() => innerWidth);
@@ -225,6 +243,18 @@ try {
   await page.evaluate(() => { window.__flow.appendChild(window.__q); });
   await waitFor((p, k) => k >= nr && p.kind === 'focus' && p.state === 'question', 'the question again');
   check(!(await vis('header')) && (await vis('#asks')), 'when the page is a question again, it is shown alone again');
+  // (1.3.70) a loading part (a spinner, "Loading…") in the question's place: out of sight, the app told, until the question
+  // is back — never shown in between
+  const nld = (await posts()).length;
+  await page.evaluate(() => { window.__q.remove(); window.__flow.insertAdjacentHTML('beforeend', '<section id="ldsec" class="compound__compound___x"><div class="theme__card___3E6YM"><div class="MuiCircularProgress-root" style="width:40px;height:40px"></div><p>Loading…</p></div></section>'); });
+  const ldh = await waitFor((p, k) => k >= nld && p.kind === 'hidden', 'out of sight while loading', 40);
+  await page.waitForTimeout(1200);
+  const ldShown = (await posts()).slice(nld).some((p) => p.kind === 'shown');
+  check(!!ldh && !ldShown && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-shown'))), 'a loading part is recognised: kept out of sight, never shown');
+  const nld2 = (await posts()).length;
+  await page.evaluate(() => { document.getElementById('ldsec').remove(); window.__flow.appendChild(window.__q); });
+  const ldBack = await waitFor((p, k) => k >= nld2 && p.kind === 'shown', 'the question shown once loaded', 60);
+  check(!!ldBack && (await vis('#asks')), 'and the question shown once it is there');
 
   // Alta opens on the assignment's overview: its objectives read from whatever Alta's page reads
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1`);
