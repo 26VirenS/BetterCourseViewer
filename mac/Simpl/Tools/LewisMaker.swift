@@ -773,10 +773,20 @@ struct LewisMaker: View {
         var g = LGraph(charge: charge)
         let c = g.add(central, at: .zero)
         let around = Self.outers.flatMap { s in Array(repeating: s, count: counts[s] ?? 0) }
+        var outer: [Int] = []
         for (k, s) in around.enumerated() {
-            let a = -Double.pi / 2 + Double(k) / Double(max(around.count, 1)) * 2 * .pi
-            let t = g.add(s, at: CGPoint(x: 90 * cos(a), y: 90 * sin(a)))
+            let a0 = -Double.pi / 2 + Double(k) / Double(max(around.count, 1)) * 2 * .pi
+            let t = g.add(s, at: CGPoint(x: 90 * cos(a0), y: 90 * sin(a0)))
             g.connect(c, t)
+            outer.append(t)
+        }
+        // (1.3.57) the atoms round it set out as its shape is drawn on paper — water bent, ammonia a fan under its lone
+        // pair — once the electrons show how many lone pairs the centre has
+        let lone = LewisSolver.solve(g, mode: mode).major?.lone[c] ?? 0
+        let angles = Self.quickAngles(bonded: outer.count, lonePairs: (lone + 1) / 2)
+        for (k, id) in outer.enumerated() {
+            let a = angles[k] * .pi / 180
+            if let i = g.atoms.firstIndex(where: { $0.id == id }) { g.atoms[i].pos = CGPoint(x: 90 * cos(a), y: 90 * sin(a)) }
         }
         graph = g
         selected = c
@@ -784,6 +794,23 @@ struct LewisMaker: View {
             guard let q = p.quick else { return false }
             return q.0 == central && p.charge == charge && q.1.sorted() == around.sorted()
         }?.name
+    }
+
+    /// Directions (degrees, y down) for the atoms round a centre, by how many there are and its lone pairs.
+    static func quickAngles(bonded n: Int, lonePairs l: Int) -> [Double] {
+        switch (n, l) {
+        case (1, _): return [0]
+        case (2, 0): return [180, 0]
+        case (2, _): return [142, 38]
+        case (3, 0): return [-90, 30, 150]
+        case (3, 1): return [150, 90, 30]
+        case (3, _): return [-90, 90, 180]
+        case (4, 1): return [-90, 90, 150, 210]
+        case (4, _): return [-90, 0, 90, 180]
+        case (6, _): return [-90, 90, 30, 150, 210, 330]
+        default:
+            return (0..<n).map { -90 + Double($0) * 360 / Double(max(n, 1)) }
+        }
     }
 
     private func load(_ name: String) {
@@ -1160,6 +1187,14 @@ struct LewisStructureCanvas: View {
         return Fit(scale: min(maxScale, sx, sy), centre: CGPoint(x: (x0 + x1) / 2, y: (y0 + y1) / 2))
     }
 
+    /// (1.3.57) The editor's view: as large as fits, up to half again full size, so a small molecule isn't lost in a
+    /// big space; drawn round the origin while that fits, so drawing atoms one by one doesn't shift it.
+    static func editorFit(_ g: LGraph, _ size: CGSize) -> Fit {
+        let big = fit(g, size, maxScale: 1.5)
+        if big.centre == .zero { return big }
+        return fit(g, size, maxScale: 1)
+    }
+
     var body: some View {
         Canvas { ctx, size in
             let f = view ?? LewisStructureCanvas.fit(graph, size, maxScale: scale)
@@ -1313,7 +1348,7 @@ struct LewisEditorCanvas: View {
         GeometryReader { geo in
             let size = geo.size
             LewisStructureCanvas(graph: graph, structure: structure, result: result, scale: 1, selected: selected, preview: preview,
-                                 view: held ?? LewisStructureCanvas.fit(graph, size, maxScale: 1))
+                                 view: held ?? LewisStructureCanvas.editorFit(graph, size))
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
@@ -1325,7 +1360,7 @@ struct LewisEditorCanvas: View {
 
     /// From the view's points to the drawing's.
     private func local(_ p: CGPoint, _ size: CGSize) -> CGPoint {
-        let f = held ?? LewisStructureCanvas.fit(graph, size, maxScale: 1)
+        let f = held ?? LewisStructureCanvas.editorFit(graph, size)
         let x: CGFloat = f.centre.x + (p.x - size.width / 2) / f.scale
         let y: CGFloat = f.centre.y + (p.y - size.height / 2) / f.scale
         return CGPoint(x: x, y: y)
@@ -1354,7 +1389,7 @@ struct LewisEditorCanvas: View {
     }
 
     private func changed(_ v: DragGesture.Value, _ size: CGSize) {
-        if held == nil { held = LewisStructureCanvas.fit(graph, size, maxScale: 1) }
+        if held == nil { held = LewisStructureCanvas.editorFit(graph, size) }
         guard hypot(v.translation.width, v.translation.height) > 4 else { return }
         let start = local(v.startLocation, size), now = local(v.location, size)
         if tool == .move || !editable {
@@ -1444,10 +1479,19 @@ struct PresetMenu: View {
                 }
             }
         } label: {
-            Text(selected ?? placeholder)
+            HStack(spacing: 8) {
+                Text(selected ?? placeholder).font(.sBody.weight(.semibold)).lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .contentShape(Rectangle())
         }
-        .controlSize(.large)
-        .frame(maxWidth: .infinity)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     @ViewBuilder
@@ -1480,31 +1524,38 @@ struct LElementPicker: View {
 
     var body: some View {
         let colour: Color = LChem.color(selected)
-        let detail: String = "\(LChem.valence(selected)) valence e⁻ · holds up to \(LChem.maxElectrons(selected))"
-        HStack(spacing: 12) {
-            Text(selected)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(colour)
-                .frame(width: 44, height: 44)
-                .background(colour.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name(selected)).font(.sBody.weight(.semibold))
-                Text(detail).font(.sCaption).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
-            Menu("Change") {
-                ForEach(Self.groups.indices, id: \.self) { k in
-                    Section(Self.groups[k].0) {
-                        ForEach(Self.groups[k].1, id: \.self) { s in
-                            Button { pick(s) } label: { item(s) }
-                        }
+        let detail: String = "\(LChem.valence(selected)) valence e⁻ · max \(LChem.maxElectrons(selected))"
+        Menu {
+            ForEach(Self.groups.indices, id: \.self) { k in
+                Section(Self.groups[k].0) {
+                    ForEach(Self.groups[k].1, id: \.self) { s in
+                        Button { pick(s) } label: { item(s) }
                     }
                 }
             }
-            .fixedSize()
+        } label: {
+            HStack(spacing: 12) {
+                Text(selected)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(colour)
+                    .frame(width: 44, height: 44)
+                    .background(colour.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name(selected)).font(.sBody.weight(.semibold)).lineLimit(1)
+                    Text(detail).font(.sCaption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
-        .padding(10)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
         .card(radius: 14)
+        .help("Change the element")
     }
 
     @ViewBuilder

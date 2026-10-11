@@ -11,6 +11,8 @@ enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.57", date: "2026-10-11", notes: [
             ReleaseNote(kind: "fixed", title: "Even element facts", body: "Every fact box one size; the atom's card its own height."),
+            ReleaseNote(kind: "fixed", title: "Orbitals in view", body: "Orbitals fit the view and open on the subshell filling."),
+            ReleaseNote(kind: "improved", title: "Lewis drawings sized", body: "Small molecules drawn larger, shaped as on paper."),
         ]),
         Release(version: "1.3.56", date: "2026-10-11", notes: [
             ReleaseNote(kind: "fixed", title: "Tidier element pages", body: "The atom and its electrons side by side, facts below."),

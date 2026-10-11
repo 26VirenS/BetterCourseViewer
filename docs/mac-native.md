@@ -175,6 +175,12 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   by side, as tall as each other, its facts below, instead of the atom stretched across the page.
   (1.3.57) Elsewhere each card keeps its own height (the wide layout no longer stretches the atom's card to the facts'
   column), and every fact box is one size (the line for a note under the value is kept, empty, where there is none).
+  The orbitals open on the outer subshell being filled (the highest l among the valence subshells: 3d for cobalt, not
+  4s) and the camera stands back far enough for the s sphere or the row of orbitals to sit well inside the view. The
+  presets' dropdown and the element card are plain full-width menus (the card itself opens the element menu). The
+  Lewis editor draws up to half again full size when there is room (`editorFit`), and the quick way sets the atoms
+  round the centre as its shape is drawn on paper, from the lone pairs the electrons give it (`quickAngles`: water
+  bent, ammonia a fan under its lone pair, ClF₃ a T, SF₄ a seesaw, XeF₄ a cross).
 
 ## Building and running
 

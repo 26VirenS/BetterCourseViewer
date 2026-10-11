@@ -195,7 +195,9 @@ enum AtomScene {
         let names = orbitalNames(sub.l)
         let gap = 2.6
         let width = Double(names.count - 1) * gap
-        let scene = base(cameraAt: Float(max(4.2, width * 0.95 + 3.6)))
+        // (1.3.57) far enough back that an s orbital's sphere, or the row of p, d or f orbitals, sits well inside the view
+        let sRadius = 0.45 + 0.12 * Double(sub.n)
+        let scene = base(cameraAt: Float(max(5.4, width * 0.95 + 4.6, sub.l == 0 ? sRadius * 6.2 : 0)))
         let root = scene.rootNode
         let filling = sub.filling
         let plus = NSColor(ptHex: "0a84ff"), minus = NSColor(ptHex: "ff9f0a")
@@ -209,8 +211,7 @@ enum AtomScene {
             core.geometry?.materials = [material(protonColor)]
             holder.addChildNode(core)
             if sub.l == 0 {
-                let r = 0.45 + 0.18 * Double(sub.n)
-                let sphere = SCNSphere(radius: CGFloat(r))
+                let sphere = SCNSphere(radius: CGFloat(sRadius))
                 sphere.segmentCount = 48
                 sphere.materials = [material(plus, alpha: alpha)]
                 holder.addChildNode(SCNNode(geometry: sphere))

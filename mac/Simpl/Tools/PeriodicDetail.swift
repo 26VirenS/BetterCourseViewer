@@ -18,7 +18,12 @@ struct PTElementPage: View {
     private var e: PTElement { element }
     private var valenceSubs: [PTSubshell] { PTConfig.valence(of: e) }
     private var allSubs: [PTSubshell] { PTConfig.subshells(of: e) }
-    private var subshell: PTSubshell? { allSubs.first { $0.id == subshellID } ?? valenceSubs.last ?? allSubs.last }
+    /// The subshell whose orbitals are shown: the one picked, else the outer one being filled (3d for cobalt, not 4s).
+    private var subshell: PTSubshell? {
+        if let picked = allSubs.first(where: { $0.id == subshellID }) { return picked }
+        let top = valenceSubs.map(\.l).max() ?? 0
+        return valenceSubs.last { $0.l == top } ?? allSubs.last
+    }
 
     var body: some View {
         ScrollView {
