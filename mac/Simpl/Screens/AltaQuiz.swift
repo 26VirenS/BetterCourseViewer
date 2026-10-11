@@ -197,7 +197,7 @@ struct AltaQuizScreen: View {
                             }
                             AltaPageHost(web: session.web, forwardScroll: split)
                                 .frame(width: g.size.width, height: split ? max(session.pageHeight, g.size.height) : g.size.height)
-                                .background { if !session.focused { Color.white } }
+                                .background { if !session.focused && session.pageShown && session.cover == nil { Color.white } }
                         }
                         .frame(width: g.size.width, alignment: .topLeading)
                         .padding(.bottom, split ? 96 : 0)
@@ -229,6 +229,14 @@ struct AltaQuizScreen: View {
             if let c = session.cover, !session.focused, session.dialog == nil, session.failure == nil, !session.opening {
                 AltaStartScreen(cover: c, start: { session.startCover() }, review: { session.reviewCover() })
                     .transition(.opacity)
+            }
+            // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place
+            if !session.pageShown && session.cover == nil && !session.opening && session.failure == nil {
+                ZStack {
+                    PageGround()
+                    ProgressView().controlSize(.regular)
+                }
+                .transition(.opacity)
             }
             if let why = session.failure {
                 ZStack {
@@ -293,6 +301,9 @@ private struct AltaStartScreen: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(d.label.uppercased()).font(.system(size: 10.5, weight: .semibold)).tracking(0.5).foregroundStyle(.secondary)
                             Text(d.value).font(.sBody.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                            if let sub = d.sub, !sub.isEmpty {
+                                Text(sub).font(.sCaption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                 }

@@ -196,6 +196,14 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Review Instruction, and the objectives by topic with each topic's estimate and each objective's mastery) and the
   popup shows a glass card with the name, details, note and a large Start (Return) and Review Instruction, and a glass
   card of the objectives — each Start or Review pressing Alta's own (`window.__simplCover`). Alta's page waits under it.
+  (1.3.60) Alta's page is see-through from its first moment (a style sheet adopted at document start: `body` at opacity
+  0 until `html[data-simpl-shown]`) until the hook has laid it out — its question on glass, its cover read for the start
+  screen, or, not recognised, shown as it is — or nine seconds have passed; a page that is not Alta's is shown at once.
+  The popup shows its own Loading meanwhile and no white behind it, so Alta never flashes in before its question. Each
+  part of a question is a centred column at most 860 points wide. The cover's objectives (every one, by topic, with its
+  topic's estimate) are the assignment's list: the rail's on the start screen, and the names lined up with Alta's answers
+  once a question is on, so none is left as "Objective 3". A detail's second line of another kind (Grade's "Last
+  updated…") is shown as a note under its value.
 
 ## Building and running
 

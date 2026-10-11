@@ -28,6 +28,40 @@ enum AltaHook {
       var post = function (m) { try { window.webkit.messageHandlers.simplAlta.postMessage(JSON.stringify(m)); } catch (e) {} };
       // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there)
       post({ kind: 'frame' });
+      // (1.3.60) Alta's page kept out of sight from its first moment until it is laid out — its question on glass, its
+      // cover as the start screen, or (not recognised) as it is — so it never flashes in before its question; the app
+      // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
+      var reveal = function () {};
+      if (window.top === window) {
+        var revealed = false;
+        reveal = function (how) {
+          if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
+          if (!revealed) { revealed = true; post({ kind: 'shown', how: how || '' }); }
+        };
+        if (/knewton|alta/i.test(location.hostname + location.pathname)) {
+          // (see-through rather than hidden: still laid out and read as it shows — its words, their lines — just not seen)
+          var VEIL = 'html:not([data-simpl-shown]) body { opacity: 0 !important; }';
+          try {
+            var veil = new CSSStyleSheet();
+            veil.replaceSync(VEIL);
+            document.adoptedStyleSheets = document.adoptedStyleSheets.concat([veil]);
+          } catch (e) {
+            var putVeil = function () {
+              if (!document.documentElement) { setTimeout(putVeil, 10); return; }
+              var st = document.createElement('style');
+              st.id = 'simpl-veil';
+              st.textContent = VEIL;
+              document.documentElement.appendChild(st);
+            };
+            putVeil();
+          }
+          // (never longer than this, whatever happens)
+          setTimeout(function () { reveal('timeout'); }, 9000);
+        } else {
+          var revealSoon = function () { if (document.documentElement) reveal('not alta'); else setTimeout(revealSoon, 10); };
+          revealSoon();
+        }
+      }
       var num = function (v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; };
       var str = function (v) { return typeof v === 'string' && v ? v.slice(0, 600) : (typeof v === 'number' ? String(v) : null); };
 
@@ -220,6 +254,8 @@ enum AltaHook {
           // question's words and its answer, for the two glass panels behind them
           + 'html[data-simpl-q] [data-simpl-bar] { display: none !important; }\n'
           + 'html[data-simpl-q] [data-simpl-answer] { margin-top: 48px !important; }\n'
+          // (1.3.60) each part a column of its own width, centred — narrower glass panels than the popup's whole width
+          + 'html[data-simpl-q] section[data-simpl-keep] { max-width: 860px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; }\n'
           + 'html[data-simpl-q] [data-simpl-thin] { height: 0 !important; min-height: 0 !important; max-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 0 !important; overflow: hidden !important; }\n'
           // (1.3.49) laid on the popup's Liquid Glass: the page, the parts round the question and the question's own card
           // draw no ground, shadow or outline of their own — the glass behind the page is the card. Everything in it
@@ -453,9 +489,16 @@ enum AltaHook {
             r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
             report(r.state, r);
             publish();
+            reveal(r.state);
             return;
           }
-          if (r.state === 'overview') { badSince = 0; wasQuestion = false; unmark(); report('overview', r); publish(); return; }
+          if (r.state === 'overview') {
+            badSince = 0; wasQuestion = false; unmark(); report('overview', r); publish();
+            // (the cover read first, so the app's start screen is up before the page would show)
+            if (window.__simplCoverNow) window.__simplCoverNow();
+            reveal('overview');
+            return;
+          }
           // (not recognised: a moment's grace — Alta between one part and the next — then its page as it is)
           if (!badSince) badSince = Date.now();
           var wait = wasQuestion ? 1500 : 8000;
@@ -463,6 +506,7 @@ enum AltaHook {
           unmark();
           report(r.state, r);
           publish();
+          reveal('as it is');
         };
         var schedule = function (ms) { if (timer) clearTimeout(timer); timer = setTimeout(tick, typeof ms === 'number' ? ms : 120); };
         try { new MutationObserver(function () { schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
@@ -499,7 +543,14 @@ enum AltaHook {
           if (head) {
             [].forEach.call(head.querySelectorAll('[class*="subheadingContainer"]'), function (c) {
               var k = c.querySelector('h2, h3'), v = c.querySelector('[class*="headingDetails"]');
-              if (k && v) o.details.push({ label: cs(k.innerText || k.textContent), value: cs((v.innerText || v.textContent || '').split('\n').join(' ')) });
+              // (a detail's lines — Monday, Oct 5 / 11:59pm PDT — each its own paragraph, joined by a space)
+              var ps = [].map.call(v.querySelectorAll('p'), function (q) { return cs(q.innerText || q.textContent); }).filter(Boolean);
+              // (1.3.60) the date and time are one value; a line after them of another kind (Grade's "Last updated…") a
+              // note of its own under it
+              var two = /^\d{1,2}:\d{2}/.test(ps[1] || '');
+              var main = ps.length ? ps.slice(0, two ? 2 : 1).join(' ') : cs((v.innerText || v.textContent || '').split('\n').join(' '));
+              var rest = ps.length ? ps.slice(two ? 2 : 1).join(' ') : '';
+              if (k && v) o.details.push({ label: cs(k.innerText || k.textContent), value: main, sub: rest });
             });
             [].forEach.call(head.querySelectorAll('p'), function (q) {
               var t = cs(q.innerText || q.textContent);
@@ -510,7 +561,7 @@ enum AltaHook {
           if (card) {
             var topic = null;
             [].forEach.call(card.querySelectorAll('h3, p, [data-test="lo-list-item"]'), function (el) {
-              if (el.tagName === 'H3') { topic = { name: cs(el.innerText || el.textContent), estimate: '', objectives: [] }; o.topics.push(topic); return; }
+              if (el.tagName === 'H3') { topic = { name: cs(el.innerText || el.textContent), estimate: '', low: null, high: null, objectives: [] }; o.topics.push(topic); return; }
               if (!topic) return;
               if (el.matches('[data-test="lo-list-item"]')) {
                 var d = el.querySelector('[class*="description"]') || el.querySelector('p');
@@ -522,7 +573,7 @@ enum AltaHook {
               if (el.closest('[data-test="lo-list-item"]')) return;
               var t = cs(el.innerText || el.textContent);
               var e = /^estimated\s+(\d+)\s*[-\u2013]\s*(\d+)\s+questions?$/i.exec(t);
-              if (e) topic.estimate = e[1] + '\u2013' + e[2] + ' questions';
+              if (e) { topic.estimate = e[1] + '\u2013' + e[2] + ' questions'; topic.low = +e[1]; topic.high = +e[2]; }
             });
           }
           return o;
@@ -536,6 +587,7 @@ enum AltaHook {
           post(o || { kind: 'cover', none: true });
         };
         setInterval(coverTick, 700);
+        window.__simplCoverNow = coverTick;
         window.__simplCover = {
           start: function () { var a = startEl(); if (!a) return false; a.click(); return true; },
           review: function () { var a = reviewEl(); if (!a) return false; a.click(); return true; }
@@ -594,9 +646,20 @@ struct AltaOverview: Decodable, Equatable {
 /// (1.3.59) The assignment's cover as Alta's page shows it before it is started: its name, its details, its note, what
 /// its Start says, whether it offers Review Instruction, and its objectives by topic.
 struct AltaCover: Decodable, Equatable {
-    struct Detail: Decodable, Equatable, Hashable { let label: String; let value: String }
+    struct Detail: Decodable, Equatable, Hashable { let label: String; let value: String; var sub: String? }
     struct Objective: Decodable, Equatable, Hashable { let name: String; let mastery: Double? }
-    struct Topic: Decodable, Equatable, Hashable { let name: String; let estimate: String; let objectives: [Objective] }
+    struct Topic: Decodable, Equatable, Hashable {
+        let name: String
+        let estimate: String
+        var low: Double?
+        var high: Double?
+        let objectives: [Objective]
+    }
+
+    /// (1.3.60) Every objective, in order, each with its topic's estimate: the assignment's whole list.
+    var list: [AltaOverview.Objective] {
+        topics.flatMap { t in t.objectives.map { AltaOverview.Objective(id: $0.name, name: $0.name, low: t.low, high: t.high) } }
+    }
     var name: String
     var details: [Detail]
     var note: String
@@ -710,6 +773,10 @@ final class AltaSession: ObservableObject {
     /// The question laid on glass panels, one behind each part, the popup scrolling the page.
     var split: Bool { focused && !panels.isEmpty && pageHeight > 0 }
 
+    /// (1.3.60) Whether Alta's page is laid out and in sight (it is kept out of sight while it loads, so it never flashes
+    /// in before its question).
+    @Published private(set) var pageShown = false
+
     /// (1.3.59) The assignment's cover, while Alta's page shows it: the popup's start screen.
     @Published private(set) var cover: AltaCover?
 
@@ -809,7 +876,11 @@ final class AltaSession: ObservableObject {
               let head = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         switch head["kind"] as? String {
         case "frame":
-            guard !frame.isMainFrame else { return }
+            // (1.3.60) a new page: kept out of sight in it until it is laid out
+            if frame.isMainFrame {
+                if pageShown { withAnimation(Motion.gentle) { pageShown = false } }
+                return
+            }
             let key = frame.request.url?.absoluteString ?? ""
             frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
             frames.append(frame)
@@ -871,6 +942,9 @@ final class AltaSession: ObservableObject {
                 errorLogs.append(entry)
                 if errorLogs.count > 50 { errorLogs.removeFirst() }
             }
+        case "shown":
+            guard frame.isMainFrame else { return }
+            withAnimation(Motion.gentle) { pageShown = true }
         case "cover":
             guard frame.isMainFrame else { return }
             if head["none"] as? Bool == true {
@@ -878,7 +952,12 @@ final class AltaSession: ObservableObject {
                 return
             }
             guard let c = try? JSONDecoder().decode(AltaCover.self, from: data) else { return }
-            withAnimation(Motion.gentle) { cover = c }
+            withAnimation(Motion.gentle) {
+                cover = c
+                // (1.3.60) the cover's list is the whole of the assignment's objectives, every one named — the rail's,
+                // and the names lined up with Alta's answers once a question is on
+                keep(c.list)
+            }
         case "overview":
             guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
             for x in o.objectives where !x.name.isEmpty && names[x.id] != x.name { names[x.id] = x.name }
@@ -982,6 +1061,13 @@ final class AltaSession: ObservableObject {
     /// with its mastery: its target's progress, or full once its status says it is mastered.
     var objectives: [AltaObjective] {
         guard let r = report else {
+            // (1.3.60) on the cover: its objectives, all of them, each as mastered as the cover says
+            if let c = cover, !c.list.isEmpty {
+                let levels = c.topics.flatMap { $0.objectives.map(\.mastery) }
+                return c.list.enumerated().map { k, o in
+                    AltaObjective(id: o.id, number: k + 1, name: o.name, mastery: min(max(levels[k] ?? 0, 0), 1), current: false)
+                }
+            }
             // (before a question: the overview's objectives, each as mastered as the whole is said to be when it is done)
             let done = overview?.completed == true
             return (overview?.objectives ?? []).enumerated().map { k, o in

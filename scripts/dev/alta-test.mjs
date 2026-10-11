@@ -81,11 +81,11 @@ try {
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a4/cover`);
   const cv = await waitFor((p) => p.kind === 'cover' && !p.none, 'the cover');
   check(!!cv && cv.name === 'Limits at a Point' && cv.details.length === 3 && cv.details[0].label === 'Due Date' && cv.details[0].value === 'Monday, Oct 12 11:59pm PDT'
-    && cv.details[1].value === 'Not started' && cv.details[2].label === 'Grade',
+    && cv.details[1].value === 'Not started' && cv.details[2].label === 'Grade' && cv.details[2].value === 'No credit' && cv.details[2].sub === 'Last updated Oct 10 at 8:08pm',
     `the cover read: its name and details (${cv && cv.details.map((d) => d.label + ': ' + d.value).join(' · ')})`);
   check(!!cv && cv.note === 'Complete by 11:59pm today to earn 100% additional credit.' && cv.start === 'Start' && cv.review === true,
     `its note, its Start as Alta words it, and Review Instruction (${cv && cv.start})`);
-  check(!!cv && cv.topics.length === 2 && cv.topics[0].name === 'The Limit of a Function' && cv.topics[0].estimate === '6\u201312 questions'
+  check(!!cv && cv.topics.length === 2 && cv.topics[0].name === 'The Limit of a Function' && cv.topics[0].estimate === '6\u201312 questions' && cv.topics[0].low === 6 && cv.topics[0].high === 12
     && JSON.stringify(cv.topics.map((t) => t.objectives.map((o) => o.mastery))) === JSON.stringify([[0, 0.4], [1]]) && cv.topics[1].objectives[0].name === 'Find a one-sided limit',
     `its objectives by topic, each topic's estimate, each objective's mastery (${cv && cv.topics.map((t) => t.name + ' ' + t.estimate + ' [' + t.objectives.map((o) => o.name).join(', ') + ']').join(' · ')})`);
   check(await page.evaluate(() => window.__simplCover.start()), 'the app\'s Start presses Alta\'s');
@@ -117,6 +117,10 @@ try {
   const [pq, pa] = pn.panels;
   check(pq.kind === 'question' && pa.kind === 'answer' && pq.y < pa.y && pa.y - (pq.y + pq.h) >= 40 && pn.height >= pa.y + pa.h && pq.w > 200,
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
+  // (1.3.60) each part a centred column no wider than 860 points
+  const vw = await page.evaluate(() => innerWidth);
+  check(pq.w <= 861 && pa.w <= 861 && (vw < 900 || Math.abs((pq.x + pq.w / 2) - vw / 2) < 40),
+    `the parts are a centred column no wider than 860 points (${Math.round(pq.w)} and ${Math.round(pa.w)} wide in ${vw})`);
   // (a sprite sheet in a part that holds nothing else kept — Alta's banner — draws but takes no room)
   await page.evaluate(() => { document.querySelector('.knewcons__knewcons___e3wUn').insertAdjacentHTML('beforeend', '<svg id="sp2" style="position:absolute;width:0;height:0"><defs><symbol id="s2"><circle r="3"/></symbol></defs></svg>'); });
   await page.waitForTimeout(600);
