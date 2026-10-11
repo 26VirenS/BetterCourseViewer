@@ -16,6 +16,7 @@ struct AltaQuizScreen: View {
     @State private var saving = false
     @State private var saved: URL?
     @State private var showLogs = false
+    @ObservedObject private var dev = DevMode.shared
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -84,10 +85,9 @@ struct AltaQuizScreen: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            // (1.3.46) all of Alta's page code, to one text file
             GlassGroup(spacing: 8) {
-                // (1.3.47) shown once Alta's page was not recognised (and given back as it is)
-                if !session.errorLogs.isEmpty {
+                // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
+                if dev.unlocked && !session.errorLogs.isEmpty {
                     Button { showLogs = true } label: {
                         Label("Error Logs (\(session.errorLogs.count))", systemImage: "exclamationmark.triangle")
                     }
@@ -96,16 +96,7 @@ struct AltaQuizScreen: View {
                     .popover(isPresented: $showLogs, arrowEdge: .bottom) { logs }
                     .transition(.opacity)
                 }
-                Button { saveCode() } label: {
-                    if saving {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label("Save Page Code", systemImage: "curlybraces")
-                    }
-                }
-                .glassButton()
-                .disabled(saving || session.opening || session.failure != nil)
-                .help("Save every bit of Alta's page code — the page, its frames, their scripts and style sheets — to a text file in Downloads")
+                // (1.3.72: Save Page Code is in the Developer menu now)
             }
         }
         .controlSize(.large)

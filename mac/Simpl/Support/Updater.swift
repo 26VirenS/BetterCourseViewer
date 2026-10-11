@@ -14,6 +14,8 @@ struct AppRelease: Equatable, Identifiable, Sendable {
     var published: Date? = nil
     /// (1.3.17) A beta (published on GitHub as a pre-release).
     var beta = false
+    /// (1.3.72) A Critical Update: installed at once, whatever this Mac's update settings say.
+    var critical = false
     var id: String { version }
 }
 
@@ -52,6 +54,8 @@ final class Updater: ObservableObject {
     /// The feed: Info.plist's `SimplUpdateFeed` when it names one (a test feed), else the site's — its beta feed
     /// (1.3.17) for a Mac that asked for betas: the newest version of all, a beta or not.
     var feedURL: URL {
+        // (1.3.72) the Developer window's own feed, when one is set there
+        if let o = UserDefaults.standard.string(forKey: "SimplUpdateFeedOverride"), !o.isEmpty, let url = URL(string: o) { return url }
         let s = (Bundle.main.object(forInfoDictionaryKey: "SimplUpdateFeed") as? String) ?? ""
         if !s.isEmpty, !s.hasPrefix("$("), let url = URL(string: s) { return url }
         return beta ? Self.betaFeed : Self.stableFeed
@@ -142,6 +146,8 @@ final class Updater: ObservableObject {
     }
 
     private func tick() {
+        // (1.3.72) a Critical Update that failed (no network, a download cut off) is tried again every ten minutes
+        if criticalNotice != nil, case .failed = state { check() }
         checkIfDue()
         installIfQuiet()
     }
@@ -149,6 +155,9 @@ final class Updater: ObservableObject {
     /// The feed read when the last look is an hour old (or was never made, or the clock went back).
     func checkIfDue() {
         guard started else { return }
+        // (1.3.72) the Developer window's pause holds off the hourly look — never a Critical Update's: the stable feed is
+        // still read, for one of those alone
+        if paused { checkForCritical(); return }
         if let last = lastCheck {
             let since = Date().timeIntervalSince(last)
             if since >= 0 && since < interval { return }
@@ -157,6 +166,20 @@ final class Updater: ObservableObject {
     }
 
     // MARK: - Checking
+
+    /// (1.3.72) Updates paused from the Developer window: no hourly look, nothing installed by itself — except a
+    /// Critical Update, which nothing holds back.
+    @Published var paused: Bool = UserDefaults.standard.bool(forKey: "SimplUpdatesPaused") {
+        didSet { UserDefaults.standard.set(paused, forKey: "SimplUpdatesPaused") }
+    }
+    private var lastCriticalLook: Date?
+
+    /// While paused: the feed read at the usual hour all the same, but only a Critical Update acted on.
+    private func checkForCritical() {
+        if let last = lastCriticalLook, Date().timeIntervalSince(last) < interval { return }
+        lastCriticalLook = Date()
+        check()
+    }
 
     /// Check Now: the feed read afresh, whatever the time.
     func check() {
@@ -208,6 +231,15 @@ final class Updater: ObservableObject {
         UserDefaults.standard.set(now.timeIntervalSince1970, forKey: Self.lastKey)
         guard case .checking = state else { return } // (a version put back meanwhile is under way: not undone by this)
         state = outcome
+        // (1.3.72) a Critical Update: in now — automatic updates off, paused, a version put back, a quiz open, none of it
+        // holds it back
+        if case .available(let release) = outcome, release.critical {
+            if let kept = ready, !Self.same(kept.release, release) { UpdateInstall.discard(kept.unpacked); ready = nil }
+            criticalNotice = release.version
+            begin(asked: true)
+            return
+        }
+        if paused, case .available = outcome { return } // (paused: offered in Settings, never installed by itself)
         if case .available(let release) = outcome {
             if let kept = ready, !Self.same(kept.release, release) {
                 UpdateInstall.discard(kept.unpacked) // (a newer one since: the one kept is no use)
@@ -230,6 +262,10 @@ final class Updater: ObservableObject {
             return .failed("The update feed could not be read.")
         }
         guard Self.isNewer(version, than: currentVersion) else { return .upToDate }
+        // (1.3.72) a Critical Update is due when the feed names one newer than this copy (`criticalVersion`; or the
+        // feed's own version marked `critical`): the feed's newest goes in, whatever this Mac's settings
+        var critical = json["critical"] as? Bool ?? false
+        if let cv = (json["criticalVersion"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !cv.isEmpty, Self.isNewer(cv, than: currentVersion) { critical = true }
         if let minimum = (json["minimumOS"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !minimum.isEmpty {
             let os = ProcessInfo.processInfo.operatingSystemVersion
             let running = "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
@@ -241,7 +277,7 @@ final class Updater: ObservableObject {
         let sha = (json["sha256"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let size = (json["size"] as? NSNumber)?.intValue
         let published = (json["published"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
-        return .available(AppRelease(version: version, url: url, sha256: (sha ?? "").isEmpty ? nil : sha, size: size, notes: json["notes"] as? String, published: published, beta: json["beta"] as? Bool ?? false))
+        return .available(AppRelease(version: version, url: url, sha256: (sha ?? "").isEmpty ? nil : sha, size: size, notes: json["notes"] as? String, published: published, beta: json["beta"] as? Bool ?? false, critical: critical))
     }
 
     /// 1.10 is newer than 1.9, and 2.0 than 1.12; a missing part counts as 0.
@@ -265,8 +301,12 @@ final class Updater: ObservableObject {
     }
 
     /// An update that came by itself goes in only when updates are automatic and nothing holds it back.
+    /// (1.3.72) A Critical Update under way: its version, for the notice over the window.
+    @Published private(set) var criticalNotice: String?
+
     func installIfQuiet() {
-        guard started, automatic, case .available = state, quiet else { return }
+        if started, case .available(let r) = state, r.critical { begin(asked: true); return }
+        guard started, automatic, !paused, case .available = state, quiet else { return }
         begin(asked: false)
     }
 

@@ -58,18 +58,7 @@ struct MacmillanScreen: View {
                 Text("Macmillan Learning").font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
-            GlassGroup(spacing: 8) {
-                Button { saveCode() } label: {
-                    if saving {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label("Save Page Code", systemImage: "curlybraces")
-                    }
-                }
-                .glassButton()
-                .disabled(saving || session.opening || session.failure != nil)
-                .help("Save every bit of the page's code — the page, its frames, their scripts and style sheets — to a text file in Downloads")
-            }
+            // (1.3.72: Save Page Code is in the Developer menu now)
         }
         .controlSize(.large)
         .padding(.horizontal, 22)

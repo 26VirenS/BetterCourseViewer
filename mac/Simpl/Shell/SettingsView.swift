@@ -858,7 +858,7 @@ private struct UpdateStatusRow: View {
             }
         case .available(let r):
             VStack(alignment: .leading, spacing: 2) {
-                Text("Version \(r.version) available").font(.sBody.weight(.semibold))
+                Text(r.critical ? "Critical Update \(r.version)" : "Version \(r.version) available").font(.sBody.weight(.semibold))
                 if let detail = r.detail {
                     Text(detail).font(.sCallout).foregroundStyle(.secondary)
                 }
@@ -1045,6 +1045,8 @@ private struct AboutPane: View {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
                         .frame(width: 56, height: 56)
+                        .contentShape(Rectangle())
+                        .onTapGesture { DevMode.shared.tap() } // (1.3.72: seven quick clicks, developer mode)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Simpl").font(.sTitle2.bold())
                         Text("\(session.lmsName), as a Mac app.").foregroundStyle(.secondary)

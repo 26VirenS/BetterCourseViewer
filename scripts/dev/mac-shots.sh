@@ -92,6 +92,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
+  shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview

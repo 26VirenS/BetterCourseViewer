@@ -14,6 +14,8 @@ final class MacmillanSession: ObservableObject {
 
     let launch: AltaLaunch
     let web: WKWebView
+    /// (1.3.72) The Macmillan assignment open now, for the Developer menu's Save Page Code.
+    static weak var current: MacmillanSession?
     private let relay: MacmillanRelay
     private var loading: NSKeyValueObservation?
     /// Each frame in the page that has said it is there (the page itself is asked as the main frame).
@@ -43,6 +45,7 @@ final class MacmillanSession: ObservableObject {
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
         web.isInspectable = true
         r.session = self
+        MacmillanSession.current = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
             let done = !w.isLoading && w.url != nil
             Task { @MainActor in if done, self?.opening == true { withAnimation(Motion.gentle) { self?.opening = false } } }

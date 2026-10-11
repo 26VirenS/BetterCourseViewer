@@ -26,6 +26,10 @@ if command -v gh >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ]; then
   # (the highest version, as numbers: GitHub's own order put mac-v1.2.10 after mac-v1.2.3)
   MAC_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
   MAC_TAG="$(printf '%s' "$MAC_REL" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "null"); print(d["tag_name"] if d else "")' 2>/dev/null || true)"
+  # (1.3.72) the newest Critical Update (a mac-v* release whose notes carry the mark): both feeds name it, and a Mac on
+  # an older version installs the feed's newest at its next check, whatever its settings (Updater.swift)
+  CRITICAL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith("mac-v")) and ((.body // "") | contains("<!-- simpl-critical -->")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last | (.tag_name // "") | ltrimstr("mac-v")' 2>/dev/null || true)"
+  [ -n "$CRITICAL" ] && echo "Critical Update: $CRITICAL"
   if [ -n "$MAC_TAG" ]; then
     MAC_ZIP="https://github.com/$REPO/releases/download/$MAC_TAG/Simpl-Mac-${MAC_TAG#mac-v}.zip"
     REDIRECTS=build/site-sync/public/_redirects
@@ -49,9 +53,10 @@ feed = {
   "notes": rel.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}",
   "published": rel.get("published_at"),
 }
+if len(sys.argv) > 2 and sys.argv[2]: feed["criticalVersion"] = sys.argv[2]
 json.dump(feed, open("build/site-sync/public/app/mac-latest.json", "w"), indent=2)
 print("/app/mac-latest.json → " + version)
-' "$REPO" || echo "no Simpl for Mac feed written"
+' "$REPO" "$CRITICAL" || echo "no Simpl for Mac feed written"
   fi
   # (1.3.17) the beta feed, /app/mac-beta.json, for Macs with Get beta updates on: the newest mac-v* release of all, a
   # beta (a pre-release) or not — so a beta Mac also moves on to a release newer than its beta
@@ -75,9 +80,10 @@ feed = {
   "published": rel.get("published_at"),
   "beta": bool(rel.get("prerelease")),
 }
+if len(sys.argv) > 2 and sys.argv[2]: feed["criticalVersion"] = sys.argv[2]
 json.dump(feed, open("build/site-sync/public/app/mac-beta.json", "w"), indent=2)
 print("/app/mac-beta.json → " + version + (" (beta)" if feed["beta"] else ""))
-' "$REPO" || echo "no Simpl for Mac beta feed written"
+' "$REPO" "$CRITICAL" || echo "no Simpl for Mac beta feed written"
   fi
 fi
 (

@@ -134,6 +134,13 @@ if [ -n "${MAC_BETA:-}" ]; then
   BETA_TITLE=" Beta"; BETA_FLAG=(--prerelease)
   BETA_LINE=$'\n**This is a beta.** Only Macs with *Settings ▸ Updates ▸ Get beta updates* on are offered it.\n'
 fi
+# (1.3.72) a Critical Update (MAC_CRITICAL=1, the workflow's critical switch): a release proper (never a beta), marked
+# in its notes; the feeds name it (criticalVersion, scripts/publish-site.sh), and every Mac on an older version installs
+# the newest release at its next check, whatever its update settings (Updater.swift)
+if [ -n "${MAC_CRITICAL:-}" ]; then
+  BETA_TITLE=" Critical Update"; BETA_FLAG=()
+  BETA_LINE=$'\n**This is a Critical Update.** Every Mac running an older Simpl installs it at its next update check, whatever its update settings.\n<!-- simpl-critical -->\n'
+fi
 cat > "$NOTES" <<EOF
 **Simpl for Mac $VERSION$BETA_TITLE** (build $BUILD) — the native Mac app, with Simpl's interface $INTERFACE inside.
 $BETA_LINE

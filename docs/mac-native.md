@@ -271,6 +271,21 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   overview waits the same way. The haze behind the quiz popups' floating buttons is a blurred capsule, with no edges.
   (1.3.71) 1.3.70 as a release proper (the betas 1.3.66–1.3.70 for every Mac): a beta's release is never edited into
   a release, so the same code goes out again under the next version.
+  (1.3.72) Developer mode (`DevMode`, Shell/Developer.swift), hidden until asked for: seven quick clicks on the app's icon
+  in Settings ▸ About, or Control-Option-Shift-Command-D anywhere (again to leave). Unlocked, the Simpl menu has a
+  Developer menu (the Developer window, Save Alta / Macmillan Page Code — no longer in the popups — Refresh, Reload,
+  Check for Updates Now, Copy Diagnostics, Leave Developer Mode) and the Developer window (no Window-menu item of its
+  own): Overview (versions, where the app runs, live diagnostics), Updates (state, feed, beta / automatic / pause, a
+  feed address of its own, Check and Install Now), Engine (its state, Refresh, Reload, Forget Kept Answers, and a
+  console: any `BCVNative.call` with JSON arguments, its answer pretty-printed), Alta & Macmillan (state, Save Page
+  Code, Error Logs — Alta's Error Logs button shows only in developer mode now — and the graphs' light colours),
+  Interface (What's New, the tour, the setup, their resets, the look for this run, the main window's size) and
+  Preferences (every one the app keeps, filtered, removed one by one; its folders). Critical Updates: the release
+  workflow's `critical` switch publishes a release proper titled "Critical Update" with a mark in its notes;
+  publish-site.sh names the newest one in both feeds (`criticalVersion`), and a Mac on an older version installs the
+  feed's newest at its next check (Updater.swift) — automatic updates off, paused, a version put back, a quiz open:
+  nothing holds it back — with a notice over the window while it installs, tried again every ten minutes if it fails.
+  Only copies from 1.3.72 on know to do this.
 
 ## Building and running
 

@@ -10,6 +10,10 @@ on:
         description: 'Publish as a beta (a pre-release: only Macs with Get beta updates on take it)'
         type: boolean
         default: false
+      critical:
+        description: 'Publish as a Critical Update (every Mac on an older version installs it at its next check, whatever its settings; never a beta)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,7 +46,8 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ github.token }}
-          MAC_BETA: ${{ inputs.beta && '1' || '' }}
+          MAC_BETA: ${{ (inputs.beta && !inputs.critical) && '1' || '' }}
+          MAC_CRITICAL: ${{ inputs.critical && '1' || '' }}
         run: bash scripts/release-mac-native.sh
       - name: Keep this build for the next
         if: success()

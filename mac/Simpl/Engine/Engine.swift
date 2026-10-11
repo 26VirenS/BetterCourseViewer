@@ -320,6 +320,8 @@ final class Engine: ObservableObject, ShellListener {
         } else if let w = LaunchOpen.take("window:") {
             // (1.3.69: -SimplOpen window:grades, a window more on that place)
             NotificationCenter.default.post(name: .simplOpenWindow, object: w)
+        } else if LaunchOpen.take("developer") != nil {
+            DevMode.shared.openAsked += 1 // (1.3.72: the screenshot suite's look at the Developer window; not unlocked for good)
         } else if LaunchOpen.take("settings") != nil {
             NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         } else if LaunchOpen.take("newtask") != nil {
@@ -527,6 +529,15 @@ final class Engine: ObservableObject, ShellListener {
             }
         }
         throw lastError
+    }
+
+    /// (1.3.72) The Developer window's console: a call's answer as the page gives it, as JSON text.
+    func callText(_ name: String, _ args: [String: Any] = [:]) async throws -> String {
+        if let primary { return try await primary.callText(name, args) }
+        await whenReady()
+        guard ready else { throw EngineError.notReady(lmsName) }
+        let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
+        return raw as? String ?? "null"
     }
 
     /// An action whose answer is only whether it worked.

@@ -1103,6 +1103,9 @@ final class AltaSession: ObservableObject {
         Task { _ = await run("return window.__simplDialog ? window.__simplDialog.show(true) : null", in: nil) }
     }
 
+    /// (1.3.72) The Alta assignment open now, for the Developer menu's Save Page Code.
+    static weak var current: AltaSession?
+
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
     @Published private(set) var errorLogs: [String] = []
 
@@ -1125,6 +1128,7 @@ final class AltaSession: ObservableObject {
             let done = !w.isLoading && w.url != nil
             Task { @MainActor in if done, self?.opening == true { withAnimation(Motion.gentle) { self?.opening = false } } }
         }
+        AltaSession.current = self
     }
 
     /// Alta opened: the assignment's launch through Canvas (or the page asked for).

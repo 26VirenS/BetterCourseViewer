@@ -10,6 +10,7 @@ struct SimplCommands: Commands {
     @FocusedObject private var focused: Engine?
     @ObservedObject private var model = AppModel.shared
     @Environment(\.openWindow) private var openWindow
+    @ObservedObject private var dev = DevMode.shared
 
     /// The main window's engine: the focused one, else the one the app keeps (a menu used from Settings or a tool's window).
     private var engine: Engine? { focused ?? model.engine }
@@ -26,6 +27,11 @@ struct SimplCommands: Commands {
         CommandGroup(after: .appSettings) {
             Button("Change School…") { session.changeSchool() }
                 .disabled(session.host == nil)
+            // (1.3.72) only once developer mode is on (its secret entrances: Developer.swift)
+            if dev.unlocked {
+                Divider()
+                DeveloperMenu(dev: dev, engine: engine)
+            }
         }
 
         CommandGroup(replacing: .newItem) {

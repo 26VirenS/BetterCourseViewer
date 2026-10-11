@@ -43,6 +43,8 @@ struct RootView: View {
             openSettings()
         }
         .onReceive(NotificationCenter.default.publisher(for: .simplOpenSetup)) { _ in engine.setup = true }
+        .onReceive(DevMode.shared.$openAsked.dropFirst()) { _ in openWindow(id: "developer") } // (1.3.72)
+        .overlay(alignment: .top) { CriticalUpdateNotice() } // (1.3.72: a Critical Update installing)
         .onReceive(NotificationCenter.default.publisher(for: .simplOpenWindow)) { n in
             openWindow(id: "window", value: n.object as? String ?? "dashboard")
         }

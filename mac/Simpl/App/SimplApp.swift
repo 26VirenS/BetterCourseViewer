@@ -45,6 +45,16 @@ struct SimplApp: App {
         .defaultSize(width: 1120, height: 800)
         .handlesExternalEvents(matching: []) // (never an empty tool window for a link from outside)
 
+        // (1.3.72) the Developer window: no item of its own in the Window menu (developer mode opens it)
+        Window("Developer", id: "developer") {
+            DeveloperView()
+                .environmentObject(session)
+                .environmentObject(model)
+        }
+        .defaultSize(width: 820, height: 640)
+        .commandsRemoved()
+        .handlesExternalEvents(matching: [])
+
         Settings {
             SettingsView()
                 .environmentObject(session)
@@ -71,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Shot.armIfAsked()
         MoveToApplications.offerIfNeeded() // (1.3.13: opened from Downloads or a disk image, an offer to move to Applications)
+        DevMode.shared.watchKeys() // (1.3.72: Control-Option-Shift-Command-D, developer mode in or out)
         Updater.shared.start() // (1.2: the update feed at launch and every hour (1.2.19); nothing in a development run)
     }
 
