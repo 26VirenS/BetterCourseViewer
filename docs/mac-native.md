@@ -181,6 +181,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Lewis editor draws up to half again full size when there is room (`editorFit`), and the quick way sets the atoms
   round the centre as its shape is drawn on paper, from the lone pairs the electrons give it (`quickAngles`: water
   bent, ammonia a fan under its lone pair, ClF₃ a T, SF₄ a seesaw, XeF₄ a cross).
+  (1.3.58) The work layout's side columns hold their content to the column's width (less room for the scroller), the
+  Lewis ranking's choices are short (Octet rule, Formal charge) so it fits, and the 3D builder turns by itself from the start.
 
 ## Building and running
 

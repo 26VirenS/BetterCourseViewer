@@ -60,7 +60,8 @@ final class MoleculeModel: ObservableObject {
     @Published var style: Style = .ballStick
     @Published var showLonePairs = true
     @Published var showLabels = true
-    @Published var autoRotate = false
+    /// (1.3.58) On from the start: the model turns slowly until it is switched off.
+    @Published var autoRotate = true
     @Published var message: String?
     @Published private(set) var title = ""
     /// Raised when the model is new (a preset, the Lewis maker's): the view frames it afresh.

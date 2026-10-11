@@ -608,13 +608,19 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
     var body: some View {
         GeometryReader { g in
             if g.size.width >= 1100 {
+                // (1.3.58) each side column's content held to the column's width, less room for its scroller, so
+                // nothing runs under the centre or under the scroll bar
                 HStack(alignment: .top, spacing: 18) {
-                    ScrollView { left.padding(.bottom, 20) }
-                        .frame(width: 280)
+                    ScrollView {
+                        left.frame(width: 284, alignment: .topLeading).padding(.bottom, 20)
+                    }
+                    .frame(width: 300, alignment: .leading)
                     centre
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    ScrollView { right.padding(.bottom, 20) }
-                        .frame(width: 300)
+                    ScrollView {
+                        right.frame(width: 300, alignment: .topLeading).padding(.bottom, 20)
+                    }
+                    .frame(width: 316, alignment: .leading)
                 }
             } else {
                 ScrollView {

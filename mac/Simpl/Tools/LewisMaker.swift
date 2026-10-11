@@ -345,7 +345,7 @@ enum LewisSolver {
     enum Mode: String, CaseIterable, Identifiable {
         case octet, formal
         var id: String { rawValue }
-        var label: String { self == .octet ? "Strict octet" : "Minimize formal charge" }
+        var label: String { self == .octet ? "Octet rule" : "Formal charge" }
     }
 
     static func solve(_ g: LGraph, mode: Mode) -> LResult {
