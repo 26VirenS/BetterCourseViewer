@@ -284,6 +284,8 @@ struct AssignmentData: Codable {
     var toolHost: String?
     /// (Mac 1.3.17) The tool is Knewton Alta.
     var alta: Bool?
+    /// (Mac 1.3.66) A Macmillan Learning assignment (Achieve, Sapling, LaunchPad).
+    var macmillan: Bool?
     var ltiQuiz: Bool?
     var discussionUrl: String?
     var canvasUrl: String?

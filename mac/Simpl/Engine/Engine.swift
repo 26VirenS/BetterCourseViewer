@@ -69,6 +69,8 @@ final class Engine: ObservableObject, ShellListener {
     @Published var quiz: QuizLaunch?
     /// (1.3.17) A Knewton Alta assignment taken in the app's own popup (AltaQuiz.swift).
     @Published var alta: AltaLaunch?
+    /// (1.3.66) A Macmillan Learning assignment open in its popup.
+    @Published var macmillan: AltaLaunch?
     /// An external tool or a page of Canvas's own to open in a window of its own (the window opens it, then clears this).
     @Published var tool: ToolLaunch?
     /// The guided setup (a sheet): the first run, and Settings → Courses and Goals.
@@ -273,6 +275,9 @@ final class Engine: ObservableObject, ShellListener {
         } else if let a = LaunchOpen.take("alta:") {
             let parts = a.split(separator: ":").map(String.init) // (1.3.17: -SimplOpen alta:104:4003, an Alta assignment's popup)
             if parts.count == 2 { alta = AltaLaunch(course: parts[0], assignment: parts[1], title: "Knewton Alta") }
+        } else if let a = LaunchOpen.take("macmillan:") {
+            let parts = a.split(separator: ":").map(String.init) // (1.3.66: -SimplOpen macmillan:104:4005)
+            if parts.count == 2 { macmillan = AltaLaunch(course: parts[0], assignment: parts[1], title: "Macmillan Learning") }
         } else if LaunchOpen.take("settings") != nil {
             NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         } else if LaunchOpen.take("newtask") != nil {

@@ -49,6 +49,11 @@ struct RootView: View {
                 .environmentObject(engine)
                 .modifier(UpdateHold()) // (nor while an Alta assignment is open)
         }
+        .sheet(item: $engine.macmillan) { a in
+            MacmillanScreen(launch: a)
+                .environmentObject(engine)
+                .modifier(UpdateHold()) // (1.3.66: nor while a Macmillan assignment is open)
+        }
         .sheet(isPresented: $engine.setup) {
             SetupScreen()
                 .environmentObject(engine)

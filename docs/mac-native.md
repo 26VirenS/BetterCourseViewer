@@ -233,6 +233,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   moved about or the builder draws (`LewisMemo`, `LGraph.topologyKey`), and its polarity (a 3D build and 900 steps of
   relaxing) once for each molecule and structure; the 3D builder's picture is built again only when what it is made of
   changes; an element's subshells are worked out once; the tour's controls' places are told only while the tour is on.
+  (1.3.66) Macmillan Learning: an assignment whose tool is Macmillan's (Achieve, Sapling, LaunchPad — its address, or a
+  title that names it; `macmillan` in the assignment's data, native-app.js) opens in its own popup, as an Alta one does
+  (`MacmillanScreen`, `MacmillanSession`): the launch through Canvas, Macmillan's page as it draws it, and Save Page Code
+  (`AltaSession.collect`, every frame's code too) — the start of laying it out as the app's own, from its saved code.
+  `-SimplOpen macmillan:104:4005` opens the mock's (the screenshot suite's `21d`).
 
 ## Building and running
 

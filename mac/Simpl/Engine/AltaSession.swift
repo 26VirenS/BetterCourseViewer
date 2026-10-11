@@ -1211,7 +1211,7 @@ final class AltaSession: ObservableObject {
     }
 
     /// Run in one page: its HTML, its web components' own trees, and the text of each script and style sheet it loads.
-    private static let collect = #"""
+    static let collect = #"""
     var strip = function (u) { try { var x = new URL(u, location.href); return x.origin + x.pathname; } catch (e) { return String(u || '').split('?')[0]; } };
     var shadows = [];
     var walk = function (root, path) {
