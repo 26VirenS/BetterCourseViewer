@@ -33,6 +33,17 @@ struct PTElementPage: View {
                         right
                     }
                     .frame(minWidth: 1000)
+                    // (1.3.56) a middle width: the atom and its electrons side by side, as tall as each other, the
+                    // facts below them, rather than the atom stretched across the page
+                    VStack(spacing: 18) {
+                        HStack(alignment: .top, spacing: 18) {
+                            modelCard.frame(minWidth: 340, maxWidth: .infinity)
+                            configCard.frame(minWidth: 320, maxWidth: .infinity)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                        right
+                    }
+                    .frame(minWidth: 700)
                     VStack(spacing: 18) {
                         modelCard
                         configCard
@@ -186,6 +197,7 @@ struct PTElementPage: View {
             }
         }
         .padding(16)
+        .frame(maxHeight: .infinity, alignment: .top)
         .card(radius: 20)
     }
 
@@ -233,7 +245,7 @@ struct PTElementPage: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .card(radius: 20)
     }
 
