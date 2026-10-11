@@ -233,6 +233,12 @@ try {
   check((await page.evaluate(() => window.__simplAlta.check())).ok, 'a second attempt is checked');
   const v2 = await waitFor((p, k) => k >= n6 && p.kind === 'feedback', 'the second verdict');
   check(v2.verdict === 'correct' && /Perfect/.test(v2.text), `the second attempt's verdict is the newest one — correct — not the first attempt's "incorrect" still on the page (${v2.verdict}: “${v2.text}”)`);
+  // (1.3.44) Alta's "Try again?" — no Next, its Check still there: Continue is another try at the same question, never
+  // a step the popup cannot take (which showed Alta's whole page)
+  await page.evaluate(() => document.querySelectorAll('#next').forEach((c) => { c.dataset.wasN = c.hidden ? '1' : ''; c.hidden = true; }));
+  const again = await page.evaluate(() => window.__simplAlta.next());
+  check(again.ok === false && again.retry === true, `with no Next and a Check still there, the popup is told it is another try (${JSON.stringify(again)})`);
+  await page.evaluate(() => document.querySelectorAll('#next').forEach((c) => { c.hidden = c.dataset.wasN === '1'; }));
   await page.evaluate(() => { document.getElementById('atts').remove(); document.querySelectorAll('#check').forEach((c) => { c.hidden = c.dataset.was === '1'; }); });
   // (a button the bar stands for, come inside what is kept — a change the trim otherwise leaves alone — is moved aside)
   await page.evaluate(() => { const b = document.createElement('button'); b.id = 'late'; b.textContent = 'Continue'; document.querySelector('.learnosity-response').appendChild(b); });

@@ -150,6 +150,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (1.3.43) Alta's question is laid on Liquid Glass: the hidden view sits inset in a glass panel (`glassCard`, radius
   22, clipped to it), its page drawing no ground of its own; Alta's own card outline (`[class*=card]`) is taken away.
   Alta's Page is still edge to edge, as it is.
+  (1.3.44) A wrong answer Alta wants tried again ("Sorry, that's incorrect. Try again?") has no Next: the bar offers
+  Try Again (Alta's own Try Again pressed if it has one) and the same question is answered again in its box. Before,
+  Continue found no Next to press and fell back to Alta's whole page.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment

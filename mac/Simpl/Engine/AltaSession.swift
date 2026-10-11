@@ -696,7 +696,17 @@ enum AltaHook {
         begin: function () { var b = buttons(START)[0]; if (!b) return { ok: false }; b.click(); return { ok: true }; },
         answer: answer,
         check: function () { var b = buttons(CHECK)[0]; if (!b) return { ok: false }; var was = snapshot(); b.click(); watch(was); return { ok: true }; },
-        next: function () { var b = buttons(NEXT)[0]; if (!b) return { ok: false }; focusFirst = true; dirty = true; b.click(); return { ok: true }; },
+        // (1.3.44) no Next after a wrong answer — Alta's "Try again?": its own Try Again pressed if it has one, and the popup
+        // told it is another try at the same question (its Check still there), not a step on
+        next: function () {
+          var b = buttons(NEXT)[0];
+          if (!b) {
+            var again = buttons(/^(try again|retry)$/)[0];
+            if (again) { dirty = true; again.click(); }
+            return { ok: false, retry: !!again || controls(CHECK).length > 0 };
+          }
+          focusFirst = true; dirty = true; b.click(); return { ok: true };
+        },
         instruct: function () { var b = buttons(INSTRUCT)[0]; if (!b) return { ok: false }; dirty = true; b.click(); return { ok: true }; },
         state: function () { return verdictNow(); }
       };
@@ -1520,11 +1530,22 @@ final class AltaSession: ObservableObject {
     /// On to what Alta gives next: its Continue pressed; the next question comes as Alta's page asks for it.
     func next() {
         Task {
-            let pressed = await call("return window.__simplAlta ? window.__simplAlta.next() : null", [:])
-            guard (pressed as? [String: Any])?["ok"] as? Bool == true else { return fail("Alta's Continue button could not be found.") }
+            let pressed = await call("return window.__simplAlta ? window.__simplAlta.next() : null", [:]) as? [String: Any]
+            // (1.3.44) a wrong answer Alta wants tried again: back to the same question, never Alta's whole page
+            if pressed?["retry"] as? Bool == true { return tryAgain() }
+            guard pressed?["ok"] as? Bool == true else { return fail("Alta's Continue button could not be found.") }
             withAnimation(Motion.gentle) { phase = .moving }
             watch(seconds: 15)
         }
+    }
+
+    /// (1.3.44) Not right, and Alta has no Continue — its "Try again?": the same question, answered again in its box.
+    var wantsRetry: Bool { altaDrawn && verdict?.correct != true && !altaHasNext && altaHasCheck }
+
+    func tryAgain() {
+        watchdog?.cancel()
+        withAnimation(Motion.gentle) { verdict = nil; phase = .answering }
+        if altaDrawn { refocus() }
     }
 
     /// A step the popup could not take: Alta's own page, where the student can take it, and why.

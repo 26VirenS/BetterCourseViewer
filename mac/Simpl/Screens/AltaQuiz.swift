@@ -249,10 +249,18 @@ struct AltaQuizScreen: View {
             QuizFloatingBar {
                 if let v = session.verdict { AltaVerdictChip(verdict: v) }
                 if session.altaDrawn && session.altaCanInstruct { instructButton }
-                Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
-                    .glassButton(prominent: true)
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .help("On to what Alta gives next")
+                // (1.3.44) Alta's "Try again?" with no Continue of its own: another go at the same question
+                if session.wantsRetry {
+                    Button { session.next() } label: { Label("Try Again", systemImage: "arrow.counterclockwise").frame(minWidth: 90) }
+                        .glassButton(prominent: true)
+                        .keyboardShortcut(.return, modifiers: .command)
+                        .help("Answer the same question again")
+                } else {
+                    Button { session.next() } label: { Label("Continue", systemImage: "arrow.right").frame(minWidth: 90) }
+                        .glassButton(prominent: true)
+                        .keyboardShortcut(.return, modifiers: .command)
+                        .help("On to what Alta gives next")
+                }
             }
         default:
             EmptyView()
