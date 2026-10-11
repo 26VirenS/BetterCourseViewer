@@ -55,8 +55,17 @@ jobs:
           cp src/examples/example_win32_directx11/LICENSE "$out/LICENSE.txt"
           cp src/examples/example_win32_directx11/THIRD-PARTY-NOTICES.md "$out/"
           cp windows-glass/liquidimgui-README.txt "$out/README-FIRST.txt"
+          bash windows-glass/ci/runtime-dlls.sh "$out" "$out/LiquidGlass.exe"
           (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-liquidImgui-win64.zip LiquidGlass-liquidImgui >/dev/null)
           ls -la LiquidGlass-liquidImgui-win64.zip
+      - name: Does it start? (run for a while, a picture of the screen)
+        shell: pwsh
+        run: ./windows-glass/ci/smoke.ps1 -Exe dist/LiquidGlass-liquidImgui/LiquidGlass.exe -Shot shot-liquidimgui.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shot-liquidimgui
+          path: shot-liquidimgui*.png
       - uses: actions/upload-artifact@v4
         with:
           name: LiquidGlass-liquidImgui-win64
@@ -91,8 +100,17 @@ jobs:
           find "$out" \( -name '*.pdb' -o -name '*.ilk' -o -name '*.lib' -o -name '*.exp' \) -delete
           cp src/LICENSE "$out/LICENSE.txt"
           cp windows-glass/aurora-README.txt "$out/README-FIRST.txt"
+          bash windows-glass/ci/runtime-dlls.sh "$out" "$out/P3_Interactive_Smoke.exe"
           (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-AuroraGlass-win64.zip LiquidGlass-AuroraGlass >/dev/null)
           ls -la LiquidGlass-AuroraGlass-win64.zip
+      - name: Does it start? (run for a while, a picture of the screen)
+        shell: pwsh
+        run: ./windows-glass/ci/smoke.ps1 -Exe dist/LiquidGlass-AuroraGlass/P3_Interactive_Smoke.exe -Shot shot-aurora.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shot-aurora
+          path: shot-aurora*.png
       - uses: actions/upload-artifact@v4
         with:
           name: LiquidGlass-AuroraGlass-win64
@@ -108,6 +126,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: zips
+          pattern: LiquidGlass-*
           merge-multiple: true
       - name: Release
         env:
