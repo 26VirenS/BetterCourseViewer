@@ -149,7 +149,7 @@ try {
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
   check(fo.found && !(await vis('header')) && !(await vis('#help')) && !(await vis('.obj')) && !(await vis('main > h2')),
     'a question of a kind the popup does not draw is shown alone: Alta’s header, help button and side panels out of sight');
-  check((await vis('#graph')) && (await vis('#check')) && (await vis('.alta-stimulus')) && (await page.$eval('#check', (b) => b.disabled)),
+  check((await vis('#graph')) && (await vis('#check')) && (await vis('.alta-stimulus')) && (await vis('.alta-qhead')) && (await page.$eval('#check', (b) => b.disabled)),
     'with the question, what it asks (outside Learnosity’s box) and Alta’s Check — greyed out until it is answered — still there');
   await page.click('#graph');
   const said = (await posts()).length;
@@ -170,6 +170,12 @@ try {
   check(!(await vis('#report')) && (await left('#instr')) < -5000, 'Alta’s Feedback put away and its More Instruction moved aside for the popup’s bar');
   const s0 = await waitFor((p, k) => k >= n0 && p.kind === 'focus', 'the question found');
   check(s0.instruct === true && s0.lessonToo === false, 'the popup is told Alta offers More Instruction (and that no lesson sits above the question)');
+  // (1.3.38) an inner page with no question in it (a chat widget) never says the question is missing
+  const chat = page.frames().find((f) => /\/mock-alta\/chat/.test(f.url()));
+  if (chat) await chat.evaluate(() => window.__simplAlta && window.__simplAlta.focus({ on: true, bar: true }));
+  await page.waitForTimeout(600);
+  const chatSaid = chat ? (await chat.evaluate(() => (window.__posted || []).map((s) => JSON.parse(s)))).filter((p) => p.kind === 'focus') : null;
+  check(chat && chatSaid.length === 0, `an inner page with no question in it (a chat) says nothing of the question — its "not found" made the popup think it gone (${chat ? chatSaid.length + ' said' : 'no chat frame'})`);
   check((await page.evaluate(() => window.__simplAlta.instruct())).ok, 'the popup’s More Instruction presses Alta’s');
   const d1 = await waitFor((p, k) => k >= n0 && p.kind === 'focus' && p.dialog === true, 'Alta’s pop-up');
   check(!!d1 && (await vis('#trouble')) && (await vis('#goback')), 'Alta’s Having trouble? pop-up is shown, and the popup is told (its bar put away under it)');

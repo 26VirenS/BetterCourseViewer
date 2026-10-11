@@ -458,7 +458,18 @@ enum AltaHook {
       };
       // (1.3.31) the part just before the question that holds what it asks ("Question", Let h(x) = …), when its words
       // were not found by the app's: the question's own card above its answer's
+      // (1.3.38) the question's whole card, as Alta has it — a "Question" header, what it asks, the answer and its
+      // buttons each in a part of its own: the nearest part round the answer that begins "Question" and holds no
+      // other question
+      var card = function (el) {
+        for (var a = el, j = 0; a && j < 8 && a !== document.body && a !== document.documentElement; a = parentOf(a), j++) {
+          if (/^\s*question\b/i.test(a.innerText || '') && a.querySelectorAll(QUESTION).length <= 8) return a;
+        }
+        return null;
+      };
       var before = function (el) {
+        var whole = card(parentOf(el));
+        if (whole) return whole;
         for (var x = el, i = 0; x && i < 4 && x !== document.body; x = parentOf(x), i++) {
           var p = x.previousElementSibling;
           while (p && !shown(p)) p = p.previousElementSibling;
@@ -500,7 +511,8 @@ enum AltaHook {
         // the whole page, when each is kept on its own
         // (1.3.37) a lesson above the question (Alta's View Instruction: the question stays on the page under it) — found
         // first, so its own Continue and words are not taken for the question's
-        stacked = lessonOnly ? null : above(common(qs) || qs[0]);
+        // (looked for above the question's whole card, so what the question asks is never taken for a lesson)
+        stacked = lessonOnly ? null : above(card(common(qs) || qs[0]) || common(qs) || qs[0]);
         var acts = controls(CHECK).concat(controls(NEXT)).filter(function (b) { return !(stacked && stacked.contains(b)); });
         var asks = asked();
         if (asks && stacked && stacked.contains(asks)) asks = null;
@@ -594,6 +606,9 @@ enum AltaHook {
       // (the popup told whether Alta's question is found, and whether its Check can be pressed yet)
       var told = '';
       var tell = function (found) {
+        // (1.3.38: an inner page with no question in it — Learnosity's helper, Alta's chat — says nothing: its "not found"
+        // came after the page's own "found", and the popup thought the question gone)
+        if (!found && window.top !== window) return;
         var m = { kind: 'focus', found: found, check: controls(CHECK).some(function (b) { return !b.disabled && b.getAttribute('aria-disabled') !== 'true'; }), next: buttons(NEXT).length > 0, nextAny: controls(NEXT).length > 0, instruct: buttons(INSTRUCT).length > 0, hasCheck: controls(CHECK).length > 0,
           dialog: deep('[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]').filter(shown).length > 0,
           lessonToo: !!stacked, showingLesson: lessonAlone,
@@ -1006,6 +1021,9 @@ final class AltaSession: ObservableObject {
                 withAnimation(Motion.gentle) { self?.notice = nil }
             }
         case "focus":
+            // (1.3.38) only the page that holds the question is heard on whether it is there: an inner page without it
+            // (Learnosity's helper, a chat) never says it is gone
+            if !(head["found"] as? Bool ?? false) && !frame.isMainFrame { return }
             withAnimation(Motion.gentle) {
                 altaFound = head["found"] as? Bool ?? false
                 altaCanCheck = head["check"] as? Bool ?? false

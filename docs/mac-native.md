@@ -132,7 +132,12 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (1.3.37) Simpler: a lesson above the question is kept with the question under it, top to bottom (found first, its own
   Continue and words not taken for the question's; the two kept apart, not all between them); no lesson view, View
   Instruction or Back to Question. Alta's notices with a Dismiss (an objective completed) are put away by it and shown a
-  few seconds at the top of the popup's question area.
+  few seconds at the top of the popup's question area. (1.3.38, from a real Copy Alta Details) Alta's page has inner
+  pages with no question (Learnosity's helper, a Wiley chat): their "not found" came after the page's "found", so the
+  popup thought the question gone and drew it itself; an inner page now never says the question is missing, and the
+  app hears "not found" only from the main page. Alta's question card is a "Question" header, what it asks, and the
+  answer with its buttons, each a part of its own: the card is kept whole (the nearest part round the answer beginning
+  "Question"), and a lesson is looked for above the card, never in it.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
