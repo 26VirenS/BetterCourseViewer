@@ -201,6 +201,108 @@ enum AltaHook {
         var s = JSON.stringify(o);
         if (s !== lastScrape) { lastScrape = s; post(o); }
       }, 1500);
+
+      // ---- (1.3.47) Alta's question alone: the rest of Alta's page hidden ----
+      // Alta's learn page as it is built (its saved page code): the question is one `section.compound__compound` in
+      // `.learn-flow-body`, a card headed "Question" holding what it asks, Learnosity's answer box and Alta's own
+      // buttons (Feedback, More Instruction, Submit). Only that section is kept — with Alta's pop-ups and MathJax's own
+      // helpers, which it measures its fonts by — and everything else is hidden by a style sheet, by marks on the
+      // elements kept and their ancestors (nothing is moved or restyled, so typing and scrolling are left alone).
+      // Anything not recognised — a part of another kind, two parts, no part — gives Alta's page back as it is, after a
+      // moment's grace (Alta between parts), and the app is told why, for its Error Logs.
+      if (window.top === window) {
+        var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *) { display: none !important; }\n'
+          + 'html[data-simpl-q] [data-simpl-hide] { display: none !important; }\n'
+          + 'html[data-simpl-q] [data-simpl-path]:not(html):not(body) { padding-top: 0 !important; margin-top: 0 !important; }\n'
+          + 'html[data-simpl-q] body { padding-top: 16px !important; }\n';
+        var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
+        var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
+        var title = function (sec) { var h = sec.querySelector('[class*="compound-header"] h2, [class*="compound-header"] h3, h2[class*="content-title"]'); return h ? txt(h) : ''; };
+        var START = /^(start|start assignment|continue|continue assignment|resume|keep going|practice|keep practicing|start practicing)$/;
+        // (read from the page as Alta shows it: the marks lifted for the moment it is read — no paint comes between —
+        // so a part the focus itself hides is still seen)
+        var read = function () {
+          var on = document.documentElement.hasAttribute('data-simpl-q');
+          if (on) document.documentElement.removeAttribute('data-simpl-q');
+          try { return readNow(); } finally { if (on) document.documentElement.setAttribute('data-simpl-q', ''); }
+        };
+        var readNow = function () {
+          var flows = all('[class*="learn-flow-body"]').filter(shown);
+          var parts = all('section[class*="compound__compound"]').filter(shown);
+          if (!flows.length && !parts.length) {
+            var overview = /estimated\s+\d+\s*[-–]\s*\d+\s+questions?/i.test(txt(document.body))
+              || all('button, a, [role="button"]').some(function (b) { return shown(b) && START.test(norm(b.innerText || b.textContent)); });
+            return { state: overview ? 'overview' : 'none', reason: 'nothing on the page is a part of Alta\'s learn page' };
+          }
+          var titles = parts.map(title);
+          var qs = parts.filter(function (p, i) { return /^question$/i.test(titles[i]) && p.querySelector('.lrn_widget, .learnosity-item, .lrn_qr, [class*="learnosity__"]'); });
+          if (qs.length === 1 && parts.length === 1) return { state: 'question', keep: qs[0], titles: titles };
+          return { state: 'unknown', titles: titles,
+            reason: !parts.length ? 'Alta\'s learn page shows no part' : qs.length ? 'the question has another part beside it' : (parts.length > 1 ? 'several parts, none a question' : 'a part of a kind not known') };
+        };
+        var lab = function (el) { var c = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''; return el.tagName.toLowerCase() + (el.id ? '#' + el.id.slice(0, 40) : '') + (c ? '.' + c.slice(0, 90) : ''); };
+        // (what the page holds, for the Error Logs: its parts' titles and makeup, its buttons' words — never an answer)
+        var shape = function (r) {
+          var flow = all('[class*="learn-flow-body"]')[0], main = document.querySelector('main');
+          return {
+            path: location.pathname, titles: r.titles || [],
+            flow: flow ? [].slice.call(flow.children).slice(0, 14).map(function (k) { return lab(k) + (shown(k) ? '' : ' (unseen)'); }) : null,
+            main: !flow && main ? [].slice.call(main.querySelectorAll('*')).filter(function (e) { return e.children.length > 1 && shown(e); }).slice(0, 12).map(lab) : null,
+            buttons: all('button, [role="button"], a[href]').filter(shown).map(function (b) { return norm(b.innerText || b.textContent || b.getAttribute('aria-label')).slice(0, 40); }).filter(Boolean).slice(0, 30),
+            dialogs: all('[role="dialog"], [role="alertdialog"], .MuiModal-root').filter(shown).length
+          };
+        };
+        var marked = [], keptNow = [];
+        var unmark = function () {
+          marked.forEach(function (m) { m[0].removeAttribute(m[1]); });
+          marked = []; keptNow = [];
+          document.documentElement.removeAttribute('data-simpl-q');
+        };
+        var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
+        var apply = function (keep) {
+          if (keep.length === keptNow.length && keep.every(function (k, i) { return k === keptNow[i] && k.isConnected; }) && document.documentElement.hasAttribute('data-simpl-q')) return;
+          unmark();
+          keep.forEach(function (k) {
+            mark(k, 'data-simpl-keep');
+            for (var x = k.parentElement; x && x !== document.documentElement; x = x.parentElement) mark(x, 'data-simpl-path');
+          });
+          keptNow = keep;
+          var st = document.getElementById('simpl-focus');
+          if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; st.textContent = FOCUS; (document.head || document.documentElement).appendChild(st); }
+          document.documentElement.setAttribute('data-simpl-q', '');
+        };
+        var told = '', badSince = 0, timer = null, wasQuestion = false;
+        var report = function (state, r) {
+          if (state === told) return;
+          told = state;
+          post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: state === 'question' || state === 'overview' ? null : shape(r || {}) });
+        };
+        var tick = function () {
+          timer = null;
+          var r = read();
+          if (r.state === 'question') {
+            badSince = 0; wasQuestion = true;
+            // (Alta's pop-ups and MathJax's helpers kept with it; its Feedback — a report to Alta — and its Content
+            // attribution link put away)
+            var extra = all('[role="dialog"], [role="alertdialog"], body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message')
+              .filter(function (e) { return !r.keep.contains(e); });
+            apply([r.keep].concat(extra));
+            [].forEach.call(r.keep.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); });
+            report('question', r);
+            return;
+          }
+          if (r.state === 'overview') { badSince = 0; wasQuestion = false; unmark(); report('overview', r); return; }
+          // (not recognised: a moment's grace — Alta between one part and the next — then its page as it is)
+          if (!badSince) badSince = Date.now();
+          var wait = wasQuestion ? 1500 : 8000;
+          if (Date.now() - badSince < wait) { schedule(wait - (Date.now() - badSince) + 20); return; }
+          unmark();
+          report(r.state, r);
+        };
+        var schedule = function (ms) { if (timer) clearTimeout(timer); timer = setTimeout(tick, typeof ms === 'number' ? ms : 120); };
+        try { new MutationObserver(function () { schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
+        schedule();
+      }
     })();
     """#
     // ALTA-HOOK-END
@@ -296,6 +398,11 @@ final class AltaSession: ObservableObject {
     private var loading: NSKeyValueObservation?
     /// (1.3.46) Each frame in Alta's page that has run the page script (the page itself is asked as the main frame).
     private var frames: [WKFrameInfo] = []
+    /// (1.3.47) How Alta's page is shown: "question" (its question alone), "overview", or — not recognised — "unknown" /
+    /// "none", when it is shown as it is.
+    @Published private(set) var focusState = ""
+    /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
+    @Published private(set) var errorLogs: [String] = []
 
     init(launch: AltaLaunch) {
         self.launch = launch
@@ -347,6 +454,18 @@ final class AltaSession: ObservableObject {
             frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
             frames.append(frame)
             if frames.count > 30 { frames.removeFirst() }
+        case "focus":
+            guard frame.isMainFrame else { return }
+            let state = head["state"] as? String ?? ""
+            withAnimation(Motion.gentle) { focusState = state }
+            guard state != "question" && state != "overview" else { return }
+            var entry = "\(Date().formatted(date: .abbreviated, time: .standard)) — Alta's page shown as it is: \(head["reason"] as? String ?? "not recognised") [\(state)]"
+            if let sh = head["shape"], !(sh is NSNull), let d = try? JSONSerialization.data(withJSONObject: sh, options: [.prettyPrinted, .sortedKeys]),
+               let t = String(data: d, encoding: .utf8) { entry += "\n" + t }
+            withAnimation(Motion.gentle) {
+                errorLogs.append(entry)
+                if errorLogs.count > 50 { errorLogs.removeFirst() }
+            }
         case "overview":
             guard let o = try? JSONDecoder().decode(AltaOverview.self, from: data) else { return }
             for x in o.objectives where !x.name.isEmpty && names[x.id] != x.name { names[x.id] = x.name }
@@ -498,14 +617,24 @@ final class AltaSession: ObservableObject {
         return list.isEmpty ? 0 : list.map(\.mastery).reduce(0, +) / Double(list.count)
     }
 
+    /// (1.3.47) The Error Logs as text, to copy.
+    var errorLogText: String { errorLogs.joined(separator: "\n\n") }
+
+    func clearErrorLogs() { withAnimation(Motion.gentle) { errorLogs = [] } }
+
     // MARK: Save Page Code
 
     /// (1.3.46) Every bit of code of Alta's page as it is now — the page and each frame in it: its HTML (with any web
     /// component's own tree), and the scripts and style sheets it loads — in one text file in Downloads, shown in Finder.
     /// Addresses are written without their queries (a launch's tokens ride in them).
-    func savePageCode() async -> URL? {
+    func savePageCode(withLogs: Bool = false) async -> URL? {
         let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?"
         var out = "Simpl for Mac \(version): Knewton Alta page code, saved \(Date().formatted(date: .complete, time: .standard))\n"
+        // (1.3.47) with the Error Logs first, when saved from them
+        if withLogs {
+            out += "\n" + String(repeating: "=", count: 100) + "\nERROR LOGS (\(errorLogs.count))\n" + String(repeating: "=", count: 100) + "\n"
+            out += errorLogs.joined(separator: "\n\n") + "\n"
+        }
         var seen = Set<String>()
         var count = 0
         let targets: [WKFrameInfo?] = [nil] + frames.map { Optional($0) }
@@ -537,7 +666,7 @@ final class AltaSession: ObservableObject {
         }()
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
-        let file = downloads.appendingPathComponent("Simpl Alta Code \(stamp).txt")
+        let file = downloads.appendingPathComponent("Simpl Alta \(withLogs ? "Error Logs" : "Code") \(stamp).txt")
         do { try out.write(to: file, atomically: true, encoding: .utf8) } catch { return nil }
         return file
     }

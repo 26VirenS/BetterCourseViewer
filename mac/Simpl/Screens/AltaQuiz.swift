@@ -14,6 +14,7 @@ struct AltaQuizScreen: View {
     @State private var ideal = AltaQuizScreen.idealSize()
     @State private var saving = false
     @State private var saved: URL?
+    @State private var showLogs = false
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -75,6 +76,16 @@ struct AltaQuizScreen: View {
             Spacer(minLength: 8)
             // (1.3.46) all of Alta's page code, to one text file
             GlassGroup(spacing: 8) {
+                // (1.3.47) shown once Alta's page was not recognised (and given back as it is)
+                if !session.errorLogs.isEmpty {
+                    Button { showLogs = true } label: {
+                        Label("Error Logs (\(session.errorLogs.count))", systemImage: "exclamationmark.triangle")
+                    }
+                    .glassButton()
+                    .help("Alta's page was not recognised, so it is shown as it is: see why")
+                    .popover(isPresented: $showLogs, arrowEdge: .bottom) { logs }
+                    .transition(.opacity)
+                }
                 Button { saveCode() } label: {
                     if saving {
                         ProgressView().controlSize(.small)
@@ -93,11 +104,42 @@ struct AltaQuizScreen: View {
         .padding(.bottom, 12)
     }
 
-    private func saveCode() {
+    /// (1.3.47) The Error Logs: each time Alta's page was not recognised — when, why, what it held — to copy, or to save
+    /// with the page's code.
+    private var logs: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Error Logs").font(.sHeadline)
+            Text("Alta's page was not recognised, so it is shown as it is. Send these (with the page code) to get it recognised.")
+                .font(.sFootnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                Text(session.errorLogText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 280)
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.05)))
+            HStack {
+                Button("Clear") { session.clearErrorLogs(); showLogs = false }
+                Spacer()
+                Button("Copy") { copyToPasteboard(session.errorLogText) }
+                Button("Save with Page Code") { showLogs = false; saveCode(withLogs: true) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(saving)
+            }
+        }
+        .padding(16)
+        .frame(width: 480)
+    }
+
+    private func saveCode(withLogs: Bool = false) {
         guard !saving else { return }
         saving = true
         Task {
-            let file = await session.savePageCode()
+            let file = await session.savePageCode(withLogs: withLogs)
             saving = false
             if let file { saved = file } else { NSSound.beep() }
         }

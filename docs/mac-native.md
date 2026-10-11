@@ -72,6 +72,17 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   and each frame that ran the page script (each says so with a `frame` message), its HTML from `outerHTML`, each open
   web component's own tree, the text of every `script[src]` and stylesheet it loads (fetched by the page; one that
   cannot be read says why) and any style rules a script put in by hand. Addresses are written without their queries.
+  (1.3.47) Alta's question alone, built on Alta's learn page as a saved page's code shows it: one
+  `section.compound__compound` in `.learn-flow-body`, a card headed "Question" with what it asks, Learnosity's answer
+  box and Alta's Feedback / More Instruction / Submit. When the page is exactly that, the hook marks the section
+  (`data-simpl-keep`), its ancestors (`data-simpl-path`), Alta's pop-ups and MathJax's helpers, and a style sheet hides
+  everything else (`html[data-simpl-q]`); Feedback and Content attribution are hidden too. Nothing is moved or
+  restyled, and the marks change only when what is kept does, so typing and scrolling are untouched. The page is read
+  with the marks lifted for that moment, so a part the focus hides is still seen. Anything else — a part of another
+  kind, two parts, no part — gives Alta's page back as it is after a moment (1.5 s after a question, 8 s otherwise)
+  and posts why with the page's makeup (parts' titles, classes, buttons' words; never the question), which the popup
+  keeps as *Error Logs* (top right, shown once there is one), to copy or save with the page code. The overview (Start,
+  "Estimated … questions") is shown as it is without a log. `/mock-alta/…/assignment/a3` is that learn page.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

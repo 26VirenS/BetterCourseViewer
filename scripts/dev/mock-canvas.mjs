@@ -1308,6 +1308,55 @@ const server = http.createServer((req, res) => {
         analytics: { percentComplete: 0, statusAndProgress: { status: 'not_started', progress: 0 } },
       }));
     }
+    // (Mac 1.3.47) Alta's learn page as it is really built (from a saved page's code, its class names only): the app bar,
+    // the title and mastery row, the Current objective card, the encouragement banner, and in `.learn-flow-body` one
+    // `section.compound__compound` — a card headed "Question" with what it asks, Learnosity's answer box and Alta's
+    // Feedback / More Instruction / Submit — then Content attribution; MathJax's helpers and the chat at the foot.
+    // window.mockLesson() puts a part headed "Instruction" above the question; window.mockDialog() opens a pop-up.
+    if (path === '/mock-alta/learn/course/c1/assignment/a3') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title><style>
+body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#eef1f4}
+.nav-app-bar__appBar___1FGyw{position:fixed;top:0;left:0;right:0;height:64px;background:#1d2a36}
+.container{padding-top:80px;max-width:900px;margin:0 auto}
+.theme__card___3E6YM{background:#fff;border-radius:8px;padding:24px;margin:16px 0}
+.jss179{display:flex;gap:12px}.MuiCard-root{background:#fff;padding:12px;border-radius:6px}
+.knewcons__knewcons___e3wUn{background:#2e7d32;color:#fff;padding:8px}
+#MathJax_Hidden{visibility:hidden;position:absolute;top:0;left:0;width:0;height:0}
+</style></head><body><div><div id="MathJax_Hidden">MathJax</div></div><div id="react-page"><div class="theme__layout___5MUsi">
+<div class="knewcons__knewcons___e3wUn">Learning is about progress, not perfection. Keep trying!</div>
+<div class="material-layout learn-page"><div class="material-layout__mainContentLinkContainer___27Bbq"><a id="skip-to-main" href="#main">Skip to main content</a></div>
+<header class="theme__appBar___3pHuB nav-app-bar__appBar___1FGyw"><button aria-label="Course and help navigation links">≡</button></header>
+<div class="container"><div id="app"><div><main id="main"><div class="main__mainInner___3DVrk"><div><div>
+<div class="box__default___27jt2"><h1 class="heading__size-h1___1Z5Al">Differentiation Rules 2</h1><p>Mastery <span>83%</span></p>
+<span class="MuiLinearProgress-root" role="progressbar" aria-label="mastery" aria-valuenow="83" aria-valuemax="100"><span class="MuiLinearProgress-bar"></span></span></div>
+<div class="jss179"><div class="MuiPaper-root MuiCard-root"><div class="MuiCardContent-root"><p class="jss205">CURRENT OBJECTIVE</p><p class="jss204">Find the derivative of a natural logarithmic function</p></div></div></div>
+<div class="page__child___2M9Bq"><div class="learn-flow-body__learnFlowBody___1btnE learn-flow-body">
+<canvas class="confetti__canvasArea___eutJq confetti__fullscreen___3q63A" style="position:fixed;inset:0;pointer-events:none" width="10" height="10"></canvas>
+<section class="compound compound__compound___Z4A7e" aria-label="Question" id="qsec"><div class="theme__card___3E6YM card__card___3beLn content-card__card___2AOs4">
+<div class="compound-header__header___Plj5Q"><div class="compound-header__topLine___1aCHl"></div><h2 class="content-title__heading___1PTj4">Question</h2></div>
+<div class="compound compound-body__container___2wdtm"><div class="compound-body__content___3FE-v"><p id="asks">Find the derivative of f(x) = (5x² + 5x⁻³) ln(x).</p></div></div>
+<div><div><div><hr><div id="compound-prompt-1"><div class="question-header__container___2Z7CP"><p>Provide your answer below:</p></div></div><hr></div>
+<div class="learnosity__container___BA5bj"><div class="learnosity__learnosity___32Ugf learnosity-2"><div class="atom__answer___2wNuF"><div>
+<div id="2" class="lrn lrn_widget lrn_qr lrn_clozeformula lrn_clearfix"><div class="lrn_response_wrapper"><span class="mq-math-mode">f′(x)=</span>
+<span class="lrn_math_editable mq-editable-field mq-math-mode"><span class="mq-textarea"><textarea id="answer"></textarea></span><span class="mq-root-block mq-empty"></span></span>
+<div class="lrn-formula-keyboard"><button class="lrn_btn">7</button><button class="lrn_btn">8</button><button class="lrn_btn">9</button></div></div></div>
+</div></div></div></div>
+<div class="button-bar__container___H_Vc_"><button id="fb">Feedback</button><button id="more">More Instruction</button><button id="submit">Submit</button></div></div></div>
+<button class="index__label___2iFff" id="attr">Content attribution<span>- Opens a dialog</span></button></section>
+</div></div></div></div></div></main></div></div></div></div></div></div>
+<iframe class="x-origin-frame" style="display:none" src="about:blank"></iframe>
+<div id="embedded-messaging"><button id="embeddedMessagingConversationButton">Chat</button></div>
+<div class="back-to-top-mount"><a href="#main">Back to Top</a></div>
+<script>
+window.mockLesson = function () { var q = document.getElementById('qsec'); var l = document.createElement('section'); l.className = 'compound compound__compound___Z4A7e'; l.id = 'lsec';
+  l.innerHTML = '<div class="theme__card___3E6YM"><div class="compound-header__header___Plj5Q"><h2 class="content-title__heading___1PTj4">Instruction</h2></div><div class="compound-body__content___3FE-v"><p>' + 'The derivative of ln(x) is 1/x. '.repeat(20) + '</p></div></div>';
+  q.parentElement.insertBefore(l, q); };
+window.mockUnlesson = function () { var l = document.getElementById('lsec'); if (l) l.remove(); };
+window.mockDialog = function () { var d = document.createElement('div'); d.className = 'MuiModal-root MuiDialog-root'; d.id = 'dlg'; d.setAttribute('role', 'presentation');
+  d.innerHTML = '<div role="dialog" style="position:fixed;top:30%;left:30%;background:#fff;padding:20px">Having trouble?<button id="vi">VIEW INSTRUCTION</button></div>'; document.body.appendChild(d); };
+</script></body></html>`);
+    }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's
     // naming them), and START a link inside a web component of its own
     if (/^\/mock-alta\/learn\/course\/\w+\/assignment\/a2$/.test(path)) {

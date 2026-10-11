@@ -76,12 +76,56 @@ try {
   check(js && js.url.endsWith('/mock-alta/api/assignment') && /Differentiation Rules 2/.test(js.text) && css && !css.text && !!css.error && css.url === 'http://127.0.0.1:9/gone.css',
     `and the text of each script and style sheet it loads, or why one could not be read (${js?.url} · ${css?.error})`);
 
+  // (1.3.47) Alta's question alone, on its learn page as it is really built: everything else hidden
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+  const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
+  const fq = await waitFor((p) => p.kind === 'focus' && p.state === 'question', 'the question recognised');
+  check(!!fq && fq.shape === null, 'Alta’s learn page is recognised: one part, headed Question, with Learnosity’s answer box');
+  const hiddenAll = !(await vis('header')) && !(await vis('h1')) && !(await vis('.jss179')) && !(await vis('.knewcons__knewcons___e3wUn')) && !(await vis('#embedded-messaging')) && !(await vis('.back-to-top-mount')) && !(await vis('#skip-to-main'));
+  check(hiddenAll, 'the app bar, title and mastery, Current objective card, banner, chat and Back to Top are hidden');
+  check((await vis('#asks')) && (await vis('#answer')) && (await vis('.lrn-formula-keyboard')) && (await vis('#more')) && (await vis('#submit')) && (await vis('.content-title__heading___1PTj4')),
+    'the question stays whole: its heading, what it asks, Learnosity’s answer box and keypad, More Instruction and Submit');
+  check(!(await vis('#fb')) && !(await vis('#attr')), 'Alta’s Feedback (a report to Alta) and Content attribution are put away');
+  check(await page.evaluate(() => getComputedStyle(document.getElementById('MathJax_Hidden')).display !== 'none' && getComputedStyle(document.getElementById('MathJax_Hidden').parentElement).display !== 'none'), 'MathJax’s own hidden helper is never hidden (it measures its fonts by it)');
+  const top = await page.$eval('#qsec', (e) => Math.round(e.getBoundingClientRect().top));
+  check(top < 60, `the question sits at the top, no gap above it (${top}px)`);
+  check(await page.evaluate(() => { const q = document.getElementById('qsec'); return q.getAttribute('style') === null && !document.querySelector('[style*="-10000px"]'); }), 'nothing of Alta’s is moved or restyled: only hidden by marks and a style sheet');
+  // typing and scrolling are left alone
+  await page.setViewportSize({ width: 900, height: 200 });
+  await page.evaluate(() => window.scrollTo(0, 120));
+  const sy0 = await page.evaluate(() => window.scrollY);
+  for (let i = 0; i < 5; i++) { await page.evaluate((i) => { document.querySelector('.mq-root-block').textContent = 'x'.repeat(i + 1); }, i); await page.waitForTimeout(200); }
+  const sy1 = await page.evaluate(() => window.scrollY);
+  check(sy0 > 0 && sy0 === sy1, `typing in the answer leaves the page where it was scrolled (${sy0} → ${sy1})`);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  // Alta's pop-ups over it stay in sight
+  await page.evaluate(() => window.mockDialog());
+  await page.waitForTimeout(400);
+  check((await vis('#vi')) && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'a pop-up of Alta’s (Having trouble?) is shown over the question');
+  await page.evaluate(() => document.getElementById('dlg').remove());
+  // not recognised (a part of another kind beside the question): Alta's page back as it is, after a moment, and why
+  const nb = (await posts()).length;
+  await page.evaluate(() => window.mockLesson());
+  await page.waitForTimeout(400);
+  check(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q')), 'a moment’s grace first (Alta between parts)');
+  const bad = await waitFor((p, k) => k >= nb && p.kind === 'focus' && p.state === 'unknown', 'the page not recognised');
+  check((await vis('header')) && (await vis('h1')) && (await vis('#lsec')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))),
+    'then Alta’s page is given back as it is');
+  check(/another part/.test(bad.reason) && bad.shape.titles.join() === 'Instruction,Question' && bad.shape.buttons.includes('submit') && !JSON.stringify(bad.shape).includes('derivative of f'),
+    `and the app is told why, with what the page held — its parts’ titles, its buttons — never the question (“${bad.reason}”)`);
+  const nr = (await posts()).length;
+  await page.evaluate(() => window.mockUnlesson());
+  await waitFor((p, k) => k >= nr && p.kind === 'focus' && p.state === 'question', 'the question again');
+  check(!(await vis('header')) && (await vis('#asks')), 'when the page is a question again, it is shown alone again');
+
   // Alta opens on the assignment's overview: its objectives read from whatever Alta's page reads
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a1`);
   const ov = await waitFor((p) => p.kind === 'overview' && p.objectives?.length && p.objectives[0].id === 'lo1', 'overview');
   check(ov.name === 'Differentiation Rules 2' && ov.objectives.length === 3 && ov.objectives[0].name === 'Combine the product and quotient rules' && ov.objectives[0].low === 4 && ov.objectives[0].high === 9 && ov.started === false && ov.percent === 0 && !!ov.due,
     `the overview: the assignment, its objectives with their estimates, not started, when it is due (${ov.objectives.map((o) => o.name).join(' · ')})`);
   check(await page.evaluate(() => window.__simplAlta === undefined && !document.getElementById('simpl-theme')), 'it gives the app no hands in the page and no style of its own');
+  const fo = await waitFor((p) => p.kind === 'focus', 'how the overview is shown');
+  check(fo.state === 'overview' && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'the overview is recognised and shown as it is (no Error Logs for it)');
 
   // the student starts it on Alta's own page
   await page.click('#start');
