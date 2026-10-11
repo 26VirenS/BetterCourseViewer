@@ -2142,6 +2142,63 @@
     return { current: rows.filter((r) => !r.past), past: rows.filter((r) => r.past), empty: 'You are not in any groups.' };
   }
 
+  // (Mac 1.3.67) External tools: every tool the school provides in the student's current courses — each course's own
+  // (its navigation's tabs) and the ones found only in its assignments and module items — one row a tool, named as the
+  // web's search names it (hub.js toolNameOf: the publisher by its address, else the words before the assignment
+  // name's colon), with each course it is in and how to open it there (its tab, else an assignment, else a module item).
+  async function externalTools() {
+    const all = await store.courses().catch(() => null);
+    if (!all) return { error: 'Your courses could not be loaded.' };
+    const cs = all.filter((c) => c.state === 'current');
+    try { await BCV.lazy?.load?.('hub'); } catch { /* not loaded: tools named by their sites */ }
+    const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const hostOf = (u) => { try { return new URL(u, location.origin).hostname.replace(/^www\./, ''); } catch { return ''; } };
+    const nameOf = (url, title) => BCV.hub?.toolNameOf?.({ external_tool_tag_attributes: { url }, name: title }) || null;
+    const tools = new Map();
+    const note = (name, host, c, open, kind) => {
+      const key = norm(name);
+      if (!key) return;
+      const t = tools.get(key) || { id: key, name, host: '', kinds: [], courses: new Map(), assignments: 0 };
+      if (!t.host && host && host !== location.hostname) t.host = host;
+      if (!t.kinds.includes(kind)) t.kinds.push(kind);
+      if (kind === 'Assignments') t.assignments += 1;
+      const had = t.courses.get(String(c.id));
+      // (a course's own tab opens it best; else the first assignment or module item found)
+      if (!had || (open.tool && !had.open.tool)) {
+        t.courses.set(String(c.id), { id: String(c.id), name: c.nickname || c.shortName || c.name || 'Course', color: c.color || GRAY, open: { course: String(c.id), ...open } });
+      }
+      tools.set(key, t);
+    };
+    await Promise.all(cs.map(async (c) => {
+      const [tabs, list, mods] = await Promise.all([store.tabs(c.id).catch(() => []), store.assignments(c.id).catch(() => []), store.modules(c.id).catch(() => [])]);
+      for (const t of tabs || []) {
+        if (t.hidden || !(t.type === 'external' || String(t.id || '').startsWith('context_external_tool'))) continue;
+        const id = String(t.id || '').replace(/^context_external_tool_/, '');
+        if (/^\d+$/.test(id)) note(t.label || 'Tool', hostOf(t.html_url || ''), c, { tool: id }, 'Course navigation');
+      }
+      for (const a of list || []) {
+        if (!(a.submission_types || []).includes('external_tool')) continue;
+        const url = a.external_tool_tag_attributes?.url || '';
+        const host = hostOf(url);
+        const name = nameOf(url, a.name) || host;
+        if (name) note(name, host, c, { assignment: String(a.id) }, 'Assignments');
+      }
+      for (const m of mods || []) {
+        for (const it of m.items || []) {
+          if (it.type !== 'ExternalTool') continue;
+          const host = hostOf(it.external_url || '');
+          const name = nameOf(it.external_url || '', it.title) || host;
+          if (name) note(name, host, c, { moduleItem: String(it.id) }, 'Modules');
+        }
+      }
+    }));
+    const rows = [...tools.values()].map((t) => ({
+      id: t.id, name: t.name, host: t.host, kinds: t.kinds, assignments: t.assignments,
+      courses: [...t.courses.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    })).sort((a, b) => a.name.localeCompare(b.name));
+    return { rows, sub: `${U.plural(rows.length, 'tool')} across ${U.plural(cs.length, 'course')}`, empty: 'None of your courses has an external tool.' };
+  }
+
   // Inbox
   let meId = null;
   const meOfInbox = async () => (meId ||= String(store.env?.().current_user_id || (await store.me().catch(() => null))?.id || ''));
@@ -2193,7 +2250,7 @@
 
   const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
+    toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
   async function gradeNeeded({ id } = {}) {

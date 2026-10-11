@@ -444,6 +444,13 @@ try {
   const wi = await nc('watchInfo');
   const wiSel = (await nc('courses')).current?.filter?.((c) => c.on !== false) || [];
   check(!wi.error && wi.me && Array.isArray(wi.courses) && wi.courses.length > 0 && wi.courses.every((c) => c.id && c.name), `the background check's context: the student's id and the courses chosen, each with the name the app shows: ${JSON.stringify({ me: wi.me, courses: wi.courses?.map((c) => `${c.id}:${c.name}`), shown: wiSel.length, error: wi.error })}`);
+  // (Mac 1.3.67) every external tool in the student's courses: a course's own tab (Resources & Policy, in each) and a
+  // tool found only in an assignment (Knewton Alta, named from its title), each with the courses it is in and how to open it
+  const et = await nc('externalTools');
+  const rp = et.rows?.find((t) => t.name === 'Resources & Policy'), ka = et.rows?.find((t) => t.name === 'Knewton Alta');
+  check(!et.error && !!rp && rp.courses.length >= 2 && rp.courses.every((c) => c.open.tool === '9' && c.open.course === c.id) && rp.kinds.includes('Course navigation')
+    && !!ka && ka.courses.length === 1 && ka.courses[0].open.assignment === '4003' && ka.assignments >= 1 && ka.kinds.includes('Assignments'),
+    `external tools: a course's own and one found only in an assignment, with where to open each (${JSON.stringify(et.rows?.map((t) => [t.name, t.courses.length, t.kinds.join('+')]))})`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

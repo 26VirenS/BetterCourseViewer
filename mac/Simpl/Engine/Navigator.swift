@@ -11,6 +11,7 @@ enum Place: Hashable {
     case notifications
     case inbox
     case tools // (1.2) the student tools (mac/Simpl/Tools)
+    case externalTools // (1.3.67) every external tool in the student's courses
     case groups
     case search(String)
     case home(String)

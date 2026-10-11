@@ -321,6 +321,7 @@ final class Engine: ObservableObject, ShellListener {
         case "notifications": return .notifications
         case "inbox": return .inbox
         case "tools": return .tools // (1.2)
+        case "externaltools", "external-tools": return .externalTools // (1.3.67)
         case "groups": return .groups
         case "search": return .search(parts.count > 1 ? parts[1] : "")
         case "course": return parts.count > 1 ? .home("courses/\(parts[1])") : nil
@@ -697,6 +698,7 @@ final class Engine: ObservableObject, ShellListener {
         case .groups: return absolute("/groups")
         case .search: return nil
         case .tools: return nil // (1.2) the app's own: nothing on Canvas
+        case .externalTools: return nil // (1.3.67) the app's own list
         case .home(let ctx): return absolute("/\(ctx)")
         case .section(let ctx, let kind):
             let path: String

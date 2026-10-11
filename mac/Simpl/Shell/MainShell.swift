@@ -170,6 +170,7 @@ struct PlaceScreen: View {
         case .notifications: NotificationsView()
         case .inbox: InboxView()
         case .tools: ToolsView()
+        case .externalTools: ExternalToolsView()
         case .groups: GroupsView()
         case .search(let q): SearchView(query: q)
         case .home(let ctx): ContextHome(ctx: ctx)
@@ -280,6 +281,10 @@ struct Sidebar: View {
                 Label("Tools", systemImage: "wrench.and.screwdriver") // (1.2)
                     .tourSpot(.toolsRow)
                     .tag(Place.tools)
+                if !engine.onBrightspace { // (1.3.67: Canvas's external tools)
+                    Label("External Tools", systemImage: "puzzlepiece.extension")
+                        .tag(Place.externalTools)
+                }
             }
             Section("Courses") {
                 ForEach(engine.courses) { course in
