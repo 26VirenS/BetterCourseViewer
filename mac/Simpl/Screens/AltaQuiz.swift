@@ -45,7 +45,11 @@ struct AltaQuizScreen: View {
         .frame(width: ideal.width, height: ideal.height)
         .background(PageGround())
         .tint(Theme.accent)
-        .task { await session.start(engine: engine) }
+        .task {
+            session.appearance(dark: scheme == .dark)
+            await session.start(engine: engine)
+        }
+        .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
         .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
             Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
             Button("OK", role: .cancel) {}
@@ -163,16 +167,16 @@ struct AltaQuizScreen: View {
         ZStack {
             // (1.3.49) Alta's question laid on Liquid Glass: its page draws no ground of its own (the page script clears
             // the page's, its parts' and the question card's), so the glass behind is the card; everything in it is
-            // drawn by Alta. The glass is light even in dark mode, as Alta's dark text and white answer boxes need, and
-            // whiter in dark mode, over the dark popup. Alta's page as it is (not recognised): edge to edge, on white.
+            // drawn by Alta. (1.3.50) The glass is the app's own, light or dark: in dark mode the page script turns the
+            // question's colours over (light words on the dark glass). Alta's page as it is (not recognised): edge to
+            // edge, on white.
             let glassy = session.focused
             AltaPageHost(web: session.web)
                 .padding(glassy ? 12 : 0)
                 .background {
                     if glassy {
                         Rectangle().fill(Color.clear)
-                            .glassCard(radius: 22, tint: Color.white.opacity(scheme == .dark ? 0.6 : 0.3))
-                            .environment(\.colorScheme, .light)
+                            .glassCard(radius: 22, tint: scheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
                     } else {
                         Color.white
                     }

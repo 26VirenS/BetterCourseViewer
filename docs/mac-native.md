@@ -93,6 +93,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   in dark mode — as Alta's dark text and white answer boxes need — and whiter there) is the card. Nothing inside the part
   is restyled: its words, MathJax, Learnosity's answer box and keypad, Alta's buttons. Alta's page as it is (not
   recognised) is shown edge to edge on white, with its own ground.
+  (1.3.50) The glass is the app's own, light or dark. In dark mode each kept part is turned over by a filter —
+  `invert(1) hue-rotate(180deg)`: dark words on light become light on dark, hues kept — and its pictures, videos,
+  canvases and frames are turned back, so Alta still draws everything and only the colours change. The app tells the page
+  through `window.__simplDark`: a script ahead of the page script on each page (`appearance(dark:)` re-adds the user
+  scripts), and at once to the page shown (`__simplFocusDark()` sets `html[data-simpl-dark]`).
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

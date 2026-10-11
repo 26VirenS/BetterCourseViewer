@@ -220,7 +220,12 @@ enum AltaHook {
           // draw no ground, shadow or outline of their own — the glass behind the page is the card. Everything in it
           // (what it asks, its maths, Learnosity's answer box and keypad, Alta's buttons) is drawn as Alta draws it.
           + 'html[data-simpl-q], html[data-simpl-q] body, html[data-simpl-q] [data-simpl-path] { background: transparent !important; box-shadow: none !important; }\n'
-          + 'html[data-simpl-q] section[data-simpl-keep], html[data-simpl-q] section[data-simpl-keep] > [class*="card"], html[data-simpl-q] section[data-simpl-keep] > [class*="card"]::before, html[data-simpl-q] section[data-simpl-keep] > [class*="card"]::after { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }\n';
+          + 'html[data-simpl-q] section[data-simpl-keep], html[data-simpl-q] section[data-simpl-keep] > [class*="card"], html[data-simpl-q] section[data-simpl-keep] > [class*="card"]::before, html[data-simpl-q] section[data-simpl-keep] > [class*="card"]::after { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }\n'
+          // (1.3.50) in dark mode, on dark glass: each part's colours turned over — dark words on light become light on
+          // dark, hues kept (inverted, then turned half round the colour wheel) — and its pictures, videos and graphs
+          // turned back, so they keep their own colours. Alta still draws it all; only its colours are turned.
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] { filter: invert(1) hue-rotate(180deg) !important; }\n'
+          + 'html[data-simpl-q][data-simpl-dark] section[data-simpl-keep] :is(img, picture, video, canvas, iframe, object, embed) { filter: invert(1) hue-rotate(180deg) !important; }\n';
         var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
         var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
         var title = function (sec) { var h = sec.querySelector('[class*="compound-header"] h2, [class*="compound-header"] h3, h2[class*="content-title"]'); return h ? txt(h) : ''; };
@@ -278,7 +283,11 @@ enum AltaHook {
           if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; (document.head || document.documentElement).appendChild(st); }
           if (st.textContent !== FOCUS) st.textContent = FOCUS;
           document.documentElement.setAttribute('data-simpl-q', '');
+          dark();
         };
+        // (1.3.50) light or dark as the app is: the app sets window.__simplDark (before the page, and again when it changes)
+        var dark = function () { if (document.documentElement) document.documentElement.toggleAttribute('data-simpl-dark', !!window.__simplDark); };
+        window.__simplFocusDark = dark;
         var told = '', badSince = 0, timer = null, wasQuestion = false;
         var report = function (state, r) {
           if (state === told) return;
@@ -409,6 +418,16 @@ final class AltaSession: ObservableObject {
     /// (1.3.47) How Alta's page is shown: "question" or "lesson" (its parts alone), "overview", or — not recognised —
     /// "unknown" / "none", when it is shown as it is.
     @Published private(set) var focusState = ""
+    /// (1.3.50) Light or dark as the app is, told to the page: before each page (a script ahead of the page script) and
+    /// at once to the page shown; in dark mode the question's colours are turned over, for dark glass.
+    func appearance(dark: Bool) {
+        let ucc = web.configuration.userContentController
+        ucc.removeAllUserScripts()
+        ucc.addUserScript(WKUserScript(source: "window.__simplDark = \(dark);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        ucc.addUserScript(AltaHook.script)
+        web.evaluateJavaScript("window.__simplDark = \(dark); if (window.__simplFocusDark) window.__simplFocusDark();", completionHandler: nil)
+    }
+
     /// (1.3.49) Alta's question (or lesson) is shown alone: laid on Liquid Glass.
     var focused: Bool { focusState == "question" || focusState == "lesson" }
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.

@@ -98,6 +98,13 @@ try {
   });
   check(clear.html === 'rgba(0, 0, 0, 0)' && clear.body === 'rgba(0, 0, 0, 0)' && clear.path && clear.card === 'rgba(0, 0, 0, 0)' && clear.cardShadow === 'none',
     `the page, the parts round the question and its card draw no ground, so the popup’s glass shows through (${JSON.stringify(clear)})`);
+  // (1.3.50) dark mode, on dark glass: the question's colours turned over (light on dark, hues kept), its pictures turned back
+  await page.evaluate(() => { document.getElementById('asks').insertAdjacentHTML('afterend', '<img id="pic" width="8" height="8" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=">'); window.__simplDark = true; window.__simplFocusDark(); });
+  const dk = await page.evaluate(() => ({ attr: document.documentElement.hasAttribute('data-simpl-dark'), sec: getComputedStyle(document.getElementById('qsec')).filter, pic: getComputedStyle(document.getElementById('pic')).filter, head: getComputedStyle(document.querySelector('header')).display }));
+  check(dk.attr && /invert\(1\)/.test(dk.sec) && /hue-rotate\(180deg\)/.test(dk.sec) && /invert\(1\)/.test(dk.pic),
+    `in dark mode the question’s colours are turned over and its pictures turned back (${dk.sec} · picture ${dk.pic})`);
+  await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); document.getElementById('pic').remove(); });
+  check(await page.evaluate(() => !document.documentElement.hasAttribute('data-simpl-dark') && getComputedStyle(document.getElementById('qsec')).filter === 'none'), 'and in light mode, left as Alta draws them');
   // typing and scrolling are left alone
   await page.setViewportSize({ width: 900, height: 200 });
   await page.evaluate(() => window.scrollTo(0, 120));
