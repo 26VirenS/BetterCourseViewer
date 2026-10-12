@@ -47,7 +47,7 @@ struct Showcase {
     int view = 1, tab = 0;
     double now = 0;
 
-    struct Shape { D2D1_RECT_F r; float radius; D2D1_COLOR_F tint; float tintAmount; bool interactive; };
+    struct Shape { D2D1_RECT_F r; float radius; D2D1_COLOR_F tint; float tintAmount; bool interactive; float power = 1; };
     std::vector<Shape> frosts, lenses;
     std::vector<std::function<void()>> content, overlays;
 
@@ -106,7 +106,7 @@ struct Showcase {
     }
 
     /// A lens of glass (a knob, a thumb, the bubble): no frost, what is under it bent through its rim.
-    void Lens(D2D1_RECT_F r, float radius) { lenses.push_back({ r, radius, {}, 0, true }); }
+    void Lens(D2D1_RECT_F r, float radius, float power = 1) { lenses.push_back({ r, radius, {}, 0, true, power }); }
 
     /// A panel that moves when dragged by anything but its controls.
     void Draggable(const std::string& id, D2D1_RECT_F r, float& x, float& y) {
@@ -134,7 +134,9 @@ struct Showcase {
             for (size_t i = 0; i < items.size(); i++)
                 Text(items[i], x + 4 + i * segW, y, segW, h, 14.5f, Ink(i == (size_t)selected ? 0.98f : 0.82f), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER);
         });
-        Lens(D2D1::RectF(tx, ty, tx + tw, ty + th), th / 2);
+        // (nearly flat at rest — the words under it stay readable — bending fully while it slides, as the Mac's does)
+        float moving = std::min(1.0f, std::fabs(sx.value - sx.target) * 1.6f + s);
+        Lens(D2D1::RectF(tx, ty, tx + tw, ty + th), th / 2, 0.12f + 0.88f * moving);
         // a thin veil of light on the chosen one, as the Mac's thumb has
         overlays.push_back([=, this] {
             g.d2d->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(tx, ty, tx + tw, ty + th), th / 2, th / 2), Brush(scene.dark ? D2D1::ColorF(1, 1, 1, 0.1f) : D2D1::ColorF(1, 1, 1, 0.55f)));
@@ -380,8 +382,8 @@ struct Showcase {
         if (isLens) {
             bool bubble = s.tintAmount < 0;
             m.SetBlurRadius(0.0f);
-            m.SetRefractionStrength(bubble ? 1.0f : std::min(1.0f, refraction + 0.25f));
-            m.SetThickness(bubble ? 1.0f : 0.75f);
+            m.SetRefractionStrength(bubble ? 1.0f : std::min(1.0f, (refraction + 0.25f) * s.power));
+            m.SetThickness(bubble ? 1.0f : 0.4f + 0.35f * s.power);
             m.SetDispersionStrength(bubble ? std::min(1.0f, dispersion + 0.35f) : dispersion);
             m.SetEdgeFresnel(0.35f + 0.4f * rim);
             m.SetSpecularStrength(0.4f + 1.2f * rim);
