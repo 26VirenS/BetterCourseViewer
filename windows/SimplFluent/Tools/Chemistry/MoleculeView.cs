@@ -46,7 +46,7 @@ internal sealed class MoleculeBuilderView : Grid
         var foot = K.Text("Drag to turn · scroll to zoom · click an atom to select it", Ty.Caption, B.Text2);
         foot.HorizontalAlignment = HorizontalAlignment.Center;
         foot.Margin = new Thickness(12);
-        var card = K.Card(K.Rows("auto, *, auto", head.Row(0), new MoleculeSceneView(m).Row(1), foot.Row(2)), new Thickness(0));
+        var card = K.Card(K.Rows("auto, *, auto", head.Row(0), new MoleculeSceneView(m).TourTarget("molViewer").Row(1), foot.Row(2)), new Thickness(0));
         Children.Add(new ChemLayout(controls, card, facts));
 
         void Changed() => Refresh();

@@ -243,6 +243,7 @@ internal sealed class LewisMakerView : Grid
         st.Start(start);
         editor = new LewisEditor(st);
         wayBar = new SelectorBar(new[] { "Quick", "Draw" }, (int)st.Way);
+        wayBar.TourTarget("lewisWay"); // (the Periodic Table's tour: "Draw your own")
         wayBar.Changed += i =>
         {
             st.Way = (LWay)i;
@@ -308,7 +309,7 @@ internal sealed class LewisMakerView : Grid
             st.Load(name);
             Chemistry.Tell("preset");
             st.Change();
-        }));
+        }).TourTarget("lewisPreset"));
         controls.Children.Add(st.Way == LWay.Quick ? QuickControls() : DrawControls());
         controls.Children.Add(ChemKit.Heading("Charge"));
         controls.Children.Add(K.Columns("*, auto",
@@ -475,7 +476,7 @@ internal sealed class LewisMakerView : Grid
     /// <summary>The resonance structures side by side, ↔ between them; a press shows one large.</summary>
     private FrameworkElement Resonance(LResult r)
     {
-        var row = K.H(6);
+        var row = K.H(6).TourTarget("lewisResonance");
         for (var k = 0; k < r.Structures.Count; k++)
         {
             if (k > 0)
