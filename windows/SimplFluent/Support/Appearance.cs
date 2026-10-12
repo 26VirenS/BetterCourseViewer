@@ -33,7 +33,7 @@ public static class Appearance
     /// <summary>The places a photo can go: the navigation pane, and each of the Dashboard's six counters.</summary>
     public static readonly (string Key, string Name)[] Slots =
     {
-        ("side", "Navigation pane"), ("today", "Due today"), ("tomorrow", "Tomorrow"), ("week", "Next 7 days"),
+        ("side", "Navigation pane"), ("today", "Due today"), ("tomorrow", "Tomorrow"), ("next", "Next 7 days"),
         ("overdue", "Overdue"), ("unread", "Unread"), ("graded", "Graded"),
     };
 

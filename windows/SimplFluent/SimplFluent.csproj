@@ -40,6 +40,8 @@
   <ItemGroup>
     <Resource Include="Assets\Simpl.ico" />
     <Resource Include="Assets\Simpl-256.png" />
+    <!-- the themes' drawn scenes (the Mac's asset catalogue's): masks, inked in the accent where they show -->
+    <Resource Include="Assets\Themes\*.png" />
   </ItemGroup>
 
   <!-- The extension the engine runs (the same files the Mac and iPhone apps carry), and the bridge and sign-in reader

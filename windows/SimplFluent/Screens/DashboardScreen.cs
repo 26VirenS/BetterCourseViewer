@@ -205,7 +205,13 @@ public sealed partial class DashboardScreen : Screen
         count.Margin = new Thickness(0, 10, 0, 0);
         var noteT = K.Text(note ?? " ", Ty.Caption, B.Text2);
         var content = K.V(0, head, count, noteT);
-        var b = K.CardButton(content, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(14, 14, 14, 12));
+        content.Margin = new Thickness(14, 14, 14, 12);
+        // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
+        var face = new Grid();
+        if (Scenes.Backdrop(c.Key) is { } scene) face.Children.Add(scene);
+        face.Children.Add(content);
+        face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
+        var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
         if (alert) b.SetResourceReference(Control.BackgroundProperty, B.CriticalBack);
         b.ToolTip = FullName(c.Key, c.Label);
         System.Windows.Automation.AutomationProperties.SetName(b, $"{FullName(c.Key, c.Label)}: {value?.ToString() ?? "counting"}");

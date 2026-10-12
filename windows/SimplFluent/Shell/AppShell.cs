@@ -34,6 +34,7 @@ public sealed class AppShell : Grid, IDisposable
     private readonly Border paneHolder = new();
     private readonly Grid page = new();
     private readonly NavList nav = new();
+    private readonly ContentControl paneScene = new() { Focusable = false, IsHitTestVisible = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
     private readonly ContentControl account = new() { Focusable = false };
     private readonly TextBox searchBox;
     private readonly Grid header = new();
@@ -86,7 +87,7 @@ public sealed class AppShell : Grid, IDisposable
         pane.Children.Add(searchBox.Row(1));
         pane.Children.Add(navScroll.Row(2));
         pane.Children.Add(settingsRow.Row(3));
-        paneHolder.Child = pane;
+        paneHolder.Child = new Grid { Children = { paneScene, pane } };
         Children.Add(paneHolder.Col(0));
 
         // ---- the page: its header, then the screen ----
@@ -169,6 +170,7 @@ public sealed class AppShell : Grid, IDisposable
     private void BuildPane()
     {
         account.Content = AccountTile();
+        paneScene.Content = Scenes.Backdrop("side");
         var snap = engine.Snapshot;
         var list = new List<NavEntry>
         {

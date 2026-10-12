@@ -287,12 +287,14 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         {
             var on = Appearance.ThemeName == r.Name;
             var color = r.Accent is { } h ? K.Hex(h) : Appearance.Accent;
+            // (its drawing inked in its own colour, as it would show on a counter; Default: Windows' accent, no drawing)
             var swatch = new Border
             {
-                Height = 64, CornerRadius = new CornerRadius(6),
-                Background = r.Accent == null ? Res("ControlStrongFillColorDefaultBrush") : new LinearGradientBrush(K.Mix(color, Colors.White, 0.25), K.Mix(color, Colors.Black, 0.25), 45),
-                Child = r.Accent == null ? K.Icon(SymbolRegular.Color24, 24, B.OnAccent) : null,
+                Height = 64, CornerRadius = new CornerRadius(6), ClipToBounds = true,
+                Background = r.Accent == null ? Res("ControlStrongFillColorDefaultBrush") : null,
+                Child = r.Scene is { } sc ? Scenes.Swatch(sc, "Card0", color) : K.Icon(SymbolRegular.Color24, 24, B.OnAccent),
             };
+            swatch.Loaded += (_, _) => swatch.Clip = new RectangleGeometry(new Rect(0, 0, swatch.ActualWidth, swatch.ActualHeight), 6, 6);
             var tile = K.V(8, swatch, K.Text(r.Name, Ty.Body).Center());
             var b = K.CardButton(tile, () => Appearance.Wear(r), 8, new Thickness(8, 8, 8, 10));
             b.Width = 132;
@@ -313,7 +315,59 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 K.V(0, K.Text("Accent colour", Ty.Body), K.Wrapped("The navigation pane’s marks, the buttons, the links and every selection take it.", Ty.Caption, B.Text2)).Col(1)),
             swatches.Margin(42, 0, 0, 0)), new Thickness(16, 14, 16, 16), 4);
         v.Children.Add(accentCard);
+        v.Children.Add(PhotosSection());
         return v;
+    }
+
+    // ---- Photos: what each place shows (the Mac's PhotoSlotEditor) ----
+
+    private string photoSlot = Launch.Get("photo-slot") is { } ps && Appearance.Slots.Any(s => s.Key == ps) ? ps : "side";
+
+    private FrameworkElement PhotosSection()
+    {
+        var v = Column(K.SectionHeader("Photos"));
+        var slot = photoSlot;
+        var place = new ComboBox { MinWidth = 200, ItemsSource = Appearance.Slots.Select(s => s.Name).ToList(), SelectedIndex = Array.FindIndex(Appearance.Slots, s => s.Key == slot) };
+        place.SelectionChanged += (_, _) => { photoSlot = Appearance.Slots[Math.Max(0, place.SelectedIndex)].Key; Render(); };
+        v.Children.Add(K.Row(SymbolRegular.Image24, "Place", "The navigation pane, or one of the Dashboard’s six counters.", place));
+
+        // the place, small, as it shows now
+        var side = slot == "side";
+        var preview = new Border { Width = side ? 96 : 200, Height = side ? 228 : 114, CornerRadius = new CornerRadius(8), ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Left };
+        preview.Bg(side ? B.Window : B.Card).Stroke(B.CardStroke);
+        preview.Child = Scenes.Backdrop(slot, frost: false) ?? (FrameworkElement)K.Text("Nothing here", Ty.Caption, B.Text3).Center().Align(HorizontalAlignment.Center, VerticalAlignment.Center);
+        preview.Loaded += (_, _) => preview.Clip = new RectangleGeometry(new Rect(0, 0, preview.ActualWidth, preview.ActualHeight), 7, 7);
+
+        var kind = new ComboBox { MinWidth = 200, ItemsSource = new[] { "The theme’s drawing", "My photo", "Nothing" } };
+        var has = Appearance.Photo(slot) != null;
+        kind.SelectedIndex = Appearance.PhotoKind(slot) switch { "photo" => 1, "none" => 2, _ => 0 };
+        kind.SelectionChanged += (_, _) =>
+        {
+            var k = kind.SelectedIndex switch { 1 => "photo", 2 => "none", _ => "drawing" };
+            if (k == "photo" && Appearance.Photo(slot) == null) { ChoosePhoto(slot); return; }
+            Appearance.SetKind(slot, k);
+        };
+        var choose = K.Button(has ? "Replace photo…" : "Choose photo…", () => ChoosePhoto(slot), icon: SymbolRegular.FolderOpen24);
+        var remove = K.Button("Remove", () => { Appearance.RemovePhoto(slot); Scenes.Forget(); });
+        remove.IsEnabled = has;
+        var zoom = new Slider { Minimum = 0.5, Maximum = 3, Value = Appearance.Zoom(slot), Width = 200, SmallChange = 0.05, LargeChange = 0.25 };
+        var zoomTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        zoomTimer.Tick += (_, _) => { zoomTimer.Stop(); Appearance.SetZoom(slot, Math.Round(zoom.Value, 2)); };
+        zoom.ValueChanged += (_, _) => { zoomTimer.Stop(); zoomTimer.Start(); };
+        var controls = K.V(4,
+            K.Row(SymbolRegular.ImageMultiple24, "Shows", "A theme’s drawing, a photo of your own (inked in two tones, as on the web), or nothing.", kind),
+            K.Row(SymbolRegular.FolderOpen24, "Photo", "Kept in Simpl’s folder on this PC, never sent anywhere.", K.H(8, choose, remove)),
+            K.Row(SymbolRegular.ZoomIn24, "Zoom", "How large it is drawn in its place.", zoom));
+        v.Children.Add(K.Columns("auto, 16, *", preview.Col(0), controls.Col(2)));
+        return v;
+    }
+
+    private void ChoosePhoto(string slot)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Pictures|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.heic;*.webp|All files|*.*" };
+        if (dlg.ShowDialog(this) != true) { Render(); return; }
+        Scenes.Forget();
+        if (Appearance.SetPhoto(slot, dlg.FileName)) Say("Photo set."); else Say("The picture could not be read.", true);
     }
 
     private static Color ApplicationAccent() => Wpf.Ui.Appearance.ApplicationAccentColorManager.SystemAccent;
