@@ -609,8 +609,8 @@ enum LGeometry {
         return (g.degree(id), l / 2 + l % 2)
     }
 
-    /// The molecule built in 3D (MoleculeModel's VSEPR forces), for its polarity — (1.3.65) once for each molecule and
-    /// structure: it was built again every time the builder drew.
+    /// The molecule built in 3D (MoleculeModel's VSEPR layout, 1.3.74), for its polarity — (1.3.65) once for each
+    /// molecule and structure: it was built again every time the builder drew.
     static func dipole(_ g: LGraph, _ s: LStructure) -> Double {
         let key = g.topologyKey + "|" + s.key
         if let d = dipoles[key] { return d }

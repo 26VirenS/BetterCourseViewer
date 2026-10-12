@@ -3,12 +3,12 @@ import SceneKit
 import SwiftUI
 
 // (1.3.51) The 3D molecule builder, in the full Periodic Table: atoms added to the one selected with a single, double or
-// triple bond, hydrogens filled in, presets, and a molecule from the Lewis maker — shaped as VSEPR has it: each atom's
-// bonds and lone pairs (modelled as points of their own) pushing apart while the bonds keep their lengths, so water
-// bends, ammonia forms a pyramid and methane a tetrahedron. Turned and zoomed by dragging and scrolling; an atom
-// selected by a click. Shown as ball and stick, space filling or sticks, with its lone pairs and labels if asked, and
-// turning by itself if asked; beside it, its formula, molar mass, counts, a valence check, its polarity, and the selected
-// atom's bonds, shape and bond angles as the model has them.
+// triple bond, hydrogens filled in, presets, and a molecule from the Lewis maker — shaped as VSEPR has it: (1.3.74) each
+// atom's bonds and lone pairs set out in the directions their number gives (MoleculeShape.swift), so water bends,
+// ammonia forms a pyramid, methane a tetrahedron and carbon dioxide a line. Turned and zoomed by dragging and
+// scrolling; an atom selected by a click. Shown as ball and stick, space filling or sticks, with its lone pairs and
+// labels if asked, and turning by itself if asked; beside it, its formula, molar mass, counts, a valence check, its
+// polarity, and the selected atom's bonds, shape and bond angles as the model has them.
 
 struct MBAtom: Identifiable, Equatable {
     let id: Int
@@ -297,7 +297,7 @@ final class MoleculeModel: ObservableObject {
         }
         if name != "Benzene" && name != "Sulfur hexafluoride" && name != "Carbon dioxide" { fillHydrogen() }
         selected = atoms.first?.id
-        relax(iterations: 900)
+        relax(keep: false)
         framing += 1
     }
 
@@ -319,7 +319,7 @@ final class MoleculeModel: ObservableObject {
             nextID += 1
         }
         selected = atoms.first?.id
-        relax(iterations: 900)
+        relax()
         framing += 1
     }
 
@@ -327,98 +327,29 @@ final class MoleculeModel: ObservableObject {
 
     private func bondFactor(_ order: Int) -> Double { order >= 3 ? 0.78 : (order == 2 ? 0.87 : 1) }
 
-    /// VSEPR by forces: bonds springs at their lengths; round each atom, its bonds and lone pairs pushing apart (lone
-    /// pairs harder); atoms not bonded kept from crowding. The lone pairs are kept for drawing.
-    func relax(iterations: Int = 500) {
+    /// (1.3.74) VSEPR, laid out (`VSEPR.layout`, MoleculeShape.swift): round each atom its bonds and lone pairs take
+    /// the directions their number gives, the molecule grown out from its first atom. With `keep`, it is turned to lie
+    /// as close to where its atoms were as it can, so a molecule being built stays put and one from the Lewis maker
+    /// faces as it was drawn. The lone pairs are kept for drawing (and the dipole).
+    func relax(keep: Bool = true) {
         let n = atoms.count
         guard n > 0 else { lonePairs = []; return }
-        var p = atoms.map(\.pos)
         let index = Dictionary(uniqueKeysWithValues: atoms.enumerated().map { ($0.element.id, $0.offset) })
-        var lp: [MBLonePair] = []
-        for a in atoms {
-            let k = lonePairCount(a)
-            for j in 0..<k {
-                let t = Double(a.id * 7 + j * 3)
-                let d = simd_normalize(SIMD3<Double>(sin(t), cos(t * 1.3), sin(t * 0.7) + 0.3))
-                lp.append(MBLonePair(atom: a.id, pos: a.pos + d * 0.55))
-            }
-        }
-        var q = lp.map(\.pos)
-        let lpOf = Dictionary(grouping: lp.indices, by: { lp[$0].atom })
-        let pairs: [(Int, Int, Double)] = bonds.compactMap { b in
+        let links: [(a: Int, b: Int, length: Double)] = bonds.compactMap { b in
             guard let i = index[b.a], let j = index[b.b] else { return nil }
-            return (i, j, (MBChem.covalent(atoms[i].symbol) + MBChem.covalent(atoms[j].symbol)) * bondFactor(b.order))
+            return (a: i, b: j, length: (MBChem.covalent(atoms[i].symbol) + MBChem.covalent(atoms[j].symbol)) * bondFactor(b.order))
         }
-        var bonded = Set<Int>()
-        var neighbours: [[Int]] = Array(repeating: [], count: n)
-        for (i, j, _) in pairs {
-            bonded.insert(i * 10000 + j)
-            bonded.insert(j * 10000 + i)
-            if !neighbours[i].contains(j) { neighbours[i].append(j) }
-            if !neighbours[j].contains(i) { neighbours[j].append(i) }
-        }
-        for step in 0..<iterations {
-            var f = Array(repeating: SIMD3<Double>(0, 0, 0), count: n)
-            var g = Array(repeating: SIMD3<Double>(0, 0, 0), count: q.count)
-            for (i, j, target) in pairs {
-                let d = p[j] - p[i]
-                let len = max(simd_length(d), 1e-6)
-                let force = d / len * (len - target) * 0.8
-                f[i] += force
-                f[j] -= force
-            }
-            for k in q.indices {
-                guard let a = index[lp[k].atom] else { continue }
-                let d = q[k] - p[a]
-                let len = max(simd_length(d), 1e-6)
-                let force = d / len * (len - 0.55) * 0.9
-                g[k] -= force
-                f[a] += force
-            }
-            // (round each atom: its domains — bonded atoms and lone pairs — as directions, pushed apart)
-            for c in 0..<n {
-                var dirs: [(SIMD3<Double>, Bool, Int)] = neighbours[c].map { (p[$0] - p[c], false, $0) }
-                for k in lpOf[atoms[c].id] ?? [] { dirs.append((q[k] - p[c], true, k)) }
-                guard dirs.count > 1 else { continue }
-                let units = dirs.map { simd_normalize($0.0 + SIMD3(1e-9, 0, 0)) }
-                for x in 0..<dirs.count {
-                    for y in (x + 1)..<dirs.count {
-                        let diff = units[x] - units[y]
-                        let weight = (dirs[x].1 ? 1.25 : 1) * (dirs[y].1 ? 1.25 : 1)
-                        let push = diff / (simd_length_squared(diff) + 0.05) * 0.22 * weight
-                        if dirs[x].1 { g[dirs[x].2] += push * 0.55 } else { f[dirs[x].2] += push * simd_length(dirs[x].0) }
-                        if dirs[y].1 { g[dirs[y].2] -= push * 0.55 } else { f[dirs[y].2] -= push * simd_length(dirs[y].0) }
-                    }
-                }
-            }
-            // (atoms not bonded kept apart)
-            for i in 0..<n {
-                for j in (i + 1)..<n where !bonded.contains(i * 10000 + j) {
-                    let d = p[j] - p[i]
-                    let len = max(simd_length(d), 0.3)
-                    if len < 3.2 {
-                        let force = d / len * (0.25 / (len * len))
-                        f[i] -= force
-                        f[j] += force
-                    }
-                }
-            }
-            let rate = step < iterations / 2 ? 0.08 : 0.04
-            for i in 0..<n {
-                var m = f[i] * rate
-                if simd_length(m) > 0.2 { m = simd_normalize(m) * 0.2 }
-                p[i] += m
-            }
-            for k in q.indices {
-                var m = g[k] * rate
-                if simd_length(m) > 0.2 { m = simd_normalize(m) * 0.2 }
-                q[k] += m
-            }
-        }
+        let shape = VSEPR.layout(lone: atoms.map { lonePairCount($0) }, odd: atoms.map { ($0.lone ?? 0) % 2 }, bonds: links,
+                                 start: atoms.map(\.pos), keep: keep)
         // (centred on the middle)
-        let centre = p.reduce(SIMD3<Double>(0, 0, 0), +) / Double(n)
-        for i in 0..<n { atoms[i].pos = p[i] - centre }
-        for k in lp.indices { lp[k].pos = q[k] - centre }
+        let centre = shape.positions.reduce(SIMD3<Double>(0, 0, 0), +) / Double(n)
+        var placed = atoms
+        var lp: [MBLonePair] = []
+        for i in 0..<n {
+            placed[i].pos = shape.positions[i] - centre
+            for d in shape.lonePairs[i] { lp.append(MBLonePair(atom: placed[i].id, pos: placed[i].pos + d * 0.55)) }
+        }
+        atoms = placed
         lonePairs = lp
     }
 }
@@ -578,7 +509,7 @@ struct MoleculeBuilder: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card(radius: 14)
             }
-            Text("Lone pairs are modelled as points of their own that push on the bonds, so water bends and ammonia forms a pyramid. Bond angles are the model's, near the real ones.")
+            Text("Each atom's bonds and lone pairs are set out as VSEPR has them, lone pairs squeezing the bonds a little, so water bends and ammonia forms a pyramid. Bond angles are the model's, near the real ones.")
                 .font(.sCaption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

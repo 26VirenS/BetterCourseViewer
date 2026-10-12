@@ -140,11 +140,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   into multiple bonds until the centre has its octet (B and Be left short), and from period 3 down bonds added while
   that lowers the formal charges — and from it the electron groups, VSEPR shape and angle, polarity, formal charges and
   octets, drawn on a canvas; *Open in 3D builder* hands it over. The *molecule builder* (`Tools/MoleculeBuilder.swift`):
-  atoms added to the selected one with a chosen bond order, hydrogen filled in, presets; shaped by forces (bond springs,
-  each atom's bonds and lone pairs — points of their own — pushing apart, lone pairs harder, non-bonded atoms kept
-  apart), so VSEPR shapes come out; SceneKit with camera control and click-to-select; ball and stick, space filling or
-  sticks; lone pairs, labels, turning by itself; its formula (Hill order), molar mass, counts, valence check, polarity
-  (from bond dipoles and lone pairs) and the selected atom's shape and bond angles as the model has them.
+  atoms added to the selected one with a chosen bond order, hydrogen filled in, presets; shaped as VSEPR has it (laid
+  out since 1.3.74, below; forces before); SceneKit with camera control and click-to-select; ball and stick, space
+  filling or sticks; lone pairs, labels, turning by itself; its formula (Hill order), molar mass, counts, valence check,
+  polarity (from bond dipoles and lone pairs) and the selected atom's shape and bond angles as the model has them.
   (1.3.54) The Lewis builder is a graph (`LGraph`: atoms with positions, bonds with orders, a charge), made by the quick
   way (the old central-atom screen, which builds the graph) or drawn (`LewisEditorCanvas`: click to place an atom bonded
   to the one selected, drag between atoms to bond, click a bond to cycle its order — the orders then the student's own,
@@ -286,6 +285,18 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   feed's newest at its next check (Updater.swift) — automatic updates off, paused, a version put back, a quiz open:
   nothing holds it back — with a notice over the window while it installs, tried again every ten minutes if it fails.
   Only copies from 1.3.72 on know to do this.
+  (1.3.74) The 3D builder's shapes are laid out by VSEPR, not found by forces (`Tools/MoleculeShape.swift`, `VSEPR`):
+  round each atom its bonds, lone pairs and an odd electron take the directions their number gives (a line, a
+  triangle, a tetrahedron, a trigonal bipyramid with lone pairs round its middle, an octahedron with lone pairs
+  opposite each other), each lone pair squeezing the bonds a little (ammonia 107°, water 104.5°) and an odd electron
+  letting them open (NO₂ 134°). The molecule grows out from its first atom, each atom's groups set round the bond it
+  was reached by and turned about it to stand staggered, a bond across from a lone pair preferred (H₂O₂ skewed); a
+  molecule being built, or one from the Lewis maker, is then turned to lie as its atoms were (Horn's best fit), and a
+  ring is eased into shape from where it is drawn (bond lengths, each atom's angles, atoms kept apart). The forces
+  pushed each atom's groups apart with nothing pushing back on the atom, so CO₂ settled bent at about 90°, water at
+  120° and methane from the Lewis maker square — and the Lewis maker, which takes polarity from the 3D shape, called
+  CO₂, BF₃, SF₆, XeF₄ and nitrate polar. Ozone's bond dipoles are nothing (one element) and its lone pairs' cancel, so
+  it reads nonpolar now (its real dipole is its formal charges', which the model does not count).
 
 ## Building and running
 
