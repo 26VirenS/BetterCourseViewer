@@ -34,6 +34,8 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
     <!-- Windows 11's controls for WPF: Mica, the title bar, cards, dialogs, info bars, toggles, Fluent icons -->
     <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <!-- PDFs written by the file tools (merge, split, pages turned, marks saved in the file, pictures and text to PDF) -->
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
   </ItemGroup>
 
   <ItemGroup>
