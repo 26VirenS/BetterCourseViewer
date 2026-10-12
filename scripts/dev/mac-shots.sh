@@ -136,6 +136,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   # maker; the 3D molecule builder
   SIZE=1440x920 shoot light-55-ptable-trends 14 -SimplPlace tools -SimplTool ptable -SimplPTColour electronegativity
   SIZE=1440x920 shoot light-55b-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6
+  # (1.3.76) the element page's Cloud view: carbon's whole atom, and the cloud model's test vectors on its console
+  SIZE=1440x920 shoot light-55k-ptable-cloud 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6 -SimplPTModel cloud -SimplCloudCheck YES
   SIZE=1440x920 shoot light-55c-ptable-lewis 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NO₃⁻"
   SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset Benzene
   SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NaNO₃"
@@ -151,6 +153,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   SIZE=1440x920 shoot dark-55e-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
+  # (1.3.76) iron's cloud in dark, its 3d chosen: the rest of the atom grey
+  SIZE=1440x920 shoot dark-55l-ptable-cloud 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26 -SimplPTModel cloud -SimplPTSubshell 3d
   shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"

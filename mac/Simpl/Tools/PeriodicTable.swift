@@ -419,8 +419,8 @@ struct PeriodicTableTool: View {
             let n = d.integer(forKey: "SimplPTElement")
             if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
             // (the tour: its step for the screenshot suite, -SimplPTTour 5; else on the first opening, and not while
-            // the suite pictures the tool)
-            let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset"].contains { d.object(forKey: $0) != nil }
+            // the suite pictures the tool — 1.3.76: nor an element's view, -SimplPTModel, which its page reads)
+            let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset", "SimplPTModel"].contains { d.object(forKey: $0) != nil }
             if d.object(forKey: "SimplPTTour") != nil {
                 tour(min(max(d.integer(forKey: "SimplPTTour"), 0), PTTourStep.all.count - 1))
             } else if !tourSeen && !shot {

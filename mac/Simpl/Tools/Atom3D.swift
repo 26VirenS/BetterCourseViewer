@@ -5,11 +5,21 @@ import SwiftUI
 // (1.3.51) An element in 3D, for its page in the Periodic Table: its atom (the nucleus's protons and neutrons, each shell
 // a ring with its electrons going round) or the shapes of a subshell's orbitals, each with its electrons — turned and
 // zoomed by dragging and scrolling (SceneKit's own camera control).
+// (1.3.76) Or its electron cloud: every electron as dots where it could be found, densest where it most likely is, and no
+// paths (ElectronCloud.swift).
+
+/// (1.3.76) The element page's three views of the atom.
+enum PTModel: String { case atom, orbitals, cloud }
 
 struct Atom3DView: NSViewRepresentable {
     let element: PTElement
-    let orbitals: Bool
+    let model: PTModel
+    /// The Orbitals view's subshell.
     let subshell: PTSubshell?
+    /// The Cloud view's chosen subshell ("2p"); nil, the whole atom.
+    let focus: String?
+    /// The appearance: the cloud's colours are its own in light and in dark.
+    let dark: Bool
 
     final class Coordinator { var key = "" }
 
@@ -30,10 +40,21 @@ struct Atom3DView: NSViewRepresentable {
     func updateNSView(_ v: SCNView, context: Context) { apply(v, context.coordinator) }
 
     private func apply(_ v: SCNView, _ c: Coordinator) {
-        let key = "\(element.number)-\(orbitals)-\(subshell?.id ?? "")"
+        // (1.3.76) the cloud made again for its chosen subshell and for light or dark; the atom and the orbitals only as
+        // before, so a change of appearance leaves their camera where it was turned
+        let key: String
+        switch model {
+        case .atom, .orbitals: key = "\(element.number)-\(model.rawValue)-\(subshell?.id ?? "")"
+        case .cloud: key = "\(element.number)-cloud-\(focus ?? "*")-\(dark)"
+        }
         guard key != c.key else { return }
         c.key = key
-        let scene = orbitals ? AtomScene.orbitals(subshell ?? PTSubshell(n: 1, l: 0, count: 1)) : AtomScene.atom(element)
+        let scene: SCNScene
+        switch model {
+        case .atom: scene = AtomScene.atom(element)
+        case .orbitals: scene = AtomScene.orbitals(subshell ?? PTSubshell(n: 1, l: 0, count: 1))
+        case .cloud: scene = AtomScene.cloud(element, focus: focus, dark: dark)
+        }
         v.scene = scene
         v.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
     }
@@ -243,5 +264,153 @@ enum AtomScene {
         }
         root.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 40)))
         return scene
+    }
+
+    // MARK: Electron cloud (1.3.76)
+
+    /// A hair under opaque, for the cloud's parts that would otherwise be opaque (the dark glow, the nucleus): every part
+    /// then goes in SceneKit's see-through pass, so the rendering order alone stacks them — the grey rest, then s, p, d,
+    /// f, then the nucleus over all — however SceneKit orders its opaque pass against that one.
+    private static let cloudNearlyOpaque: CGFloat = 0.999
+
+    /// A cloud node's material: 0…3 the s, p, d or f dots, 4 the grey rest. In dark the chosen dots' light adds up (a
+    /// glow, white where they crowd); in light they are ink. The rest is grey ink in both. (Starting values, to be set
+    /// against Windows' pictures: SceneKit stacks n dots of opacity a as 1 − (1 − a)ⁿ, in linear light.)
+    static func cloudMaterial(_ key: Int, dark: Bool) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.lightingModel = .constant
+        m.diffuse.contents = key == 4 ? ElectronCloud.restColor(dark: dark) : ElectronCloud.color(key, dark: dark)
+        if key != 4 && dark {
+            m.blendMode = .add
+            m.diffuse.intensity = 0.45
+            m.transparency = cloudNearlyOpaque
+        } else {
+            m.blendMode = .alpha
+            m.transparency = key == 4 ? 0.35 : 0.55
+        }
+        m.writesToDepthBuffer = false
+        m.readsFromDepthBuffer = false
+        m.isDoubleSided = true
+        return m
+    }
+
+    /// The electron cloud: the element's dots, to scale, framed by the chosen subshell (or the whole atom) so that its
+    /// 95% sphere is a unit across the middle of the view; tipped (−1 about x, then −0.6 about y) so its z axis stands up
+    /// and leans towards you; turning once in 40 seconds and drawing a few dots afresh ten times a second, where motion
+    /// is wanted (not with Reduce Motion, nor in the screenshot suite's pictures); no rings, since the electrons follow
+    /// no paths; and the nucleus marked on top, not to scale.
+    static func cloud(_ e: PTElement, focus: String?, dark: Bool) -> SCNScene {
+        let c = ElectronCloud.cloud(for: e)
+        let focusIndex = c.subs.firstIndex { $0.id == focus }
+        let frame = focusIndex.map { c.subs[$0].radius(0.95) } ?? c.frameAll
+        let scene = base(cameraAt: 4)
+        let spin = SCNNode()
+        let pose = SCNNode()
+        // (the right-hand turn is made first)
+        pose.simdOrientation = simd_quatf(angle: -0.6, axis: SIMD3<Float>(0, 1, 0)) * simd_quatf(angle: -1.0, axis: SIMD3<Float>(1, 0, 0))
+        spin.addChildNode(pose)
+        scene.rootNode.addChildNode(spin)
+        let state = CloudState(cloud: c, focus: focusIndex, frame: frame, dark: dark, holder: pose)
+        // (the nucleus: a dot on a halo that parts it from a crowded core, drawn over everything)
+        let marks: [(CGFloat, NSColor, Int)] = [(0.036, ElectronCloud.haloColor(dark: dark), 100), (0.024, ElectronCloud.nucleusColor(dark: dark), 101)]
+        for (radius, color, order) in marks {
+            let ball = SCNSphere(radius: radius)
+            ball.segmentCount = 24
+            let m = SCNMaterial()
+            m.lightingModel = .constant
+            m.diffuse.contents = color
+            m.blendMode = .alpha
+            m.transparency = cloudNearlyOpaque
+            m.readsFromDepthBuffer = false
+            m.writesToDepthBuffer = false
+            ball.materials = [m]
+            let node = SCNNode(geometry: ball)
+            node.renderingOrder = order
+            scene.rootNode.addChildNode(node)
+        }
+        let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || UserDefaults.standard.string(forKey: "SimplShotFile") != nil
+        if !still {
+            spin.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 40)))
+            // (the action holds the state, and the scene the action: it goes with the scene)
+            let tick = SCNAction.run({ _ in state.shimmer() }, queue: .main)
+            pose.runAction(.repeatForever(.sequence([.wait(duration: 0.1), tick])))
+        }
+        return scene
+    }
+}
+
+/// (1.3.76) The Cloud view's dots as SceneKit nodes — one for each kind of dot (s, p, d, f, or the grey rest), each a
+/// geometry of points — and the shimmer that draws a few of them afresh now and then (main thread). Its dots are a copy
+/// of the cached cloud's (arrays copy on write): the shimmer never reaches the cache.
+final class CloudState {
+    private var cloud: ElectronCloud.Cloud
+    private let focus: Int?
+    private let frame: Double
+    private let dark: Bool
+    /// Each kind's dots, by index.
+    private var members: [Int: [Int]] = [:]
+    private var nodes: [Int: SCNNode] = [:]
+    /// Each kind's material, made once (the shimmer makes its points again, not its look).
+    private var materials: [Int: SCNMaterial] = [:]
+    /// The shimmer's own generator (the cloud's stream stays as both apps draw it).
+    private var rng: ElectronCloud.Rng
+
+    init(cloud: ElectronCloud.Cloud, focus: Int?, frame: Double, dark: Bool, holder: SCNNode) {
+        self.cloud = cloud
+        self.focus = focus
+        self.frame = frame
+        self.dark = dark
+        rng = ElectronCloud.Rng(UInt64(cloud.z) ^ 0x5DEECE66D)
+        for i in 0..<cloud.count { members[kind(i), default: []].append(i) }
+        for key in members.keys.sorted() {
+            let node = SCNNode()
+            // (the grey rest first, then s, p, d, f over it)
+            node.renderingOrder = key == 4 ? 10 : 11 + key
+            node.geometry = geometry(key)
+            holder.addChildNode(node)
+            nodes[key] = node
+        }
+    }
+
+    /// What a dot is drawn as: its subshell's kind (0 s … 3 f), or 4 (the grey rest) when another subshell is chosen.
+    private func kind(_ i: Int) -> Int {
+        let s = Int(cloud.subIndex[i])
+        if let f = focus, s != f { return 4 }
+        return min(max(cloud.subs[s].l, 0), 3)
+    }
+
+    /// A kind's dots as points, in scene units (the frame's radius one); nil for none (a geometry is never made empty).
+    private func geometry(_ key: Int) -> SCNGeometry? {
+        guard let idx = members[key], !idx.isEmpty else { return nil }
+        let k = 1.0 / frame
+        let vs = idx.map { i in SCNVector3(CGFloat(cloud.x[i] * k), CGFloat(cloud.y[i] * k), CGFloat(cloud.zs[i] * k)) }
+        let element = SCNGeometryElement(indices: Array(0..<Int32(vs.count)), primitiveType: .point)
+        // (about 1.4 points across at the first zoom, more as it comes closer, 1 to 3 pixels' radius on the screen)
+        element.pointSize = 0.012
+        element.minimumPointScreenSpaceRadius = 1
+        element.maximumPointScreenSpaceRadius = 3
+        let g = SCNGeometry(sources: [SCNGeometrySource(vertices: vs)], elements: [element])
+        let material = materials[key] ?? AtomScene.cloudMaterial(key, dark: dark)
+        materials[key] = material
+        g.materials = [material]
+        return g
+    }
+
+    /// A few dots drawn afresh (0.5% of them a tick, ten ticks a second, each from its own subshell and orbital): where
+    /// an electron could be found keeps changing, and the cloud keeps its shape.
+    func shimmer() {
+        let n = cloud.count
+        guard n > 0 else { return }
+        var dirty = Set<Int>()
+        for _ in 0..<max(1, n / 200) {
+            let i = min(n - 1, Int(rng.next() * Double(n)))
+            let s = cloud.subs[Int(cloud.subIndex[i])]
+            let p = ElectronCloud.sample(&rng, s, Int(cloud.orbital[i]))
+            cloud.x[i] = p.0
+            cloud.y[i] = p.1
+            cloud.zs[i] = p.2
+            dirty.insert(kind(i))
+        }
+        for key in dirty { nodes[key]?.geometry = geometry(key) }
     }
 }

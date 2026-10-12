@@ -299,6 +299,20 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   it reads nonpolar now (its real dipole is its formal charges', which the model does not count).
   (1.3.75) A preset laid out afresh with more than one centre (a chain, a ring) is turned to face the viewer, its
   principal axes across, up and towards the viewer (`VSEPR.face`): ethanol lay along the line of sight, end on.
+  (1.3.76) An element's page has a third view of its atom, Cloud (Atom · Orbitals · Cloud, `PTModel`): the electron
+  cloud model, every electron as dots where it could be found, densest where it most likely is, with no paths
+  (`Tools/ElectronCloud.swift`, line for line Windows' `ElectronCloud.cs`: the same dots). Each subshell is a
+  hydrogen-like orbital (its radial nodes kept) whose exponent gives it the mean radius of Slater's orbital for Slater's
+  Z_eff (summed in whole hundredths), its electrons in its real orbitals by Hund's rule; the dots come from a radial
+  table per (n, l) (inverse CDF) and |Y|² by rejection, drawn by SplitMix64 seeded with the atomic number in a fixed
+  order — up to 40 000 for an atom, by electron. Drawn to scale as SceneKit points (`AtomScene.cloud`, `CloudState`),
+  one node a kind (s, p, d, f, grey): ink in light, light that adds up in dark; the nucleus a dot on a halo over them,
+  not to scale; tipped so z stands up, turning once in 40 s and a few dots drawn afresh ten times a second, unless
+  Reduce Motion is on or the screenshot suite is picturing it. Chips under it choose All or one subshell: that one
+  coloured, the rest grey, the view framed by its 95% radius, its Z_eff and mean distance said, and how much larger it
+  is drawn than in All. The tour's Orbitals step is still done by Orbitals alone. `-SimplPTModel cloud` and
+  `-SimplPTSubshell 3d` (or `all`) set the view for the screenshot suite (`light-55k-ptable-cloud`,
+  `dark-55l-ptable-cloud`); `-SimplCloudCheck YES` writes the model's test vectors to the console (`cloud-check …`).
 
 ## Building and running
 
