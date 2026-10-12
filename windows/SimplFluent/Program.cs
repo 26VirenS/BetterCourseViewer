@@ -41,6 +41,8 @@ public static class Program
         Instance.ShowRequested += main.Bring;
         Instance.QuitRequested += () =>
         {
+            // (Uninstall Simpl's own uninstaller, asking while Simpl erases what it keeps: it quits by itself once done)
+            if (Uninstall.Erasing) return;
             Log.Write("quit: asked by Simpl's installer");
             EraseAll.Quit();
         };

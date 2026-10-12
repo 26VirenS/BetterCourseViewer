@@ -44,6 +44,9 @@ public static class Updates
 
     /// <summary>The installer's AppId (Installer/Simpl.iss): its entry in Settings ▸ Apps is the uninstall key named by it.</summary>
     public const string InstallerAppId = "{B65F70B7-E13E-4CCC-9E1C-0B659660D130}";
+    /// <summary>That entry, the current user's (Inno Setup names it by the AppId and "_is1"): where Simpl is installed, and
+    /// its uninstaller (Support/Uninstall.cs).</summary>
+    public const string EntryKey = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{InstallerAppId}_is1";
 
     public static event Action? Changed;
     /// <summary>A download moved on (<see cref="Progress"/>): often, so apart from <see cref="Changed"/>.</summary>
@@ -86,7 +89,7 @@ public static class Updates
     {
         try
         {
-            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{InstallerAppId}_is1");
+            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(EntryKey);
             return k?.GetValue("InstallLocation") is string at && at.Length > 0 && SameFolder(at, AppPaths.AppDir);
         }
         catch { return false; }

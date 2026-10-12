@@ -49,6 +49,15 @@ version that was there, so Simpl is never left closed. Without `/LAUNCH`, nothin
 elsewhere; `/LOG="…"` writes a log.
 Uninstalling silently: `"%LOCALAPPDATA%\Programs\Simpl\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`.
 
+Uninstalling from Simpl (`Support/Uninstall.cs`): Settings ▸ General ▸ This PC ▸ **Uninstall Simpl** asks first (with
+"Also erase my settings, grade history and saved sign-in", off), then starts the uninstaller its Settings ▸ Apps entry
+names (`UninstallString`; else `unins000.exe` beside Simpl.exe) with `/SILENT /NORESTART` — its progress shows, its own
+question and its "removed" message do not, the latter's words about what is kept being wrong after an erase — erases
+what Simpl keeps if asked (as Data ▸ Reset everything does) while the uninstaller waits for Simpl to go, and quits for
+real. Not `/SUPPRESSMSGBOXES`: it would answer the uninstaller's one remaining box, "Simpl is still open", with Cancel.
+A copy run from its zip says it is removed by deleting its folder (Open Folder); a development run has the button off.
+`--uninstall yes` does the same as the sheet's Uninstall, keeping what Simpl keeps — for the installed copy only.
+
 Updates (`Support/Updates.cs`): a copy the installer put here — its uninstall entry names the folder Simpl.exe runs
 from — downloads the new release's Simpl-Setup.exe (checked against the size and SHA-256 GitHub publishes) to
 `%TEMP%\Simpl-Update\<tag>`, and **Restart to Update** runs it with the arguments above and quits Simpl. A portable
@@ -60,8 +69,9 @@ against the mock to picture the Dashboard (`installed-dashboard`; its log must s
 the update exactly as Restart to Update does over a Simpl left open (it must take the quit event, Setup must see it
 go, and `/LAUNCH` must open Simpl again); runs an update that cannot finish (a stand-in holding Simpl's mutex: Setup
 must give up and open the old copy again); uninstalls silently with that Simpl open (the uninstaller must close it),
-and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not. The installer's and each
-Simpl's logs are kept with the pictures.
+and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not; then installs again and
+uninstalls from Simpl itself (`--uninstall yes`: Simpl must start its uninstaller and quit, and the uninstaller — both
+its phases — must finish), checking the same. The installer's and each Simpl's logs are kept with the pictures.
 
 ## Layout of the code
 

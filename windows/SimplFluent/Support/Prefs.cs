@@ -30,6 +30,7 @@ public static class Prefs
 {
     private static readonly object Gate = new();
     private static JsonObject? data;
+    private static bool erased;
 
     private static JsonObject Data
     {
@@ -71,8 +72,22 @@ public static class Prefs
         lock (Gate) return Data.Select(kv => (kv.Key, kv.Value?.ToJsonString() ?? "null")).OrderBy(k => k.Key).ToList();
     }
 
+    /// <summary>
+    /// The file deleted, and nothing written after it by this copy (Reset Everything restarts it, Uninstall quits it):
+    /// what is changed on the way out — the window's place, saved as it closes — would write every preference back.
+    /// </summary>
+    public static void Erase()
+    {
+        lock (Gate)
+        {
+            erased = true;
+            try { File.Delete(AppPaths.PrefsFile); } catch { }
+        }
+    }
+
     private static void Save()
     {
+        if (erased) return;
         try
         {
             var tmp = AppPaths.PrefsFile + ".tmp";

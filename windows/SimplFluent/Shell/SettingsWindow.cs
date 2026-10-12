@@ -70,7 +70,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     private static readonly (string Key, string Title, SymbolRegular Icon, Color Tint, string Words)[] Tabs =
     {
-        ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential courses goals set up background notification area close taskbar pin"),
+        ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential courses goals set up background notification area close taskbar pin uninstall remove delete"),
         ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent photo picture"),
         ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts activity announcements"),
         ("grades", "Grades", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8), "gpa goal history record what-if track"),
@@ -180,6 +180,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape && !sheets.IsOpen) { Close(); e.Handled = true; } };
         Go(tab);
         if (engine.Phase == Phase.Native) _ = LoadInfo();
+        // (--settings-sheet uninstall: the screenshot suite's picture of Uninstall Simpl's question)
+        if (Launch.Take("uninstall", "settings-sheet") != null) Loaded += (_, _) => AskUninstall();
     }
 
     private void OnUpdates() => Dispatcher.BeginInvoke(() => { if (tab == "updates") Render(); });
@@ -283,7 +285,70 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 "Simpl stays in the notification area, so alerts keep coming. Quit it there, or from the account menu.", keep),
             K.Row(SymbolRegular.Pin24, "Taskbar", pinned ? "Simpl is on your taskbar, one click away." : "Keep Simpl one click away.",
                 pinned ? K.Text("Pinned", Ty.Body, B.Text2) : K.Button("Pin to taskbar…", () => _ = PinToTaskbar()))));
+
+        // (taking Simpl off this PC from here, as Windows' Settings ▸ Apps would: the installer's own uninstaller for the
+        // copy it put here; a copy run from its zip is its folder)
+        v.Children.Add(K.SectionHeader("This PC"));
+        v.Children.Add(UninstallRow());
         return v;
+    }
+
+    /// <summary>Uninstall Simpl: Uninstall… for the installed copy (off in a development run, as Updates are); for a copy
+    /// run from its zip, its folder, deleting which is uninstalling it.</summary>
+    private FrameworkElement UninstallRow()
+    {
+        if (!Updates.Installed && !Updates.IsDevelopmentRun)
+            return K.Row(SymbolRegular.Delete24, "Uninstall Simpl",
+                "This copy wasn’t installed with Simpl-Setup.exe, so it’s removed by deleting its folder once Simpl is quit.",
+                K.Button("Open Folder", OpenAppFolder, icon: SymbolRegular.FolderOpen24));
+        return K.Row(SymbolRegular.Delete24, "Uninstall Simpl",
+            Updates.IsDevelopmentRun ? "Uninstalling is off in a development run." : "Removes Simpl from this PC, as Windows’ Settings ▸ Apps does; you choose whether your settings and sign-in go too.",
+            Enabled(K.Button("Uninstall…", AskUninstall), Uninstall.Available));
+    }
+
+    /// <summary>Open Folder: the folder this copy runs from, in File Explorer.</summary>
+    private void OpenAppFolder()
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{AppPaths.AppDir.TrimEnd('\\', '/')}\"") { UseShellExecute = true }); }
+        catch (Exception e) { Say("Could not open the folder: " + e.Message, true); }
+    }
+
+    /// <summary>
+    /// Uninstall…: Windows 11's question — Simpl removed from this PC, and closing now — with what it keeps kept unless
+    /// the box says otherwise; Uninstall in the critical colour, Cancel the way out.
+    /// </summary>
+    private void AskUninstall()
+    {
+        var kept = $"Left unticked, they stay on this PC (in {AppPaths.Root} and Windows’ Credential Manager) in case you install Simpl again.";
+        var erased = $"Erased from this PC first, with your goals and saved pages, as Data ▸ Reset everything erases them. This can’t be undone. Your {engine.LmsName} account is not affected.";
+        var note = K.Wrapped(kept, Ty.Caption, B.Text2);
+        const string eraseWords = "Also erase my settings, grade history and saved sign-in";
+        var erase = new CheckBox { Content = K.Wrapped(eraseWords, Ty.Body, B.Text), IsChecked = false };
+        System.Windows.Automation.AutomationProperties.SetName(erase, eraseWords);
+        erase.Checked += (_, _) => note.Text = erased;
+        erase.Unchecked += (_, _) => note.Text = kept;
+        var s = new Sheet
+        {
+            Title = "Uninstall Simpl?",
+            Body = K.V(12,
+                K.Wrapped("Simpl will be removed from this PC, with its shortcuts and its entry in Windows’ Settings ▸ Apps. Simpl closes now; the uninstaller shows its progress.", Ty.Body, B.Text),
+                erase, note),
+        };
+        s.Add("Uninstall", SheetButtonKind.Primary, () => _ = UninstallNow(erase.IsChecked == true)).Danger = true;
+        s.Add("Cancel", SheetButtonKind.Close);
+        sheets.Show(s);
+    }
+
+    /// <summary>Uninstall pressed: a sheet that says it is happening (nothing to press meanwhile), then Simpl gone and its
+    /// uninstaller at work. The uninstaller could not start: said, and Simpl stays as it was.</summary>
+    private async Task UninstallNow(bool erase)
+    {
+        var s = new Sheet { Title = "Uninstalling…", Body = K.H(12, K.Spinner(20), K.Text(erase ? "Erasing what Simpl keeps, then Simpl closes." : "Simpl closes in a moment.", Ty.Body)), Modal = true, Width = 360 };
+        sheets.Show(s);
+        await Task.Delay(300);
+        if (await Uninstall.Run(engine, erase) is not { } problem) return;
+        s.Close();
+        Say(problem, true);
     }
 
     private async Task PinToTaskbar()
@@ -751,7 +816,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 K.Row(SymbolRegular.Code24, "Interface", "The extension’s own scripts, as the Mac and iPhone apps carry them.", K.Text(ScriptBundle.ExtensionVersion, Ty.Body, B.Text2)),
                 K.Row(SymbolRegular.Bug24, "Report a bug", "Tell us what went wrong, and what you were doing.", null, () => Engine.Engine.OpenExternally(new Uri("https://simplcourses.com/report/")))));
         v.Children.Add(Foot(Updates.Installed
-            ? $"To take Simpl off this PC, uninstall it in Windows’ Settings ▸ Apps ▸ Installed apps. What it stored stays in {AppPaths.Root}: to erase that too, use Data ▸ Reset everything first. Your {engine.LmsName} account is not affected."
+            ? $"To take Simpl off this PC, use General ▸ Uninstall Simpl, which can erase what it stored in {AppPaths.Root} too; or uninstall it in Windows’ Settings ▸ Apps ▸ Installed apps, which keeps that. Your {engine.LmsName} account is not affected."
             : $"To take Simpl off this PC with everything it stored, sign out here first, then delete Simpl’s folder and {AppPaths.Root}. Your {engine.LmsName} account is not affected."));
         return v;
     }

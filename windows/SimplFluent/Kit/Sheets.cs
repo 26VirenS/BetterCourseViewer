@@ -16,6 +16,8 @@ public sealed class SheetButton
     public SheetButtonKind Kind { get; set; }
     public Action? Click { get; set; }
     public bool Closes { get; set; } = true;
+    /// <summary>The primary button in the critical colour: what it does cannot be undone (Uninstall).</summary>
+    public bool Danger { get; set; }
     internal Wpf.Ui.Controls.Button? Control;
 
     public SheetButton(string text, SheetButtonKind kind, Action? click = null, bool closes = true)
@@ -225,7 +227,7 @@ public sealed class SheetHost : Grid
                 var btn = new Wpf.Ui.Controls.Button
                 {
                     Content = b.Text, HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Appearance = b.Kind == SheetButtonKind.Primary ? ControlAppearance.Primary : ControlAppearance.Secondary,
+                    Appearance = b.Kind != SheetButtonKind.Primary ? ControlAppearance.Secondary : b.Danger ? ControlAppearance.Danger : ControlAppearance.Primary,
                 };
                 b.Control = btn;
                 var bb = b;

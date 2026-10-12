@@ -8,11 +8,20 @@ namespace Simpl.Support;
 /// Settings ▸ Data ▸ Reset Everything (the Mac's EraseAll): everything Simpl keeps on this PC erased — the preferences,
 /// the extension's storage, the answers kept, the saved sign-in, the school's cookies and site data, the photos — and
 /// Simpl opened again as if it were new. No step may hold it up: each has a few seconds, then the next goes on; the new
-/// copy waits for this one to have quit (--after) before it clears the web data this one was still using.
+/// copy waits for this one to have quit (--after) before it clears the web data this one was still using. Uninstall
+/// Simpl's "Also erase…" erases the same, then quits instead.
 /// </summary>
 public static class EraseAll
 {
     public static async Task Run(Engine.Engine? engine)
+    {
+        await Erase(engine);
+        Restart(erased: true);
+    }
+
+    /// <summary>Everything Simpl keeps erased, this copy left running only to restart or quit: nothing it still holds is
+    /// written back (the preferences and the extension's storage stay erased).</summary>
+    public static async Task Erase(Engine.Engine? engine)
     {
         Log.Write("erase: everything");
         try { LoginVault.Clear(); } catch (Exception e) { Log.Write("erase vault: " + e.Message); }
@@ -26,15 +35,12 @@ public static class EraseAll
             catch (Exception e) { Log.Write("erase web: " + e.Message); }
         }
         try { Engine.Bridge.Shared.EraseStorage(); } catch (Exception e) { Log.Write("erase storage: " + e.Message); }
-        foreach (var f in new[] { AppPaths.PrefsFile, AppPaths.Storage })
-        {
-            try { File.Delete(f); } catch { }
-        }
+        Prefs.Erase();
+        try { File.Delete(AppPaths.Storage); } catch { }
         foreach (var d in new[] { AppPaths.Answers, Appearance.PhotosDir })
         {
             try { if (Directory.Exists(d)) Directory.Delete(d, true); } catch { }
         }
-        Restart(erased: true);
     }
 
     /// <summary>Simpl opened afresh: a new copy started (it waits for this one), and this one gone at once.</summary>

@@ -1,7 +1,8 @@
 # Simpl for Windows, made again in Windows 11's look (windows/SimplFluent: WPF with WPF-UI — Mica, the Settings app's
 # navigation and cards, Fluent icons): built on a Windows runner, made into an installer (Simpl-Setup.exe, Inno Setup:
 # windows/SimplFluent/Installer/Simpl.iss) that is tried — installed, opened, pictured, updated over an open Simpl as
-# Restart to Update runs it, an update that cannot finish, uninstalled with Simpl open — pictured against
+# Restart to Update runs it, an update that cannot finish, uninstalled with Simpl open, installed again and uninstalled
+# from Simpl's own Settings — pictured against
 # the mock Canvas, and — when a commit asks for it with "[preview]" in its message, or by hand (Run workflow) —
 # published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
 # real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
@@ -45,9 +46,9 @@ jobs:
       - name: Build (Release, win-x64, self-contained)
         shell: bash
         run: |
-          # (the build carries its run's number — "0.2.2 (v003)" — as About and Updates name it)
+          # (the build carries its run's number — "0.2.3 (v003)" — as About and Updates name it)
           n=$(printf '%03d' "${{ github.run_number }}")
-          dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.2 (v$n)"
+          dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.3 (v$n)"
           test -f dist/Simpl/Simpl.exe
       - name: Installer (Simpl-Setup.exe)
         shell: pwsh
@@ -257,6 +258,9 @@ jobs:
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
           }
           Shot 'settings-appearance-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance'))
+          # (General's foot, below the fold: This PC's Uninstall Simpl, and the question it asks)
+          Shot 'settings-general-end' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000'))
+          Shot 'settings-uninstall' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000', '--settings-sheet', 'uninstall'))
           foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
           Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
@@ -270,13 +274,16 @@ jobs:
           $bad = Select-String -Path $saved -Pattern 'setup save:|setup saved, then|bridge ' -SimpleMatch:$false
           if ($bad) { Write-Host "--- setup-saved: what failed"; Get-Content $saved; Write-Error "setup's save failed or something after it did (shots/profile-setup-saved.log)"; exit 1 }
           Get-ChildItem shots
-      - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled)
+      - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled, uninstalled from Simpl)
         shell: pwsh
         run: |
           $setupLog = Join-Path $env:RUNNER_TEMP 'installer-setup.log'
           $updateLog = Join-Path $env:RUNNER_TEMP 'installer-update.log'
           $failedLog = Join-Path $env:RUNNER_TEMP 'installer-update-failed.log'
           $uninstallLog = Join-Path $env:RUNNER_TEMP 'installer-uninstall.log'
+          $againLog = Join-Path $env:RUNNER_TEMP 'installer-setup-again.log'
+          # (the uninstaller Simpl itself starts writes its log here: Support/Uninstall.cs, LogFile)
+          $inAppLog = Join-Path ([System.IO.Path]::GetTempPath()) 'Simpl-Uninstall.log'
           New-Item -ItemType Directory -Force shots | Out-Null
           $dir = Join-Path $env:RUNNER_TEMP 'Simpl test install'   # (a space in it, as a user's own folder may have)
           $exe = Join-Path $dir 'Simpl.exe'
@@ -295,7 +302,7 @@ jobs:
           # (every log, kept with the pictures: the installer's runs and each Simpl's)
           $simplLogs = [ordered]@{ 'profile-installed' = $prof; 'profile-running' = $prof2; 'profile-default' = $data }
           function Keep-Logs {
-            foreach ($f in @($setupLog, $updateLog, $failedLog, $uninstallLog)) { if (Test-Path $f) { Copy-Item $f shots } }
+            foreach ($f in @($setupLog, $updateLog, $failedLog, $uninstallLog, $againLog, $inAppLog)) { if (Test-Path $f) { Copy-Item $f shots } }
             foreach ($name in $simplLogs.Keys) {
               $log = Join-Path $simplLogs[$name] 'simpl.log'
               if (Test-Path $log) { Copy-Item $log "shots\$name.log" }
@@ -304,7 +311,7 @@ jobs:
           function Fail($why) {
             Write-Host "::error::$why"
             Keep-Logs
-            $all = @($setupLog, $updateLog, $failedLog, $uninstallLog) + @($simplLogs.Values | ForEach-Object { Join-Path $_ 'simpl.log' })
+            $all = @($setupLog, $updateLog, $failedLog, $uninstallLog, $againLog, $inAppLog) + @($simplLogs.Values | ForEach-Object { Join-Path $_ 'simpl.log' })
             foreach ($f in $all) { if (Test-Path $f) { Write-Host "--- $f"; Get-Content $f -Tail 60 } }
             Get-Process Simpl -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
             exit 1
@@ -421,6 +428,61 @@ jobs:
           Keep-Logs
           Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue
           Write-Host "Simpl-Setup.exe: installed, opened, pictured, updated over an open Simpl, recovered from an update that could not finish, and uninstalled with Simpl open, as it should be"
+
+          # 6. installed again, then uninstalled from Simpl itself, as Settings > General's Uninstall Simpl does it
+          #    (--uninstall yes: its sheet's Uninstall, what Simpl keeps kept, Support/Uninstall.cs): Simpl, opened as
+          #    the Start menu opens it, starts its uninstaller and quits -- for real, not to the notification area -- so
+          #    the uninstaller finds it gone; then the folder, the shortcut and the entry gone, and what Simpl keeps kept
+          New-Item -ItemType Directory -Force $data | Out-Null
+          Set-Content $kept 'what Simpl keeps'
+          # (this Simpl's log apart from the default profile's kept above)
+          $simplLogs.Remove('profile-default')
+          $simplLogs['profile-default-uninstall'] = $data
+          if (Test-Path $inAppLog) { Remove-Item -Force $inAppLog }
+          $p = Start-Process -FilePath dist\Simpl-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', "/DIR=`"$dir`"", "/LOG=`"$againLog`"") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Fail "Simpl-Setup.exe, run again, exited with $($p.ExitCode)" }
+          if (-not (Test-Path $exe) -or -not (Test-Path $entry)) { Fail "Simpl was not installed again in $dir" }
+          $self = Start-Process -FilePath $exe -ArgumentList @('--uninstall', 'yes') -WorkingDirectory $dir -PassThru
+          $null = $self.Handle
+          if (-not $self.WaitForExit(60000)) { Fail "Simpl, asked to uninstall itself, was still open after a minute" }
+          if (-not (Has (Join-Path $data 'simpl.log') 'uninstall: .*unins000\.exe started')) { Fail "Simpl did not start its uninstaller" }
+          # (the uninstaller: unins000.exe, which copies itself to %TEMP% and runs the copy -- its second phase, given
+          #  /SECONDPHASE="<unins000.exe>", which takes the files away -- and waits for it; either running is the
+          #  uninstall not done)
+          $unins = Join-Path $dir 'unins000.exe'
+          function Get-Uninstaller {
+            @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+              $line = "$($_.CommandLine)"
+              ("$($_.ExecutablePath)" -eq $unins) -or ($line.Contains('/SECONDPHASE=') -and $line.IndexOf($unins, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+            })
+          }
+          $began = Get-Date; $seen = $false
+          while ($true) {
+            $running = Get-Uninstaller
+            $took = ((Get-Date) - $began).TotalSeconds
+            if ($running.Count -gt 0) { $seen = $true }
+            elseif ($seen -or -not (Test-Path $dir)) { break }
+            elseif ($took -gt 30) { Fail "Simpl's uninstaller was never seen running, and $dir is still there" }
+            if ($took -gt 180) {
+              foreach ($r in $running) { Write-Host "still running: $($r.CommandLine)"; Stop-Process -Id $r.ProcessId -Force -ErrorAction SilentlyContinue }
+              Fail "Simpl's uninstaller did not finish in three minutes (waiting on a box of its own?)"
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Write-Host "Simpl quit and its uninstaller ran ($([math]::Round(((Get-Date) - $began).TotalSeconds)) s after Simpl had gone)"
+          # (its last moment, taking its own .exe and the folder away, comes just after it exits)
+          $until = (Get-Date).AddSeconds(30)
+          while ((Test-Path $dir) -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 500 }
+          if (Test-Path $dir) { Get-ChildItem -Recurse $dir | ForEach-Object { Write-Host "left: $($_.FullName)" }; Fail "$dir is still there after Simpl uninstalled itself" }
+          if (Test-Path $startMenu) { Fail "the Start menu shortcut is still there after Simpl uninstalled itself" }
+          if (Test-Path $entry) { Fail "Simpl is still in Settings > Apps after it uninstalled itself" }
+          if (-not (Test-Path $kept)) { Fail "Simpl's own uninstall took what Simpl keeps ($data), though it was to keep it" }
+          # (Simpl quits by itself as it starts the uninstaller; the uninstaller asking it to, as it asks a Simpl left in
+          #  the notification area, is said -- not failed: the two may cross)
+          if (Has (Join-Path $data 'simpl.log') 'quit: asked by Simpl') { Write-Host "::warning::the uninstaller Simpl started had to ask Simpl to quit" }
+          Keep-Logs
+          Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue
+          Write-Host "Uninstall Simpl, from Simpl itself: it quit, its uninstaller took the program, its shortcut and its entry away, and what Simpl keeps was kept"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

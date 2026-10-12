@@ -147,6 +147,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private void Begin()
     {
         Shot.ArmIfAsked();
+        Uninstall.IfAsked();
         if (Launch.DevBaseUrl is { } dev) { Open(dev.Host); return; }
         if (Prefs.String("school") is { Length: > 0 } school) { Open(school); return; }
         ShowPicker();
