@@ -119,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       # (the mock Canvas is all the pictures take from the repository; Node is on the image)
       - uses: actions/checkout@v4
@@ -138,20 +138,21 @@ jobs:
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
           # (a second one that asks for a sign-in first: the sign-in pictures)
           node scripts/dev/mock-canvas.mjs 8802 8803 --login > mock-login.log 2>&1 &
-          sleep 3
+          # (up when it answers — a cold runner's Node may take a few seconds — not after a set time)
+          for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8802/login/canvas && break; sleep 0.5; done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
           curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
       - name: Pictures
         shell: pwsh
         env:
           SHARD: ${{ matrix.shard }}
-          SHARDS: 6
+          SHARDS: 8
         run: |
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
           New-Item -ItemType Directory -Force shots | Out-Null
           # (three at a time, each with a profile of its own: each copy of Simpl pictures its own window, then quits)
           $script:running = @()
-          # (this job's share of the pictures: every SHARDS-th, from SHARD — six jobs at once, each three at a time)
+          # (this job's share of the pictures: every SHARDS-th, from SHARD — eight jobs at once, each three at a time)
           $shard = [int]$env:SHARD; $shards = [int]$env:SHARDS
           $script:k = -1; $script:mine = @()
           function Shot($name, $size, $wait, $extra) {
@@ -402,7 +403,8 @@ jobs:
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
           # (a second one that asks for a sign-in first: the sign-in pictures)
           node scripts/dev/mock-canvas.mjs 8802 8803 --login > mock-login.log 2>&1 &
-          sleep 3
+          # (up when it answers — a cold runner's Node may take a few seconds — not after a set time)
+          for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8802/login/canvas && break; sleep 0.5; done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
           curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
       - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled, uninstalled from Simpl)
