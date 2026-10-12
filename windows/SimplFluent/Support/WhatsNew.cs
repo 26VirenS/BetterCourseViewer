@@ -26,6 +26,11 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.6", "2026-10-12",
+            ("improved", "A quicker start", "Your Dashboard from last time shows at once while Simpl connects."),
+            ("improved", "Smoother switching", "The sidebar and header stay put, and a page is drawn again only when it changed."),
+            ("improved", "Easier on slower PCs", "Without a graphics card (a virtual machine, a remote session), Simpl drops shadows, motion and Mica to keep up."),
+            ("improved", "Quieter saving", "Moving or sizing the window no longer writes to disk as it goes.")),
         R("0.2.5", "2026-10-12",
             ("fixed", "No strip behind the What-If bar", "The page runs under it now, all the way to the window's edge."),
             ("improved", "Pages scroll to the edge", "Every page, Settings and To Do scroll right to the bottom of the window.")),
