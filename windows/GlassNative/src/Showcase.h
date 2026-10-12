@@ -471,7 +471,7 @@ struct Showcase {
             bubbleX.To(std::clamp(bubbleX.value + Spring::Project(vx), 10.0f, W - d - 10), vx);
             bubbleY.To(std::clamp(bubbleY.value + Spring::Project(vy), 10.0f, H - d - 10), vy);
         }
-        Lens(r, d / 2, 1, KindBubble);
+        lenses.push_back({ r, d / 2, { 0, 0, 0, 0 }, 1, KindBubble, 1, 0 }); // (a circle stays a circle, whatever the corners)
     }
 
     // ---- drawing a frame ----
