@@ -20,6 +20,8 @@ public sealed class LoginLayer
     private bool formUp, autoDone;
     private double formShownAt, workingSince = -1, shakeAt = -100;
     private string? shownError;
+    /// <summary>"Change school…" on the card: the school forgotten, the picker again (the Mac's is in Settings; Windows has no Settings yet).</summary>
+    public Action? ChangeSchool;
 
     /// <summary>The Mac's large control size, as pictured: its fields 22 tall (12 apart), its buttons 30.</summary>
     private const float FieldH = 22, FieldGap = 12, ButtonH = 30;
@@ -84,7 +86,8 @@ public sealed class LoginLayer
         var note = error ?? "These go into your school’s own sign-in page. After you sign in, you can choose to stay logged in.";
         var noteH = ui.Measure(note, Theme.Callout, inner, 0).Y;
         const float headerH = 40 + 8 + 27 + 8 + 17, fieldsH = FieldH + FieldGap + FieldH, buttonsH = ButtonH + 10 + 16;
-        var cardH = pad + headerH + gap + fieldsH + gap + noteH + gap + buttonsH + pad;
+        var schoolH = ChangeSchool != null ? 8 + 15 : 0; // (the way to another school, under the link to the website)
+        var cardH = pad + headerH + gap + fieldsH + gap + noteH + gap + buttonsH + schoolH + pad;
         var card = new R(MathF.Round((ui.W - cardW) / 2), MathF.Round(TitleBar + (ui.H - TitleBar - cardH) / 2), cardW, cardH);
         ui.Glass(card, 20, GlassKind.Panel, null, 0, Ui.Shadow.Panel); // (the Mac's card: a shade lighter than the page by day, darker by night, under a soft, wide shadow)
         var x = card.X + pad;
@@ -121,6 +124,13 @@ public sealed class LoginLayer
         const string link = "Use the website instead";
         var lw = ui.Measure(link, Theme.Subheadline).X;
         if (ui.LinkButton("login:web", card.CenterX - lw / 2, y, link, Theme.Subheadline)) assist.UseWebsite();
+        if (ChangeSchool != null)
+        {
+            y += 16 + 8;
+            const string other = "Not your school? Change school…";
+            var ow = ui.Measure(other, Theme.Caption).X;
+            if (ui.LinkButton("login:school", card.CenterX - ow / 2, y, other, Theme.Caption)) ChangeSchool();
+        }
 
         AutoSignIn(ui);
     }

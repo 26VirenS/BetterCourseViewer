@@ -106,7 +106,7 @@ public sealed class MainWindow : Window
         engine = new Engine.Engine(schoolHost);
         root.Children.Insert(0, engine.Web);
         view = new AppView(engine, host);
-        login = new LoginLayer(engine);
+        login = new LoginLayer(engine) { ChangeSchool = ChangeSchool };
         overlay = new LoginOverlay(this, engine);
         engine.PropertyChanged += (_, e) =>
         {
@@ -122,6 +122,25 @@ public sealed class MainWindow : Window
         engine.Web.CoreWebView2InitializationCompleted += (_, _) => Phased();
         Phased();
         engine.Start();
+    }
+
+    /// <summary>Another school (the card's "Change school…"): this one forgotten, its engine let go, the picker again.</summary>
+    private void ChangeSchool()
+    {
+        if (engine == null) return;
+        Prefs.Remove("school");
+        var old = engine;
+        engine = null;
+        view = null;
+        login = null;
+        overlay?.Close();
+        overlay = null;
+        root.Children.Remove(old.Web);
+        try { old.Web.Dispose(); } catch { }
+        picker = new SchoolPicker(host, Open);
+        host.Visibility = Visibility.Visible;
+        host.BringToTop();
+        host.Invalidate();
     }
 
     private void Phased()
