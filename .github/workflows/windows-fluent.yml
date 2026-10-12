@@ -173,6 +173,13 @@ jobs:
           Shot 'pin-ptable' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'ptable', '--pin-open', 'ptable', '--ptable-pin-element', '25'))
           Shot 'lewis-sheet' '1366x778' 45 ($mock + @('--appearance', 'dark', '--lewis', 'Benzene'))
           Shot 'molecule-sheet' '1024x681' 45 ($mock + @('--appearance', 'light', '--molecule', 'CH4'))
+          Shot 'tool-convert' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'conv', '--tool-file', 'sample'))
+          Shot 'tool-split' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'pdfx', '--tool-file', 'sample'))
+          Shot 'tool-merge' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'pdfx', '--tool-file', 'sample|sample'))
+          Shot 'tool-annotate' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'mark', '--tool-file', 'sample', '--mark-demo'))
+          Shot 'tool-ocr' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ocr', '--tool-file', 'sample'))
+          Shot 'tool-graph' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'graph'))
+          Shot 'pin-graph' '1366x778' 50 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-open', 'graph'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
           # an assignment: a quiz taken, work handed in late, its feedback, Hand In, the rubric
           Shot 'assignment-quiz' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))

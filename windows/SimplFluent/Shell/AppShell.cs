@@ -421,6 +421,7 @@ public sealed class AppShell : Grid, IDisposable
         if (sheetOpen == open) return;
         sheetOpen = open;
         WebScreen.SheetOver(open);
+        Simpl.Tools.GraphWeb.Cover(open);
     }
 
     // ---- narrow: the pane over the page ----
@@ -479,6 +480,7 @@ public sealed class AppShell : Grid, IDisposable
         paneHolder.Effect = K.Shadow(32, 0, 0.28);
         scrim.Visibility = Visibility.Visible;
         WebScreen.SheetOver(true);
+        Simpl.Tools.GraphWeb.Cover(true);
         var t = new TranslateTransform(-PaneWidth, 0);
         paneHolder.RenderTransform = t;
         Motion.FromTo(t, TranslateTransform.XProperty, -PaneWidth, 0, Motion.Medium, Motion.Decelerate);
@@ -490,6 +492,7 @@ public sealed class AppShell : Grid, IDisposable
         paneOpen = false;
         scrim.Visibility = Visibility.Collapsed;
         WebScreen.SheetOver(sheetOpen);
+        Simpl.Tools.GraphWeb.Cover(sheetOpen);
         if (paneHolder.RenderTransform is TranslateTransform t)
             Motion.FromTo(t, TranslateTransform.XProperty, 0, -PaneWidth, Motion.Normal, Motion.Accelerate, 0, () => { if (!paneOpen && narrow) paneHolder.Visibility = Visibility.Collapsed; });
         else paneHolder.Visibility = Visibility.Collapsed;
