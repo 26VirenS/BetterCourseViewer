@@ -202,6 +202,6 @@ internal sealed class MoleculeBuilderView : Grid
             }
             facts.Children.Add(ChemKit.Card(v));
         }
-        facts.Children.Add(ChemKit.Caption("Lone pairs are modelled as points of their own that push on the bonds, so water bends and ammonia forms a pyramid. Bond angles are the model's, near the real ones."));
+        facts.Children.Add(ChemKit.Caption("Each atom's bonds and lone pairs are set out as VSEPR has them, lone pairs squeezing the bonds a little, so water bends and ammonia forms a pyramid. Bond angles are the model's, near the real ones."));
     }
 }

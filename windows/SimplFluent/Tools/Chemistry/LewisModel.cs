@@ -739,7 +739,7 @@ internal static class LGeometry
     private static readonly Dictionary<string, double> Dipoles = new();
 
     /// <summary>
-    /// The molecule built in 3D (MoleculeModel's VSEPR forces), for its polarity — once for each molecule and structure,
+    /// The molecule built in 3D (MoleculeModel's VSEPR layout), for its polarity — once for each molecule and structure,
     /// not every time the builder draws.
     /// </summary>
     public static double Dipole(LGraph g, LStructure s)

@@ -6,8 +6,8 @@ namespace Simpl.Tools;
 
 // The 3D molecule builder's model (the Mac's MoleculeBuilder.swift, its MoleculeModel): atoms added to the one selected
 // with a single, double or triple bond, hydrogens filled in, presets, and a molecule from the Lewis maker — shaped as
-// VSEPR has it: each atom's bonds and lone pairs (modelled as points of their own) pushing apart while the bonds keep
-// their lengths, so water bends, ammonia forms a pyramid and methane a tetrahedron.
+// VSEPR has it: each atom's bonds and lone pairs set out in the directions their number gives (MoleculeShape.cs), so
+// water bends, ammonia forms a pyramid, methane a tetrahedron and carbon dioxide a line.
 
 internal sealed class MBAtom
 {
@@ -411,7 +411,7 @@ internal sealed class MoleculeModel
         }
         if (name != "Benzene" && name != "Sulfur hexafluoride" && name != "Carbon dioxide") FillHydrogenQuietly();
         selected = Atoms.FirstOrDefault()?.Id;
-        Relax(900);
+        Relax(keep: false);
         Framing++;
         Notify();
     }
@@ -439,7 +439,7 @@ internal sealed class MoleculeModel
             nextId++;
         }
         selected = Atoms.FirstOrDefault()?.Id;
-        Relax(900);
+        Relax();
         Framing++;
         Notify();
     }
@@ -474,7 +474,7 @@ internal sealed class MoleculeModel
             // (hydrogens only on an element the builder knows the bonds of: a metal or a noble gas stays alone)
             if (MBChem.Allowed.ContainsKey(e.Symbol)) FillHydrogenQuietly();
             selected = Atoms[0].Id;
-            Relax(900);
+            Relax(keep: false);
             Notify();
             return true;
         }
@@ -486,127 +486,35 @@ internal sealed class MoleculeModel
     private static double BondFactor(int order) => order >= 3 ? 0.78 : (order == 2 ? 0.87 : 1);
 
     /// <summary>
-    /// VSEPR by forces: bonds springs at their lengths; round each atom, its bonds and lone pairs pushing apart (lone pairs
-    /// harder); atoms not bonded kept from crowding. The lone pairs are kept for drawing.
+    /// VSEPR, laid out (<see cref="Vsepr.Layout"/>, MoleculeShape.cs; the Mac's 1.3.74): round each atom its bonds and
+    /// lone pairs take the directions their number gives, the molecule grown out from its first atom. With
+    /// <paramref name="keep"/>, it is turned to lie as close to where its atoms were as it can, so a molecule being built
+    /// stays put and one from the Lewis maker faces as it was drawn. The lone pairs are kept for drawing (and the dipole).
     /// </summary>
-    public void Relax(int iterations = 500)
+    public void Relax(bool keep = true)
     {
         var n = Atoms.Count;
         if (n == 0) { LonePairs = new(); return; }
-        var p = Atoms.Select(a => a.Pos).ToArray();
         var index = new Dictionary<int, int>();
         for (var i = 0; i < n; i++) index[Atoms[i].Id] = i;
-        var lp = new List<MBLonePair>();
-        foreach (var a in Atoms)
-        {
-            var k = LonePairCount(a);
-            for (var j = 0; j < k; j++)
-            {
-                double t = a.Id * 7 + j * 3;
-                var d = Unit(new Vector3D(Math.Sin(t), Math.Cos(t * 1.3), Math.Sin(t * 0.7) + 0.3));
-                lp.Add(new MBLonePair { Atom = a.Id, Pos = a.Pos + d * 0.55 });
-            }
-        }
-        var q = lp.Select(x => x.Pos).ToArray();
-        var lpOf = new Dictionary<int, List<int>>();
-        for (var k = 0; k < lp.Count; k++)
-        {
-            if (!lpOf.TryGetValue(lp[k].Atom, out var l)) lpOf[lp[k].Atom] = l = new List<int>();
-            l.Add(k);
-        }
-        var pairs = new List<(int I, int J, double Target)>();
+        var links = new List<(int A, int B, double Length)>();
         foreach (var b in Bonds)
         {
             if (!index.TryGetValue(b.A, out var i) || !index.TryGetValue(b.B, out var j)) continue;
-            pairs.Add((i, j, (MBChem.Covalent(Atoms[i].Symbol) + MBChem.Covalent(Atoms[j].Symbol)) * BondFactor(b.Order)));
+            links.Add((i, j, (MBChem.Covalent(Atoms[i].Symbol) + MBChem.Covalent(Atoms[j].Symbol)) * BondFactor(b.Order)));
         }
-        var bonded = new HashSet<int>();
-        var neighbours = Enumerable.Range(0, n).Select(_ => new List<int>()).ToArray();
-        foreach (var (i, j, _) in pairs)
-        {
-            bonded.Add(i * 10000 + j);
-            bonded.Add(j * 10000 + i);
-            if (!neighbours[i].Contains(j)) neighbours[i].Add(j);
-            if (!neighbours[j].Contains(i)) neighbours[j].Add(i);
-        }
-        var f = new Vector3D[n];
-        var g = new Vector3D[q.Length];
-        for (var step = 0; step < iterations; step++)
-        {
-            Array.Clear(f);
-            Array.Clear(g);
-            foreach (var (i, j, target) in pairs)
-            {
-                var d = p[j] - p[i];
-                var len = Math.Max(d.Length, 1e-6);
-                var force = d / len * (len - target) * 0.8;
-                f[i] += force;
-                f[j] -= force;
-            }
-            for (var k = 0; k < q.Length; k++)
-            {
-                if (!index.TryGetValue(lp[k].Atom, out var a)) continue;
-                var d = q[k] - p[a];
-                var len = Math.Max(d.Length, 1e-6);
-                var force = d / len * (len - 0.55) * 0.9;
-                g[k] -= force;
-                f[a] += force;
-            }
-            // (round each atom: its domains — bonded atoms and lone pairs — as directions, pushed apart)
-            for (var c = 0; c < n; c++)
-            {
-                var dirs = neighbours[c].Select(x => (Dir: p[x] - p[c], Lone: false, Index: x)).ToList();
-                if (lpOf.TryGetValue(Atoms[c].Id, out var mine)) foreach (var k in mine) dirs.Add((q[k] - p[c], true, k));
-                if (dirs.Count <= 1) continue;
-                var units = dirs.Select(x => Unit(x.Dir + new Vector3D(1e-9, 0, 0))).ToArray();
-                for (var x = 0; x < dirs.Count; x++)
-                {
-                    for (var y = x + 1; y < dirs.Count; y++)
-                    {
-                        var diff = units[x] - units[y];
-                        var weight = (dirs[x].Lone ? 1.25 : 1) * (dirs[y].Lone ? 1.25 : 1);
-                        var push = diff / (diff.LengthSquared + 0.05) * 0.22 * weight;
-                        if (dirs[x].Lone) g[dirs[x].Index] += push * 0.55; else f[dirs[x].Index] += push * dirs[x].Dir.Length;
-                        if (dirs[y].Lone) g[dirs[y].Index] -= push * 0.55; else f[dirs[y].Index] -= push * dirs[y].Dir.Length;
-                    }
-                }
-            }
-            // (atoms not bonded kept apart)
-            for (var i = 0; i < n; i++)
-            {
-                for (var j = i + 1; j < n; j++)
-                {
-                    if (bonded.Contains(i * 10000 + j)) continue;
-                    var d = p[j] - p[i];
-                    var len = Math.Max(d.Length, 0.3);
-                    if (len < 3.2)
-                    {
-                        var force = d / len * (0.25 / (len * len));
-                        f[i] -= force;
-                        f[j] += force;
-                    }
-                }
-            }
-            var rate = step < iterations / 2 ? 0.08 : 0.04;
-            for (var i = 0; i < n; i++)
-            {
-                var m = f[i] * rate;
-                if (m.Length > 0.2) m = Unit(m) * 0.2;
-                p[i] += m;
-            }
-            for (var k = 0; k < q.Length; k++)
-            {
-                var m = g[k] * rate;
-                if (m.Length > 0.2) m = Unit(m) * 0.2;
-                q[k] += m;
-            }
-        }
+        var shape = Vsepr.Layout(Atoms.Select(LonePairCount).ToArray(), Atoms.Select(a => (a.Lone ?? 0) % 2).ToArray(), links,
+                                 Atoms.Select(a => a.Pos).ToArray(), keep);
         // (centred on the middle)
         var centre = new Vector3D();
-        foreach (var x in p) centre += x;
+        foreach (var x in shape.Positions) centre += x;
         centre /= n;
-        for (var i = 0; i < n; i++) Atoms[i].Pos = p[i] - centre;
-        for (var k = 0; k < lp.Count; k++) lp[k].Pos = q[k] - centre;
+        var lp = new List<MBLonePair>();
+        for (var i = 0; i < n; i++)
+        {
+            Atoms[i].Pos = shape.Positions[i] - centre;
+            foreach (var d in shape.LonePairs[i]) lp.Add(new MBLonePair { Atom = Atoms[i].Id, Pos = Atoms[i].Pos + d * 0.55 });
+        }
         LonePairs = lp;
     }
 }
