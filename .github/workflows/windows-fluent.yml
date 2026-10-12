@@ -8,7 +8,8 @@
 # real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
 # feeds are not touched.
 # Built once (the installer and the zip a release carries); then, at the same time, the pictures in four parts and the
-# installer tried; a release publishes that one build (windows-fluent-ship.yml publishes a green run's, by hand).
+# installer tried; a release publishes that one build (windows-fluent-ship.yml publishes a green run's, by hand). Beside
+# them, the performance walk, which only reports: no release waits for it.
 name: Windows app (Windows 11 look)
 
 on:
@@ -344,6 +345,130 @@ jobs:
           name: windows-fluent-part-${{ matrix.shard }}
           path: shots
 
+  # (how quickly Simpl starts and moves about, walked against the mock — Support/PerfWalk.cs: a fresh profile, cold,
+  #  then the same one again, warm — and compared with the last green run's; it only reports: a slower number never
+  #  fails the run, and nothing waits for it but the pictures' merge)
+  perf:
+    name: Performance walk
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    permissions:
+      contents: read
+      actions: read # (the last green run's walk, to compare with)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/dev
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: dist
+      - name: The build
+        shell: bash
+        run: (cd dist && 7z x -y Simpl-Windows-x64.zip >/dev/null) && test -f dist/Simpl/Simpl.exe && ls dist
+      - name: Mock Canvas
+        shell: bash
+        run: |
+          node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && break; sleep 0.5; done
+          curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+      - name: The last green run's walk
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # (the newest green push run of this branch that kept a walk: its numbers are the "before")
+          mkdir -p prev
+          gh run list -R "$GITHUB_REPOSITORY" --workflow windows-fluent.yml --branch "$BRANCH" --event push --status success -L 5 \
+            --json databaseId,number,headSha --jq '.[] | "\(.databaseId) \(.number) \(.headSha)"' > runs.txt 2>/dev/null || true
+          while read -r id number sha; do
+            [ -n "$id" ] || continue
+            if gh run download "$id" -R "$GITHUB_REPOSITORY" -n windows-fluent-perf -D prev >/dev/null 2>&1 && [ -f prev/perf-warm.json ]; then
+              echo "run #$number (${sha:0:7})" > prev/from.txt
+              break
+            fi
+            rm -rf prev && mkdir -p prev
+          done < runs.txt
+          if [ -f prev/from.txt ]; then echo "comparing with $(cat prev/from.txt)"; else echo "no earlier walk to compare with"; fi
+      - name: Walk (cold, then warm)
+        shell: pwsh
+        run: |
+          try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
+          # (Windows Server leaves its animation effects off; a student's PC has them on, and Simpl's motion follows them)
+          try {
+            Add-Type -Namespace SimplPerf -Name Spi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SystemParametersInfo(uint action, uint param, IntPtr value, uint flags);'
+            Write-Host "animation effects on: $([SimplPerf.Spi]::SystemParametersInfo(0x1043, 0, [IntPtr]1, 3))"
+          } catch { Write-Host "animation effects left as they are: $_" }
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $prof = Join-Path $env:RUNNER_TEMP 'profile-perf'
+          $mock = @('--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light')
+          $fence = '```'
+          foreach ($run in @('cold', 'warm')) {
+            # (one profile for both: the second opens on what the first kept; no --window-size, so where the window
+            #  is, and the prefs that keep it, are walked too)
+            $argList = $mock + @('--profile', $prof, '--perf-walk', "$PWD/shots", '--perf-name', $run, '--perf-course', '101', '--perf-assignment', '1001')
+            $began = Get-Date
+            $p = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            if (-not $p.WaitForExit(180000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; Write-Host "::warning::the $run walk was still going after three minutes: stopped" }
+            Write-Host "$run walk: $([math]::Round(((Get-Date) - $began).TotalSeconds)) s"
+            $txt = "shots/perf-$run.txt"
+            if (Test-Path $txt) {
+              Get-Content $txt | Write-Host
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Performance walk: $run", '', $fence, (Get-Content $txt -Raw), $fence, ''
+            } else { Write-Host "::warning::the $run walk wrote no perf-$run.txt" }
+            Start-Sleep -Seconds 3   # (its web view's helper processes end a moment after it)
+          }
+          $log = Join-Path $prof 'simpl.log'
+          if (Test-Path $log) { Copy-Item $log shots/profile-perf.log }
+          Get-ChildItem shots
+      - name: Against the last green run
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ ! -f prev/from.txt ]; then echo "no earlier walk to compare with"; exit 0; fi
+          node - "$(cat prev/from.txt)" <<'EOF'
+          // (each walk against the same walk of the last green run: every point of the start, every step's ui and data)
+          const fs = require('fs');
+          const from = process.argv[2] || 'the last green run';
+          const read = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
+          const n = v => v == null ? '—' : String(Math.round(v));
+          const change = (b, a) => b == null || a == null || b <= 0 ? '—' : `${a >= b ? '+' : '-'}${Math.abs(Math.round((a - b) / b * 100))}%`;
+          const out = [];
+          for (const run of ['cold', 'warm']) {
+            const before = read(`prev/perf-${run}.json`), after = read(`shots/perf-${run}.json`);
+            if (!before || !after) { out.push(`${run}: nothing to compare (${after ? 'no earlier walk' : 'no walk this time'})`, ''); continue; }
+            const rows = Object.entries(after.start || {}).map(([k, v]) => [`start ${k}`, before.start?.[k], v]);
+            for (const s of after.steps || []) {
+              const b = (before.steps || []).find(x => x.name === s.name) || {};
+              rows.push([`${s.name} ui`, b.ui, s.ui]);
+              if (s.data != null || b.data != null) rows.push([`${s.name} data`, b.data, s.data]);
+            }
+            const unfinished = [before.complete === false && 'that walk did not finish', after.complete === false && 'this one did not finish'].filter(Boolean);
+            out.push(`${run}, ms, against ${from}${unfinished.length ? ` (${unfinished.join('; ')})` : ''}`);
+            out.push(`${''.padEnd(28)} ${'before'.padStart(8)} ${'after'.padStart(8)} ${'change'.padStart(8)}`);
+            for (const [name, b, a] of rows) out.push(`${name.padEnd(28)} ${n(b).padStart(8)} ${n(a).padStart(8)} ${change(b, a).padStart(8)}`);
+            out.push('');
+          }
+          console.log(out.join('\n'));
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Performance walk, against ${from}\n\n\`\`\`\n${out.join('\n')}\n\`\`\`\n`);
+          EOF
+      # (the walk alone, for the next run to compare with; and with the pictures, its profile's log too)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-fluent-perf
+          path: shots/perf-*
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-fluent-part-perf
+          path: shots
+
   installer:
     name: Installer, made and tried
     needs: build
@@ -627,7 +752,7 @@ jobs:
 
   shots:
     name: The pictures, together
-    needs: [build, pictures, installer]
+    needs: [build, pictures, installer, perf]
     if: ${{ always() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
