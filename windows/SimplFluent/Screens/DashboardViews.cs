@@ -4,6 +4,7 @@ using System.Windows.Media;
 using Simpl.Engine;
 using Simpl.Kit;
 using Simpl.Models;
+using Simpl.Support;
 using Wpf.Ui.Controls;
 using TextBlock = System.Windows.Controls.TextBlock;
 
@@ -11,6 +12,8 @@ namespace Simpl.Screens;
 
 public sealed partial class DashboardScreen
 {
+    private static bool previewShot;
+
     private FrameworkElement Main(Today d, double w) => View switch
     {
         0 => CoursesSection(w),
@@ -91,6 +94,12 @@ public sealed partial class DashboardScreen
         // (a click: its quick look, grown out of the row; a double-click: the work whole)
         var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
         b.Click += (_, _) => WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b);
+        // (the screenshot suite: --open preview opens the first row's quick look once it is on screen)
+        if (!previewShot && Launch.Get("open") == "preview")
+        {
+            previewShot = true;
+            b.Loaded += async (_, _) => { await Task.Delay(1500); WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b); };
+        }
         return b;
     }
 

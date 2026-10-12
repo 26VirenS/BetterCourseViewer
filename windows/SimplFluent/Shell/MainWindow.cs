@@ -37,6 +37,10 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private readonly ContentControl trailing = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly HandoffBar handoff;
     private Tray? tray;
+    private TourOverlay? tour;
+
+    /// <summary>The account menu's Take the tour.</summary>
+    public void StartTour() => tour?.Start();
 
     private Engine.Engine? engine;
     private AppShell? shell;
@@ -189,6 +193,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         Notices.Stop();
         shell?.Dispose();
         shell = null;
+        if (tour != null) { root.Children.Remove(tour); tour = null; }
         card = null;
         working = null;
         pageArea.Children.Remove(old.Web);
@@ -244,7 +249,15 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         {
             card = null;
             working = null;
-            if (shell == null) { shell = new AppShell(engine, this); Notices.Start(engine, this); }
+            if (shell == null)
+            {
+                shell = new AppShell(engine, this);
+                Notices.Start(engine, this);
+                tour = new TourOverlay(engine, this);
+                Grid.SetRow(tour, 1);
+                root.Children.Insert(root.Children.IndexOf(sheets), tour);
+                tour.AutoStart();
+            }
             shell.WindowWidth(ActualWidth);
             SetCover(shell);
             pageArea.Visibility = Visibility.Collapsed;

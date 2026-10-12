@@ -27,6 +27,9 @@ public sealed class NavEntry
     /// <summary>A heading over entries (Courses, Groups), not a place.</summary>
     public bool Header;
     public bool Separator;
+    /// <summary>The tour's name for this row, if it lights it.</summary>
+    public TourSpot? Spot;
+    public Action? Hover;
 }
 
 /// <summary>
@@ -75,6 +78,8 @@ public sealed class NavList : Grid
         }
         var row = Row(e, depth);
         rows[e.Key] = row;
+        if (e.Spot is { } spot) row.Mark(spot);
+        if (e.Hover is { } hover) row.MouseEnter += (_, _) => hover();
         items.Children.Add(row);
         if (e.Expanded && e.Children != null)
             foreach (var c in e.Children) Add(c, depth + 1);

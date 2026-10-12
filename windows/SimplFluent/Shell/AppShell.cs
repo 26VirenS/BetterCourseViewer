@@ -90,6 +90,8 @@ public sealed class AppShell : Grid, IDisposable
         pane.Children.Add(navScroll.Row(2));
         pane.Children.Add(settingsRow.Row(3));
         paneHolder.Child = new Grid { Children = { paneScene, pane } };
+        pane.Mark(TourSpot.Pane);
+        searchBox.Mark(TourSpot.Search);
         Children.Add(paneHolder.Col(0));
 
         // ---- the page: its header, then the screen ----
@@ -179,13 +181,13 @@ public sealed class AppShell : Grid, IDisposable
         var snap = engine.Snapshot;
         var list = new List<NavEntry>
         {
-            new() { Key = "dashboard", Title = "Dashboard", Icon = SymbolRegular.Home24, Tint = Blue, Go = () => GoPlace(Place.Dashboard) },
+            new() { Key = "dashboard", Title = "Dashboard", Icon = SymbolRegular.Home24, Tint = Blue, Go = () => GoPlace(Place.Dashboard), Spot = TourSpot.DashboardRow },
             new() { Key = "todo", Title = "To Do", Icon = SymbolRegular.TaskListLtr24, Tint = Green, Go = () => GoPlace(Place.Todo) },
             new() { Key = "calendar", Title = "Calendar", Icon = SymbolRegular.CalendarLtr24, Tint = Red, Go = () => GoPlace(Place.Calendar) },
-            new() { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades) },
+            new() { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades), Spot = TourSpot.GradesRow },
             new() { Key = "notifications", Title = "Notifications", Icon = SymbolRegular.Alert24, Tint = Orange, Badge = snap?.NotifUnread ?? 0, Go = () => GoPlace(Place.Notifications) },
             new() { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = snap?.InboxUnread ?? 0, Go = () => GoPlace(Place.Inbox) },
-            new() { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools) },
+            new() { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools), Spot = TourSpot.ToolsRow },
         };
         var courses = engine.Courses;
         if (courses.Count > 0)
@@ -201,6 +203,8 @@ public sealed class AppShell : Grid, IDisposable
                     Go = () => { expanded.Add(ctx); GoPlace(Place.Home(ctx)); },
                     Expanded = expanded.Contains(ctx),
                     Toggle = open => { if (open) { expanded.Add(ctx); _ = engine.LoadSections(ctx); } else expanded.Remove(ctx); BuildPane(); },
+                    Spot = c == courses[0] ? TourSpot.FirstCourse : null,
+                    Hover = () => Tour.Did(TourEvent.CourseHover),
                 };
                 if (engine.Sections.TryGetValue(ctx, out var secs))
                     entry.Children = secs.Where(s => s.Kind != "home").Select(s => new NavEntry
@@ -265,6 +269,7 @@ public sealed class AppShell : Grid, IDisposable
         tile.ToolTip = "Your account";
         System.Windows.Automation.AutomationProperties.SetName(tile, $"{name}, account menu");
         accountTile = tile;
+        tile.Mark(TourSpot.Account);
         return tile;
     }
 
@@ -283,6 +288,7 @@ public sealed class AppShell : Grid, IDisposable
         }
         menu.Items.Add(Item("Settings…", SymbolRegular.Settings24, window.OpenSettings));
         menu.Items.Add(Item("What’s New", SymbolRegular.Sparkle24, () => engine.ShowWhatsNew(WhatsNew.All)));
+        menu.Items.Add(Item("Take the tour", SymbolRegular.Map24, window.StartTour));
         menu.Items.Add(Item($"{engine.LmsName} Profile", SymbolRegular.Person24, () => engine.OpenWebScreen("/profile", "Profile")));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Report a Bug…", SymbolRegular.Bug24, () => Engine.Engine.OpenExternally(new Uri("https://simplcourses.com/report/"))));

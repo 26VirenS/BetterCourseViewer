@@ -63,10 +63,10 @@ public static class Appearance
     }
 
     /// <summary>The theme worn, by name ("Default" when none).</summary>
-    public static string ThemeName => Prefs.String("theme") ?? "Default";
+    public static string ThemeName => Launch.Get("theme") ?? Prefs.String("theme") ?? "Default";
 
     /// <summary>The accent's hex, or null for Windows' own accent colour.</summary>
-    public static string? AccentHex => Prefs.String("accent");
+    public static string? AccentHex => Launch.Get("theme") is { } t ? ReadyThemes.FirstOrDefault(r => r.Name == t).Accent : Prefs.String("accent");
 
     public static void Wear(Ready r)
     {

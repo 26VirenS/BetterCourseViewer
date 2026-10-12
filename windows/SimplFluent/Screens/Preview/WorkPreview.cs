@@ -115,6 +115,7 @@ public static class WorkPreview
             Effect = K.Shadow(36, 12, 0.24), SnapsToDevicePixels = true,
         };
         card.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+        Shell.Tour.Mark(card, Shell.TourSpot.Preview);
         card.MouseDown += (_, e) => e.Handled = true;
         host.Children.Add(card);
         face.Resized += hh =>

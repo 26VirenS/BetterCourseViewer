@@ -98,6 +98,10 @@ jobs:
           Shot 'account-menu' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'menu'))
           Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
           Shot 'setup' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'setup'))
+          Shot 'preview' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'preview'))
+          Shot 'tour-start' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'tour'))
+          Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:12'))
+          Shot 'theme-dusk' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme', 'Dusk'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'appearance', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))

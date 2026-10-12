@@ -190,6 +190,7 @@ public sealed partial class DashboardScreen : Screen
             Grid.SetRow(tile, (k / cols) * 2);
             grid.Children.Add(tile);
             tiles[c.Key] = tile;
+            if (c.Key == "next") Shell.Tour.Mark(tile, Shell.TourSpot.CounterNext);
             if (openKey == c.Key) tile.Opacity = 0;
         }
         return grid;
@@ -257,6 +258,7 @@ public sealed partial class DashboardScreen : Screen
         openKey = key;
         if (key != null)
         {
+            Shell.Tour.Did(Shell.TourEvent.CounterOpened);
             sheet.Ensure(engine, "todaySheet", new { key });
             ShowPanel(animate: true);
         }
@@ -312,6 +314,7 @@ public sealed partial class DashboardScreen : Screen
             Effect = K.Shadow(32, 10, 0.22), SnapsToDevicePixels = true,
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+        Shell.Tour.Mark(frame, Shell.TourSpot.CounterPanel);
         overlay.Children.Add(frame);
         if (tiles.TryGetValue(key, out var t)) t.Opacity = 0;
         if (!animate || !Motion.On)
