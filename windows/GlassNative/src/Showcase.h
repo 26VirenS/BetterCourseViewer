@@ -2,33 +2,37 @@
 // The showcase: Simpl's Dashboard as the backdrop, and over it glass as Simpl for Windows will draw it — the Mac's
 // "Unread announcements" popover, a toolbar with the Dashboard's Cards · List · Activity, a tab bar, switches and a
 // slider whose knobs turn into lenses while held, buttons, a card of clear glass and a glass bubble to drag (the bubble
-// to fling), and Tune (the glass and the backdrop, live). Built afresh each frame (immediate mode), then drawn in layers:
-//   1. the backdrop (Direct2D) → the frame, and the frost's small copies;
-//   2. the panels' frosted glass (AuroraGlass: one frost a frame, each shape composited on the GPU);
-//   3. what is on the panels: their tint and rim of light, words, icons, tracks (Direct2D);
-//   4. the lenses — knobs, thumbs, the bubble — refracting the frame so far (AuroraGlass, no frost);
+// to fling), and Tune (the glass, its corners and the backdrop, live). Built afresh each frame (immediate mode), then
+// drawn in layers:
+//   1. the backdrop (Direct2D) → the frame, and its frost (Glass.h: a quarter-size copy, a Gaussian blur);
+//   2. the panels' glass — frost, bent edges, tone, rim, shadow — each shape on the GPU (Glass.h);
+//   3. what is on the panels: words, icons, tracks (Direct2D);
+//   4. the lenses — knobs, thumbs, the bubble, the clear card — refracting the frame so far (Glass.h, no frost);
 //   5. what is on the lenses (Direct2D).
+// Corners: rounded, or squircles (continuous corners, as the Mac's) — the glass and every shape Direct2D draws alike.
 #include "Gfx.h"
 #include "Scene.h"
 #include "Spring.h"
-#include "core/glass_surface.h"
-#include "core/glass_material.h"
+#include "Glass.h"
 #include <functional>
 #include <vector>
 #include <string>
 #include <unordered_map>
 
-using namespace AuroraGlass;
-
 struct Showcase {
     Gfx& g;
     Scene scene;
-    GlassSurface frost, lens;
+    Glass glass;
     bool ready = false;
 
-    // the glass, as Tune sets it
-    float frostLevel = 0.62f;   // 0..1 → clear glass (0) … a full-size frost (0.2) … a frost of a copy 1/32 the size (1)
-    float refraction = 0.5f, dispersion = 0.25f, thickness = 0.55f, saturation = 1.45f, tintAmount = 0.42f, rim = 0.45f;
+    // the glass, as Tune sets it (DIPs where a length) — the defaults are the Mac's popover, measured
+    float frostSigma = 13;      // the frost's Gaussian (0: clear glass)
+    float pull = 30;            // how far past the edge the rim reads what is behind
+    float band = 13;            // how deep the rim's bending band is
+    float dispersion = 0.03f, saturation = 1.8f;
+    float lift = 0.38f;         // how far what is behind is lifted toward the material's colour
+    float rim = 1.0f;           // the rim's light
+    bool squircle = false;      // corners: rounded (false) or continuous (true)
 
     // input (layout DIPs)
     float mx = -1, my = -1;
@@ -39,7 +43,7 @@ struct Showcase {
     // where things are
     float popX = 34, popY = 104, ctlX = -1, ctlY = 96, tuneX = -1, tuneY = 414, clearX = 622, clearY = 104;
     float grabX = 0, grabY = 0;
-    Spring bubbleX{ 700, 0.45f, 0.78f }, bubbleY{ 430, 0.45f, 0.78f };
+    Spring bubbleX{ 700, 0.45f, 0.78f }, bubbleY{ 560, 0.45f, 0.78f };
     std::vector<std::pair<double, std::pair<float, float>>> samples;
     std::unordered_map<std::string, Spring> springs;
     bool toggles[4] = { true, false, true, true };
@@ -48,23 +52,21 @@ struct Showcase {
     double now = 0;
 
     static constexpr float kBubble = 150, kClearW = 300, kClearH = 200;
-    enum LensKind { LensControl = 0, LensBubble = 1, LensClear = 2 };
-    struct Shape { D2D1_RECT_F r; float radius; D2D1_COLOR_F tint; float tintAmount; bool interactive; float power = 1; int kind = LensControl; };
+    enum Kind { KindPanel = 0, KindControl = 1, KindBubble = 2, KindClear = 3 };
+    /// A shape of glass: tint.a is how far the material's colour leans to the tint; keep < 0: Tune's.
+    struct Shape { D2D1_RECT_F r; float radius; D2D1_COLOR_F tint; float keep = -1; int kind = KindPanel; float power = 1; int corners = -1; /* -1: Tune's, 0: round, 1: squircle */ };
     std::vector<Shape> frosts, lenses;
     std::vector<std::function<void()>> content, overlays;
 
     explicit Showcase(Gfx& gfx) : g(gfx) {}
 
     bool Init() {
-        SurfaceDesc d{ g.width, g.height };
-        ready = GlassSurface::Create(g.device.Get(), d, frost).ok() && GlassSurface::Create(g.device.Get(), d, lens).ok();
+        ready = glass.Init(g.device.Get()) && glass.Resize(g.device.Get(), g.width, g.height);
         return ready;
     }
 
     void Resized() {
-        if (!ready) return;
-        frost.Resize(g.width, g.height);
-        lens.Resize(g.width, g.height);
+        if (ready) glass.Resize(g.device.Get(), g.width, g.height);
     }
 
     Spring& S(const std::string& id, float v, float r = 0.34f, float d = 0.8f) {
@@ -101,24 +103,58 @@ struct Showcase {
 
     // ---- the parts ----
 
-    /// A frosted panel of glass (the Mac's popover glass): a shape of frost, its tint and rim drawn over it after.
-    void Frost(D2D1_RECT_F r, float radius, bool interactive = false, D2D1_COLOR_F tint = { 0, 0, 0, -1 }, float amount = -1) {
-        D2D1_COLOR_F t = tint.a < 0 ? (scene.dark ? Rgb(128, 112, 96) : Rgb(250, 248, 246)) : tint;
-        frosts.push_back({ r, radius, t, amount < 0 ? tintAmount * (scene.dark ? 1.0f : 1.15f) : amount, interactive });
+    /// A frosted panel of glass (the Mac's popover glass). tint: the colour it leans to (a = how far: the Mac's
+    /// .tint(c.opacity(0.10)) measures about 0.25); keep: how much of what is behind shows (< 0: Tune's).
+    void Frost(D2D1_RECT_F r, float radius, bool interactive = false, D2D1_COLOR_F tint = { 0, 0, 0, 0 }, float keep = -1) {
+        (void)interactive;
+        frosts.push_back({ r, radius, tint, keep, KindPanel });
     }
 
-    /// A lens of glass (a knob, a thumb, the bubble): no frost, what is under it bent through its rim.
-    void Lens(D2D1_RECT_F r, float radius, float power = 1, int kind = LensControl) { lenses.push_back({ r, radius, {}, 0, true, power, kind }); }
+    /// A lens of glass (a knob, a thumb, the bubble, the clear card): no frost, what is under it bent through its rim.
+    void Lens(D2D1_RECT_F r, float radius, float power = 1, int kind = KindControl) { lenses.push_back({ r, radius, { 0, 0, 0, 0 }, 1, kind, power }); }
 
-    /// The rim's hairline of light, brightest top-left.
-    void Rim(D2D1_RECT_F r, float radius, float strength) {
-        ComPtr<ID2D1GradientStopCollection> stops;
-        float a = strength * (scene.dark ? 0.55f : 0.9f);
-        D2D1_GRADIENT_STOP gs[3] = { { 0, D2D1::ColorF(1, 1, 1, a) }, { 0.5f, D2D1::ColorF(1, 1, 1, a * 0.18f) }, { 1, D2D1::ColorF(1, 1, 1, a * 0.55f) } };
-        g.d2d->CreateGradientStopCollection(gs, 3, &stops);
-        ComPtr<ID2D1LinearGradientBrush> lb;
-        g.d2d->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(r.left, r.top), D2D1::Point2F(r.right, r.bottom)), stops.Get(), &lb);
-        g.d2d->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(r.left + 0.5f, r.top + 0.5f, r.right - 0.5f, r.bottom - 0.5f), radius - 0.5f, radius - 0.5f), lb.Get(), 1.0f);
+    /// The shape of a rounded rectangle as the glass draws it: round corners, or a squircle's (a superellipse of degree 4
+    /// over 1.528 × the radius, as the shader's).
+    ComPtr<ID2D1Geometry> Geo(D2D1_RECT_F r, float radius) {
+        ComPtr<ID2D1Geometry> out;
+        float hw = (r.right - r.left) / 2, hh = (r.bottom - r.top) / 2;
+        if (!squircle) {
+            ComPtr<ID2D1RoundedRectangleGeometry> rr;
+            float rad = std::min(radius, std::min(hw, hh));
+            g.d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(r, rad, rad), &rr);
+            out = rr;
+            return out;
+        }
+        float R = std::min(radius * 1.528f, std::min(hw, hh));
+        ComPtr<ID2D1PathGeometry> path;
+        g.d2dFactory->CreatePathGeometry(&path);
+        ComPtr<ID2D1GeometrySink> sink;
+        path->Open(&sink);
+        // corners clockwise from the top right: centre, and the quadrant's signs
+        struct C { float cx, cy, sx, sy; } cs[4] = {
+            { r.right - R, r.top + R, 1, -1 }, { r.right - R, r.bottom - R, 1, 1 }, { r.left + R, r.bottom - R, -1, 1 }, { r.left + R, r.top + R, -1, -1 } };
+        const int steps = 18;
+        bool begun = false;
+        for (int c = 0; c < 4; c++) {
+            for (int i = 0; i <= steps; i++) {
+                // from the edge before the corner to the edge after it (clockwise)
+                float t = (float)i / steps * 1.5707963f;
+                float a = (c % 2 == 0) ? 1.5707963f - t : t; // (top right and bottom left run from the vertical)
+                float ux = std::sqrt(std::cos(a)), uy = std::sqrt(std::sin(a));
+                D2D1_POINT_2F pt = D2D1::Point2F(cs[c].cx + cs[c].sx * R * ux, cs[c].cy + cs[c].sy * R * uy);
+                if (!begun) { sink->BeginFigure(pt, D2D1_FIGURE_BEGIN_FILLED); begun = true; }
+                else sink->AddLine(pt);
+            }
+        }
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        sink->Close();
+        out = path;
+        return out;
+    }
+
+    void FillShape(D2D1_RECT_F r, float radius, D2D1_COLOR_F c) {
+        auto geo = Geo(r, radius);
+        g.d2d->FillGeometry(geo.Get(), Brush(c));
     }
 
     /// A panel that moves when dragged by anything but its controls.
@@ -153,7 +189,7 @@ struct Showcase {
         Lens(D2D1::RectF(tx, ty, tx + tw, ty + th), th / 2, 0.12f + 0.88f * moving);
         // a thin veil of light on the chosen one, as the Mac's thumb has
         overlays.push_back([=, this] {
-            g.d2d->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(tx, ty, tx + tw, ty + th), th / 2, th / 2), Brush(scene.dark ? D2D1::ColorF(1, 1, 1, 0.1f) : D2D1::ColorF(1, 1, 1, 0.55f)));
+            FillShape(D2D1::RectF(tx, ty, tx + tw, ty + th), th / 2, scene.dark ? D2D1::ColorF(1, 1, 1, 0.1f) : D2D1::ColorF(1, 1, 1, 0.55f));
         });
     }
 
@@ -171,7 +207,7 @@ struct Showcase {
         content.push_back([=, this] {
             D2D1_COLOR_F off = scene.dark ? D2D1::ColorF(0.47f, 0.47f, 0.5f, 0.3f) : D2D1::ColorF(0.47f, 0.47f, 0.5f, 0.2f);
             D2D1_COLOR_F c = D2D1::ColorF(off.r + (52 / 255.f - off.r) * t, off.g + (199 / 255.f - off.g) * t, off.b + (89 / 255.f - off.b) * t, off.a + (1 - off.a) * t);
-            g.d2d->FillRoundedRectangle(D2D1::RoundedRect(r, h / 2, h / 2), Brush(c));
+            FillShape(r, h / 2, c);
         });
         Lens(D2D1::RectF(kx, ky, kx + kw, ky + kh), kh / 2);
         overlays.push_back([=, this] { Knob(kx, ky, kw, kh, 1 - 0.9f * hv); });
@@ -181,8 +217,8 @@ struct Showcase {
     void Knob(float x, float y, float w, float h, float opacity) {
         if (opacity <= 0.01f) return;
         for (int i = 3; i >= 1; i--)
-            g.d2d->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x - i * 0.6f, y + 1.2f, x + w + i * 0.6f, y + h + i * 1.1f), h / 2 + i, h / 2 + i), Brush(D2D1::ColorF(0, 0, 0, 0.06f * opacity)));
-        g.d2d->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + w, y + h), h / 2, h / 2), Brush(D2D1::ColorF(1, 1, 1, opacity)));
+            FillShape(D2D1::RectF(x - i * 0.6f, y + 1.2f, x + w + i * 0.6f, y + h + i * 1.1f), h / 2 + i, D2D1::ColorF(0, 0, 0, 0.06f * opacity));
+        FillShape(D2D1::RectF(x, y, x + w, y + h), h / 2, D2D1::ColorF(1, 1, 1, opacity));
     }
 
     /// A slider: a thin track filled to its value, and a knob that becomes a lens while dragged.
@@ -217,10 +253,10 @@ struct Showcase {
         if (active == id && released) { pr.To(0); clicked = Inside(r); }
         float grow = pr.value * 3;
         D2D1_RECT_F gr = D2D1::RectF(x - grow, y - grow * 0.5f, x + w + grow, y + h + grow * 0.5f);
-        if (prominent) Frost(gr, h / 2 + grow, true, Rgb(0, 122, 255), 0.7f); else Frost(gr, h / 2 + grow, true);
+        if (prominent) Frost(gr, h / 2 + grow, true, Rgb(0, 122, 255, 0.9f), 0.3f); else Frost(gr, h / 2 + grow, true);
         content.push_back([=, this] {
             Text(label, x, y, w, h, 14.5f, prominent ? D2D1::ColorF(1, 1, 1, 1) : Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER);
-            if (pr.value > 0.01f) g.d2d->FillRoundedRectangle(D2D1::RoundedRect(gr, h / 2 + grow, h / 2 + grow), Brush(D2D1::ColorF(1, 1, 1, 0.08f * pr.value)));
+            if (pr.value > 0.01f) FillShape(gr, h / 2 + grow, D2D1::ColorF(1, 1, 1, 0.08f * pr.value));
         });
         return clicked;
     }
@@ -272,15 +308,33 @@ struct Showcase {
         float bw = 5 * 86 + 8;
         Segmented("tab", (W - bw) / 2, H - 78, 86, { L"Today", L"Courses", L"To Do", L"Grades", L"Search" }, tab);
 
+        CompareCorners();
         ClearCard();
         Bubble(W, H);
+    }
+
+    /// Round corners beside squircles (continuous corners), whatever Tune's Corners: a card each, and a bar each.
+    void CompareCorners() {
+        float x = clearX, y = clearY + kClearH + 22;
+        const wchar_t* names[] = { L"Round", L"Squircle" };
+        for (int i = 0; i < 2; i++) {
+            float cx = x + i * 160;
+            frosts.push_back({ D2D1::RectF(cx, y, cx + 140, y + 112), 26, { 0, 0, 0, 0 }, -1, KindPanel, 1, i });
+            frosts.push_back({ D2D1::RectF(cx, y + 126, cx + 140, y + 166), 20, { 0, 0, 0, 0 }, -1, KindPanel, 1, i });
+            const wchar_t* name = names[i];
+            content.push_back([=, this] {
+                Text(name, cx, y + 36, 140, 40, 16, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER);
+                Text(i ? L"continuous corners" : L"circular corners", cx, y + 62, 140, 24, 12, Ink2(), DWRITE_FONT_WEIGHT_NORMAL, DWRITE_TEXT_ALIGNMENT_CENTER);
+                Text(i ? L"Squircle bar" : L"Round bar", cx, y + 126, 140, 40, 13.5f, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER);
+            });
+        }
     }
 
     /// The Mac's popover, as screenshotted: Unread announcements.
     void Popover() {
         float x = popX, y = popY, w = 560, h = 560;
         D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + h);
-        Frost(r, 34, true);
+        Frost(r, 22, true, Rgb(255, 149, 0, 0.25f)); // (the Mac's: radius 22, continuous; .tint(orange.opacity(0.10)))
         content.push_back([=, this] {
             Icon(L"", x + 30, y + 28, 30, 36, 21, Rgb(255, 149, 0));
             Text(L"Unread announcements", x + 70, y + 28, 400, 36, 21, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_LEADING, L"Segoe UI Variable Display");
@@ -310,7 +364,7 @@ struct Showcase {
     void Controls() {
         float x = ctlX, y = ctlY, w = 344, h = 316;
         D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + h);
-        Frost(r, 30, true);
+        Frost(r, 24, true);
         content.push_back([=, this] { Text(L"Controls", x + 24, y + 18, 200, 32, 20, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_LEADING, L"Segoe UI Variable Display"); });
         const wchar_t* labels[] = { L"Hide completed", L"Reminders", L"Beta updates" };
         for (int i = 0; i < 3; i++) {
@@ -326,52 +380,59 @@ struct Showcase {
     }
 
     void Tune() {
-        float x = tuneX, y = tuneY, w = 344, h = 420;
+        float x = tuneX, y = tuneY, w = 344, h = 444;
         D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + h);
-        Frost(r, 30, true);
+        Frost(r, 24, true);
         content.push_back([=, this] { Text(L"Tune", x + 24, y + 16, 120, 36, 20, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_LEADING, L"Segoe UI Variable Display"); });
         int mode = scene.dark ? 0 : 1;
         Segmented("mode", x + w - 24 - 146, y + 14, 69, { L"Dark", L"Light" }, mode, false);
         scene.dark = mode == 0;
 
-        // the backdrop: Grid · Photo · Simpl (Photo again: the next picture)
+        // the backdrop: Simpl · Grid · Photo (Photo again: the next picture)
         float bx = x + w - 24 - 206, by = y + 58;
         content.push_back([=, this] { Text(L"Backdrop", x + 24, by, 90, 40, 13.5f, Ink()); });
-        if (pressed && !consumed && scene.backdrop == BackdropPhoto && Inside(D2D1::RectF(bx + 4 + 66, by, bx + 4 + 132, by + 40))) scene.NextPhoto();
-        Segmented("backdrop", bx, by, 66, { L"Grid", L"Photo", L"Simpl" }, scene.backdrop, false);
+        if (pressed && !consumed && scene.backdrop == BackdropPhoto && Inside(D2D1::RectF(bx + 4 + 132, by, bx + 4 + 198, by + 40))) scene.NextPhoto();
+        int shown[] = { BackdropSimpl, BackdropGrid, BackdropPhoto };
+        int pick = scene.backdrop == BackdropSimpl ? 0 : scene.backdrop == BackdropGrid ? 1 : 2;
+        Segmented("backdrop", bx, by, 66, { L"Simpl", L"Grid", L"Photo" }, pick, false);
+        scene.backdrop = shown[pick];
 
-        struct K { const wchar_t* name; float* v; float lo, hi; };
-        float sat = (saturation - 0.5f) / 1.5f;
+        // the corners: rounded, or continuous (squircles)
+        float cy = y + 102;
+        content.push_back([=, this] { Text(L"Corners", x + 24, cy, 90, 40, 13.5f, Ink()); });
+        int corners = squircle ? 1 : 0;
+        Segmented("corners", x + w - 24 - 168, cy, 80, { L"Round", L"Squircle" }, corners, false);
+        squircle = corners == 1;
+
+        struct K { const wchar_t* name; float* v; float lo, hi; const wchar_t* fmt; };
         K knobs[] = {
-            { L"Frost", &frostLevel, 0, 1 }, { L"Refraction", &refraction, 0, 1 }, { L"Dispersion", &dispersion, 0, 1 },
-            { L"Thickness", &thickness, 0, 1 }, { L"Colour", &sat, 0, 1 }, { L"Tint", &tintAmount, 0, 0.9f }, { L"Rim", &rim, 0, 1 },
+            { L"Frost", &frostSigma, 0, 30, L"%.0f pt" }, { L"Refraction", &pull, 0, 60, L"%.0f pt" }, { L"Edge", &band, 4, 30, L"%.0f pt" },
+            { L"Dispersion", &dispersion, 0, 0.15f, L"%.2f" }, { L"Colour", &saturation, 0.5f, 2, L"%.2f" }, { L"Tint", &lift, 0, 0.9f, L"%.2f" },
+            { L"Rim", &rim, 0, 1.5f, L"%.2f" },
         };
-        float ry = y + 108;
+        float ry = y + 150;
         int index = 0;
         for (auto& k : knobs) {
-            float shown = *k.v;
-            if (k.v == &sat) shown = saturation;
-            wchar_t val[16];
-            swprintf(val, 16, L"%.2f", shown);
+            wchar_t val[24];
+            swprintf(val, 24, k.fmt, *k.v);
             std::wstring valS = val;
             const wchar_t* name = k.name;
             content.push_back([=, this] {
                 Text(name, x + 24, ry, 90, 30, 13.5f, Ink());
-                Text(valS.c_str(), x + w - 64, ry, 40, 30, 12, Ink2(), DWRITE_FONT_WEIGHT_NORMAL, DWRITE_TEXT_ALIGNMENT_TRAILING);
+                Text(valS.c_str(), x + w - 74, ry, 50, 30, 12, Ink2(), DWRITE_FONT_WEIGHT_NORMAL, DWRITE_TEXT_ALIGNMENT_TRAILING);
             });
             float f = (*k.v - k.lo) / (k.hi - k.lo);
-            Slider("knob" + std::to_string(index++), x + 112, ry, w - 112 - 70, f);
+            Slider("knob" + std::to_string(index++), x + 112, ry, w - 112 - 78, f);
             *k.v = k.lo + f * (k.hi - k.lo);
-            ry += 34;
+            ry += 32;
         }
-        saturation = 0.5f + sat * 1.5f;
         content.push_back([=, this] { Text(L"Moving backdrop", x + 24, ry + 2, 200, 32, 13.5f, Ink()); });
         Toggle("moving", x + w - 24 - 56, ry + 2, scene.moving);
 
         // what the backdrop is
         std::wstring hint;
         if (scene.backdrop == BackdropGrid) hint = L"Straight lines: see them bend at each rim (Frost 0: clear)";
-        else if (scene.backdrop == BackdropSimpl) hint = L"Simpl's Dashboard";
+        else if (scene.backdrop == BackdropSimpl) hint = L"Simpl's Dashboard, as behind the Mac's popover";
         else if (scene.photos.empty()) hint = L"No pictures found: drop one on the window";
         else hint = scene.PhotoName() + L" (" + std::to_wstring(scene.photoIndex + 1) + L" of " + std::to_wstring(scene.photos.size()) + L") · Photo: next · or drop one";
         content.push_back([=, this] { Text(hint.c_str(), x + 24, ry + 40, w - 48, 22, 12, Ink2()); });
@@ -383,9 +444,8 @@ struct Showcase {
     void ClearCard() {
         float w = kClearW, h = kClearH, x = clearX, y = clearY;
         D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + h);
-        Lens(r, 44, 1, LensClear);
+        Lens(r, 44, 1, KindClear);
         overlays.push_back([=, this] {
-            Rim(r, 44, std::max(rim, 0.3f));
             Text(L"Clear glass", x + 22, y + 14, 200, 26, 14.5f, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD);
         });
         Draggable("clear", r, clearX, clearY);
@@ -411,62 +471,73 @@ struct Showcase {
             bubbleX.To(std::clamp(bubbleX.value + Spring::Project(vx), 10.0f, W - d - 10), vx);
             bubbleY.To(std::clamp(bubbleY.value + Spring::Project(vy), 10.0f, H - d - 10), vy);
         }
-        Lens(r, d / 2, 1, LensBubble);
+        Lens(r, d / 2, 1, KindBubble);
     }
 
     // ---- drawing a frame ----
 
-    GlassMaterial Material(float radiusPx, const Shape& s, bool isLens) const {
-        GlassMaterial m;
-        float cx = (s.r.left + s.r.right) / 2, cy = (s.r.top + s.r.bottom) / 2;
-        float hw = std::max((s.r.right - s.r.left) / 2, 1.0f), hh = std::max((s.r.bottom - s.r.top) / 2, 1.0f);
-        float hx = std::clamp((mx - cx) / hw * 0.6f, -1.0f, 1.0f), hy = std::clamp((my - cy) / hh * 0.6f, -1.0f, 1.0f);
-        if (mx < 0) { hx = -0.5f; hy = -0.7f; }
-        m.SetCornerRadius(std::min(radiusPx, 200.0f));
-        m.SetHighlightPosition(hx, hy);
-        m.SetTintAmount(0.0f);
-        m.SetNoiseAmount(isLens ? 0.0f : 0.012f);
-        m.SetOpacity(1.0f);
-        if (isLens && s.kind == LensClear) {
-            m.SetBlurRadius(0.0f);
-            m.SetRefractionStrength(std::min(1.0f, refraction * 1.5f));
-            m.SetThickness(thickness);
-            m.SetDispersionStrength(dispersion);
-            m.SetEdgeFresnel(0.35f + 0.4f * rim);
-            m.SetSpecularStrength(0.4f + 1.2f * rim);
-            m.SetSaturation(1.0f);
-            m.SetBrightness(1.02f);
-        } else if (isLens) {
-            bool bubble = s.kind == LensBubble;
-            m.SetBlurRadius(0.0f);
-            m.SetRefractionStrength(bubble ? 1.0f : std::min(1.0f, (refraction + 0.25f) * s.power));
-            m.SetThickness(bubble ? 1.0f : 0.4f + 0.35f * s.power);
-            m.SetDispersionStrength(bubble ? std::min(1.0f, dispersion + 0.35f) : dispersion);
-            m.SetEdgeFresnel(0.35f + 0.4f * rim);
-            m.SetSpecularStrength(0.4f + 1.2f * rim);
-            m.SetSaturation(std::min(2.0f, 0.85f + saturation * 0.25f));
-            m.SetBrightness(1.04f);
-        } else {
-            m.SetBlurRadius(FrostBlur());
-            m.SetRefractionStrength(refraction);
-            m.SetThickness(thickness);
-            m.SetDispersionStrength(dispersion);
-            m.SetEdgeFresnel(0.2f + 0.5f * rim);
-            m.SetSpecularStrength(0.3f + 1.0f * rim);
-            m.SetSaturation(std::clamp(saturation, 0.0f, 2.0f));
-            m.SetBrightness(1.0f);
-        }
-        return m;
-    }
-
-    /// Frost, as Tune sets it: up to 0.2 a full-size frost growing from none (clear glass); past it, the same frost of
-    /// ever smaller copies of the backdrop (each smaller copy reads as a deeper frost).
-    float FrostBlur() const { return frostLevel >= 0.2f ? 24.0f : 24.0f * std::sqrt(frostLevel / 0.2f); }
-    UINT FrostMip() const { return frostLevel <= 0.2f ? 0 : std::min<UINT>((UINT)std::lround((frostLevel - 0.2f) / 0.8f * 5), g.sceneMipCount - 1); }
-
-    D2D1_RECT_F Px(D2D1_RECT_F r) const {
+    /// A shape's glass, in pixels: the panels as the Mac's popover (Tune's numbers), the lenses as its knobs.
+    GlassLook Look(const Shape& s) const {
         float k = g.Scale() * uiScale;
-        return D2D1::RectF(r.left * k, r.top * k, r.right * k, r.bottom * k);
+        GlassLook l;
+        l.cx = (s.r.left + s.r.right) / 2 * k;
+        l.cy = (s.r.top + s.r.bottom) / 2 * k;
+        l.hw = std::max((s.r.right - s.r.left) / 2, 1.0f) * k;
+        l.hh = std::max((s.r.bottom - s.r.top) / 2, 1.0f) * k;
+        l.radius = s.radius * k;
+        l.squircle = s.corners < 0 ? squircle : s.corners == 1;
+        l.dark = scene.dark;
+        float minHalf = std::min(l.hw, l.hh);
+        bool big = minHalf / k > 50;
+        l.rimWidth = 1.25f * k;
+        l.glow = scene.dark ? 0.03f : 0.02f;
+        l.outline = scene.dark ? 0.5f : 0.1f;
+        if (s.kind == KindPanel) {
+            l.frost = std::clamp(frostSigma / 3, 0.0f, 1.0f);
+            l.pull = std::min(pull * k, minHalf * 1.2f);
+            l.band = std::min(band * k, minHalf * 0.6f);
+            float keep = s.keep >= 0 ? s.keep : 1 - lift;
+            l.keep = keep;
+            float grey = scene.dark ? 0.55f : 0.97f; // (solved from the Mac's popover: plain glass over its dark page)
+            l.r = grey + (s.tint.r - grey) * s.tint.a;
+            l.g = grey + (s.tint.g - grey) * s.tint.a;
+            l.b = grey + (s.tint.b - grey) * s.tint.a;
+            l.saturation = saturation;
+            l.dispersion = dispersion;
+            l.rim = rim;
+            l.shadow = big ? (scene.dark ? 0.35f : 0.16f) : (scene.dark ? 0.16f : 0.07f);
+            l.shadowBlur = (big ? 30.0f : 6.0f) * k;
+            l.shadowY = (big ? 8.0f : 2.0f) * k;
+        } else {
+            l.frost = 0;
+            l.keep = 1;
+            l.saturation = 1.08f;
+            l.brightness = 1.03f;
+            l.rim = std::max(rim, 0.6f);
+            l.shadow = scene.dark ? 0.18f : 0.1f;
+            l.shadowBlur = 8 * k;
+            l.shadowY = 3 * k;
+            if (s.kind == KindClear) {
+                l.pull = std::min(pull * k, minHalf);
+                l.band = std::min(band * k, minHalf * 0.8f);
+                l.dispersion = dispersion;
+                l.brightness = 1.02f;
+                l.saturation = 1;
+                l.shadowBlur = 20 * k;
+                l.shadowY = 6 * k;
+            } else if (s.kind == KindBubble) {
+                l.pull = minHalf * 0.6f;
+                l.band = minHalf * 0.9f;
+                l.magnify = 0.18f;
+                l.dispersion = std::max(dispersion, 0.05f);
+            } else {
+                l.pull = minHalf * (0.15f + 0.45f * s.power);
+                l.band = minHalf * 0.8f;
+                l.magnify = 0.12f * s.power;
+                l.dispersion = dispersion + 0.03f * s.power;
+            }
+        }
+        return l;
     }
 
     void Draw(float dt) {
@@ -483,7 +554,7 @@ struct Showcase {
         auto* d = g.d2d.Get();
         D2D1_MATRIX_3X2_F scale = D2D1::Matrix3x2F::Scale(uiScale, uiScale);
 
-        // 1. the backdrop
+        // 1. the backdrop, and its frost
         d->SetTarget(g.sceneBitmap.Get());
         d->BeginDraw();
         d->SetTransform(scale);
@@ -491,62 +562,23 @@ struct Showcase {
         d->EndDraw();
         g.PublishScene();
 
-        // the panels' soft shadows, under the glass
+        // 2. the panels' glass
+        if (ready) {
+            ID3D11ShaderResourceView* frosted = frostSigma > 0.2f ? glass.Frost(g.ctx.Get(), g.sceneSRV.Get(), g.width, g.height, frostSigma * k * uiScale) : nullptr;
+            for (auto& s : frosts) glass.Draw(g.ctx.Get(), g.backRTV.Get(), g.width, g.height, k * uiScale, g.sceneSRV.Get(), frosted, Look(s));
+        }
+
+        // 3. on the panels
         d->SetTarget(g.backBitmap.Get());
         d->BeginDraw();
         d->SetTransform(scale);
-        for (auto& s : frosts) {
-            if (s.r.bottom - s.r.top < 100) continue;
-            for (int i = 1; i <= 7; i++) {
-                float e = i * 3.0f;
-                d->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(s.r.left - e + 4, s.r.top - e + 12, s.r.right + e - 4, s.r.bottom + e + 6), s.radius + e, s.radius + e),
-                    Brush(D2D1::ColorF(0, 0, 0, (scene.dark ? 0.05f : 0.022f) * (8 - i) / 7)));
-            }
-        }
-        d->EndDraw();
-
-        D3D11_VIEWPORT vp = { 0, 0, (float)g.width, (float)g.height, 0, 1 };
-        // 2. the frosted glass: one frost of a small copy of the backdrop, each panel composited
-        if (ready) {
-            UINT level = FrostMip();
-            FrameInfo fi;
-            fi.timeSeconds = (float)now;
-            g.ctx->OMSetRenderTargets(1, g.backRTV.GetAddressOf(), nullptr);
-            g.ctx->RSSetViewports(1, &vp);
-            if (frost.PrepareFrame(g.ctx.Get(), g.sceneSRV[level].Get(), fi, FrostBlur()).ok()) {
-                for (auto& s : frosts) {
-                    frost.SetMaterial(Material(s.radius * k * uiScale, s, false));
-                    auto p = Px(s.r);
-                    frost.RenderRect(g.ctx.Get(), g.backRTV.Get(), GlassRect{ p.left, p.top, p.right - p.left, p.bottom - p.top });
-                }
-            }
-        }
-
-        // 3. on the panels: the Mac's tint, the rim's hairline of light, then the words, icons and tracks
-        d->BeginDraw();
-        d->SetTransform(scale);
-        for (auto& s : frosts) {
-            auto rr = D2D1::RoundedRect(s.r, s.radius, s.radius);
-            d->FillRoundedRectangle(rr, Brush(D2D1::ColorF(s.tint.r, s.tint.g, s.tint.b, std::clamp(s.tintAmount, 0.0f, 1.0f))));
-            Rim(s.r, s.radius, rim);
-        }
         for (auto& f : content) f();
         d->EndDraw();
 
         // 4. the lenses, refracting the frame so far
         if (ready && !lenses.empty()) {
             g.Snapshot();
-            FrameInfo fi;
-            fi.timeSeconds = (float)now;
-            g.ctx->OMSetRenderTargets(1, g.backRTV.GetAddressOf(), nullptr);
-            g.ctx->RSSetViewports(1, &vp);
-            if (lens.PrepareFrame(g.ctx.Get(), g.compositeSRV.Get(), fi, 0.0f).ok()) {
-                for (auto& s : lenses) {
-                    lens.SetMaterial(Material(s.radius * k * uiScale, s, true));
-                    auto p = Px(s.r);
-                    lens.RenderRect(g.ctx.Get(), g.backRTV.Get(), GlassRect{ p.left, p.top, p.right - p.left, p.bottom - p.top });
-                }
-            }
+            for (auto& s : lenses) glass.Draw(g.ctx.Get(), g.backRTV.Get(), g.width, g.height, k * uiScale, g.compositeSRV.Get(), nullptr, Look(s));
         }
 
         // 5. on the lenses

@@ -1,9 +1,7 @@
 #pragma once
-// The showcase's graphics: one Direct3D 11 device for everything (AuroraGlass draws the glass with it), Direct2D and
+// The showcase's graphics: one Direct3D 11 device for everything (the glass is drawn with it, Glass.h), Direct2D and
 // DirectWrite on the same device for the backdrop, the words and the icons, and the textures the glass reads:
-//   scene     — the backdrop as drawn (Direct2D's target), copied into
-//   sceneMips — the same with its smaller copies (mips): the frost reads a smaller one, so a 24 px blur reads as a
-//               deep frost at almost no cost (the Mac's popovers are frosted far past what a full-size blur of 24 gives);
+//   scene     — the backdrop as drawn (Direct2D's target): what the panels' glass frosts and bends;
 //   composite — the frame so far (frosted panels and what is on them), for the lenses that refract everything under them.
 #include <windows.h>
 #include <d3d11.h>
@@ -30,10 +28,7 @@ struct Gfx {
 
     ComPtr<ID3D11Texture2D> scene;          // Direct2D draws the backdrop here
     ComPtr<ID2D1Bitmap1> sceneBitmap;
-    ComPtr<ID3D11Texture2D> sceneMips;      // the backdrop and its smaller copies
-    ComPtr<ID3D11ShaderResourceView> sceneSRV[8];  // one view per mip level
-    ComPtr<ID3D11ShaderResourceView> sceneAllSRV;  // every level: what GenerateMips fills
-    UINT sceneMipCount = 1;
+    ComPtr<ID3D11ShaderResourceView> sceneSRV;
     ComPtr<ID3D11Texture2D> composite;      // the frame so far, for the lenses
     ComPtr<ID3D11ShaderResourceView> compositeSRV;
 
@@ -106,9 +101,7 @@ struct Gfx {
         backRTV.Reset();
         sceneBitmap.Reset();
         scene.Reset();
-        for (auto& s : sceneSRV) s.Reset();
-        sceneAllSRV.Reset();
-        sceneMips.Reset();
+        sceneSRV.Reset();
         compositeSRV.Reset();
         composite.Reset();
     }
@@ -134,7 +127,7 @@ struct Gfx {
         back.As(&backSurface);
         if (FAILED(d2d->CreateBitmapFromDxgiSurface(backSurface.Get(), &bp, &backBitmap))) return false;
 
-        // the backdrop as Direct2D draws it (one level: Direct2D draws only into a texture of one level)
+        // the backdrop as Direct2D draws it
         D3D11_TEXTURE2D_DESC td = {};
         td.Width = width;
         td.Height = height;
@@ -150,22 +143,7 @@ struct Gfx {
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), dpi, dpi);
         if (FAILED(d2d->CreateBitmapFromDxgiSurface(sceneSurface.Get(), &sp, &sceneBitmap))) return false;
 
-        // the backdrop with its smaller copies, for the frost
-        D3D11_TEXTURE2D_DESC md = td;
-        md.MipLevels = 0;
-        md.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-        if (FAILED(device->CreateTexture2D(&md, nullptr, &sceneMips))) return false;
-        sceneMips->GetDesc(&md);
-        sceneMipCount = std::min<UINT>(md.MipLevels, 8);
-        if (FAILED(device->CreateShaderResourceView(sceneMips.Get(), nullptr, &sceneAllSRV))) return false;
-        for (UINT i = 0; i < sceneMipCount; i++) {
-            D3D11_SHADER_RESOURCE_VIEW_DESC vd = {};
-            vd.Format = td.Format;
-            vd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-            vd.Texture2D.MostDetailedMip = i;
-            vd.Texture2D.MipLevels = 1;
-            if (FAILED(device->CreateShaderResourceView(sceneMips.Get(), &vd, &sceneSRV[i]))) return false;
-        }
+        if (FAILED(device->CreateShaderResourceView(scene.Get(), nullptr, &sceneSRV))) return false;
         // the frame so far, for the lenses
         D3D11_TEXTURE2D_DESC cd = td;
         cd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -174,10 +152,8 @@ struct Gfx {
         return true;
     }
 
-    /// The backdrop as drawn, into the frost's texture and its smaller copies, and onto the frame.
+    /// The backdrop as drawn, onto the frame.
     void PublishScene() {
-        ctx->CopySubresourceRegion(sceneMips.Get(), 0, 0, 0, 0, scene.Get(), 0, nullptr);
-        ctx->GenerateMips(sceneAllSRV.Get()); // (a view of every level: one of a single level fills none below it)
         ComPtr<ID3D11Texture2D> back;
         swap->GetBuffer(0, IID_PPV_ARGS(&back));
         ctx->CopyResource(back.Get(), scene.Get());

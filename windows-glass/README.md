@@ -42,3 +42,15 @@ glass drawn by AuroraGlass's renderer (its core compiled in from a pinned copy, 
 small copy (a mip) of the backdrop, so a deep Mac-like frost costs almost nothing; each panel composited on the GPU;
 lenses (knobs, thumbs, a bubble) refracting the frame drawn so far; Direct2D and DirectWrite for the backdrop, the
 Mac's tint, the rim's hairline, the words and icons. This workflow builds it with MSVC and publishes it.
+
+## Simpl's own glass (October 2026)
+
+Against the Mac's own popover (macOS 26), AuroraGlass's frost looked blotchy and grey, and its edges flat. The showcase
+now draws its glass with a shader of its own (`windows/GlassNative/src/Glass.h`), modelled on Core Animation's
+`glassBackground` filter as taken apart by [ShatteredGlass](https://github.com/AlexStrNik/ShatteredGlass) — a backdrop
+copied at a quarter of its size and blurred by a true Gaussian; a band at the rim (~12 pt) that bends what lies past
+the edge (up to ~40 pt) into it; a rim of light along the top and bottom drawn from the glass's own colour; a dark
+hairline outside; a soft shadow — and tuned against a screenshot of the Mac's popover (its tone solved from the pixels).
+Corners can be round or continuous (squircles: a superellipse of degree 4 over 1.528 × the radius, as SwiftUI's
+`.continuous`). AuroraGlass is no longer part of the build.
+

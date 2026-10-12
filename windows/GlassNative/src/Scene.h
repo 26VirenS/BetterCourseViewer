@@ -29,7 +29,7 @@ struct Scene {
     bool dark = true;
     bool moving = true;
     float clock = 0;
-    int backdrop = BackdropGrid;
+    int backdrop = BackdropSimpl;
 
     // the pictures (Photo): found on first use; the one shown, loaded when it changes
     std::vector<std::wstring> photos;

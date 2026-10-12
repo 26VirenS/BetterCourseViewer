@@ -1,6 +1,5 @@
-# Liquid Glass for Windows: the showcase (windows/GlassNative) — Win32 and Direct3D 11, the glass drawn by AuroraGlass's
-# renderer (its core compiled in from a pinned copy) with a deep frost, Direct2D and DirectWrite for the backdrop and the
-# words. Built with MSVC, started on the runner for a picture, and published as a pre-release (windows-glass-v<run>, zero-padded) to
+# Liquid Glass for Windows: the showcase (windows/GlassNative) — Win32 and Direct3D 11, the glass drawn by Simpl's own
+# shader (modelled on macOS 26's Liquid Glass), Direct2D and DirectWrite for the backdrop and the words. Built with MSVC, started on the runner for a picture, and published as a pre-release (windows-glass-v<run>, zero-padded) to
 # try on a real PC. Nothing here touches Simpl's own builds, releases or update feeds (those read mac-v* releases only).
 name: Windows Liquid Glass
 
@@ -20,28 +19,17 @@ concurrency:
   group: windows-glass
   cancel-in-progress: true
 
-env:
-  AURORA_REPO: https://github.com/VeiQiuLab/AuroraGlass.git
-  AURORA_SHA: 9355428a4a04f27a01b8e34fec90b7bfde2f0cf6
-
 jobs:
   showcase:
-    name: Liquid Glass showcase (Direct3D 11, AuroraGlass)
+    name: Liquid Glass showcase (Direct3D 11)
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch AuroraGlass
-        shell: bash
-        run: |
-          git init -q aurora && cd aurora
-          git remote add origin "$AURORA_REPO"
-          git fetch -q --depth 1 origin "$AURORA_SHA"
-          git checkout -q FETCH_HEAD
       - name: Build (Release, x64)
         shell: bash
         run: |
-          cmake -S windows/GlassNative -B build -A x64 -DAURORA_DIR="$PWD/aurora"
+          cmake -S windows/GlassNative -B build -A x64
           cmake --build build --config Release --parallel
       - name: Package
         shell: bash
@@ -49,10 +37,8 @@ jobs:
           out=dist/LiquidGlass
           mkdir -p "$out"
           cp build/Release/LiquidGlass.exe "$out/"
-          cp -R build/Release/shaders "$out/shaders"
-          cp aurora/LICENSE "$out/LICENSE-AuroraGlass.txt"
           cp windows-glass/showcase-README.txt "$out/README-FIRST.txt"
-          ls -la "$out" "$out/shaders"
+          ls -la "$out"
       - name: Does it start? (pictures of its frame)
         shell: pwsh
         run: |
@@ -63,10 +49,11 @@ jobs:
             if (Test-Path "$name.txt") { Get-Content "$name.txt" }
             if (-not (Test-Path $name)) { throw "no picture: $name" }
           }
-          Shot 'shot-showcase.png' @()                                 # the grid test card
-          Shot 'shot-showcase-200.png' @('--dpi', '192')               # as on a display scaled 200%: everything at one scale
-          Shot 'shot-showcase-photo.png' @('--backdrop', 'photo')      # a photo Windows carries, at full resolution
-          Shot 'shot-showcase-clear.png' @('--frost', '0')             # every panel clear: the bending at each rim
+          Shot 'shot-showcase.png' @()                                              # the Dashboard behind, round corners
+          Shot 'shot-showcase-squircle.png' @('--corners', 'squircle')              # the same with continuous corners
+          Shot 'shot-showcase-200.png' @('--dpi', '192')                            # as on a display scaled 200%
+          Shot 'shot-showcase-clear.png' @('--backdrop', 'grid', '--frost', '0')    # clear glass over the grid: the bending
+          Shot 'shot-showcase-photo.png' @('--backdrop', 'photo')                   # a photo Windows carries
       - name: Zip
         shell: bash
         run: (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-Showcase-win64.zip LiquidGlass >/dev/null) && ls -la LiquidGlass-Showcase-win64.zip
@@ -99,6 +86,6 @@ jobs:
           n=$(printf '%03d' "${{ github.run_number }}")
           tag="windows-glass-v$n"
           gh release create "$tag" zips/*.zip --target "${{ github.sha }}" --prerelease \
-            --title "Liquid Glass on Windows — native, on AuroraGlass (v$n)" \
+            --title "Liquid Glass on Windows — native, Simpl's own glass (v$n)" \
             --notes-file windows-glass/RELEASE_NOTES.md
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"

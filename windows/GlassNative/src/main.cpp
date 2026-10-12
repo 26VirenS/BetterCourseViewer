@@ -1,9 +1,9 @@
-// Liquid Glass for Windows — Simpl's showcase, native: a Win32 window, Direct3D 11 with AuroraGlass for the glass,
+// Liquid Glass for Windows — Simpl's showcase, native: a Win32 window, Direct3D 11 with Simpl's own glass (Glass.h),
 // Direct2D and DirectWrite for the backdrop and the words. A frame is drawn each time the display refreshes (vsync).
 // A picture dropped on the window becomes the backdrop.
 // --shot file.png: a picture of the frame after a few seconds (and file.png.txt: the graphics card and the frame rate),
-// then it quits — for CI. --dpi 192: as on a display scaled 200%. --backdrop grid|photo|simpl, --frost 0..1 and
-// --image file: Tune's choices, set from the start.
+// then it quits — for CI. --dpi 192: as on a display scaled 200%. --backdrop simpl|grid|photo, --frost <pt> (0: clear),
+// --corners round|squircle and --image file: Tune's choices, set from the start.
 #include "Gfx.h"
 #include "Showcase.h"
 #include <wincodec.h>
@@ -23,7 +23,7 @@ static float Unit() { return g.Scale() * (show ? show->uiScale : 1.0f); }
 static void FitScale() {
     if (!show) return;
     float W = g.width / g.Scale(), H = g.height / g.Scale();
-    show->uiScale = std::min(1.0f, std::min(W / 1320.0f, H / 840.0f));
+    show->uiScale = std::min(1.0f, std::min(W / 1320.0f, H / 870.0f));
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -131,7 +131,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    std::wstring shot, backdrop, image;
+    std::wstring shot, backdrop, image, corners;
     float frostArg = -1;
     for (int i = 1; i + 1 < argc; i++) {
         std::wstring a = argv[i];
@@ -140,6 +140,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
         if (a == L"--backdrop") backdrop = argv[i + 1];
         if (a == L"--frost") frostArg = (float)_wtof(argv[i + 1]);
         if (a == L"--image") image = argv[i + 1];
+        if (a == L"--corners") corners = argv[i + 1];
     }
 
     WNDCLASSEXW wc = { sizeof(wc) };
@@ -171,11 +172,15 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     show = &s;
     FitScale();
     if (backdrop == L"photo") s.scene.backdrop = BackdropPhoto;
-    if (backdrop == L"simpl") s.scene.backdrop = BackdropSimpl;
-    if (frostArg >= 0) s.frostLevel = std::clamp(frostArg, 0.0f, 1.0f);
+    if (backdrop == L"grid") s.scene.backdrop = BackdropGrid;
+    if (frostArg >= 0) s.frostSigma = std::clamp(frostArg, 0.0f, 30.0f);
+    if (corners == L"squircle") s.squircle = true;
     if (!image.empty()) s.scene.Open(image);
     DragAcceptFiles(hwnd, TRUE);
-    if (!s.Init()) MessageBoxW(hwnd, L"AuroraGlass could not start (its shaders folder must be beside the app).", L"Liquid Glass", MB_ICONWARNING);
+    if (!s.Init() && shot.empty()) {
+        std::wstring why = L"The glass could not start.\n\n" + std::wstring(s.glass.error.begin(), s.glass.error.end());
+        MessageBoxW(hwnd, why.c_str(), L"Liquid Glass", MB_ICONWARNING);
+    }
     ShowWindow(hwnd, SW_SHOW);
 
     LARGE_INTEGER freq, last, start;
@@ -221,7 +226,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
             FILE* f = _wfopen((shot + L".txt").c_str(), L"w");
             if (f) {
                 fwprintf(f, L"saved=%d glass=%d adapter=%s fps=%.1f size=%ux%u\n", ok ? 1 : 0, s.ready ? 1 : 0, ad.Description, fps, g.width, g.height);
-                fwprintf(f, L"backdrop=%d photos=%zu photo=%s (%ux%u)\n", s.scene.backdrop, s.scene.photos.size(), s.scene.loadedPath.c_str(), s.scene.photoW, s.scene.photoH);
+                fwprintf(f, L"backdrop=%d photos=%zu photo=%s (%ux%u) squircle=%d\n", s.scene.backdrop, s.scene.photos.size(), s.scene.loadedPath.c_str(), s.scene.photoW, s.scene.photoH, s.squircle ? 1 : 0);
+                if (!s.glass.error.empty()) fprintf(f, "glass error: %s\n", s.glass.error.c_str());
                 fclose(f);
             }
             break;
