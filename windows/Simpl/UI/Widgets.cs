@@ -115,12 +115,18 @@ public sealed partial class Ui
     /// </summary>
     public bool Button(string id, R r, string label, bool prominent = false, bool enabled = true, string? icon = null)
     {
-        var f = r.H >= 30 ? Theme.Body : Theme.Callout;
+        var f = r.H >= 30 ? Theme.Subheadline : Theme.Callout; // (the Mac's large buttons: 13)
         var i = Press(id, r, enabled);
         var press = Animate(id + ":p", i.Held ? 1 : 0, 0.22f, 0.8f);
-        if (prominent) Glass(r, r.H / 2, GlassKind.Panel, T.Accent, enabled ? 0.9f : 0.45f, Shadow.None);
+        if (prominent && enabled)
+        {
+            // (the Mac's prominent button: the accent, solid, a thread of light along its top)
+            Fill(r, r.H / 2, T.Accent);
+            Stroke(r, r.H / 2, new Color4(1, 1, 1, T.Dark ? 0.18f : 0.28f), 1);
+        }
+        else if (prominent) Fill(r, r.H / 2, T.Primary(T.Dark ? 0.1f : 0.07f)); // (one that cannot be pressed: a gray capsule, as the Mac's)
         else Glass(r, r.H / 2, GlassKind.Panel, null, 0, Shadow.None);
-        var ink = !enabled ? (prominent ? new Color4(1, 1, 1, 0.75f) : T.Ink3) : prominent ? new Color4(1, 1, 1, 1) : T.Ink();
+        var ink = !enabled ? T.Ink2 : prominent ? new Color4(1, 1, 1, 1) : T.Ink();
         var m = Measure(label, f);
         var iw = icon != null ? 20 : 0;
         var cx = r.CenterX - (m.X + iw) / 2;
@@ -132,7 +138,7 @@ public sealed partial class Ui
     }
 
     /// <summary>The width <see cref="Button"/> wants for its words (and a symbol before them).</summary>
-    public float ButtonWidth(string label, bool icon = false, float h = 30) => Measure(label, h >= 30 ? Theme.Body : Theme.Callout).X + 32 + (icon ? 20 : 0);
+    public float ButtonWidth(string label, bool icon = false, float h = 30) => Measure(label, h >= 30 ? Theme.Subheadline : Theme.Callout).X + 32 + (icon ? 20 : 0);
 
     /// <summary>A button that is a link in the accent (the Mac's .link style: "All Courses"); clicked.</summary>
     public bool LinkButton(string id, float x, float y, string label, Font? font = null)
@@ -381,18 +387,18 @@ public sealed partial class Ui
         }
         if (boxed)
         {
-            const float radius = 6;
-            Fill(r, radius, T.Dark ? Theme.Rgb(30, 30, 32) : new Color4(1, 1, 1, 1));
-            Stroke(r, radius, T.Dark ? new Color4(1, 1, 1, 0.14f) : new Color4(0, 0, 0, 0.14f));
+            // (the Mac's rounded-border field as macOS 26 draws it at the large size: a gray well, 22 tall, its corners 5)
+            const float radius = 5;
+            Fill(r, radius, T.Primary(T.Dark ? 0.1f : 0.07f));
             if (focused) Stroke(r.Inset(-1.5f), radius + 1.5f, Theme.WithAlpha(T.Accent, 0.55f), 3f);
         }
         else if (glassBar) Glass(r, r.H / 2, GlassKind.Panel, null, 0, Shadow.None);
         var shown = secret ? new string('•', text.Length) : text;
-        var x = r.X + 12;
+        var x = r.X + (boxed ? 7 : 12);
         if (icon != null) { Icon(icon, r.X + 17, r.CenterY, 12.5f, T.Ink2, FontWeight.SemiBold); x = r.X + 30; }
-        var room = r.Right - 12 - x;
+        var room = r.Right - (boxed ? 7 : 12) - x;
         var h = Measure("Ag", f).Y;
-        if (shown.Length == 0) Text(placeholder, x, r.CenterY - h / 2, f, T.Ink3, room);
+        if (shown.Length == 0) Text(placeholder, x, r.CenterY - h / 2, f, boxed ? T.Ink2 : T.Ink3, room);
         else
         {
             var tw = Measure(shown, f).X;

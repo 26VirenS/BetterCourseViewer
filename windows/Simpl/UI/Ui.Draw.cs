@@ -167,6 +167,34 @@ public sealed partial class Ui
     public void Line(float x0, float y0, float x1, float y1, Color4 c, float width = 1) =>
         Draw(() => D.DrawLine(new Vector2(x0, y0), new Vector2(x1, y1), Brush(c), width));
 
+    /// <summary>A shield, filled (the SF Symbol lock.shield's): a flat top with rounded corners, straight sides, then a soft point.</summary>
+    public void Shield(float cx, float cy, float w, float h, Color4 c)
+    {
+        Draw(() =>
+        {
+            using var path = gpu!.D2dFactory.CreatePathGeometry();
+            using (var sink = path.Open())
+            {
+                float left = cx - w / 2, right = cx + w / 2, top = cy - h / 2, bottom = cy + h / 2;
+                var r = w * 0.16f;               // the top corners
+                var straight = top + h * 0.4f;   // the sides run straight this far down
+                var pts = new List<Vector2>();
+                for (var i = 0; i <= 6; i++) { var a = MathF.PI + MathF.PI / 2 * i / 6; pts.Add(new Vector2(left + r + r * MathF.Cos(a), top + r + r * MathF.Sin(a))); }
+                for (var i = 0; i <= 6; i++) { var a = -MathF.PI / 2 + MathF.PI / 2 * i / 6; pts.Add(new Vector2(right - r + r * MathF.Cos(a), top + r + r * MathF.Sin(a))); }
+                pts.Add(new Vector2(right, straight));
+                for (var i = 1; i <= 12; i++) pts.Add(Quad(new Vector2(right, straight), new Vector2(right, bottom - h * 0.08f), new Vector2(cx, bottom), i / 12f));
+                for (var i = 1; i <= 12; i++) pts.Add(Quad(new Vector2(cx, bottom), new Vector2(left, bottom - h * 0.08f), new Vector2(left, straight), i / 12f));
+                sink.BeginFigure(pts[0], FigureBegin.Filled);
+                for (var i = 1; i < pts.Count; i++) sink.AddLine(pts[i]);
+                sink.EndFigure(FigureEnd.Closed);
+                sink.Close();
+            }
+            D.FillGeometry(path, Brush(c));
+        });
+    }
+
+    private static Vector2 Quad(Vector2 a, Vector2 b, Vector2 c, float t) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c;
+
     /// <summary>A picture from a file (the app's icon), fitted into a rectangle; read once, kept with the graphics.</summary>
     public void Image(string path, R r, float opacity = 1)
     {

@@ -21,8 +21,10 @@ public sealed class LoginLayer
     private double formShownAt, workingSince = -1, shakeAt = -100;
     private string? shownError;
 
-    /// <summary>The Mac's large control size: its fields and buttons.</summary>
-    private const float FieldH = 30, ButtonH = 30;
+    /// <summary>The Mac's large control size, as pictured: its fields 22 tall (12 apart), its buttons 30.</summary>
+    private const float FieldH = 22, FieldGap = 12, ButtonH = 30;
+    /// <summary>The Mac's title bar while the page shows: the card is centred in what is under it.</summary>
+    private const float TitleBar = 28;
 
     public LoginLayer(Engine.Engine engine)
     {
@@ -37,8 +39,10 @@ public sealed class LoginLayer
     public void Frame(Ui ui)
     {
         ui.T.Dark = AppView.Dark(engine.Snapshot?.Dark);
-        ui.Layer(Ui.Overlay);
+        // (the ground in the page's layer, under the cover's glass: a layer's glass reads what the layers under it drew)
+        ui.Layer(Ui.Page);
         ui.Fill(new R(0, 0, ui.W, ui.H), ui.T.Page);
+        ui.Layer(Ui.Overlay);
         if (assist.Phase == LoginAssist.Mode.Capture)
         {
             workingSince = -1;
@@ -79,29 +83,30 @@ public sealed class LoginLayer
         var error = assist.CaptureError;
         var note = error ?? "These go into your school’s own sign-in page. After you sign in, you can choose to stay logged in.";
         var noteH = ui.Measure(note, Theme.Callout, inner, 0).Y;
-        const float headerH = 44 + 8 + 27 + 8 + 18, fieldsH = FieldH + 10 + FieldH, buttonsH = ButtonH + 10 + 16;
+        const float headerH = 40 + 8 + 27 + 8 + 17, fieldsH = FieldH + FieldGap + FieldH, buttonsH = ButtonH + 10 + 16;
         var cardH = pad + headerH + gap + fieldsH + gap + noteH + gap + buttonsH + pad;
-        var card = new R(MathF.Round((ui.W - cardW) / 2), MathF.Round((ui.H - cardH) / 2), cardW, cardH);
+        var card = new R(MathF.Round((ui.W - cardW) / 2), MathF.Round(TitleBar + (ui.H - TitleBar - cardH) / 2), cardW, cardH);
         ui.Glass(card, 20, GlassKind.Panel, t.Card, 0.22f, Ui.Shadow.Panel);
         var x = card.X + pad;
         var y = card.Y + pad;
 
-        // the header: the lock, "Sign in to your school", where
-        ui.Icon("lock.shield.fill", card.CenterX, y + 22, 40, t.Accent);
-        y += 44 + 8;
+        // the header: the lock in its shield, "Sign in to your school", where
+        ui.Shield(card.CenterX, y + 20, 34, 40, t.Accent);
+        ui.Icon("lock", card.CenterX, y + 21, 15, new Color4(1, 1, 1, 1), FontWeight.SemiBold);
+        y += 40 + 8;
         ui.Text("Sign in to your school", x, y, Theme.Title2, t.Ink(), inner, TextAlignment.Center);
         y += 27 + 8;
         ui.Text($"Signing in at {assist.CaptureHost}", x, y, Theme.Callout, t.Ink2, inner, TextAlignment.Center);
-        y += 18 + gap;
+        y += 17 + gap;
 
         // the fields (shaken once, side to side, for a wrong password — as the Mac's own login window does)
         var shake = Shake(ui);
         foreach (var k in ui.Keys)
             if (k == Key.Tab) ui.Focus = ui.Focus == "login:user" ? "login:pass" : "login:user";
         var userR = new R(x + shake, y, inner, FieldH);
-        var passR = new R(x + shake, y + FieldH + 10, inner, FieldH);
-        var enterUser = ui.TextField("login:user", userR, ref user, "Username", Theme.Body, null, false, false, true);
-        var enterPass = ui.TextField("login:pass", passR, ref pass, "Password", Theme.Body, null, false, true, true);
+        var passR = new R(x + shake, y + FieldH + FieldGap, inner, FieldH);
+        var enterUser = ui.TextField("login:user", userR, ref user, "Username", Theme.Subheadline, null, false, false, true);
+        var enterPass = ui.TextField("login:pass", passR, ref pass, "Password", Theme.Subheadline, null, false, true, true);
         if (enterUser) ui.Focus = "login:pass";
         y += fieldsH + gap;
 
