@@ -9,7 +9,9 @@
 //   3. what is on the panels: words, icons, tracks (Direct2D);
 //   4. the lenses — knobs, thumbs, the bubble, the clear card — refracting the frame so far (Glass.h, no frost);
 //   5. what is on the lenses (Direct2D).
-// Corners: rounded, or squircles (continuous corners, as the Mac's) — the glass and every shape Direct2D draws alike.
+// Corners: cards are soft squircles (continuous corners: a superellipse of degree 3 over 1.5 × the radius), bars and
+// every other capsule are round — the glass and every shape Direct2D draws alike. (Tune → Corners → Round: round corners
+// for the cards too, to compare.)
 #include "Gfx.h"
 #include "Scene.h"
 #include "Spring.h"
@@ -31,8 +33,19 @@ struct Showcase {
     float band = 13;            // how deep the rim's bending band is
     float dispersion = 0.03f, saturation = 1.8f;
     float lift = 0.38f;         // how far what is behind is lifted toward the material's colour
-    float rim = 1.0f;           // the rim's light
-    bool squircle = false;      // corners: rounded (false) or continuous (true)
+    float rim = 0.53f;          // the rim's light
+    bool squircle = true;       // cards' corners: continuous (true) or round (false); bars are round capsules either way
+    static constexpr float kSquircleDegree = 3, kSquircleScale = 1.5f;
+
+    /// A shape's corners: a capsule (its radius reaching half its height) stays round; a card's are a soft squircle's.
+    /// Returns the superellipse's degree (0: round) and sets the radius to draw with.
+    float Corners(float hw, float hh, float& radius, int choice = -1) const {
+        bool sq = choice < 0 ? squircle : choice == 1;
+        float minHalf = std::min(hw, hh);
+        if (!sq || radius >= minHalf - 0.5f) { radius = std::min(radius, minHalf); return 0; }
+        radius = std::min(radius * kSquircleScale, minHalf);
+        return kSquircleDegree;
+    }
 
     // input (layout DIPs)
     float mx = -1, my = -1;
@@ -43,7 +56,7 @@ struct Showcase {
     // where things are
     float popX = 34, popY = 104, ctlX = -1, ctlY = 96, tuneX = -1, tuneY = 414, clearX = 622, clearY = 104;
     float grabX = 0, grabY = 0;
-    Spring bubbleX{ 700, 0.45f, 0.78f }, bubbleY{ 560, 0.45f, 0.78f };
+    Spring bubbleX{ 700, 0.45f, 0.78f }, bubbleY{ 400, 0.45f, 0.78f };
     std::vector<std::pair<double, std::pair<float, float>>> samples;
     std::unordered_map<std::string, Spring> springs;
     bool toggles[4] = { true, false, true, true };
@@ -113,19 +126,19 @@ struct Showcase {
     /// A lens of glass (a knob, a thumb, the bubble, the clear card): no frost, what is under it bent through its rim.
     void Lens(D2D1_RECT_F r, float radius, float power = 1, int kind = KindControl) { lenses.push_back({ r, radius, { 0, 0, 0, 0 }, 1, kind, power }); }
 
-    /// The shape of a rounded rectangle as the glass draws it: round corners, or a squircle's (a superellipse of degree 4
-    /// over 1.528 × the radius, as the shader's).
+    /// The shape of a rounded rectangle as the glass draws it (Corners: round, or a soft squircle's).
     ComPtr<ID2D1Geometry> Geo(D2D1_RECT_F r, float radius) {
         ComPtr<ID2D1Geometry> out;
         float hw = (r.right - r.left) / 2, hh = (r.bottom - r.top) / 2;
-        if (!squircle) {
+        float R = radius;
+        float degree = Corners(hw, hh, R);
+        if (degree == 0) {
             ComPtr<ID2D1RoundedRectangleGeometry> rr;
-            float rad = std::min(radius, std::min(hw, hh));
-            g.d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(r, rad, rad), &rr);
+            g.d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(r, R, R), &rr);
             out = rr;
             return out;
         }
-        float R = std::min(radius * 1.528f, std::min(hw, hh));
+        float e = 2 / degree;
         ComPtr<ID2D1PathGeometry> path;
         g.d2dFactory->CreatePathGeometry(&path);
         ComPtr<ID2D1GeometrySink> sink;
@@ -140,7 +153,7 @@ struct Showcase {
                 // from the edge before the corner to the edge after it (clockwise)
                 float t = (float)i / steps * 1.5707963f;
                 float a = (c % 2 == 0) ? 1.5707963f - t : t; // (top right and bottom left run from the vertical)
-                float ux = std::sqrt(std::cos(a)), uy = std::sqrt(std::sin(a));
+                float ux = std::pow(std::max(std::cos(a), 0.0f), e), uy = std::pow(std::max(std::sin(a), 0.0f), e);
                 D2D1_POINT_2F pt = D2D1::Point2F(cs[c].cx + cs[c].sx * R * ux, cs[c].cy + cs[c].sy * R * uy);
                 if (!begun) { sink->BeginFigure(pt, D2D1_FIGURE_BEGIN_FILLED); begun = true; }
                 else sink->AddLine(pt);
@@ -308,26 +321,8 @@ struct Showcase {
         float bw = 5 * 86 + 8;
         Segmented("tab", (W - bw) / 2, H - 78, 86, { L"Today", L"Courses", L"To Do", L"Grades", L"Search" }, tab);
 
-        CompareCorners();
         ClearCard();
         Bubble(W, H);
-    }
-
-    /// Round corners beside squircles (continuous corners), whatever Tune's Corners: a card each, and a bar each.
-    void CompareCorners() {
-        float x = clearX, y = clearY + kClearH + 22;
-        const wchar_t* names[] = { L"Round", L"Squircle" };
-        for (int i = 0; i < 2; i++) {
-            float cx = x + i * 160;
-            frosts.push_back({ D2D1::RectF(cx, y, cx + 140, y + 112), 26, { 0, 0, 0, 0 }, -1, KindPanel, 1, i });
-            frosts.push_back({ D2D1::RectF(cx, y + 126, cx + 140, y + 166), 20, { 0, 0, 0, 0 }, -1, KindPanel, 1, i });
-            const wchar_t* name = names[i];
-            content.push_back([=, this] {
-                Text(name, cx, y + 36, 140, 40, 16, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER);
-                Text(i ? L"continuous corners" : L"circular corners", cx, y + 62, 140, 24, 12, Ink2(), DWRITE_FONT_WEIGHT_NORMAL, DWRITE_TEXT_ALIGNMENT_CENTER);
-                Text(i ? L"Squircle bar" : L"Round bar", cx, y + 126, 140, 40, 13.5f, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER);
-            });
-        }
     }
 
     /// The Mac's popover, as screenshotted: Unread announcements.
@@ -397,7 +392,7 @@ struct Showcase {
         Segmented("backdrop", bx, by, 66, { L"Simpl", L"Grid", L"Photo" }, pick, false);
         scene.backdrop = shown[pick];
 
-        // the corners: rounded, or continuous (squircles)
+        // the cards' corners: soft squircles (the bars are round either way), or round to compare
         float cy = y + 102;
         content.push_back([=, this] { Text(L"Corners", x + 24, cy, 90, 40, 13.5f, Ink()); });
         int corners = squircle ? 1 : 0;
@@ -485,7 +480,7 @@ struct Showcase {
         l.hw = std::max((s.r.right - s.r.left) / 2, 1.0f) * k;
         l.hh = std::max((s.r.bottom - s.r.top) / 2, 1.0f) * k;
         l.radius = s.radius * k;
-        l.squircle = s.corners < 0 ? squircle : s.corners == 1;
+        l.squircle = Corners(l.hw, l.hh, l.radius, s.corners);
         l.dark = scene.dark;
         float minHalf = std::min(l.hw, l.hh);
         bool big = minHalf / k > 50;

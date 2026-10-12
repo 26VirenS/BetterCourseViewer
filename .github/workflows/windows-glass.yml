@@ -49,8 +49,8 @@ jobs:
             if (Test-Path "$name.txt") { Get-Content "$name.txt" }
             if (-not (Test-Path $name)) { throw "no picture: $name" }
           }
-          Shot 'shot-showcase.png' @()                                              # the Dashboard behind, round corners
-          Shot 'shot-showcase-squircle.png' @('--corners', 'squircle')              # the same with continuous corners
+          Shot 'shot-showcase.png' @()                                              # the Dashboard behind: soft squircle cards, round bars
+          Shot 'shot-showcase-round.png' @('--corners', 'round')                    # the same with round corners on the cards
           Shot 'shot-showcase-200.png' @('--dpi', '192')                            # as on a display scaled 200%
           Shot 'shot-showcase-clear.png' @('--backdrop', 'grid', '--frost', '0')    # clear glass over the grid: the bending
           Shot 'shot-showcase-photo.png' @('--backdrop', 'photo')                   # a photo Windows carries

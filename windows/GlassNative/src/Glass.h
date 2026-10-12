@@ -9,8 +9,8 @@
 //     colours it), its colours made a little richer;
 //   - the light: a thin rim, brightest along the top and the bottom, drawn from the glass's own colour made brighter (the
 //     two highlights at opposite angles of CASDFGlassHighlightEffect); a hairline of dark just outside; a soft shadow;
-//   - the shape: a rounded rectangle, or a squircle (continuous corners, as SwiftUI's .continuous: a superellipse of
-//     degree 4 over 1.528 × the radius).
+//   - the shape: a rounded rectangle, or a squircle — continuous corners, a superellipse (its degree and its radius
+//     set by the showcase: soft ones, degree 3 over 1.5 × the radius) — and a capsule (a bar) is always round.
 // The same shader draws a lens (a knob, a thumb, the bubble): no frost, the middle magnified, the rim bending hard.
 // Its HLSL is compiled when the app starts (d3dcompiler_47, part of Windows).
 #include "Gfx.h"
@@ -21,7 +21,7 @@ static const char* kGlassHlsl = R"HLSL(
 cbuffer Shape : register(b0) {
     float4 uRes;        // xy: target size (px)
     float4 uBox;        // xy: centre, zw: half size (px)
-    float4 uForm;       // x: corner radius (px), y: squircle (0/1), z: quad margin (px), w: px per DIP
+    float4 uForm;       // x: corner radius (px), y: the squircle's degree (0: round corners), z: quad margin (px), w: px per DIP
     float4 uOptics;     // x: frost mix, y: pull (px), z: band (px), w: magnify
     float4 uTone;       // x: keep (how much of what is behind shows), y: saturation, z: brightness, w: dispersion
     float4 uColor;      // rgb: the material's colour (what the rest lifts toward)
@@ -49,13 +49,15 @@ float ShapeSdf(float2 p) {
     float r = uForm.x;
     float2 a = abs(p);
     if (uForm.y > 0.5) {
-        float R = min(r * 1.528, min(h.x, h.y));
+        float n = uForm.y;
+        float R = min(r, min(h.x, h.y));
         float2 q = a - (h - R);
         if (q.x > 0.0 && q.y > 0.0) {
-            // a superellipse corner, degree 4; its distance corrected by its gradient so it stays near true pixels
-            float2 q2 = q * q, q4 = q2 * q2;
-            float m = pow(q4.x + q4.y, 0.25);
-            float2 g = (q2 * q) / max(m * m * m, 1e-4);
+            // a superellipse corner of degree n; its distance corrected by its gradient so it stays near true pixels
+            q = max(q, 1e-5);
+            float2 qn = pow(q, n);
+            float m = pow(qn.x + qn.y, 1.0 / n);
+            float2 g = pow(q, n - 1.0) / max(pow(m, n - 1.0), 1e-4);
             return (m - R) / max(length(g), 1e-3);
         }
         float2 e = a - h;
@@ -171,7 +173,7 @@ float4 BlurPS(VOut i) : SV_Target {
 /// One shape of glass, in pixels, with everything that makes up its look.
 struct GlassLook {
     float cx = 0, cy = 0, hw = 0, hh = 0, radius = 0;
-    bool squircle = false;
+    float squircle = 0;      // the corners' superellipse degree (0: round corners); radius already the squircle's
     float frost = 1, pull = 0, band = 1, magnify = 0;
     float keep = 1, saturation = 1, brightness = 1, dispersion = 0;
     float r = 0.5f, g = 0.5f, b = 0.5f;
@@ -316,7 +318,7 @@ struct Glass {
         float data[32] = {
             (float)tw, (float)th, 0, 0,
             l.cx, l.cy, l.hw, l.hh,
-            l.radius, l.squircle ? 1.0f : 0.0f, margin, scale,
+            l.radius, l.squircle, margin, scale,
             l.frost, l.pull, l.band, l.magnify,
             l.keep, l.saturation, l.brightness, l.dispersion,
             l.r, l.g, l.b, 1,

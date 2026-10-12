@@ -3,7 +3,7 @@
 // A picture dropped on the window becomes the backdrop.
 // --shot file.png: a picture of the frame after a few seconds (and file.png.txt: the graphics card and the frame rate),
 // then it quits — for CI. --dpi 192: as on a display scaled 200%. --backdrop simpl|grid|photo, --frost <pt> (0: clear),
-// --corners round|squircle and --image file: Tune's choices, set from the start.
+// --corners round (the cards' too; squircles by default) and --image file: Tune's choices, set from the start.
 #include "Gfx.h"
 #include "Showcase.h"
 #include <wincodec.h>
@@ -174,7 +174,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     if (backdrop == L"photo") s.scene.backdrop = BackdropPhoto;
     if (backdrop == L"grid") s.scene.backdrop = BackdropGrid;
     if (frostArg >= 0) s.frostSigma = std::clamp(frostArg, 0.0f, 30.0f);
-    if (corners == L"squircle") s.squircle = true;
+    if (corners == L"round") s.squircle = false;
     if (!image.empty()) s.scene.Open(image);
     DragAcceptFiles(hwnd, TRUE);
     if (!s.Init() && shot.empty()) {

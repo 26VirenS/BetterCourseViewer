@@ -7,8 +7,9 @@ code-signed).
 
 Try
   - Compare the "Unread announcements" popover with the Mac's.
-  - Tune > Corners: Round or Squircle (continuous corners) for every bar
-    and card; the "Round" and "Squircle" pair shows both side by side.
+  - Cards have soft squircle corners (continuous corners); bars are round
+    capsules. Tune > Corners > Round puts round corners on the cards too,
+    to compare.
   - Drag the popover and the panels around; drag the "Clear glass" card
     and the bubble (fling the bubble) over the backdrop.
   - Click Cards / List / Activity and the tabs at the bottom: a lens slides.
