@@ -27,8 +27,10 @@ internal sealed class PTElementPage : Grid
     private readonly ContentControl body = new() { Focusable = false };
     private readonly ScrollViewer scroller;
     private PTElement e;
-    private bool orbitals;
+    private PTModel show = PTModel.Atom;
     private string? subshellId;
+    /// <summary>The Cloud view's chosen subshell ("2p"; null: every electron) — apart from the Orbitals view's.</summary>
+    private string? cloudFocus;
     private int layout = -1;
     private ModelCard? model;
 
@@ -65,15 +67,22 @@ internal sealed class PTElementPage : Grid
         if (next.Number == e.Number) return;
         e = next;
         subshellId = null;
+        cloudFocus = null;
         Build();
         Motion.FadeIn(body, Motion.Normal);
         Shot.Moved();
     }
 
-    /// <summary>The model's Atom or Orbitals (the screenshot suite's --ptable-orbitals).</summary>
-    public void Orbitals(bool on)
+    /// <summary>The model's Atom, Orbitals or Cloud, and a subshell for it ("3d"; "all" for the whole cloud) — the screenshot
+    /// suite's --ptable-orbitals, --ptable-cloud and --ptable-subshell.</summary>
+    public void ShowModel(PTModel m, string? subshell = null)
     {
-        orbitals = on;
+        show = m;
+        if (subshell != null)
+        {
+            if (m == PTModel.Cloud) cloudFocus = subshell == "all" ? null : subshell;
+            else subshellId = subshell;
+        }
         model?.Sync();
     }
 
@@ -199,8 +208,9 @@ internal sealed class PTElementPage : Grid
         }
     }
 
-    /// <summary>The atom in 3D (or a subshell's orbitals) with Atom and Orbitals over it; under it, the parts' colours, or
-    /// the subshells to pick from and the orbitals' electrons.</summary>
+    /// <summary>The atom in 3D (or a subshell's orbitals, or the electron cloud) with Atom, Orbitals and Cloud over it; under
+    /// it, the parts' colours, or the subshells to pick from and the orbitals' electrons, or the cloud's subshells, colours
+    /// and words.</summary>
     private sealed class ModelCard
     {
         public readonly Border Card;
@@ -212,36 +222,162 @@ internal sealed class PTElementPage : Grid
         public ModelCard(PTElementPage page)
         {
             this.page = page;
-            selector = new SelectorBar(new[] { "Atom", "Orbitals" }, page.orbitals ? 1 : 0);
+            selector = new SelectorBar(new[] { "Atom", "Orbitals", "Cloud" }, (int)page.show);
             selector.Changed += i =>
             {
-                page.orbitals = i == 1;
-                if (page.orbitals) PTTour.Did(PTTourEvent.Orbitals);
+                page.show = (PTModel)i;
+                // (the tour's Orbitals step completes on Orbitals only: the Cloud is no step of it)
+                if (page.show == PTModel.Orbitals) PTTour.Did(PTTourEvent.Orbitals);
                 Refresh();
             };
-            var hint = K.Text("Drag to turn · scroll to zoom", Ty.Caption, B.Text2);
+            // (the hint wraps beside the three choices when the card is narrow, rather than being cut off)
+            var hint = K.Wrapped("Drag to turn · scroll to zoom", Ty.Caption, B.Text2);
+            hint.TextAlignment = TextAlignment.Right;
             hint.VerticalAlignment = VerticalAlignment.Center;
-            var head = K.Columns("auto, *, auto", selector.Col(0), hint.Margin(12, 0, 0, 0).Col(2));
+            var head = K.Columns("auto, *", selector.Col(0), hint.Margin(12, 0, 0, 0).Col(1));
             var frame = new Border { Height = 330, Child = atom, CornerRadius = new CornerRadius(8) };
             PTKit.RoundClip(frame, 8);
             Card = K.Card(K.V(10, head, frame, lower), new Thickness(16));
             Card.TourTarget("ptModel");
+            // (light and dark: the cloud's dots and the legend's colours follow)
+            Card.Loaded += (_, _) =>
+            {
+                Appearance.Changed -= OnAppearance;
+                Appearance.Changed += OnAppearance;
+            };
+            Card.Unloaded += (_, _) => Appearance.Changed -= OnAppearance;
             Refresh();
         }
+
+        private void OnAppearance() => Refresh();
 
         /// <summary>The selector set to the page's choice (asked for from outside), and the model with it.</summary>
         public void Sync()
         {
-            selector.Select(page.orbitals ? 1 : 0, false);
+            selector.Select((int)page.show, false);
             Refresh();
         }
 
         public void Refresh()
         {
             var sub = page.Subshell;
-            atom.Show(page.e, page.orbitals, sub);
-            lower.Content = page.orbitals && sub is { } s ? OrbitalParts(s) : Legend();
+            atom.Show(page.e, page.show, sub, page.cloudFocus);
+            lower.Content = page.show switch
+            {
+                PTModel.Cloud => CloudParts(),
+                PTModel.Orbitals when sub is { } s => OrbitalParts(s),
+                _ => Legend(),
+            };
             Shot.Moved();
+        }
+
+        // ---- the cloud's parts (cloud-spec.md §4.2) ----
+
+        /// <summary>Under the cloud: All and each subshell to choose from (the chosen one coloured, the rest grey), the
+        /// colours' legend, the chosen subshell's charge and size, and what the picture shows.</summary>
+        private FrameworkElement CloudParts()
+        {
+            var cloud = ElectronClouds.For(page.e);
+            var dark = Appearance.Dark;
+            var chosen = cloud.Subs.FirstOrDefault(s => s.Name == page.cloudFocus);
+            Color TypeColor(int l) => K.Hex((dark ? CloudRaster.DarkHex : CloudRaster.LightHex)[Math.Clamp(l, 0, 3)]);
+
+            // (the chips: All, then every subshell in order, core included, each with its colour's dot)
+            var chips = new WrapPanel { Orientation = Orientation.Horizontal };
+            FrameworkElement Chip(string label, int? l, bool on, string tip, string name, Action pick)
+            {
+                var t = PTKit.Text(label, 12, on ? FontWeights.Bold : FontWeights.Normal, B.Text, PTKit.Mono);
+                t.VerticalAlignment = VerticalAlignment.Center;
+                UIElement content = t;
+                if (l is { } type)
+                    content = K.H(5, new Ellipse { Width = 7, Height = 7, Fill = new SolidColorBrush(TypeColor(type)), VerticalAlignment = VerticalAlignment.Center }, t);
+                var pill = new Border { Child = content, Padding = new Thickness(9, 3, 9, 4), CornerRadius = new CornerRadius(11) };
+                if (on) pill.Background = new SolidColorBrush(K.WithAlpha(Appearance.Accent, 0.25)); else pill.Bg(B.Subtle);
+                var b = K.Subtle(pill, () =>
+                {
+                    // (the chosen one again: nothing to do)
+                    if (on) return;
+                    pick();
+                    Refresh();
+                }, new Thickness(0), 11);
+                b.Margin = new Thickness(0, 0, 6, 6);
+                b.ToolTip = tip;
+                System.Windows.Automation.AutomationProperties.SetName(b, on ? $"{name}, selected" : name);
+                return b;
+            }
+            chips.Children.Add(Chip("All", null, chosen == null, "Show every electron", "All electrons", () => page.cloudFocus = null));
+            foreach (var s in cloud.Subs)
+            {
+                var one = s.Count == 1;
+                var id = s.Name;
+                chips.Children.Add(Chip($"{s.Name}{PTConfig.Superscript(s.Count)}", s.L, ReferenceEquals(chosen, s),
+                    one ? $"Show the {s.Name} electron on its own" : $"Show the {s.Name} electrons on their own",
+                    one ? $"{s.Name}, 1 electron" : $"{s.Name}, {s.Count.ToString(CultureInfo.InvariantCulture)} electrons",
+                    () => page.cloudFocus = id));
+            }
+
+            // (the legend: each type's electrons, or the chosen subshell's and the rest's; the nucleus on the right)
+            FrameworkElement Part(string text, Color c, bool outlined = false)
+            {
+                var dot = new Ellipse { Width = 9, Height = 9, Fill = new SolidColorBrush(c), VerticalAlignment = VerticalAlignment.Center };
+                if (outlined)
+                {
+                    // (the rest's grey is quiet on the card by design: an edge so its legend dot can be seen)
+                    dot.SetResourceReference(Shape.StrokeProperty, B.Text2);
+                    dot.StrokeThickness = 1;
+                }
+                return K.H(5, dot, K.Text(text, Ty.Caption));
+            }
+            var parts = new WrapPanel { Orientation = Orientation.Horizontal };
+            void Add(FrameworkElement part) => parts.Children.Add(part.Margin(0, 0, 14, 0));
+            if (chosen == null)
+            {
+                for (var t = 0; t < 4; t++)
+                {
+                    var kind = t;
+                    var count = cloud.Subs.Where(s => s.L == kind).Sum(s => s.Count);
+                    if (count > 0) Add(Part($"{"spdf"[t]} · {count.ToString(CultureInfo.InvariantCulture)} e⁻", TypeColor(t)));
+                }
+            }
+            else
+            {
+                Add(Part($"{chosen.Name} · {chosen.Count.ToString(CultureInfo.InvariantCulture)} e⁻", TypeColor(chosen.L)));
+                var rest = cloud.Subs.Where(s => !ReferenceEquals(s, chosen)).Sum(s => s.Count);
+                if (rest > 0) Add(Part($"Rest · {rest.ToString(CultureInfo.InvariantCulture)} e⁻", K.Hex(dark ? CloudRaster.RestDark : CloudRaster.RestLight), outlined: true));
+            }
+            var nucleus = Part("Nucleus", K.Hex(dark ? CloudRaster.NucleusDark : CloudRaster.NucleusLight));
+            nucleus.VerticalAlignment = VerticalAlignment.Top;
+            var legend = K.Columns("*, auto", parts.Col(0), nucleus.Col(1));
+
+            var detail = chosen == null ? null : K.Wrapped(CloudDetail(chosen), Ty.Caption, B.Text).Tabular();
+            var caption = K.Wrapped(CloudCaption(cloud, chosen), Ty.Caption, B.Text2);
+            return K.V(10, chips, legend, detail, caption);
+        }
+
+        /// <summary>"2p² · effective nuclear charge 3.25 · on average 81 pm from the nucleus" (the Mac's ElectronCloud.detail).</summary>
+        private static string CloudDetail(ElectronCloud.Sub s)
+        {
+            var v = s.MeanRadius * ElectronCloud.BohrPm;
+            var pm = v < 10 ? v.ToString("0.0", CultureInfo.InvariantCulture) : ((int)Math.Round(v, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture);
+            return $"{s.Name}{PTConfig.Superscript(s.Count)} · effective nuclear charge {s.Zeff.ToString("0.00", CultureInfo.InvariantCulture)} · on average {pm} pm from the nucleus";
+        }
+
+        /// <summary>What the cloud shows: every electron, or only the chosen subshell's, and how much larger it is drawn than
+        /// in All (the Mac's ElectronCloud.caption, word for word).</summary>
+        private static string CloudCaption(ElectronCloud.Cloud c, ElectronCloud.Sub? s)
+        {
+            if (s == null)
+                return "Each dot is a place an electron could be found; the dots are densest where one is most likely to be. Electrons follow no paths. The centre dot is the nucleus, not to scale.";
+            var t = s.Count == 1 ? $"Only the {s.Name} electron is coloured" : $"Only the {s.Name} electrons are coloured";
+            t += c.Subs.Count > 1 ? "; the rest of the atom is grey." : ".";
+            t += " The dots are densest where an electron is most likely to be.";
+            var k = c.FrameAll / s.Radius(0.95);
+            if (k >= 1.5)
+            {
+                var times = k < 10 ? k.ToString("0.0", CultureInfo.InvariantCulture) : ((int)Math.Round(k, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture);
+                t += $" Drawn {times}× larger than in All.";
+            }
+            return t;
         }
 
         private FrameworkElement OrbitalParts(PTSubshell sub)

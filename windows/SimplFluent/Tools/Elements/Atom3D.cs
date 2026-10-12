@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using Simpl.Kit;
 using Simpl.Support;
@@ -10,12 +12,34 @@ namespace Simpl.Tools;
 
 // An element in 3D, for its page in the Periodic Table (the Mac's Atom3D.swift, SceneKit there; WPF's Viewport3D here):
 // its atom — the nucleus's protons and neutrons, each shell a ring with its electrons going round — or the shapes of a
-// subshell's orbitals, each with its electrons; turned by dragging, zoomed by the scroll wheel, and slowly turning on its
-// own (the nucleus spinning, the electrons going round, the orbitals revolving).
+// subshell's orbitals, each with its electrons, or (0.2.1) its electron cloud — every electron a cloud of dots, each dot a
+// place it could be found, densest where it most likely is, with no paths; turned by dragging, zoomed by the scroll wheel,
+// and slowly turning on its own (the nucleus spinning, the electrons going round, the orbitals revolving, the cloud turning
+// and now and then drawing a few of its dots afresh).
+
+/// <summary>The element page's three views of the atom (the Mac's PTModel): the Bohr-style atom, a subshell's orbitals, and
+/// the electron cloud (the quantum-mechanical model).</summary>
+internal enum PTModel { Atom, Orbitals, Cloud }
+
+/// <summary>Built clouds by element (at most six), so chips, appearance and the picker never sample again.</summary>
+internal static class ElectronClouds
+{
+    private static readonly Dictionary<int, ElectronCloud.Cloud> Cache = new();
+
+    public static ElectronCloud.Cloud For(PTElement e)
+    {
+        if (Cache.TryGetValue(e.Number, out var c)) return c;
+        c = ElectronCloud.Build(e.Number, PTConfig.Subshells(e).Select(s => (s.N, s.L, s.Count)).ToList());
+        if (Cache.Count >= 6) Cache.Clear();
+        Cache[e.Number] = c;
+        return c;
+    }
+}
 
 /// <summary>
-/// The 3D view of an element (the Mac's Atom3DView): its atom or a subshell's orbitals, lit from above left, on nothing (the
-/// card shows through). Drag turns it, the wheel zooms; it moves on its own while Windows' animation effects are on.
+/// The 3D view of an element (the Mac's Atom3DView): its atom or a subshell's orbitals, lit from above left, or its electron
+/// cloud, on nothing (the card shows through). Drag turns it, the wheel zooms; it moves on its own while Windows' animation
+/// effects are on.
 /// </summary>
 internal sealed class Atom3DView : Border
 {
@@ -26,6 +50,8 @@ internal sealed class Atom3DView : Border
     };
     private readonly ModelVisual3D holder = new();
     private readonly QuaternionRotation3D turnRotation = new();
+    private readonly CloudPicture cloud = new();
+    private PTModel mode = PTModel.Atom;
     private Quaternion turn = Quaternion.Identity;
     private double distance = 6, baseDistance = 6;
     private string key = "";
@@ -63,6 +89,11 @@ internal sealed class Atom3DView : Border
             turn.Normalize();
             turnRotation.Quaternion = turn;
             scene?.Sort(camera.Position);
+            if (mode == PTModel.Cloud)
+            {
+                cloud.Turn = turn;
+                cloud.Draw(force: true);
+            }
         };
         MouseLeftButtonUp += (_, _) => { dragFrom = null; ReleaseMouseCapture(); };
         LostMouseCapture += (_, _) => dragFrom = null;
@@ -71,24 +102,56 @@ internal sealed class Atom3DView : Border
             distance = Math.Clamp(distance * Math.Pow(0.9985, e.Delta), baseDistance * 0.35, baseDistance * 2.5);
             camera.Position = new Point3D(0, 0, distance);
             scene?.Sort(camera.Position);
+            if (mode == PTModel.Cloud)
+            {
+                cloud.Distance = distance;
+                cloud.Draw(force: true);
+            }
             e.Handled = true;
         };
         ToolTip = "Drag to turn · scroll to zoom";
         System.Windows.Automation.AutomationProperties.SetName(this, "The atom in 3D");
     }
 
-    /// <summary>The element's atom, or a subshell's orbitals (built again only when one of them changes).</summary>
-    public void Show(PTElement e, bool orbitals, PTSubshell? subshell)
+    /// <summary>The element's atom, a subshell's orbitals, or its electron cloud with one subshell (focus, "2p") or all of
+    /// them coloured (built again only when one of them, or light and dark, changes).</summary>
+    public void Show(PTElement e, PTModel model, PTSubshell? subshell, string? focus)
     {
-        var k = $"{e.Number}-{orbitals}-{subshell?.Id}";
+        var k = $"{e.Number}-{model}-{subshell?.Id}-{focus}-{Appearance.Dark}";
         if (k == key) return;
         key = k;
-        scene = orbitals ? AtomScene.Orbitals(subshell ?? new PTSubshell(1, 0, 1), turnRotation) : AtomScene.Atom(e, turnRotation);
-        holder.Content = scene.Root;
-        baseDistance = distance = scene.Distance;
-        camera.Position = new Point3D(0, 0, distance);
-        scene.Sort(camera.Position);
-        System.Windows.Automation.AutomationProperties.SetName(this, orbitals && subshell is { } s ? $"The {s.Name} orbitals of {e.Name} in 3D" : $"{e.Name}’s atom in 3D");
+        mode = model;
+        string name;
+        if (model == PTModel.Cloud)
+        {
+            // (the cloud is drawn in software into a bitmap: the 3D scene goes, and with it its spins)
+            Child = cloud;
+            holder.Content = null;
+            scene = null;
+            var c = ElectronClouds.For(e);
+            cloud.Set(c, focus, Appearance.Dark);
+            baseDistance = distance = CloudRaster.CameraDistance;
+            camera.Position = new Point3D(0, 0, distance);
+            cloud.Distance = distance;
+            cloud.Turn = turn;
+            cloud.Draw(force: true);
+            var chosen = c.Subs.FirstOrDefault(s => s.Name == focus);
+            name = chosen == null ? $"{e.Name}’s electron cloud in 3D"
+                : chosen.Count == 1 ? $"The {chosen.Name} electron of {e.Name} as a cloud in 3D"
+                : $"The {chosen.Name} electrons of {e.Name} as a cloud in 3D";
+        }
+        else
+        {
+            Child = view;
+            var orbitals = model == PTModel.Orbitals;
+            scene = orbitals ? AtomScene.Orbitals(subshell ?? new PTSubshell(1, 0, 1), turnRotation) : AtomScene.Atom(e, turnRotation);
+            holder.Content = scene.Root;
+            baseDistance = distance = scene.Distance;
+            camera.Position = new Point3D(0, 0, distance);
+            scene.Sort(camera.Position);
+            name = orbitals && subshell is { } s ? $"The {s.Name} orbitals of {e.Name} in 3D" : $"{e.Name}’s atom in 3D";
+        }
+        System.Windows.Automation.AutomationProperties.SetName(this, name);
     }
 
     /// <summary>SceneKit's 38° is the view's height; WPF's lens is measured across its width.</summary>
@@ -116,18 +179,173 @@ internal sealed class Atom3DView : Border
 
     private void Frame(object? sender, EventArgs e)
     {
-        if (e is not RenderingEventArgs r || scene == null) return;
+        if (e is not RenderingEventArgs r) return;
+        var cloudShown = mode == PTModel.Cloud;
+        var built = scene;
+        if (!cloudShown && built == null) return;
         if (last is { } l)
         {
             var dt = (r.RenderingTime - l).TotalSeconds;
             if (dt <= 0) return;
             if (dt < 0.5)
             {
-                foreach (var (rot, perSecond) in scene.Spins) rot.Angle = (rot.Angle + perSecond * dt) % 360;
-                scene.Sort(camera.Position);
+                if (cloudShown)
+                {
+                    // (still in a picture, or once Windows' animation effects are turned off)
+                    if (Motion.On && !Shot.Asked) cloud.Advance(dt);
+                }
+                else if (built != null)
+                {
+                    foreach (var (rot, perSecond) in built.Spins) rot.Angle = (rot.Angle + perSecond * dt) % 360;
+                    built.Sort(camera.Position);
+                }
             }
         }
         last = r.RenderingTime;
+        if (cloudShown) cloud.Draw();
+    }
+}
+
+/// <summary>
+/// The Cloud view's picture (cloud-spec.md §3, §5.2.2): the element's dots, framed by the chosen subshell (or the whole
+/// atom), tipped to the pose, slowly turning about the vertical and turned by the drag, drawn by <see cref="CloudRaster"/>
+/// into a bitmap at the screen's own pixels — at most 30 times a second while it turns, else only when something changes
+/// (input, a new choice, a new size, light or dark). Now and then a few dots are drawn afresh (the shimmer), in a copy:
+/// the cached cloud stays as it was built.
+/// </summary>
+internal sealed class CloudPicture : FrameworkElement
+{
+    private readonly CloudRaster raster = new();
+    private readonly Stopwatch clock = Stopwatch.StartNew();
+    private WriteableBitmap? bitmap;
+    private ElectronCloud.Cloud? cloud;
+    private double[] x = Array.Empty<double>(), y = Array.Empty<double>(), z = Array.Empty<double>();
+    private int n;
+    private int[] subL = Array.Empty<int>();
+    private int focus = -1;
+    private double frame = 1;
+    private bool dark;
+    private double spin;
+    private double shimmerDue;
+    private ElectronCloud.Rng shimmer;
+    private Quaternion turn = Quaternion.Identity;
+    private double distance = CloudRaster.CameraDistance;
+    private bool dirty;
+    private TimeSpan lastDraw = TimeSpan.FromSeconds(-1);
+
+    public CloudPicture()
+    {
+        IsHitTestVisible = false;
+        RenderOptions.SetBitmapScalingMode(this, BitmapScalingMode.NearestNeighbor);
+        SizeChanged += (_, _) =>
+        {
+            dirty = true;
+            Draw(force: true);
+        };
+    }
+
+    /// <summary>The drag's turn (applied last, after the pose and the spin).</summary>
+    public Quaternion Turn
+    {
+        get => turn;
+        set { turn = value; dirty = true; }
+    }
+
+    /// <summary>The camera's distance in scene units (4, unless zoomed).</summary>
+    public double Distance
+    {
+        get => distance;
+        set { distance = value; dirty = true; }
+    }
+
+    /// <summary>A cloud to show, with one subshell chosen (its name, "2p") or all of them (null, or a name it lacks).</summary>
+    public void Set(ElectronCloud.Cloud c, string? focusId, bool dark)
+    {
+        cloud = c;
+        x = (double[])c.X.Clone();
+        y = (double[])c.Y.Clone();
+        z = (double[])c.Zs.Clone();
+        n = x.Length;
+        subL = c.Subs.Select(s => s.L).ToArray();
+        focus = c.Subs.FindIndex(s => s.Name == focusId);
+        frame = focus < 0 ? c.FrameAll : c.Subs[focus].Radius(0.95);
+        this.dark = dark;
+        shimmer = new ElectronCloud.Rng((ulong)c.Z ^ 0x5DEECE66DUL);
+        spin = 0;
+        shimmerDue = 0;
+        dirty = true;
+    }
+
+    /// <summary>Time going by (only while motion is allowed): the spin, 360° in 40 s, and the shimmer's ticks, ten a second.</summary>
+    public void Advance(double dt)
+    {
+        if (cloud == null) return;
+        spin = (spin + dt * 2 * Math.PI / 40) % (2 * Math.PI);
+        shimmerDue += dt;
+        while (shimmerDue >= 0.1)
+        {
+            shimmerDue -= 0.1;
+            Shimmer();
+        }
+        dirty = true;
+    }
+
+    /// <summary>A tick of the shimmer: 0.5% of the dots drawn afresh, each from its own subshell and orbital, by a second
+    /// generator (cloud-spec.md §2.8).</summary>
+    private void Shimmer()
+    {
+        if (cloud is not { } c || n == 0) return;
+        var m = Math.Max(1, n / 200);
+        for (var k = 0; k < m; k++)
+        {
+            var i = Math.Min(n - 1, (int)(shimmer.Next() * n));
+            var (px, py, pz) = ElectronCloud.Sample(ref shimmer, c.Subs[c.SubIndex[i]], c.Orbital[i]);
+            x[i] = px;
+            y[i] = py;
+            z[i] = pz;
+        }
+    }
+
+    /// <summary>Draws the cloud into the bitmap when something has changed — at most 30 times a second, unless forced (input).</summary>
+    public void Draw(bool force = false)
+    {
+        if (!dirty || cloud is not { } c || ActualWidth < 1 || ActualHeight < 1) return;
+        var now = clock.Elapsed;
+        if (!force && (now - lastDraw).TotalSeconds < 1.0 / 30) return;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var w = (int)Math.Round(ActualWidth * dpi.DpiScaleX);
+        var h = (int)Math.Round(ActualHeight * dpi.DpiScaleY);
+        if (w < 1 || h < 1) return;
+        if (bitmap == null || bitmap.PixelWidth != w || bitmap.PixelHeight != h
+            || Math.Abs(bitmap.DpiX - 96 * dpi.DpiScaleX) > 0.01 || Math.Abs(bitmap.DpiY - 96 * dpi.DpiScaleY) > 0.01)
+        {
+            bitmap = new WriteableBitmap(w, h, 96 * dpi.DpiScaleX, 96 * dpi.DpiScaleY, PixelFormats.Pbgra32, null);
+            raster.Resize(w, h);
+            InvalidateVisual();
+        }
+        var m = Matrix3D.Identity;
+        m.Rotate(new Quaternion(new Vector3D(1, 0, 0), -1.0 * 180 / Math.PI));   // the pose: x first …
+        m.Rotate(new Quaternion(new Vector3D(0, 1, 0), -0.6 * 180 / Math.PI));   // … then y
+        m.Rotate(new Quaternion(new Vector3D(0, 1, 0), spin * 180 / Math.PI));   // the spin
+        m.Rotate(turn);                                                          // the drag
+        // (WPF multiplies row vectors, p·M: the column-vector matrix the raster takes is its transpose)
+        double[] r = { m.M11, m.M21, m.M31, m.M12, m.M22, m.M32, m.M13, m.M23, m.M33 };
+        raster.Draw(x, y, z, c.SubIndex, subL, focus, frame, r, distance, dpi.DpiScaleY, dark);
+        bitmap.WritePixels(new Int32Rect(0, 0, w, h), raster.Pixels, w * 4, 0);
+        dirty = false;
+        lastDraw = now;
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        dirty = true;
+        Draw(force: true);
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        if (bitmap != null) dc.DrawImage(bitmap, new Rect(0, 0, ActualWidth, ActualHeight));
     }
 }
 

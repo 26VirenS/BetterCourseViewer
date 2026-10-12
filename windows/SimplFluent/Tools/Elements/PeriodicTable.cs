@@ -310,11 +310,12 @@ internal static class PTCornerCard
 /// </summary>
 /// <remarks>
 /// The screenshot suite's flags (the Mac's -SimplPT… defaults): --ptable-element Fe (an element's page; a number, symbol or
-/// name), --ptable-orbitals (its model showing orbitals), --ptable-colour electronegativity (category, electronegativity,
-/// radius, ionization, affinity, melting, boiling, density, block, state), --ptable-category metalloid (a kind lit),
-/// --ptable-hover Fe (that element's card in the table's top), --ptable-page lewis|molecules, --ptable-molecule Ethanol,
-/// --ptable-lewis "NO₃⁻", --ptable-search ne (the header's search open with its results), --ptable-tour 4 (the tour at
-/// its fourth step), and --ptable-pin-element 25 for the pin's flyout.
+/// name), --ptable-orbitals (its model showing orbitals), --ptable-cloud (its model showing the electron cloud),
+/// --ptable-subshell 3d (with either of those, the subshell shown; "all" for the whole cloud), --ptable-colour
+/// electronegativity (category, electronegativity, radius, ionization, affinity, melting, boiling, density, block, state),
+/// --ptable-category metalloid (a kind lit), --ptable-hover Fe (that element's card in the table's top), --ptable-page
+/// lewis|molecules, --ptable-molecule Ethanol, --ptable-lewis "NO₃⁻", --ptable-search ne (the header's search open with its
+/// results), --ptable-tour 4 (the tour at its fourth step), and --ptable-pin-element 25 for the pin's flyout.
 /// </remarks>
 internal sealed class PeriodicTableTool : Grid
 {
@@ -335,6 +336,8 @@ internal sealed class PeriodicTableTool : Grid
     private int version;
     private bool firstLoad = true;
     private bool orbitalsAsked;
+    private bool cloudAsked;
+    private string? subshellAsked;
 
     // the tour
     private List<PTTourStep> steps = new();
@@ -382,6 +385,8 @@ internal sealed class PeriodicTableTool : Grid
         if (Launch.Take("", "ptable-category") is { } cat && PTCategory.All.FirstOrDefault(k => string.Equals(k.Key, cat.Trim(), StringComparison.OrdinalIgnoreCase)) is { } kind) PTState.Category = kind.Key;
         if (Launch.Take("", "ptable-page") is { } pg && PTNav.Parse(pg) is { } pv) PTNav.Page = pv;
         orbitalsAsked = Launch.Take("", "ptable-orbitals") != null;
+        cloudAsked = Launch.Take("", "ptable-cloud") != null;
+        subshellAsked = Launch.Take("", "ptable-subshell");
         var molecule = Launch.Take("", "ptable-molecule");
         var lewisAsk = Launch.Take("", "ptable-lewis");
         var tourAt = Launch.Take("", "ptable-tour");
@@ -397,7 +402,7 @@ internal sealed class PeriodicTableTool : Grid
 
         // the tour: its step for the screenshot suite (--ptable-tour 5, as the app's own --open tour:5), else on the
         // first opening — not in a development run or while the suite pictures the tool
-        var picture = molecule != null || lewisAsk != null || hover != null || handed != null || orbitalsAsked || Launch.Get("ptable-search") != null
+        var picture = molecule != null || lewisAsk != null || hover != null || handed != null || orbitalsAsked || cloudAsked || Launch.Get("ptable-search") != null
                       || Launch.Get("ptable-colour") != null || Launch.Get("ptable-page") != null || Launch.IsDevelopment;
         if (tourAt != null) tourAsked = int.TryParse(tourAt.Trim(':', ' '), out var n) ? Math.Max(0, n - 1) : 0;
         else if (!c.Quick && !Prefs.Bool("simpl.ptTourSeen") && !picture) tourAsked = -1;
@@ -428,7 +433,8 @@ internal sealed class PeriodicTableTool : Grid
         if (firstLoad)
         {
             firstLoad = false;
-            if (orbitalsAsked) page?.Orbitals(true);
+            if (cloudAsked) page?.ShowModel(PTModel.Cloud, subshellAsked);
+            else if (orbitalsAsked) page?.ShowModel(PTModel.Orbitals, subshellAsked);
             if (tourAsked is { } at) PTKit.After(at < 0 ? 0.6 : 1.2, () => { if (IsLoaded) Tour(Math.Max(0, at)); });
         }
         if (tourStep != null) DrawTour();

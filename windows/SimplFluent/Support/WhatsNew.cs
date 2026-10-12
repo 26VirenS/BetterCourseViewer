@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.1", "2026-10-12",
+            ("new", "Electron cloud model", "A Cloud view: dots show where electrons are likely to be."),
+            ("new", "One subshell at a time", "Pick a subshell such as 3d; the rest of the atom goes grey.")),
         R("0.2.0", "2026-10-12",
             ("new", "Made for Windows 11", "Mica, the Settings app's navigation, cards and motion."),
             ("new", "Signing in", "Find your school, confirm it, and sign in with Simpl's own card."),

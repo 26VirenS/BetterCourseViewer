@@ -41,9 +41,9 @@ jobs:
       - name: Build (Release, win-x64, self-contained)
         shell: bash
         run: |
-          # (the build carries its run's number — "0.2.0 (v003)" — as About and Updates name it)
+          # (the build carries its run's number — "0.2.1 (v003)" — as About and Updates name it)
           n=$(printf '%03d' "${{ github.run_number }}")
-          dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.0 (v$n)"
+          dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.1 (v$n)"
           test -f dist/Simpl/Simpl.exe
       - name: Mock Canvas
         shell: bash
@@ -170,6 +170,8 @@ jobs:
           Shot 'ptable-search' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-search', 'ne'))
           Shot 'ptable-element' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe'))
           Shot 'ptable-orbitals' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'C', '--ptable-orbitals'))
+          Shot 'ptable-cloud' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'C', '--ptable-cloud'))
+          Shot 'ptable-cloud-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe', '--ptable-cloud', '--ptable-subshell', '3d'))
           Shot 'ptable-tour' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '1'))
           Shot 'ptable-lewis' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-lewis', 'NO3-'))
           Shot 'ptable-molecule' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-molecule', 'Ethanol'))
