@@ -183,7 +183,7 @@ public sealed class GlassSegmented : Grid
         Children.Add(labels);
         thumb = new LiquidGlass
         {
-            Backdrop = labels, Capsule = true, BlurRadius = 0.5, Refraction = 9, Bevel = 12, Dispersion = 0.35, TintAmount = 0.1,
+            Backdrop = labels, Capsule = true, BlurRadius = 0.5, Refraction = 9, Bevel = 12, Dispersion = 0.35, TintAmount = darkText ? 0.78 : 0.2,
             Tint = Colors.White, Saturation = 1.3, Rim = 0.6, Glow = 0.12, ShadowOpacity = 0.15, PressGrowth = 0,
             Width = segment - 6, Height = 28, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(3, 0, 0, 0), RenderTransform = move,

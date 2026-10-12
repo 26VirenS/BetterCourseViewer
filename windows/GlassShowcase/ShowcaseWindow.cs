@@ -26,14 +26,17 @@ public sealed class ShowcaseWindow : Window
     public ShowcaseWindow()
     {
         Title = "Liquid Glass for Windows — Simpl";
-        Width = 1360;
-        Height = 860;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = Brushes.Black;
-        var root = new Grid();
+        var root = new Grid { Width = 1360, Height = 860 };
         root.Children.Add(scene);
         root.Children.Add(glassLayer);
-        Content = root;
+        // (a smaller screen: the whole showcase scaled to fit it, glass and all)
+        var area = SystemParameters.WorkArea;
+        var fit = Math.Min(1, Math.Min((area.Width - 24) / 1360, (area.Height - 48) / 860));
+        Content = new Viewbox { Child = root, Stretch = Stretch.Uniform };
+        Width = 1360 * fit + 16;
+        Height = 860 * fit + 39;
         Loaded += (_, _) => Build();
         SizeChanged += (_, _) => Layout();
     }
@@ -73,12 +76,12 @@ public sealed class ShowcaseWindow : Window
         panels.Clear();
         placed.Clear();
         scene.Dark = dark;
-        Place("popover", Popover(), 60, 150);
+        Place("popover", Popover(), 32, 104);
         Place("toolbar", Toolbar(), 0, 18);
-        Place("controls", ControlsPanel(), 0, 150);
+        Place("controls", ControlsPanel(), 0, 96);
         Place("tabbar", TabBar(), 0, 0);
         Place("tune", TunePanel(), 0, 0);
-        Place("lens", Lens(), 560, 420);
+        Place("lens", Lens(), 640, 560);
         Layout();
     }
 
@@ -87,9 +90,9 @@ public sealed class ShowcaseWindow : Window
         var w = glassLayer.ActualWidth > 0 ? glassLayer.ActualWidth : Width;
         var h = glassLayer.ActualHeight > 0 ? glassLayer.ActualHeight : Height;
         if (placed.TryGetValue("toolbar", out var tb)) Canvas.SetLeft(tb, Math.Max(20, (w - 760) / 2));
-        if (placed.TryGetValue("controls", out var cp)) Canvas.SetLeft(cp, w - 360 - 40);
+        if (placed.TryGetValue("controls", out var cp)) Canvas.SetLeft(cp, w - 344 - 36);
         if (placed.TryGetValue("tabbar", out var tab)) { Canvas.SetLeft(tab, Math.Max(20, (w - 420) / 2)); Canvas.SetTop(tab, h - 96); }
-        if (placed.TryGetValue("tune", out var tune)) { Canvas.SetLeft(tune, w - 360 - 40); Canvas.SetTop(tune, 470); }
+        if (placed.TryGetValue("tune", out var tune)) { Canvas.SetLeft(tune, w - 344 - 36 - 344 - 20); Canvas.SetTop(tune, 96); }
     }
 
     // MARK: - The Mac's popover (the screenshot's): Unread announcements
@@ -246,8 +249,8 @@ public sealed class ShowcaseWindow : Window
     {
         var g = new LiquidGlass { Backdrop = scene, Capsule = true, Width = 150, Height = 150, BlurRadius = 3, Refraction = 26, Bevel = 44, Dispersion = 0.5, TintAmount = 0.04, Saturation = 1.3, Rim = 0.6, Glow = 0.08, ShadowOpacity = 0.3, Interactive = true, PressGrowth = 0.06 };
         panels.Add(g);
-        var sx = new Spring(560, 0.45, 0.78);
-        var sy = new Spring(420, 0.45, 0.78);
+        var sx = new Spring(640, 0.45, 0.78);
+        var sy = new Spring(560, 0.45, 0.78);
         sx.Changed += v => Canvas.SetLeft(g, v);
         sy.Changed += v => Canvas.SetTop(g, v);
         Point grab = default;

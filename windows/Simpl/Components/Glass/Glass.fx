@@ -63,16 +63,24 @@ float4 main(float2 uv : TEXCOORD) : COLOR
     col = lerp(col, tint.rgb, tint.a);
     col *= tone.x;
 
+    // over a backdrop that is partly see-through (a control's own layer: its words on nothing), what is not there is
+    // the tint alone, as thin as it is — never black: premultiplied, the backdrop's share and the tint's share
+    float3 pc = col * a + tint.rgb * tint.a * (1.0 - a);
+    float pa = a + tint.a * (1.0 - a);
+
     // the rim: a hairline of light, brightest facing the light and on the far side; and a soft lift inside it
     float hair = 1.0 - saturate(d / 1.6);
     float facing = dot(-n, light.xy);
     float lit = 0.35 + 0.65 * pow(abs(facing), 1.5);
-    col += hair * lit * light.z;
+    float rimLight = hair * lit * light.z;
     float glow = 1.0 - saturate(d / (bevel * 0.9));
-    col += glow * glow * light.w * (0.6 + 0.4 * saturate(facing));
+    float glowLight = glow * glow * light.w * (0.6 + 0.4 * saturate(facing));
     // pressed: a little light gathered in the middle
-    col += tone.z * 0.06 * (1.0 - saturate(length(p / h)));
+    float pressLight = tone.z * 0.06 * (1.0 - saturate(length(p / h)));
+    float added = rimLight + glowLight + pressLight;
+    pc += added;
+    pa = saturate(pa + added);
 
-    float alpha = cover * tone.y;
-    return float4(saturate(col) * alpha, alpha);
+    float k2 = cover * tone.y;
+    return float4(min(pc, pa) * k2, pa * k2);
 }
