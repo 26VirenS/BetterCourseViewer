@@ -489,25 +489,31 @@ private struct DevDefaults: View {
 /// While a Critical Update installs: a notice over the window — Simpl restarts on it in a moment.
 struct CriticalUpdateNotice: View {
     @ObservedObject private var u = Updater.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if let v = u.criticalNotice {
-            HStack(spacing: 10) {
-                Image(systemName: "exclamationmark.shield.fill").foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Installing a Critical Update").font(.sCallout.weight(.semibold))
-                    Text(status(v)).font(.sFootnote).foregroundStyle(.secondary)
+        ZStack {
+            if let v = u.criticalNotice {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.shield.fill").foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Installing a Critical Update").font(.sCallout.weight(.semibold))
+                        Text(status(v)).font(.sFootnote).foregroundStyle(.secondary)
+                    }
+                    if case .downloading(let f) = u.state {
+                        ProgressView(value: f).frame(width: 90)
+                    }
                 }
-                if case .downloading(let f) = u.state {
-                    ProgressView(value: f).frame(width: 90)
-                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassCard(radius: 18)
+                .padding(.top, 12)
+                .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.move(edge: .top).combined(with: .opacity))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .glassCard(radius: 18)
-            .padding(.top, 12)
-            .transition(.move(edge: .top).combined(with: .opacity))
         }
+        // (1.3.76: outside the if, as the quiz's banner has it — Updater sets the notice plainly, so the transition
+        // never ran and the capsule cut in. It comes down from the top and goes back up; under Reduce Motion it fades)
+        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Motion.gentle, value: u.criticalNotice)
     }
 
     private func status(_ v: String) -> String {

@@ -91,16 +91,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct ContentView: View {
     @EnvironmentObject private var session: AppSession
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Group {
+        // (1.3.76) the picker and the school's window crossfade, on the engine's own curve for its splash and the app
+        // (Engine.setPhase), so Yes, Sign In and Change School read as one fade with what comes after
+        ZStack {
             if let host = session.host {
                 RootView(host: host)
                     .id(host) // a different school is a different engine
+                    .transition(.opacity)
             } else {
                 SchoolPicker()
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: reduceMotion ? 0.2 : 0.35), value: session.host)
         .onOpenURL { url in ContentView.open(url) }
     }
 
