@@ -58,6 +58,10 @@ public static class Updates
 
     public static bool Automatic { get => Prefs.Bool("updates:auto", true); set { Prefs.Set("updates:auto", value); Changed?.Invoke(); } }
     public static bool Beta { get => Prefs.Bool("updates:beta", false); set { Prefs.Set("updates:beta", value); Changed?.Invoke(); } }
+
+    /// <summary>This copy is itself a preview (0.x: every Windows 11-look build so far, each published as a pre-release):
+    /// the next preview is its ordinary update, betas asked for or not — without it, a new install never found one.</summary>
+    private static bool Preview => Version.StartsWith("0.", StringComparison.Ordinal);
     public static DateTime? LastCheck
     {
         get => DateTime.TryParse(Prefs.String("updates:checked"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d : null;
@@ -115,7 +119,7 @@ public static class Updates
         try
         {
             var list = await Releases();
-            var newest = list.FirstOrDefault(r => Beta || !r.Beta);
+            var newest = list.FirstOrDefault(r => Beta || !r.Beta || Preview);
             if (newest != null && newest.Run > CurrentRun)
             {
                 // (the same version downloaded already: ready to install as it was)
