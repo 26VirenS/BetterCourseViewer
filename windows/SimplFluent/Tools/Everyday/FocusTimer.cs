@@ -323,7 +323,6 @@ public sealed class FocusTimer : ITimerState
         ArmTicker();
         // (the screenshot suite: --focus-start starts a session, for the title bar's live timer — as the Mac's SimplFocusDemo)
         if (Launch.Take("", "focus-start") != null && !Running) Start(false);
-        EverydayLaunch.Pins();
     }
 
     private void Save()

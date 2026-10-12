@@ -153,17 +153,3 @@ internal sealed class LeftMax : Decorator
         return final;
     }
 }
-
-/// <summary>
-/// The screenshot suite's pins (as the Mac's defaults set for a picture): --pin calc,pomo pins those tools to the title
-/// bar. Read with the focus timer's first look, the first of the tools' code a window runs (its pin's state).
-/// </summary>
-internal static class EverydayLaunch
-{
-    public static void Pins()
-    {
-        if (Launch.Take("", "pin") is not { Length: > 0 } keys) return;
-        foreach (var k in keys.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            if (ToolsCenter.KindOf(k) != null && !ToolsPins.IsPinned(k)) ToolsPins.Toggle(k);
-    }
-}

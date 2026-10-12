@@ -5,6 +5,7 @@ using Simpl.Kit;
 using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
+using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace Simpl.Screens;
 
@@ -141,14 +142,44 @@ public sealed class ToolsScreen : Screen
         return true;
     }
 
+    /// <summary>The focus timer's tile, while a session goes: its phase and what is left, counted down each second.</summary>
+    private TextBlock? timerLine;
+    private readonly System.Windows.Threading.DispatcherTimer clock = new() { Interval = TimeSpan.FromSeconds(1) };
+    private Simpl.Tools.ITimerState? watched;
+
+    private static string TimerWords(Simpl.Tools.ITimerState t) => $"{t.PhaseName} · {Simpl.Tools.PinBar.Clock(t.Remaining)}{(t.Paused ? " · Paused" : "")}";
+
+    private void TimerChanged()
+    {
+        if (Open == null) Render(); // (started, paused, a phase over: the tile again)
+    }
+
+    private void Tick()
+    {
+        if (timerLine == null || Open != null || Simpl.Tools.ToolRegistry.Timer is not { Active: true } t) return;
+        timerLine.Text = TimerWords(t);
+        timerLine.Foreground = new SolidColorBrush(t.PhaseColor);
+    }
+
     public override void Refresh()
     {
+        if (!ReferenceEquals(watched, Simpl.Tools.ToolRegistry.Timer))
+        {
+            if (watched != null) watched.Changed -= TimerChanged;
+            watched = Simpl.Tools.ToolRegistry.Timer;
+            if (watched != null) watched.Changed += TimerChanged;
+        }
+        clock.Tick -= OnClock;
+        clock.Tick += OnClock;
+        clock.Start();
         // (a pin changed anywhere — here, a sheet, the title bar — shows on the tiles while the page is up)
         ToolsPins.Changed -= PinsChanged;
         ToolsPins.Changed += PinsChanged;
         // (the screenshot suite: --tool calc opens the Calculator, as the Mac's -SimplTool)
         if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.Any(t => t.Key == k)) Simpl.Tools.ToolsCenter.Open = k;
     }
+
+    private void OnClock(object? sender, EventArgs e) => Tick();
 
     private void PinsChanged()
     {
@@ -159,6 +190,8 @@ public sealed class ToolsScreen : Screen
     {
         base.Hide();
         ToolsPins.Changed -= PinsChanged;
+        clock.Stop();
+        if (watched != null) { watched.Changed -= TimerChanged; watched = null; }
     }
 
     private Simpl.Tools.ToolContext Context(Kind k) => new() { Engine = engine, Key = k.Key, Owner = Window.GetWindow(View) };
@@ -179,6 +212,7 @@ public sealed class ToolsScreen : Screen
         }
         shown = null;
         toolView = null;
+        timerLine = null;
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
         var grid = new MoreGrid(300, 16, Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true);
         page.Children.Add(grid);
@@ -196,9 +230,10 @@ public sealed class ToolsScreen : Screen
         var words = K.V(4, K.Text(kind.Name, Ty.BodyStrong), K.Wrapped(kind.Note, Ty.Body, B.Text2));
         if (kind.Key == "pomo" && Simpl.Tools.ToolRegistry.Timer is { Active: true } t)
         {
-            var live = K.Text($"{t.PhaseName} · {Simpl.Tools.PinBar.Clock(t.Remaining)}{(t.Paused ? " · Paused" : "")}", Ty.BodyStrong);
-            live.Foreground = new SolidColorBrush(t.PhaseColor);
-            words.Children.Add(live);
+            timerLine = K.Text(TimerWords(t), Ty.BodyStrong);
+            timerLine.Foreground = new SolidColorBrush(t.PhaseColor);
+            Simpl.Tools.FontFeatureExtensions.FontFeatures(timerLine);
+            words.Children.Add(timerLine);
         }
         var g = K.Columns("auto, *", K.IconTile(kind.Symbol, kind.Color, 48).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 0, 14, 0).Col(0), words.Margin(0, 0, 36, 0).Col(1));
         var card = K.CardButton(g, () => OpenTool(engine, kind, View), 8, new Thickness(18));
