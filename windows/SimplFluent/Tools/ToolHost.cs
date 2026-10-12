@@ -418,8 +418,16 @@ public static class ToolPopup
     }
 
     /// <summary>A tool not here yet: says so.</summary>
-    public static FrameworkElement Missing(ToolsScreen.Kind kind) =>
-        K.Empty(kind.Symbol, $"{kind.Name} is on its way to Simpl for Windows.").Margin(40);
+    public static FrameworkElement Missing(ToolsScreen.Kind kind)
+    {
+        var v = K.V(14, K.IconTile(kind.Symbol, kind.Color, 56).Align(HorizontalAlignment.Center),
+            K.Text(kind.Name, Ty.Subtitle).Center(),
+            K.Wrapped($"{kind.Name} is on its way to Simpl for Windows.", Ty.Body, B.Text2).Center());
+        v.HorizontalAlignment = HorizontalAlignment.Center;
+        v.VerticalAlignment = VerticalAlignment.Center;
+        v.Margin = new Thickness(40, 0, 40, 60);
+        return new Grid { Children = { v } };
+    }
 }
 
 /// <summary>A tool's heading over it when opened whole: Done, its tile, its name and line, its own controls, its pin.</summary>
@@ -629,10 +637,12 @@ public sealed class PinBar : StackPanel
         card.Bg(B.Flyout);
         card.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
         card.SetResourceReference(TextElement.ForegroundProperty, B.Text);
+        // (its right edge under its pin's: the pins sit at the window's right, so the flyout opens towards the page)
+        var target = (FrameworkElement?)anchor ?? this;
         flyout = new Popup
         {
-            Child = card, StaysOpen = false, AllowsTransparency = true, PlacementTarget = (UIElement?)anchor ?? this,
-            Placement = PlacementMode.Bottom, HorizontalOffset = -12, PopupAnimation = PopupAnimation.None,
+            Child = card, StaysOpen = false, AllowsTransparency = true, PlacementTarget = target,
+            Placement = PlacementMode.Bottom, HorizontalOffset = target.ActualWidth - (card.Width + 24) + 12, PopupAnimation = PopupAnimation.None,
         };
         flyoutKey = key;
         flyout.Closed += (_, _) => { if (flyout?.IsOpen != true) { flyout = null; flyoutKey = null; } };

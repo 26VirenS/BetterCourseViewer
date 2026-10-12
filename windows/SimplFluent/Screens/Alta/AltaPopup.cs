@@ -86,7 +86,7 @@ internal sealed class AltaPopupView
         root.Children.Add(layer);
     }
 
-    private FrameworkElement Tile(double size) => K.IconTile(SymbolRegular.Brain24, AltaLook.Accent, size);
+    private FrameworkElement Tile(double size) => K.IconTile(SymbolRegular.BrainCircuit24, AltaLook.Accent, size);
 
     public void Open()
     {

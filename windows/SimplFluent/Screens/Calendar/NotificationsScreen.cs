@@ -290,7 +290,7 @@ public sealed class NotificationsScreen : Screen
         "overdue" => SymbolRegular.Warning24,
         "soon" => SymbolRegular.Clock24,
         "graded" => SymbolRegular.DataBarVertical24,
-        "feedback" => SymbolRegular.CommentText24,
+        "feedback" => SymbolRegular.Comment24,
         "message" => SymbolRegular.Mail24,
         "discuss" => SymbolRegular.People24,
         "announce" => SymbolRegular.Megaphone24,

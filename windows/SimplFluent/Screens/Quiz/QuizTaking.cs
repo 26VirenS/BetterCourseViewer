@@ -686,7 +686,7 @@ internal sealed class QuizQuestionPage
     private FrameworkElement DropZone()
     {
         dropEdge = new Rectangle { RadiusX = 8, RadiusY = 8, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4, 2.7 }, SnapsToDevicePixels = true };
-        dropIcon = new SymbolIcon { Symbol = SymbolRegular.DocumentArrowDown24, FontSize = 30, HorizontalAlignment = HorizontalAlignment.Center };
+        dropIcon = new SymbolIcon { Symbol = SymbolRegular.DocumentArrowDown20, FontSize = 30, HorizontalAlignment = HorizontalAlignment.Center };
         dropWords = K.Text("", Ty.Body, B.Text2).Center();
         var busy = Run.Uploading != null;
         var chooseFile = QuizUi.Button(q.Files.Count == 0 ? "Choose File…" : "Replace…", PickFile, icon: SymbolRegular.Folder24);

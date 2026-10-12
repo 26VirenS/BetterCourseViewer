@@ -199,8 +199,18 @@ public sealed class RichText : RichTextBox
         }
         // (a paragraph that only holds spaces is dropped)
         foreach (var p in into.OfType<Paragraph>().ToList())
-            if (new TextRange(p.ContentStart, p.ContentEnd).Text.Trim().Length == 0 && !p.Inlines.OfType<InlineUIContainer>().Any() && !p.Inlines.OfType<LineBreak>().Any()) into.Remove(p);
+            if (!HasWords(p.Inlines) && !p.Inlines.OfType<InlineUIContainer>().Any() && !p.Inlines.OfType<LineBreak>().Any()) into.Remove(p);
     }
+
+    /// <summary>Inline content with words in it (read off its runs: a range's text fails on a list item not yet in a
+    /// document).</summary>
+    private static bool HasWords(InlineCollection inlines) => inlines.Any(i => i switch
+    {
+        Run r => !string.IsNullOrWhiteSpace(r.Text),
+        Span sp => HasWords(sp.Inlines),
+        InlineUIContainer => true,
+        _ => false,
+    });
 
     private static Paragraph NewParagraph() => new() { Margin = new Thickness(0, 0, 0, 10) };
 

@@ -120,9 +120,15 @@ public static class WorkPreview
         host.Children.Add(card);
         face.Resized += hh =>
         {
-            if (card == null || t != token) return;
-            var r = new Rect(Canvas.GetLeft(card), Canvas.GetTop(card), w, hh + 2);
-            Motion.To(card, FrameworkElement.HeightProperty, r.Height, Motion.Medium, Motion.Decelerate);
+            if (card == null || t != token || host == null) return;
+            // (grown with what it read: still inside the page — moved up as far as it must, no taller than the page)
+            var room2 = host.ActualHeight - 24;
+            var nh = Math.Min(hh + 2, room2);
+            var top = Canvas.GetTop(card);
+            var bottom = host.ActualHeight - 12;
+            var ny = top + nh > bottom ? Math.Max(12, bottom - nh) : top;
+            Motion.To(card, FrameworkElement.HeightProperty, nh, Motion.Medium, Motion.Decelerate);
+            if (Math.Abs(ny - top) > 0.5) Motion.To(card, Canvas.TopProperty, ny, Motion.Medium, Motion.Decelerate);
         };
         if (!Motion.On || from0.IsEmpty) { Place(card, target); return; }
         Place(card, from0);
@@ -460,14 +466,14 @@ public static class WorkPreview
             {
                 var handedIn = Text(d.Submitted) != null || d.Grade != null;
                 if (Text(d.QuizUrl) is { } q && !handedIn) return ("Take quiz", SymbolRegular.TaskListLtr24, () => e.ActOn(q, title, false));
-                if (handedIn) return ("See feedback", SymbolRegular.CommentText24, () => e.ActOn(url, title, true));
+                if (handedIn) return ("See feedback", SymbolRegular.Comment24, () => e.ActOn(url, title, true));
                 if (Text(d.DiscussionUrl) is { } disc) return ("Reply", SymbolRegular.Chat24, () => e.OpenWeb(disc, title));
                 if (d.CanSubmit) return (d.Resubmit == true ? "Resubmit" : "Hand in", SymbolRegular.ArrowUpload24, () => e.ActOn(url, title, false));
                 if (d.ToolUrl != null) return d.LtiQuiz == true ? ("Take quiz", SymbolRegular.TaskListLtr24, () => e.ActOn(url, title, false)) : ("Open tool", SymbolRegular.PuzzlePiece24, () => e.ActOn(url, title, false));
                 return null;
             }
             if (item.Work is not { } wk) return null;
-            if (wk.HandedIn) return ("See feedback", SymbolRegular.CommentText24, () => e.ActOn(url, title, true));
+            if (wk.HandedIn) return ("See feedback", SymbolRegular.Comment24, () => e.ActOn(url, title, true));
             if (!wk.Open) return null;
             return (wk.Kind ?? "").ToLowerInvariant() switch
             {

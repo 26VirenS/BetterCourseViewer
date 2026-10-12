@@ -199,7 +199,7 @@ internal sealed class HandInSheet
         });
         var label = new Border
         {
-            Child = K.H(8, K.Icon(SymbolRegular.DocumentArrowDown24, 18, B.Text, filled: true),
+            Child = K.H(8, K.Icon(SymbolRegular.DocumentArrowDown20, 18, B.Text, filled: true),
                 K.Text(a.Types.Contains("online_upload") ? "Drop to Add Files" : "Drop to Add the Link", Ty.BodyStrong)),
             Padding = new Thickness(18, 10, 18, 10), CornerRadius = new CornerRadius(20), HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center, Effect = K.Shadow(20, 4, 0.18),
@@ -307,7 +307,7 @@ internal sealed class HandInSheet
     private FrameworkElement DropZone()
     {
         var words = K.V(6,
-            K.Icon(SymbolRegular.DocumentArrowDown24, 26, B.Text2).Align(HorizontalAlignment.Center),
+            K.Icon(SymbolRegular.DocumentArrowDown20, 26, B.Text2).Align(HorizontalAlignment.Center),
             K.Text("Drop files here", Ty.BodyStrong).Center(),
             K.Text("or click to choose them", Ty.Caption, B.Text2).Center());
         var dash = new Rectangle { RadiusX = 8, RadiusY = 8, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 3.4, 2.6 } };

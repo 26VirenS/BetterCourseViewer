@@ -167,7 +167,7 @@ internal sealed class PaletteCommand
         c.Add(C("setup", ["goals"], "Guided Setup", "Choose your courses and goals again", SymbolRegular.CheckmarkCircle24, PaletteAction.Of(PaletteDo.Setup)));
         c.Add(C("tour", ["welcome", "guide", "intro", "onboarding"], "Take the Tour", "A quick look round the app", SymbolRegular.Map24, PaletteAction.Of(PaletteDo.Tour)));
         c.Add(C("browser", ["web", "site", "canvas", "brightspace"], $"Open {lms} in Browser", "The school’s own site", SymbolRegular.Globe24, PaletteAction.Of(PaletteDo.Browser)));
-        c.Add(C("help", ["?", "commands"], "Commands", "Every command", SymbolRegular.SlashForward24, lists: PaletteLists.Commands));
+        c.Add(C("help", ["?", "commands"], "Commands", "Every command", SymbolRegular.AppsList24, lists: PaletteLists.Commands));
         return c;
     }
 

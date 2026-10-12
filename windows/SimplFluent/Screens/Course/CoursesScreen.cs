@@ -54,7 +54,8 @@ public sealed class CoursesScreen : Screen
     }
 
     public override string Title => "Courses";
-    public override string? Subtitle => data.Data?.Sub;
+    /// <summary>The page's line, in Windows' words ("not in the navigation pane", where the Mac's says sidebar).</summary>
+    public override string? Subtitle => data.Data?.Sub?.Replace("sidebar", "navigation pane");
 
     /// <summary>All · Past · Future (the Mac's segmented picker) and Choose Courses, beside the title.</summary>
     public override FrameworkElement? Commands

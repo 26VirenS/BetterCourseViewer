@@ -104,7 +104,7 @@ public sealed partial class SearchPalette
             var list = PaletteCommand.Matching(all, t.Name, strict: false);
             if (list.Count == 0)
             {
-                var help = new PaletteItem("help", "/help", SymbolRegular.SlashForward24, PaletteAction.Fill("/")) { Sub = "Every command" };
+                var help = new PaletteItem("help", "/help", SymbolRegular.AppsList24, PaletteAction.Fill("/")) { Sub = "Every command" };
                 return ([new PaletteSection("No Command by That Name", [help, SearchRow(t.Name)])], null);
             }
             return ([new PaletteSection("Commands", list.Select(c => c.SlashRow).ToList())], null);
