@@ -1,0 +1,168 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
+using Simpl.Engine;
+using Simpl.Kit;
+using Simpl.Shell;
+using Simpl.Support;
+using Wpf.Ui.Controls;
+using TextBlock = System.Windows.Controls.TextBlock;
+
+namespace Simpl.Screens;
+
+/// <summary>
+/// (Mac 1.3.66) A Macmillan Learning assignment (Achieve, Sapling, LaunchPad) in a popup over the window, as an Alta one
+/// opens (the Mac's MacmillanScreen): the assignment's name and Close across the top; below, Macmillan's page as it
+/// draws it, on white, the student working on it there — the popup's Loading while it opens, or why it could not.
+/// </summary>
+public static class MacmillanPopup
+{
+    public static void Show(Engine.Engine engine, AltaLaunch launch, Window over) => new MacmillanPopupView(engine, launch, over).Open();
+}
+
+internal sealed class MacmillanPopupView
+{
+    private sealed class LaunchAnswer { public string Url { get; set; } = ""; }
+
+    private readonly Engine.Engine engine;
+    private readonly AltaLaunch launch;
+    private readonly Window over;
+    private readonly Grid root = new();
+    private readonly WebView2 web = new() { Visibility = Visibility.Hidden, DefaultBackgroundColor = System.Drawing.Color.White };
+    private readonly Border stateSlot = new();
+    private Sheet? sheet;
+    /// <summary>The page still opening (the launch through Canvas): a spinner in its place meanwhile.</summary>
+    private bool opening = true;
+    /// <summary>The launch could not be had from Canvas.</summary>
+    private string? failure;
+    private bool started, closing, closed;
+
+    public MacmillanPopupView(Engine.Engine engine, AltaLaunch launch, Window over)
+    {
+        this.engine = engine;
+        this.launch = launch;
+        this.over = over;
+        root.Bg(B.Solid);
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var tile = K.IconTile(SymbolRegular.Library24, K.Tone("red"), 32);
+        root.Children.Add(AltaLook.Header(tile, K.Text(launch.Title, Ty.Subtitle), K.Text("Macmillan Learning", Ty.Body, B.Text2), null, Close, "Close — your work is kept by Macmillan").Row(0));
+        // (the page on white, edge to edge under the header, as Macmillan draws it — clear of the popup's rounded foot;
+        // the popup's own ground in its place while it opens)
+        stateSlot.Bg(B.Solid);
+        var holder = new Grid { Background = Brushes.White, Children = { web, stateSlot } };
+        web.Margin = new Thickness(0, 0, 0, 8);
+        var page = new Border { Child = holder, BorderThickness = new Thickness(0, 1, 0, 0) }.Stroke(B.Divider);
+        page.BorderThickness = new Thickness(0, 1, 0, 0);
+        root.Children.Add(page.Row(1));
+    }
+
+    public void Open()
+    {
+        sheet = AltaLook.Popup(root, over);
+        sheet.Closed += Cleanup;
+        over.PreviewKeyDown += OnKey;
+        RoutedEventHandler? loaded = null;
+        loaded = (_, _) =>
+        {
+            root.Loaded -= loaded;
+            AltaLook.Settle(root);
+            Start();
+        };
+        root.Loaded += loaded;
+        Draw();
+        Dialogs.Show(sheet, over);
+    }
+
+    private void Draw()
+    {
+        if (closing) return;
+        stateSlot.Child = failure is { } why ? AltaLook.Failure("Macmillan Learning could not be opened", why)
+            : opening ? AltaLook.Opening("Opening Macmillan Learning…") : null;
+        stateSlot.Visibility = stateSlot.Child == null ? Visibility.Collapsed : Visibility.Visible;
+        web.Visibility = failure == null && !opening ? Visibility.Visible : Visibility.Hidden;
+        Shot.Moved();
+    }
+
+    /// <summary>Opened: a web view with the engine's web data, then the assignment's launch through Canvas (or the page asked for).</summary>
+    private async void Start()
+    {
+        if (started) return;
+        started = true;
+        try
+        {
+            var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Simpl.Engine.Engine.BrowserArguments));
+            await web.EnsureCoreWebView2Async(env);
+        }
+        catch (Exception e)
+        {
+            Log.Write("macmillan: " + e.Message);
+            Fail(e.Message);
+            return;
+        }
+        if (closed) return;
+        var core = web.CoreWebView2;
+        core.Settings.AreDevToolsEnabled = true;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.IsPasswordAutosaveEnabled = false;
+        core.Settings.IsGeneralAutofillEnabled = false;
+        core.NavigationCompleted += (_, _) =>
+        {
+            if (!opening) return;
+            opening = false;
+            Draw();
+        };
+        core.NewWindowRequested += (_, e) => { e.Handled = true; engine.GoTo(e.Uri, ""); };
+        core.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
+        if (launch.Page is { } p && engine.Absolute(p) is { } page)
+        {
+            core.Navigate(page.ToString());
+            return;
+        }
+        try
+        {
+            var a = await engine.Call<LaunchAnswer>("toolLaunch", new { course = launch.Course, assignment = launch.Assignment });
+            if (!Uri.TryCreate(a.Url, UriKind.Absolute, out var u)) throw new EngineException("The answer could not be read.");
+            if (!closed) core.Navigate(u.ToString());
+        }
+        catch (Exception e) { Fail(e.Message); }
+    }
+
+    private void Fail(string why)
+    {
+        failure = "Macmillan Learning could not be opened. " + why;
+        opening = false;
+        Draw();
+    }
+
+    /// <summary>Close (the button, Escape): the page goes first — nothing of the app's can fade a web view out — then the popup.</summary>
+    private void Close()
+    {
+        if (closing) return;
+        closing = true;
+        web.Visibility = Visibility.Collapsed;
+        if (sheet != null) sheet.Close();
+        else Cleanup();
+    }
+
+    private void Cleanup()
+    {
+        if (closed) return;
+        closed = true;
+        closing = true;
+        over.PreviewKeyDown -= OnKey;
+        try { web.Dispose(); } catch { }
+    }
+
+    /// <summary>Escape closes, unless the page has the keyboard (its own Escape: a menu, a pop-up of Macmillan's).</summary>
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        if (closing || !root.IsVisible || e.Key != Key.Escape) return;
+        if (ReferenceEquals(e.OriginalSource, web) || ReferenceEquals(Keyboard.FocusedElement, web)) return;
+        Close();
+        e.Handled = true;
+    }
+}

@@ -1,0 +1,1052 @@
+using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Windows;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
+using Simpl.Engine;
+using Simpl.Support;
+
+namespace Simpl.Screens;
+
+// (Mac 1.3.17) A Knewton Alta assignment opened in the app: Open Tool on an Alta assignment opens a popup (AltaPopup)
+// with the objectives and the total mastery down the left and Alta's own page in the rest. (1.3.45) The popup only
+// reads Alta: the student works on Alta's page itself; the app presses only what the student presses in the popup.
+
+/// <summary>A progress target as Alta's answers carry it: an objective's id, how far it is mastered, its status.</summary>
+internal sealed class AltaTarget
+{
+    public string? Id { get; set; }
+    public double? Progress { get; set; }
+    public string? Status { get; set; }
+}
+
+/// <summary>What the page passes from a question's answer (the Mac's AltaReport).</summary>
+internal sealed class AltaReport
+{
+    public sealed class Objective
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+    }
+
+    public sealed class Now
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public double? Low { get; set; }
+        public double? High { get; set; }
+        public string? Source { get; set; }
+    }
+
+    public string? Name { get; set; }
+    public double? Threshold { get; set; }
+    public List<Objective> Objectives { get; set; } = new();
+    public List<AltaTarget> Targets { get; set; } = new();
+    public double? Percent { get; set; }
+    public double? Progress { get; set; }
+    public string? Status { get; set; }
+    public bool Completed { get; set; }
+    public double? Due { get; set; }
+    public Now Current { get; set; } = new();
+}
+
+/// <summary>
+/// (1.3.17) The assignment's overview, as Alta's page reads it before it is started (or between questions): its name,
+/// when it is due, its objectives with Alta's estimate of the questions each takes, and how far it is mastered.
+/// </summary>
+internal sealed class AltaOverview
+{
+    public sealed class Objective
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public double? Low { get; set; }
+        public double? High { get; set; }
+    }
+
+    public string? Name { get; set; }
+    public double? Due { get; set; }
+    /// <summary>(1.3.19) As the page words them, when no answer of Alta's gave them ("Monday, Oct 12 11:59pm PDT").</summary>
+    public string? DueText { get; set; }
+    public string? StatusText { get; set; }
+    public double? Threshold { get; set; }
+    public double? Percent { get; set; }
+    /// <summary>(1.3.21) The whole's progress (0…1) and each objective's, from any answer of Alta's that carries them.</summary>
+    public double? Progress { get; set; }
+    public List<AltaTarget>? Targets { get; set; }
+    public string? Status { get; set; }
+    public bool? Started { get; set; }
+    public bool? Completed { get; set; }
+    public List<Objective> Objectives { get; set; } = new();
+
+    /// <summary>Its objectives as the assignment's list keeps them (each named, with its id).</summary>
+    public List<AltaKnown> List => Objectives.Where(o => !string.IsNullOrEmpty(o.Id) && o.Name != null).Select(o => new AltaKnown(o.Id!, o.Name!, o.Low, o.High)).ToList();
+}
+
+/// <summary>One of the assignment's objectives as its overview or cover lists it: its id, name and Alta's estimate.</summary>
+internal sealed record AltaKnown(string Id, string Name, double? Low, double? High);
+
+/// <summary>
+/// (1.3.59) The assignment's cover as Alta's page shows it before it is started: its name, its details, its note, what
+/// its Start says, whether it offers Review Instruction, and its objectives by topic.
+/// </summary>
+internal sealed class AltaCover
+{
+    public sealed class Detail
+    {
+        public string Label { get; set; } = "";
+        public string Value { get; set; } = "";
+        public string? Sub { get; set; }
+    }
+
+    public sealed class Objective
+    {
+        public string Name { get; set; } = "";
+        public double? Mastery { get; set; }
+    }
+
+    public sealed class Topic
+    {
+        public string Name { get; set; } = "";
+        public string Estimate { get; set; } = "";
+        public double? Low { get; set; }
+        public double? High { get; set; }
+        public List<Objective> Objectives { get; set; } = new();
+    }
+
+    public string Name { get; set; } = "";
+    public List<Detail> Details { get; set; } = new();
+    public string Note { get; set; } = "";
+    public string Start { get; set; } = "";
+    public bool Review { get; set; }
+    public List<Topic> Topics { get; set; } = new();
+
+    /// <summary>(1.3.60) Every objective, in order, each with its topic's estimate: the assignment's whole list.</summary>
+    public List<AltaKnown> List => Topics.SelectMany(t => t.Objectives.Select(o => new AltaKnown(o.Name, o.Name, t.Low, t.High))).ToList();
+}
+
+/// <summary>One objective as the popup shows it.</summary>
+internal sealed record AltaObjective(string Id, int Number, string Name, double Mastery, bool Current)
+{
+    public bool Mastered => Mastery >= 0.999;
+}
+
+/// <summary>(1.3.53) A part of Alta's question as the page lays it out (its own coordinates): what it asks, its answer, or a lesson.</summary>
+internal sealed record AltaPanel(int Id, string Kind, Rect Rect);
+
+/// <summary>(1.3.70) A small graph in what a question asks, where the page lays it (its own coordinates).</summary>
+internal sealed record AltaPic(int Id, Rect Rect);
+
+/// <summary>(1.3.53) One of the buttons in Alta's button bars, whatever it says: shown as the app's own, pressing Alta's.</summary>
+internal sealed record AltaButton(int Id, string Label, bool Primary, bool Enabled);
+
+/// <summary>(1.3.51) A pop-up of Alta's, shown as the app's own: its title, words and buttons, and a picture of it as Alta draws it.</summary>
+internal sealed class AltaDialog
+{
+    public string Title { get; set; } = "";
+    public string Text { get; set; } = "";
+    public List<string> Buttons { get; set; } = new();
+    public BitmapSource? Picture { get; set; }
+    /// <summary>The picture's size as the page draws it (its CSS pixels: the popup's own).</summary>
+    public Size PictureSize { get; set; }
+}
+
+/// <summary>
+/// One Alta assignment open in the popup (the Mac's AltaSession): Alta's page in a web view of the popup's own — signed
+/// in as the app is (the engine's web data, its browser arguments) — and what the page last said of the objectives and
+/// their mastery, the question's parts and buttons, its pop-ups and its cover. The popup draws from it and is told when
+/// it changes.
+/// </summary>
+internal sealed class AltaSession
+{
+    private sealed class LaunchAnswer { public string Url { get; set; } = ""; }
+
+    private const string NamesKey = "altaObjectiveNames";
+    private const string PicsLightKey = "altaGraphsLight";
+
+    private readonly Engine.Engine engine;
+    private readonly Window owner;
+    private readonly Dictionary<string, string> names;
+    private readonly List<CoreWebView2Frame> frames = new();
+    private readonly Dictionary<string, TaskCompletionSource<JsonNode?>> codeAsked = new();
+    private CancellationTokenSource? dialogWait;
+    private string? darkScript;
+    private bool started, closed, isDark, notifyQueued;
+    private string lastPaint = "";
+    private int? picOpen;
+
+    /// <summary>Something the popup shows changed (coalesced: told once per turn of the dispatcher).</summary>
+    public event Action? Changed;
+
+    public AltaLaunch Launch { get; }
+    /// <summary>Alta's page: the popup places it, shown only while nothing of the popup's own is in its place.</summary>
+    public WebView2 Web { get; } = new() { Visibility = Visibility.Hidden };
+
+    public AltaReport? Report { get; private set; }
+    /// <summary>(1.3.17) The overview Alta opens on: the assignment and its objectives, before a question is asked.</summary>
+    public AltaOverview? Overview { get; private set; }
+    /// <summary>Alta's page still opening (the launch through Canvas): a spinner in its place meanwhile.</summary>
+    public bool Opening { get; private set; } = true;
+    /// <summary>The launch could not be had from Canvas.</summary>
+    public string? Failure { get; private set; }
+    /// <summary>(1.3.21) The mastery last heard, from wherever Alta said it, 0…1: the whole, and each objective's by its id.</summary>
+    public double? LivePercent { get; private set; }
+    public Dictionary<string, AltaTarget> LiveTargets { get; } = new();
+    /// <summary>(1.3.47) How Alta's page is shown: "question" or "lesson" (its parts alone), "overview", or — not
+    /// recognised — "unknown" / "none", when it is shown as it is.</summary>
+    public string FocusState { get; private set; } = "";
+    /// <summary>(1.3.53) The parts' panels, the page's height, which question they are of, and the parts' buttons.</summary>
+    public List<AltaPanel> Panels { get; private set; } = new();
+    public double PageHeight { get; private set; }
+    public int PanelGen { get; private set; }
+    public List<AltaButton> Buttons { get; private set; } = new();
+    /// <summary>(1.3.70) Where each small graph is in the page.</summary>
+    public List<AltaPic> Pics { get; private set; } = new();
+    /// <summary>In dark mode a graph's colours are turned over with the question's unless the student asks for them as
+    /// Alta draws them (on a white card): kept for every assignment.</summary>
+    public bool PicsLight { get; private set; } = Prefs.Bool(PicsLightKey);
+    /// <summary>(1.3.60) Whether Alta's page is laid out and in sight (kept out of sight while it loads).</summary>
+    public bool PageShown { get; private set; }
+    /// <summary>(1.3.59) The assignment's cover, while Alta's page shows it: the popup's start screen.</summary>
+    public AltaCover? Cover { get; private set; }
+    /// <summary>(1.3.51) Alta's pop-up open, shown as the app's own; bumped each time it is said again.</summary>
+    public AltaDialog? Dialog { get; private set; }
+    public int DialogVersion { get; private set; }
+    /// <summary>(1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.</summary>
+    public List<string> ErrorLogs { get; } = new();
+    /// <summary>(1.3.23) The assignment's objectives as its overview lists them, kept for this assignment.</summary>
+    public List<AltaKnown> Known { get; private set; } = new();
+
+    public AltaSession(Engine.Engine engine, AltaLaunch launch, Window owner)
+    {
+        this.engine = engine;
+        this.owner = owner;
+        Launch = launch;
+        names = ReadJson<Dictionary<string, string>>(NamesKey) ?? new();
+    }
+
+    private string KnownKey => $"altaObjectives:{Launch.Course}:{Launch.Assignment}";
+
+    /// <summary>(1.3.49) Alta's question (or lesson) is shown alone.</summary>
+    public bool Focused => FocusState is "question" or "lesson";
+
+    /// <summary>The question laid out on panels, one behind each part.</summary>
+    public bool Split => Focused && Panels.Count > 0 && PageHeight > 0;
+
+    private void Notify()
+    {
+        Shot.Moved();
+        if (notifyQueued || closed) return;
+        notifyQueued = true;
+        Application.Current.Dispatcher.BeginInvoke(() =>
+        {
+            notifyQueued = false;
+            if (!closed) Changed?.Invoke();
+        }, DispatcherPriority.Normal);
+    }
+
+    // ---- starting ----
+
+    /// <summary>Alta opened: the web view made with the engine's web data, the page script in it, then the assignment's
+    /// launch through Canvas (or the page asked for).</summary>
+    public async void Start(bool dark)
+    {
+        if (started) return;
+        started = true;
+        isDark = dark;
+        if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
+        try
+        {
+            var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Simpl.Engine.Engine.BrowserArguments));
+            await Web.EnsureCoreWebView2Async(env);
+        }
+        catch (Exception e)
+        {
+            Log.Write("alta: " + e.Message);
+            Fail(e.Message);
+            return;
+        }
+        if (closed) return;
+        var core = Web.CoreWebView2;
+        core.Settings.AreDevToolsEnabled = true;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.IsPasswordAutosaveEnabled = false;
+        core.Settings.IsGeneralAutofillEnabled = false;
+        try
+        {
+            darkScript = await core.AddScriptToExecuteOnDocumentCreatedAsync(DarkScript());
+            await core.AddScriptToExecuteOnDocumentCreatedAsync(AltaHook.Source);
+        }
+        catch (Exception e) { Log.Write("alta script: " + e.Message); }
+        core.WebMessageReceived += (_, e) => { if (Said(e) is { } s) Take(s, null); };
+        core.FrameCreated += (_, e) => WatchFrame(e.Frame);
+        core.NavigationCompleted += (_, _) =>
+        {
+            if (!Opening) return;
+            Opening = false;
+            Notify();
+        };
+        core.NewWindowRequested += (_, e) => { e.Handled = true; engine.GoTo(e.Uri, ""); };
+        core.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
+        if (Launch.Page is { } p && engine.Absolute(p) is { } page)
+        {
+            core.Navigate(page.ToString());
+            return;
+        }
+        try
+        {
+            var a = await engine.Call<LaunchAnswer>("toolLaunch", new { course = Launch.Course, assignment = Launch.Assignment });
+            if (!Uri.TryCreate(a.Url, UriKind.Absolute, out var u)) throw new EngineException("The answer could not be read.");
+            if (!closed) core.Navigate(u.ToString());
+        }
+        catch (Exception e) { Fail(e.Message); }
+    }
+
+    private void Fail(string why)
+    {
+        Failure = "Knewton Alta could not be opened. " + why;
+        Opening = false;
+        Notify();
+    }
+
+    private static string? Said(CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try { return e.TryGetWebMessageAsString(); } catch { return null; }
+    }
+
+    private void WatchFrame(CoreWebView2Frame f)
+    {
+        try
+        {
+            f.WebMessageReceived += (_, e) => { if (Said(e) is { } s) Take(s, f); };
+            f.FrameCreated += (_, e) => WatchFrame(e.Frame);
+            f.Destroyed += (_, _) => frames.Remove(f);
+        }
+        catch { /* an older runtime: the frame's messages are not heard */ }
+    }
+
+    /// <summary>The popup closed: the page let go, its graph's window with it.</summary>
+    public void Close()
+    {
+        if (closed) return;
+        closed = true;
+        dialogWait?.Cancel();
+        ClosePic();
+        foreach (var t in codeAsked.Values) t.TrySetResult(null);
+        try { Web.Dispose(); } catch { }
+    }
+
+    // ---- (1.3.50) light or dark, told to the page ----
+
+    private string DarkScript() => $"window.__simplDark = {Js(isDark)}; window.__simplPicsLight = {Js(PicsLight)};";
+
+    private static string Js(bool b) => b ? "true" : "false";
+
+    /// <summary>Light or dark as the app is: before each page (a script ahead of the page script) and at once to the page
+    /// shown; in dark mode the question's colours are turned over, for the dark ground. The panels are drawn again in
+    /// the theme's card colours.</summary>
+    public async void Appearance(bool dark)
+    {
+        isDark = dark;
+        lastPaint = "";
+        if (Web.CoreWebView2 is not { } core || closed) return;
+        try
+        {
+            if (darkScript != null) core.RemoveScriptToExecuteOnDocumentCreated(darkScript);
+            darkScript = await core.AddScriptToExecuteOnDocumentCreatedAsync(DarkScript());
+        }
+        catch { }
+        _ = Run(DarkScript() + " if (window.__simplFocusDark) window.__simplFocusDark(); null");
+        PaintPanels();
+    }
+
+    // ---- what the page says ----
+
+    private void Take(string text, CoreWebView2Frame? frame)
+    {
+        if (closed) return;
+        JsonObject? head;
+        try { head = JsonNode.Parse(text) as JsonObject; } catch { return; }
+        if (head == null) return;
+        var main = frame == null;
+        switch (Str(head["kind"]))
+        {
+            case "code":
+                if (Str(head["token"]) is { } token && codeAsked.Remove(token, out var asked)) asked.TrySetResult(head["result"]?.DeepClone());
+                return;
+            case "frame":
+                if (main)
+                {
+                    // (1.3.60) a new page: kept out of sight in it until it is laid out — (1.3.62) and the last page's
+                    // panels and buttons put away with it
+                    PageShown = false;
+                    Panels = new();
+                    Buttons = new();
+                    Pics = new();
+                    lastPaint = "";
+                    ClosePic();
+                    Notify();
+                    return;
+                }
+                frames.RemoveAll(f => SameFrame(f, frame!));
+                frames.Add(frame!);
+                if (frames.Count > 30) frames.RemoveAt(0);
+                return;
+            case "panels":
+            {
+                if (!main) return;
+                var list = new List<AltaPanel>();
+                var k = 0;
+                foreach (var p in (head["panels"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                {
+                    if (Box(p) is { } r) list.Add(new AltaPanel(k, Str(p["kind"]) ?? "", r));
+                    k++;
+                }
+                var pics = new List<AltaPic>();
+                k = 0;
+                foreach (var p in (head["pics"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                {
+                    if (Box(p) is { } r) pics.Add(new AltaPic(k, r));
+                    k++;
+                }
+                var height = Num(head["height"]) ?? 0;
+                var gen = (int)(Num(head["gen"]) ?? 0);
+                if (!list.SequenceEqual(Panels)) Panels = list;
+                if (height != PageHeight) PageHeight = height;
+                if (!pics.SequenceEqual(Pics)) Pics = pics;
+                if (gen != PanelGen)
+                {
+                    // (another question: the last one's graph window goes, and the page back to its top)
+                    PanelGen = gen;
+                    ClosePic();
+                    _ = Run("window.scrollTo(0, 0); null");
+                }
+                PaintPanels();
+                Notify();
+                return;
+            }
+            case "buttons":
+            {
+                if (!main) return;
+                var list = new List<AltaButton>();
+                var k = 0;
+                foreach (var b in (head["items"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                    list.Add(new AltaButton(k++, Str(b["label"]) ?? "", Bool(b["primary"]) ?? false, Bool(b["enabled"]) ?? true));
+                if (list.SequenceEqual(Buttons)) return;
+                Buttons = list;
+                Notify();
+                return;
+            }
+            case "dialog":
+            {
+                if (!main) return;
+                if (Bool(head["open"]) != true)
+                {
+                    dialogWait?.Cancel();
+                    if (Dialog != null) { Dialog = null; DialogVersion++; Notify(); }
+                    return;
+                }
+                var title = Str(head["title"]) ?? "";
+                var words = Str(head["text"]) ?? "";
+                var buttons = (head["buttons"] as JsonArray ?? new JsonArray()).Select(Str).OfType<string>().ToList();
+                dialogWait?.Cancel();
+                var wait = new CancellationTokenSource();
+                dialogWait = wait;
+                ShowDialogSoon(title, words, buttons, wait.Token);
+                return;
+            }
+            case "focus":
+            {
+                if (!main) return;
+                var state = Str(head["state"]) ?? "";
+                FocusState = state;
+                if (state is not ("question" or "lesson" or "overview"))
+                {
+                    var entry = $"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — Alta’s page shown as it is: {Str(head["reason"]) ?? "not recognised"} [{state}]";
+                    if (head["shape"] is JsonObject shape) entry += "\n" + shape.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+                    ErrorLogs.Add(entry);
+                    if (ErrorLogs.Count > 50) ErrorLogs.RemoveAt(0);
+                }
+                PaintPanels();
+                Notify();
+                return;
+            }
+            case "shown":
+                if (!main) return;
+                PageShown = true;
+                Notify();
+                return;
+            case "hidden":
+                if (!main) return;
+                PageShown = false;
+                ClosePic(); // (Alta between parts: the question gone)
+                Notify();
+                return;
+            case "picOpen":
+                if (main && Num(head["i"]) is { } i) _ = OpenPic((int)i);
+                return;
+            case "cover":
+            {
+                if (!main) return;
+                if (Bool(head["none"]) == true)
+                {
+                    if (Cover != null) { Cover = null; Notify(); }
+                    return;
+                }
+                if (Read<AltaCover>(head) is not { } c) return;
+                Cover = c;
+                // (1.3.60) the cover's list is the whole of the assignment's objectives, every one named
+                Keep(c.List);
+                Notify();
+                return;
+            }
+            case "overview":
+            {
+                if (Read<AltaOverview>(head) is not { } o) return;
+                var renamed = false;
+                foreach (var x in o.Objectives)
+                    if (!string.IsNullOrEmpty(x.Id) && !string.IsNullOrEmpty(x.Name) && (!names.TryGetValue(x.Id!, out var had) || had != x.Name)) { names[x.Id!] = x.Name!; renamed = true; }
+                if (renamed) Prefs.Set(NamesKey, JsonSerializer.Serialize(names));
+                Overview = Merge(Overview, o);
+                Hear(o.Percent is { } pc ? pc / 100 : o.Progress, o.Targets ?? new());
+                Keep(o.List);
+                Notify();
+                return;
+            }
+            case "content":
+            {
+                if (Read<AltaReport>(head) is not { } r) return;
+                // (1.3.34) an answer that names only the objective on screen: the assignment's objectives kept from the last
+                if (Report is { } old)
+                {
+                    if (r.Objectives.Count == 0) r.Objectives = old.Objectives;
+                    if (r.Targets.Count == 0) r.Targets = old.Targets;
+                    r.Name ??= old.Name;
+                    r.Due ??= old.Due;
+                    r.Threshold ??= old.Threshold;
+                }
+                Remember(r);
+                Report = r;
+                Hear(r.Percent is { } pc ? pc / 100 : r.Progress, r.Targets);
+                Notify();
+                return;
+            }
+            case "meter":
+            {
+                // (1.3.21) Alta's page's own mastery bars: the whole's, and each objective's by its name
+                var percent = Num(head["percent"]);
+                var found = new List<AltaTarget>();
+                var named = Objectives;
+                foreach (var b in (head["bars"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                {
+                    if (Str(b["label"]) is not { Length: > 0 } label || Num(b["value"]) is not { } value) continue;
+                    var o = named.FirstOrDefault(o =>
+                    {
+                        var n = o.Name.ToLowerInvariant();
+                        return !o.Name.StartsWith("Objective ", StringComparison.Ordinal) && n.Length > 3 && (label.Contains(n) || n.Contains(label));
+                    });
+                    if (o != null) found.Add(new AltaTarget { Id = o.Id, Progress = value });
+                }
+                Hear(percent is { } pc ? pc / 100 : null, found);
+                Notify();
+                return;
+            }
+        }
+    }
+
+    private static bool SameFrame(CoreWebView2Frame a, CoreWebView2Frame b)
+    {
+        try { return a.FrameId == b.FrameId; } catch { return ReferenceEquals(a, b); }
+    }
+
+    // ---- reading the page's words ----
+
+    private static string? Str(JsonNode? n)
+    {
+        try { return n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null; } catch { return null; }
+    }
+
+    private static double? Num(JsonNode? n)
+    {
+        try
+        {
+            if (n is not JsonValue v) return null;
+            if (v.TryGetValue<double>(out var d)) return d;
+            if (v.TryGetValue<string>(out var s) && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var p)) return p;
+        }
+        catch { }
+        return null;
+    }
+
+    private static bool? Bool(JsonNode? n)
+    {
+        try { return n is JsonValue v && v.TryGetValue<bool>(out var b) ? b : null; } catch { return null; }
+    }
+
+    private static Rect? Box(JsonObject p)
+    {
+        if (Num(p["x"]) is not { } x || Num(p["y"]) is not { } y || Num(p["w"]) is not { } w || Num(p["h"]) is not { } h || w <= 0 || h <= 0) return null;
+        return new Rect(x, y, w, h);
+    }
+
+    private static T? Read<T>(JsonObject o) where T : class
+    {
+        try { return o.Deserialize<T>(Json.Options); } catch { return null; }
+    }
+
+    private static T? ReadJson<T>(string key) where T : class
+    {
+        try { return Prefs.String(key) is { Length: > 0 } s ? JsonSerializer.Deserialize<T>(s, Json.Options) : null; } catch { return null; }
+    }
+
+    // ---- what is known of the objectives ----
+
+    private void Keep(List<AltaKnown> list)
+    {
+        if (list.Count == 0 || list.Count < Known.Count || list.SequenceEqual(Known)) return;
+        Known = list;
+        Prefs.Set(KnownKey, JsonSerializer.Serialize(list, Json.Script));
+    }
+
+    private static bool Same(string? a, string? b)
+    {
+        if (a == null || b == null) return false;
+        var x = a.Trim().ToLowerInvariant();
+        return x.Length > 0 && x == b.Trim().ToLowerInvariant();
+    }
+
+    /// <summary>(1.3.23) Alta's estimate of the questions the objective being worked on takes, as its overview says it
+    /// ("Estimated 4 - 9 questions"), else as the question's answer has it.</summary>
+    public (double Low, double High)? Estimate
+    {
+        get
+        {
+            if (Report?.Current is not { } c) return null;
+            if (Known.FirstOrDefault(o => o.Id == c.Id || Same(o.Name, c.Name)) is { Low: { } l, High: { } h } && h > 0) return (l, h);
+            if (c.Low is { } l2 && c.High is { } h2 && h2 > 0) return (l2, h2);
+            return null;
+        }
+    }
+
+    /// <summary>A newer overview kept over the last, its blanks filled from the one before.</summary>
+    private static AltaOverview Merge(AltaOverview? old, AltaOverview now)
+    {
+        if (old == null) return now;
+        return new AltaOverview
+        {
+            Name = now.Name ?? old.Name, Due = now.Due ?? old.Due, DueText = now.DueText ?? old.DueText, StatusText = now.StatusText ?? old.StatusText,
+            Threshold = now.Threshold ?? old.Threshold, Percent = now.Percent ?? old.Percent, Progress = now.Progress ?? old.Progress,
+            Targets = now.Targets ?? old.Targets, Status = now.Status ?? old.Status, Started = now.Started ?? old.Started,
+            Completed = now.Completed ?? old.Completed, Objectives = now.Objectives.Count == 0 ? old.Objectives : now.Objectives,
+        };
+    }
+
+    /// <summary>(1.3.21) Mastery heard: the newest word on it kept, whichever of Alta's answers or bars it came in (as a
+    /// fraction, or as Alta's percent).</summary>
+    private void Hear(double? percent, IEnumerable<AltaTarget> targets)
+    {
+        static double Unit(double p) => Math.Clamp(p > 1 ? p / 100 : p, 0, 1);
+        if (percent is { } p) LivePercent = Unit(p);
+        foreach (var t in targets)
+        {
+            if (string.IsNullOrEmpty(t.Id)) continue;
+            LiveTargets.TryGetValue(t.Id!, out var before);
+            LiveTargets[t.Id!] = new AltaTarget { Id = t.Id, Progress = t.Progress is { } v ? Unit(v) : null, Status = t.Status ?? before?.Status };
+        }
+    }
+
+    private void Remember(AltaReport r)
+    {
+        if (r.Current.Id is not { } id || r.Current.Name is not { Length: > 0 } name || (names.TryGetValue(id, out var had) && had == name)) return;
+        names[id] = name;
+        if (names.Count > 400) foreach (var k in names.Keys.Take(names.Count - 300).ToList()) names.Remove(k);
+        Prefs.Set(NamesKey, JsonSerializer.Serialize(names));
+    }
+
+    /// <summary>The objectives in Alta's order (the assignment's list, else the progress targets, else the one on
+    /// screen), each with its mastery: its target's progress, or full once its status says it is mastered.</summary>
+    public List<AltaObjective> Objectives
+    {
+        get
+        {
+            if (Report is not { } r)
+            {
+                // (1.3.60) on the cover: its objectives, all of them, each as mastered as the cover says
+                if (Cover is { } c && c.List.Count > 0)
+                {
+                    var levels = c.Topics.SelectMany(t => t.Objectives.Select(o => o.Mastery)).ToList();
+                    return c.List.Select((o, k) => new AltaObjective(o.Id, k + 1, o.Name, Math.Clamp(levels[k] ?? 0, 0, 1), false)).ToList();
+                }
+                // (before a question: the overview's objectives, each as mastered as the whole is said to be when it is done)
+                var done = Overview?.Completed == true;
+                return (Overview?.List ?? new()).Select((o, k) => new AltaObjective(o.Id, k + 1, o.Name, done ? 1 : Level(LiveTargets.GetValueOrDefault(o.Id)), false)).ToList();
+            }
+            var ids = r.Objectives.Select(o => o.Id).OfType<string>().ToList();
+            if (ids.Count == 0) ids = r.Targets.Select(t => t.Id).OfType<string>().ToList();
+            if (ids.Count == 0 && r.Current.Id is { } only) ids = new() { only };
+            ids = ids.Distinct().ToList();
+            var here = r.Current.Id is { } cid ? ids.IndexOf(cid) : -1;
+            var there = Known.FindIndex(o => Same(o.Name, r.Current.Name));
+            var aligned = Known.Count == ids.Count || (here >= 0 && here == there);
+            return ids.Select((id, k) =>
+            {
+                // (1.3.21) the newest word on it, from any of Alta's answers or its page's bars, over the question's
+                var p = Level(LiveTargets.GetValueOrDefault(id) ?? r.Targets.FirstOrDefault(t => t.Id == id));
+                // (1.3.20) a name from the overview by its place when Alta's answers name only the objective on screen —
+                // (1.3.23) the overview's list lined up by the objective on screen when the two lists differ in length
+                var byPlace = aligned && k < Known.Count ? Known[k].Name : null;
+                var byId = Known.FirstOrDefault(o => o.Id == id)?.Name;
+                var named = r.Objectives.FirstOrDefault(o => o.Id == id)?.Name ?? (r.Current.Id == id ? r.Current.Name : null) ?? names.GetValueOrDefault(id) ?? byId ?? byPlace;
+                return new AltaObjective(id, k + 1, named ?? $"Objective {k + 1}", p, r.Current.Id == id);
+            }).ToList();
+        }
+    }
+
+    /// <summary>An objective's mastery, 0…1: its progress, or full once its status says it is mastered.</summary>
+    private static double Level(AltaTarget? t)
+    {
+        if ((t?.Status ?? "").ToLowerInvariant() is "complete" or "completed" or "mastered" or "done") return 1;
+        return Math.Clamp(t?.Progress ?? 0, 0, 1);
+    }
+
+    /// <summary>The whole assignment's mastery, 0…1.</summary>
+    public double Mastery
+    {
+        get
+        {
+            if (Report is not { } r)
+            {
+                if (Overview?.Completed == true) return 1;
+                if (LivePercent is { } lp) return lp;
+                return Math.Clamp((Overview?.Percent ?? 0) / 100, 0, 1);
+            }
+            if (r.Completed || (r.Status ?? "").ToLowerInvariant() == "complete") return 1;
+            if (LivePercent is { } p) return p;
+            if (r.Percent is { } pc) return Math.Clamp(pc / 100, 0, 1);
+            if (r.Progress is { } pr) return Math.Clamp(pr, 0, 1);
+            var list = Objectives;
+            return list.Count == 0 ? 0 : list.Average(o => o.Mastery);
+        }
+    }
+
+    // ---- pressing Alta's own ----
+
+    /// <summary>A script in Alta's page (an expression); what it gives back, or null.</summary>
+    private async Task<JsonNode?> Run(string js)
+    {
+        if (closed || Web.CoreWebView2 is not { } core) return null;
+        try { return JsonNode.Parse(await core.ExecuteScriptAsync(js)); } catch { return null; }
+    }
+
+    /// <summary>The cover's Start (or Continue, Resume), pressed in Alta's page.</summary>
+    public void StartCover() => _ = Run("window.__simplCover ? window.__simplCover.start() : null");
+
+    /// <summary>The cover's Review Instruction, pressed in Alta's page.</summary>
+    public void ReviewCover() => _ = Run("window.__simplCover ? window.__simplCover.review() : null");
+
+    public void PressButton(int index)
+    {
+        // (1.3.70: the question answered — Submit, Continue — its graph's window put away)
+        if (Buttons.FirstOrDefault(b => b.Id == index)?.Primary == true) ClosePic();
+        _ = Run($"window.__simplButtons ? window.__simplButtons.press({index}) : null");
+    }
+
+    /// <summary>One of the pop-up's buttons, pressed in Alta's own.</summary>
+    public void PressDialog(int index) => _ = Run($"window.__simplDialog ? window.__simplDialog.press({index}) : null");
+
+    /// <summary>The app's dialog put away without a button: Alta's pop-up given back to the page.</summary>
+    public void DialogDismissed()
+    {
+        dialogWait?.Cancel();
+        Dialog = null;
+        DialogVersion++;
+        Notify();
+        _ = Run("window.__simplDialog ? window.__simplDialog.show(true) : null");
+    }
+
+    /// <summary>(1.3.51) Alta's pop-up: its opening fade done, a picture of it as Alta draws it — then hidden in the page,
+    /// the app's own shown.</summary>
+    private async void ShowDialogSoon(string title, string text, List<string> buttons, CancellationToken stop)
+    {
+        try { await Task.Delay(380, stop); } catch { return; }
+        var same = Dialog is { } was && was.Title == title && was.Text == text && was.Buttons.SequenceEqual(buttons);
+        var picture = await DialogPicture();
+        if (stop.IsCancellationRequested || closed) return;
+        _ = Run("window.__simplDialog ? window.__simplDialog.show(false) : null");
+        // (the page out of sight under the app's dialog: the picture taken before is kept while the pop-up says the same)
+        if (picture == null && same) picture = (Dialog!.Picture, Dialog.PictureSize) is ({ } img, var size) ? (img, size) : null;
+        Dialog ??= new AltaDialog();
+        Dialog.Title = title;
+        Dialog.Text = text;
+        Dialog.Buttons = buttons;
+        Dialog.Picture = picture?.Image;
+        Dialog.PictureSize = picture?.Size ?? default;
+        DialogVersion++;
+        Notify();
+    }
+
+    /// <summary>A picture of Alta's pop-up as it draws it, shown in the page for the moment it is taken (its buttons
+    /// hidden, the row of them cropped off — the app's dialog has them as its own).</summary>
+    private async Task<(BitmapSource Image, Size Size)?> DialogPicture()
+    {
+        if (!Web.IsVisible) return null;
+        _ = await Run("window.__simplDialog ? (window.__simplDialog.show(true), window.__simplDialog.shot(true)) : null");
+        await Task.Delay(80);
+        try
+        {
+            if (await Run("(function () { var r = window.__simplDialog ? window.__simplDialog.rect() : null; if (r) { r.dpr = window.devicePixelRatio || 1; } return r; })()") is not JsonObject r
+                || Num(r["x"]) is not { } x || Num(r["y"]) is not { } y || Num(r["w"]) is not { } w || Num(r["h"]) is not { } h || w <= 4 || h <= 4) return null;
+            var rect = new Rect(x, y, w, h);
+            return await Preview(rect, Num(r["dpr"]) ?? 1) is { } img ? (img, rect.Size) : null;
+        }
+        finally { _ = Run("window.__simplDialog ? window.__simplDialog.shot(false) : null"); }
+    }
+
+    /// <summary>What the page shows now, cropped to a part of it (the page's own coordinates in its view).</summary>
+    private async Task<BitmapSource?> Preview(Rect rect, double dpr)
+    {
+        if (Web.CoreWebView2 is not { } core) return null;
+        try
+        {
+            using var stream = new MemoryStream();
+            await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream);
+            if (Decode(stream.ToArray()) is not { } whole) return null;
+            var at = new Int32Rect((int)Math.Max(0, rect.X * dpr), (int)Math.Max(0, rect.Y * dpr), 0, 0);
+            at.Width = (int)Math.Min(rect.Width * dpr, whole.PixelWidth - at.X);
+            at.Height = (int)Math.Min(rect.Height * dpr, whole.PixelHeight - at.Y);
+            if (at.Width <= 4 || at.Height <= 4) return null;
+            var cut = new CroppedBitmap(whole, at);
+            cut.Freeze();
+            return cut;
+        }
+        catch { return null; }
+    }
+
+    private static BitmapSource? Decode(byte[] bytes)
+    {
+        try
+        {
+            var b = new BitmapImage();
+            b.BeginInit();
+            b.CacheOption = BitmapCacheOption.OnLoad;
+            b.StreamSource = new MemoryStream(bytes);
+            b.EndInit();
+            b.Freeze();
+            return b;
+        }
+        catch { return null; }
+    }
+
+    // ---- (1.3.70) the question's graphs: small, opened large in a window of their own ----
+
+    public void SetPicsLight(bool on)
+    {
+        PicsLight = on;
+        Prefs.Set(PicsLightKey, on);
+        AltaGraphWindow.Light(on);
+        Appearance(isDark);
+        Notify();
+        if (picOpen is { } i) _ = Reopen(i);
+    }
+
+    private async Task Reopen(int i)
+    {
+        await Task.Delay(120);
+        await OpenPic(i);
+    }
+
+    /// <summary>The graph, large, in its window: a picture of it as the page draws it now, at its own size (drawn afresh
+    /// at that scale, so it is sharp).</summary>
+    public async Task OpenPic(int i)
+    {
+        if (await Run($"(function () {{ var r = window.__simplPic ? window.__simplPic.rect({i}) : null; if (r) {{ r.sx = window.scrollX; r.sy = window.scrollY; r.vw = window.innerWidth; r.vh = window.innerHeight; r.dpr = window.devicePixelRatio || 1; }} return r; }})()") is not JsonObject r
+            || Num(r["x"]) is not { } x || Num(r["y"]) is not { } y || Num(r["w"]) is not { } w || Num(r["h"]) is not { } h || w <= 4 || h <= 4) return;
+        var z = Math.Max(0.05, Num(r["z"]) ?? 1);
+        var rect = Rect.Intersect(new Rect(x - 4, y - 4, w + 8, h + 8), new Rect(0, 0, Num(r["vw"]) ?? 4000, Num(r["vh"]) ?? 4000));
+        if (rect.IsEmpty || rect.Width <= 1 || rect.Height <= 1) return;
+        var image = await Snapshot(rect, Num(r["sx"]) ?? 0, Num(r["sy"]) ?? 0, 1 / z) ?? await Preview(rect, Num(r["dpr"]) ?? 1);
+        if (image == null || closed) return;
+        picOpen = i;
+        AltaGraphWindow.Show(image, new Size(rect.Width / z, rect.Height / z), Launch.Title, this, owner);
+    }
+
+    /// <summary>Part of the page drawn afresh at a scale (the browser's own picture of it, through its DevTools).</summary>
+    private async Task<BitmapSource?> Snapshot(Rect rect, double scrollX, double scrollY, double scale)
+    {
+        if (Web.CoreWebView2 is not { } core) return null;
+        try
+        {
+            var args = new JsonObject
+            {
+                ["format"] = "png", ["fromSurface"] = true, ["captureBeyondViewport"] = false,
+                ["clip"] = new JsonObject { ["x"] = rect.X + scrollX, ["y"] = rect.Y + scrollY, ["width"] = rect.Width, ["height"] = rect.Height, ["scale"] = scale },
+            };
+            var call = core.CallDevToolsProtocolMethodAsync("Page.captureScreenshot", args.ToJsonString());
+            if (await Task.WhenAny(call, Task.Delay(4000)) != call) return null;
+            return Str(JsonNode.Parse(await call)?["data"]) is { } data ? Decode(Convert.FromBase64String(data)) : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>The question answered or gone: its graph's window goes with it.</summary>
+    public void ClosePic()
+    {
+        picOpen = null;
+        AltaGraphWindow.CloseIt();
+    }
+
+    public void PicWindowClosed() => picOpen = null;
+
+    // ---- the panels behind the question's parts ----
+
+    /// <summary>
+    /// (1.3.53, 1.3.59) A panel behind each part where the page lays it out — every panel as wide as the widest, one
+    /// column of them, each as tall as its own content. The Mac lays glass behind its see-through web view; a WebView2
+    /// is a window of its own that nothing can be drawn behind, so the app has the page draw them, in Windows 11's card
+    /// colours, under everything of Alta's — scrolling with the page, as the Mac's scroll with it.
+    /// </summary>
+    private void PaintPanels()
+    {
+        var list = Split ? Panels : new List<AltaPanel>();
+        string at = "[]";
+        if (list.Count > 0)
+        {
+            var left = list.Min(p => p.Rect.Left);
+            var right = list.Max(p => p.Rect.Right);
+            at = Json.Write(list.Select(p => new { x = Math.Round(left - 16), y = Math.Round(p.Rect.Top - 16), w = Math.Round(right - left + 32), h = Math.Round(p.Rect.Height + 32) }).ToList());
+        }
+        var js = $"({PanelsScript})({at}, {Json.Str(AltaLook.Css(Kit.B.Card))}, {Json.Str(AltaLook.Css(Kit.B.CardStroke))})";
+        if (js == lastPaint) return;
+        lastPaint = js;
+        _ = Run(js);
+    }
+
+    private const string PanelsScript = """
+        function (list, fill, edge) {
+          var host = document.getElementById('simpl-panels');
+          if (!list.length) { if (host) host.remove(); return null; }
+          if (!host) {
+            host = document.createElement('div');
+            host.id = 'simpl-panels';
+            host.setAttribute('aria-hidden', 'true');
+            host.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;z-index:-1;pointer-events:none;';
+            document.documentElement.appendChild(host);
+          }
+          while (host.children.length > list.length) host.removeChild(host.lastChild);
+          while (host.children.length < list.length) host.appendChild(document.createElement('div'));
+          list.forEach(function (p, i) {
+            host.children[i].style.cssText = 'position:absolute;box-sizing:border-box;left:' + p.x + 'px;top:' + p.y + 'px;width:' + p.w + 'px;height:' + p.h
+              + 'px;border-radius:8px;background:' + fill + ';border:1px solid ' + edge + ';';
+          });
+          return null;
+        }
+        """;
+
+    // ---- (1.3.46) Save Page Code ----
+
+    /// <summary>(1.3.47) The Error Logs as text, to copy.</summary>
+    public string ErrorLogText => string.Join("\n\n", ErrorLogs);
+
+    public void ClearErrorLogs()
+    {
+        ErrorLogs.Clear();
+        Notify();
+    }
+
+    /// <summary>
+    /// Every bit of code of Alta's page as it is now — the page and each frame in it: its HTML (with any web component's
+    /// own tree), and the scripts and style sheets it loads — in one text file in Downloads (the Error Logs first, when
+    /// saved from them). Addresses are written without their queries (a launch's tokens ride in them).
+    /// </summary>
+    public async Task<string?> SavePageCode(bool withLogs)
+    {
+        var line = new string('=', 100);
+        var out_ = new StringBuilder($"Simpl for Windows {Updates.Version}: Knewton Alta page code, saved {DateTime.Now.ToString("F", CultureInfo.CurrentCulture)}\n");
+        if (withLogs)
+        {
+            out_.Append($"\n{line}\nERROR LOGS ({ErrorLogs.Count})\n{line}\n");
+            out_.Append(ErrorLogText).Append('\n');
+        }
+        var seen = new HashSet<string>();
+        var count = 0;
+        var targets = new List<CoreWebView2Frame?> { null };
+        targets.AddRange(frames);
+        foreach (var f in targets)
+        {
+            if (await Collect(f) is not JsonObject r) continue;
+            var url = Str(r["url"]) ?? "?";
+            var html = Str(r["html"]) ?? "";
+            if (!seen.Add(url + "#" + html.Length)) continue;
+            count++;
+            out_.Append($"\n\n{line}\n");
+            out_.Append($"PAGE {count}{(f == null ? " (the popup's page)" : " (a frame in it)")}: {url}\n");
+            out_.Append($"Title: {Str(r["title"]) ?? ""}\n{line}\n");
+            out_.Append("\n---- HTML ----\n").Append(html).Append('\n');
+            foreach (var sh in (r["shadows"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                out_.Append($"\n---- WEB COMPONENT'S OWN TREE: {Str(sh["host"]) ?? ""} ----\n").Append(Str(sh["html"]) ?? "").Append('\n');
+            foreach (var file in (r["files"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+            {
+                out_.Append($"\n---- {(Str(file["kind"]) ?? "file").ToUpperInvariant()}: {Str(file["url"]) ?? ""} ----\n");
+                if (Str(file["text"]) is { } t) out_.Append(t).Append('\n');
+                else out_.Append($"(could not be read: {Str(file["error"]) ?? "unknown"})\n");
+            }
+        }
+        if (count == 0) return null;
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd 'at' HH.mm.ss", CultureInfo.InvariantCulture);
+        try
+        {
+            var dir = Downloads();
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, $"Simpl Alta {(withLogs ? "Error Logs" : "Code")} {stamp}.txt");
+            await File.WriteAllTextAsync(path, out_.ToString());
+            return path;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>The page-code script run in a frame (null: the page itself), its answer passed back as a message.</summary>
+    private async Task<JsonNode?> Collect(CoreWebView2Frame? frame)
+    {
+        if (closed || Web.CoreWebView2 is not { } core) return null;
+        var token = Guid.NewGuid().ToString("N");
+        var done = new TaskCompletionSource<JsonNode?>();
+        codeAsked[token] = done;
+        var js = "(async function () {\n" + AltaHook.Collect + "\n})().then(function (r) { window.chrome.webview.postMessage(JSON.stringify({ kind: 'code', token: '" + token
+                 + "', result: r })); }, function () { window.chrome.webview.postMessage(JSON.stringify({ kind: 'code', token: '" + token + "', result: null })); }); null";
+        try
+        {
+            if (frame == null) await core.ExecuteScriptAsync(js);
+            else if (frame.IsDestroyed() == 0) await frame.ExecuteScriptAsync(js);
+            else return null;
+            var finished = await Task.WhenAny(done.Task, Task.Delay(40_000));
+            return finished == done.Task ? done.Task.Result : null;
+        }
+        catch { return null; }
+        finally { codeAsked.Remove(token); }
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid id, uint flags, IntPtr token, out IntPtr path);
+
+    /// <summary>The student's Downloads folder (wherever Windows keeps it).</summary>
+    public static string Downloads()
+    {
+        try
+        {
+            if (SHGetKnownFolderPath(new Guid("374DE290-123F-4565-9164-39C4925E467B"), 0, IntPtr.Zero, out var p) == 0)
+            {
+                var s = Marshal.PtrToStringUni(p);
+                Marshal.FreeCoTaskMem(p);
+                if (!string.IsNullOrEmpty(s)) return s;
+            }
+        }
+        catch { }
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+    }
+}
