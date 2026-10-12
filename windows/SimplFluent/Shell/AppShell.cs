@@ -54,9 +54,18 @@ public sealed class AppShell : Grid, IDisposable
     private readonly HashSet<string> expanded = new();
     private readonly Dictionary<Place, Screen> placeScreens = new();
     private readonly Dictionary<string, Screen> routeScreens = new();
+    /// <summary>When each kept screen was last shown (a count of showings), so the least lately shown are let go first.</summary>
+    private readonly Dictionary<Screen, long> shownAt = new();
+    private long showings;
+    /// <summary>How many screens are kept to come back to: those pushed on a place, and courses' and groups' pages.</summary>
+    private const int KeptRoutes = 12, KeptPages = 8;
     private Screen? current;
     private bool narrow, paneOpen, sheetOpen;
     private int lastNav = -1;
+    /// <summary>Who the account tile shows, as last drawn (null: to be drawn).</summary>
+    private (string? Name, string? Initials, string? Avatar, string? Email, string Host)? accountDrawn;
+    /// <summary>The header as last drawn: the screen, its breadcrumb's words and line under it, its commands.</summary>
+    private (Screen Screen, string Words, FrameworkElement? Commands)? headerDrawn;
 
     public bool Narrow => narrow;
 
@@ -134,6 +143,7 @@ public sealed class AppShell : Grid, IDisposable
         engine.PropertyChanged += OnEngine;
         Updates();
         Navigate();
+        paneScene.Content = Scenes.Backdrop("side");
         BuildPane();
         _ = engine.LoadSidebar();
     }
@@ -189,7 +199,11 @@ public sealed class AppShell : Grid, IDisposable
     /// <summary>Light, dark or the accent changed: what is drawn with colours of its own is drawn again.</summary>
     public void Retheme()
     {
-        BuildPane();
+        paneScene.Content = Scenes.Backdrop("side");
+        accountDrawn = null;
+        BuildPane(redraw: true);
+        headerDrawn = null;
+        Header();
         current?.Render();
     }
 
@@ -199,10 +213,20 @@ public sealed class AppShell : Grid, IDisposable
         Purple = Color.FromRgb(0x88, 0x64, 0xd8), Orange = Color.FromRgb(0xe3, 0x6c, 0x0a), Teal = Color.FromRgb(0x00, 0x99, 0xbc), Gray = Color.FromRgb(0x76, 0x76, 0x7c),
         Gold = Color.FromRgb(0xc1, 0x8a, 0x00);
 
-    private void BuildPane()
+    /// <summary>
+    /// The pane brought up to date (after every step and every new count): who is signed in drawn again only when they
+    /// changed (their picture is not fetched again), the rows only when what they draw changed — else only the choice
+    /// moves. Its scene is drawn at start and with the look (<see cref="Retheme"/>). Redraw builds every row again.
+    /// </summary>
+    private void BuildPane(bool redraw = false)
     {
-        account.Content = AccountTile();
-        paneScene.Content = Scenes.Backdrop("side");
+        var me = engine.Snapshot?.Me;
+        var who = (me?.Name, me?.Initials, me?.Avatar, me?.Email, engine.Host);
+        if (accountDrawn is not { } drawn || !drawn.Equals(who))
+        {
+            accountDrawn = who;
+            account.Content = AccountTile();
+        }
         var snap = engine.Snapshot;
         var list = new List<NavEntry>
         {
@@ -251,7 +275,8 @@ public sealed class AppShell : Grid, IDisposable
                 list.Add(new NavEntry { Key = ctx, Title = g.Name, Icon = SymbolRegular.People24, Tint = Teal, Go = () => GoPlace(Place.Home(ctx)) });
             }
         }
-        nav.Set(list, SelectedKey(engine.Nav.Current.Place));
+        if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
+        else nav.Show(list, SelectedKey(engine.Nav.Current.Place));
     }
 
     private static string Initial(string s)
@@ -374,9 +399,48 @@ public sealed class AppShell : Grid, IDisposable
         }
         current.SetWidth(ContentWidth);
         current.Show();
+        shownAt[current] = ++showings;
+        Trim(loc);
         Header();
         scroller.ScrollToTop();
     }
+
+    /// <summary>
+    /// The screens kept to come back to, bounded: past <see cref="KeptRoutes"/> pushed screens and <see cref="KeptPages"/>
+    /// courses' and groups' pages, the least lately shown are let go (hidden already; opened again, they start afresh).
+    /// Never the one showing, the place and the screens under it (Back), the app's own places, or Search.
+    /// </summary>
+    private void Trim(Location loc)
+    {
+        if (routeScreens.Count > KeptRoutes)
+        {
+            var under = loc.Path.Select(r => r.ToString()).ToHashSet();
+            foreach (var key in Oldest(routeScreens, routeScreens.Count - KeptRoutes, k => !under.Contains(k)))
+            {
+                shownAt.Remove(routeScreens[key]);
+                routeScreens.Remove(key);
+            }
+        }
+        static bool Page(Place p) => p.Kind is PlaceKind.Home or PlaceKind.Section;
+        var pages = placeScreens.Keys.Count(Page);
+        if (pages > KeptPages)
+        {
+            var here = loc.Place.Identity;
+            foreach (var key in Oldest(placeScreens, pages - KeptPages, k => Page(k) && k != here))
+            {
+                shownAt.Remove(placeScreens[key]);
+                placeScreens.Remove(key);
+            }
+        }
+    }
+
+    /// <summary>Up to <paramref name="over"/> of the kept screens that may go, the least lately shown first (never the one showing).</summary>
+    private List<TKey> Oldest<TKey>(Dictionary<TKey, Screen> kept, int over, Func<TKey, bool> may) where TKey : notnull =>
+        kept.Where(kv => kv.Value != current && may(kv.Key))
+            .OrderBy(kv => shownAt.GetValueOrDefault(kv.Value))
+            .Take(over)
+            .Select(kv => kv.Key)
+            .ToList();
 
     private void Mount(Screen s)
     {
@@ -420,6 +484,15 @@ public sealed class AppShell : Grid, IDisposable
         }
         foreach (var (t, go) in current.Before) crumbs.Add((t, go));
         crumbs.Add((current.Title, null));
+        var subtitle = current.Subtitle;
+        var commands = current.Commands;
+        window.Title = current.Title == "Dashboard" ? "Simpl" : $"{current.Title} – Simpl";
+        // (the same screen with the same words, the same steps under it and the same commands: drawn already — kept, its
+        // buttons with it; a screen that makes its commands anew each time is drawn again each time)
+        var words = string.Join("\u001f", crumbs.Select(c => (c.Go != null ? ">" : "") + c.Title).Concat(loc.Path.Select(r => r.ToString())).Append(subtitle ?? ""));
+        (Screen Screen, string Words, FrameworkElement? Commands) drawn = (current, words, commands);
+        if (headerDrawn is { } was && was.Equals(drawn)) return;
+        headerDrawn = drawn;
         var line = new WrapPanel { Orientation = Orientation.Horizontal };
         for (var i = 0; i < crumbs.Count; i++)
         {
@@ -436,10 +509,9 @@ public sealed class AppShell : Grid, IDisposable
             else line.Children.Add(t);
         }
         var stack = K.V(2, line);
-        if (current.Subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
+        if (subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
         titleHost.Content = stack;
-        commandsHost.Content = current.Commands;
-        window.Title = current.Title == "Dashboard" ? "Simpl" : $"{current.Title} – Simpl";
+        commandsHost.Content = commands;
     }
 
     private double ContentWidth => Math.Max(200, page.ActualWidth - 80);

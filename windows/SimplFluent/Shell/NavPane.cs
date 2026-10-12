@@ -45,6 +45,8 @@ public sealed class NavList : Grid
     private readonly Dictionary<string, Button> rows = new();
     private string? selected;
     private double? pillAt;
+    /// <summary>What the rows built last draw (<see cref="Signature"/>).</summary>
+    private string? drawn;
 
     public NavList()
     {
@@ -56,12 +58,52 @@ public sealed class NavList : Grid
         LayoutUpdated += (_, _) => PlacePill(animate: false);
     }
 
+    /// <summary>The rows built again from the entries, the one chosen marked.</summary>
     public void Set(IEnumerable<NavEntry> entries, string? chosen)
     {
+        var list = entries as IReadOnlyList<NavEntry> ?? entries.ToList();
+        Set(list, chosen, Signature(list));
+    }
+
+    /// <summary>
+    /// The entries shown: the rows are built again only when something they draw changed (a count, a course, a course's
+    /// sections folded out or in); otherwise they stay as they are — their tour marks and keyboard focus with them — and
+    /// only the choice moves, the pill sliding to it.
+    /// </summary>
+    public void Show(IReadOnlyList<NavEntry> entries, string? chosen)
+    {
+        var sign = Signature(entries);
+        if (sign == drawn) Select(chosen);
+        else Set(entries, chosen, sign);
+    }
+
+    private void Set(IReadOnlyList<NavEntry> entries, string? chosen, string sign)
+    {
+        drawn = sign;
         items.Children.Clear();
         rows.Clear();
         foreach (var e in entries) Add(e, 0);
         Select(chosen);
+    }
+
+    /// <summary>Everything the entries' rows draw, in order, as words: the same words, the same rows. A course's sections
+    /// count only while they are folded out (they are drawn only then).</summary>
+    public static string Signature(IEnumerable<NavEntry> entries)
+    {
+        var s = new System.Text.StringBuilder();
+        void Sign(NavEntry e, int depth)
+        {
+            s.Append(depth).Append(e.Separator ? 'S' : e.Header ? 'H' : 'R').Append('\u001f')
+                .Append(e.Key).Append('\u001f').Append(e.Title).Append('\u001f')
+                .Append((int)e.Icon).Append('\u001f').Append(e.Tint.ToString()).Append('\u001f')
+                .Append(e.Square?.ToString()).Append('\u001f').Append(e.Letter).Append('\u001f')
+                .Append(e.Badge).Append('\u001f').Append(e.Expanded ? '+' : '-').Append(e.Toggle != null ? 'T' : '_')
+                .Append(e.Hover != null ? 'h' : '_').Append('\u001f').Append(e.Spot?.ToString()).Append('\u001e');
+            if (e.Expanded && e.Children != null)
+                foreach (var c in e.Children) Sign(c, depth + 1);
+        }
+        foreach (var e in entries) Sign(e, 0);
+        return s.ToString();
     }
 
     private void Add(NavEntry e, int depth)

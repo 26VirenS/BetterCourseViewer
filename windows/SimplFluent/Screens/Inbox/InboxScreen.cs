@@ -68,6 +68,9 @@ public sealed class InboxScreen : Screen
     private readonly Button courseButton;
     private readonly FrameworkElement handle;
     private readonly Dictionary<string, RowView> rowViews = new();
+    /// <summary>The rows made for the answer shown, kept while the filter or the course narrows the list: a conversation
+    /// shown again has its row put back, not made anew (a new answer, or the page built again, makes them afresh).</summary>
+    private readonly Dictionary<string, RowView> made = new();
     private readonly List<string> order = new();
     private InboxThreadView? reader;
 
@@ -217,6 +220,7 @@ public sealed class InboxScreen : Screen
     /// </summary>
     private void Adopt(InboxData d, bool fresh, bool animate)
     {
+        if (!ReferenceEquals(d, shown)) made.Clear();
         shown = d;
         switching = false;
         opened.IntersectWith(d.Rows.Where(r => r.Unread == true).Select(r => r.Id));
@@ -264,6 +268,7 @@ public sealed class InboxScreen : Screen
         // (the conversation beside the list put away: on a narrow page one opens on a screen of its own)
         if (IsCompact) selection = null;
         Arrange();
+        made.Clear(); // (built again for the look or the width: every row made afresh)
         ShowRows(false);
         ShowReader();
         Header();
@@ -370,7 +375,8 @@ public sealed class InboxScreen : Screen
         }).ToList();
     }
 
-    /// <summary>The conversations drawn again (the mailbox's answer, the filter, the course), the one focused kept focused.</summary>
+    /// <summary>The conversations drawn again (the mailbox's answer, the filter, the course), the one focused kept focused:
+    /// a conversation already drawn for this answer has its row put back (painted as it is now), the others are made.</summary>
     private void ShowRows(bool animate)
     {
         if (shown is not { } d) return;
@@ -381,10 +387,13 @@ public sealed class InboxScreen : Screen
         order.Clear();
         for (var i = 0; i < rows.Count; i++)
         {
+            var c = rows[i];
             if (i > 0) rowsPanel.Children.Add(K.Divider().Margin(77, 1, 10, 1));
-            var v = Row(rows[i]);
-            rowViews[rows[i].Id] = v;
-            order.Add(rows[i].Id);
+            RowView v;
+            if (!rowViews.ContainsKey(c.Id) && made.TryGetValue(c.Id, out var kept) && ReferenceEquals(kept.Row, c)) { v = kept; Paint(v); }
+            else made[c.Id] = v = Row(c);
+            rowViews[c.Id] = v;
+            order.Add(c.Id);
             rowsPanel.Children.Add(v.Button);
         }
         Dim(switching);
