@@ -269,6 +269,7 @@ public sealed class SheetHost : Grid
 
     private static IInputElement? FirstFocusable(DependencyObject root)
     {
+        if (root is not Visual and not System.Windows.Media.Media3D.Visual3D) return null; // (a document, a run: nothing to focus)
         if (root is System.Windows.Controls.TextBox or System.Windows.Controls.PasswordBox or Wpf.Ui.Controls.TextBox or Wpf.Ui.Controls.PasswordBox)
             return ((UIElement)root).IsEnabled && ((UIElement)root).IsVisible ? (IInputElement)root : null;
         var n = VisualTreeHelper.GetChildrenCount(root);

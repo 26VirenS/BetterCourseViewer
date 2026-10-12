@@ -260,6 +260,7 @@ internal sealed class AltaSession
         if (started) return;
         started = true;
         isDark = dark;
+        Hold(true); // (the screenshot suite waits for Alta's page, not only for the app's own calls)
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
         try
         {
@@ -290,6 +291,7 @@ internal sealed class AltaSession
         {
             if (!Opening) return;
             Opening = false;
+            Hold(false);
             Notify();
         };
         core.NewWindowRequested += (_, e) => { e.Handled = true; engine.GoTo(e.Uri, ""); };
@@ -308,9 +310,21 @@ internal sealed class AltaSession
         catch (Exception e) { Fail(e.Message); }
     }
 
+    private bool holding;
+
+    /// <summary>The picture held while Alta opens (counted as work in flight), let go once its page is in, it failed, or
+    /// the popup closed.</summary>
+    private void Hold(bool on)
+    {
+        if (on == holding) return;
+        holding = on;
+        if (on) Shot.Began(); else Shot.Ended();
+    }
+
     private void Fail(string why)
     {
         Failure = "Knewton Alta could not be opened. " + why;
+        Hold(false);
         Opening = false;
         Notify();
     }
@@ -336,6 +350,7 @@ internal sealed class AltaSession
     {
         if (closed) return;
         closed = true;
+        Hold(false);
         dialogWait?.Cancel();
         ClosePic();
         foreach (var t in codeAsked.Values) t.TrySetResult(null);

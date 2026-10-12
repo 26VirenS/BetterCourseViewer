@@ -87,11 +87,22 @@ internal sealed class MacmillanPopupView
         Shot.Moved();
     }
 
+    private bool holding;
+
+    /// <summary>The picture held while the page opens, let go once it is in, it failed, or the popup closed.</summary>
+    private void Hold(bool on)
+    {
+        if (on == holding) return;
+        holding = on;
+        if (on) Shot.Began(); else Shot.Ended();
+    }
+
     /// <summary>Opened: a web view with the engine's web data, then the assignment's launch through Canvas (or the page asked for).</summary>
     private async void Start()
     {
         if (started) return;
         started = true;
+        Hold(true); // (the screenshot suite waits for the page, not only for the app's own calls)
         try
         {
             var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Simpl.Engine.Engine.BrowserArguments));
@@ -113,6 +124,7 @@ internal sealed class MacmillanPopupView
         {
             if (!opening) return;
             opening = false;
+            Hold(false);
             Draw();
         };
         core.NewWindowRequested += (_, e) => { e.Handled = true; engine.GoTo(e.Uri, ""); };
@@ -133,6 +145,7 @@ internal sealed class MacmillanPopupView
 
     private void Fail(string why)
     {
+        Hold(false);
         failure = "Macmillan Learning could not be opened. " + why;
         opening = false;
         Draw();
@@ -152,6 +165,7 @@ internal sealed class MacmillanPopupView
     {
         if (closed) return;
         closed = true;
+        Hold(false);
         closing = true;
         over.PreviewKeyDown -= OnKey;
         try { web.Dispose(); } catch { }
