@@ -198,7 +198,8 @@ public sealed class TourOverlay : Grid
     public void Start(int at = 0)
     {
         WorkPreview.Dismiss();
-        if (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0) engine.Go(Place.Dashboard);
+        // (from the start, on the Dashboard; one begun part-way, as the screenshot suite does, stays where it is opened)
+        if (at == 0 && (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0)) engine.Go(Place.Dashboard);
         steps = Steps();
         index = null;
         lastHole = null;
