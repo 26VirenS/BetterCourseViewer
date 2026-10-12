@@ -15,9 +15,10 @@ CI (`.github/workflows/windows-fluent.yml`) builds it, pictures it against the m
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). |
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states), `B` (theme brush keys), `Motion` (WinUI curves and transitions), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, `NavPane`), Settings, Setup, What's New, dialogs, the web window. |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), dialogs, the tray, the web window. `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
-| `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. |
+| `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder). |
 
 ## A screen
 
@@ -51,3 +52,32 @@ public sealed class TodoScreen : Screen
   everything respects Windows' "Animation effects" and is off in the screenshot suite.
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
+
+## The quick look
+
+A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grows a card out of itself with
+`WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
+Calendar's `CalendarPeek`). The card reads the work's details as it opens, Mark done ticks it, a double-click or a
+Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row.
+
+## A tool
+
+A tool registers itself from its own file, so a tool added is a file added:
+
+```csharp
+internal static class CalculatorRegistration
+{
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void Register() => ToolRegistry.Register("calc", c => new CalculatorTool(c), c => new CalculatorCompact(c));
+}
+```
+
+The whole tool opens under the Tools page's header ("Tools › Calculator", its pin beside the title) and, from a pin's
+flyout, over the window (`ToolPopup`); the quick version is the pin's flyout. `ToolContext` hands it the engine, what
+was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` for the flyout. `ToolKit` has the page, two
+columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
+
+## Icons
+
+WPF-UI 4.3 draws only the Fluent icons whose code is at most U+FFFF; the rest show as a stray character. Check a new
+`SymbolRegular` against that before using it.
