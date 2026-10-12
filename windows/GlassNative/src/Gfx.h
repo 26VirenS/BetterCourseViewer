@@ -79,7 +79,24 @@ struct Gfx {
         if (FAILED(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2d))) return false;
         d2d->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
         if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)dwrite.GetAddressOf()))) return false;
-        dpi = (float)GetDpiForWindow(hwnd);
+        SetDpi((float)GetDpiForWindow(hwnd));
+        return CreateSized();
+    }
+
+    /// The display's scale, for Direct2D too: its context draws at 96 DPI unless told otherwise, whatever its target's
+    /// DPI — on a scaled display everything it drew came out at 100% while the glass was placed at the real scale.
+    void SetDpi(float d) {
+        dpi = d;
+        if (d2d) d2d->SetDpi(d, d);
+    }
+
+    /// The display's scale changed (the window moved to another display): every target made again at it.
+    bool Rescale(float d) {
+        SetDpi(d);
+        ReleaseSized();
+        ctx->ClearState();
+        ctx->Flush();
+        if (FAILED(swap->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0))) return false;
         return CreateSized();
     }
 

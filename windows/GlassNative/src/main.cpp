@@ -14,6 +14,7 @@
 static Gfx g;
 static Showcase* show = nullptr;
 static bool tracking = false;
+static float forcedDpi = 0; // (--dpi 192: drawn as on a display scaled 200%, for CI's picture)
 
 static float Unit() { return g.Scale() * (show ? show->uiScale : 1.0f); }
 
@@ -33,7 +34,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         return 0;
     case WM_DPICHANGED: {
-        g.dpi = (float)HIWORD(wp);
+        if (!forcedDpi) g.Rescale((float)HIWORD(wp));
+        if (show) { show->Resized(); FitScale(); }
         auto* r = (RECT*)lp;
         SetWindowPos(hwnd, nullptr, r->left, r->top, r->right - r->left, r->bottom - r->top, SWP_NOZORDER | SWP_NOACTIVATE);
         return 0;
@@ -122,7 +124,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     std::wstring shot;
-    for (int i = 1; i + 1 < argc; i++) if (std::wstring(argv[i]) == L"--shot") shot = argv[i + 1];
+    for (int i = 1; i + 1 < argc; i++) {
+        if (std::wstring(argv[i]) == L"--shot") shot = argv[i + 1];
+        if (std::wstring(argv[i]) == L"--dpi") forcedDpi = (float)_wtof(argv[i + 1]);
+    }
 
     WNDCLASSEXW wc = { sizeof(wc) };
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -148,6 +153,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
         MessageBoxW(nullptr, L"Direct3D 11 could not be started.", L"Liquid Glass", MB_ICONERROR);
         return 1;
     }
+    if (forcedDpi > 0) g.Rescale(forcedDpi);
     static Showcase s(g);
     show = &s;
     FitScale();

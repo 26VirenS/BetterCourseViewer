@@ -61,6 +61,10 @@ jobs:
           Write-Host "exit code: $($p.ExitCode)"
           if (Test-Path shot-showcase.png.txt) { Get-Content shot-showcase.png.txt }
           if (-not (Test-Path shot-showcase.png)) { throw 'no picture' }
+          # and as on a display scaled 200% (most laptops, and a Mac's Windows in Parallels): everything at one scale
+          $p = Start-Process -FilePath dist/LiquidGlass/LiquidGlass.exe -ArgumentList '--shot', "$PWD/shot-showcase-200.png", '--dpi', '192' -WorkingDirectory dist/LiquidGlass -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'it did not finish (200%)' }
+          if (Test-Path shot-showcase-200.png.txt) { Get-Content shot-showcase-200.png.txt }
       - name: Zip
         shell: bash
         run: (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-Showcase-win64.zip LiquidGlass >/dev/null) && ls -la LiquidGlass-Showcase-win64.zip
