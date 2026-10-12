@@ -454,8 +454,15 @@ public static class ToolHeader
         void Draw()
         {
             var on = ToolsPins.IsPinned(kind.Key);
-            var b = K.Button(squished ? "" : on ? "Pinned" : "Pin to Title Bar", () => ToolsPins.Toggle(kind.Key), accent: on, icon: on ? SymbolRegular.Pin24 : SymbolRegular.Pin24);
-            if (squished) { b.Content = null; b.Padding = new Thickness(10, 6, 10, 6); }
+            var b = K.Button(on ? "Pinned" : "Pin to Title Bar", () => ToolsPins.Toggle(kind.Key), accent: on, icon: SymbolRegular.Pin24);
+            if (squished)
+            {
+                // (a header full of the tool's own controls: the pin a symbol alone, the size of theirs)
+                b.Icon = null;
+                b.Content = K.Icon(SymbolRegular.Pin24, 16, on ? B.OnAccent : B.Text, filled: on);
+                b.MinWidth = 0;
+                b.Padding = new Thickness(10, 6, 10, 6);
+            }
             b.ToolTip = on ? "In the title bar on every screen. Press to take it out." : $"Keep {kind.Name} in the title bar on every screen";
             System.Windows.Automation.AutomationProperties.SetName(b, on ? $"Unpin {kind.Name}" : $"Pin {kind.Name}");
             host.Content = b;
@@ -519,20 +526,55 @@ public sealed class PinBar : StackPanel
         return pins;
     }
 
+    /// <summary>The pins as drawn, by key, and what they were drawn for (the keys, and whether the timer was live).</summary>
+    private readonly Dictionary<string, Button> buttons = new();
+    private string drawn = "";
+
+    /// <summary>The pins drawn again when they change (pinned, unpinned, moved, the timer started or stopped); each second
+    /// of a running timer only its pin's face is (the buttons stay, so a flyout or a menu stays where it hangs).</summary>
     private void Draw()
     {
         Hook();
         var live = timer?.Active == true;
         if (live && !tick.IsEnabled) tick.Start();
         if (!live && tick.IsEnabled) tick.Stop();
+        var pins = Pins();
+        var now = string.Join(",", pins) + (live ? "|live" : "");
+        if (now == drawn)
+        {
+            if (live && buttons.TryGetValue("pomo", out var tb) && ToolsCenter.KindOf("pomo") is { } pk) Dress(tb, pk);
+            return;
+        }
+        drawn = now;
         Children.Clear();
-        foreach (var key in Pins())
-            if (ToolsCenter.KindOf(key) is { } kind) Children.Add(Pin(kind));
+        buttons.Clear();
+        foreach (var key in pins)
+            if (ToolsCenter.KindOf(key) is { } kind) Children.Add(buttons[key] = Pin(kind));
+        if (flyout != null && flyoutKey != null)
+        {
+            if (buttons.TryGetValue(flyoutKey, out var nb)) flyout.PlacementTarget = nb; else CloseFlyout();
+        }
     }
 
     private Button Pin(ToolsScreen.Kind kind)
     {
-        UIElement face;
+        var b = K.Subtle(new Grid(), () => OpenFlyout(kind.Key), new Thickness(10, 0, 10, 0), 4);
+        b.Height = 32;
+        b.MinWidth = 40;
+        b.VerticalAlignment = VerticalAlignment.Center;
+        b.HorizontalContentAlignment = HorizontalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(b, kind.Name);
+        System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(b, true);
+        b.ContextMenu = Menu(kind);
+        b.ContextMenuOpening += (_, _) => b.ContextMenu = Menu(kind); // (filled as it opens: the timer's state then)
+        Dress(b, kind);
+        return b;
+    }
+
+    /// <summary>A pin's face: its tool's symbol in its colour; the running timer's, what is left of the phase on a small
+    /// ring and in figures, in the phase's colour.</summary>
+    private void Dress(Button b, ToolsScreen.Kind kind)
+    {
         var live = kind.Key == "pomo" && timer?.Active == true;
         if (live && timer != null)
         {
@@ -543,19 +585,14 @@ public sealed class PinBar : StackPanel
             clock.FontFeatures();
             var row = K.H(6, ring, clock);
             if (timer.Paused) row.Children.Add(K.Icon(SymbolRegular.Pause24, 10, B.Text2, filled: true));
-            face = row;
+            b.Content = row;
+            b.ToolTip = $"Focus timer: {timer.PhaseName.ToLowerInvariant()}{(timer.Paused ? ", paused" : "")}";
         }
-        else face = K.Icon(kind.Symbol, 16, kind.Color);
-        var b = K.Subtle(face, () => OpenFlyout(kind.Key), new Thickness(10, 0, 10, 0), 4);
-        b.Height = 32;
-        b.MinWidth = 40;
-        b.VerticalAlignment = VerticalAlignment.Center;
-        b.HorizontalContentAlignment = HorizontalAlignment.Center;
-        b.ToolTip = live && timer != null ? $"Focus timer: {timer.PhaseName.ToLowerInvariant()}{(timer.Paused ? ", paused" : "")}" : kind.Name;
-        System.Windows.Automation.AutomationProperties.SetName(b, kind.Name);
-        System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(b, true);
-        b.ContextMenu = Menu(kind);
-        return b;
+        else
+        {
+            b.Content = K.Icon(kind.Symbol, 16, kind.Color);
+            b.ToolTip = kind.Name;
+        }
     }
 
     private ContextMenu Menu(ToolsScreen.Kind kind)
@@ -599,7 +636,7 @@ public sealed class PinBar : StackPanel
     {
         if (flyout != null) { var same = flyoutKey == key; CloseFlyout(); if (same) return; }
         if (ToolsCenter.KindOf(key) is not { } kind) return;
-        var anchor = Children.OfType<Button>().FirstOrDefault(b => System.Windows.Automation.AutomationProperties.GetName(b) == kind.Name);
+        var anchor = buttons.GetValueOrDefault(key);
         var owner = Window.GetWindow(this);
         void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files)
         {
