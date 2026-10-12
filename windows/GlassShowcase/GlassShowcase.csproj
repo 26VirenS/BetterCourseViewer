@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Liquid Glass for Windows, shown off: the glass Simpl for Windows draws (windows/Simpl/Components/Glass), over a
+       vivid moving backdrop, as popovers, toolbars, tab bars, toggles, sliders and a lens to drag and fling. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>GlassShowcase</RootNamespace>
+    <AssemblyName>LiquidGlassShowcase</AssemblyName>
+    <ApplicationIcon>..\Simpl\Assets\Simpl.ico</ApplicationIcon>
+    <ApplicationManifest>..\Simpl\app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Simpl\Components\Glass\*.cs" Link="Glass\%(Filename)%(Extension)" />
+    <!-- the compiled glass shader (fxc, in CI: windows/tools/shaders.ps1); without it the glass draws its fallback -->
+    <EmbeddedResource Include="..\Simpl\Components\Glass\Glass.ps" Condition="Exists('..\Simpl\Components\Glass\Glass.ps')" LogicalName="Simpl.Glass.ps" />
+  </ItemGroup>
+
+</Project>

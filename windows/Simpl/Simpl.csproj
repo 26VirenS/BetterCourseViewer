@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Simpl for Windows: the Mac app's Windows twin (mac/Simpl). As there, the student's Canvas runs in a web view
+       underneath (WebView2, with the extension's own scripts in it) and answers what the app's own screens show. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Simpl</RootNamespace>
+    <AssemblyName>Simpl</AssemblyName>
+    <ApplicationIcon>Assets\Simpl.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>Simpl</Product>
+    <Company>Simpl Courses</Company>
+    <Description>Simpl for Windows</Description>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.1</FileVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- (WPF's own usings: no System.Windows.Forms nor System.Drawing to clash with it) -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the compiled glass shader (fxc, in CI: windows/tools/shaders.ps1); without it the glass draws its fallback -->
+    <EmbeddedResource Include="Components\Glass\Glass.ps" Condition="Exists('Components\Glass\Glass.ps')" LogicalName="Simpl.Glass.ps" />
+    <None Remove="Components\Glass\Glass.fx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Simpl.ico" />
+    <Resource Include="Assets\Simpl-256.png" />
+  </ItemGroup>
+
+  <!-- The extension the engine runs (the same files the Mac and iPhone apps carry), and the bridge and sign-in reader
+       the apps share — beside the app, as loose files. -->
+  <ItemGroup>
+    <None Include="..\..\extension\**\*" Exclude="..\..\extension\**\.DS_Store" Link="extension\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\ios\SimplCourses\Web\bridge.js" Link="Web\bridge.js" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\ios\SimplCourses\Web\login.js" Link="Web\login.js" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+</Project>

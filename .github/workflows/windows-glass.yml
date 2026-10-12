@@ -1,6 +1,8 @@
-# Liquid Glass on Windows: the candidates found online, built for Windows and published as a pre-release of their own
-# (windows-glass-r<run>) to try on a real PC. Nothing here touches Simpl's own builds, releases or update feeds (those
-# read mac-v* releases only). See windows-glass/README.md.
+# Liquid Glass for Windows: Simpl's own glass (windows/Simpl/Components/Glass), shown off in a small app of its own
+# (windows/GlassShowcase) — the glass shader compiled with the Windows SDK's fxc, the app published as one portable exe,
+# started on the runner for a picture, and published as a pre-release (windows-glass-r<run>) to try on a real PC.
+# Nothing here touches Simpl's own builds, releases or update feeds (those read mac-v* releases only).
+# (The first candidates built here — liquidImgui and AuroraGlass, r1–r4 — were tried and set aside: windows-glass/README.md.)
 name: Windows Liquid Glass
 
 on:
@@ -8,6 +10,9 @@ on:
     branches: [claude/windows-liquid-glass]
     paths:
       - 'windows-glass/**'
+      - 'windows/GlassShowcase/**'
+      - 'windows/Simpl/Components/Glass/**'
+      - 'windows/tools/shaders.ps1'
       - '.github/workflows/windows-glass.yml'
   workflow_dispatch:
 
@@ -18,109 +23,51 @@ concurrency:
   group: windows-glass
   cancel-in-progress: true
 
-env:
-  # pinned: the exact code that was looked at
-  LIQUIDIMGUI_REPO: https://github.com/charlie-x/liquidImgui.git
-  LIQUIDIMGUI_SHA: 1f6f0225035c5602690d62749e4256200da8d7a1
-  AURORA_REPO: https://github.com/VeiQiuLab/AuroraGlass.git
-  AURORA_SHA: 9355428a4a04f27a01b8e34fec90b7bfde2f0cf6
-
 jobs:
-  liquidimgui:
-    name: liquidImgui (Direct3D 11, live desktop refraction)
+  showcase:
+    name: Liquid Glass showcase (WPF, the glass shader)
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch liquidImgui
-        shell: bash
-        run: |
-          git init -q src && cd src
-          git remote add origin "$LIQUIDIMGUI_REPO"
-          git fetch -q --depth 1 origin "$LIQUIDIMGUI_SHA"
-          git checkout -q FETCH_HEAD
-      - name: Build (Release, x64)
-        shell: bash
-        run: |
-          # (a windowed app, not a console one: no empty terminal window opens beside it)
-          cmake -S src -B build -A x64 -DCMAKE_EXE_LINKER_FLAGS="/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup"
-          cmake --build build --config Release --parallel
-      - name: Package
-        shell: bash
-        run: |
-          out=dist/LiquidGlass-liquidImgui
-          mkdir -p "$out"
-          cp build/Release/liquidDX11.exe "$out/LiquidGlass.exe"
-          cp -R src/data "$out/data"
-          cp src/LICENSE.txt "$out/LICENSE-imgui.txt"
-          cp src/examples/example_win32_directx11/LICENSE "$out/LICENSE.txt"
-          cp src/examples/example_win32_directx11/THIRD-PARTY-NOTICES.md "$out/"
-          cp windows-glass/liquidimgui-README.txt "$out/README-FIRST.txt"
-          bash windows-glass/ci/runtime-dlls.sh "$out" "$out/LiquidGlass.exe"
-          (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-liquidImgui-win64.zip LiquidGlass-liquidImgui >/dev/null)
-          ls -la LiquidGlass-liquidImgui-win64.zip
-      - name: Does it start? (run for a while, a picture of the screen)
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Compile the glass shader (fxc, ps_3_0)
         shell: pwsh
-        run: ./windows-glass/ci/smoke.ps1 -Exe dist/LiquidGlass-liquidImgui/LiquidGlass.exe -Shot shot-liquidimgui.png -Keys "{F11}"
+        run: ./windows/tools/shaders.ps1
+      - name: Publish (one portable exe, .NET inside)
+        shell: bash
+        run: |
+          dotnet publish windows/GlassShowcase/GlassShowcase.csproj -c Release -r win-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+            -o dist/LiquidGlassShowcase
+          cp windows-glass/showcase-README.txt dist/LiquidGlassShowcase/README-FIRST.txt
+          ls -la dist/LiquidGlassShowcase
+      - name: Does it start? (a picture of its window)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/LiquidGlassShowcase/LiquidGlassShowcase.exe -ArgumentList '--shot', "$PWD/shot-showcase.png" -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'it did not finish' }
+          Write-Host "exit code: $($p.ExitCode)"
+          if (Test-Path shot-showcase.png.txt) { Get-Content shot-showcase.png.txt }
+          if (-not (Test-Path shot-showcase.png)) { throw 'no picture' }
+      - name: Zip
+        shell: bash
+        run: (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-Showcase-win64.zip LiquidGlassShowcase >/dev/null) && ls -la LiquidGlass-Showcase-win64.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: shot-liquidimgui
-          path: shot-liquidimgui*.png
+          name: shot-showcase
+          path: shot-showcase.png*
       - uses: actions/upload-artifact@v4
         with:
-          name: LiquidGlass-liquidImgui-win64
-          path: LiquidGlass-liquidImgui-win64.zip
-
-  aurora:
-    name: AuroraGlass (Direct3D 11 SDK, interactive demo)
-    runs-on: windows-latest
-    timeout-minutes: 40
-    continue-on-error: true # (a second candidate: the first is published whatever becomes of this one)
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fetch AuroraGlass
-        shell: bash
-        run: |
-          git init -q src && cd src
-          git remote add origin "$AURORA_REPO"
-          git fetch -q --depth 1 origin "$AURORA_SHA"
-          git checkout -q FETCH_HEAD
-      - name: Build its demos (Release, x64)
-        shell: bash
-        run: |
-          cmake -S src -B build -A x64
-          cmake --build build --config Release --target P3_Interactive_Smoke
-          cmake --build build --config Release --target P4_Motion_Smoke || echo "P4_Motion_Smoke did not build"
-      - name: Package
-        shell: bash
-        run: |
-          out=dist/LiquidGlass-AuroraGlass
-          mkdir -p "$out"
-          cp -R build/Release/. "$out/"
-          find "$out" \( -name '*.pdb' -o -name '*.ilk' -o -name '*.lib' -o -name '*.exp' \) -delete
-          cp src/LICENSE "$out/LICENSE.txt"
-          cp windows-glass/aurora-README.txt "$out/README-FIRST.txt"
-          bash windows-glass/ci/runtime-dlls.sh "$out" "$out/P3_Interactive_Smoke.exe"
-          (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-AuroraGlass-win64.zip LiquidGlass-AuroraGlass >/dev/null)
-          ls -la LiquidGlass-AuroraGlass-win64.zip
-      - name: Does it start? (run for a while, a picture of the screen)
-        shell: pwsh
-        run: ./windows-glass/ci/smoke.ps1 -Exe dist/LiquidGlass-AuroraGlass/P3_Interactive_Smoke.exe -Shot shot-aurora.png
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: shot-aurora
-          path: shot-aurora*.png
-      - uses: actions/upload-artifact@v4
-        with:
-          name: LiquidGlass-AuroraGlass-win64
-          path: LiquidGlass-AuroraGlass-win64.zip
+          name: LiquidGlass-Showcase-win64
+          path: LiquidGlass-Showcase-win64.zip
 
   publish:
     name: Publish the pre-release
-    needs: [liquidimgui, aurora]
-    if: always() && needs.liquidimgui.result == 'success'
+    needs: [showcase]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -134,8 +81,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="windows-glass-r${{ github.run_number }}"
-          ls -la zips
           gh release create "$tag" zips/*.zip --target "${{ github.sha }}" --prerelease \
-            --title "Liquid Glass on Windows — showcase r${{ github.run_number }}" \
+            --title "Liquid Glass on Windows — Simpl's own (r${{ github.run_number }})" \
             --notes-file windows-glass/RELEASE_NOTES.md
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"
