@@ -139,32 +139,9 @@ internal static class Vsepr
             { zx - xz, xy + yx, yy - xx - zz, yz + zy },
             { xy - yx, zx + xz, yz + zy, zz - xx - yy },
         };
-        // (shifted so that every eigenvalue is positive and the largest stays the largest)
-        var shift = 1e-9;
-        foreach (var x in m) shift += Math.Abs(x);
-        for (var i = 0; i < 4; i++) m[i, i] += shift;
-        for (var step = 0; step < 40; step++)
-        {
-            var sq = new double[4, 4];
-            for (var i = 0; i < 4; i++)
-                for (var j = 0; j < 4; j++)
-                    for (var k = 0; k < 4; k++) sq[i, j] += m[i, k] * m[k, j];
-            var top = 1e-300;
-            foreach (var x in sq) top = Math.Max(top, Math.Abs(x));
-            for (var i = 0; i < 4; i++)
-                for (var j = 0; j < 4; j++) m[i, j] = sq[i, j] / top;
-        }
-        // (every column now lies along the leading eigenvector: the longest is taken)
-        double[] qq = { 1, 0, 0, 0 };
-        var len = 0.0;
-        for (var j = 0; j < 4; j++)
-        {
-            double[] column = { m[0, j], m[1, j], m[2, j], m[3, j] };
-            var l = Math.Sqrt(column.Sum(x => x * x));
-            if (l > len) (qq, len) = (column, l);
-        }
-        if (len <= 1e-12) return v => v - ca + cb;
-        double w = qq[0] / len, qx = qq[1] / len, qy = qq[2] / len, qz = qq[3] / len;
+        var qq = Leading(m);
+        if (qq.Length != 4) return v => v - ca + cb;
+        double w = qq[0], qx = qq[1], qy = qq[2], qz = qq[3];
         var r0 = V(1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - w * qz), 2 * (qx * qz + w * qy));
         var r1 = V(2 * (qx * qy + w * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - w * qx));
         var r2 = V(2 * (qx * qz - w * qy), 2 * (qy * qz + w * qx), 1 - 2 * (qx * qx + qy * qy));
@@ -173,6 +150,78 @@ internal static class Vsepr
             var d = v - ca;
             return V(Vector3D.DotProduct(r0, d), Vector3D.DotProduct(r1, d), Vector3D.DotProduct(r2, d)) + cb;
         };
+    }
+
+    /// <summary>
+    /// The leading eigenvector (unit) of a symmetric matrix: shifted so that every eigenvalue is positive and the largest
+    /// stays the largest, then squared until one direction is left in it, whose longest column is taken.
+    /// </summary>
+    public static double[] Leading(double[,] a)
+    {
+        var n = a.GetLength(0);
+        var m = (double[,])a.Clone();
+        var shift = 1e-9;
+        foreach (var x in a) shift += Math.Abs(x);
+        for (var i = 0; i < n; i++) m[i, i] += shift;
+        for (var step = 0; step < 40; step++)
+        {
+            var sq = new double[n, n];
+            for (var i = 0; i < n; i++)
+                for (var j = 0; j < n; j++)
+                    for (var k = 0; k < n; k++) sq[i, j] += m[i, k] * m[k, j];
+            var top = 1e-300;
+            foreach (var x in sq) top = Math.Max(top, Math.Abs(x));
+            for (var i = 0; i < n; i++)
+                for (var j = 0; j < n; j++) m[i, j] = sq[i, j] / top;
+        }
+        var best = Array.Empty<double>();
+        var len = 0.0;
+        for (var j = 0; j < n; j++)
+        {
+            var column = Enumerable.Range(0, n).Select(i => m[i, j]).ToArray();
+            var l = Math.Sqrt(column.Sum(x => x * x));
+            if (l > len) (best, len) = (column, l);
+        }
+        return len > 1e-12 ? best.Select(x => x / len).ToArray() : Array.Empty<double>();
+    }
+
+    /// <summary>
+    /// A piece turned about its middle to face the viewer: spread most from side to side, then up and down, least towards
+    /// the viewer (its principal axes), so a chain lies across the view and a flat molecule faces it.
+    /// </summary>
+    public static void Face(List<int> part, Vector3D[] pos, List<Vector3D>[] frame)
+    {
+        var c = new Vector3D();
+        foreach (var i in part) c += pos[i];
+        c /= Math.Max(part.Count, 1);
+        var spread = new double[3, 3];
+        foreach (var i in part)
+        {
+            var d = pos[i] - c;
+            double[] dv = { d.X, d.Y, d.Z };
+            for (var x = 0; x < 3; x++)
+                for (var y = 0; y < 3; y++) spread[x, y] += dv[x] * dv[y];
+        }
+        var e = Leading(spread);
+        if (e.Length != 3) return;
+        var a = V(e[0], e[1], e[2]);
+        // (the most along it taken away, the next most is the second axis)
+        var along = 0.0;
+        for (var x = 0; x < 3; x++)
+            for (var y = 0; y < 3; y++) along += e[x] * spread[x, y] * e[y];
+        for (var x = 0; x < 3; x++)
+            for (var y = 0; y < 3; y++) spread[x, y] -= along * e[x] * e[y];
+        var f = Leading(spread);
+        var b = f.Length == 3 ? Flat(V(f[0], f[1], f[2]), a) : new Vector3D();
+        if (b.Length < 1e-6) b = Vector3D.CrossProduct(a, Math.Abs(a.X) < 0.9 ? V(1, 0, 0) : V(0, 1, 0));
+        b = Unit(b);
+        var k = Vector3D.CrossProduct(a, b);
+        foreach (var i in part)
+        {
+            var d = pos[i] - c;
+            pos[i] = c + V(Vector3D.DotProduct(d, a), Vector3D.DotProduct(d, b), Vector3D.DotProduct(d, k));
+            frame[i] = frame[i].Select(x => V(Vector3D.DotProduct(x, a), Vector3D.DotProduct(x, b), Vector3D.DotProduct(x, k))).ToList();
+        }
     }
 
     /// <summary>
@@ -226,6 +275,9 @@ internal static class Vsepr
                     }
                 }
             }
+            // (laid out afresh, a molecule of more than one centre — a chain, a ring — is turned to face the viewer; one
+            // centre's own directions already do)
+            if (!keep && part.Count(i => nb[i].Count >= 2) >= 2) Face(part, pos, frame);
             // (never on top of a piece already placed: moved along until it is clear)
             for (var tries = 0; tries < 400; tries++)
             {
