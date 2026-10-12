@@ -78,14 +78,13 @@ public sealed class LoginOverlay : Window
         note.Visibility = login.Handoff ? Visibility.Visible : Visibility.Collapsed;
         startOver.Visibility = !login.Handoff && login.OnSchoolPage ? Visibility.Visible : Visibility.Collapsed;
         if (maxGlyph != null) maxGlyph.Text = main.WindowState == WindowState.Maximized ? "" : "";
-        if (!IsVisible) Show();
         Place();
+        if (!IsVisible) Show();
     }
 
     /// <summary>Over the top band of the main window's content, wherever it is.</summary>
     private void Place()
     {
-        if (!IsVisible) return;
         try
         {
             var src = PresentationSource.FromVisual(main);
