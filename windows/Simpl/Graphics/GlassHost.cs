@@ -93,10 +93,13 @@ public sealed class GlassHost : HwndHost
         if (hwnd != IntPtr.Zero) SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 /* NOSIZE | NOMOVE | NOACTIVATE */);
     }
 
-    private void Frame()
+    private void Frame() => Draw(false);
+
+    /// <summary>A frame drawn and presented; with capture, read before it is presented (the back buffer after a present is another).</summary>
+    private (byte[] Pixels, int Width, int Height)? Draw(bool capture)
     {
         scheduled = false;
-        if (Gpu == null || hwnd == IntPtr.Zero || !IsVisible) return;
+        if (Gpu == null || hwnd == IntPtr.Zero || !IsVisible) return null;
         var now = clock.Elapsed.TotalSeconds;
         var dt = (float)(now - last);
         last = now;
@@ -116,12 +119,14 @@ public sealed class GlassHost : HwndHost
         catch (Exception e) { if (failures++ < 5) Support.Log.Write("a frame failed: " + e); }
         Ui.Render(Ground());
         Ui.EndFrame();
+        var picture = capture ? Gpu.ReadBack() : ((byte[], int, int)?)null;
         Gpu.Present(true);
         if (Ui.Animating || dirty || Ui.Down) Schedule();
+        return picture;
     }
 
-    /// <summary>The screens as they are now (the screenshot suite's picture): BGRA rows.</summary>
-    public (byte[] Pixels, int Width, int Height)? Pixels() => Gpu?.ReadBack();
+    /// <summary>The screens as they are now (the screenshot suite's picture): a frame drawn afresh, BGRA rows.</summary>
+    public (byte[] Pixels, int Width, int Height)? Pixels() => Draw(true);
 
     // ---- the pointer and the keys ----
 
