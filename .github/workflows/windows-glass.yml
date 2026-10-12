@@ -1,16 +1,11 @@
 # Liquid Glass for Windows: the showcase (windows/GlassNative) — Win32 and Direct3D 11, the glass drawn by Simpl's own
 # shader (modelled on macOS 26's Liquid Glass), Direct2D and DirectWrite for the backdrop and the words. Built with MSVC, started on the runner for a picture, and published as a pre-release (windows-glass-v<run>, zero-padded) to
 # try on a real PC. Nothing here touches Simpl's own builds, releases or update feeds (those read mac-v* releases only).
+# The showcase did its job (its glass is the app's now): it is built and released only when asked for by hand
+# (Actions ▸ Windows Liquid Glass ▸ Run workflow), never on a push.
 name: Windows Liquid Glass
 
 on:
-  push:
-    branches: [claude/windows-liquid-glass]
-    paths:
-      - 'windows-glass/**'
-      - 'windows/GlassNative/**'
-      - 'windows/Shared/**'
-      - '.github/workflows/windows-glass.yml'
   workflow_dispatch:
 
 permissions:
