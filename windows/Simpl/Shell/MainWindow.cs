@@ -29,6 +29,7 @@ public sealed class MainWindow : Window
     private SchoolPicker? picker;
     private LoginLayer? login;
     private LoginOverlay? overlay;
+    private WhatsNewSheet? whatsNew;
     private HwndSource? source;
     private string? phaseLogged;
 
@@ -68,10 +69,16 @@ public sealed class MainWindow : Window
                 // (signing in: the app's own card or "Logging you in" in place of the screens; "Stay logged in?" over them)
                 if (login is { Covers: true }) login.Frame(ui); else view.Frame(ui);
                 login?.StayAlert(ui);
+                whatsNew?.Frame(ui);
             }
             else picker?.Frame(ui);
+            Alerts.Draw(ui, host);
             CaptionButtons(ui);
         };
+        // what the page's own settings button and the Settings window's changes ask of the window
+        Bridge.Shared.OpenSettingsRequested += OpenSettings;
+        Appearance.Changed += Retheme;
+        Alerts.Changed += host.Invalidate;
         host.Ground = () => view?.Ground ?? AppView.DefaultGround(host.Ui.T);
         host.Chrome = ChromeAt;
         host.MaxToggle = () => { if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this); else SystemCommands.MaximizeWindow(this); };
@@ -120,6 +127,13 @@ public sealed class MainWindow : Window
         engine.QuizRequested += q => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{q.Course}/quizzes/{q.Quiz}"), q.Title, this).Show();
         engine.AltaRequested += a => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{a.Course}/assignments/{a.Assignment}"), a.Title, this).Show();
         engine.MacmillanRequested += a => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{a.Course}/assignments/{a.Assignment}"), a.Title, this).Show();
+        engine.SettingsRequested += OpenSettings;
+        engine.WhatsNewRequested += d =>
+        {
+            WhatsNew.MarkSeen();
+            whatsNew = new WhatsNewSheet(d, () => { whatsNew = null; host.Invalidate(); });
+            host.Invalidate();
+        };
         // (the web view's own window is made later, on top: the screens go back over it)
         engine.Web.CoreWebView2InitializationCompleted += (_, _) => Phased();
         Phased();
@@ -142,6 +156,21 @@ public sealed class MainWindow : Window
         picker = new SchoolPicker(host, Open);
         host.Visibility = Visibility.Visible;
         host.BringToTop();
+        host.Invalidate();
+    }
+
+    /// <summary>Settings (the account menu's, the page's own button's, --open settings): the Settings window, one at a time, over this one.</summary>
+    private void OpenSettings()
+    {
+        if (engine == null) return;
+        SettingsWindow.Show(this, engine, Launch.Get("settings-tab"), ChangeSchool);
+    }
+
+    /// <summary>Appearance changed in Settings (light or dark, the accent): the screens drawn again, the frame with them.</summary>
+    private void Retheme()
+    {
+        var dark = AppView.Dark(engine?.Snapshot?.Dark);
+        if (dark != darkFrame) { host.Ui.T.Dark = dark; Frame(dark); }
         host.Invalidate();
     }
 

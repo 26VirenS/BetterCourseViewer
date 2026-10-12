@@ -36,7 +36,9 @@ jobs:
       - name: Build (Release, win-x64, self-contained)
         shell: bash
         run: |
-          dotnet publish windows/Simpl/Simpl.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo
+          # (the build carries its run's number — "0.1.0 (v015)" — as About and Updates name it)
+          n=$(printf '%03d' "${{ github.run_number }}")
+          dotnet publish windows/Simpl/Simpl.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.1.0 (v$n)"
           ls dist/Simpl | head -50
           test -f dist/Simpl/Simpl.exe
       - name: Mock Canvas
@@ -72,6 +74,13 @@ jobs:
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'activity'))
           Shot 'dashboard-narrow' '780x683' 45 ($mock + @('--appearance', 'light'))
           Shot 'school-picker' '1024x681' 10 @('--appearance', 'dark')
+          # the account menu, What's New, and the Settings window (pictured alone, as the Mac's is) on each of its tabs
+          Shot 'account-menu' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'menu'))
+          Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
+          foreach ($tab in @('general', 'appearance', 'notifications', 'grades', 'data', 'updates', 'about')) {
+            Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
+          }
+          Shot 'settings-appearance-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance'))
           # the sign-in (the mock with --login, on :8802): the app's own card — light, dark, wide; the card again after a
           # wrong password; "Logging you in" with its offer (the login "slow" takes twelve seconds); "Stay logged in?"
           # once Canvas is reached; and the note over a page the student must finish by hand (a one-time code)

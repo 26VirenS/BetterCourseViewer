@@ -79,6 +79,8 @@ public sealed partial class Engine : Observable, IShellListener
     public event Action<ToolLaunch>? ToolRequested;
     public event Action? SetupRequested;
     public event Action<WhatsNewData>? WhatsNewRequested;
+    /// <summary>Settings asked for (the page's "open options", the account menu's Settings…, --open settings).</summary>
+    public event Action? SettingsRequested;
     public event Action? NewTaskRequested;
     public event Action? NewMessageRequested;
 
@@ -365,6 +367,7 @@ public sealed partial class Engine : Observable, IShellListener
         await LoadSidebar();
         if (Snapshot?.SetupDone == false || Launch.Take("setup") != null) { SetupRequested?.Invoke(); return; }
         if (Launch.Take("whatsnew") != null) WhatsNewRequested?.Invoke(WhatsNew.All);
+        else if (Launch.Take("settings") != null) SettingsRequested?.Invoke();
         else if (WhatsNew.Due() is { } wn) WhatsNewRequested?.Invoke(wn);
     }
 
@@ -725,6 +728,8 @@ public sealed partial class Engine : Observable, IShellListener
     public void OpenMacmillan(AltaLaunch a) => MacmillanRequested?.Invoke(a);
 
     public void AskSetup() => SetupRequested?.Invoke();
+
+    public void AskSettings() => SettingsRequested?.Invoke();
 
     public void AskNewTask() => NewTaskRequested?.Invoke();
 

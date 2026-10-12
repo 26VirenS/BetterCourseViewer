@@ -9,6 +9,8 @@ What is in it so far:
 - **signing in, as on the Mac**: your school's sign-in page comes up as Simpl's own card — what you type goes into the school's own form and its button is pressed for you. Once you are in, **Stay logged in?** keeps your username and password in Windows' Credential Manager (this PC only, under "Simpl Courses/sign-in") and signs you in the next time your school asks; a two-step code or a page you must finish yourself is handed to you with a note over it, and Start Over begins again from Canvas. The browser underneath never offers to save a password — its own saving and autofill are off;
 - **the sidebar**: Dashboard, To Do, Calendar, Grades, Notifications, the Inbox, Tools, your courses (with their sections) and groups;
 - **the toolbar**: Back and Forward, Refresh, the screen's title, Search;
-- **the Dashboard**: the greeting, the six counters, Cards · List · Activity (tick work off in the List), today's work and the week's load.
+- **the Dashboard**: the greeting, the six counters, Cards · List · Activity (tick work off in the List), today's work and the week's load;
+- **the account menu** (the ⋯ by your name): Settings…, What's New, your Canvas profile, Report a Bug…, Sign Out…;
+- **Settings**, as on the Mac — General (the school, the saved sign-in), Appearance (light, dark or as Windows is; the ready themes and accent colours; photos for the sidebar and the counters), Notifications, Grades (what the page tracks: the record, goals, history), Data (export and import, Reset Everything), Updates (the version, automatic and beta updates, Check Now, earlier versions) and About. The photos chosen and the reminders are kept but not yet drawn or sent; updates are checked but downloaded by hand for now.
 
 The other screens open as the school's own page for now; they come over from the Mac one by one.

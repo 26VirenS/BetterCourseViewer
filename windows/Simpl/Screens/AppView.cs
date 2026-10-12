@@ -1,6 +1,8 @@
 using Simpl.Components;
 using Simpl.Engine;
 using Simpl.Graphics;
+using Simpl.Shell;
+using Simpl.Support;
 using Simpl.UI;
 using Vortice.DirectWrite;
 using Vortice.Mathematics;
@@ -44,23 +46,10 @@ public sealed class AppView
 
     public static Color4 DefaultGround(Theme t) => t.Page;
 
-    /// <summary>Light or dark: as asked at launch (--appearance), else as the page says, else as Windows is set.</summary>
-    public static bool Dark(bool? page) => Support.Launch.Get("appearance") switch
-    {
-        "dark" => true,
-        "light" => false,
-        _ => page ?? SystemDark(),
-    };
+    /// <summary>Light or dark: as asked at launch (--appearance), else as chosen in Settings, else as the page says, else as Windows is set.</summary>
+    public static bool Dark(bool? page) => Support.Appearance.Dark(page);
 
-    public static bool SystemDark()
-    {
-        try
-        {
-            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            return k?.GetValue("AppsUseLightTheme") is int v && v == 0;
-        }
-        catch { return true; }
-    }
+    public static bool SystemDark() => Support.Appearance.SystemDark();
 
     /// <summary>A frame of the window.</summary>
     public void Frame(Ui ui)
@@ -343,8 +332,27 @@ public sealed class AppView
             ui.Spinner(62 + 6, cy + 8, 5);
             Lines.Text(ui, "Updating…", 62 + 17, cy + 1, Theme.Caption, t.Ink2, SideW - 79 - 48);
         }
-        ui.RoundIconButton("side:account", SideW - 25, cy, "ellipsis.circle", 16, t.Accent);
+        // the account menu (the Mac's, under the ellipsis): Settings, What's New, the Canvas profile, Report a Bug, Sign Out
+        if (ui.RoundIconButton("side:account", SideW - 25, cy, "ellipsis.circle", 16, t.Accent)) ui.OpenMenu("account:menu");
+        if (!menuAsked && Launch.Take("menu") != null) { menuAsked = true; ui.OpenMenu("account:menu"); } // (the screenshot suite's --open menu)
+        var pick = ui.Menu("account:menu", new R(SideW - 40, cy - 15, 30, 30),
+            new string?[] { "Settings…", "What’s New", $"{engine.LmsName} Profile", null, "Report a Bug…", null, "Sign Out…" }, alignRight: true);
+        switch (pick)
+        {
+            case 0: engine.AskSettings(); break;
+            case 1: engine.ShowWhatsNew(WhatsNew.All); break;
+            case 2: engine.OpenWebScreen("/profile", "Profile"); break;
+            case 4: Engine.Engine.OpenExternally(ReportBug); break; // (the web's purple button: the site's form)
+            case 6:
+                Alerts.Confirm($"Sign out of {engine.LmsName} on this PC?", $"Your {engine.LmsName} session and any saved sign-in are cleared; settings stay.",
+                    "Sign Out", () => engine.SignOut(), owner: host);
+                break;
+        }
     }
+
+    /// <summary>Report a Bug (the Mac's ReportBug): the site's form.</summary>
+    private static readonly Uri ReportBug = new("https://simplcourses.com/report/");
+    private bool menuAsked;
 
     /// <summary>A row of the sidebar: its symbol 16 secondary at 38, its words 15 at 57 (a section's row 20 further in), a count at its end; clicked.</summary>
     private bool SideRow(Ui ui, string id, float y, string icon, string label, bool on, int badge, float indent = 0, bool glyph = false)

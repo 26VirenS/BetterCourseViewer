@@ -11,7 +11,11 @@ public static class WhatsNew
 {
     private const string SeenKey = "whatsNewSeen";
 
+    /// <summary>This copy's version as its release names it: "0.1.0 (v015)" for the preview build of run 15.</summary>
     public static string Current => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0";
+
+    /// <summary>The version alone ("0.1.0"), as the notes name theirs.</summary>
+    public static string Number => Current.Split(' ')[0];
 
     private static Release R(string version, string date, params (string Kind, string Title, string Body)[] notes) => new()
     {
@@ -24,21 +28,25 @@ public static class WhatsNew
     {
         R("0.1.0", "2026-10-12",
             ("new", "Simpl for Windows", "Your Canvas, as the Mac app has it, on Windows."),
-            ("new", "The sidebar", "Dashboard, To Do, Grades and your courses, a click away.")),
+            ("new", "The sidebar", "Dashboard, To Do, Grades and your courses, a click away."),
+            ("new", "Signing in", "Your school's sign-in as Simpl's own card; kept on this PC if you ask."),
+            ("new", "Settings", "Appearance, notifications, grades, data and updates, from the account menu."),
+            ("new", "Files to Downloads", "A file opened or downloaded lands in your Downloads folder.")),
     };
 
     public static WhatsNewData All => new() { Version = Current, Releases = Releases };
 
-    /// <summary>After an update, the versions since the one last seen (null: nothing to show).</summary>
+    /// <summary>After an update, the versions since the one last seen (null: nothing to show; never unasked in a picture).</summary>
     public static WhatsNewData? Due()
     {
+        if (Launch.Get("shot") != null) return null;
         var seen = Prefs.String(SeenKey);
-        var newer = Releases.Where(r => seen != null ? IsNewer(r.Version, seen) : r.Version == Current)
-                            .Where(r => !IsNewer(r.Version, Current)).ToList();
+        var newer = Releases.Where(r => seen != null ? IsNewer(r.Version, seen) : r.Version == Number)
+                            .Where(r => !IsNewer(r.Version, Number)).ToList();
         return newer.Count == 0 ? null : new WhatsNewData { Version = Current, Releases = newer };
     }
 
-    public static void MarkSeen() => Prefs.Set(SeenKey, Current);
+    public static void MarkSeen() => Prefs.Set(SeenKey, Number);
 
     /// <summary>1.10 is newer than 1.9; a missing part counts as 0.</summary>
     public static bool IsNewer(string a, string b)

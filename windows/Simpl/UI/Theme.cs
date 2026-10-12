@@ -79,7 +79,10 @@ public sealed class Theme
 
     // ---- the Mac's system colours ----
 
-    public Color4 Accent => Dark ? Rgb(10, 132, 255) : Rgb(0, 122, 255);
+    /// <summary>The accent chosen in Settings ▸ Appearance (the theme's, or one of the web's colours), when it is not the regular one.</summary>
+    public static Color4? CustomAccent;
+
+    public Color4 Accent => CustomAccent ?? (Dark ? Rgb(10, 132, 255) : Rgb(0, 122, 255));
     public Color4 Red => Dark ? Rgb(255, 69, 58) : Rgb(255, 59, 48);
     public Color4 Orange => Dark ? Rgb(255, 159, 10) : Rgb(255, 149, 0);
     public Color4 Yellow => Dark ? Rgb(255, 214, 10) : Rgb(255, 204, 0);

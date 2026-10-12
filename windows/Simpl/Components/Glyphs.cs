@@ -42,6 +42,10 @@ public static class Glyphs
         ["arrow.right"] = "\uE72A", ["chevron.left.small"] = "\uE76B", ["chevron.right.small"] = "\uE76C",
         // signing in
         ["lock.shield"] = "\uE72E", ["hand.point.up.left"] = "\uE7C9", ["safari"] = "\uE774", ["arrow.counterclockwise"] = "\uE72C",
+        // Settings and What's New
+        ["paintpalette"] = "\uE790", ["bell.badge"] = "\uE7ED", ["externaldrive"] = "\uEDA2", ["arrow.down.circle"] = "\uE896",
+        ["arrow.up.circle"] = "\uE898", ["wrench.adjustable"] = "\uE90F", ["ladybug"] = "\uEBE8", ["magnifyingglass.minus"] = "\uE71F",
+        ["magnifyingglass.plus"] = "\uE8A3", ["plus.magnifyingglass"] = "\uE8A3", ["minus.magnifyingglass"] = "\uE71F", ["photo.on.rectangle"] = "\uEB9F",
     };
 
     public static string Of(string? symbol) =>

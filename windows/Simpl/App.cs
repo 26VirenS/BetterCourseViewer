@@ -10,6 +10,8 @@ public static class Program
     public static void Main(string[] args)
     {
         Launch.Parse(args);
+        EraseAll.FinishIfAsked();  // (opened again after Settings ▸ Data ▸ Reset Everything: the last of it gone)
+        Appearance.Apply();        // (the accent chosen in Settings, from the first frame)
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         app.DispatcherUnhandledException += (_, e) =>
         {
