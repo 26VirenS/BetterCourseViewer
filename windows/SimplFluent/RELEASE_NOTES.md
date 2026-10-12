@@ -1,6 +1,8 @@
-**Simpl for Windows, made again in Windows 11's look — an early preview.** A test build for evaluation, not a release: Simpl's own updates never offer it. The first Windows preview (windows-app-v…) stays available.
+**Download Simpl-Setup.exe and open it.** It installs Simpl for you alone — no administrator needed — with a Start menu shortcut (and a desktop one if you tick it), then opens it. Simpl-Setup.exe is not code-signed yet: on "Windows protected your PC", choose **More info → Run anyway**. Once installed, Simpl updates itself from **Settings ▸ Updates** (Download, then Restart to Update), and you can uninstall it from Windows' **Settings ▸ Apps** — your settings and sign-in stay unless you erase them in Simpl first.
 
-**Simpl-Windows-x64.zip** — unzip anywhere and run **Simpl.exe** (everything it needs is in the folder; it uses Microsoft Edge WebView2, which Windows 10 and 11 already have). Not code-signed: on "Windows protected your PC", choose **More info → Run anyway**.
+**Simpl-Windows-x64.zip** — the portable choice: unzip anywhere and run **Simpl.exe** (everything it needs is in the folder; it uses Microsoft Edge WebView2, which Windows 10 and 11 already have). The same "More info → Run anyway" applies.
+
+**Simpl for Windows, made again in Windows 11's look — an early preview.** A test build for evaluation, not a release: Simpl's own updates never offer it. The first Windows preview (windows-app-v…) stays available.
 
 What is in it — the Mac app's screens and steps, in Windows 11's look:
 
@@ -12,5 +14,7 @@ What is in it — the Mac app's screens and steps, in Windows 11's look:
 - **quizzes, Knewton Alta and Macmillan in their own popups**, as on the Mac;
 - **the tools**: Citation generator, Focus timer, Calculator, Graphing calculator, the Periodic Table (with the Lewis structure maker and the 3D molecule builder), Grade needed, File converter, Unit converter, Merge & split PDFs, PDF annotator, Image to text, Flashcards — pin any of them to the title bar for its quick version;
 - **Settings laid out like Windows 11's Settings app**, Guided Setup, What's New, the guided tour, themes and photos, reminders and new-activity alerts;
+- **an installer**: Simpl-Setup.exe installs it for you alone, and updates it quietly when you choose Restart to Update — Simpl opens again on its own;
+- **on your taskbar**: after the guided tour, Simpl asks once to be kept on the taskbar (and Settings ▸ General has Pin to taskbar… any time);
 - **runs in the background**: closing the window keeps Simpl in the notification area (right-click its icon to quit);
 - **the window's size**: it opens as you left it, never larger than your screen.

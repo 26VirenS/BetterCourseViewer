@@ -70,12 +70,12 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     private static readonly (string Key, string Title, SymbolRegular Icon, Color Tint, string Words)[] Tabs =
     {
-        ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential courses goals set up background notification area close"),
+        ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential courses goals set up background notification area close taskbar pin"),
         ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent photo picture"),
         ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts activity announcements"),
         ("grades", "Grades", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8), "gpa goal history record what-if track"),
         ("data", "Data", SymbolRegular.Database24, Color.FromRgb(0x00, 0x99, 0xbc), "export import reset erase everything backup"),
-        ("updates", "Updates", SymbolRegular.ArrowSync24, Color.FromRgb(0x10, 0x89, 0x3e), "version update beta automatic check earlier"),
+        ("updates", "Updates", SymbolRegular.ArrowSync24, Color.FromRgb(0x10, 0x89, 0x3e), "version update beta automatic check earlier download install restart"),
         ("about", "About", SymbolRegular.Info24, Color.FromRgb(0x00, 0x78, 0xd4), "version interface uninstall"),
     };
 
@@ -166,10 +166,12 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         Content = root;
 
         Updates.Changed += OnUpdates;
+        Updates.ProgressChanged += OnProgress;
         Appearance.Changed += OnAppearance;
         Closed += (_, _) =>
         {
             Updates.Changed -= OnUpdates;
+            Updates.ProgressChanged -= OnProgress;
             Appearance.Changed -= OnAppearance;
             open = null;
             main.Activate();
@@ -181,6 +183,11 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     }
 
     private void OnUpdates() => Dispatcher.BeginInvoke(() => { if (tab == "updates") Render(); });
+    private void OnProgress() => Dispatcher.BeginInvoke(() =>
+    {
+        if (downloadBar != null) downloadBar.Value = Updates.Progress * 100;
+        if (downloadWords != null) downloadWords.Text = DownloadWords();
+    });
     private void OnAppearance() => Dispatcher.BeginInvoke(() => { Pane(); if (tab == "appearance") Render(); });
 
     private void Pane()
@@ -265,9 +272,22 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var keep = new ToggleSwitch { IsChecked = Prefs.Bool("keepRunning", true) };
         keep.Checked += (_, _) => Prefs.Set("keepRunning", null);
         keep.Unchecked += (_, _) => Prefs.Set("keepRunning", false);
-        v.Children.Add(K.Row(SymbolRegular.WindowArrowUp24, "Keep Simpl running when its window is closed",
-            "Simpl stays in the notification area, so alerts keep coming. Quit it there, or from the account menu.", keep));
+        // (Simpl on the taskbar: said when it is; else the way to put it there — what the tour's ending asks)
+        var pinned = Taskbar.IsPinned();
+        v.Children.Add(K.Group(
+            K.Row(SymbolRegular.WindowArrowUp24, "Keep Simpl running when its window is closed",
+                "Simpl stays in the notification area, so alerts keep coming. Quit it there, or from the account menu.", keep),
+            K.Row(SymbolRegular.Pin24, "Taskbar", pinned ? "Simpl is on your taskbar, one click away." : "Keep Simpl one click away.",
+                pinned ? K.Text("Pinned", Ty.Body, B.Text2) : K.Button("Pin to taskbar…", () => _ = PinToTaskbar()))));
         return v;
+    }
+
+    private async Task PinToTaskbar()
+    {
+        var answer = await Taskbar.Ask(this);
+        if (answer == Taskbar.Answer.AlreadyPinned) Say("Simpl is on your taskbar already.");
+        else if (answer == Taskbar.Answer.Pinned) Say("Simpl is on your taskbar.");
+        if (tab == "general") Render();
     }
 
     // ---- Appearance ----
@@ -596,30 +616,64 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     private bool versionsAsked;
     private string? versionsProblem;
+    private System.Windows.Controls.ProgressBar? downloadBar;
+    private TextBlock? downloadWords;
 
     private FrameworkElement UpdatesPane()
     {
         var dev = Updates.IsDevelopmentRun;
+        var found = Updates.Found;
         var v = Column(K.SectionHeader("Simpl for Windows", 0));
         var status = Updates.State switch
         {
             Updates.Mode.Checking => "Checking…",
             Updates.Mode.UpToDate => "You’re up to date",
-            Updates.Mode.Available => $"Version {Updates.Found?.Version} is available",
+            Updates.Mode.Available => $"Version {found?.Version} is available",
+            Updates.Mode.Downloading => $"Downloading version {found?.Version}…",
+            Updates.Mode.Ready => $"Version {found?.Version} is ready to install",
             Updates.Mode.Failed => Updates.Message ?? "Could not check.",
             _ => dev ? "Updates are off in a development run." : "Not checked yet",
         };
-        var when = Updates.LastCheck is { } last ? "Last checked " + Ago(last) : null;
+        var when = Updates.State switch
+        {
+            Updates.Mode.Downloading => null,
+            Updates.Mode.Ready => "Simpl closes, updates and opens again in a few seconds, your settings and sign-in as they were.",
+            _ => Updates.LastCheck is { } last ? "Last checked " + Ago(last) : null,
+        };
+        // (Download: fetched here for a copy the installer put here, then Restart to Update; else the version's page)
         FrameworkElement action = Updates.State switch
         {
             Updates.Mode.Checking => K.Spinner(20),
-            Updates.Mode.Available when Updates.Found is { } found => K.Button("Download", () => Updates.Open(found), accent: true),
+            Updates.Mode.Downloading => new Border(),
+            Updates.Mode.Available or Updates.Mode.Failed when found != null => K.Button("Download", () => _ = Updates.Download(), accent: true),
+            Updates.Mode.Ready => K.Button("Restart to Update", Updates.InstallAndRestart, accent: true),
             _ => Enabled(K.Button("Check for updates", () => _ = Updates.Check()), !dev),
         };
+        var words = K.V(2, K.Text(status, Ty.Subtitle), when != null ? K.Wrapped(when, Ty.Caption, B.Text2) : null);
+        downloadBar = null;
+        downloadWords = null;
+        if (Updates.State == Updates.Mode.Downloading)
+        {
+            // (moved on by Updates.ProgressChanged, not by building the page again)
+            downloadBar = new System.Windows.Controls.ProgressBar
+            {
+                Minimum = 0, Maximum = 100, Value = Updates.Progress * 100, MaxWidth = 360,
+                Margin = new Thickness(0, 10, 0, 6), HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            downloadWords = K.Text(DownloadWords(), Ty.Caption, B.Text2);
+            words.Children.Add(downloadBar);
+            words.Children.Add(downloadWords);
+        }
+        var icon = Updates.State switch
+        {
+            Updates.Mode.Available or Updates.Mode.Downloading => SymbolRegular.ArrowDownload24,
+            Updates.Mode.Ready => SymbolRegular.ArrowClockwise24,
+            Updates.Mode.Failed => SymbolRegular.ErrorCircle24,
+            _ => SymbolRegular.ArrowSyncCheckmark24,
+        };
         var big = K.Columns("auto, *, auto",
-            K.IconTile(Updates.State == Updates.Mode.Available ? SymbolRegular.ArrowDownload24 : Updates.State == Updates.Mode.Failed ? SymbolRegular.ErrorCircle24 : SymbolRegular.ArrowSyncCheckmark24,
-                Updates.State == Updates.Mode.Failed ? Color.FromRgb(0xe3, 0x6c, 0x0a) : Appearance.Accent, 48).Col(0),
-            K.V(2, K.Text(status, Ty.Subtitle), when != null ? K.Text(when, Ty.Caption, B.Text2) : null).Margin(16, 0, 16, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1),
+            K.IconTile(icon, Updates.State == Updates.Mode.Failed ? Color.FromRgb(0xe3, 0x6c, 0x0a) : Appearance.Accent, 48).Col(0),
+            words.Margin(16, 0, 16, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1),
             action.Col(2));
         v.Children.Add(K.Card(big, new Thickness(20), 4));
         v.Children.Add(new Border { Height = 8 });
@@ -630,7 +684,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         beta.Checked += (_, _) => Updates.Beta = true;
         beta.Unchecked += (_, _) => Updates.Beta = false;
         v.Children.Add(K.Group(
-            K.Row(SymbolRegular.Info24, "Version", null, K.Text(Updates.Version, Ty.Body, B.Text2)),
+            K.Row(SymbolRegular.Info24, "Version", Updates.Installed ? "Installed with Simpl-Setup.exe" : null, K.Text(Updates.Version, Ty.Body, B.Text2)),
             K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version now and then, and says so here when there is one.", auto),
             K.Row(SymbolRegular.Beaker24, "Get beta updates", "Try new features before everyone else. A beta may have rough edges; turn this off to go back to the usual releases when the next one comes out.", beta)));
 
@@ -649,8 +703,17 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 installed ? K.Text("Installed", Ty.Body, B.Text2) : Enabled(K.Button("Open…", () => Updates.Open(r)), !dev)));
         }
         v.Children.Add(list);
-        v.Children.Add(Foot("A version opens on its own page, its download there; unzip it over this copy to take its place."));
+        v.Children.Add(Foot(Updates.Installed
+            ? "Simpl was installed with Simpl-Setup.exe: a new version downloads here, and Restart to Update installs it. An earlier version opens on its own page."
+            : "A version opens on its own page, its downloads there: Simpl-Setup.exe installs Simpl (and from then on, updates install from here), or unzip Simpl-Windows-x64.zip over this copy to take its place."));
         return v;
+    }
+
+    /// <summary>"12.4 of 61.2 MB": how far the installer's download has come.</summary>
+    private static string DownloadWords()
+    {
+        var size = Updates.Found?.Setup?.Size ?? 0;
+        return size > 0 ? $"{Updates.Progress * size / 1048576.0:0.0} of {size / 1048576.0:0.0} MB" : $"{Updates.Progress * 100:0}%";
     }
 
     private async Task LoadVersions()
@@ -681,7 +744,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 K.Row(SymbolRegular.Info24, "Version", null, K.Text(Updates.Version, Ty.Body, B.Text2)),
                 K.Row(SymbolRegular.Code24, "Interface", "The extension’s own scripts, as the Mac and iPhone apps carry them.", K.Text(ScriptBundle.ExtensionVersion, Ty.Body, B.Text2)),
                 K.Row(SymbolRegular.Bug24, "Report a bug", "Tell us what went wrong, and what you were doing.", null, () => Engine.Engine.OpenExternally(new Uri("https://simplcourses.com/report/")))));
-        v.Children.Add(Foot($"To take Simpl off this PC with everything it stored, sign out here first, then delete Simpl’s folder and {AppPaths.Root}. Your {engine.LmsName} account is not affected."));
+        v.Children.Add(Foot(Updates.Installed
+            ? $"To take Simpl off this PC, uninstall it in Windows’ Settings ▸ Apps ▸ Installed apps. What it stored stays in {AppPaths.Root}: to erase that too, use Data ▸ Reset everything first. Your {engine.LmsName} account is not affected."
+            : $"To take Simpl off this PC with everything it stored, sign out here first, then delete Simpl’s folder and {AppPaths.Root}. Your {engine.LmsName} account is not affected."));
         return v;
     }
 

@@ -5,8 +5,53 @@ navigation pane and cards, Segoe UI Variable, Fluent System Icons, WinUI's motio
 [WPF-UI](https://github.com/lepoco/wpfui) 4.3. The first Windows app (`windows/Simpl`) is untouched, for rollback.
 
 Build (Windows, or Linux with the targeting pack): `dotnet build windows/SimplFluent/SimplFluent.csproj -c Release -p:EnableWindowsTargeting=true`.
-CI (`.github/workflows/windows-fluent.yml`) builds it, pictures it against the mock Canvas, and publishes a preview
-(`windows-fluent-v<run>`) when a commit message carries `[preview]`.
+CI (`.github/workflows/windows-fluent.yml`) builds it, makes and tries its installer, pictures it against the mock
+Canvas, and publishes a preview (`windows-fluent-v<run>`) when a commit message carries `[preview]`.
+
+## Installing
+
+Each preview ships two ways: **Simpl-Setup.exe**, the installer, and **Simpl-Windows-x64.zip**, the same folder to
+unzip anywhere (portable). Neither is code-signed yet: SmartScreen's "More info → Run anyway". The installer is
+Inno Setup 6's (`Installer/Simpl.iss`; Inno Setup 7 compiles it too), compiled by CI right after `dotnet publish`, the
+build's version passed in:
+
+```
+ISCC /DAppVersion=0.2.0.12 "/DAppDisplayVersion=0.2.0 (v012)" /DSourceDir=<dist\Simpl> /DOutputDir=<dist> windows\SimplFluent\Installer\Simpl.iss
+```
+
+What the installer does:
+
+- installs for the current user only, with no administrator prompt (`PrivilegesRequired=lowest`), into
+  `%LOCALAPPDATA%\Programs\Simpl` — never Simpl's own data folder, `%LOCALAPPDATA%\Simpl` (settings, grade history,
+  the web view's data; the saved sign-in is in Credential Manager);
+- asks one thing — a desktop shortcut too? (unticked) — then installs; the last page has **Open Simpl** ticked;
+- makes a Start menu shortcut (and the desktop one), both carrying Simpl's app id `SimplCourses.Simpl`, the one
+  `Program.Main` sets first of all (`AppIdentity`), so the window, its taskbar button and the shortcuts are one app and
+  pinning pins Simpl; it registers that id's name and picture for notifications (`HKCU\Software\Classes\AppUserModelId`);
+- adds Simpl to Settings ▸ Apps (AppId `{B65F70B7-E13E-4CCC-9E1C-0B659660D130}`, per user); uninstalling removes the
+  program, its shortcuts and that entry and **keeps** `%LOCALAPPDATA%\Simpl`, and says so;
+- closes a running Simpl first (it hides in the notification area when its window closes): every Simpl holds the mutex
+  `SimplCourses.Simpl.App` (the installer's `AppMutex`), and the installer and uninstaller ask it to quit through the
+  event `Local\SimplCourses.Simpl.Quit` (`Instance` in `Program.cs`) — an install someone opens asks first — then wait
+  for it; Restart Manager (`CloseApplications`) closes anything else holding the files.
+
+Silent install or update, as Simpl's own **Restart to Update** runs it:
+
+```
+Simpl-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAUNCH
+```
+
+`/LAUNCH` (the installer's own switch, read in its `[Code]`) waits for Simpl to have quit and opens it again when the
+new version is in place; without it, nothing is opened. `/DIR="…"` installs elsewhere; `/LOG="…"` writes a log.
+Uninstalling silently: `"%LOCALAPPDATA%\Programs\Simpl\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`.
+
+Updates (`Support/Updates.cs`): a copy the installer put here — its uninstall entry names the folder Simpl.exe runs
+from — downloads the new release's Simpl-Setup.exe (checked against the size and SHA-256 GitHub publishes) to
+`%TEMP%\Simpl-Update\<tag>`, and **Restart to Update** runs it with the arguments above and quits Simpl. A portable
+copy opens the release's page, as before. CI tries the installer on every build: it installs silently into a folder
+of its own, checks Simpl.exe, the Start menu shortcut and the Settings ▸ Apps entry, opens the installed Simpl against
+the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed), uninstalls
+silently, and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not.
 
 ## Layout of the code
 
@@ -15,7 +60,7 @@ CI (`.github/workflows/windows-fluent.yml`) builds it, pictures it against the m
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). |
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states), `B` (theme brush keys), `Motion` (WinUI curves and transitions), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), dialogs, the tray, the web window. `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window. `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder). |

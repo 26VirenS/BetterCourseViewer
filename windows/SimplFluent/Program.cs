@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using Simpl.Support;
@@ -5,14 +6,16 @@ using Simpl.Support;
 namespace Simpl;
 
 /// <summary>
-/// Simpl for Windows: the launch arguments read, one copy of the app at a time (a second one opened brings the first
-/// back, from the notification area too), Windows 11's theme put on, then the window.
+/// Simpl for Windows: who it is to Windows (one app id, before anything shows), the launch arguments read, one copy of
+/// the app at a time (a second one opened brings the first back, from the notification area too), Windows 11's theme
+/// put on, then the window.
 /// </summary>
 public static class Program
 {
     [STAThread]
     public static void Main(string[] args)
     {
+        AppIdentity.Claim();              // (first of all: the window, its taskbar button and the shortcuts are one app)
         Launch.Parse(args);
         Instance.WaitForPrevious();       // (opened again by Reset Everything: the copy before it gone first)
         EraseAll.FinishIfAsked();         // (and what it could not delete, deleted now)
@@ -26,22 +29,76 @@ public static class Program
         };
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("fatal: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("task: " + e.Exception); e.SetObserved(); };
-        Log.Write($"Simpl for Windows {WhatsNew.Current} starting: {string.Join(' ', args)}");
+        Log.Write($"Simpl for Windows {WhatsNew.Current} starting{(Updates.Installed ? " (installed)" : "")}: {string.Join(' ', args)}");
+        if (!Launch.IsDevelopment)
+        {
+            AppIdentity.Register();
+            // (an update's installer, done with by now: deleted a minute on)
+            _ = Task.Run(async () => { await Task.Delay(TimeSpan.FromMinutes(1)); Updates.Tidy(); });
+        }
         Appearance.Apply();
         var main = new Shell.MainWindow();
         Instance.ShowRequested += main.Bring;
+        Instance.QuitRequested += () =>
+        {
+            Log.Write("quit: asked by Simpl's installer");
+            EraseAll.Quit();
+        };
         app.Run(main);
     }
 }
 
 /// <summary>
+/// Who Simpl is to Windows: one app id (an AppUserModelID) for its windows and their taskbar button, the installer's
+/// shortcuts (Installer/Simpl.iss) and what the taskbar pins — so they are one app, and pinning it pins Simpl — and the
+/// name and picture its notifications carry for that id.
+/// </summary>
+public static class AppIdentity
+{
+    public const string Id = "SimplCourses.Simpl";
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string appId);
+
+    /// <summary>Before anything shows or is read (Windows asks it be set first).</summary>
+    public static void Claim()
+    {
+        try { SetCurrentProcessExplicitAppUserModelID(Id); } catch { /* (nothing to set it with: Windows' own grouping) */ }
+    }
+
+    /// <summary>
+    /// The app id's name and picture, as Windows shows them on Simpl's notifications (the installer writes the same
+    /// when it installs, and takes it away when it uninstalls; a copy run from its zip has no shortcut to say them, so
+    /// it says them here).
+    /// </summary>
+    public static void Register()
+    {
+        try
+        {
+            var icon = System.IO.Path.Combine(AppPaths.AppDir, "Assets", "Simpl-256.png");
+            using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Classes\AppUserModelId\" + Id);
+            if (k.GetValue("DisplayName") as string != "Simpl") k.SetValue("DisplayName", "Simpl");
+            if (System.IO.File.Exists(icon) && k.GetValue("IconUri") as string != icon) k.SetValue("IconUri", icon);
+        }
+        catch (Exception e) { Log.Write("app id: " + e.Message); }
+    }
+}
+
+/// <summary>
 /// One Simpl at a time for each place it keeps its files (the screenshot suite's copies each have their own): a second
-/// copy opened tells the first to come forward, then quits.
+/// copy opened tells the first to come forward, then quits. Every copy that runs also holds the mutex Simpl's installer
+/// looks for, and listens for its installer's or uninstaller's request to quit (Installer/Simpl.iss).
 /// </summary>
 public static class Instance
 {
-    private static Mutex? mutex;
+    /// <summary>Held while any Simpl runs: the installer's AppMutex.</summary>
+    public const string AppMutexName = "SimplCourses.Simpl.App";
+    /// <summary>Set by the installer and the uninstaller: the Simpl that takes it quits (one signal, one copy).</summary>
+    public const string QuitEventName = @"Local\SimplCourses.Simpl.Quit";
+
+    private static Mutex? mutex, appMutex;
     public static event Action? ShowRequested;
+    public static event Action? QuitRequested;
 
     private static string Key
     {
@@ -63,12 +120,22 @@ public static class Instance
             show.Set();
             return false;
         }
+        // (the mutex kept in a field for as long as the app runs: a handle let go would end it, and the installer's check)
+        EventWaitHandle? quit = null;
+        try
+        {
+            appMutex = new Mutex(false, AppMutexName);
+            quit = new EventWaitHandle(false, EventResetMode.AutoReset, QuitEventName);
+            quit.Reset(); // (a request meant for a copy that has gone since is not this one's)
+        }
+        catch (Exception e) { Log.Write("installer's mutex: " + e.Message); }
+        var handles = quit != null ? new WaitHandle[] { show, quit } : new WaitHandle[] { show };
         var t = new Thread(() =>
         {
             while (true)
             {
-                show.WaitOne();
-                Application.Current?.Dispatcher.BeginInvoke(() => ShowRequested?.Invoke());
+                var which = WaitHandle.WaitAny(handles);
+                Application.Current?.Dispatcher.BeginInvoke(() => (which == 0 ? ShowRequested : QuitRequested)?.Invoke());
             }
         }) { IsBackground = true, Name = "Simpl show" };
         t.Start();

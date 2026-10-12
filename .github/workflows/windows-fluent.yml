@@ -1,8 +1,10 @@
 # Simpl for Windows, made again in Windows 11's look (windows/SimplFluent: WPF with WPF-UI — Mica, the Settings app's
-# navigation and cards, Fluent icons): built on a Windows runner, pictured against the mock Canvas, and — when a commit
-# asks for it with "[preview]" in its message, or by hand (Run workflow) — published as a pre-release
-# (windows-fluent-v<run>, zero-padded) to try on a real PC. The first Windows app (windows/Simpl, windows-app-v*) and
-# Simpl's Mac and iPhone builds, releases and update feeds are not touched.
+# navigation and cards, Fluent icons): built on a Windows runner, made into an installer (Simpl-Setup.exe, Inno Setup:
+# windows/SimplFluent/Installer/Simpl.iss) that is tried — installed, opened, pictured, uninstalled — pictured against
+# the mock Canvas, and — when a commit asks for it with "[preview]" in its message, or by hand (Run workflow) —
+# published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
+# real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
+# feeds are not touched.
 name: Windows app (Windows 11 look)
 
 on:
@@ -29,7 +31,8 @@ jobs:
   app:
     name: Simpl for Windows (Windows 11 look)
     runs-on: windows-latest
-    timeout-minutes: 60
+    # (the pictures, and the installer made and tried: compressing, installing, a picture, uninstalling)
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -45,6 +48,41 @@ jobs:
           n=$(printf '%03d' "${{ github.run_number }}")
           dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.1 (v$n)"
           test -f dist/Simpl/Simpl.exe
+      - name: Installer (Simpl-Setup.exe)
+        shell: pwsh
+        run: |
+          # Inno Setup's compiler: on GitHub's Windows image when it has it, else from Chocolatey (Inno Setup 7, if that
+          # is what comes, reads the script the same)
+          function Find-Iscc {
+            $onPath = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($onPath) { return $onPath.Source }
+            foreach ($root in @(${env:ProgramFiles(x86)}, $env:ProgramFiles, (Join-Path $env:LOCALAPPDATA 'Programs'))) {
+              if (-not $root) { continue }
+              $found = Get-ChildItem -Path $root -Filter 'Inno Setup*' -Directory -ErrorAction SilentlyContinue |
+                ForEach-Object { Join-Path $_.FullName 'ISCC.exe' } | Where-Object { Test-Path $_ } | Sort-Object -Descending | Select-Object -First 1
+              if ($found) { return $found }
+            }
+            return $null
+          }
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            Write-Host "Inno Setup is not on this image: installing it"
+            choco install innosetup -y --no-progress | Out-Host
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { Write-Host "::error::Inno Setup's compiler (ISCC.exe) was not found, and could not be installed"; exit 1 }
+          Write-Host "ISCC: $iscc"
+          # the version: the build's own, as About shows it ("0.2.0 (v012)"), and as Windows numbers it (0.2.0.12)
+          $display = (Get-Item dist/Simpl/Simpl.dll).VersionInfo.ProductVersion
+          $number = "$display".Split(' ')[0]
+          if ($number -notmatch '^\d+\.\d+\.\d+$') { $number = '0.0.0' }
+          $version = "$number.${{ github.run_number }}"
+          if (-not $display) { $display = $version }
+          & $iscc "/DAppVersion=$version" "/DAppDisplayVersion=$display" "/DSourceDir=$PWD\dist\Simpl" "/DOutputDir=$PWD\dist" windows\SimplFluent\Installer\Simpl.iss
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::ISCC failed ($LASTEXITCODE)"; exit 1 }
+          if (-not (Test-Path dist/Simpl-Setup.exe)) { Write-Host "::error::ISCC made no dist/Simpl-Setup.exe"; exit 1 }
+          $size = [math]::Round((Get-Item dist/Simpl-Setup.exe).Length / 1MB, 1)
+          Write-Host "Simpl-Setup.exe, version $version ($display): $size MB"
       - name: Mock Canvas
         shell: bash
         run: |
@@ -104,6 +142,7 @@ jobs:
           Shot 'preview' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'preview'))
           Shot 'tour-start' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'tour'))
           Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:12'))
+          Shot 'taskbar-ask' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'taskbar'))
           Shot 'theme-dusk' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme', 'Dusk'))
           # To Do, Calendar, Notifications
           Shot 'todo' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'todo'))
@@ -222,6 +261,70 @@ jobs:
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 25 }
           }
           Get-ChildItem shots
+      - name: Installer, tried (installed, opened, uninstalled)
+        shell: pwsh
+        run: |
+          $setupLog = Join-Path $env:RUNNER_TEMP 'installer-setup.log'
+          $uninstallLog = Join-Path $env:RUNNER_TEMP 'installer-uninstall.log'
+          New-Item -ItemType Directory -Force shots | Out-Null
+          function Fail($why) {
+            Write-Host "::error::$why"
+            foreach ($f in @($setupLog, $uninstallLog)) { if (Test-Path $f) { Copy-Item $f shots; Write-Host "--- $f"; Get-Content $f -Tail 60 } }
+            exit 1
+          }
+          $dir = Join-Path $env:RUNNER_TEMP 'Simpl test install'   # (a space in it, as a user's own folder may have)
+          $exe = Join-Path $dir 'Simpl.exe'
+          $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Simpl.lnk'
+          $desktop = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Simpl.lnk'
+          # (Settings > Apps' entry: the installer's AppId, as Installer/Simpl.iss and Support/Updates.cs have it)
+          $entry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{B65F70B7-E13E-4CCC-9E1C-0B659660D130}_is1'
+          # what Simpl keeps is in its own folder, never the program's: there before, and still there after uninstalling
+          $data = Join-Path $env:LOCALAPPDATA 'Simpl'
+          $kept = Join-Path $data 'kept-by-uninstall.txt'
+          New-Item -ItemType Directory -Force $data | Out-Null
+          Set-Content $kept 'what Simpl keeps'
+
+          # 1. installed silently, as Simpl's Restart to Update runs it (without /LAUNCH), into a folder of the test's own
+          $p = Start-Process -FilePath dist\Simpl-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', "/DIR=`"$dir`"", "/LOG=`"$setupLog`"") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Fail "Simpl-Setup.exe exited with $($p.ExitCode)" }
+          if (-not (Test-Path $exe)) { Fail "Simpl.exe is not in $dir" }
+          if (-not (Test-Path (Join-Path $dir 'unins000.exe'))) { Fail "there is no uninstaller beside Simpl.exe" }
+          if (-not (Test-Path $startMenu)) { Fail "there is no Start menu shortcut ($startMenu)" }
+          if (Test-Path $desktop) { Fail "a desktop shortcut was made, though its box starts unticked" }
+          $app = Get-ItemProperty -Path $entry -ErrorAction SilentlyContinue
+          if (-not $app -or $app.DisplayName -ne 'Simpl') { Fail "Simpl is not in Settings > Apps ($entry)" }
+          Write-Host "installed: $($app.DisplayName) $($app.DisplayVersion) in $($app.InstallLocation)"
+          try {
+            $link = (New-Object -ComObject Shell.Application).NameSpace((Split-Path $startMenu)).ParseName('Simpl.lnk')
+            $id = $link.ExtendedProperty('System.AppUserModel.ID')
+            if ($id -eq 'SimplCourses.Simpl') { Write-Host "the Start menu shortcut's app id: $id" } else { Write-Host "::warning::the Start menu shortcut's app id reads '$id'" }
+          } catch { Write-Host "::warning::the Start menu shortcut's app id could not be read: $_" }
+
+          # 2. the installed copy opened against the mock: the Dashboard pictured, and Simpl knows it was installed (so
+          #    its updates come through the installer)
+          $prof = Join-Path $env:RUNNER_TEMP 'profile-installed'
+          $shot = Join-Path $PWD 'shots\installed-dashboard.png'
+          $run = Start-Process -FilePath $exe -ArgumentList @('--shot', $shot, '--shot-after', '45', '--profile', $prof, '--window-size', '1024x681', '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light') -PassThru
+          if (-not $run.WaitForExit(150000)) { Stop-Process -Id $run.Id -Force -ErrorAction SilentlyContinue; Fail "the installed Simpl did not finish its picture" }
+          $log = Join-Path $prof 'simpl.log'
+          if (Test-Path $log) { Copy-Item $log shots\profile-installed.log; Write-Host "--- the installed Simpl's log"; Get-Content $log -Tail 15 }
+          if (-not (Test-Path $shot) -or (Get-Item $shot).Length -lt 10000) { Fail "the installed Simpl made no picture of the Dashboard" }
+          if (-not (Test-Path $log) -or -not (Select-String -Path $log -Pattern 'starting \(installed\)' -Quiet)) { Fail "the installed Simpl does not know it was installed" }
+          Start-Sleep -Seconds 2   # (its web view's helper processes end a moment after it)
+
+          # 3. uninstalled silently: its folder, its shortcut and its entry in Settings > Apps gone; what Simpl keeps, kept
+          $u = Start-Process -FilePath (Join-Path $dir 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$uninstallLog`"") -Wait -PassThru
+          if ($u.ExitCode -ne 0) { Fail "the uninstaller exited with $($u.ExitCode)" }
+          # (its last moment, taking its own .exe and the folder away, comes just after it exits)
+          $until = (Get-Date).AddSeconds(30)
+          while ((Test-Path $dir) -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 500 }
+          if (Test-Path $dir) { Get-ChildItem -Recurse $dir | ForEach-Object { Write-Host "left: $($_.FullName)" }; Fail "$dir is still there after uninstalling" }
+          if (Test-Path $startMenu) { Fail "the Start menu shortcut is still there after uninstalling" }
+          if (Test-Path $entry) { Fail "Simpl is still in Settings > Apps after uninstalling" }
+          if (-not (Test-Path $kept)) { Fail "uninstalling took what Simpl keeps ($data)" }
+          Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue
+          foreach ($f in @($setupLog, $uninstallLog)) { if (Test-Path $f) { Copy-Item $f shots } }
+          Write-Host "Simpl-Setup.exe: installed, opened, pictured and uninstalled, as it should be"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -234,6 +337,10 @@ jobs:
         with:
           name: Simpl-Windows-x64
           path: Simpl-Windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Simpl-Setup
+          path: dist/Simpl-Setup.exe
 
   publish:
     name: Publish the preview
@@ -246,13 +353,19 @@ jobs:
         with:
           name: Simpl-Windows-x64
           path: zips
+      - uses: actions/download-artifact@v4
+        with:
+          name: Simpl-Setup
+          path: setup
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           n=$(printf '%03d' "${{ github.run_number }}")
           tag="windows-fluent-v$n"
-          gh release create "$tag" zips/*.zip --target "${{ github.sha }}" --prerelease \
+          # (the installer first, the portable zip beside it; Simpl's own Updates finds Simpl-Setup.exe by its name)
+          test -f setup/Simpl-Setup.exe
+          gh release create "$tag" setup/Simpl-Setup.exe zips/*.zip --target "${{ github.sha }}" --prerelease \
             --title "Simpl for Windows — Windows 11 look, preview (v$n)" \
             --notes-file windows/SimplFluent/RELEASE_NOTES.md
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"

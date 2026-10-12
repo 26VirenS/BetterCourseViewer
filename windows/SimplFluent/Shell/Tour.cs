@@ -80,7 +80,8 @@ public static class Tour
 /// lit at a time, the window dimmed round it and the part ringed in the accent, and a callout beside it — its count,
 /// what it is, what to do — with Next where the step waits for nothing. A step that asks for something (click Grades,
 /// hover a ring, turn on what-if) waits for it and moves on once it is done. It comes once, after the app first shows
-/// with nothing over it; the account menu's Take the tour runs it again. It ends on its last step.
+/// with nothing over it; the account menu's Take the tour runs it again. It ends on its last step, whose Done says it
+/// was followed to the end (<see cref="Completed"/>: Simpl then asks, once, to be kept on the taskbar).
 /// </summary>
 public sealed class TourOverlay : Grid
 {
@@ -101,6 +102,9 @@ public sealed class TourOverlay : Grid
     private Rect? lastHole;
 
     public bool On => index != null;
+
+    /// <summary>The last step's Done pressed: the tour followed to its end (not left early).</summary>
+    public event Action? Completed;
 
     public TourOverlay(Engine.Engine engine, MainWindow window)
     {
@@ -189,7 +193,9 @@ public sealed class TourOverlay : Grid
     private void Next()
     {
         if (index is not { } i) return;
-        if (i + 1 >= steps.Count) Finish(); else Show(i + 1);
+        if (i + 1 < steps.Count) { Show(i + 1); return; }
+        Finish();
+        Completed?.Invoke();
     }
 
     private void Back()

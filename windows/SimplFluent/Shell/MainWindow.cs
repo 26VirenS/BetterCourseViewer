@@ -275,9 +275,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 shell = new AppShell(engine, this);
                 Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
+                tour.Completed += () => Taskbar.AfterTour(this);
                 Grid.SetRow(tour, 1);
                 root.Children.Insert(root.Children.IndexOf(sheets), tour);
                 tour.AutoStart();
+                Taskbar.ShowIfAsked(this);
             }
             shell.WindowWidth(ActualWidth);
             SetCover(shell);
