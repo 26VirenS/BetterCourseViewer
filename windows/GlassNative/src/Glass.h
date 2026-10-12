@@ -74,9 +74,9 @@ float3 Saturate3(float3 c, float s) {
 float3 Behind(float2 uv, float2 off) {
     float disp = uTone.w;
     float2 r = (off * (1.0 + disp)) / uRes.xy, g = off / uRes.xy, b = (off * (1.0 - disp)) / uRes.xy;
-    float3 sharp = float3(tSharp.Sample(sLinear, uv + r).r, tSharp.Sample(sLinear, uv + g).g, tSharp.Sample(sLinear, uv + b).b);
+    float3 sharp = float3(tSharp.SampleLevel(sLinear, uv + r, 0).r, tSharp.SampleLevel(sLinear, uv + g, 0).g, tSharp.SampleLevel(sLinear, uv + b, 0).b);
     if (uOptics.x <= 0.001) return sharp;
-    float3 frost = float3(tFrost.Sample(sLinear, uv + r).r, tFrost.Sample(sLinear, uv + g).g, tFrost.Sample(sLinear, uv + b).b);
+    float3 frost = float3(tFrost.SampleLevel(sLinear, uv + r, 0).r, tFrost.SampleLevel(sLinear, uv + g, 0).g, tFrost.SampleLevel(sLinear, uv + b, 0).b);
     return lerp(sharp, frost, uOptics.x);
 }
 
@@ -125,7 +125,7 @@ float4 GlassPS(VOut i) : SV_Target {
 
 // ---- the frost: down to a quarter, then a Gaussian, one way then the other ----
 
-cbuffer Pass : register(b1) {
+cbuffer BlurPass : register(b1) {
     float4 uPass;   // xy: source texel size, zw: direction (texels) for the blur
     float4 uBlur;   // x: sigma (texels), y: radius (taps)
 };
@@ -145,8 +145,8 @@ float4 DownPS(VOut i) : SV_Target {
     tSrc.GetDimensions(dim.x, dim.y);
     float2 uv = i.pos.xy * 2.0 / dim;
     float2 t = uPass.xy;
-    float4 s = tSrc.Sample(sLinear, uv + t * float2(-1, -1)) + tSrc.Sample(sLinear, uv + t * float2(1, -1))
-             + tSrc.Sample(sLinear, uv + t * float2(-1, 1)) + tSrc.Sample(sLinear, uv + t * float2(1, 1));
+    float4 s = tSrc.SampleLevel(sLinear, uv + t * float2(-1, -1), 0) + tSrc.SampleLevel(sLinear, uv + t * float2(1, -1), 0)
+             + tSrc.SampleLevel(sLinear, uv + t * float2(-1, 1), 0) + tSrc.SampleLevel(sLinear, uv + t * float2(1, 1), 0);
     return s * 0.25;
 }
 
@@ -156,12 +156,12 @@ float4 BlurPS(VOut i) : SV_Target {
     float2 uv = i.pos.xy / dim;
     float sigma = max(uBlur.x, 0.01);
     int radius = (int)uBlur.y;
-    float4 sum = tSrc.Sample(sLinear, uv);
+    float4 sum = tSrc.SampleLevel(sLinear, uv, 0);
     float total = 1.0;
     [loop] for (int k = 1; k <= radius; k++) {
         float w = exp(-0.5 * (k * k) / (sigma * sigma));
         float2 o = uPass.zw * k / dim;
-        sum += (tSrc.Sample(sLinear, uv + o) + tSrc.Sample(sLinear, uv - o)) * w;
+        sum += (tSrc.SampleLevel(sLinear, uv + o, 0) + tSrc.SampleLevel(sLinear, uv - o, 0)) * w;
         total += 2.0 * w;
     }
     return sum / total;
