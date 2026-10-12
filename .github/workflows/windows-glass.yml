@@ -1,8 +1,7 @@
-# Liquid Glass for Windows: Simpl's own glass (windows/Simpl/Components/Glass), shown off in a small app of its own
-# (windows/GlassShowcase) — the glass shader compiled with the Windows SDK's fxc, the app published as one portable exe,
-# started on the runner for a picture, and published as a pre-release (windows-glass-r<run>) to try on a real PC.
-# Nothing here touches Simpl's own builds, releases or update feeds (those read mac-v* releases only).
-# (The first candidates built here — liquidImgui and AuroraGlass, r1–r4 — were tried and set aside: windows-glass/README.md.)
+# Liquid Glass for Windows: the showcase (windows/GlassNative) — Win32 and Direct3D 11, the glass drawn by AuroraGlass's
+# renderer (its core compiled in from a pinned copy) with a deep frost, Direct2D and DirectWrite for the backdrop and the
+# words. Built with MSVC, started on the runner for a picture, and published as a pre-release (windows-glass-r<run>) to
+# try on a real PC. Nothing here touches Simpl's own builds, releases or update feeds (those read mac-v* releases only).
 name: Windows Liquid Glass
 
 on:
@@ -10,9 +9,7 @@ on:
     branches: [claude/windows-liquid-glass]
     paths:
       - 'windows-glass/**'
-      - 'windows/GlassShowcase/**'
-      - 'windows/Simpl/Components/Glass/**'
-      - 'windows/tools/shaders.ps1'
+      - 'windows/GlassNative/**'
       - '.github/workflows/windows-glass.yml'
   workflow_dispatch:
 
@@ -23,38 +20,50 @@ concurrency:
   group: windows-glass
   cancel-in-progress: true
 
+env:
+  AURORA_REPO: https://github.com/VeiQiuLab/AuroraGlass.git
+  AURORA_SHA: 9355428a4a04f27a01b8e34fec90b7bfde2f0cf6
+
 jobs:
   showcase:
-    name: Liquid Glass showcase (WPF, the glass shader)
+    name: Liquid Glass showcase (Direct3D 11, AuroraGlass)
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-      - name: Compile the glass shader (fxc, ps_3_0)
-        shell: pwsh
-        run: ./windows/tools/shaders.ps1
-      - name: Publish (one portable exe, .NET inside)
+      - name: Fetch AuroraGlass
         shell: bash
         run: |
-          dotnet publish windows/GlassShowcase/GlassShowcase.csproj -c Release -r win-x64 --self-contained true \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
-            -o dist/LiquidGlassShowcase
-          cp windows-glass/showcase-README.txt dist/LiquidGlassShowcase/README-FIRST.txt
-          ls -la dist/LiquidGlassShowcase
-      - name: Does it start? (a picture of its window)
+          git init -q aurora && cd aurora
+          git remote add origin "$AURORA_REPO"
+          git fetch -q --depth 1 origin "$AURORA_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Build (Release, x64)
+        shell: bash
+        run: |
+          cmake -S windows/GlassNative -B build -A x64 -DAURORA_DIR="$PWD/aurora"
+          cmake --build build --config Release --parallel
+      - name: Package
+        shell: bash
+        run: |
+          out=dist/LiquidGlass
+          mkdir -p "$out"
+          cp build/Release/LiquidGlass.exe "$out/"
+          cp -R build/Release/shaders "$out/shaders"
+          cp aurora/LICENSE "$out/LICENSE-AuroraGlass.txt"
+          cp windows-glass/showcase-README.txt "$out/README-FIRST.txt"
+          ls -la "$out" "$out/shaders"
+      - name: Does it start? (a picture of its frame)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dist/LiquidGlassShowcase/LiquidGlassShowcase.exe -ArgumentList '--shot', "$PWD/shot-showcase.png" -PassThru
+          $p = Start-Process -FilePath dist/LiquidGlass/LiquidGlass.exe -ArgumentList '--shot', "$PWD/shot-showcase.png" -WorkingDirectory dist/LiquidGlass -PassThru
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'it did not finish' }
           Write-Host "exit code: $($p.ExitCode)"
           if (Test-Path shot-showcase.png.txt) { Get-Content shot-showcase.png.txt }
           if (-not (Test-Path shot-showcase.png)) { throw 'no picture' }
       - name: Zip
         shell: bash
-        run: (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-Showcase-win64.zip LiquidGlassShowcase >/dev/null) && ls -la LiquidGlass-Showcase-win64.zip
+        run: (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-Showcase-win64.zip LiquidGlass >/dev/null) && ls -la LiquidGlass-Showcase-win64.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -82,6 +91,6 @@ jobs:
         run: |
           tag="windows-glass-r${{ github.run_number }}"
           gh release create "$tag" zips/*.zip --target "${{ github.sha }}" --prerelease \
-            --title "Liquid Glass on Windows — Simpl's own (r${{ github.run_number }})" \
+            --title "Liquid Glass on Windows — native, on AuroraGlass (r${{ github.run_number }})" \
             --notes-file windows-glass/RELEASE_NOTES.md
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"

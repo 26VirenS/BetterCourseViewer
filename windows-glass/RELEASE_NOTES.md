@@ -1,13 +1,13 @@
-**Liquid Glass on Windows — Simpl's own.** A test build for evaluation; it is not Simpl, and Simpl's own updates never offer it.
+**Liquid Glass on Windows — native, on AuroraGlass.** A test build for evaluation; it is not Simpl, and Simpl's own updates never offer it.
 
-**LiquidGlass-Showcase-win64.zip** — unzip and run **LiquidGlassShowcase.exe** (one portable file, nothing to install). Not code-signed: on "Windows protected your PC", choose **More info → Run anyway**.
+**LiquidGlass-Showcase-win64.zip** — unzip (keep the `shaders` folder beside the app) and run **LiquidGlass.exe**. Nothing to install. Not code-signed: on "Windows protected your PC", choose **More info → Run anyway**.
 
-The Mac's soft, frosted glass, drawn by Simpl's own renderer (WPF + a glass pixel shader adapted from AuroraGlass's optics): what is behind is frosted, bent through the rim, its colours enriched and tinted, the rim lit. Over a moving Simpl Dashboard:
+Rebuilt from scratch for speed and the Mac's look: Direct3D 11 throughout, the glass drawn on the GPU by AuroraGlass's renderer (Apache-2.0) and frosted deeply — it reads a small copy of what is behind, so the frost costs almost nothing — with the Mac's warm tint and a hairline rim of light; the words and icons by DirectWrite. It runs at the display's refresh rate (the frame rate is in the window's title).
 
 - the Mac's *Unread announcements* popover (drag it around);
 - a toolbar with the Dashboard's Cards · List · Activity, and a tab bar — a lens slides between the choices;
-- switches and a slider whose knobs turn into glass lenses while held;
-- a glass bubble to drag and fling (it heads where its momentum takes it, on a spring);
-- **Tune**: frost, refraction, dispersion, bevel, colour, tint and rim, live; Dark or Light; the moving backdrop on or off.
+- switches and sliders whose knobs turn into glass lenses while held (they refract the panel under them);
+- glass buttons; a glass bubble to drag and fling;
+- **Tune**: frost, refraction, dispersion, thickness, colour, tint and rim, live; Dark or Light; the moving backdrop on or off.
 
-Needs a graphics card WPF can use for pixel shaders (almost every PC); in a VM without one the glass falls back to a plainer frost (the Tune panel says which).
+Esc closes it.

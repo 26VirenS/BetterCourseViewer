@@ -23,6 +23,5 @@ scripts/dev/out/
 .vscode/
 node_modules/
 npm-debug.log*
-windows/Simpl/Components/Glass/Glass.ps
 windows/**/bin/
 windows/**/obj/

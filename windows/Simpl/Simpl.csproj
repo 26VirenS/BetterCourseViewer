@@ -33,12 +33,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- the compiled glass shader (fxc, in CI: windows/tools/shaders.ps1); without it the glass draws its fallback -->
-    <EmbeddedResource Include="Components\Glass\Glass.ps" Condition="Exists('Components\Glass\Glass.ps')" LogicalName="Simpl.Glass.ps" />
-    <None Remove="Components\Glass\Glass.fx" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Resource Include="Assets\Simpl.ico" />
     <Resource Include="Assets\Simpl-256.png" />
   </ItemGroup>

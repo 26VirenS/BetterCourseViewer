@@ -35,9 +35,10 @@ publishes them as a pre-release, `windows-glass-r<run>`, with a zip each: unzip,
 
 ## Verdict (October 2026) and what replaced them
 
-Neither candidate was up to par (AuroraGlass came closest). Simpl draws its own: `windows/Simpl/Components/Glass` — a
-WPF control that frosts the layer behind it (WPF's blur), then a glass pixel shader (`Glass.fx`, ps_3_0, its optics
-adapted from AuroraGlass's `glass.hlsl`, Apache-2.0) bends it through a rounded bevel, enriches and tints it and lights
-its rim; springs (SwiftUI's response and damping) for every move. Its presets are the Mac's: `Dark()` the warm,
-deeply frosted popover glass, `Light()` the bright veil. `windows/GlassShowcase` shows it off; this workflow compiles
-the shader with fxc and publishes the showcase. The Windows app (`windows/Simpl`) uses the same control.
+Neither candidate was up to par as built (AuroraGlass came closest). A first showcase of Simpl's own in WPF (a live
+copy of the page frosted by WPF, then a pixel shader) looked wrong and ran at 1–3 frames a second: WPF re-renders the
+copy and blurs it on the CPU path every frame. Replaced by `windows/GlassNative`: Win32 and Direct3D 11 throughout, the
+glass drawn by AuroraGlass's renderer (its core compiled in from a pinned copy, Apache-2.0) — one frost a frame over a
+small copy (a mip) of the backdrop, so a deep Mac-like frost costs almost nothing; each panel composited on the GPU;
+lenses (knobs, thumbs, a bubble) refracting the frame drawn so far; Direct2D and DirectWrite for the backdrop, the
+Mac's tint, the rim's hairline, the words and icons. This workflow builds it with MSVC and publishes it.
