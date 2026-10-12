@@ -65,6 +65,7 @@ struct RadialColorPicker: View {
                 .onChanged { g in turn(g.startLocation, g.location) }
                 .onEnded { _ in mode = nil }
         )
+        .allowsHitTesting(!leaving) // (put away: a click on it as it fades turns nothing, Done included)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Colour")
         .accessibilityValue(Text(hex))

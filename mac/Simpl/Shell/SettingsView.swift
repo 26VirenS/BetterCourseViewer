@@ -298,6 +298,8 @@ private struct AppearancePane: View {
     @State private var picking = false
     /// (1.3.76) The picker going: its row stays until it has shrunk back and faded (closePicker).
     @State private var leaving = false
+    /// (1.3.76) Each close counted: a close's completion takes the row away only if no close has come since.
+    @State private var closes = 0
     @State private var slot: PhotoSlot = AppearancePane.launchSlot
 
     /// The screenshot suite's -SimplPhotoSlot graded (or another place): the editor opens on it.
@@ -453,15 +455,19 @@ private struct AppearancePane: View {
         .accessibilityLabel(Text("Custom colour"))
     }
 
-    /// (1.3.76) The picker put away as it came: it shrinks back to 0.92 and fades on the gentle spring (fades only,
-    /// under Reduce Motion), and then its row closes. (A grouped form's row comes and goes by the form's own animation,
-    /// not surely by a transition of its own; so the way out is the picker's, as the way in is.)
+    /// (1.3.76) The picker put away as it came: it shrinks back to 0.92 and fades on the snappy spring, a little quicker
+    /// than it grew in (fades only, under Reduce Motion), and then its row closes on the gentle one, as it opened. (A
+    /// grouped form's row comes and goes by the form's own animation, not surely by a transition of its own; so the way
+    /// out is the picker's, as the way in is.)
     private func closePicker() {
         guard picking, !leaving else { return }
-        withAnimation(Motion.gentle) {
+        closes += 1
+        let mine = closes
+        withAnimation(Motion.snappy) {
             leaving = true
         } completion: {
-            guard leaving else { return } // (opened again on its way out: it stays)
+            // (opened again on its way out, it stays; closed again since, that later close takes the row)
+            guard leaving, closes == mine else { return }
             withAnimation(Motion.gentle) { picking = false }
         }
     }
