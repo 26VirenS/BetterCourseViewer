@@ -140,6 +140,8 @@ jobs:
           Shot 'account-menu' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'menu'))
           Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
           Shot 'setup' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'setup'))
+          # (setup run to its end and saved, as Start using Simpl does: its log is checked below for a save that failed)
+          Shot 'setup-saved' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'setup', '--setup-save', 'yes'))
           Shot 'preview' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'preview'))
           Shot 'tour-start' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'tour'))
           Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:12'))
@@ -261,6 +263,12 @@ jobs:
             $log = Join-Path $_.FullName 'simpl.log'
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 25 }
           }
+          # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
+          # printed whole, with the bridge's own error, so its cause can be read here)
+          $saved = 'shots/profile-setup-saved.log'
+          if (-not (Test-Path $saved)) { Write-Error "setup-saved made no log"; exit 1 }
+          $bad = Select-String -Path $saved -Pattern 'setup save:|setup saved, then|bridge ' -SimpleMatch:$false
+          if ($bad) { Write-Host "--- setup-saved: what failed"; Get-Content $saved; Write-Error "setup's save failed or something after it did (shots/profile-setup-saved.log)"; exit 1 }
           Get-ChildItem shots
       - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled)
         shell: pwsh

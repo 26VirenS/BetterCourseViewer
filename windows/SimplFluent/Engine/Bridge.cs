@@ -87,16 +87,23 @@ public sealed class Bridge
             {
                 var items = FollowingSystem(body["items"] as JsonObject ?? new JsonObject());
                 var changes = store.Set(items);
-                Broadcast(changes);
-                if (items["settings"] is JsonObject settings) SettingsChanged?.Invoke(settings);
+                // (stored: telling the open pages and the app's chrome can no longer make the page's write fail)
+                Told("storage.set", () => Broadcast(changes));
+                if (items["settings"] is JsonObject settings) Told("settings", () => SettingsChanged?.Invoke(settings));
                 return null;
             }
             case "storage.remove":
-                Broadcast(store.Remove((body["keys"] as JsonArray)?.Select(k => k?.ToString() ?? "") ?? Enumerable.Empty<string>()));
+            {
+                var changes = store.Remove((body["keys"] as JsonArray)?.Select(k => k?.ToString() ?? "") ?? Enumerable.Empty<string>());
+                Told("storage.remove", () => Broadcast(changes));
                 return null;
+            }
             case "storage.clear":
-                Broadcast(store.Clear());
+            {
+                var changes = store.Clear();
+                Told("storage.clear", () => Broadcast(changes));
                 return null;
+            }
             case "signOut":
                 SignOutRequested?.Invoke();
                 return new JsonObject { ["ok"] = true };
@@ -141,6 +148,11 @@ public sealed class Bridge
             default:
                 return null;
         }
+    }
+
+    private static void Told(string what, Action tell)
+    {
+        try { tell(); } catch (Exception e) { Log.Write($"bridge {what}, after storing: {e}"); }
     }
 
     /// <summary>The app's own question for one the page asks (a destructive answer said as such): true for OK.</summary>

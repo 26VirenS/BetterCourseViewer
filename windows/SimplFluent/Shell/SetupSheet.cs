@@ -98,7 +98,17 @@ public sealed class SetupSheet
         }
         catch (Exception e) { loadError = e.Message; sheet.Modal = false; }
         Draw();
+        // (the screenshot suite's --setup-save yes: run through to the end and saved, as Start using Simpl does)
+        if (d != null && !autoSaved && Launch.Get("setup-save") == "yes")
+        {
+            autoSaved = true;
+            step = Step.Done;
+            Draw();
+            await Save();
+        }
     }
+
+    private static bool autoSaved;
 
     private void Draw()
     {
@@ -344,32 +354,37 @@ public sealed class SetupSheet
             tracking,
             goal,
         };
-        try
-        {
-            await engine.Call<OK>("setupSave", args);
-            Prefs.Set(Engine.Engine.SetupPendingKey, false);
-            engine.DataChanged();
-            _ = engine.LoadSidebar(); // (the pane's courses: the ones just chosen, by their new names)
-            sheet.Close();
-            // (the Mac's NotificationAsk.afterSetup: once the setup is done, reminders and new-activity alerts are on —
-            // Windows asks nothing for them; Settings ▸ Notifications turns either off)
-            if (!Prefs.Bool("notifications:asked") && !Launch.IsDevelopment)
-            {
-                Prefs.Set("notifications:asked", true);
-                Prefs.Set("reminders:on", true);
-                Prefs.Set("activity:on", true);
-                Notices.SettingsChanged();
-            }
-        }
+        try { await engine.Call<OK>("setupSave", args); }
         catch (Exception e)
         {
             Log.Write("setup save: " + e);
             error = e.Message;
             forward = true;
             sheet.Modal = false; // (a save that fails never keeps the student in: Escape, or Skip for Now, lets them go)
+            saving = false;
             Draw();
+            return;
         }
+        // saved: what follows tells the rest of the app, and nothing it meets can make the save look as if it failed
         saving = false;
-        Footer();
+        Quietly("pending", () => Prefs.Set(Engine.Engine.SetupPendingKey, false));
+        Quietly("close", sheet.Close);
+        Quietly("data", engine.DataChanged);
+        _ = engine.LoadSidebar(); // (the pane's courses: the ones just chosen, by their new names)
+        // (the Mac's NotificationAsk.afterSetup: once the setup is done, reminders and new-activity alerts are on —
+        // Windows asks nothing for them; Settings ▸ Notifications turns either off)
+        if (!Prefs.Bool("notifications:asked") && !Launch.IsDevelopment)
+            Quietly("notifications", () =>
+            {
+                Prefs.Set("notifications:asked", true);
+                Prefs.Set("reminders:on", true);
+                Prefs.Set("activity:on", true);
+                Notices.SettingsChanged();
+            });
+    }
+
+    private static void Quietly(string what, Action a)
+    {
+        try { a(); } catch (Exception e) { Log.Write($"setup saved, then {what}: {e}"); }
     }
 }

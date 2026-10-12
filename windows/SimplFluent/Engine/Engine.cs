@@ -582,7 +582,12 @@ public sealed partial class Engine : Observable, IShellListener
             if (name == "bcv" && m["msg"] is JsonObject body) answer = await Bridge.Shared.Handle(body, Web);
             else if (name == "bcvLogin" && m["msg"] is JsonObject said) Login.Said(said, e.Source); // (the page's own address, as WebView2 knows it)
         }
-        catch (Exception ex) { ok = false; answer = ex.Message; }
+        catch (Exception ex)
+        {
+            ok = false;
+            answer = ex.Message;
+            Log.Write($"bridge {(m["msg"] as JsonObject)?["op"]} ({name}): {ex}");
+        }
         if (Web.CoreWebView2 == null) return;
         var value = answer == null ? "null" : Json.Literal(answer);
         _ = Web.CoreWebView2.ExecuteScriptAsync($"window.__simplNative&&window.__simplNative.reply({msgId},{(ok ? "true" : "false")},{value})");
