@@ -1010,9 +1010,13 @@ private struct FCRoundView: View {
 
     private func finished(_ d: FCDeck) -> some View {
         VStack(spacing: 18) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 54))
-                .foregroundStyle(.green)
+            if learning.isEmpty {
+                FinishMark(symbol: "checkmark.circle.fill", size: 54) // (1.3.76: every card known; not with cards left)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(.green)
+            }
             Text(learning.isEmpty ? "You know them all!" : "Nice work!").font(.sTitle)
             Text(learning.isEmpty ? "Every card marked Know." : "\(toolPlural(learning.count, "term")) still to learn.")
                 .font(.sBody)
@@ -1251,7 +1255,7 @@ private struct FCLearnView: View {
 
     private var allLearned: some View {
         VStack(spacing: 16) {
-            Image(systemName: "checkmark.seal.fill").font(.system(size: 54)).foregroundStyle(.green)
+            FinishMark(size: 54) // (1.3.76: the whole set learned, a bounce)
             Text("You’ve learned them all!").font(.sTitle)
             Text("Every card right twice in a row. They come back for a quick check in a day, then less and less often.")
                 .font(.sBody)
@@ -1443,40 +1447,57 @@ private struct FCMatchView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                if let finished {
-                    Text(String(format: "%.1f s", finished)).font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
-                } else {
-                    TimelineView(.periodic(from: .now, by: 0.1)) { ctx in
-                        Text(String(format: "%.1f s", ctx.date.timeIntervalSince(started)))
-                            .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
-                    }
-                }
+                clock
+                    .transaction { $0.animation = nil } // (1.3.76: the time is the score; it stops, never fades)
                 Spacer()
                 if let best = store.deck(deckID)?.best {
                     Text(String(format: "Best %.1f s", best)).font(.sCallout).foregroundStyle(.secondary)
                 }
             }
-            if let finished {
-                VStack(spacing: 12) {
-                    Text(newBest ? "A new best time!" : "All matched.")
-                        .font(.sTitle2)
-                    HStack(spacing: 10) {
-                        Button("Play Again") { make() }.glassButton(prominent: true).tint(.green)
-                        Button("Back to Set", action: back).glassButton()
+            // (1.3.76) the last pair finishing its fade as the grid crossfades into the result, and back for Play
+            // Again: one over the other, so neither waits below the other while it goes
+            ZStack(alignment: .top) {
+                if let finished {
+                    VStack(spacing: 12) {
+                        Text(newBest ? "A new best time!" : "All matched.")
+                            .font(.sTitle2)
+                        HStack(spacing: 10) {
+                            Button("Play Again") {
+                                withAnimation(Motion.gentle) { make() }
+                            }
+                            .glassButton(prominent: true)
+                            .tint(.green)
+                            Button("Back to Set", action: back).glassButton()
+                        }
+                        .controlSize(.large)
                     }
-                    .controlSize(.large)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
-                    ForEach(tiles) { t in tile(t) }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                    .transition(.opacity)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
+                        ForEach(tiles) { t in tile(t) }
+                    }
+                    .transition(.opacity)
                 }
             }
         }
         .frame(maxWidth: 1000)
         .frame(maxWidth: .infinity)
         .onAppear { if tiles.isEmpty { make() } }
+    }
+
+    /// The time: running while the game is, then where it stopped.
+    @ViewBuilder
+    private var clock: some View {
+        if let finished {
+            Text(String(format: "%.1f s", finished)).font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+        } else {
+            TimelineView(.periodic(from: .now, by: 0.1)) { ctx in
+                Text(String(format: "%.1f s", ctx.date.timeIntervalSince(started)))
+                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+            }
+        }
     }
 
     private func make() {
@@ -1530,8 +1551,10 @@ private struct FCMatchView: View {
             picked = nil
             if gone.count == tiles.count {
                 let time = Date().timeIntervalSince(started)
-                newBest = time < (store.deck(deckID)?.best ?? .infinity)
-                finished = time
+                withAnimation(Motion.gentle) {
+                    newBest = time < (store.deck(deckID)?.best ?? .infinity)
+                    finished = time
+                }
                 store.change(deckID) { d in
                     if d.best == nil || time < (d.best ?? .infinity) { d.best = (time * 10).rounded() / 10 }
                 }

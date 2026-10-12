@@ -602,6 +602,10 @@ private struct TourCard: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if step.id == "end" {
+                // (1.3.76) the setup's seal, bouncing once the card has glided to the middle (Motion.gentle, above)
+                FinishMark(size: 28, weight: .semibold, delay: 300_000_000)
+            }
             Text("\(index + 1) of \(count)")
                 .font(.sFootnote.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
