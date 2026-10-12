@@ -1,0 +1,664 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+using Microsoft.Win32;
+using Simpl.Engine;
+using Simpl.Kit;
+using Simpl.Screens;
+using Simpl.Shell;
+using Simpl.Support;
+using Wpf.Ui.Controls;
+using Button = System.Windows.Controls.Button;
+using TextBlock = System.Windows.Controls.TextBlock;
+using TextBox = Wpf.Ui.Controls.TextBox;
+
+namespace Simpl.Tools;
+
+/// <summary>
+/// What a tool is given where it opens (the Mac's ToolScreen, PinnedToolPopover and ToolPopup between them): the engine,
+/// whether it is the quick version in a pin's flyout, the files and details handed to it (from a pin's flyout, a
+/// command), and how to open the whole tool or close the flyout.
+/// </summary>
+public sealed class ToolContext
+{
+    public required Engine.Engine Engine { get; init; }
+    public required string Key { get; init; }
+    /// <summary>The quick version, in a pin's flyout (the Mac's FocusTimerCompact, CalculatorCompact …).</summary>
+    public bool Quick { get; init; }
+    /// <summary>The window it is in (for its dialogs).</summary>
+    public Window? Owner { get; init; }
+
+    /// <summary>From the quick version: the whole tool over the window, with details or files for it.</summary>
+    public Action<Dictionary<string, string>?, IReadOnlyList<string>?> OpenFull { get; init; } = (_, _) => { };
+
+    /// <summary>From the quick version: the flyout closed.</summary>
+    public Action Close { get; init; } = () => { };
+
+    /// <summary>The files handed to the tool, taken once (the Mac's ToolsCenter.takeFiles).</summary>
+    public IReadOnlyList<string> TakeFiles() => ToolsCenter.TakeFiles(Key);
+
+    /// <summary>A detail handed to the tool, taken once (the Mac's ToolsCenter.takeInfo).</summary>
+    public string? TakeInfo(string name) => ToolsCenter.TakeInfo(name);
+}
+
+/// <summary>
+/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc).
+/// Each tool's file registers its own from a module initializer, so a tool added is a file added.
+/// </summary>
+public static class ToolRegistry
+{
+    private static readonly Dictionary<string, Func<ToolContext, FrameworkElement>> full = new();
+    private static readonly Dictionary<string, Func<ToolContext, FrameworkElement>> quick = new();
+    private static readonly Dictionary<string, Func<ToolContext, FrameworkElement>> header = new();
+
+    /// <param name="key">The tool's key.</param>
+    /// <param name="full">The whole tool (on the Tools page, or over the window).</param>
+    /// <param name="quick">Its quick version, for its pin's flyout (null: the flyout offers the whole tool).</param>
+    /// <param name="headerControls">Controls beside its pin in the page header (the Periodic Table's search).</param>
+    public static void Register(string key, Func<ToolContext, FrameworkElement> full, Func<ToolContext, FrameworkElement>? quick = null,
+        Func<ToolContext, FrameworkElement>? headerControls = null)
+    {
+        ToolRegistry.full[key] = full;
+        if (quick != null) ToolRegistry.quick[key] = quick;
+        if (headerControls != null) header[key] = headerControls;
+    }
+
+    public static bool Has(string key) => full.ContainsKey(key);
+
+    public static FrameworkElement? Full(ToolContext c) => Make(full, c);
+    public static FrameworkElement? Quick(ToolContext c) => Make(quick, c);
+    public static FrameworkElement? Header(ToolContext c) => Make(header, c);
+
+    private static FrameworkElement? Make(Dictionary<string, Func<ToolContext, FrameworkElement>> d, ToolContext c)
+    {
+        if (!d.TryGetValue(c.Key, out var f)) return null;
+        try { return f(c); }
+        catch (Exception e)
+        {
+            Log.Write($"tool {c.Key}: {e}");
+            return K.Wrapped($"This tool could not open: {e.Message}", Ty.Body, B.Text2).Margin(4);
+        }
+    }
+
+    /// <summary>The focus timer's state while a session goes, for its pin (set by the focus timer).</summary>
+    public static ITimerState? Timer { get; set; }
+}
+
+/// <summary>A running focus timer as its pin shows it (the Mac's FocusTimer.shared, as PinnedTimerLabel reads it).</summary>
+public interface ITimerState
+{
+    bool Active { get; }
+    bool Running { get; }
+    bool Paused { get; }
+    string PhaseName { get; }
+    Color PhaseColor { get; }
+    string NextPhaseName { get; }
+    TimeSpan Remaining { get; }
+    /// <summary>What is left of the phase, 1 to 0.</summary>
+    double Fraction { get; }
+    void Toggle();
+    void Skip();
+    void Reset();
+    /// <summary>Started, paused, a phase over, stopped.</summary>
+    event Action? Changed;
+}
+
+/// <summary>
+/// What the tools share across the window (the Mac's ToolsCenter): the tool open on the Tools page, and files and details
+/// handed to a tool for it to take when it opens.
+/// </summary>
+public static class ToolsCenter
+{
+    private static string? open;
+    private static List<string> handoff = new();
+    private static string? handoffTool;
+    private static Dictionary<string, string> handoffInfo = new();
+
+    /// <summary>The tool open, or closed, on the Tools page.</summary>
+    public static event Action? OpenChanged;
+
+    /// <summary>The tool open on the Tools page (null: the tiles). Kept while you go elsewhere.</summary>
+    public static string? Open
+    {
+        get => open;
+        set { if (open == value) return; open = value; OpenChanged?.Invoke(); }
+    }
+
+    /// <summary>A tool opened on the Tools page from anywhere (a pin's flyout, a command), with files or details for it.</summary>
+    public static void Show(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
+    {
+        Hand(key, files, info);
+        open = null; // (opened afresh: built again with what it was handed)
+        Open = key;
+        engine.Go(Place.Tools);
+    }
+
+    /// <summary>A pinned tool opened whole, over the window where you are (the Mac's popUp): the screen stays under it.</summary>
+    public static void PopUp(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
+    {
+        Hand(key, files, info);
+        ToolPopup.Show(key, engine, owner);
+    }
+
+    private static void Hand(string key, IReadOnlyList<string>? files, Dictionary<string, string>? info)
+    {
+        handoff = files?.ToList() ?? new();
+        handoffTool = handoff.Count == 0 ? null : key;
+        handoffInfo = info ?? new();
+    }
+
+    public static IReadOnlyList<string> TakeFiles(string key)
+    {
+        if (handoffTool != key || handoff.Count == 0) return Array.Empty<string>();
+        var f = handoff;
+        handoff = new();
+        handoffTool = null;
+        return f;
+    }
+
+    public static string? TakeInfo(string name) => handoffInfo.Remove(name, out var v) ? v : null;
+
+    /// <summary>A tool's short name, for its pin's flyout (the Mac's ToolKind.shortName).</summary>
+    public static string ShortName(string key) => key switch
+    {
+        "cite" => "Cite", "pomo" => "Focus", "calc" => "Calculator", "graph" => "Graphing", "ptable" => "Elements",
+        "need" => "Grade needed", "conv" => "Convert", "units" => "Units", "pdfx" => "Merge & split", "mark" => "Mark up",
+        "ocr" => "Image to text", "fc" => "Flashcards", _ => key,
+    };
+
+    /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
+    public static double FlyoutWidth(string key) => key switch
+    {
+        "calc" or "ptable" => 420, "cite" => 400, "graph" => 360, "fc" => 340, _ => 330,
+    };
+
+    /// <summary>The files a tool takes from its pin's flyout (null: none), as an open dialog's filter.</summary>
+    public static string? Accepts(string key) => key switch
+    {
+        "conv" => "All files|*.*",
+        "pdfx" or "mark" => "PDF documents|*.pdf",
+        "ocr" => "Pictures and PDFs|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.webp;*.pdf",
+        _ => null,
+    };
+
+    public static ToolsScreen.Kind? KindOf(string key) => ToolsScreen.Kinds.FirstOrDefault(k => k.Key == key);
+}
+
+// ---- what the tools share (the Mac's ToolPage, ToolColumns, ToolField, ToolNote, ToolDropZone, ToolFiles) ----
+
+/// <summary>The pieces every tool is made of, so they look one family.</summary>
+public static class ToolKit
+{
+    /// <summary>A tool's scrolling body: the page's side margins, its content as wide as the window allows.</summary>
+    public static ScrollViewer Page(UIElement content, double maxWidth = 1480, double spacing = 20)
+    {
+        if (content is FrameworkElement fe) { fe.MaxWidth = maxWidth; fe.HorizontalAlignment = HorizontalAlignment.Left; }
+        var sv = new ScrollViewer
+        {
+            Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Padding = new Thickness(40, 8, 40, 40), Focusable = false,
+        };
+        sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 8, 20, 32) : new Thickness(40, 8, 40, 40);
+        return sv;
+    }
+
+    /// <summary>A tool's scrolling body made of parts one under another.</summary>
+    public static ScrollViewer Page(double spacing, params UIElement?[] parts) => Page(K.V(spacing, parts));
+
+    /// <summary>Two columns side by side on a wide window (the work and its side panel), one over the other on a narrow one.</summary>
+    public static FrameworkElement Columns(UIElement main, UIElement side, double sideWidth = 380, double breakpoint = 900, double spacing = 28)
+    {
+        var g = new Grid();
+        g.Children.Add(main);
+        g.Children.Add(side);
+        var wide = (bool?)null;
+        void Lay()
+        {
+            var w = g.ActualWidth >= breakpoint;
+            if (wide == w) return;
+            wide = w;
+            g.ColumnDefinitions.Clear();
+            g.RowDefinitions.Clear();
+            if (w)
+            {
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(spacing) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(sideWidth) });
+                Grid.SetColumn(main, 0); Grid.SetRow(main, 0);
+                Grid.SetColumn(side, 2); Grid.SetRow(side, 0);
+            }
+            else
+            {
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(spacing) });
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetColumn(main, 0); Grid.SetRow(main, 0);
+                Grid.SetColumn(side, 0); Grid.SetRow(side, 2);
+            }
+        }
+        g.SizeChanged += (_, _) => Lay();
+        g.Loaded += (_, _) => Lay();
+        if (main is FrameworkElement m) m.VerticalAlignment = VerticalAlignment.Top;
+        if (side is FrameworkElement s) s.VerticalAlignment = VerticalAlignment.Top;
+        return g;
+    }
+
+    /// <summary>A labelled field: its label over it, a hint under it, a word after it (a unit, "%").</summary>
+    public static FrameworkElement Field(string label, TextBox box, string? hint = null, string? suffix = null, double? width = null)
+    {
+        var row = suffix == null ? (UIElement)box : K.Columns("*, auto", box.Col(0), K.Text(suffix, Ty.Body, B.Text2).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1));
+        if (row is FrameworkElement r) { r.HorizontalAlignment = width == null ? HorizontalAlignment.Stretch : HorizontalAlignment.Left; if (width is { } w) r.Width = w; }
+        var v = K.V(6, K.Text(label, Ty.BodyStrong, B.Text2), row);
+        if (!string.IsNullOrEmpty(hint)) v.Children.Add(K.Wrapped(hint, Ty.Caption, B.Text2));
+        return v;
+    }
+
+    /// <summary>A text box as the tools have them.</summary>
+    public static TextBox Box(string text = "", string placeholder = "", Action<string>? changed = null)
+    {
+        var b = new TextBox { Text = text, PlaceholderText = placeholder, ClearButtonEnabled = false, MinHeight = 32 };
+        if (changed != null) b.TextChanged += (_, _) => changed(b.Text);
+        return b;
+    }
+
+    /// <summary>A short line that says something went wrong or needs doing.</summary>
+    public static FrameworkElement Note(string text, SymbolRegular symbol = SymbolRegular.Warning24, Color? tint = null)
+    {
+        var icon = K.Icon(symbol, 16, tint ?? Color.FromRgb(0xf7, 0x63, 0x0c), filled: true);
+        icon.VerticalAlignment = VerticalAlignment.Top;
+        icon.Margin = new Thickness(0, 2, 8, 0);
+        return K.Columns("auto, *", icon.Col(0), K.Wrapped(text, Ty.Body).Col(1));
+    }
+
+    /// <summary>
+    /// Where a tool takes its files: dropped on it from File Explorer, or chosen with a press — a dashed box in the tool's
+    /// colour, brighter while files are over it.
+    /// </summary>
+    public static FrameworkElement DropZone(string title, string? sub, string filter, bool multiple, Color tint, Action<IReadOnlyList<string>> onFiles,
+        SymbolRegular symbol = SymbolRegular.ArrowDownload24, double height = 170)
+    {
+        var dash = new Rectangle { RadiusX = 12, RadiusY = 12, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4, 3.3 }, Stroke = new SolidColorBrush(K.WithAlpha(tint, 0.4)), Fill = new SolidColorBrush(K.WithAlpha(tint, 0.05)) };
+        var words = K.V(10, K.Icon(symbol, 30, tint).Align(HorizontalAlignment.Center), K.Text(title, Ty.BodyStrong).Center());
+        if (sub != null) words.Children.Add(K.Wrapped(sub, Ty.Body, B.Text2).Center());
+        words.VerticalAlignment = VerticalAlignment.Center;
+        words.Margin = new Thickness(20);
+        var g = new Grid { MinHeight = height, Children = { dash, words } };
+        var b = new Button { Content = g, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, Cursor = Cursors.Hand, AllowDrop = true };
+        b.SetResourceReference(FrameworkElement.StyleProperty, "SubtleButton");
+        K.SetCorner(b, new CornerRadius(12));
+        void Over(bool on)
+        {
+            dash.Stroke = new SolidColorBrush(K.WithAlpha(tint, on ? 0.8 : 0.4));
+            dash.Fill = new SolidColorBrush(K.WithAlpha(tint, on ? 0.14 : 0.05));
+        }
+        b.Click += (_, e) =>
+        {
+            e.Handled = true;
+            var files = Files.Choose(filter, multiple, Window.GetWindow(b));
+            if (files.Count > 0) onFiles(files);
+        };
+        b.DragEnter += (_, e) => { var ok = Dropped(e, filter).Count > 0; e.Effects = ok ? DragDropEffects.Copy : DragDropEffects.None; Over(ok); e.Handled = true; };
+        b.DragOver += (_, e) => { e.Effects = Dropped(e, filter).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
+        b.DragLeave += (_, _) => Over(false);
+        b.Drop += (_, e) =>
+        {
+            Over(false);
+            var ok = Dropped(e, filter);
+            if (ok.Count > 0) onFiles(multiple ? ok : new[] { ok[0] });
+            e.Handled = true;
+        };
+        System.Windows.Automation.AutomationProperties.SetName(b, title);
+        return b;
+    }
+
+    private static IReadOnlyList<string> Dropped(DragEventArgs e, string filter) =>
+        e.Data.GetData(DataFormats.FileDrop) is string[] paths ? Files.Filter(paths, filter) : Array.Empty<string>();
+
+    /// <summary>"1 term", "3 terms".</summary>
+    public static string Plural(int n, string one, string? many = null) => $"{n} {(n == 1 ? one : many ?? one + "s")}";
+
+    /// <summary>A section's card of a tool: its heading over its content.</summary>
+    public static FrameworkElement Section(string title, UIElement content, UIElement? trailing = null) =>
+        K.V(10, trailing == null ? K.Text(title, Ty.BodyStrong) : K.Columns("*, auto", K.Text(title, Ty.BodyStrong).Col(0), trailing.Col(1)), K.Card(content, new Thickness(16)));
+}
+
+/// <summary>Windows' own dialogs for a tool's files, and the checks on what was dropped (the Mac's ToolFiles).</summary>
+public static class Files
+{
+    public static IReadOnlyList<string> Choose(string filter, bool multiple, Window? owner = null, string? title = null)
+    {
+        var d = new OpenFileDialog { Filter = filter, Multiselect = multiple, CheckFileExists = true };
+        if (title != null) d.Title = title;
+        return d.ShowDialog(owner) == true ? d.FileNames : Array.Empty<string>();
+    }
+
+    public static string? SaveAs(string name, string filter, Window? owner = null, string? title = null)
+    {
+        var d = new SaveFileDialog { FileName = name, Filter = filter, AddExtension = true, OverwritePrompt = true };
+        if (title != null) d.Title = title;
+        return d.ShowDialog(owner) == true ? d.FileName : null;
+    }
+
+    public static string? ChooseFolder(string title, Window? owner = null)
+    {
+        var d = new OpenFolderDialog { Title = title };
+        return d.ShowDialog(owner) == true ? d.FolderName : null;
+    }
+
+    /// <summary>The files a filter takes ("PDF documents|*.pdf"; anything for *.*).</summary>
+    public static IReadOnlyList<string> Filter(IEnumerable<string> paths, string filter)
+    {
+        var exts = filter.Split('|').Where((_, i) => i % 2 == 1).SelectMany(p => p.Split(';')).Select(p => p.Trim().TrimStart('*').ToLowerInvariant()).ToList();
+        var any = exts.Contains(".*") || exts.Count == 0;
+        return paths.Where(File.Exists).Where(p => any || exts.Contains(System.IO.Path.GetExtension(p).ToLowerInvariant())).ToList();
+    }
+
+    /// <summary>A name for a new file that does not take the place of one already in the folder.</summary>
+    public static string Free(string name, string ext, string folder)
+    {
+        var path = System.IO.Path.Combine(folder, $"{name}.{ext}");
+        for (var n = 2; File.Exists(path); n++) path = System.IO.Path.Combine(folder, $"{name} {n}.{ext}");
+        return path;
+    }
+
+    public static string SizeText(string path)
+    {
+        double size = File.Exists(path) ? new FileInfo(path).Length : 0;
+        string[] units = { "bytes", "KB", "MB", "GB" };
+        var u = 0;
+        while (size >= 1000 && u < units.Length - 1) { size /= 1000; u++; }
+        return u == 0 ? $"{size:0} {units[u]}" : $"{size:0.#} {units[u]}";
+    }
+
+    /// <summary>The finished file shown in File Explorer.</summary>
+    public static void Reveal(IEnumerable<string> paths)
+    {
+        var first = paths.FirstOrDefault();
+        if (first == null) return;
+        try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{first}\""); } catch (Exception e) { Log.Write($"reveal: {e.Message}"); }
+    }
+
+    /// <summary>A file opened in its own app.</summary>
+    public static void OpenInApp(string path)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception e) { Log.Write($"open: {e.Message}"); }
+    }
+}
+
+// ---- a tool opened whole over the window (the Mac's ToolPopup) ----
+
+/// <summary>A pinned tool opened whole, over the window, in a sheet nearly the window's size: Done closes it.</summary>
+public static class ToolPopup
+{
+    public static void Show(string key, Engine.Engine engine, Window? owner)
+    {
+        if (ToolsCenter.KindOf(key) is not { } kind) return;
+        var win = owner ?? Application.Current.MainWindow;
+        var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
+        var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
+        var sheet = new Sheet { Bare = true, Width = w, Height = h };
+        var c = new ToolContext { Engine = engine, Key = key, Owner = win };
+        var body = ToolRegistry.Full(c) ?? Missing(kind);
+        var done = K.Button("Done", () => sheet.Close());
+        done.ToolTip = $"Close {kind.Name} (Esc)";
+        var head = ToolHeader.Make(kind, c, done);
+        head.Margin = new Thickness(40, 20, 40, 12);
+        var g = K.Rows("auto, *", head.Row(0), body.Row(1));
+        g.Bg(B.Window);
+        sheet.Body = g;
+        sheet.Add("Done", SheetButtonKind.Close);
+        Dialogs.Show(sheet, win);
+    }
+
+    /// <summary>A tool not here yet: says so.</summary>
+    public static FrameworkElement Missing(ToolsScreen.Kind kind) =>
+        K.Empty(kind.Symbol, $"{kind.Name} is on its way to Simpl for Windows.").Margin(40);
+}
+
+/// <summary>A tool's heading over it when opened whole: Done, its tile, its name and line, its own controls, its pin.</summary>
+public static class ToolHeader
+{
+    public static FrameworkElement Make(ToolsScreen.Kind kind, ToolContext c, UIElement? leading)
+    {
+        var words = K.V(2, K.Text(kind.Name, Ty.Title));
+        if (kind.Key != "ptable") words.Children.Add(K.Text(kind.Note, Ty.Body, B.Text2));
+        var row = K.Columns("auto, auto, *, auto, auto");
+        if (leading != null) { ((FrameworkElement)leading).Margin = new Thickness(0, 0, 14, 0); ((FrameworkElement)leading).VerticalAlignment = VerticalAlignment.Center; row.Children.Add(leading.Col(0)); }
+        row.Children.Add(K.IconTile(kind.Symbol, kind.Color, 44).Margin(0, 0, 14, 0).Col(1));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        row.Children.Add(words.Col(2));
+        if (ToolRegistry.Header(c) is { } extra) { extra.Margin = new Thickness(12, 0, 12, 0); extra.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(extra.Col(3)); }
+        row.Children.Add(PinButton(kind, squished: kind.Key == "ptable").Col(4));
+        return row;
+    }
+
+    /// <summary>A tool's pin in its header: "Pin to Title Bar", or "Pinned" in the accent while it is pinned.</summary>
+    public static FrameworkElement PinButton(ToolsScreen.Kind kind, bool squished = false)
+    {
+        var host = new ContentControl { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
+        void Draw()
+        {
+            var on = ToolsPins.IsPinned(kind.Key);
+            var b = K.Button(squished ? "" : on ? "Pinned" : "Pin to Title Bar", () => ToolsPins.Toggle(kind.Key), accent: on, icon: on ? SymbolRegular.Pin24 : SymbolRegular.Pin24);
+            if (squished) { b.Content = null; b.Padding = new Thickness(10, 6, 10, 6); }
+            b.ToolTip = on ? "In the title bar on every screen. Press to take it out." : $"Keep {kind.Name} in the title bar on every screen";
+            System.Windows.Automation.AutomationProperties.SetName(b, on ? $"Unpin {kind.Name}" : $"Pin {kind.Name}");
+            host.Content = b;
+        }
+        Draw();
+        void Changed() => Draw();
+        host.Loaded += (_, _) => { ToolsPins.Changed -= Changed; ToolsPins.Changed += Changed; Draw(); };
+        host.Unloaded += (_, _) => ToolsPins.Changed -= Changed;
+        return host;
+    }
+}
+
+// ---- the pins in the title bar (the Mac's PinnedToolButton, PinnedTimerLabel, PinnedToolPopover) ----
+
+/// <summary>
+/// The tools pinned to the title bar, on every screen: a button each in its tool's colour; a press opens a flyout with
+/// the tool's quickest use, and its name opens the whole tool. A running focus timer is live in its pin (it borrows a
+/// pin while it runs if the timer is not pinned). A pin's menu opens, moves or unpins it.
+/// </summary>
+public sealed class PinBar : StackPanel
+{
+    private readonly Engine.Engine engine;
+    private readonly DispatcherTimer tick = new() { Interval = TimeSpan.FromSeconds(1) };
+    private ITimerState? timer;
+    private Popup? flyout;
+    private string? flyoutKey;
+
+    public PinBar(Engine.Engine engine)
+    {
+        this.engine = engine;
+        Orientation = Orientation.Horizontal;
+        VerticalAlignment = VerticalAlignment.Center;
+        Margin = new Thickness(0, 0, 6, 0);
+        ToolsPins.Changed += Draw;
+        tick.Tick += (_, _) => { if (timer?.Active == true) Draw(); };
+        Loaded += (_, _) => { Hook(); Draw(); };
+        Draw();
+        // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch)
+        if (Launch.Take("", "pin-open") is { Length: > 0 } k)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+            t.Tick += (_, _) => { t.Stop(); OpenFlyout(k); };
+            t.Start();
+        }
+    }
+
+    private void Hook()
+    {
+        if (ReferenceEquals(timer, ToolRegistry.Timer)) return;
+        if (timer != null) timer.Changed -= Draw;
+        timer = ToolRegistry.Timer;
+        if (timer != null) timer.Changed += Draw;
+    }
+
+    private List<string> Pins()
+    {
+        var pins = ToolsPins.Pinned.ToList();
+        if (ToolRegistry.Timer?.Active == true && !pins.Contains("pomo")) pins.Add("pomo");
+        return pins;
+    }
+
+    private void Draw()
+    {
+        Hook();
+        var live = timer?.Active == true;
+        if (live && !tick.IsEnabled) tick.Start();
+        if (!live && tick.IsEnabled) tick.Stop();
+        Children.Clear();
+        foreach (var key in Pins())
+            if (ToolsCenter.KindOf(key) is { } kind) Children.Add(Pin(kind));
+    }
+
+    private Button Pin(ToolsScreen.Kind kind)
+    {
+        UIElement face;
+        var live = kind.Key == "pomo" && timer?.Active == true;
+        if (live && timer != null)
+        {
+            var c = timer.PhaseColor;
+            var ring = K.Ring(timer.Fraction, c, 15, 2.5);
+            var clock = K.Text(Clock(timer.Remaining), Ty.BodyStrong);
+            clock.Foreground = new SolidColorBrush(c);
+            clock.FontFeatures();
+            var row = K.H(6, ring, clock);
+            if (timer.Paused) row.Children.Add(K.Icon(SymbolRegular.Pause24, 10, B.Text2, filled: true));
+            face = row;
+        }
+        else face = K.Icon(kind.Symbol, 16, kind.Color);
+        var b = K.Subtle(face, () => OpenFlyout(kind.Key), new Thickness(10, 0, 10, 0), 4);
+        b.Height = 32;
+        b.MinWidth = 40;
+        b.VerticalAlignment = VerticalAlignment.Center;
+        b.HorizontalContentAlignment = HorizontalAlignment.Center;
+        b.ToolTip = live && timer != null ? $"Focus timer: {timer.PhaseName.ToLowerInvariant()}{(timer.Paused ? ", paused" : "")}" : kind.Name;
+        System.Windows.Automation.AutomationProperties.SetName(b, kind.Name);
+        System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(b, true);
+        b.ContextMenu = Menu(kind);
+        return b;
+    }
+
+    private ContextMenu Menu(ToolsScreen.Kind kind)
+    {
+        var m = new ContextMenu();
+        System.Windows.Controls.MenuItem Item(string text, Action a, bool enabled = true)
+        {
+            var i = new System.Windows.Controls.MenuItem { Header = text, IsEnabled = enabled };
+            i.Click += (_, _) => a();
+            return i;
+        }
+        m.Items.Add(Item($"Open {kind.Name}", () => ToolsCenter.Show(kind.Key, engine)));
+        if (kind.Key == "pomo" && timer?.Active == true)
+        {
+            var t = timer;
+            m.Items.Add(new Separator());
+            m.Items.Add(Item(t.Running ? "Pause" : "Resume", t.Toggle));
+            m.Items.Add(Item($"Skip to {t.NextPhaseName}", t.Skip));
+            m.Items.Add(Item("Cancel Session", t.Reset));
+        }
+        m.Items.Add(new Separator());
+        var pins = ToolsPins.Pinned;
+        if (ToolsPins.IsPinned(kind.Key))
+        {
+            m.Items.Add(Item("Move Left", () => ToolsPins.Move(kind.Key, -1), pins.FirstOrDefault() != kind.Key));
+            m.Items.Add(Item("Move Right", () => ToolsPins.Move(kind.Key, 1), pins.LastOrDefault() != kind.Key));
+            m.Items.Add(Item("Unpin from Title Bar", () => ToolsPins.Toggle(kind.Key)));
+        }
+        else m.Items.Add(Item("Pin to Title Bar", () => ToolsPins.Toggle(kind.Key)));
+        return m;
+    }
+
+    public static string Clock(TimeSpan t)
+    {
+        var s = Math.Max(0, (int)Math.Ceiling(t.TotalSeconds));
+        return s >= 3600 ? $"{s / 3600}:{s / 60 % 60:00}:{s % 60:00}" : $"{s / 60}:{s % 60:00}";
+    }
+
+    /// <summary>A pin's flyout: the tool's name (a press opens the whole tool), its pin, and its quickest use.</summary>
+    public void OpenFlyout(string key)
+    {
+        if (flyout != null) { var same = flyoutKey == key; CloseFlyout(); if (same) return; }
+        if (ToolsCenter.KindOf(key) is not { } kind) return;
+        var anchor = Children.OfType<Button>().FirstOrDefault(b => System.Windows.Automation.AutomationProperties.GetName(b) == kind.Name);
+        var owner = Window.GetWindow(this);
+        void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files)
+        {
+            CloseFlyout();
+            ToolsCenter.PopUp(key, engine, owner, files, info);
+        }
+        var c = new ToolContext { Engine = engine, Key = key, Quick = true, Owner = owner, OpenFull = Full, Close = CloseFlyout };
+
+        var name = K.Subtle(K.H(4, K.Text(ToolsCenter.ShortName(key), Ty.BodyStrong), K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2)), () => Full(null, null), new Thickness(4, 2, 4, 2));
+        name.ToolTip = $"Open {kind.Name}";
+        var on = ToolsPins.IsPinned(key);
+        var pin = K.IconButton(on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24, () => { ToolsPins.Toggle(key); CloseFlyout(); }, on ? "Unpin from the title bar" : "Pin to the title bar", 16, 30);
+        var grow = K.IconButton(SymbolRegular.ArrowMaximize24, () => Full(null, null), $"Open {kind.Name} full size", 16, 30);
+        var head = K.Columns("auto, auto, *, auto, auto", K.IconTile(kind.Symbol, kind.Color, 28).Margin(0, 0, 10, 0).Col(0), name.Col(1), pin.Col(3), grow.Col(4));
+
+        FrameworkElement body;
+        if (ToolsCenter.Accepts(key) is { } filter)
+        {
+            var (title, sub, many) = key switch
+            {
+                "conv" => ("Click to add files", "Documents, PDFs, pictures and data, turned into one another.", true),
+                "pdfx" => ("Click to add PDFs", "Put PDFs together, pull pages out, or turn them.", true),
+                "mark" => ("Click to add a PDF", "Highlight, underline and add notes; saved in the PDF.", false),
+                _ => ("Click to add a picture", "The words in a picture or a scan, as text you can copy.", false),
+            };
+            body = ToolKit.DropZone(title, sub, filter, many, kind.Color, files => Full(null, files), height: 140);
+        }
+        else body = ToolRegistry.Quick(c) ?? K.Wrapped(ToolRegistry.Has(key) ? $"Open {kind.Name} to use it." : $"{kind.Name} is on its way to Simpl for Windows.", Ty.Body, B.Text2);
+
+        var card = new Border
+        {
+            Width = ToolsCenter.FlyoutWidth(key), Padding = new Thickness(16), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
+            Child = K.V(14, head, body), Margin = new Thickness(12, 4, 12, 20), Effect = K.Shadow(24, 6, 0.22),
+        };
+        card.Bg(B.Flyout);
+        card.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
+        card.SetResourceReference(TextElement.ForegroundProperty, B.Text);
+        flyout = new Popup
+        {
+            Child = card, StaysOpen = false, AllowsTransparency = true, PlacementTarget = (UIElement?)anchor ?? this,
+            Placement = PlacementMode.Bottom, HorizontalOffset = -12, PopupAnimation = PopupAnimation.None,
+        };
+        flyoutKey = key;
+        flyout.Closed += (_, _) => { if (flyout?.IsOpen != true) { flyout = null; flyoutKey = null; } };
+        flyout.IsOpen = true;
+        if (Motion.On)
+        {
+            var t = new TranslateTransform(0, -12);
+            card.RenderTransform = t;
+            card.Opacity = 0;
+            Motion.To(t, TranslateTransform.YProperty, 0, Motion.Medium, Motion.Decelerate);
+            Motion.To(card, OpacityProperty, 1, Motion.Fast);
+        }
+        card.Loaded += (_, _) => card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        Shot.Moved();
+    }
+
+    public void CloseFlyout()
+    {
+        if (flyout == null) return;
+        var f = flyout;
+        flyout = null;
+        flyoutKey = null;
+        f.IsOpen = false;
+    }
+}
+
+internal static class FontFeatureExtensions
+{
+    /// <summary>Figures of one width (a clock that does not shake as it counts).</summary>
+    public static void FontFeatures(this TextBlock t) => Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);
+}

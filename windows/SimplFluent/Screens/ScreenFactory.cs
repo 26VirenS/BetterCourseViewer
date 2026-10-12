@@ -11,6 +11,12 @@ public static class ScreenFactory
     public static Screen For(Engine.Engine engine, Place p) => p.Kind switch
     {
         PlaceKind.Dashboard => new DashboardScreen(engine),
+        PlaceKind.Todo => new TodoScreen(engine),
+        PlaceKind.Calendar => new CalendarScreen(engine),
+        PlaceKind.Notifications => new NotificationsScreen(engine),
+        PlaceKind.Search => new SearchScreen(engine, p.Arg ?? ""),
+        PlaceKind.ExternalTools => new ExternalToolsScreen(engine),
+        PlaceKind.Tools => new ToolsScreen(engine),
         _ => Native(engine, p) ?? new WebScreen(engine, engine.SchoolUrl(p), () => TitleOf(engine, p)),
     };
 
@@ -22,6 +28,7 @@ public static class ScreenFactory
         if (Registry.Route?.Invoke(engine, r) is { } s) return s;
         return r.Kind switch
         {
+            RouteKind.Topic => new TopicScreen(engine, r.A, r.B),
             RouteKind.Web => new WebScreen(engine, engine.Absolute(r.A), string.IsNullOrEmpty(r.B) ? engine.LmsName : r.B),
             _ => new WebScreen(engine, UrlOf(engine, r), TitleOf(r)),
         };

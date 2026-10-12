@@ -483,9 +483,9 @@ public static class K
     /// <summary>A flag's colour by its kind (the page's words: red, orange, green, blue, purple, gray).</summary>
     public static Color Tone(string? kind) => kind switch
     {
-        "red" or "late" or "missing" or "danger" => Color.FromRgb(0xe8, 0x4a, 0x3f),
+        "red" or "late" or "missing" or "danger" or "bad" => Color.FromRgb(0xe8, 0x4a, 0x3f),
         "orange" or "warn" or "warning" => Color.FromRgb(0xf7, 0x8c, 0x1a),
-        "green" or "ok" or "done" or "success" => Color.FromRgb(0x2f, 0xa8, 0x4f),
+        "green" or "ok" or "done" or "success" or "good" => Color.FromRgb(0x2f, 0xa8, 0x4f),
         "blue" or "info" => Color.FromRgb(0x29, 0x7b, 0xe6),
         "purple" => Color.FromRgb(0x8e, 0x5c, 0xd9),
         "yellow" => Color.FromRgb(0xd8, 0xa8, 0x00),

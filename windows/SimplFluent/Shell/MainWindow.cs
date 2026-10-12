@@ -162,6 +162,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.SettingsRequested += OpenSettings;
         engine.WhatsNewRequested += d => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); };
         engine.SetupRequested += () => SetupSheet.Show(engine, this);
+        engine.NewTaskRequested += () =>
+        {
+            if (Simpl.Screens.CalendarScreen.TakeNewTaskDay() is { } day) Simpl.Screens.NewTaskSheet.StartDay = day;
+            Simpl.Screens.NewTaskSheet.Show(engine, this);
+        };
         Bridge.Shared.OpenSettingsRequested += OpenSettings;
         // (pictures in the school's rich text come with its session)
         var e0 = engine;
@@ -281,12 +286,17 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         // (a sheet over the window: the page, a window of its own, steps aside meanwhile)
         if (sheets.IsOpen && pageArea.Visibility == Visibility.Visible) pageArea.Visibility = Visibility.Hidden;
         shell?.SheetOpen(sheets.IsOpen);
-        trailing.Content = engine.Phase != Phase.Native && !login.Covers && login.OnSchoolPage && !login.Handoff ? StartOverButton() : null;
+        var app = engine.Phase == Phase.Native && !login.Covers;
+        trailing.Content = !app && login.OnSchoolPage && !login.Handoff ? StartOverButton() : app ? Pins() : null;
         UpdateTitleButtons();
         if (login.AskStay && !stayAsked) AskStay();
     }
 
     private FrameworkElement? startOver;
+    private Simpl.Tools.PinBar? pins;
+
+    /// <summary>The tools pinned to the title bar, while the app shows.</summary>
+    private FrameworkElement? Pins() => engine == null ? null : pins ??= new Simpl.Tools.PinBar(engine);
 
     private FrameworkElement StartOverButton()
     {

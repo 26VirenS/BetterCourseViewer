@@ -25,6 +25,9 @@ public abstract class Screen
     /// <summary>A line under the title (a date, a course's term), or null.</summary>
     public virtual string? Subtitle => null;
 
+    /// <summary>Breadcrumb parts of the screen's own before its title (the Tools page's "Tools" before a tool open on it).</summary>
+    public virtual IReadOnlyList<(string Title, Action Go)> Before => Array.Empty<(string, Action)>();
+
     /// <summary>The commands beside the title (a view picker, New Task), or null.</summary>
     public virtual FrameworkElement? Commands => null;
 

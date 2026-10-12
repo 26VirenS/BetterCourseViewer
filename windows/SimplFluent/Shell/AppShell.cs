@@ -377,6 +377,7 @@ public sealed class AppShell : Grid, IDisposable
                 crumbs.Add((t, () => engine.SetPath(loc.Path.Take(n).ToList())));
             }
         }
+        foreach (var (t, go) in current.Before) crumbs.Add((t, go));
         crumbs.Add((current.Title, null));
         var line = new WrapPanel { Orientation = Orientation.Horizontal };
         for (var i = 0; i < crumbs.Count; i++)
