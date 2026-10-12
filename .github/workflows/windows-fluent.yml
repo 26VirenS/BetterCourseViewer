@@ -138,6 +138,11 @@ jobs:
           # Search, External Tools, Tools (pins in the title bar, a pin's flyout, a tool open), a discussion
           Shot 'search' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'search:discussion'))
           Shot 'search-start' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'search'))
+          Shot 'palette-commands' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'palette:/'))
+          Shot 'palette-course' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'palette:phys'))
+          Shot 'palette-sum' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'palette:12*4'))
+          Shot 'palette-grades' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'palette:/grades_'))
+          Shot 'palette-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--pane-open', '--open', 'palette:/'))
           Shot 'external-tools' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'externaltools'))
           Shot 'tools' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--pin', 'calc,ptable,pomo'))
           Shot 'tools-pin' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable,pomo', '--pin-open', 'calc'))

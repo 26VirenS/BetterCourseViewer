@@ -37,6 +37,7 @@ public sealed class AppShell : Grid, IDisposable
     private readonly ContentControl paneScene = new() { Focusable = false, IsHitTestVisible = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
     private readonly ContentControl account = new() { Focusable = false };
     private readonly TextBox searchBox;
+    private readonly SearchPalette palette;
     private readonly Grid header = new();
     private readonly ContentControl titleHost = new() { Focusable = false };
     private readonly ContentControl commandsHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
@@ -69,13 +70,9 @@ public sealed class AppShell : Grid, IDisposable
             PlaceholderText = $"Search {engine.LmsName}", Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, IconPlacement = ElementPlacement.Right,
             ClearButtonEnabled = false, Margin = new Thickness(16, 4, 16, 12), MinHeight = 34,
         };
-        searchBox.KeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Enter) return;
-            engine.Search(searchBox.Text);
-            e.Handled = true;
-            if (narrow) ClosePane();
-        };
+        // (its suggestions and commands as you type, the Mac's SearchPalette: Enter runs the one chosen, or searches)
+        palette = SearchPalette.Attach(searchBox, engine, window);
+        palette.Ran += () => { if (narrow) ClosePane(); };
         var navScroll = new ScrollViewer { Content = nav, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 0, 8) };
         var settingsRow = K.Subtle(K.Columns("auto, *", K.Icon(SymbolRegular.Settings24, 16, Color.FromRgb(0x76, 0x76, 0x7c), filled: true).Col(0), K.Text("Settings", Ty.Body).Margin(14, 0, 0, 0).Col(1)),
             window.OpenSettings, new Thickness(12, 0, 8, 0));
@@ -412,6 +409,7 @@ public sealed class AppShell : Grid, IDisposable
 
     public bool Escape()
     {
+        if (palette.Escape()) return true;
         if (paneOpen) { ClosePane(); return true; }
         if (WorkPreview.IsOpen) { WorkPreview.Close(); return true; }
         return current?.Escape() == true;
@@ -508,8 +506,16 @@ public sealed class AppShell : Grid, IDisposable
         };
     }
 
+    /// <summary>The search box's commands (Ctrl+K), the pane opened for it on a narrow window.</summary>
+    public void OpenCommands()
+    {
+        if (narrow && !paneOpen) OpenPane();
+        palette.OpenCommands();
+    }
+
     public void Dispose()
     {
+        palette.Dispose();
         engine.PropertyChanged -= OnEngine;
         FilePreview.Shared.PropertyChanged -= OnFile;
         current?.Hide();

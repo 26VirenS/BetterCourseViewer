@@ -30,8 +30,6 @@ public sealed class SearchScreen : Screen
     private int generation;
     /// <summary>One kind of result alone (its chip pressed); null for all of them.</summary>
     private string? only;
-    /// <summary>A kind asked for with its words (a command's own box): shown alone once its answer is in.</summary>
-    private string? onlyNext;
 
     public SearchScreen(Engine.Engine engine, string query) : base(engine) => this.query = (query ?? "").Trim();
 
@@ -95,7 +93,6 @@ public sealed class SearchScreen : Screen
         answered = q;
         data = d ?? new SearchData();
         fresh = true;
-        if (onlyNext != null) { only = data.Groups.Any(g => g.Title == onlyNext) ? onlyNext : only; onlyNext = null; }
         HeaderChange();
         Render();
     }
@@ -221,79 +218,26 @@ public sealed class SearchScreen : Screen
 
     // ---- the commands ----
 
-    /// <summary>The commands whose names the words start, over the results (none for words that start none).</summary>
+    /// <summary>The commands whose names the words start, over the results (none for words that start none) — the search
+    /// box's own (the Mac's SearchPalette.commandItems), each a press away.</summary>
     private FrameworkElement? Actions(string words)
     {
-        var items = SearchCommands.For(words, engine);
+        // (one that takes something gets the words with it: "Discussions" puts "/discussion dis" in the box, its list)
+        var items = Shell.SearchPalette.CommandItems(words, engine)
+            .Select(i => i.Action.Do == Shell.PaletteDo.Fill ? i with { Action = Shell.PaletteAction.Fill(i.Action.Text + words) } : i).ToList();
         if (items.Count == 0) return null;
-        return K.V(0, Heading.Section("Commands"), Pills(items, words));
+        return K.V(0, Heading.Section("Commands"), Pills(items));
     }
 
     /// <summary>Nothing typed yet: what Search finds, and every command, each a press away.</summary>
     private FrameworkElement Start()
     {
-        var intro = K.Wrapped($"Find courses, assignments, quizzes, announcements, pages, discussions, files and people in {engine.LmsName} — type in the search box and press Enter.", Ty.Body, B.Text2);
-        var items = SearchCommands.For("", engine);
-        return K.V(26, intro, K.V(0, Heading.Section("Commands"), Pills(items, "")));
+        var intro = K.Wrapped($"Find courses, assignments, quizzes, announcements, pages, discussions, files and people in {engine.LmsName} — or type / in the search box for a command.", Ty.Body, B.Text2);
+        return K.V(26, intro, K.V(0, Heading.Section("Commands"), Pills(Shell.SearchPalette.CommandItems("", engine))));
     }
 
-    private FrameworkElement Pills(List<SearchCommand> items, string words) =>
-        new MoreGrid(230, 10, items.Select(c => (UIElement)Pill(c, words)), stretch: true);
-
-    /// <summary>A command as a card a press runs: its symbol in the accent, its name, its shortcut.</summary>
-    private Button Pill(SearchCommand c, string words)
-    {
-        var g = K.Columns("auto, *, auto",
-            K.Icon(c.Symbol, 16, B.AccentText).Margin(0, 0, 10, 0).Col(0),
-            K.Text(c.Title, Ty.Body).Col(1));
-        if (c.Key != null) g.Children.Add(K.Text(c.Key, Ty.Caption, B.Text2).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(2));
-        var b = K.CardButton(g, () => Press(c, words), 6, new Thickness(14, 9, 14, 10));
-        b.ToolTip = c.Hint.Length > 0 ? c.Hint : c.Title;
-        System.Windows.Automation.AutomationProperties.SetName(b, c.Title);
-        return b;
-    }
-
-    /// <summary>
-    /// A command pressed: it runs. One that takes something does the nearest the window can without the Mac's field of
-    /// suggestions — a kind of result shown alone for the words (its own box asks for them when there are none), the
-    /// words searched, All Courses for a course, To Do for what is due, New Task for a task.
-    /// </summary>
-    private void Press(SearchCommand c, string words)
-    {
-        if (!c.Fills) { c.Act?.Invoke(); return; }
-        switch (c.Takes)
-        {
-            case CommandTakes.Kinds:
-                if (words.Length > 0 && data != null) { Choose(c.Kinds.FirstOrDefault()); return; }
-                AskWords(c);
-                return;
-            case CommandTakes.Words:
-                if (words.Length > 0) { stale = true; Refresh(); return; }
-                AskWords(c);
-                return;
-            default:
-                c.Act?.Invoke();
-                return;
-        }
-    }
-
-    /// <summary>The words for a command that finds something (the Mac's "/assignment " in the field): a box of its own.</summary>
-    private void AskWords(SearchCommand c)
-    {
-        var box = new TextBox { PlaceholderText = c.Hint, Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, IconPlacement = ElementPlacement.Right, MinHeight = 34 };
-        var sheet = new Sheet { Title = c.Title, Body = box, Width = 420 };
-        var go = sheet.Add("Search", SheetButtonKind.Primary, () =>
-        {
-            var w = box.Text.Trim();
-            if (w.Length == 0) return;
-            onlyNext = c.Kinds.FirstOrDefault();
-            engine.Search(w);
-        });
-        sheet.Add("Cancel", SheetButtonKind.Close);
-        box.TextChanged += (_, _) => go.Enabled = box.Text.Trim().Length > 0;
-        box.Loaded += (_, _) => go.Enabled = box.Text.Trim().Length > 0;
-        Shell.Dialogs.Show(sheet, Window.GetWindow(View));
-    }
+    private static FrameworkElement Pills(IReadOnlyList<Shell.PaletteItem> items) =>
+        new MoreGrid(230, 10, items.Select(Shell.SearchPalette.CommandPill), stretch: true);
 }
 
 /// <summary>

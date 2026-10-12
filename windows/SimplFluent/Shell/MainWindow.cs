@@ -377,7 +377,21 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (ctrl && e.Key == Key.OemComma) { OpenSettings(); e.Handled = true; return; }
         if (ctrl && e.Key == Key.R || e.Key == Key.F5) { engine?.Refresh(); e.Handled = true; return; }
         if (ctrl && e.Key == Key.F) { shell?.FocusSearch(); e.Handled = true; return; }
-        if (ctrl && (Keyboard.Modifiers & ModifierKeys.Shift) != 0 && e.Key == Key.N) { engine?.AskNewMessage(); e.Handled = true; return; }
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (ctrl && e.Key == Key.K) { shell?.OpenCommands(); e.Handled = true; return; }
+        if (ctrl && shift && e.Key == Key.N) { if (engine is { OnBrightspace: false }) engine.AskNewMessage(); e.Handled = true; return; }
+        // (the Mac's ⌘1–⌘7: the pane's places in order)
+        if (ctrl && !shift && engine != null && e.Key is >= Key.D1 and <= Key.D7)
+        {
+            Place? p = (e.Key - Key.D1) switch
+            {
+                0 => Place.Dashboard, 1 => Place.Todo, 2 => Place.Calendar, 3 => Place.Grades, 4 => Place.Notifications,
+                5 => engine.OnBrightspace ? null : Place.Inbox, _ => Place.Tools,
+            };
+            if (p != null) engine.Go(p);
+            e.Handled = true;
+            return;
+        }
         if (ctrl && e.Key == Key.N) { engine?.AskNewTask(); e.Handled = true; }
     }
 
