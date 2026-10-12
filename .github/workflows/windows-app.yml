@@ -48,20 +48,27 @@ jobs:
       - name: Pictures
         shell: pwsh
         run: |
+          # a display big enough for a window the size of the user's (the runner's is 1024 × 768 unless it can be set)
+          try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
           New-Item -ItemType Directory -Force shots | Out-Null
-          function Shot($name, $wait, $extra) {
+          function Shot($name, $size, $wait, $extra) {
             $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
-            $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', "$wait", '--profile', $prof, '--window-size', '1360x860') + $extra
+            $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', "$wait", '--profile', $prof, '--window-size', $size) + $extra
             $p = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
             if (-not $p.WaitForExit(($wait + 40) * 1000)) { Stop-Process -Id $p.Id -Force; Write-Host "$name did not finish" }
             if (Test-Path "shots/$name.png") { Write-Host "shot $name" } else { Write-Host "no picture: $name" }
           }
           $mock = @('--base-url', 'http://localhost:8800', '--demo')
-          Shot 'dashboard-dark' 45 ($mock + @('--appearance', 'dark'))
-          Shot 'dashboard-light' 45 ($mock + @('--appearance', 'light'))
-          Shot 'dashboard-cards' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'cards'))
-          Shot 'todo' 35 ($mock + @('--appearance', 'dark', '--place', 'todo'))
-          Shot 'school-picker' 10 @('--appearance', 'dark')
+          # the Mac's own pictures are 1024 × 681 (its CI); the user's window is 1366 × 778
+          Shot 'dashboard-dark' '1024x681' 45 ($mock + @('--appearance', 'dark'))
+          Shot 'dashboard-light' '1024x681' 45 ($mock + @('--appearance', 'light'))
+          Shot 'dashboard-dark-wide' '1366x778' 45 ($mock + @('--appearance', 'dark'))
+          Shot 'dashboard-light-wide' '1366x778' 45 ($mock + @('--appearance', 'light'))
+          Shot 'dashboard-counter' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next'))
+          Shot 'dashboard-cards-wide' '1366x778' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'cards'))
+          Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'activity'))
+          Shot 'dashboard-narrow' '780x683' 45 ($mock + @('--appearance', 'light'))
+          Shot 'school-picker' '1024x681' 10 @('--appearance', 'dark')
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
             $log = Join-Path $_.FullName 'simpl.log'
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 30 }

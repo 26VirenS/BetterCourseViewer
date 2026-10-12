@@ -13,7 +13,7 @@ public static class Glyphs
         ["bell"] = "", ["tray"] = "", ["wrench.and.screwdriver"] = "", ["puzzlepiece.extension"] = "",
         ["books.vertical"] = "", ["person.2"] = "", ["house"] = "",
         // the toolbar and common actions
-        ["magnifyingglass"] = "", ["chevron.left"] = "", ["chevron.right"] = "", ["chevron.down"] = "",
+        ["magnifyingglass"] = "", ["chevron.left"] = "", ["chevron.right"] = "", ["chevron.down"] = "",
         ["chevron.up"] = "", ["arrow.clockwise"] = "", ["plus"] = "", ["ellipsis"] = "",
         ["ellipsis.circle"] = "", ["gearshape"] = "", ["xmark"] = "", ["sidebar.left"] = "",
         ["square.and.arrow.up"] = "", ["arrow.up.forward"] = "", ["arrow.up.right.square"] = "",
@@ -36,6 +36,10 @@ public static class Glyphs
         ["rectangle.stack"] = "", ["questionmark.square"] = "", ["checkmark.square"] = "",
         ["text.book.closed"] = "", ["calendar.badge.clock"] = "", ["envelope"] = "",
         ["video"] = "", ["photo"] = "", ["music.note"] = "", ["globe"] = "",
+        // the Dashboard and the sidebar's more
+        ["chart.bar"] = "\uE9D2", ["checkmark.seal"] = "\uE930", ["tray.and.arrow.up"] = "\uE898", ["textformat"] = "\uE8D2",
+        ["building.2"] = "\uE80F", ["person.3.sequence"] = "\uE716", ["square.stack.3d.up"] = "\uE8FD", ["arrow.left"] = "\uE72B",
+        ["arrow.right"] = "\uE72A", ["chevron.left.small"] = "\uE76B", ["chevron.right.small"] = "\uE76C",
     };
 
     public static string Of(string? symbol) =>
@@ -57,6 +61,19 @@ public static class Glyphs
         "syllabus" => "text.book.closed",
         "groups" => "person.2",
         "calendar" => "calendar",
+        _ => "doc",
+    });
+
+    /// <summary>An item of the school's recent activity by its type (the Mac's DashGlyph.activity).</summary>
+    public static string Activity(string? type) => Of(type switch
+    {
+        "Announcement" => "megaphone",
+        "DiscussionTopic" => "bubble.left.and.bubble.right",
+        "Conversation" => "envelope",
+        "Message" => "bell",
+        "Submission" => "checkmark.seal",
+        "Conference" or "WebConference" => "video",
+        "Collaboration" or "AssessmentRequest" => "person.2",
         _ => "doc",
     });
 

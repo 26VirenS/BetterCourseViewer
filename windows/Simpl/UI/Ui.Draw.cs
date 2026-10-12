@@ -13,7 +13,7 @@ public sealed partial class Ui
     private GlassRenderer? glass;
     private ID2D1SolidColorBrush? brush;
     private readonly Dictionary<Font, IDWriteTextFormat> formats = new();
-    private readonly Dictionary<(string, Font, int, int, int), (IDWriteTextLayout Layout, long Used)> layouts = new();
+    private readonly Dictionary<(string, Font, int, int, int, bool), (IDWriteTextLayout Layout, long Used)> layouts = new();
     private string? iconFace;
     private IDWriteInlineObject? ellipsis;
     public string? GlassError { get; private set; }
@@ -95,6 +95,72 @@ public sealed partial class Ui
         });
     }
 
+    /// <summary>A rectangle fading from one colour at its top to another at its bottom (a scroll edge under the toolbar, a hero's shade).</summary>
+    public void FillGradientV(R r, Color4 top, Color4 bottom)
+    {
+        Draw(() =>
+        {
+            var stops = new[] { new GradientStop { Position = 0, Color = top }, new GradientStop { Position = 1, Color = bottom } };
+            using var coll = D.CreateGradientStopCollection(stops);
+            using var b = D.CreateLinearGradientBrush(new LinearGradientBrushProperties { StartPoint = new Vector2(r.X, r.Y), EndPoint = new Vector2(r.X, r.Bottom) }, coll);
+            D.FillRectangle(r.Raw, b);
+        });
+    }
+
+    /// <summary>A rounded rectangle filled with a gradient running from its top left to its bottom right (a course card's hero).</summary>
+    public void FillGradient(R r, float radius, Color4 from, Color4 to, bool topOnly = false)
+    {
+        Draw(() =>
+        {
+            var stops = new[] { new GradientStop { Position = 0, Color = from }, new GradientStop { Position = 1, Color = to } };
+            using var coll = D.CreateGradientStopCollection(stops);
+            using var b = D.CreateLinearGradientBrush(new LinearGradientBrushProperties { StartPoint = new Vector2(r.X, r.Y), EndPoint = new Vector2(r.Right, r.Bottom) }, coll);
+            if (topOnly)
+            {
+                // round at the top, square at the bottom: the shape clipped under a taller one
+                using var geo = Shape(new R(r.X, r.Y, r.W, r.H + radius * 2), radius);
+                D.PushAxisAlignedClip(r.Raw, AntialiasMode.PerPrimitive);
+                D.FillGeometry(geo, b);
+                D.PopAxisAlignedClip();
+            }
+            else
+            {
+                using var geo = Shape(r, radius);
+                D.FillGeometry(geo, b);
+            }
+        });
+    }
+
+    /// <summary>A rectangle rounded at its top corners only (a tower, a hero), filled with a gradient from top to bottom.</summary>
+    public void FillTopRounded(R r, float radius, Color4 top, Color4 bottom)
+    {
+        Draw(() =>
+        {
+            var stops = new[] { new GradientStop { Position = 0, Color = top }, new GradientStop { Position = 1, Color = bottom } };
+            using var coll = D.CreateGradientStopCollection(stops);
+            using var b = D.CreateLinearGradientBrush(new LinearGradientBrushProperties { StartPoint = new Vector2(r.X, r.Y), EndPoint = new Vector2(r.X, r.Bottom) }, coll);
+            var rad = Math.Min(radius, Math.Min(r.W / 2, r.H));
+            using var geo = gpu!.D2dFactory.CreateRoundedRectangleGeometry(new RoundedRectangle { Rect = new RawRectF(r.X, r.Y, r.Right, r.Bottom + rad * 2), RadiusX = rad, RadiusY = rad });
+            D.PushAxisAlignedClip(r.Raw, AntialiasMode.PerPrimitive);
+            D.FillGeometry(geo, b);
+            D.PopAxisAlignedClip();
+        });
+    }
+
+    /// <summary>A dashed outline of a rectangle rounded at its top corners (a tower with no score yet).</summary>
+    public void DashedTopRounded(R r, float radius, Color4 c, float width)
+    {
+        Draw(() =>
+        {
+            var rad = Math.Min(radius, Math.Min(r.W / 2, r.H));
+            using var geo = gpu!.D2dFactory.CreateRoundedRectangleGeometry(new RoundedRectangle { Rect = new RawRectF(r.X + width / 2, r.Y + width / 2, r.Right - width / 2, r.Bottom + rad * 2), RadiusX = rad, RadiusY = rad });
+            using var style = gpu!.D2dFactory.CreateStrokeStyle(new StrokeStyleProperties { DashStyle = DashStyle.Custom, DashCap = CapStyle.Flat }, new[] { 4f / width, 3f / width });
+            D.PushAxisAlignedClip(r.Raw, AntialiasMode.PerPrimitive);
+            D.DrawGeometry(geo, Brush(c), width, style);
+            D.PopAxisAlignedClip();
+        });
+    }
+
     public void Line(float x0, float y0, float x1, float y1, Color4 c, float width = 1) =>
         Draw(() => D.DrawLine(new Vector2(x0, y0), new Vector2(x1, y1), Brush(c), width));
 
@@ -167,15 +233,16 @@ public sealed partial class Ui
     }
 
     /// <summary>The words laid out (kept a while: the same words are laid out once).</summary>
-    private IDWriteTextLayout Layout(string s, Font f, float maxW, TextAlignment align, int lines)
+    private IDWriteTextLayout Layout(string s, Font f, float maxW, TextAlignment align, int lines, bool strike = false)
     {
-        var key = (s, f, maxW >= 100000 ? -1 : (int)MathF.Round(maxW * 4), (int)align, lines);
+        var key = (s, f, maxW >= 100000 ? -1 : (int)MathF.Round(maxW * 4), (int)align, lines, strike);
         if (layouts.TryGetValue(key, out var e)) { layouts[key] = (e.Layout, frame); return e.Layout; }
         var w = maxW >= 100000 ? 100000 : Math.Max(1, maxW);
         var lineH = f.Size * 1.34f;
         var layout = gpu!.DWrite.CreateTextLayout(s, Format(f), w, lines > 0 ? lineH * lines + 1 : 100000);
         layout.TextAlignment = align;
         layout.WordWrapping = lines == 1 ? WordWrapping.NoWrap : WordWrapping.Wrap;
+        if (strike) layout.SetStrikethrough(true, new TextRange(0, (uint)s.Length));
         if (maxW < 100000)
         {
             ellipsis ??= gpu.DWrite.CreateEllipsisTrimmingSign(Format(f));
@@ -203,10 +270,10 @@ public sealed partial class Ui
     }
 
     /// <summary>Words at (x, y), their top; trimmed with … past maxW; returns their height.</summary>
-    public float Text(string s, float x, float y, Font f, Color4 c, float maxW = 100000, TextAlignment align = TextAlignment.Leading, int lines = 1)
+    public float Text(string s, float x, float y, Font f, Color4 c, float maxW = 100000, TextAlignment align = TextAlignment.Leading, int lines = 1, bool strike = false)
     {
         if (gpu == null || string.IsNullOrEmpty(s)) return f.Size * 1.34f;
-        var layout = Layout(s, f, maxW, align, lines);
+        var layout = Layout(s, f, maxW, align, lines, strike);
         Draw(() => D.DrawTextLayout(new Vector2(x, y), layout, Brush(c), DrawTextOptions.Clip));
         return Math.Max(layout.Metrics.Height, f.Size * 1.2f);
     }
@@ -219,13 +286,13 @@ public sealed partial class Ui
     }
 
     /// <summary>An icon (an SF Symbol's name, as Segoe Fluent Icons draws it) centred on (cx, cy).</summary>
-    public void Icon(string symbol, float cx, float cy, float size, Color4 c) => Glyph(Components.Glyphs.Of(symbol), cx, cy, size, c);
+    public void Icon(string symbol, float cx, float cy, float size, Color4 c, FontWeight weight = FontWeight.Regular) => Glyph(Components.Glyphs.Of(symbol), cx, cy, size, c, weight);
 
-    /// <summary>An icon by its glyph (Segoe Fluent Icons) centred on (cx, cy).</summary>
-    public void Glyph(string g, float cx, float cy, float size, Color4 c)
+    /// <summary>An icon by its glyph (Segoe Fluent Icons) centred on (cx, cy). A heavier weight is the face's own if it has one, else drawn a little heavier.</summary>
+    public void Glyph(string g, float cx, float cy, float size, Color4 c, FontWeight weight = FontWeight.Regular)
     {
         if (g.Length == 0 || iconFace == null) { Circle(cx, cy, size * 0.16f, c); return; }
-        var f = new Font(iconFace, size);
+        var f = new Font(iconFace, size, weight >= FontWeight.SemiBold ? FontWeight.SemiBold : FontWeight.Regular);
         var layout = Layout(g, f, size * 2, TextAlignment.Center, 1);
         var m = layout.Metrics;
         Draw(() => D.DrawTextLayout(new Vector2(cx - size, cy - m.Height / 2), layout, Brush(c)));

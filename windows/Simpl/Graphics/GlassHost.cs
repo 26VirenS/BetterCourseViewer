@@ -20,6 +20,9 @@ public sealed class GlassHost : HwndHost
     public readonly Ui Ui = new();
     /// <summary>The window's screens, a frame of them.</summary>
     public Action<Ui>? Build;
+    /// <summary>Whether a point (DIPs) belongs to the window's chrome — its title bar's drag area, its edges, its caption buttons — rather than the screens.</summary>
+    public Func<Vector2, bool>? Chrome;
+
     /// <summary>The colour under everything.</summary>
     public Func<Color4> Ground = () => new Color4(0.08f, 0.08f, 0.09f, 1);
     public Gpu? Gpu { get; private set; }
@@ -137,8 +140,18 @@ public sealed class GlassHost : HwndHost
         switch (msg)
         {
             case 0x0084: // WM_NCHITTEST
+            {
+                // the title bar's band (the toolbar's) with no control under the pointer, and the window's edges: the
+                // window's own (a drag moves it, its edges size it, its caption buttons answer)
                 handled = true;
+                var sx = (short)(lParam.ToInt64() & 0xffff);
+                var sy = (short)((lParam.ToInt64() >> 16) & 0xffff);
+                var pt = new POINT { X = sx, Y = sy };
+                ScreenToClient(h, ref pt);
+                var p = new Vector2(pt.X / scale, pt.Y / scale);
+                if (Chrome != null && Chrome(p)) return (IntPtr)(-1); // HTTRANSPARENT
                 return (IntPtr)1; // HTCLIENT
+            }
             case 0x0014: // WM_ERASEBKGND
                 handled = true;
                 return (IntPtr)1;
@@ -238,6 +251,9 @@ public sealed class GlassHost : HwndHost
     private struct RECT { public int Left, Top, Right, Bottom; }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X, Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct TRACKMOUSEEVENT { public uint cbSize, dwFlags; public IntPtr hwndTrack; public uint dwHoverTime; }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern ushort RegisterClassExW(ref WNDCLASSEX wc);
@@ -245,6 +261,7 @@ public sealed class GlassHost : HwndHost
     [DllImport("user32.dll")] private static extern IntPtr DefWindowProcW(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr h);
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] private static extern bool ScreenToClient(IntPtr h, ref POINT p);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr h);
     [DllImport("user32.dll")] private static extern IntPtr SetCapture(IntPtr h);
     [DllImport("user32.dll")] private static extern bool ReleaseCapture();

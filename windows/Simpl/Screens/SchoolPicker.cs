@@ -67,7 +67,7 @@ public sealed class SchoolPicker
         foreach (var s in results.Take(60))
         {
             var r = new R(vp.X, ry, vp.W, 52);
-            var i = ui.Row("school:" + s.Id, r, false, 12);
+            var i = ui.RowWash("school:" + s.Id, r, 12);
             ui.Icon("graduationcap", r.X + 22, r.CenterY, 16, t.Accent);
             ui.Text(s.Name, r.X + 44, r.Y + 7, Theme.Body, t.Ink(), r.W - 56);
             ui.Text(s.Domain, r.X + 44, r.Y + 28, Theme.Footnote, t.Ink2, r.W - 56);
@@ -80,7 +80,7 @@ public sealed class SchoolPicker
             else if (SchoolSearch.AddressLike(text) is { } addr)
             {
                 var r = new R(vp.X, ry, vp.W, 52);
-                if (ui.Row("school:addr", r, false, 12).Clicked) { picked(addr); return; }
+                if (ui.RowWash("school:addr", r, 12).Clicked) { picked(addr); return; }
                 ui.Icon("globe", r.X + 22, r.CenterY, 16, t.Accent);
                 ui.Text($"Open {addr}", r.X + 44, r.CenterY - 10, Theme.Body, t.Ink(), r.W - 56);
                 ry += 54;

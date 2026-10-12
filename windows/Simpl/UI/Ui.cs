@@ -201,6 +201,16 @@ public sealed partial class Ui
 
     public bool Hovered(string id) => hot == id;
 
+    /// <summary>The height of the band at the top the window's title bar shares with the toolbar (DIPs).</summary>
+    public const float Caption = 52;
+
+    /// <summary>Whether a control (of the frame before) is at a point — what the window asks before it lets a drag of its title bar through.</summary>
+    public bool HitsAt(Vector2 p)
+    {
+        foreach (var h in hits) if (h.Rect.Contains(p)) return true;
+        return false;
+    }
+
     // ---- springs and kept state ----
 
     public Spring S(string id, float value, float response = 0.34f, float damping = 0.86f)
@@ -227,11 +237,16 @@ public sealed partial class Ui
 
     // ---- glass ----
 
+    /// <summary>What shadow a shape of glass throws: none, a card's hairline of one, or a floating panel's.</summary>
+    public enum Shadow { None, Card, Panel }
+
     /// <summary>
-    /// A shape of glass in the current layer, reading what the layers under it drew: a panel or a card (frosted; tinted
-    /// toward a colour by tintWeight), or a lens. A panel takes the clicks over it that nothing on it takes.
+    /// A shape of glass in the current layer, reading what the layers under it drew. A panel or a card (frosted) is
+    /// the Mac's: untinted, it is all but the page it sits on (a shade lighter by day, darker by night, as the Mac's
+    /// cards measure); tinted — the Mac's .tint(colour.opacity(opacity)) — it lifts toward the colour. A lens is a
+    /// knob's or a thumb's. A panel takes the clicks over it that nothing on it takes.
     /// </summary>
-    public void Glass(R r, float radius, GlassKind kind = GlassKind.Panel, Color4? tint = null, float tintWeight = 0, float keep = -1, float power = 1)
+    public void Glass(R r, float radius, GlassKind kind = GlassKind.Panel, Color4? tint = null, float tintOpacity = 0, Shadow shadow = Shadow.Card, float power = 1)
     {
         var k = Scale;
         var l = new GlassLook
@@ -248,26 +263,37 @@ public sealed partial class Ui
         };
         l.Squircle = GlassStyle.Corners(l.Hw, l.Hh, ref l.Radius);
         var minHalf = Math.Min(l.Hw, l.Hh);
-        var big = minHalf / k > 50;
         var frosted = kind == GlassKind.Panel;
         if (frosted)
         {
             l.Frost = Math.Clamp(GlassStyle.FrostSigma / 3, 0, 1);
             l.Pull = Math.Min(GlassStyle.Pull * k, minHalf * 1.2f);
             l.Band = Math.Min(GlassStyle.Band * k, minHalf * 0.6f);
-            l.Keep = keep >= 0 ? keep : 1 - GlassStyle.Lift;
-            var grey = T.Dark ? 0.55f : 0.97f;
-            var c = tint ?? new Color4(grey, grey, grey, 1);
-            var w = tint == null ? 0 : tintWeight;
-            l.R = grey + (c.R - grey) * w;
-            l.G = grey + (c.G - grey) * w;
-            l.B = grey + (c.B - grey) * w;
             l.Saturation = GlassStyle.Saturation;
             l.Dispersion = GlassStyle.Dispersion;
             l.Rim = GlassStyle.Rim;
-            l.Shadow = big ? (T.Dark ? 0.35f : 0.16f) : (T.Dark ? 0.16f : 0.07f);
-            l.ShadowBlur = (big ? 30f : 6f) * k;
-            l.ShadowY = (big ? 8f : 2f) * k;
+            var w = tint == null ? 0 : Math.Min(1, tintOpacity * (T.Dark ? 2.5f : 2.0f));
+            if (w <= 0.001f)
+            {
+                // the Mac's untinted card: the page, a shade apart
+                l.Keep = T.Dark ? 0.9f : 0.45f;
+                l.R = l.G = l.B = T.Dark ? 0 : 1;
+            }
+            else
+            {
+                l.Keep = 1 - GlassStyle.Lift;
+                var grey = (T.Dark ? 0.55f : 0.97f) * (1 - w);
+                var c = tint!.Value;
+                l.R = grey + (c.R - grey) * w;
+                l.G = grey + (c.G - grey) * w;
+                l.B = grey + (c.B - grey) * w;
+            }
+            switch (shadow)
+            {
+                case Shadow.Panel: l.Shadow = 0.18f; l.ShadowBlur = 24 * k; l.ShadowY = 10 * k; break;
+                case Shadow.Card: l.Shadow = T.Dark ? 0.2f : 0.05f; l.ShadowBlur = 3 * k; l.ShadowY = 1 * k; break;
+                default: l.Shadow = 0; l.ShadowBlur = k; break;
+            }
         }
         else
         {
