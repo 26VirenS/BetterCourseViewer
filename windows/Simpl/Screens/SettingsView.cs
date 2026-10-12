@@ -75,6 +75,7 @@ public sealed class SettingsView
     private bool versionsOpen;
     private string? versionsProblem;
     private bool versionsAsked;
+    private bool scrolledAsAsked;
 
     public SettingsView(Engine.Engine engine, GlassHost host, Window window, string? tab)
     {
@@ -101,6 +102,11 @@ public sealed class SettingsView
         // the content, scrolling under the strip
         var top = TitleBar + Strip;
         var vp = new R(0, top, ui.W, ui.H - top);
+        if (!scrolledAsAsked && Launch.Get("settings-scroll") is { } asked) // (the screenshot suite: a pane scrolled down)
+        {
+            scrolledAsAsked = true;
+            if (float.TryParse(asked, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var to)) ui.ScrollTo("settings:" + Tabs[Tab].Key, to);
+        }
         var off = ui.BeginScroll("settings:" + Tabs[Tab].Key, vp);
         var y = top + 24 - off;
         var x = 20f;
@@ -147,7 +153,8 @@ public sealed class SettingsView
             }
             else if (hover > 0.01f) ui.Fill(r, 8, t.Primary(0.04f * hover));
             var ink = on ? t.Accent : t.Ink2;
-            ui.Icon(Tabs[k].Icon, r.CenterX, r.Y + 17, 21, ink);
+            if (Tabs[k].Icon == "arrow.down.circle") ui.CircledIcon("arrow.down", r.CenterX, r.Y + 17, 21, ink);
+            else ui.Icon(Tabs[k].Icon, r.CenterX, r.Y + 17, 21, ink);
             if (Tabs[k].Icon == "bell.badge") ui.Circle(r.CenterX + 7, r.Y + 9, 3.2f, ink); // (the bell's badge)
             ui.Text(Tabs[k].Title, r.X, r.Y + 32, Theme.Caption2, ink, r.W, TextAlignment.Center);
             if (i.Clicked && !on)
@@ -669,11 +676,17 @@ public sealed class SettingsView
             y = box.Bottom;
         }
         y += 24;
-        // (always here, signed in or not: the way out of anything)
-        box = new R(x, y, w, Row2H + 6);
+        // (always here, signed in or not: the way out of anything; its words wrap beside the button, as the Mac's do)
+        var resetW = ui.FormButtonWidth("Reset Everything…");
+        var resetNote = "Erases everything Simpl keeps on this PC, signs you out and restarts Simpl.";
+        var noteW = w - 2 * Inset - resetW - 16;
+        var noteH = ui.Measure(resetNote, Theme.Callout, noteW, 0).Y;
+        var rowH = Math.Max(Row2H + 6, 10 + 20 + noteH + 10);
+        box = new R(x, y, w, rowH);
         BoxBehind(ui, box);
-        Label(ui, x, y + (Row2H + 6) / 2, "Reset", "Erases everything Simpl keeps on this PC, signs you out and restarts Simpl.", w - 170);
-        if (ui.FormButton("set:d:reset", x + w - Inset - ui.FormButtonWidth("Reset Everything…"), y + (Row2H + 6) / 2, "Reset Everything…", enabled: !busy))
+        ui.Text("Reset", x + Inset, y + 10, Theme.Body, t.Ink());
+        ui.Text(resetNote, x + Inset, y + 30, Theme.Callout, t.Ink2, noteW, TextAlignment.Leading, 0);
+        if (ui.FormButton("set:d:reset", x + w - Inset - resetW, y + rowH / 2, "Reset Everything…", enabled: !busy))
             Alerts.Confirm("Erase everything and restart Simpl?", $"Your settings, grade history, goals, saved pages, reminders and {engine.LmsName} sign-in are erased from this PC. Simpl then restarts as if it were new. This can’t be undone.", "Erase and Restart", () => _ = EraseAll.Run(engine), owner: host);
         return box.Bottom;
     }

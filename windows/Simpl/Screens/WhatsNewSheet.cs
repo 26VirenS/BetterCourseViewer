@@ -32,8 +32,9 @@ public sealed class WhatsNewSheet
         const float w = 500;
         var h = Math.Min(560, ui.H - 124);
         var card = new R(MathF.Round((ui.W - w) / 2), MathF.Round((ui.H - h) / 2), w, h);
+        // (the Mac's sheet is a solid material: the page does not ghost through its words)
         ui.Glass(card, 14, GlassKind.Panel, null, 0, Ui.Shadow.Panel);
-        ui.Fill(card, 14, Theme.WithAlpha(t.Card, t.Dark ? 0.6f : 0.85f));
+        ui.Fill(card, 14, Theme.WithAlpha(t.Card, t.Dark ? 0.94f : 0.97f));
 
         // the head: the icon in its tile, the title, the version
         var y = card.Y + 34;
@@ -71,7 +72,12 @@ public sealed class WhatsNewSheet
                     _ => ("arrow.up.circle", t.Accent),
                 };
                 ui.Fill(new R(lx, ly + 2, 30, 30), 15, Theme.WithAlpha(colour, 0.14f));
-                ui.Icon(symbol, lx + 15, ly + 17, 13, colour, FontWeight.SemiBold);
+                switch (symbol)
+                {
+                    case "sparkles": ui.Sparkles(lx + 15, ly + 17, 16, colour); break;
+                    case "arrow.up.circle": ui.CircledIcon("arrow.up", lx + 15, ly + 17, 15, colour); break;
+                    default: ui.Icon(symbol, lx + 15, ly + 17, 13, colour, FontWeight.SemiBold); break;
+                }
                 ui.Text(n.Title, lx + 44, ly, Theme.Semibold(Theme.Body), t.Ink(), lw - 44);
                 var bh = ui.Text(n.Body ?? "", lx + 44, ly + 21, Theme.Callout, t.Ink2, lw - 44, TextAlignment.Leading, 0);
                 ly += 21 + Math.Max(bh, 18) + 14;

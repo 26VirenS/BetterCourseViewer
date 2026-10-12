@@ -76,10 +76,12 @@ jobs:
           Shot 'school-picker' '1024x681' 10 @('--appearance', 'dark')
           # the account menu, What's New, and the Settings window (pictured alone, as the Mac's is) on each of its tabs
           Shot 'account-menu' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'menu'))
-          Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
+          Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'whatsnew'))
+          Shot 'whats-new-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
           foreach ($tab in @('general', 'appearance', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
           }
+          Shot 'settings-photos' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'appearance', '--settings-scroll', '560'))
           Shot 'settings-appearance-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance'))
           # the sign-in (the mock with --login, on :8802): the app's own card — light, dark, wide; the card again after a
           # wrong password; "Logging you in" with its offer (the login "slow" takes twelve seconds); "Stay logged in?"

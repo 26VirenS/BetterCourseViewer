@@ -195,6 +195,46 @@ public sealed partial class Ui
 
     private static Vector2 Quad(Vector2 a, Vector2 b, Vector2 c, float t) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c;
 
+    /// <summary>Sparkles (the SF Symbol's: a four-point star with two smaller ones beside it), filled, in a box `size` across.</summary>
+    public void Sparkles(float cx, float cy, float size, Color4 c)
+    {
+        Star(cx - size * 0.1f, cy + size * 0.08f, size * 0.42f, c);
+        Star(cx + size * 0.33f, cy - size * 0.33f, size * 0.2f, c);
+        Star(cx + size * 0.3f, cy + size * 0.36f, size * 0.13f, c);
+    }
+
+    /// <summary>A four-point star (its sides drawn in, as a sparkle's are), filled.</summary>
+    public void Star(float cx, float cy, float r, Color4 c)
+    {
+        Draw(() =>
+        {
+            using var path = gpu!.D2dFactory.CreatePathGeometry();
+            using (var sink = path.Open())
+            {
+                var tips = new[] { new Vector2(cx, cy - r), new Vector2(cx + r, cy), new Vector2(cx, cy + r), new Vector2(cx - r, cy) };
+                sink.BeginFigure(tips[0], FigureBegin.Filled);
+                for (var k = 0; k < 4; k++)
+                {
+                    var a = tips[k];
+                    var b = tips[(k + 1) % 4];
+                    // (the side between two tips bends in towards the middle)
+                    var ctrl = new Vector2(cx + (a.X + b.X - 2 * cx) * 0.18f, cy + (a.Y + b.Y - 2 * cy) * 0.18f);
+                    for (var i = 1; i <= 6; i++) sink.AddLine(Quad(a, ctrl, b, i / 6f));
+                }
+                sink.EndFigure(FigureEnd.Closed);
+                sink.Close();
+            }
+            D.FillGeometry(path, Brush(c));
+        });
+    }
+
+    /// <summary>A symbol in a ring (the SF Symbols' .circle variants: arrow.up.circle, arrow.down.circle).</summary>
+    public void CircledIcon(string symbol, float cx, float cy, float size, Color4 c, FontWeight weight = FontWeight.SemiBold)
+    {
+        Ring(cx, cy, size / 2 - 0.8f, c, Math.Max(1.2f, size / 11));
+        Icon(symbol, cx, cy, size * 0.5f, c, weight);
+    }
+
     /// <summary>A picture from a file (the app's icon), fitted into a rectangle; read once, kept with the graphics.</summary>
     public void Image(string path, R r, float opacity = 1)
     {
