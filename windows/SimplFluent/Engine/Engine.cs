@@ -212,7 +212,7 @@ public sealed partial class Engine : Observable, IShellListener
                     ready = true;
                     openedOnKept = false;
                     SetPhase(Phase.Native);
-                    if (!shownNative) { shownNative = true; _ = FirstNative(); }
+                    if (!shownNative) { shownNative = true; FirstNative().ContinueWith(t => Log.Write("first: " + t.Exception), TaskContinuationOptions.OnlyOnFaulted); }
                 }
                 else
                 {

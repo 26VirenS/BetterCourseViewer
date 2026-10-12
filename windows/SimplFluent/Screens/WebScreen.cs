@@ -18,19 +18,21 @@ public sealed class WebScreen : Screen
     private static readonly List<WeakReference<WebScreen>> All = new();
     private static bool covered;
     private readonly Uri? url;
-    private readonly string title;
+    private readonly Func<string> title;
     private readonly Grid root = new();
     private readonly Grid holder = new();
     private WebView2? web;
 
-    public WebScreen(Engine.Engine engine, Uri? url, string title) : base(engine)
+    public WebScreen(Engine.Engine engine, Uri? url, string title) : this(engine, url, () => title) { }
+
+    public WebScreen(Engine.Engine engine, Uri? url, Func<string> title) : base(engine)
     {
         this.url = url;
         this.title = title;
         All.Add(new WeakReference<WebScreen>(this));
     }
 
-    public override string Title => title;
+    public override string Title => title();
     public override bool Scrolls => false;
 
     public override FrameworkElement? Commands

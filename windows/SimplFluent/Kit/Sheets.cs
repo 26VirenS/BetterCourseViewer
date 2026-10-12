@@ -90,7 +90,7 @@ public sealed class SheetHost : Grid
     public SheetHost()
     {
         Visibility = Visibility.Collapsed;
-        smoke.SetResourceReference(Border.BackgroundProperty, "ContentDialogSmokeFill");
+        smoke.Background = new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
         smoke.MouseLeftButtonDown += (_, e) => { e.Handled = true; };
         Children.Add(smoke);
         Panel.SetZIndex(this, 1000);
@@ -107,6 +107,7 @@ public sealed class SheetHost : Grid
         focusBefore = Keyboard.FocusedElement;
         Children.Add(card);
         Visibility = Visibility.Visible;
+        smoke.Background = new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
         Motion.FadeIn(smoke, Motion.Normal);
         Motion.Pop(card);
         OpenChanged?.Invoke(true);
@@ -173,9 +174,8 @@ public sealed class SheetHost : Grid
             title.TextTrimming = TextTrimming.None;
             top.Children.Add(title);
         }
-        top.Children.Add(s.Body);
+        if (!s.Bare) top.Children.Add(s.Body);
         var content = new Border { Child = s.Bare ? s.Body : top, Padding = s.Bare ? new Thickness(0) : new Thickness(24, 24, 24, 24) };
-        if (s.Bare) top.Children.Remove(s.Body);
         content.SetResourceReference(Border.BackgroundProperty, "ContentDialogTopOverlay");
 
         var grid = new Grid();

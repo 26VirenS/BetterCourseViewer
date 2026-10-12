@@ -105,7 +105,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         WindowCornerPreference = WindowCornerPreference.Round;
         FontFamily = K.TextFace;
         SetResourceReference(ForegroundProperty, B.Text);
-        if (Shot.Asked) SetResourceReference(BackgroundProperty, B.Window);
+        if (Shot.Asked) { SetResourceReference(BackgroundProperty, B.Window); ToolTipService.SetIsEnabled(this, false); }
         if (Shot.Asked && Launch.Get("window-size") is { } ws && ws.Split('x') is { Length: 2 } p && double.TryParse(p[0], out var w0) && double.TryParse(p[1], out var h0))
         {
             Width = w0;

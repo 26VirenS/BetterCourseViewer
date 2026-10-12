@@ -137,7 +137,7 @@ public sealed class AppShell : Grid, IDisposable
         switch (e.PropertyName)
         {
             case nameof(Engine.Engine.NavVersion): Navigate(); BuildPane(); break;
-            case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections) or nameof(Engine.Engine.Snapshot): BuildPane(); break;
+            case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections) or nameof(Engine.Engine.Snapshot): BuildPane(); Header(); break;
             case nameof(Engine.Engine.DataVersion): current?.Refresh(); break;
             case nameof(Engine.Engine.Query): if (searchBox.Text != engine.Query && !searchBox.IsKeyboardFocusWithin) searchBox.Text = engine.Query; break;
         }
@@ -218,7 +218,14 @@ public sealed class AppShell : Grid, IDisposable
         nav.Set(list, SelectedKey(engine.Nav.Current.Place));
     }
 
-    private static string Initial(string s) => s.FirstOrDefault(char.IsLetterOrDigit) is var c && c != default ? char.ToUpperInvariant(c).ToString() : "•";
+    private static string Initial(string s)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(s ?? "", @"^(?:[A-Za-z]{1,3}\d{2,4}[-_ :]+)?(?<rest>.*)$");
+        var rest = m.Success ? m.Groups["rest"].Value : s ?? "";
+        var c = rest.FirstOrDefault(char.IsLetter);
+        if (c == default) c = (s ?? "").FirstOrDefault(char.IsLetterOrDigit);
+        return c != default ? char.ToUpperInvariant(c).ToString() : "•";
+    }
 
     private static string? SelectedKey(Place p) => p.Kind switch
     {
@@ -250,11 +257,11 @@ public sealed class AppShell : Grid, IDisposable
         tile.Margin = new Thickness(4, 4, 4, 8);
         tile.ToolTip = "Your account";
         System.Windows.Automation.AutomationProperties.SetName(tile, $"{name}, account menu");
-        if (!menuAsked && Launch.Get("open") == "menu") { menuAsked = true; Dispatcher.BeginInvoke(() => AccountMenu(tile), System.Windows.Threading.DispatcherPriority.Loaded); }
+        accountTile = tile;
         return tile;
     }
 
-    private bool menuAsked;
+    private Button? accountTile;
 
     /// <summary>The account menu (the Mac's ⋯ by your name): Settings…, What's New, the school's profile, Report a Bug…,
     /// Sign Out…, and Quit Simpl (closing the window only puts Simpl in the notification area).</summary>
@@ -473,7 +480,12 @@ public sealed class AppShell : Grid, IDisposable
     private void Updates()
     {
         // (a picture asked for with the narrow window: the pane shown open)
-        Loaded += (_, _) => { if (narrow && Launch.Flag("pane-open")) OpenPane(); };
+        Loaded += async (_, _) =>
+        {
+            if (narrow && Launch.Flag("pane-open")) OpenPane();
+            // (the screenshot suite: --open menu shows the account menu once the window has settled)
+            if (Launch.Get("open") == "menu") { await Task.Delay(3000); if (accountTile != null) AccountMenu(accountTile); }
+        };
     }
 
     public void Dispose()

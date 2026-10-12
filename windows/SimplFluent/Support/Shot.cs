@@ -89,6 +89,13 @@ public static class Shot
         }
     }
 
+    private static bool FindTip(DependencyObject d)
+    {
+        if (d is System.Windows.Controls.ToolTip) return true;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(d) && i < 4; i++) if (FindTip(VisualTreeHelper.GetChild(d, i))) return true;
+        return false;
+    }
+
     /// <summary>The app's frontmost window (Settings, a popup window, else the main one) with its menus and flyouts over it.</summary>
     public static void Take(string file)
     {
@@ -103,12 +110,19 @@ public static class Shot
         using (var dc = dv.RenderOpen())
         {
             dc.DrawImage(image, new Rect(0, 0, width, height));
-            // what floats over it: a menu, a flyout, a tooltip (each a window of its own)
+            // what floats over it: a menu, a flyout (each a window of its own, drawn by WPF — pictured as WPF draws it,
+            // its see-through edges and shadow kept)
             foreach (var s in PresentationSource.CurrentSources.OfType<HwndSource>().ToList())
             {
-                if (s.Handle == hwnd || s.IsDisposed || !IsWindowVisible(s.Handle) || s.RootVisual is Window) continue;
-                if (Print(s.Handle) is not { } p) continue;
-                dc.DrawImage(p.Image, new Rect(p.At.L - at.L, p.At.T - at.T, p.At.R - p.At.L, p.At.B - p.At.T));
+                if (s.Handle == hwnd || s.IsDisposed || !IsWindowVisible(s.Handle) || s.RootVisual is Window or null) continue;
+                if (s.RootVisual is FrameworkElement root && FindTip(root)) continue;
+                GetWindowRect(s.Handle, out var r);
+                int pw = r.R - r.L, ph = r.B - r.T;
+                if (pw <= 0 || ph <= 0) continue;
+                var m = s.CompositionTarget?.TransformToDevice ?? Matrix.Identity;
+                var rtb = new RenderTargetBitmap(pw, ph, 96 * m.M11, 96 * m.M22, PixelFormats.Pbgra32);
+                rtb.Render(s.RootVisual);
+                dc.DrawImage(rtb, new Rect(r.L - at.L, r.T - at.T, pw, ph));
             }
         }
         var all = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);

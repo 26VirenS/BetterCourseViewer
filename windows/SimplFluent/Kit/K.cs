@@ -265,13 +265,13 @@ public static class K
     }
 
     /// <summary>A subtle button that is only a symbol (a toolbar's, a card's corner).</summary>
-    public static Wpf.Ui.Controls.Button IconButton(SymbolRegular s, Action click, string tip, double size = 16, double box = 32)
+    public static Button IconButton(SymbolRegular s, Action click, string tip, double size = 16, double box = 32)
     {
-        var b = new Wpf.Ui.Controls.Button
-        {
-            Content = Icon(s, size, B.Text), Appearance = ControlAppearance.Transparent, Width = box, Height = box,
-            Padding = new Thickness(0), BorderThickness = new Thickness(0), ToolTip = tip,
-        };
+        var b = Subtle(Icon(s, size, B.Text), null, new Thickness(0), 4);
+        b.Width = box;
+        b.Height = box;
+        b.HorizontalContentAlignment = HorizontalAlignment.Center;
+        b.ToolTip = tip;
         System.Windows.Automation.AutomationProperties.SetName(b, tip);
         b.Click += (_, _) => click();
         return b;

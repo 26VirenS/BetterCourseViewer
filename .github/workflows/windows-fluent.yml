@@ -59,21 +59,21 @@ jobs:
         run: |
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
           New-Item -ItemType Directory -Force shots | Out-Null
-          $jobs = @()
+          # (three at a time, each with a profile of its own: each copy of Simpl pictures its own window, then quits)
+          $script:running = @()
           function Shot($name, $size, $wait, $extra) {
+            while (@($script:running | Where-Object { -not $_.HasExited }).Count -ge 3) { Start-Sleep -Milliseconds 400 }
             $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
             $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', "$wait", '--profile', $prof, '--window-size', $size) + $extra
-            $p = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
-            if (-not $p.WaitForExit(($wait + 40) * 1000)) { Stop-Process -Id $p.Id -Force; Write-Host "$name did not finish" }
-            if (Test-Path "shots/$name.png") { Write-Host "shot $name" } else { Write-Host "no picture: $name" }
+            $script:running += Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
           }
           $mock = @('--base-url', 'http://localhost:8800', '--demo')
           $login = @('--base-url', 'http://localhost:8802', '--demo')
           # the first run: finding the school, and the school confirmed
           Shot 'school-picker-dark' '1024x681' 8 @('--appearance', 'dark')
           Shot 'school-picker-light' '1024x681' 8 @('--appearance', 'light')
-          Shot 'school-search' '1024x681' 10 @('--appearance', 'light', '--picker-query', 'state uni')
-          Shot 'school-confirm' '1024x681' 10 @('--appearance', 'dark', '--picker-query', 'state uni', '--picker-confirm')
+          Shot 'school-search' '1024x681' 10 @('--appearance', 'light', '--picker-query', 'state')
+          Shot 'school-confirm' '1024x681' 10 @('--appearance', 'dark', '--picker-query', 'state', '--picker-confirm')
           # signing in (the mock with --login): the card, a wrong password, "Logging you in", "Stay logged in?", a page
           # finished by hand (a one-time code)
           Shot 'sign-in-dark' '1024x681' 14 ($login + @('--appearance', 'dark'))
@@ -97,6 +97,14 @@ jobs:
           Shot 'course-open' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101'))
           Shot 'account-menu' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'menu'))
           Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
+          Shot 'setup' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'setup'))
+          # Settings, as Windows 11's own Settings app, on each of its categories
+          foreach ($tab in @('general', 'appearance', 'notifications', 'grades', 'data', 'updates', 'about')) {
+            Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
+          }
+          Shot 'settings-appearance-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance'))
+          foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+          Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
             $log = Join-Path $_.FullName 'simpl.log'
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 25 }

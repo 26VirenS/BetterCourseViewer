@@ -11,7 +11,7 @@ public static class ScreenFactory
     public static Screen For(Engine.Engine engine, Place p) => p.Kind switch
     {
         PlaceKind.Dashboard => new DashboardScreen(engine),
-        _ => Native(engine, p) ?? new WebScreen(engine, engine.SchoolUrl(p), TitleOf(engine, p)),
+        _ => Native(engine, p) ?? new WebScreen(engine, engine.SchoolUrl(p), () => TitleOf(engine, p)),
     };
 
     /// <summary>The screens made since the Dashboard (filled in as they come over from the Mac).</summary>

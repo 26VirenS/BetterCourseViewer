@@ -33,8 +33,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private readonly ContentControl cover = new() { Focusable = false };
     private readonly SheetHost sheets = new();
     private readonly TitleBar titleBar;
-    private readonly Wpf.Ui.Controls.Button back;
-    private readonly Wpf.Ui.Controls.Button menuButton;
+    private readonly System.Windows.Controls.Button back;
+    private readonly System.Windows.Controls.Button menuButton;
     private readonly ContentControl trailing = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly HandoffBar handoff;
     private NotifyIcon? tray;
@@ -62,7 +62,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         WindowCornerPreference = WindowCornerPreference.Round;
         FontFamily = K.TextFace;
         SetResourceReference(ForegroundProperty, B.Text);
-        if (Shot.Asked) SetResourceReference(BackgroundProperty, B.Window);
+        if (Shot.Asked) { SetResourceReference(BackgroundProperty, B.Window); ToolTipService.SetIsEnabled(this, false); }
         Placement.Restore(this, "main", 1280, 820, 720, 520);
 
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(TitleBarHeight) });
@@ -160,6 +160,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.WhatsNewRequested += d => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); };
         engine.SetupRequested += () => SetupSheet.Show(engine, this);
         Bridge.Shared.OpenSettingsRequested += OpenSettings;
+        // (pictures in the school's rich text come with its session)
+        var e0 = engine;
+        RichText.Cookies = async u => e0.Web.CoreWebView2 is { } core
+            ? string.Join("; ", (await core.CookieManager.GetCookiesAsync(u.ToString())).Select(c => $"{c.Name}={c.Value}"))
+            : null;
         engine.Web.CoreWebView2InitializationCompleted += (_, _) => Phased();
         Phased();
         engine.Start();

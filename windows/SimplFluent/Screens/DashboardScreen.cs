@@ -296,9 +296,9 @@ public sealed partial class DashboardScreen : Screen
         var along = root.ActualWidth > tile.Width ? Math.Clamp(tile.X / (root.ActualWidth - tile.Width), 0, 1) : 0;
         var x = Math.Clamp(tile.X + (tile.Width - w) * along, 0, Math.Max(0, root.ActualWidth - w));
         panelContent = PanelContent(c, key, w);
-        panelContent.Width = w;
-        panelContent.Measure(new Size(w, double.PositiveInfinity));
-        var h = Math.Max(tile.Height, panelContent.DesiredSize.Height);
+        panelContent.Width = w - 2;
+        panelContent.Measure(new Size(w - 2, double.PositiveInfinity));
+        var h = Math.Max(tile.Height, panelContent.DesiredSize.Height + 2);
         panelRect = new Rect(x, tile.Y, w, h);
         frame = new Border
         {
@@ -363,11 +363,11 @@ public sealed partial class DashboardScreen : Screen
         if (openKey == null || frame == null || root == null || today.Data?.Counters.FirstOrDefault(k => k.Key == openKey) is not { } c) return;
         var w = panelRect.Width;
         var content = PanelContent(c, openKey, w);
-        content.Width = w;
-        content.Measure(new Size(w, double.PositiveInfinity));
+        content.Width = w - 2;
+        content.Measure(new Size(w - 2, double.PositiveInfinity));
         if (frame.Child is Canvas cv) { cv.Children.Clear(); cv.Children.Add(content); }
         panelContent = content;
-        var h = Math.Max(TileRect(openKey).Height, content.DesiredSize.Height);
+        var h = Math.Max(TileRect(openKey).Height, content.DesiredSize.Height + 2);
         Motion.To(frame, FrameworkElement.HeightProperty, h, Motion.Medium, Motion.Decelerate);
         panelRect.Height = h;
         Shot.Moved();
@@ -406,8 +406,7 @@ public sealed partial class DashboardScreen : Screen
             body = new ScrollViewer { Content = sections, MaxHeight = 260, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         }
         var all = K.V(14, head, K.Divider(), body);
-        all.Margin = new Thickness(18, 14, 14, 16);
-        return all;
+        return new Border { Child = all, Padding = new Thickness(18, 14, 14, 16) };
     }
 
     private static bool IsInside(DependencyObject o, DependencyObject container)
