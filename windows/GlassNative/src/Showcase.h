@@ -1,8 +1,8 @@
 #pragma once
 // The showcase: Simpl's Dashboard as the backdrop, and over it glass as Simpl for Windows will draw it — the Mac's
 // "Unread announcements" popover, a toolbar with the Dashboard's Cards · List · Activity, a tab bar, switches and a
-// slider whose knobs turn into lenses while held, buttons, a glass bubble to drag and fling, and Tune (the glass,
-// live). Built afresh each frame (immediate mode), then drawn in layers:
+// slider whose knobs turn into lenses while held, buttons, a card of clear glass and a glass bubble to drag (the bubble
+// to fling), and Tune (the glass and the backdrop, live). Built afresh each frame (immediate mode), then drawn in layers:
 //   1. the backdrop (Direct2D) → the frame, and the frost's small copies;
 //   2. the panels' frosted glass (AuroraGlass: one frost a frame, each shape composited on the GPU);
 //   3. what is on the panels: their tint and rim of light, words, icons, tracks (Direct2D);
@@ -27,8 +27,8 @@ struct Showcase {
     bool ready = false;
 
     // the glass, as Tune sets it
-    float frostLevel = 0.62f;   // 0..1 → how small a copy of the backdrop the frost reads (0: full size … 1: 1/32)
-    float refraction = 0.42f, dispersion = 0.25f, thickness = 0.55f, saturation = 1.45f, tintAmount = 0.42f, rim = 0.45f;
+    float frostLevel = 0.62f;   // 0..1 → clear glass (0) … a full-size frost (0.2) … a frost of a copy 1/32 the size (1)
+    float refraction = 0.5f, dispersion = 0.25f, thickness = 0.55f, saturation = 1.45f, tintAmount = 0.42f, rim = 0.45f;
 
     // input (layout DIPs)
     float mx = -1, my = -1;
@@ -37,9 +37,9 @@ struct Showcase {
     float uiScale = 1;         // the whole showcase scaled down to fit a small window
 
     // where things are
-    float popX = 34, popY = 104, ctlX = -1, ctlY = 96, tuneX = -1, tuneY = 414;
+    float popX = 34, popY = 104, ctlX = -1, ctlY = 96, tuneX = -1, tuneY = 414, clearX = 622, clearY = 104;
     float grabX = 0, grabY = 0;
-    Spring bubbleX{ 640, 0.45f, 0.78f }, bubbleY{ 560, 0.45f, 0.78f };
+    Spring bubbleX{ 700, 0.45f, 0.78f }, bubbleY{ 430, 0.45f, 0.78f };
     std::vector<std::pair<double, std::pair<float, float>>> samples;
     std::unordered_map<std::string, Spring> springs;
     bool toggles[4] = { true, false, true, true };
@@ -47,7 +47,9 @@ struct Showcase {
     int view = 1, tab = 0;
     double now = 0;
 
-    struct Shape { D2D1_RECT_F r; float radius; D2D1_COLOR_F tint; float tintAmount; bool interactive; float power = 1; };
+    static constexpr float kBubble = 150, kClearW = 300, kClearH = 200;
+    enum LensKind { LensControl = 0, LensBubble = 1, LensClear = 2 };
+    struct Shape { D2D1_RECT_F r; float radius; D2D1_COLOR_F tint; float tintAmount; bool interactive; float power = 1; int kind = LensControl; };
     std::vector<Shape> frosts, lenses;
     std::vector<std::function<void()>> content, overlays;
 
@@ -106,7 +108,18 @@ struct Showcase {
     }
 
     /// A lens of glass (a knob, a thumb, the bubble): no frost, what is under it bent through its rim.
-    void Lens(D2D1_RECT_F r, float radius, float power = 1) { lenses.push_back({ r, radius, {}, 0, true, power }); }
+    void Lens(D2D1_RECT_F r, float radius, float power = 1, int kind = LensControl) { lenses.push_back({ r, radius, {}, 0, true, power, kind }); }
+
+    /// The rim's hairline of light, brightest top-left.
+    void Rim(D2D1_RECT_F r, float radius, float strength) {
+        ComPtr<ID2D1GradientStopCollection> stops;
+        float a = strength * (scene.dark ? 0.55f : 0.9f);
+        D2D1_GRADIENT_STOP gs[3] = { { 0, D2D1::ColorF(1, 1, 1, a) }, { 0.5f, D2D1::ColorF(1, 1, 1, a * 0.18f) }, { 1, D2D1::ColorF(1, 1, 1, a * 0.55f) } };
+        g.d2d->CreateGradientStopCollection(gs, 3, &stops);
+        ComPtr<ID2D1LinearGradientBrush> lb;
+        g.d2d->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(r.left, r.top), D2D1::Point2F(r.right, r.bottom)), stops.Get(), &lb);
+        g.d2d->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(r.left + 0.5f, r.top + 0.5f, r.right - 0.5f, r.bottom - 0.5f), radius - 0.5f, radius - 0.5f), lb.Get(), 1.0f);
+    }
 
     /// A panel that moves when dragged by anything but its controls.
     void Draggable(const std::string& id, D2D1_RECT_F r, float& x, float& y) {
@@ -121,6 +134,7 @@ struct Showcase {
         if (glassCapsule) Frost(r, h / 2, true);
         Spring& sx = S(id + ":x", (float)selected, 0.36f, 0.74f);
         Spring& st = S(id + ":s", 0, 0.3f, 0.7f);
+        if (sx.target != (float)selected) sx.To((float)selected); // (chosen elsewhere: a picture dropped in)
         if (pressed && !consumed && Inside(r)) {
             int i = std::clamp((int)((mx - x - 4) / segW), 0, (int)items.size() - 1);
             if (i != selected) { selected = i; sx.To((float)i); st.To(1); }
@@ -225,6 +239,12 @@ struct Showcase {
     void Build(float W, float H) {
         frosts.clear(); lenses.clear(); content.clear(); overlays.clear();
         consumed = false;
+        // the bubble and the clear card lie over everything: they take the pointer first
+        if (pressed && Inside(D2D1::RectF(bubbleX.value, bubbleY.value, bubbleX.value + kBubble, bubbleY.value + kBubble))) {
+            active = "bubble"; grabX = mx - bubbleX.value; grabY = my - bubbleY.value; samples.clear(); consumed = true;
+        } else if (pressed && Inside(D2D1::RectF(clearX, clearY, clearX + kClearW, clearY + kClearH))) {
+            active = "clear"; grabX = mx - clearX; grabY = my - clearY; consumed = true;
+        }
         if (ctlX < 0) ctlX = W - 344 - 36;
         if (tuneX < 0) tuneX = W - 344 - 36;
 
@@ -252,6 +272,7 @@ struct Showcase {
         float bw = 5 * 86 + 8;
         Segmented("tab", (W - bw) / 2, H - 78, 86, { L"Today", L"Courses", L"To Do", L"Grades", L"Search" }, tab);
 
+        ClearCard();
         Bubble(W, H);
     }
 
@@ -305,20 +326,27 @@ struct Showcase {
     }
 
     void Tune() {
-        float x = tuneX, y = tuneY, w = 344, h = 384;
+        float x = tuneX, y = tuneY, w = 344, h = 420;
         D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + h);
         Frost(r, 30, true);
         content.push_back([=, this] { Text(L"Tune", x + 24, y + 16, 120, 36, 20, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_LEADING, L"Segoe UI Variable Display"); });
         int mode = scene.dark ? 0 : 1;
         Segmented("mode", x + w - 24 - 146, y + 14, 69, { L"Dark", L"Light" }, mode, false);
         scene.dark = mode == 0;
+
+        // the backdrop: Grid · Photo · Simpl (Photo again: the next picture)
+        float bx = x + w - 24 - 206, by = y + 58;
+        content.push_back([=, this] { Text(L"Backdrop", x + 24, by, 90, 40, 13.5f, Ink()); });
+        if (pressed && !consumed && scene.backdrop == BackdropPhoto && Inside(D2D1::RectF(bx + 4 + 66, by, bx + 4 + 132, by + 40))) scene.NextPhoto();
+        Segmented("backdrop", bx, by, 66, { L"Grid", L"Photo", L"Simpl" }, scene.backdrop, false);
+
         struct K { const wchar_t* name; float* v; float lo, hi; };
         float sat = (saturation - 0.5f) / 1.5f;
         K knobs[] = {
             { L"Frost", &frostLevel, 0, 1 }, { L"Refraction", &refraction, 0, 1 }, { L"Dispersion", &dispersion, 0, 1 },
             { L"Thickness", &thickness, 0, 1 }, { L"Colour", &sat, 0, 1 }, { L"Tint", &tintAmount, 0, 0.9f }, { L"Rim", &rim, 0, 1 },
         };
-        float ry = y + 64;
+        float ry = y + 108;
         int index = 0;
         for (auto& k : knobs) {
             float shown = *k.v;
@@ -334,19 +362,39 @@ struct Showcase {
             float f = (*k.v - k.lo) / (k.hi - k.lo);
             Slider("knob" + std::to_string(index++), x + 112, ry, w - 112 - 70, f);
             *k.v = k.lo + f * (k.hi - k.lo);
-            ry += 38;
+            ry += 34;
         }
         saturation = 0.5f + sat * 1.5f;
         content.push_back([=, this] { Text(L"Moving backdrop", x + 24, ry + 2, 200, 32, 13.5f, Ink()); });
         Toggle("moving", x + w - 24 - 56, ry + 2, scene.moving);
+
+        // what the backdrop is
+        std::wstring hint;
+        if (scene.backdrop == BackdropGrid) hint = L"Straight lines: see them bend at each rim (Frost 0: clear)";
+        else if (scene.backdrop == BackdropSimpl) hint = L"Simpl's Dashboard";
+        else if (scene.photos.empty()) hint = L"No pictures found: drop one on the window";
+        else hint = scene.PhotoName() + L" (" + std::to_wstring(scene.photoIndex + 1) + L" of " + std::to_wstring(scene.photos.size()) + L") · Photo: next · or drop one";
+        content.push_back([=, this] { Text(hint.c_str(), x + 24, ry + 40, w - 48, 22, 12, Ink2()); });
         Draggable("tune", r, tuneX, tuneY);
+    }
+
+    /// A card of clear glass (no frost at all): what is under it shows sharp, bent at its rim — Refraction and
+    /// Thickness, as Tune sets them, plain to see.
+    void ClearCard() {
+        float w = kClearW, h = kClearH, x = clearX, y = clearY;
+        D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + h);
+        Lens(r, 44, 1, LensClear);
+        overlays.push_back([=, this] {
+            Rim(r, 44, std::max(rim, 0.3f));
+            Text(L"Clear glass", x + 22, y + 14, 200, 26, 14.5f, Ink(), DWRITE_FONT_WEIGHT_SEMI_BOLD);
+        });
+        Draggable("clear", r, clearX, clearY);
     }
 
     /// The bubble: drag it, fling it — it heads where its momentum takes it, inside the window, on a spring.
     void Bubble(float W, float H) {
-        float d = 150;
+        float d = kBubble;
         D2D1_RECT_F r = D2D1::RectF(bubbleX.value, bubbleY.value, bubbleX.value + d, bubbleY.value + d);
-        if (pressed && !consumed && Inside(r)) { active = "bubble"; grabX = mx - bubbleX.value; grabY = my - bubbleY.value; samples.clear(); consumed = true; }
         if (active == "bubble" && down) {
             bubbleX.Snap(mx - grabX);
             bubbleY.Snap(my - grabY);
@@ -363,7 +411,7 @@ struct Showcase {
             bubbleX.To(std::clamp(bubbleX.value + Spring::Project(vx), 10.0f, W - d - 10), vx);
             bubbleY.To(std::clamp(bubbleY.value + Spring::Project(vy), 10.0f, H - d - 10), vy);
         }
-        lenses.push_back({ r, d / 2, {}, -1, true }); // (tintAmount -1: the bubble's own, thicker lens)
+        Lens(r, d / 2, 1, LensBubble);
     }
 
     // ---- drawing a frame ----
@@ -379,8 +427,17 @@ struct Showcase {
         m.SetTintAmount(0.0f);
         m.SetNoiseAmount(isLens ? 0.0f : 0.012f);
         m.SetOpacity(1.0f);
-        if (isLens) {
-            bool bubble = s.tintAmount < 0;
+        if (isLens && s.kind == LensClear) {
+            m.SetBlurRadius(0.0f);
+            m.SetRefractionStrength(std::min(1.0f, refraction * 1.5f));
+            m.SetThickness(thickness);
+            m.SetDispersionStrength(dispersion);
+            m.SetEdgeFresnel(0.35f + 0.4f * rim);
+            m.SetSpecularStrength(0.4f + 1.2f * rim);
+            m.SetSaturation(1.0f);
+            m.SetBrightness(1.02f);
+        } else if (isLens) {
+            bool bubble = s.kind == LensBubble;
             m.SetBlurRadius(0.0f);
             m.SetRefractionStrength(bubble ? 1.0f : std::min(1.0f, (refraction + 0.25f) * s.power));
             m.SetThickness(bubble ? 1.0f : 0.4f + 0.35f * s.power);
@@ -390,7 +447,7 @@ struct Showcase {
             m.SetSaturation(std::min(2.0f, 0.85f + saturation * 0.25f));
             m.SetBrightness(1.04f);
         } else {
-            m.SetBlurRadius(24.0f);
+            m.SetBlurRadius(FrostBlur());
             m.SetRefractionStrength(refraction);
             m.SetThickness(thickness);
             m.SetDispersionStrength(dispersion);
@@ -401,6 +458,11 @@ struct Showcase {
         }
         return m;
     }
+
+    /// Frost, as Tune sets it: up to 0.2 a full-size frost growing from none (clear glass); past it, the same frost of
+    /// ever smaller copies of the backdrop (each smaller copy reads as a deeper frost).
+    float FrostBlur() const { return frostLevel >= 0.2f ? 24.0f : 24.0f * std::sqrt(frostLevel / 0.2f); }
+    UINT FrostMip() const { return frostLevel <= 0.2f ? 0 : std::min<UINT>((UINT)std::lround((frostLevel - 0.2f) / 0.8f * 5), g.sceneMipCount - 1); }
 
     D2D1_RECT_F Px(D2D1_RECT_F r) const {
         float k = g.Scale() * uiScale;
@@ -446,12 +508,12 @@ struct Showcase {
         D3D11_VIEWPORT vp = { 0, 0, (float)g.width, (float)g.height, 0, 1 };
         // 2. the frosted glass: one frost of a small copy of the backdrop, each panel composited
         if (ready) {
-            UINT level = std::min<UINT>((UINT)std::lround(frostLevel * 5), g.sceneMipCount - 1);
+            UINT level = FrostMip();
             FrameInfo fi;
             fi.timeSeconds = (float)now;
             g.ctx->OMSetRenderTargets(1, g.backRTV.GetAddressOf(), nullptr);
             g.ctx->RSSetViewports(1, &vp);
-            if (frost.PrepareFrame(g.ctx.Get(), g.sceneSRV[level].Get(), fi, 24.0f).ok()) {
+            if (frost.PrepareFrame(g.ctx.Get(), g.sceneSRV[level].Get(), fi, FrostBlur()).ok()) {
                 for (auto& s : frosts) {
                     frost.SetMaterial(Material(s.radius * k * uiScale, s, false));
                     auto p = Px(s.r);
@@ -466,13 +528,7 @@ struct Showcase {
         for (auto& s : frosts) {
             auto rr = D2D1::RoundedRect(s.r, s.radius, s.radius);
             d->FillRoundedRectangle(rr, Brush(D2D1::ColorF(s.tint.r, s.tint.g, s.tint.b, std::clamp(s.tintAmount, 0.0f, 1.0f))));
-            ComPtr<ID2D1GradientStopCollection> stops;
-            float a = rim * (scene.dark ? 0.55f : 0.9f);
-            D2D1_GRADIENT_STOP gs[3] = { { 0, D2D1::ColorF(1, 1, 1, a) }, { 0.5f, D2D1::ColorF(1, 1, 1, a * 0.18f) }, { 1, D2D1::ColorF(1, 1, 1, a * 0.55f) } };
-            d->CreateGradientStopCollection(gs, 3, &stops);
-            ComPtr<ID2D1LinearGradientBrush> lb;
-            d->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(s.r.left, s.r.top), D2D1::Point2F(s.r.right, s.r.bottom)), stops.Get(), &lb);
-            d->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(s.r.left + 0.5f, s.r.top + 0.5f, s.r.right - 0.5f, s.r.bottom - 0.5f), s.radius - 0.5f, s.radius - 0.5f), lb.Get(), 1.0f);
+            Rim(s.r, s.radius, rim);
         }
         for (auto& f : content) f();
         d->EndDraw();

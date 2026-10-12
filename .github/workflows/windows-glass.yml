@@ -1,6 +1,6 @@
 # Liquid Glass for Windows: the showcase (windows/GlassNative) — Win32 and Direct3D 11, the glass drawn by AuroraGlass's
 # renderer (its core compiled in from a pinned copy) with a deep frost, Direct2D and DirectWrite for the backdrop and the
-# words. Built with MSVC, started on the runner for a picture, and published as a pre-release (windows-glass-r<run>) to
+# words. Built with MSVC, started on the runner for a picture, and published as a pre-release (windows-glass-v<run>, zero-padded) to
 # try on a real PC. Nothing here touches Simpl's own builds, releases or update feeds (those read mac-v* releases only).
 name: Windows Liquid Glass
 
@@ -53,18 +53,20 @@ jobs:
           cp aurora/LICENSE "$out/LICENSE-AuroraGlass.txt"
           cp windows-glass/showcase-README.txt "$out/README-FIRST.txt"
           ls -la "$out" "$out/shaders"
-      - name: Does it start? (a picture of its frame)
+      - name: Does it start? (pictures of its frame)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dist/LiquidGlass/LiquidGlass.exe -ArgumentList '--shot', "$PWD/shot-showcase.png" -WorkingDirectory dist/LiquidGlass -PassThru
-          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'it did not finish' }
-          Write-Host "exit code: $($p.ExitCode)"
-          if (Test-Path shot-showcase.png.txt) { Get-Content shot-showcase.png.txt }
-          if (-not (Test-Path shot-showcase.png)) { throw 'no picture' }
-          # and as on a display scaled 200% (most laptops, and a Mac's Windows in Parallels): everything at one scale
-          $p = Start-Process -FilePath dist/LiquidGlass/LiquidGlass.exe -ArgumentList '--shot', "$PWD/shot-showcase-200.png", '--dpi', '192' -WorkingDirectory dist/LiquidGlass -PassThru
-          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'it did not finish (200%)' }
-          if (Test-Path shot-showcase-200.png.txt) { Get-Content shot-showcase-200.png.txt }
+          function Shot($name, $extra) {
+            $p = Start-Process -FilePath dist/LiquidGlass/LiquidGlass.exe -ArgumentList (@('--shot', "$PWD/$name") + $extra) -WorkingDirectory dist/LiquidGlass -PassThru
+            if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "$name did not finish" }
+            Write-Host "$name exit code: $($p.ExitCode)"
+            if (Test-Path "$name.txt") { Get-Content "$name.txt" }
+            if (-not (Test-Path $name)) { throw "no picture: $name" }
+          }
+          Shot 'shot-showcase.png' @()                                 # the grid test card
+          Shot 'shot-showcase-200.png' @('--dpi', '192')               # as on a display scaled 200%: everything at one scale
+          Shot 'shot-showcase-photo.png' @('--backdrop', 'photo')      # a photo Windows carries, at full resolution
+          Shot 'shot-showcase-clear.png' @('--frost', '0')             # every panel clear: the bending at each rim
       - name: Zip
         shell: bash
         run: (cd dist && 7z a -tzip -mx=9 ../LiquidGlass-Showcase-win64.zip LiquidGlass >/dev/null) && ls -la LiquidGlass-Showcase-win64.zip
@@ -93,8 +95,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="windows-glass-r${{ github.run_number }}"
+          # (numbered so the newest sorts first: windows-glass-v013 after windows-glass-v012; the older r tags sort below)
+          n=$(printf '%03d' "${{ github.run_number }}")
+          tag="windows-glass-v$n"
           gh release create "$tag" zips/*.zip --target "${{ github.sha }}" --prerelease \
-            --title "Liquid Glass on Windows — native, on AuroraGlass (r${{ github.run_number }})" \
+            --title "Liquid Glass on Windows — native, on AuroraGlass (v$n)" \
             --notes-file windows-glass/RELEASE_NOTES.md
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"

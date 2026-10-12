@@ -7,7 +7,8 @@ Rebuilt from scratch for speed and the Mac's look: Direct3D 11 throughout, the g
 - the Mac's *Unread announcements* popover (drag it around);
 - a toolbar with the Dashboard's Cards · List · Activity, and a tab bar — a lens slides between the choices;
 - switches and sliders whose knobs turn into glass lenses while held (they refract the panel under them);
-- glass buttons; a glass bubble to drag and fling;
-- **Tune**: frost, refraction, dispersion, thickness, colour, tint and rim, live; Dark or Light; the moving backdrop on or off.
+- glass buttons; a card of clear glass to drag; a glass bubble to drag and fling;
+- **Backdrops**, at the display's full resolution: **Grid** (a sharp test card — hairlines, a Siemens star, rainbow stripes, rings, small text — so every bend at a rim shows), **Photo** (your wallpaper, then the photos Windows carries; click Photo again for the next, or drop any picture on the window), **Simpl** (the Dashboard);
+- **Tune**: frost (all the way down to clear glass), refraction, dispersion, thickness, colour, tint and rim, live; Dark or Light; the backdrop; its motion on or off.
 
 Esc closes it.

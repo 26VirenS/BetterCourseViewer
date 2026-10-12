@@ -1,7 +1,9 @@
 // Liquid Glass for Windows — Simpl's showcase, native: a Win32 window, Direct3D 11 with AuroraGlass for the glass,
 // Direct2D and DirectWrite for the backdrop and the words. A frame is drawn each time the display refreshes (vsync).
+// A picture dropped on the window becomes the backdrop.
 // --shot file.png: a picture of the frame after a few seconds (and file.png.txt: the graphics card and the frame rate),
-// then it quits — for CI.
+// then it quits — for CI. --dpi 192: as on a display scaled 200%. --backdrop grid|photo|simpl, --frost 0..1 and
+// --image file: Tune's choices, set from the start.
 #include "Gfx.h"
 #include "Showcase.h"
 #include <wincodec.h>
@@ -70,6 +72,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             ReleaseCapture();
         }
         return 0;
+    case WM_DROPFILES: {
+        wchar_t path[MAX_PATH] = {};
+        if (show && DragQueryFileW((HDROP)wp, 0, path, MAX_PATH)) show->scene.Open(path);
+        DragFinish((HDROP)wp);
+        return 0;
+    }
     case WM_KEYDOWN:
         if (wp == VK_ESCAPE) DestroyWindow(hwnd);
         return 0;
@@ -123,10 +131,15 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    std::wstring shot;
+    std::wstring shot, backdrop, image;
+    float frostArg = -1;
     for (int i = 1; i + 1 < argc; i++) {
-        if (std::wstring(argv[i]) == L"--shot") shot = argv[i + 1];
-        if (std::wstring(argv[i]) == L"--dpi") forcedDpi = (float)_wtof(argv[i + 1]);
+        std::wstring a = argv[i];
+        if (a == L"--shot") shot = argv[i + 1];
+        if (a == L"--dpi") forcedDpi = (float)_wtof(argv[i + 1]);
+        if (a == L"--backdrop") backdrop = argv[i + 1];
+        if (a == L"--frost") frostArg = (float)_wtof(argv[i + 1]);
+        if (a == L"--image") image = argv[i + 1];
     }
 
     WNDCLASSEXW wc = { sizeof(wc) };
@@ -157,6 +170,11 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
     static Showcase s(g);
     show = &s;
     FitScale();
+    if (backdrop == L"photo") s.scene.backdrop = BackdropPhoto;
+    if (backdrop == L"simpl") s.scene.backdrop = BackdropSimpl;
+    if (frostArg >= 0) s.frostLevel = std::clamp(frostArg, 0.0f, 1.0f);
+    if (!image.empty()) s.scene.Open(image);
+    DragAcceptFiles(hwnd, TRUE);
     if (!s.Init()) MessageBoxW(hwnd, L"AuroraGlass could not start (its shaders folder must be beside the app).", L"Liquid Glass", MB_ICONWARNING);
     ShowWindow(hwnd, SW_SHOW);
 
@@ -201,7 +219,11 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
             if (dd) dd->GetAdapter(&a);
             if (a) a->GetDesc(&ad);
             FILE* f = _wfopen((shot + L".txt").c_str(), L"w");
-            if (f) { fwprintf(f, L"saved=%d glass=%d adapter=%s fps=%.1f size=%ux%u\n", ok ? 1 : 0, s.ready ? 1 : 0, ad.Description, fps, g.width, g.height); fclose(f); }
+            if (f) {
+                fwprintf(f, L"saved=%d glass=%d adapter=%s fps=%.1f size=%ux%u\n", ok ? 1 : 0, s.ready ? 1 : 0, ad.Description, fps, g.width, g.height);
+                fwprintf(f, L"backdrop=%d photos=%zu photo=%s (%ux%u)\n", s.scene.backdrop, s.scene.photos.size(), s.scene.loadedPath.c_str(), s.scene.photoW, s.scene.photoH);
+                fclose(f);
+            }
             break;
         }
         g.swap->Present(1, 0);
