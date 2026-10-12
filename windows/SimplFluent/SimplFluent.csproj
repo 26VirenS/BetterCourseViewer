@@ -28,6 +28,9 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);CA1416;WPF0001</NoWarn>
+    <!-- published for Windows (CI: -r win-x64), precompiled (ReadyToRun) — the app and what it carries: WPF-UI, PDFsharp,
+         WebView2's — so less is compiled as it starts; a build for no runtime in particular (dotnet build) is as before -->
+    <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +39,11 @@
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <!-- PDFs written by the file tools (merge, split, pages turned, marks saved in the file, pictures and text to PDF) -->
     <PackageReference Include="PDFsharp" Version="6.2.4" />
+  </ItemGroup>
+
+  <!-- (Windows' own APIs as .NET sees them, 25 MB that the file tools alone use: not precompiled, or it more than doubles) -->
+  <ItemGroup>
+    <PublishReadyToRunExclude Include="Microsoft.Windows.SDK.NET.dll" />
   </ItemGroup>
 
   <ItemGroup>

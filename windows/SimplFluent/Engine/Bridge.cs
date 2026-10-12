@@ -23,6 +23,7 @@ public sealed class Bridge
 
     private readonly BridgeStore store = new();
     private readonly List<WeakReference<Microsoft.Web.WebView2.Wpf.WebView2>> views = new();
+    private bool savesAtExit;
 
     /// <summary>The app's own chrome: what the page says about it goes there.</summary>
     public IShellListener? Shell { get; set; }
@@ -37,6 +38,15 @@ public sealed class Bridge
     public void EraseStorage() => store.Erase();
 
     public void SaveNow() => store.SaveNow();
+
+    /// <summary>The storage written as the app quits (Application.Exit), so a change in its last moments is kept — set
+    /// once, by the first engine. After Reset Everything's erase, nothing is.</summary>
+    public void SaveAtExit()
+    {
+        if (savesAtExit || Application.Current is not { } app) return;
+        savesAtExit = true;
+        app.Exit += (_, _) => SaveNow();
+    }
 
     public JsonNode? Value(string key) => store.Value(key);
 

@@ -21,6 +21,7 @@ public static class Program
         Instance.WaitForPrevious();       // (opened again by Reset Everything: the copy before it gone first)
         EraseAll.FinishIfAsked();         // (and what it could not delete, deleted now)
         if (!Instance.Claim()) return;    // (already open: that one is brought forward instead)
+        Engine.BridgeStore.Preload();     // (the extension's storage read meanwhile, off this thread)
         var app = new App();
         app.InitializeComponent();
         app.DispatcherUnhandledException += (_, e) =>

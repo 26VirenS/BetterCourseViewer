@@ -91,6 +91,8 @@ public sealed partial class Engine : Observable, IShellListener
     private bool started;
     private readonly Dictionary<long, TaskCompletionSource<(bool Ok, string Text)>> calls = new();
     private long nextCall;
+    /// <summary>Reads asked and not answered yet, by the file their answer is kept in: the same read asked meanwhile waits for that answer.</summary>
+    private readonly Dictionary<string, TaskCompletionSource<string>> reading = new();
     private readonly HashSet<string> sectionsRead = new();
 
     public Engine(string host)
@@ -100,6 +102,7 @@ public sealed partial class Engine : Observable, IShellListener
         BaseUrl = dev != null && string.Equals(dev.Host, host, StringComparison.OrdinalIgnoreCase) ? dev : new Uri($"https://{host}/");
         Answers = new AnswerCache(BaseUrl.IsDefaultPort ? BaseUrl.Host : $"{BaseUrl.Host}_{BaseUrl.Port}");
         Bridge.Shared.Shell = this;
+        Bridge.Shared.SaveAtExit();
         Login = new LoginAssist(BaseUrl.Host, this);
         Login.OnRestart = () => Web.CoreWebView2?.Navigate(new Uri(BaseUrl, "/").ToString()); // (Start Over: Canvas afresh, which asks the school anew)
         Login.PropertyChanged += (_, e) => Changed("Login." + e.PropertyName);
@@ -115,6 +118,11 @@ public sealed partial class Engine : Observable, IShellListener
     {
         if (started) return;
         started = true;
+        // (the extension's scripts read and put together meanwhile, off the window's thread)
+        var bundle = Task.Run(() => ScriptBundle.Scripts(Host, shellOn: true));
+        // signed in here before: the app's own screens at once, while the web view starts (what they read waits for the
+        // page, as it would)
+        OpenOnKept();
         try
         {
             // (the page runs as briskly with the app's own screens over it as when it is shown: nothing of it is put to
@@ -125,6 +133,7 @@ public sealed partial class Engine : Observable, IShellListener
         }
         catch (Exception e)
         {
+            if (Web.Parent == null) return; // (let go of while it started: another school chosen over the screens kept)
             Phase = Phase.Web;
             Shell.Dialogs.Fail("Simpl needs Microsoft Edge WebView2", "Simpl draws your school's pages with Microsoft Edge WebView2, which could not be started: " + e.Message + "\n\nInstall it from https://go.microsoft.com/fwlink/p/?LinkId=2124703 and open Simpl again.");
             return;
@@ -141,9 +150,12 @@ public sealed partial class Engine : Observable, IShellListener
         Bridge.Shared.Register(Web);
         Bridge.Shared.FollowSystemAppearance();
         if (Launch.Flag("demo")) Bridge.Shared.Seed(ScriptBundle.DemoSeed());
-        foreach (var s in ScriptBundle.Scripts(Host, shellOn: true)) await core.AddScriptToExecuteOnDocumentCreatedAsync(s);
-        // the sign-in reader, on every page (the school's sign-in pages above all)
-        await core.AddScriptToExecuteOnDocumentCreatedAsync(ScriptBundle.LoginScript(BaseUrl.Host));
+        // the extension's scripts, then the sign-in reader on every page (the school's sign-in pages above all): all asked
+        // for at once, one after another in that order — the order they run in — and all in before the first page
+        var adding = new List<Task<string>>();
+        foreach (var s in await bundle) adding.Add(core.AddScriptToExecuteOnDocumentCreatedAsync(s));
+        adding.Add(core.AddScriptToExecuteOnDocumentCreatedAsync(ScriptBundle.LoginScript(BaseUrl.Host)));
+        await Task.WhenAll(adding);
         core.WebMessageReceived += OnMessage;
         core.NavigationStarting += (_, e) =>
         {
@@ -165,7 +177,6 @@ public sealed partial class Engine : Observable, IShellListener
         Bridge.Shared.SignOutRequested += SignOut;
         core.NewWindowRequested += OnNewWindow;
         core.DownloadStarting += OnDownload;
-        OpenOnKept();
         core.Navigate(new Uri(BaseUrl, "/").ToString());
         // a page that never says (a school's sign-in on another host, a page that failed): shown as it is
         _ = Task.Delay(10_000).ContinueWith(_ => Application.Current.Dispatcher.Invoke(() => { if (Phase == Phase.Starting) SetPhase(Phase.Web); }));
@@ -173,7 +184,7 @@ public sealed partial class Engine : Observable, IShellListener
 
     /// <summary>
     /// Signed in here before, the setup done: the app's own screens at once, on what they showed last time, while the
-    /// page loads underneath; the live answers replace them as they come.
+    /// web view starts and the page loads underneath; the live answers replace them as they come.
     /// </summary>
     private void OpenOnKept()
     {
@@ -449,6 +460,7 @@ public sealed partial class Engine : Observable, IShellListener
     /// <summary>Something changed under the screens (a tick, a hand-in): they read again, and so do the counts.</summary>
     public void DataChanged()
     {
+        reading.Clear(); // (what is read from here on is asked anew, never joined to a read asked before the change)
         DataVersion++;
         _ = RefreshSnapshot();
     }
@@ -459,6 +471,7 @@ public sealed partial class Engine : Observable, IShellListener
         if (Refreshing) return;
         Refreshing = true;
         try { await Call<OK>("refresh"); } catch { }
+        reading.Clear(); // (the page's caches let go: nothing read from here on joins a read asked before)
         await LoadSidebar();
         DataChanged();
         await Task.Delay(400);
@@ -478,12 +491,56 @@ public sealed partial class Engine : Observable, IShellListener
 
     /// <summary>
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready (a page load
-    /// under way), and tries again if the page went away mid-call.
+    /// under way), and tries again if the page went away mid-call. A read already asked with the same arguments, not
+    /// answered yet, is not asked twice: its answer is this one's too.
     /// </summary>
     public async Task<T> Call<T>(string name, object? args = null)
     {
         var a = ArgsOf(args);
-        var text = await CallText(name, a);
+        var text = await Read(name, a);
+        // (decoded off the window's thread: a long answer holds up nothing on screen)
+        var answer = await Task.Run(() => Decode<T>(name, text));
+        Answers.Keep(text, name, a);
+        return answer;
+    }
+
+    /// <summary>
+    /// A call's answer text, as <see cref="CallText"/> gives it; a read (a name whose answers are kept) already asked with
+    /// the same arguments and not answered yet is waited for instead of asked again.
+    /// </summary>
+    private Task<string> Read(string name, JsonObject a)
+    {
+        if (AnswerCache.FileName(name, a) is not { } key) return CallText(name, a);
+        if (reading.TryGetValue(key, out var asked)) return asked.Task;
+        var shared = new TaskCompletionSource<string>();
+        reading[key] = shared;
+        _ = Ask(key, shared, name, a);
+        return shared.Task;
+    }
+
+    private async Task Ask(string key, TaskCompletionSource<string> shared, string name, JsonObject a)
+    {
+        string text;
+        try { text = await CallText(name, a); }
+        catch (Exception e)
+        {
+            Settled(key, shared);
+            shared.SetException(e);
+            return;
+        }
+        Settled(key, shared);
+        shared.SetResult(text);
+    }
+
+    /// <summary>A shared read answered: the next one asked is asked anew (unless a change let go of it already).</summary>
+    private void Settled(string key, TaskCompletionSource<string> shared)
+    {
+        if (reading.TryGetValue(key, out var now) && now == shared) reading.Remove(key);
+    }
+
+    /// <summary>An answer read (off the window's thread): the page's own error said as one, else the answer decoded.</summary>
+    private static T Decode<T>(string name, string text)
+    {
         if (text.Length > 0 && text[0] == '{')
         {
             try
@@ -501,7 +558,6 @@ public sealed partial class Engine : Observable, IShellListener
             throw new EngineException("The answer could not be read.");
         }
         if (answer == null) throw new EngineException("The answer could not be read.");
-        Answers.Keep(text, name, a);
         return answer;
     }
 
@@ -522,7 +578,9 @@ public sealed partial class Engine : Observable, IShellListener
             try
             {
                 await Web.CoreWebView2.ExecuteScriptAsync($"window.__simplCall&&window.__simplCall({id},{Json.Str(name)},{Json.Literal(a)})");
-                var finished = await Task.WhenAny(done.Task, Task.Delay(90_000));
+                using var wait = new CancellationTokenSource();
+                var finished = await Task.WhenAny(done.Task, Task.Delay(90_000, wait.Token));
+                wait.Cancel(); // (its timer let go of as soon as the answer is in)
                 if (finished != done.Task) throw new EngineException("The page did not answer.");
                 var (ok, text) = done.Task.Result;
                 if (ok) return text;
@@ -562,10 +620,62 @@ public sealed partial class Engine : Observable, IShellListener
         foreach (var c in calls.Values.ToList()) c.TrySetException(new EngineException(why));
     }
 
+    /// <summary>
+    /// The call a message answers, when it is a call's answer as the native channel writes it, its kind and its id before
+    /// the answer itself (<see cref="ScriptBundle.NativeChannel"/>): only its first few names are looked at, never the
+    /// answer. Anything else, null — read the usual way.
+    /// </summary>
+    private static long? AnswerTo(string json)
+    {
+        var head = System.Text.Encoding.UTF8.GetBytes(json.Length > 96 ? json[..96] : json);
+        var r = new Utf8JsonReader(head, isFinalBlock: false, default);
+        if (!r.Read() || r.TokenType != JsonTokenType.StartObject) return null;
+        string? kind = null;
+        long? id = null;
+        while (kind == null || id == null)
+        {
+            if (!r.Read() || r.TokenType != JsonTokenType.PropertyName) return null;
+            var name = r.GetString();
+            if (!r.Read()) return null;
+            if (name == "kind" && r.TokenType == JsonTokenType.String) kind = r.GetString();
+            else if (name == "id" && r.TokenType == JsonTokenType.Number && r.TryGetInt64(out var n)) id = n;
+            else return null;
+        }
+        return kind == "call" ? id : null;
+    }
+
+    /// <summary>A call's answer read (off the window's thread) and handed to the call.</summary>
+    private static void Answer(TaskCompletionSource<(bool Ok, string Text)> done, string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var m = doc.RootElement;
+            var ok = m.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True;
+            var text = !m.TryGetProperty("text", out var t) ? "" : t.ValueKind switch
+            {
+                JsonValueKind.String => t.GetString() ?? "",
+                JsonValueKind.Null => "",
+                _ => t.GetRawText(),
+            };
+            done.TrySetResult((ok, text));
+        }
+        catch { /* (not an answer that can be read: as if none came) */ }
+    }
+
     private async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
+        string json;
+        try { json = e.WebMessageAsJson; } catch { return; }
+        // a call's answer: the call's as it comes, whatever the page does next, and read off the window's thread; all
+        // else the page says (the bridge's storage, its questions) is heard here, in order
+        if (AnswerTo(json) is { } callId)
+        {
+            if (calls.Remove(callId, out var answered)) _ = Task.Run(() => Answer(answered, json));
+            return;
+        }
         JsonObject? m;
-        try { m = JsonNode.Parse(e.WebMessageAsJson) as JsonObject; } catch { return; }
+        try { m = JsonNode.Parse(json) as JsonObject; } catch { return; }
         if (m == null) return;
         var kind = m["kind"]?.ToString();
         if (kind == "call")

@@ -32,7 +32,7 @@ public static class Notices
     private static Engine.Engine? engine;
     private static Shell.MainWindow? window;
     private static readonly List<DispatcherTimer> due = new();
-    private static DispatcherTimer? watch, settle;
+    private static DispatcherTimer? watch, settle, first;
     private static int lastData = -1;
 
     /// <summary>The app's screens up: reminders set from what is due now, and the look for new activity begun.</summary>
@@ -52,11 +52,19 @@ public static class Notices
             settle.Tick += (_, _) => { settle?.Stop(); _ = Reschedule(); };
             settle.Start();
         };
-        _ = Reschedule();
+        // (the first reminders and look half a minute on: the first screen's reads go first)
+        first = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        first.Tick += (_, _) =>
+        {
+            first?.Stop();
+            first = null;
+            _ = Reschedule();
+            _ = Look(notify: false); // (what the student sees now is not news)
+        };
+        first.Start();
         watch = new DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
         watch.Tick += (_, _) => _ = Look(notify: true);
         watch.Start();
-        _ = Look(notify: false); // (what the student sees now is not news)
     }
 
     /// <summary>Signed out, another school: no reminder nor alert of that account's left.</summary>
@@ -64,6 +72,8 @@ public static class Notices
     {
         foreach (var t in due) t.Stop();
         due.Clear();
+        first?.Stop();
+        first = null;
         watch?.Stop();
         watch = null;
         engine = null;

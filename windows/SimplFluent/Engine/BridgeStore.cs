@@ -9,20 +9,37 @@ namespace Simpl.Engine;
 /// <summary>
 /// The extension's <c>storage.local</c>: one JSON file (%LOCALAPPDATA%\Simpl\storage.json), mirrored in memory — the
 /// Mac's BridgeStore. Values are whatever the scripts store (settings, preferences, cached Canvas answers). Used on the
-/// UI thread; the file write is coalesced and done off it.
+/// UI thread; the file is read as the app starts (<see cref="Preload"/>), and each write is coalesced, put into words on
+/// the UI thread and written off it, one after another.
 /// </summary>
 public sealed class BridgeStore
 {
-    private JsonObject data = new();
+    private static Task<JsonObject>? preloaded;
+
+    private JsonObject data;
     private readonly string file = AppPaths.Storage;
     private readonly DispatcherTimer saveTimer;
+    /// <summary>The writer: each save written after the one before it, off the UI thread.</summary>
+    private Task writing = Task.CompletedTask;
+    private readonly object gate = new();
     private bool erased;
+
+    /// <summary>storage.json read on a worker as the app starts (Program.Main), for the store to take once it is made.</summary>
+    public static void Preload() => preloaded ??= Task.Run(() => Load());
+
+    private static JsonObject Load()
+    {
+        try { if (File.Exists(AppPaths.Storage)) return JsonNode.Parse(File.ReadAllText(AppPaths.Storage)) as JsonObject ?? new JsonObject(); } catch { }
+        return new JsonObject();
+    }
 
     public BridgeStore()
     {
-        try { if (File.Exists(file)) data = JsonNode.Parse(File.ReadAllText(file)) as JsonObject ?? new JsonObject(); } catch { data = new JsonObject(); }
+        // (read as the app started — in by now, as a rule; else read here)
+        data = preloaded?.GetAwaiter().GetResult() ?? Load();
+        preloaded = null;
         saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-        saveTimer.Tick += (_, _) => { saveTimer.Stop(); SaveNow(); };
+        saveTimer.Tick += (_, _) => { saveTimer.Stop(); SaveSoon(); };
     }
 
     /// <summary>Chrome's shapes: nothing/null = everything, a key, a list of keys, or {key: default}.</summary>
@@ -88,13 +105,17 @@ public sealed class BridgeStore
         return changes;
     }
 
-    /// <summary>Everything gone and the file deleted; nothing written after it (the app is about to restart).</summary>
+    /// <summary>Everything gone and the file deleted; nothing written after it (the app is about to restart) — a write
+    /// under way finishes first, and is deleted with the rest.</summary>
     public void Erase()
     {
-        erased = true;
         saveTimer.Stop();
-        data = new JsonObject();
-        try { File.Delete(file); } catch { }
+        lock (gate)
+        {
+            erased = true;
+            data = new JsonObject();
+            try { File.Delete(file); } catch { }
+        }
     }
 
     private void ScheduleSave()
@@ -104,17 +125,36 @@ public sealed class BridgeStore
         saveTimer.Start();
     }
 
-    /// <summary>Written now (the app is closing).</summary>
-    public void SaveNow()
+    /// <summary>The store as it is now, to the writer: put into words here (its values are the UI thread's), written off it.</summary>
+    private void SaveSoon()
     {
         if (erased) return;
         var text = data.ToJsonString();
-        try
+        writing = writing.ContinueWith(_ => Write(text), TaskScheduler.Default);
+    }
+
+    /// <summary>Written now (the app is closing), once the writer has written what it has.</summary>
+    public void SaveNow()
+    {
+        if (erased) return;
+        saveTimer.Stop();
+        var text = data.ToJsonString();
+        try { writing.Wait(); } catch { }
+        Write(text);
+    }
+
+    private void Write(string text)
+    {
+        lock (gate)
         {
-            var tmp = file + ".tmp";
-            File.WriteAllText(tmp, text);
-            File.Move(tmp, file, true);
+            if (erased) return; // (erased meanwhile: nothing written after it)
+            try
+            {
+                var tmp = file + ".tmp";
+                File.WriteAllText(tmp, text);
+                File.Move(tmp, file, true);
+            }
+            catch { /* the next change tries again */ }
         }
-        catch { /* the next change tries again */ }
     }
 }
