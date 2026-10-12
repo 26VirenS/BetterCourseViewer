@@ -10,11 +10,17 @@ struct PTElementPage: View {
     let close: () -> Void
     let go: (Int) -> Void
     /// (1.3.76) Atom, Orbitals or Cloud: kept from element to element, as the Orbitals view was.
-    @State private var model: PTModel = .atom
-    @State private var subshellID: String?
+    @State private var model: PTModel = PTElementPage.shotModel
+    @State private var subshellID: String? = PTElementPage.shotModel == .cloud ? nil : PTElementPage.shotSubshell
     /// (1.3.76) The Cloud view's chosen subshell ("3d"); nil, the whole atom. Its own, apart from the Orbitals' subshell,
     /// and back to the whole atom on every element.
-    @State private var cloudFocus: String?
+    @State private var cloudFocus: String? = PTElementPage.shotModel == .cloud && PTElementPage.shotSubshell != "all" ? PTElementPage.shotSubshell : nil
+
+    /// (1.3.76) The screenshot suite's -SimplPTModel cloud (the view: atom, orbitals or cloud) and -SimplPTSubshell 3d
+    /// (the Cloud's chosen subshell, all for the whole atom; in another view, the Orbitals'): read whenever the page is
+    /// made, as the table's other -SimplPT* settings are — a page made again before the picture keeps them.
+    private static var shotModel: PTModel { PTModel(rawValue: UserDefaults.standard.string(forKey: "SimplPTModel") ?? "") ?? .atom }
+    private static var shotSubshell: String? { UserDefaults.standard.string(forKey: "SimplPTSubshell") }
     @Environment(\.colorScheme) private var scheme
     @FocusState private var focused: Bool
     /// The page's width inside its margins, which picks the layout.
@@ -57,17 +63,7 @@ struct PTElementPage: View {
         .onKeyPress(.rightArrow) { step(1); return .handled }
         .onAppear {
             focused = true
-            // (1.3.76) the screenshot suite, once a launch: -SimplPTModel cloud (the view: atom, orbitals or cloud) and
-            // -SimplPTSubshell 3d (the Cloud's chosen subshell, all for the whole atom; in another view, the Orbitals');
-            // -SimplCloudCheck YES, the cloud model's test vectors on the console
-            var shown = model
-            if let raw = LaunchOpen.take("", key: "SimplPTModel"), let m = PTModel(rawValue: raw) {
-                shown = m
-                model = m
-            }
-            if let s = LaunchOpen.take("", key: "SimplPTSubshell") {
-                if shown == .cloud { cloudFocus = s == "all" ? nil : s } else { subshellID = s }
-            }
+            // (1.3.76) the screenshot suite's -SimplCloudCheck YES: the cloud model's test vectors on the console
             if UserDefaults.standard.bool(forKey: "SimplCloudCheck") { ElectronCloud.selfCheck() }
         }
         .onChange(of: e.number) { _, _ in
