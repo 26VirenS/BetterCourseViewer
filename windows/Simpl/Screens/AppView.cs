@@ -22,7 +22,11 @@ public sealed class AppView
     private readonly HashSet<string> open = new();
     private string query = "";
     private bool sideHidden, searchOpen;
+    private bool? wasWide;
     private int lastNav = -1;
+
+    /// <summary>The Mac's MainShell.narrow: below this width the sidebar folds away as the window narrows, and comes back as it widens.</summary>
+    public const float Narrow = 880;
 
     /// <summary>The sidebar's width (the Mac's, as pictured).</summary>
     public const float SideW = 278;
@@ -64,6 +68,12 @@ public sealed class AppView
         ui.T.Dark = Dark(engine.Snapshot?.Dark);
         if (engine.Phase == Phase.Starting && engine.Snapshot == null) { Opening(ui); return; }
 
+        var wide = ui.W >= Narrow;
+        if (wide != wasWide)
+        {
+            if (wasWide != null || !wide) sideHidden = !wide; // (a wide window opens as it was)
+            wasWide = wide;
+        }
         var side = sideHidden ? 0 : SideW;
         var content = new R(side, 0, Math.Max(200, ui.W - side), ui.H);
         var place = engine.Nav.Current.Place;
@@ -254,7 +264,7 @@ public sealed class AppView
 
         y += 12;
         Lines.Text(ui, "Courses", 22, y + 3, Theme.Semibold(Theme.Caption2), t.Ink2);
-        y += 32;
+        y += 20;
         foreach (var c in engine.Courses)
         {
             var ctx = "courses/" + c.Id;

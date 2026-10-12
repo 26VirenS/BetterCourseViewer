@@ -871,6 +871,7 @@ public sealed class DashboardScreen
             var th = MathF.Round((float)(height * fraction));
             var cx = cx0 + colW * k + colW / 2;
             var delay = Math.Min(k, 8) * 0.07;
+            if (risen <= 0.3 + delay) ui.Animating = true; // (a tower waiting its turn: the frames keep coming until it has risen)
             var up = ui.Animate($"dash:sky:{c.Id}", risen > 0.08 + delay ? 1 : 0, 0.42f, 0.92f);
             var color = Theme.Hex(c.Color);
             var ghost = c.Score == null;

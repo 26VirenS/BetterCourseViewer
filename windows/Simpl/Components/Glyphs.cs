@@ -43,7 +43,9 @@ public static class Glyphs
     };
 
     public static string Of(string? symbol) =>
-        symbol != null && Map.TryGetValue(symbol, out var g) ? g : (symbol != null && Map.TryGetValue(symbol.Replace(".fill", ""), out var g2) ? g2 : "");
+        symbol == null ? "" :
+        symbol.Length == 1 && symbol[0] >= '\uE000' ? symbol : // (a glyph already)
+        Map.TryGetValue(symbol, out var g) ? g : (Map.TryGetValue(symbol.Replace(".fill", ""), out var g2) ? g2 : "");
 
     /// <summary>A section of a course, by its kind (the Mac's Glyph.section).</summary>
     public static string Section(string kind) => Of(kind switch
