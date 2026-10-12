@@ -346,7 +346,7 @@ public sealed class AppShell : Grid, IDisposable
         var crumbs = new List<(string Title, Action? Go)>();
         if (loc.Path.Count > 0)
         {
-            var root = placeScreens.TryGetValue(loc.Place.Identity, out var ps) ? ps.Title : ScreenFactory.TitleOf(engine, loc.Place);
+            var root = ScreenFactory.TitleOf(engine, loc.Place);
             crumbs.Add((root, () => engine.PopToRoot()));
             for (var i = 0; i < loc.Path.Count - 1; i++)
             {

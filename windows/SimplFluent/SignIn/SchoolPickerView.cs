@@ -27,7 +27,7 @@ public sealed class SchoolPickerView : Grid
     private readonly Window owner;
     private readonly SchoolSearch search = new();
     private readonly Grid searching = new();
-    private readonly TextBox field;
+    private readonly TextBox query;
     private readonly Border results;
     private readonly Stack list = new() { Orientation = Orientation.Vertical, Spacing = 2 };
     private readonly ScrollViewer scroller;
@@ -49,19 +49,19 @@ public sealed class SchoolPickerView : Grid
         var sub = K.Text("Find your school’s Canvas or Brightspace.", Ty.BodyLarge, B.Text2).Center();
 
         // the field: Windows' search box, large
-        field = new TextBox
+        query = new TextBox
         {
             PlaceholderText = "School name", Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, ClearButtonEnabled = true,
             FontSize = 16, MinHeight = 40, Padding = new Thickness(10, 9, 10, 9),
         };
-        field.TextChanged += (_, _) => Find();
-        field.PreviewKeyDown += OnFieldKey;
+        query.TextChanged += (_, _) => Find();
+        query.PreviewKeyDown += OnFieldKey;
         asking.Visibility = Visibility.Collapsed;
         asking.HorizontalAlignment = HorizontalAlignment.Right;
         asking.Margin = new Thickness(0, 0, 40, 0);
-        var fieldGrid = new Grid { Children = { field, asking } };
+        var fieldGrid = new Grid { Children = { query, asking } };
 
-        // what matches, in a card that grows in under the field
+        // what matches, in a card that grows in under the query
         scroller = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(4), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         results = K.Card(scroller, new Thickness(0));
         results.Height = 280;
@@ -101,14 +101,14 @@ public sealed class SchoolPickerView : Grid
         {
             Motion.Stagger(column.Children.OfType<UIElement>(), 60);
             await search.Load();
-            field.Focus();
-            Keyboard.Focus(field);
+            query.Focus();
+            Keyboard.Focus(query);
             // (the screenshot suite: --picker-query and --picker-confirm)
-            if (Launch.Get("picker-query") is { } q) field.Text = q;
+            if (Launch.Get("picker-query") is { } q) query.Text = q;
         };
     }
 
-    private string Trimmed => field.Text.Trim();
+    private string Trimmed => query.Text.Trim();
 
     /// <summary>What Enter opens, in order: the address typed, then each school found.</summary>
     private List<string> Choices
@@ -116,7 +116,7 @@ public sealed class SchoolPickerView : Grid
         get
         {
             var outList = new List<string>();
-            if (SchoolSearch.AddressLike(field.Text) is { } typed) outList.Add("open:" + typed);
+            if (SchoolSearch.AddressLike(query.Text) is { } typed) outList.Add("open:" + typed);
             outList.AddRange(search.Results.Select(r => r.Id));
             return outList;
         }
@@ -124,7 +124,7 @@ public sealed class SchoolPickerView : Grid
 
     private void Find()
     {
-        search.Find(field.Text);
+        search.Find(query.Text);
         chosen = null;
         ShowResults();
     }
@@ -141,7 +141,7 @@ public sealed class SchoolPickerView : Grid
         list.Children.Clear();
         rows.Clear();
         if (!shown) return;
-        if (SchoolSearch.AddressLike(field.Text) is { } typed)
+        if (SchoolSearch.AddressLike(query.Text) is { } typed)
             list.Children.Add(Row("open:" + typed, $"Open {typed}", "The address as typed", SymbolRegular.Open24, () => PickTyped(typed)));
         foreach (var s in search.Results)
         {
@@ -150,7 +150,7 @@ public sealed class SchoolPickerView : Grid
         }
         if (search.Asking && search.Results.Count == 0)
             list.Children.Add(K.H(10, K.Spinner(16), K.Text("Searching…", Ty.Body, B.Text2)).Margin(12));
-        else if (search.Results.Count == 0 && SchoolSearch.AddressLike(field.Text) == null)
+        else if (search.Results.Count == 0 && SchoolSearch.AddressLike(query.Text) == null)
             list.Children.Add(K.Wrapped("No school by that name. Try another part of its name, or enter its address below.", Ty.Body, B.Text2).Margin(12));
         var all = Choices;
         if (chosen == null || !all.Contains(chosen)) chosen = all.FirstOrDefault();
@@ -250,6 +250,6 @@ public sealed class SchoolPickerView : Grid
         confirm = null;
         searching.Visibility = Visibility.Visible;
         Motion.FadeIn(searching);
-        Dispatcher.BeginInvoke(() => { field.Focus(); Keyboard.Focus(field); }, System.Windows.Threading.DispatcherPriority.Input);
+        Dispatcher.BeginInvoke(() => { query.Focus(); Keyboard.Focus(query); }, System.Windows.Threading.DispatcherPriority.Input);
     }
 }
