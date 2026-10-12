@@ -111,7 +111,7 @@ public sealed partial class Engine : Observable, IShellListener
         catch (Exception e)
         {
             Phase = Phase.Web;
-            Dialogs.Fail("Simpl needs Microsoft Edge WebView2", "Simpl draws your school's pages with Microsoft Edge WebView2, which could not be started: " + e.Message + "\n\nInstall it from https://go.microsoft.com/fwlink/p/?LinkId=2124703 and open Simpl again.");
+            Shell.Dialogs.Fail("Simpl needs Microsoft Edge WebView2", "Simpl draws your school's pages with Microsoft Edge WebView2, which could not be started: " + e.Message + "\n\nInstall it from https://go.microsoft.com/fwlink/p/?LinkId=2124703 and open Simpl again.");
             return;
         }
         var core = Web.CoreWebView2;
@@ -130,7 +130,7 @@ public sealed partial class Engine : Observable, IShellListener
             ready = false;
             FailCalls("The page went away.");
         };
-        core.NavigationCompleted += (_, _) => PageFinished(core.Source);
+        core.NavigationCompleted += (_, _) => PageFinished(Uri.TryCreate(core.Source, UriKind.Absolute, out var u) ? u : null);
         core.NewWindowRequested += OnNewWindow;
         core.DownloadStarting += OnDownload;
         OpenOnKept();

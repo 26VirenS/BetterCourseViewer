@@ -54,9 +54,22 @@ public static class Shot
     [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
     [StructLayout(LayoutKind.Sequential)] private struct Rect32 { public int L, T, R, B; }
 
+    /// <summary>The app's own screens, as they are drawn (BGRA rows), while they are up: pictured from the renderer.</summary>
+    public static Func<(byte[] Pixels, int Width, int Height)?>? Frame;
+
     /// <summary>The app's frontmost window (a tool's, a popup's, else the main one), pictured.</summary>
     public static void Take(string file)
     {
+        if (Frame?.Invoke() is { } f)
+        {
+            var bmp0 = BitmapSource.Create(f.Width, f.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, f.Pixels, f.Width * 4);
+            var enc0 = new PngBitmapEncoder();
+            enc0.Frames.Add(BitmapFrame.Create(bmp0));
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file))!);
+            using var fs0 = File.Create(file);
+            enc0.Save(fs0);
+            return;
+        }
         var w = Application.Current.Windows.OfType<Window>().Where(x => x.IsVisible).OrderByDescending(x => x.IsActive).ThenByDescending(x => x.Topmost).FirstOrDefault()
                 ?? Application.Current.MainWindow;
         if (w == null) return;

@@ -12,3 +12,10 @@ endif()
 add_executable(LiquidGlass WIN32 src/main.cpp src/app.rc)
 target_link_libraries(LiquidGlass PRIVATE d3d11 dxgi d3dcompiler d2d1 dwrite windowscodecs dwmapi ole32 shell32 user32)
 target_compile_definitions(LiquidGlass PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+
+# the glass's HLSL, shared with the app (windows/Shared/Glass.hlsl), carried in the exe as a string
+set(GLASS_HLSL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../Shared/Glass.hlsl)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GLASS_HLSL_FILE})
+file(READ ${GLASS_HLSL_FILE} GLASS_HLSL)
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/generated/GlassHlsl.h "#pragma once\nstatic const char* kGlassHlsl = R\"HLSL(\n${GLASS_HLSL})HLSL\";\n")
+target_include_directories(LiquidGlass PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)

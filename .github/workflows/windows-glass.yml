@@ -9,6 +9,7 @@ on:
     paths:
       - 'windows-glass/**'
       - 'windows/GlassNative/**'
+      - 'windows/Shared/**'
       - '.github/workflows/windows-glass.yml'
   workflow_dispatch:
 
