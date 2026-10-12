@@ -301,12 +301,10 @@ internal sealed class ImageToTextTool : ContentControl
 
     private void Render()
     {
-        var sv = Content as ScrollViewer;
-        FileKit.Keep(sv, () =>
-        {
-            FileKit.Detach(box);
-            Content = !s.HasSource && !s.Busy ? ToolKit.Page(Intake()) : ToolKit.Page(Reading());
-        });
+        FileKit.Detach(box);
+        FileKit.Detach(none);
+        FileKit.Detach(count);
+        Content = FileKit.Page(Content as ScrollViewer, !s.HasSource && !s.Busy ? Intake() : Reading());
         if (box.Text != s.Text) box.Text = s.Text;
         Counts();
     }

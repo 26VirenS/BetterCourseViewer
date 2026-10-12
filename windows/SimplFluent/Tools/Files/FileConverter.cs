@@ -114,11 +114,20 @@ internal static class ConvEngine
         }
         byte[] bytes;
         try { bytes = await WinImage.Write(sb, encoder, q); }
-        catch (Exception e)
+        catch (Exception first)
         {
-            Log.Write($"convert {target}: {e.Message}");
-            if (target == "heic") throw new ConvError("This PC cannot write HEIC pictures: Windows needs the HEIF Image Extensions from the Microsoft Store.");
-            throw new ConvError("The picture could not be written.");
+            Log.Write($"convert {target}: {first.Message}");
+            try
+            {
+                // (an encoder that takes no quality setting: its own)
+                if (q == null) throw;
+                bytes = await WinImage.Write(sb, encoder);
+            }
+            catch
+            {
+                if (target == "heic") throw new ConvError("This PC cannot write HEIC pictures: Windows needs the HEIF Image Extensions from the Microsoft Store.");
+                throw new ConvError("The picture could not be written.");
+            }
         }
         try { await File.WriteAllBytesAsync(dest, bytes); }
         catch { throw new ConvError("The picture could not be written."); }
@@ -843,8 +852,7 @@ internal sealed class FileConverterTool : ContentControl
 
     private void Render()
     {
-        FileKit.Keep(Content as ScrollViewer, () =>
-            Content = ToolKit.Page(s.Files.Count == 0 ? Intake() : ToolKit.Columns(List(), Controls(), 380, 940)));
+        Content = FileKit.Page(Content as ScrollViewer, s.Files.Count == 0 ? Intake() : ToolKit.Columns(List(), Controls(), 380, 940));
     }
 
     private FrameworkElement Intake()

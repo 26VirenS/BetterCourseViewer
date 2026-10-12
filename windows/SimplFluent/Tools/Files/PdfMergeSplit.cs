@@ -395,18 +395,8 @@ internal sealed class PdfMergeSplitTool : ContentControl
         Notes();
         if (s.Mode == "merge") { Files(); Merged(); } else Split();
         var body = s.Mode == "merge" ? K.V(20, filesHost, mergedHost) : (UIElement)splitHost;
-        var top = K.V(20, modes, notes, body);
-        if (page == null)
-        {
-            page = ToolKit.Page(top);
-            Content = page;
-        }
-        else
-        {
-            top.MaxWidth = 1480;
-            top.HorizontalAlignment = HorizontalAlignment.Left;
-            page.Content = top;
-        }
+        page = FileKit.Page(page, K.V(20, modes, notes, body));
+        Content = page;
     }
 
     private void Notes()

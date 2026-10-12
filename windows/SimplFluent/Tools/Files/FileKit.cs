@@ -100,14 +100,16 @@ internal static class FileKit
         }
     }
 
-    /// <summary>A scroll viewer's place kept while what is in it is built again.</summary>
-    public static void Keep(ScrollViewer? sv, Action rebuild)
+    /// <summary>
+    /// A tool's scrolling page (ToolKit.Page) with new content: the same page kept when there is one, so it stays
+    /// scrolled where it was while the tool is built again.
+    /// </summary>
+    public static ScrollViewer Page(ScrollViewer? page, UIElement content, double maxWidth = 1480)
     {
-        var h = sv?.HorizontalOffset ?? 0;
-        var v = sv?.VerticalOffset ?? 0;
-        rebuild();
-        if (sv == null) return;
-        sv.Dispatcher.BeginInvoke(() => { sv.ScrollToHorizontalOffset(h); sv.ScrollToVerticalOffset(v); }, System.Windows.Threading.DispatcherPriority.Loaded);
+        if (page == null) return ToolKit.Page(content, maxWidth);
+        if (content is FrameworkElement fe) { fe.MaxWidth = maxWidth; fe.HorizontalAlignment = HorizontalAlignment.Left; }
+        page.Content = content;
+        return page;
     }
 
     /// <summary>
@@ -126,7 +128,7 @@ internal static class FileKit
     {
         try
         {
-            PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows = true;
+            if (!PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows) PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows = true;
             var path = Path.Combine(AppPaths.Root, "Biology notes.pdf");
             using var doc = new PdfSharp.Pdf.PdfDocument();
             var title = new PdfSharp.Drawing.XFont("Arial", 22, PdfSharp.Drawing.XFontStyleEx.Bold);
