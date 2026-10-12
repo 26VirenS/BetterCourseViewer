@@ -89,26 +89,34 @@ struct TodoView: View {
     private func todoRow(_ row: WorkRow, withCourse: Bool) -> some View {
         HStack(spacing: 12) {
             CheckCircle(done: row.done, color: .green) { toggle(row, !row.done) }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.title)
-                    .lineLimit(2)
-                    .strikethrough(row.done, color: .secondary)
-                    .foregroundStyle(row.done ? .secondary : .primary)
-                Text(withCourse ? (row.sub ?? "") : (row.meta ?? ""))
-                    .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 5) {
-                    if let flag = row.flag { FlagBadge(flag: flag) }
-                    if let p = row.pri, p > 0 { priorityChip(p) }
+            // (the tick a button of its own; the rest opens the task, dimming under the finger as every other row does, 1.7.5)
+            Button { open(row) } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                            .lineLimit(2)
+                            .strikethrough(row.done, color: .secondary)
+                            .foregroundStyle(row.done ? .secondary : .primary)
+                        Text(withCourse ? (row.sub ?? "") : (row.meta ?? ""))
+                            .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    .separatorAtText()
+                    Spacer(minLength: 6)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack(spacing: 5) {
+                            if let flag = row.flag { FlagBadge(flag: flag) }
+                            if let p = row.pri, p > 0 { priorityChip(p) }
+                        }
+                        if let t = row.time { Text(t).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                    }
                 }
-                if let t = row.time { Text(t).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(row.custom == true || row.url == nil) // (a task of your own has nothing to open)
         }
         .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onTapGesture { open(row) }
+        .contentShape(Rectangle()) // (the long press anywhere on the row)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button { toggle(row, !row.done) } label: { Label(row.done ? "Not Done" : "Done", systemImage: row.done ? "arrow.uturn.backward" : "checkmark") }
                 .tint(row.done ? .gray : .green)

@@ -8,6 +8,10 @@ struct TopicView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<TopicData>()
     @State private var replyTo: ReplyTarget?
+    /// A reply went in from the sheet: once it is down, the thread reloads and goes to it (1.7.5).
+    @State private var posted = false
+    @State private var jump: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     struct ReplyTarget: Identifiable {
         let id: String
@@ -18,6 +22,7 @@ struct TopicView: View {
     var body: some View {
         Group {
             if let d = model.data {
+                ScrollViewReader { proxy in
                 List {
                     Section { post(d) }
                     if let files = d.attachments, !files.isEmpty {
@@ -38,7 +43,7 @@ struct TopicView: View {
                         } else if d.entries.isEmpty {
                             Text(d.announcement == true ? "No replies." : "No replies yet. Be the first.").foregroundStyle(.secondary)
                         }
-                        ForEach(d.entries) { e in entry(e, d) }
+                        ForEach(d.entries) { e in entry(e, d).id(e.id) }
                     } header: {
                         HStack {
                             Text("Replies")
@@ -59,6 +64,12 @@ struct TopicView: View {
                         }
                     }
                 }
+                .onChange(of: jump) {
+                    guard let j = jump else { return }
+                    jump = nil
+                    if reduceMotion { proxy.scrollTo(j, anchor: .center) } else { withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(j, anchor: .center) } }
+                }
+                }
             } else {
                 LoadState(error: model.error) { Task { await load() } }
             }
@@ -77,14 +88,26 @@ struct TopicView: View {
         }
         .task(id: engine.dataVersion) { await load() }
         .toolbar(.hidden, for: .tabBar) // (Reply takes the tab bar's place at the bottom)
-        .sheet(item: $replyTo) { t in
+        .sheet(item: $replyTo, onDismiss: replied) { t in
             ReplySheet(title: t.parent == nil ? "Reply" : "Reply to \(t.quote)") { text in
                 var args: [String: Any] = ["ctx": ctx, "id": id, "text": text]
                 if let p = t.parent { args["parent"] = p }
                 _ = try await engine.call("reply", args, as: OK.self)
-                await load()
-                engine.changed()
+                posted = true // (the thread reloads once the sheet is down: a reload behind it went unseen)
             }
+        }
+    }
+
+    /// The sheet away first, then the reply arrives where it can be seen: the thread reloads on the house spring
+    /// and goes to the reply that is new, as a hand-in goes to Your work (1.7.5).
+    private func replied() {
+        guard posted else { return }
+        posted = false
+        Task {
+            let before = Set(model.data?.entries.map(\.id) ?? [])
+            await model.load(engine, "topic", ["ctx": ctx, "id": id], animated: true)
+            jump = model.data?.entries.first { !before.contains($0.id) }?.id
+            engine.changed()
         }
     }
 

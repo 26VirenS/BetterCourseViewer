@@ -200,6 +200,7 @@ struct ModulesList: View {
     private var lastKey: String { "SimplModLast.\(ctx)" }
     /// Marked done (or not) here, before Canvas has answered: the circle fills at once, and goes back if Canvas says no.
     @State private var marking: [String: Bool] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Loaded(model: model, title: model.data?.title ?? (engine.onBrightspace ? "Content" : "Modules"), load: load) { d in // (Brightspace's own name there, as the course's sections say it)
@@ -246,7 +247,7 @@ struct ModulesList: View {
                 if m.done == true { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
                 Text(m.name).lineLimit(2)
                 Spacer()
-                if let p = m.progress, !p.isEmpty { Text(p).textCase(nil).monospacedDigit() }
+                if let p = m.progress, !p.isEmpty { Text(p).textCase(nil).monospacedDigit().contentTransition(reduceMotion ? .opacity : .numericText()) }
                 Image(systemName: "chevron.down")
                     .font(.caption.weight(.semibold))
                     .rotationEffect(.degrees(opened.contains(m.id) ? 0 : -90))
@@ -321,7 +322,9 @@ struct ModulesList: View {
         Task {
             if await engine.act("markDone", ["ctx": ctx, "module": m.id, "item": it.id, "done": done]) {
                 if done { Haptics.success() }
-                await load()
+                // (1.7.5) Canvas's answer to the tick on the house spring: a module finished shows its tick, its count
+                // rolls, the requirement line folds away and a lock comes off together, not all in one frame
+                await model.load(engine, "modules", ["ctx": ctx], animated: true)
             }
             withAnimation(.snappy) { marking[it.id] = nil } // (Canvas's own answer from here: the reload, or back as it was)
         }

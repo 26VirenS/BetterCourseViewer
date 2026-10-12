@@ -39,9 +39,7 @@ struct TodayView: View {
                             Text(d.list.empty ?? "Nothing due.").foregroundStyle(.secondary)
                         }
                         ForEach(d.list.rows) { row in
-                            WorkRowView(row: row) { done in toggle(row, done) }
-                                .contentShape(Rectangle())
-                                .onTapGesture { open(row) }
+                            WorkRowView(row: row, open: { open(row) }) { done in toggle(row, done) }
                                 .workSwipe(WorkAction(row), engine: engine)
                                 .swipeActions(edge: .trailing) {
                                     Button { toggle(row, !row.done) } label: {
@@ -179,33 +177,43 @@ struct TodayView: View {
     }
 }
 
-/// A row of work: its tick, its title and line, where it stands, its course and its time.
+/// A row of work: its tick, its title and line, where it stands, its course and its time. The tick is a
+/// button of its own; the rest opens the work, dimming under the finger as every other row does (1.7.5).
 struct WorkRowView: View {
     let row: WorkRow
     var showCourse = true
+    let open: () -> Void
     let toggle: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             CheckCircle(done: row.done, color: .green) { toggle(!row.done) }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.title)
-                    .font(.body)
-                    .lineLimit(2)
-                    .strikethrough(row.done, color: .secondary)
-                    .foregroundStyle(row.done ? .secondary : .primary)
-                if let sub = row.sub, !sub.isEmpty {
-                    Text(sub).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+            Button(action: open) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                            .font(.body)
+                            .lineLimit(2)
+                            .strikethrough(row.done, color: .secondary)
+                            .foregroundStyle(row.done ? .secondary : .primary)
+                        if let sub = row.sub, !sub.isEmpty {
+                            Text(sub).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                    .separatorAtText()
+                    Spacer(minLength: 6)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        if let flag = row.flag { FlagBadge(flag: flag) }
+                        HStack(spacing: 6) {
+                            if showCourse, let course = row.course, !course.isEmpty { CourseChip(text: course, color: row.color) }
+                            if let time = row.time, !time.isEmpty { Text(time).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                        }
+                    }
                 }
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 4) {
-                if let flag = row.flag { FlagBadge(flag: flag) }
-                HStack(spacing: 6) {
-                    if showCourse, let course = row.course, !course.isEmpty { CourseChip(text: course, color: row.color) }
-                    if let time = row.time, !time.isEmpty { Text(time).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
-                }
-            }
+            .buttonStyle(.plain)
+            .disabled(row.url == nil) // (nothing to open: no press that goes nowhere)
         }
         .padding(.vertical, 2)
     }

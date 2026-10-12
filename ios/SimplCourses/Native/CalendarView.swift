@@ -66,10 +66,7 @@ struct CalendarView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Today") {
                     Haptics.tap()
-                    anchor = Self.monthStart(Date())
-                    weekStart = Self.sunday(Date())
-                    selected = Self.cal.startOfDay(for: Date())
-                    Task { await load() }
+                    today()
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -131,6 +128,29 @@ struct CalendarView: View {
             withAnimation(.snappy) {
                 if view == "month" { anchor = Self.cal.date(byAdding: .month, value: step, to: anchor) ?? anchor }
                 else { weekStart = Self.cal.date(byAdding: .day, value: 7 * step, to: weekStart) ?? weekStart }
+            }
+            await load()
+        }
+    }
+
+    /// Back to today as an arrow moves (1.7.5): the month (or week) slides in from the side today lies on, and
+    /// the day picked moves on the spring a tap does. Already there, only the day picked moves.
+    private func today() {
+        let now = Date()
+        let month = Self.monthStart(now)
+        let week = Self.sunday(now)
+        let from = view == "week" ? weekStart : anchor
+        let to = view == "week" ? week : month
+        let step = to > from ? 1 : to < from ? -1 : dir
+        Task {
+            if dir != step {
+                dir = step
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            withAnimation(.snappy) {
+                anchor = month
+                weekStart = week
+                selected = Self.cal.startOfDay(for: now)
             }
             await load()
         }

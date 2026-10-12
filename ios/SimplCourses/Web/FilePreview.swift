@@ -165,11 +165,17 @@ final class FileSheetController: UIViewController {
         addChild(nav)
         nav.view.frame = view.bounds
         nav.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        nav.view.alpha = 0
         view.addSubview(nav.view)
         nav.didMove(toParent: self)
-        spinner.stopAnimating()
-        spinner.isHidden = true
-        label.isHidden = true
+        // (1.7.5) the file fades in over "Opening …", as a web screen's page does over its spinner (SlotView.reveal's 0.18s)
+        UIView.animate(withDuration: 0.18) {
+            nav.view.alpha = 1
+        } completion: { _ in
+            self.spinner.stopAnimating()
+            self.spinner.isHidden = true
+            self.label.isHidden = true
+        }
     }
 
     func fail(_ text: String) {

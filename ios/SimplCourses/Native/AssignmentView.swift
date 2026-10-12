@@ -18,6 +18,9 @@ struct AssignmentView: View {
     @State private var jump: String?
     /// Counts the hand-ins made here: each one bounces the Submitted seal once it is in view.
     @State private var handedIn = 0
+    /// A comment went in from its sheet: once it is down, the comments reload and the page goes to it (1.7.5).
+    @State private var posted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -45,7 +48,7 @@ struct AssignmentView: View {
                     workSection(d)
                     Section {
                         if d.comments.isEmpty { Text("No comments.").foregroundStyle(.secondary) }
-                        ForEach(d.comments) { c in commentRow(c) }
+                        ForEach(d.comments) { c in commentRow(c).id(c.id) }
                         Button { comment = true } label: { Label("Add a Comment", systemImage: "text.bubble") }
                     } header: {
                         Text("Comments")
@@ -57,7 +60,7 @@ struct AssignmentView: View {
                 .onChange(of: jump) {
                     guard let j = jump else { return }
                     jump = nil
-                    withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(j, anchor: .top) }
+                    if reduceMotion { proxy.scrollTo(j, anchor: .top) } else { withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(j, anchor: .top) } }
                 }
                 }
             } else {
@@ -95,11 +98,23 @@ struct AssignmentView: View {
                 .environmentObject(engine)
             }
         }
-        .sheet(isPresented: $comment) {
+        .sheet(isPresented: $comment, onDismiss: commented) {
             ReplySheet(title: "Comment", placeholder: "Write a comment for your teacher", action: "Send") { text in
                 _ = try await engine.call("commentOn", ["course": course, "id": id, "text": text], as: OK.self)
-                await load()
+                posted = true // (the comments reload once the sheet is down: commented())
             }
+        }
+    }
+
+    /// The sheet away first, then the comment arrives where it can be seen: the comments reload on the house
+    /// spring and the page goes to the new one, as a hand-in goes to Your work (1.7.5).
+    private func commented() {
+        guard posted else { return }
+        posted = false
+        Task {
+            let before = Set(model.data?.comments.map(\.id) ?? [])
+            await model.load(engine, "assignment", ["course": course, "id": id], animated: true)
+            jump = model.data?.comments.first { !before.contains($0.id) }?.id
         }
     }
 

@@ -344,12 +344,13 @@ final class Loader<T: Decodable>: ObservableObject {
     @Published var error: String?
 
     /// `animated`: the answer to something the student just did (a mailbox picked, a reply sent, a star) —
-    /// rows come and go on the house spring. Every other load is a redraw, not an arrival.
+    /// rows come and go on the house spring (under Reduce Motion a short fade, as `Arrive`'s, 1.7.5). Every
+    /// other load is a redraw, not an arrival.
     func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
         do {
             let d = try await engine.call(name, args, as: T.self)
             if animated {
-                withAnimation(.snappy) {
+                withAnimation(UIAccessibility.isReduceMotionEnabled ? .easeOut(duration: 0.2) : .snappy) {
                     data = d
                     error = nil
                 }
