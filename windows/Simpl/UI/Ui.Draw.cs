@@ -83,6 +83,18 @@ public sealed partial class Ui
     public void Ring(float cx, float cy, float radius, Color4 c, float width) =>
         Draw(() => D.DrawEllipse(new Ellipse(new Vector2(cx, cy), radius, radius), Brush(c), width));
 
+    /// <summary>A soft glow of colour fading out from its centre (a radial gradient).</summary>
+    public void Glow(float cx, float cy, float radius, Color4 c)
+    {
+        Draw(() =>
+        {
+            var stops = new[] { new GradientStop { Position = 0, Color = c }, new GradientStop { Position = 1, Color = new Color4(c.R, c.G, c.B, 0) } };
+            using var coll = D.CreateGradientStopCollection(stops);
+            using var b = D.CreateRadialGradientBrush(new RadialGradientBrushProperties { Center = new Vector2(cx, cy), RadiusX = radius, RadiusY = radius }, coll);
+            D.FillEllipse(new Ellipse(new Vector2(cx, cy), radius, radius), b);
+        });
+    }
+
     public void Line(float x0, float y0, float x1, float y1, Color4 c, float width = 1) =>
         Draw(() => D.DrawLine(new Vector2(x0, y0), new Vector2(x1, y1), Brush(c), width));
 

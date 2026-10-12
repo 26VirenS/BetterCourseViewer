@@ -18,7 +18,9 @@ public static class Shot
     private static DateTime lastActivity = DateTime.UtcNow;
     private static bool armed;
 
-    public static void Began() { inFlight++; lastActivity = DateTime.UtcNow; }
+    private static bool everBegan;
+
+    public static void Began() { inFlight++; everBegan = true; lastActivity = DateTime.UtcNow; }
 
     public static void Ended() { inFlight = Math.Max(0, inFlight - 1); lastActivity = DateTime.UtcNow; }
 
@@ -34,8 +36,9 @@ public static class Shot
         t.Tick += (_, _) =>
         {
             var since = (DateTime.UtcNow - start).TotalSeconds;
-            var quiet = inFlight == 0 && (DateTime.UtcNow - lastActivity).TotalSeconds > 1.5;
-            if (since < 3 || (since < after && !(settle && quiet && since > 5))) return;
+            // (settled: something was asked of the page, and nothing has been for a moment — never before the first ask)
+            var quiet = everBegan && inFlight == 0 && (DateTime.UtcNow - lastActivity).TotalSeconds > 2.5;
+            if (since < 3 || (since < after && !(settle && quiet && since > 8))) return;
             t.Stop();
             Take(file);
             Application.Current.Shutdown();

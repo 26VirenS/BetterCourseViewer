@@ -92,6 +92,6 @@ public sealed class SchoolPicker
 
     private static void Blob(Ui ui, float cx, float cy, float r, Color4 c)
     {
-        for (var k = 6; k >= 1; k--) ui.Circle(cx, cy, r * k / 6f, Theme.WithAlpha(c, c.A * 0.22f));
+        ui.Glow(cx, cy, r, c);
     }
 }

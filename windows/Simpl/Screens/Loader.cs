@@ -36,6 +36,7 @@ public sealed class Loader<T> where T : class
     private async Task Load(Engine.Engine engine, string name, object? a)
     {
         Loading = true;
+        Support.Shot.Began();
         try
         {
             Data = await engine.Call<T>(name, a);
@@ -47,6 +48,7 @@ public sealed class Loader<T> where T : class
         }
         finally
         {
+            Support.Shot.Ended();
             Loading = false;
             host.Invalidate();
         }
