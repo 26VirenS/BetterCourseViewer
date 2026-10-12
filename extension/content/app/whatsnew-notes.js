@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.32', date: '2026-10-12', notes: [
+      { kind: 'improved', title: 'Smoother exits', body: 'Sets, pins, dropdowns and widgets leave, not vanish.', icon: P.arrows },
+      { kind: 'improved', title: 'Sections slide open', body: 'Idle courses, quiz options and scales slide, not jump.', icon: P.layers },
+      { kind: 'improved', title: 'Flashcards tick', body: 'A finished round draws its tick, as a quiz does.', icon: P.check },
+    ] },
     { version: '2.99.31', date: '2026-10-10', notes: [
       { kind: 'fixed', title: 'Finished quizzes', body: 'A Brightspace quiz you finished shows as done.', icon: P.check },
       { kind: 'fixed', title: 'Brightspace To Do', body: 'To Do lists your Brightspace work again.', icon: P.list },

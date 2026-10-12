@@ -109,11 +109,20 @@
     const go = (view, patch = {}) => { clearInterval(ticker); Object.assign(st, { view, flip: false, fb: null, typed: '', last: '', note: '', pasteOpen: false, paste: '' }, patch); arriving = true; paint(); };
     const back = () => go(st.view === 'set' || st.view === 'edit' ? 'sets' : 'set');
 
+    // A round finished, a set mastered, the last pair matched: the view that says so hands its tick here
+    // (doneTick, with the run it ends), and the tick draws itself in once that run has got there — as a
+    // hand-in's and a finished quiz's do (ui.drawCheck), once per run, after the paint (which was still,
+    // and drawCheck stands down inside ui.still). A view arrived at already finished has it there.
+    let doneTick = null;
     function paint() {
       const fresh = arriving;
       arriving = false;
-      return fresh ? paintNow() : U.still(paintNow);
+      doneTick = null;
+      const out = fresh ? paintNow() : U.still(paintNow);
+      if (doneTick && !doneTick.run.drawn) { doneTick.run.drawn = true; if (!fresh) U.drawCheck(doneTick.el, true); }
+      return out;
     }
+    const tickFor = (run) => { const el = h('span', { class: 'bcv-fc__donetick' }, U.svg(IC.check, { size: 28, stroke: 'var(--bcv-green)', width: 2.4 })); doneTick = { el, run }; return el; };
     function paintNow() {
       const d = deck();
       const cards = cardsOf(d);
@@ -135,28 +144,45 @@
     }
 
     // ---- your sets --------------------------------------------------------------------------
+    // A set deleted leaves where it stood, fading as it settles back to .97 (app.css .bcv-fc__deck.is-out),
+    // and what is below it slides up into the gap (ui.flipList: each row, the buttons and the hint keyed)
+    // rather than jumping. The set is gone from the list, and written, at once; deleted from the keyboard
+    // it simply goes. Reduced motion: a 150ms fade, and the rest land where they belong.
+    async function deleteSet(d, row, keyed) {
+      st.decks = st.decks.filter((x) => x.id !== d.id);
+      const saved = persist();
+      if (!keyed && row.isConnected) {
+        row.inert = true; // (on its way out: not opened, nor deleted twice)
+        row.classList.add('is-out');
+        await U.afterMotion(row, 450, { reduced: true });
+      }
+      await saved;
+      if (st.view === 'sets' && p.alive()) U.flipList(body, paint); // (the popup moved on meanwhile: nothing to redraw)
+    }
     function setsView() {
       const rows = st.decks.map((d, i) => {
         const cards = cardsOf(d);
         const pct = cards.length ? Math.round((cards.filter(learned).length / cards.length) * 100) : 0;
-        const row = h('div', { class: 'bcv-fc__deck', role: 'button', tabindex: '0', dataset: { deck: d.id }, onclick: () => go('set', { deck: d.id, idx: 0 }) }, [
+        const row = h('div', { class: 'bcv-fc__deck', role: 'button', tabindex: '0', dataset: { deck: d.id, flip: d.id }, onclick: () => go('set', { deck: d.id, idx: 0 }) }, [
           U.el('bcv-fc__deckhead', [U.text('bcv-fc__deckname bcv-ellip', d.name || 'Untitled set'), U.text('bcv-fc__deckcount', countOf(cards.length, 'term'))]),
           d.desc ? U.text('bcv-fc__deckdesc bcv-ellip', d.desc) : null,
           U.el('bcv-fc__bar', [h('span', { class: 'bcv-fc__track' }, h('span', { class: 'bcv-fc__fill', style: { width: `${pct}%` } })), U.text('bcv-fc__pct', `${pct}% learned`)]),
-          ibtn(IC.close, { size: 30, iconSize: 12, title: 'Delete set', cls: 'bcv-fc__delete', onClick: async (e) => { e.stopPropagation(); st.decks = st.decks.filter((x) => x.id !== d.id); await persist(); paint(); } }),
+          ibtn(IC.close, { size: 30, iconSize: 12, title: 'Delete set', cls: 'bcv-fc__delete', onClick: (e) => { e.stopPropagation(); deleteSet(d, row, e.detail === 0); } }), // (e.detail 0: Enter or Space)
         ]);
         row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go('set', { deck: d.id, idx: 0 }); } });
         U.enter(row, i, 35, 300);
         return row;
       });
+      const hint = T.hint('A CSV needs two columns: term, definition.');
+      hint.dataset.flip = 'hint';
       return [
         ...(rows.length ? rows : [U.el('bcv-fc__empty', [U.text('bcv-fc__emptytitle', 'No sets yet'), U.text('bcv-fc__emptytext', 'Make one, or import a CSV.')])]),
         U.el('bcv-fc__actions', [
           U.btn('Create a set', { kind: 'primary', cls: 'bcv-fc__new', onClick: () => { const d = { id: T.uid('d'), name: 'Untitled set', cards: [] }; st.decks = [...st.decks, d]; persist(); go('edit', { deck: d.id }); } }),
           U.btn('Import CSV', { cls: 'bcv-fc__import', onClick: () => csvInput.click() }),
           U.btn('Template', { cls: 'bcv-fc__template', onClick: () => T.saveFile('flashcard-template.csv', new Blob([TEMPLATE], { type: 'text/csv;charset=utf-8' })) }),
-        ]),
-        T.hint('A CSV needs two columns: term, definition.'),
+        ], { dataset: { flip: 'actions' } }),
+        hint,
       ];
     }
 
@@ -219,7 +245,7 @@
       if (r.i >= n) {
         const learning = r.learning.length;
         return [U.el('bcv-fc__done', [
-          h('span', { class: 'bcv-fc__donetick' }, U.svg(IC.check, { size: 28, stroke: 'var(--bcv-green)', width: 2.4 })),
+          tickFor(r),
           U.text('bcv-fc__donetitle', learning ? 'Nice work!' : 'You know them all!'),
           U.text('bcv-fc__donetext bcv-pretty', learning ? `${countOf(learning, 'term')} still to learn.` : 'Every card marked Know.'),
           U.el('bcv-fc__counts', [
@@ -353,13 +379,13 @@
       const pct = cards.length ? Math.round((mastered / cards.length) * 100) : 0;
       const bar = U.el('bcv-fc__bar', [h('span', { class: 'bcv-fc__track bcv-fc__track--6' }, h('span', { class: 'bcv-fc__fill', style: { width: `${pct}%` } })), U.text('bcv-fc__progress', `${mastered} / ${cards.length}`)]);
       if (!cards.length) return [bar, T.hint('Add some terms first.')];
-      if (!st.learnQ) st.learnQ = learnQueue(cards);
+      if (!st.learnQ) { st.learnQ = learnQueue(cards); st.learnRun = {}; } // (a pass begins: Learn opened, or Start over)
       // the card asked: the queue's first — or, with feedback on screen, the one just answered (it was asked at its previous level)
       const asked = st.fb && st.asked ? cards.find((c) => c.id === st.asked) : null;
       const cur = asked || cards.find((c) => c.id === st.learnQ[0]) || null;
       if (!cur) {
         return [bar, U.el('bcv-fc__done', [
-          h('span', { class: 'bcv-fc__donetick' }, U.svg(IC.check, { size: 28, stroke: 'var(--bcv-green)', width: 2.4 })),
+          tickFor(st.learnRun),
           U.text('bcv-fc__donetitle', 'You’ve learned them all!'),
           U.text('bcv-fc__donetext bcv-pretty', 'Every card right twice in a row. They come back for a quick check in a day, then less and less often.'),
           U.el('bcv-tool__btns bcv-fc__donebtns', [
@@ -485,7 +511,7 @@
         const best = d?.best && d.best <= took ? d.best : took;
         if (!d?.best || took < d.best) patchDeck((x) => ({ ...x, best: took }));
         return [U.el('bcv-fc__done', [
-          h('span', { class: 'bcv-fc__donetick' }, U.svg(IC.check, { size: 28, stroke: 'var(--bcv-green)', width: 2.4 })),
+          tickFor(m),
           U.text('bcv-fc__donetitle', `Matched in ${secs(took)}`),
           U.text('bcv-fc__donetext bcv-pretty', took <= best ? 'A new best time!' : `Best: ${secs(best)}`),
           U.el('bcv-tool__btns bcv-fc__donebtns', [U.btn('Play again', { kind: 'primary', cls: 'bcv-fc__again', onClick: () => go('match', { match: makeMatch(cards) }) }), U.btn('Back to set', { cls: 'bcv-fc__toset', onClick: () => go('set') })]),

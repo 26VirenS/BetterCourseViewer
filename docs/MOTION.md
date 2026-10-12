@@ -39,7 +39,7 @@ The engine has no view of the page beyond two things it is asked for:
 ## 2. Where the script moves things
 
 - **`ui.dismiss(el)`** is the one way out for sheets, tool popups, the hand-in popover, menus, the
-  quick nav, the reader and toasts. With the springs it marks the element `is-closing bcv-sprung`
+  dropdown's list (2.99.32), the quick nav, the reader and toasts. With the springs it marks the element `is-closing bcv-sprung`
   (the stylesheet's exit stands down) and runs the exit springs — the scrim fades, the sheet inside
   it shrinks (or slides down on the phone) from wherever its entrance had got to. Without them, or
   under reduced motion, `is-closing` starts the stylesheet's exit and `afterMotion` sees it end.
@@ -118,6 +118,25 @@ From a sweep for places that should move and do not — and the ones that moved 
   fades in; the preview panel put away by a press slides back out, and another row pressed changes
   only its words. The settings page's switches slide as they are pressed, its Saved pill fades out
   and nods at a second save; the setup's stepper nods rather than popping from nothing.
+
+## 3c. What 2.99.32 added
+
+Exits that mirrored nothing, and a few rare moments left flat — each with its reduced-motion fade:
+
+- **Leaving the way they came.** The dropdown's list pops back into its button (`dismiss`, kind
+  `pop`); an unpinned pin shrinks back to 0.9 as it fades (`bcv-pin-out`, the mirror of
+  `bcv-pin-pop`), taken out of the row so its neighbours slide into the gap by `translate` on the pin
+  spring; a deleted Flashcards set fades as it settles to 0.97 and the sets below close up
+  (`ui.flipList`); a widget pulled out of the tray and put back by its red light is carried home by
+  `translate` on the pin spring. The list, the widget and the set, shut or deleted from the keyboard
+  (Escape, Tab, Enter or Space), simply go, as before.
+- **Disclosures slide.** `ui.collapsible` is the modules' collapsing grid row for the Dashboard's
+  courses with nothing assigned, a quiz's full list of options and a course's grading scale: the
+  content fades in over 200 ms and out over 150 ms; shut, it is `inert`.
+- **Flashcards' finish** draws its tick (`ui.drawCheck`) once per round, mastered pass or Match game,
+  as a hand-in and a finished quiz do.
+- `ui.afterMotion(el, cap, { reduced: true })` waits for an exit's reduced-motion fade, which it
+  otherwise skips.
 
 ## 4. The rules
 

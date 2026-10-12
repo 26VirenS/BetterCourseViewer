@@ -934,23 +934,43 @@
       item.setAttribute('aria-expanded', 'false');
       panel?.onFold?.();
     };
-    /** Back to the tray, folded: the red light, and Escape while it is out. */
-    const dock = () => {
-      trayMoves();
-      item.classList.remove('is-free', 'is-hover');
-      item.style.left = '';
-      item.style.top = '';
-      item.querySelector(':focus')?.blur();
-      item.classList.remove('is-open');
-      folding(item);
-      item.setAttribute('aria-expanded', 'false');
-      panel?.onFold?.();
+    /** Back to the tray, folded: the red light, and Escape while it is out. From a press the pin it folds
+     *  into is carried home from where the panel floated — by translate alone, on the pin spring — so where
+     *  it went is seen; from the keyboard it is simply back. Reduced motion: no travel — it fades where it
+     *  floats (150ms), and then it is back in the tray. */
+    let docking = false;
+    const dock = (keyed = false) => {
+      if (docking) return;
+      const back = () => {
+        trayMoves();
+        item.classList.remove('is-free', 'is-hover');
+        item.style.left = '';
+        item.style.top = '';
+        item.querySelector(':focus')?.blur();
+        item.classList.remove('is-open');
+        folding(item);
+        item.setAttribute('aria-expanded', 'false');
+        panel?.onFold?.();
+      };
+      if (keyed) { back(); return; }
+      if (U.reducedMotion()) {
+        docking = true;
+        const ease = getComputedStyle(document.documentElement).getPropertyValue('--bcv-ease-out').trim() || 'cubic-bezier(.23,1,.32,1)';
+        const fade = item.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: ease, fill: 'forwards' });
+        U.afterMotion(item, 450, { reduced: true }).then(() => { docking = false; back(); fade.cancel(); });
+        return;
+      }
+      const a = item.getBoundingClientRect(); // (where it floats)
+      back();
+      const b = item.getBoundingClientRect(); // (its place in the tray: the rect read lays the change out)
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) item.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }], { duration: pinMs(), easing: pinEase() });
     };
     const build = () => {
       if (panel) return;
       panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, over: true, ...o }); } });
       body.replaceChildren(...panel.els);
-      body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(); });
+      body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(e.detail === 0); }); // (e.detail 0: Enter or Space)
     };
     const openQ = () => {
       build();
@@ -1008,7 +1028,7 @@
       clearTimeout(leave);
       leave = setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 260); // (a field being typed in holds it open)
     });
-    item.addEventListener('keydown', (e) => { if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); if (pulledOut()) dock(); else closeQ(); item.querySelector('.bcv-pin__btn')?.focus(); } });
+    item.addEventListener('keydown', (e) => { if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); if (pulledOut()) dock(true); else closeQ(); item.querySelector('.bcv-pin__btn')?.focus(); } });
     item.addEventListener('focusout', () => setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 0));
     return [glass, body, bar];
   }
@@ -1605,13 +1625,39 @@
       el.classList.toggle('is-guest', k === 'pomo' && !pins.includes('pomo'));
       return el;
     });
+    // An unpinned pin leaves the way it landed (app.css .bcv-pin.is-out:not(.is-live)): taken out of the row
+    // where it stands, so the pins beside it slide into its place at once — by translate, on the pin spring,
+    // from wherever they are drawn (a slide already going is taken up, not stacked), as a swell moves them
+    // (swellWatch). Reduced motion: it fades in its place, and the others then simply close up.
+    const leaving = [...have].filter(([k, el]) => !keys.includes(k) && !el.classList.contains('is-live')).map(([, el]) => el);
+    const slide = leaving.length > 0 && !U.reducedMotion();
+    const drawn = slide ? new Map([...bar.children].map((p) => [p, p.getBoundingClientRect()])) : null;
+    if (slide) {
+      for (const p of bar.children) for (const a of p.getAnimations()) if (a.id === 'bcv-swell') a.cancel();
+      const at = leaving.filter((el) => !el.classList.contains('is-free')).map((el) => [el, el.offsetLeft, el.offsetTop]); // (one pulled out is out of the row already)
+      for (const [el, left, top] of at) Object.assign(el.style, { position: 'absolute', left: `${left}px`, top: `${top}px` });
+    }
     for (const [k, el] of have) {
       if (keys.includes(k)) continue;
-      if (el.classList.contains('is-live')) { islandClose(el); el.classList.add('is-out'); U.afterMotion(el).then(() => { el.remove(); bar.hidden = !bar.querySelector('.bcv-pin'); }); }
-      else el.remove();
+      if (el.classList.contains('is-live')) islandClose(el);
+      el.classList.add('is-out');
+      U.afterMotion(el, 450, { reduced: !el.classList.contains('is-live') }).then(() => { el.remove(); bar.hidden = !bar.querySelector('.bcv-pin'); });
     }
     next.forEach((el, i) => { const ref = [...bar.children].filter((c) => !c.classList.contains('is-out'))[i] || null; if (ref !== el) bar.insertBefore(el, ref); });
     bar.hidden = !bar.querySelector('.bcv-pin');
+    if (slide) {
+      // the tray is held by its right edge, so the row closing up moves what the leaving pin was placed in: it is put back where it was drawn
+      for (const el of leaving) {
+        const was = drawn.get(el), now = el.getBoundingClientRect();
+        if (el.style.position === 'absolute') Object.assign(el.style, { left: `${parseFloat(el.style.left) + was.left - now.left}px`, top: `${parseFloat(el.style.top) + was.top - now.top}px` });
+      }
+      const easing = pinEase(), duration = pinMs();
+      for (const p of bar.children) {
+        if (p.classList.contains('is-out') || !drawn.has(p)) continue;
+        const a = drawn.get(p), b = p.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) Object.assign(p.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }], { duration, easing }), { id: 'bcv-swell' });
+      }
+    }
     for (const c of document.querySelectorAll('.bcv-tool-card')) c.classList.toggle('is-pinned', pins.includes(c.dataset.tool));
   }
   /** The drag: press a card and pull it up; a ghost of it follows the pointer, the top of the page

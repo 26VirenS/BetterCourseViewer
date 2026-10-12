@@ -1170,11 +1170,11 @@
       U.text('bcv-gpa-detail__note', 'Enter the lowest percentage for each letter, as your syllabus or instructor sets it.'),
       grid, err, U.el('bcv-scale__actions', [own ? reset : null, save]),
     ]);
-    editor.hidden = !open.on;
-    const toggle = h('button', { type: 'button', class: 'bcv-scale__toggle', 'aria-expanded': String(open.on), text: open.on ? 'Hide' : 'Edit', onclick: () => { open.on = !open.on; editor.hidden = !open.on; toggle.textContent = open.on ? 'Hide' : 'Edit'; toggle.setAttribute('aria-expanded', String(open.on)); } });
+    const fold = U.collapsible(editor, open.on, 'bcv-scale__fold'); // (Edit slides it open, Hide shut)
+    const toggle = h('button', { type: 'button', class: 'bcv-scale__toggle', 'aria-expanded': String(open.on), text: open.on ? 'Hide' : 'Edit', onclick: () => { open.on = !open.on; fold.setOpen(open.on); toggle.textContent = open.on ? 'Hide' : 'Edit'; toggle.setAttribute('aria-expanded', String(open.on)); } });
     return U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line bcv-scale', [
       U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Grading scale', 'span'), status, toggle]),
-      editor,
+      fold,
     ]);
   }
 

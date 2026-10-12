@@ -3645,7 +3645,7 @@ try {
   check(/em$/.test(eqFit.set) && eqFit.w === 'auto' && !eqFit.attrs && eqFit.h < eqFit.natural && eqFit.h > eqFit.fs && eqFit.h <= eqFit.fs * 4 && eqFit.va === 'middle' && eqFit.display === 'inline-block', `a formula is sized to the text it sits in and reads on the line: ${JSON.stringify(eqFit)}`);
   // every option the question offered, for checking the rest — folded away until asked for
   const optsBtn = await page.$$('.bcv-qfb__q .bcv-fb__more');
-  check(optsBtn.length === 3 && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.hidden)), 'each choice question offers its full list of options, folded away');
+  check(optsBtn.length === 3 && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.parentElement.inert && !e.closest('.bcv-collapsible').classList.contains('is-open'))), 'each choice question offers its full list of options, folded away');
   await optsBtn[0].click();
   const shownOpts = await page.$$eval('.bcv-qfb__q[data-k="0"] .bcv-fb__opt', (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')));
   check(shownOpts.length === 5 && shownOpts[0] === 'A-3.15 m/sYour answerCorrect' && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Hide the options', `the options open with your pick marked, the right one from Canvas's results page: ${shownOpts.join(' | ')}`);
@@ -3654,7 +3654,7 @@ try {
   const wrongOpts = await page.$$eval('.bcv-qfb__q[data-k="1"] .bcv-fb__opt', (els) => els.map((e) => `${e.textContent.trim().replace(/\s+/g, ' ')}${e.classList.contains('is-right') ? ' [right]' : ''}${e.classList.contains('is-mine') ? ' [mine]' : ''}`));
   check(wrongOpts.length === 5 && wrongOpts.filter((t) => t.includes('[right]')).length === 1 && wrongOpts.filter((t) => t.includes('[mine]')).length === 1 && wrongOpts.some((t) => /Correct.*\[right\]/.test(t)), `a wrong question marks both your pick and the right one: ${wrongOpts.join(' | ')}`);
   await (await page.$$('.bcv-qfb__q .bcv-fb__more'))[0].click();
-  check(await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.hidden), 'pressing it again folds the options away');
+  check(await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.parentElement.inert && !e.closest('.bcv-collapsible').classList.contains('is-open')), 'pressing it again folds the options away');
   const eqText = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
@@ -6655,7 +6655,7 @@ try {
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowLeft');
   await page.waitForSelector('.bcv-fc__keep', { timeout: 3000 });
-  check((await texts('.bcv-fc__donetitle'))[0] === 'Nice work!' && (await texts('.bcv-fc__countn')).join(',') === '3,2' && (await texts('.bcv-fc__keep'))[0] === 'Keep reviewing 2 terms', 'the end of the round: the counts, and Keep reviewing for the two still being learned');
+  check((await texts('.bcv-fc__donetitle'))[0] === 'Nice work!' && (await texts('.bcv-fc__countn')).join(',') === '3,2' && (await texts('.bcv-fc__keep'))[0] === 'Keep reviewing 2 terms' && (await page.$eval('.bcv-fc__donetick', (e) => e.classList.contains('bcv-check--draw'))), 'the end of the round: the counts, Keep reviewing for the two still being learned, and its tick drawn in (2.99.32), the last mark a key');
   await shot(page, '40b-tools-flashcards-round');
   await page.click('.bcv-fc__keep');
   await page.waitForSelector('.bcv-fc__mark--know', { timeout: 3000 });
@@ -6746,8 +6746,26 @@ try {
   for (const id of ids) { await page.click(`.bcv-fc__tilecard[data-tile="${termOf(id).i}"]`); await page.click(`.bcv-fc__tilecard[data-tile="${defOf(id).i}"]`); }
   await page.waitForSelector('.bcv-fc__again', { timeout: 3000 });
   const matchDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
-  check(/^Matched in \d+\.\d s$/.test((await texts('.bcv-fc__donetitle'))[0]) && (await texts('.bcv-fc__donetext'))[0] === 'A new best time!' && matchDecks[0].best > 0, `every pair matched: the time, and a best kept on the set (${(await texts('.bcv-fc__donetitle'))[0]})`);
+  check(/^Matched in \d+\.\d s$/.test((await texts('.bcv-fc__donetitle'))[0]) && (await texts('.bcv-fc__donetext'))[0] === 'A new best time!' && matchDecks[0].best > 0 && (await page.$eval('.bcv-fc__donetick', (e) => e.classList.contains('bcv-check--draw'))), `every pair matched: the time, a best kept on the set, and the tick drawn in (${(await texts('.bcv-fc__donetitle'))[0]})`);
   await shot(page, '40e-tools-flashcards-match');
+  // (2.99.32) a set deleted leaves where it stood, fading as it settles back, and is written at once; what was below it closes up
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__deck', { timeout: 3000 });
+  await page.setInputFiles('.bcv-fc input[type=file]', [{ name: 'spare.csv', mimeType: 'text/csv', buffer: Buffer.from('Term,Definition\nLimit,what f(x) nears\n') }]);
+  await page.waitForSelector('.bcv-fc__editrow', { timeout: 5000 });
+  await page.click('.bcv-tool__back');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__deck').length === 2, null, { timeout: 3000 });
+  const spare = (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks'])).find((d) => d.name === 'spare');
+  const deleting = await realMotion(page, async () => {
+    await page.click(`.bcv-fc__deck[data-deck="${spare?.id}"] .bcv-fc__delete`);
+    const mid = await page.evaluate(() => { const r = document.querySelector('.bcv-fc__deck.is-out'); return { out: !!r, inert: !!r?.inert, name: getComputedStyle(r || document.body).animationName }; });
+    await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__deck').length === 1, null, { timeout: 3000 });
+    return mid;
+  });
+  const keptDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  check(!!spare && deleting.out && deleting.inert && deleting.name === 'bcv-leave-shrink' && keptDecks.length === 1 && keptDecks[0].id === decks[0].id && (await page.$(`.bcv-fc__deck[data-deck="${spare.id}"]`)) === null && (await toolSub()) === '1 set', `the X deletes the set: it fades where it stood (pressed no more) and is gone from the list and the store, the other kept (${JSON.stringify(deleting)})`);
   await closeTool();
   // a card dragged to the top becomes a pin beside the switch, on every page
   const cardBox = await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 60, y: r.top + 30 }; });
