@@ -123,12 +123,24 @@ internal static class FileKit
             .Select(p => p == "sample" ? Sample() : p).OfType<string>().Where(File.Exists).ToList();
     }
 
+    private static bool fontsSet;
+
+    /// <summary>PDFsharp told, once, to draw text with Windows' own fonts (it refuses the setting once it has been read or
+    /// set, so it is only ever set, and only once).</summary>
+    private static void WindowsFonts()
+    {
+        if (fontsSet) return;
+        fontsSet = true;
+        try { PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows = true; }
+        catch (InvalidOperationException e) { Log.Write("pdf fonts: " + e.Message); }
+    }
+
     /// <summary>A PDF of two pages of a student's notes (for the screenshot suite).</summary>
     private static string? Sample()
     {
         try
         {
-            if (!PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows) PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows = true;
+            WindowsFonts();
             var path = Path.Combine(AppPaths.Root, "Biology notes.pdf");
             using var doc = new PdfSharp.Pdf.PdfDocument();
             var title = new PdfSharp.Drawing.XFont("Arial", 22, PdfSharp.Drawing.XFontStyleEx.Bold);
