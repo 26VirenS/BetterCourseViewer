@@ -269,8 +269,8 @@ enum AtomScene {
     // MARK: Electron cloud (1.3.76)
 
     /// A hair under opaque, for the cloud's parts that would otherwise be opaque (the dark glow, the nucleus): every part
-    /// then goes in SceneKit's see-through pass, so the rendering order alone stacks them — the grey rest, then s, p, d,
-    /// f, then the nucleus over all — however SceneKit orders its opaque pass against that one.
+    /// then goes in SceneKit's see-through pass, so the rendering order alone stacks them — the grey rest, then f, d, p,
+    /// s, then the nucleus over all — however SceneKit orders its opaque pass against that one.
     private static let cloudNearlyOpaque: CGFloat = 0.999
 
     /// A cloud node's material: 0…3 the s, p, d or f dots, 4 the grey rest. In dark the chosen dots' light adds up (a
@@ -364,8 +364,10 @@ final class CloudState {
         for i in 0..<cloud.count { members[kind(i), default: []].append(i) }
         for key in members.keys.sorted() {
             let node = SCNNode()
-            // (the grey rest first, then s, p, d, f over it)
-            node.renderingOrder = key == 4 ? 10 : 11 + key
+            // (the grey rest first, then f, d, p and s over it: SceneKit stacks the kinds in turn where Windows averages
+            // their ink by how many dots fall there, so the s — 1s, crowded at the centre — goes last, keeping the core
+            // red as Windows has it, rather than browned by the p over it)
+            node.renderingOrder = key == 4 ? 10 : 14 - key
             node.geometry = geometry(key)
             holder.addChildNode(node)
             nodes[key] = node
