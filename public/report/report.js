@@ -156,7 +156,8 @@
     card.replaceChildren();
     const box = document.createElement('div');
     box.className = 'done';
-    box.innerHTML = '<span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><h2>Thanks — it is on its way.</h2>';
+    // (the tick's path starts at its short side, so it draws itself as a hand would)
+    box.innerHTML = '<span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path pathLength="1" d="M4 12l5 5L20 6"/></svg></span><h2>Thanks — it is on its way.</h2>';
     const p = document.createElement('p');
     p.append('Your report is ', Object.assign(document.createElement('span'), { className: 'code', textContent: id }), '. Quote it if you write to us about it.');
     const back = Object.assign(document.createElement('a'), { href: '/', textContent: 'Back to Simpl Courses' });
