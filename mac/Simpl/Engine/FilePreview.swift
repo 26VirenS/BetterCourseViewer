@@ -4,13 +4,15 @@ import Quartz
 import WebKit
 
 /// A file from the school in the Mac's own viewer. A click on a file fetches it with the web view's own session (its
-/// cookies, its redirects to the school's file host) and, the moment it is in, opens it in Quick Look over the window —
-/// no second click, no other app: the space bar or Escape puts it away, and the panel's own toolbar opens it in its app
-/// or shares it. While it comes, a small glass toast at the window's foot says how far it has got (FileToastContent).
-/// The same fetch serves a file's other ways out (1.2): Open in its app (Preview, Pages…), Download (a copy kept in
-/// Downloads) and the previews drawn in a page (FilesBrowser). A file fetched once opens at once the next time, for a
-/// while. Not tied to the main actor: the web view's delegates (shared with the iPhone app) hand downloads to it from
-/// wherever they run, and everything it shows is set on the main thread.
+/// cookies, its redirects to the school's file host) into Downloads and, the moment it is in, opens it in Quick Look over
+/// the window — no second click, no other app: the space bar or Escape puts it away, and the panel's own toolbar opens
+/// it in its app or shares it. While it comes, a small glass toast at the window's foot says how far it has got
+/// (FileToastContent). The same fetch serves a file's other ways out (1.2): Open in its app (Preview, Pages…), Download
+/// (the copy in Downloads shown in Finder) and the previews drawn in a page (FilesBrowser). (1.3.73) Every file the
+/// school hands over lands in Downloads — opened, previewed or downloaded — under a name not yet taken, and stays there:
+/// the student has it after, as on the web. A file fetched once opens at once the next time, while it is still there.
+/// Not tied to the main actor: the web view's delegates (shared with the iPhone app) hand downloads to it from wherever
+/// they run, and everything it shows is set on the main thread.
 final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     static let shared = FilePreview()
 
@@ -71,15 +73,13 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     private var front: Job?
     /// Files fetched lately, by their address: opened again at once.
     private var cache: [URL: (file: URL, at: Date)] = [:]
-    private static let keepFor: TimeInterval = 20 * 60
+    private static let keepFor: TimeInterval = 24 * 60 * 60
     /// Quick Look's controller, in the window's chain of responders while a file is open in it (made on the main
     /// thread, the first time a file is shown).
     private var controller: PreviewController?
     /// The window the file was opened from (the main window, or a tool's).
     private weak var host: NSWindow?
     private var keptTimer: Timer?
-
-    private var folder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("SimplFiles", isDirectory: true) }
 
     // MARK: - Asking for a file
 
@@ -100,7 +100,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             if let hit = self.cached(url) {
                 if purpose != .quiet { self.follow(nil) }
                 var file = hit
-                if purpose == .keep { // (kept: a copy of the one already here, in Downloads)
+                if purpose == .keep, !FilePreview.inDownloads(hit) { // (kept: a copy of the one already here, in Downloads)
                     guard let copy = FilePreview.copyToDownloads(hit) else {
                         self.failed = "\(name) could not be saved to Downloads."
                         done?(.failure(CocoaError(.fileWriteUnknown)))
@@ -249,10 +249,8 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
 
     private func cached(_ url: URL) -> URL? {
         let now = Date()
-        for (key, hit) in cache where now.timeIntervalSince(hit.at) > FilePreview.keepFor {
-            cache[key] = nil
-            try? FileManager.default.removeItem(at: hit.file.deletingLastPathComponent())
-        }
+        // (a stale entry is forgotten; the file itself stays — it is the student's, in Downloads)
+        for (key, hit) in cache where now.timeIntervalSince(hit.at) > FilePreview.keepFor { cache[key] = nil }
         guard let hit = cache[url], FileManager.default.fileExists(atPath: hit.file.path) else { return nil }
         return hit.file
     }
@@ -270,6 +268,11 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     private static var downloads: URL {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
+    }
+
+    /// Whether a file is in Downloads already (every file fetched is, since 1.3.73; one fetched by an older copy may not be).
+    private static func inDownloads(_ file: URL) -> Bool {
+        file.deletingLastPathComponent().standardizedFileURL.path == downloads.standardizedFileURL.path
     }
 
     /// A copy of a file already fetched, in Downloads.
@@ -311,21 +314,12 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             completionHandler(nil)
             return
         }
-        let fm = FileManager.default
-        let dir: URL
-        if job.purpose == .keep {
-            dir = FilePreview.downloads
-        } else {
-            dir = folder.appendingPathComponent(UUID().uuidString, isDirectory: true) // (a folder each: two files of one name)
-        }
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        // (1.3.73) every file the school hands over lands in Downloads — one opened in Quick Look, one for its app, one
+        // kept, one drawn in a page — under a name not yet taken (never over another), and stays there
+        let dir = FilePreview.downloads
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let fileName = FilePreview.clean(suggestedFilename.isEmpty ? job.name : suggestedFilename)
-        var dest = dir.appendingPathComponent(fileName)
-        if job.purpose == .keep {
-            dest = FilePreview.unused(dest)
-        } else {
-            try? fm.removeItem(at: dest)
-        }
+        let dest = FilePreview.unused(dir.appendingPathComponent(fileName))
         job.destination = dest
         completionHandler(dest)
     }
@@ -344,7 +338,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
                 job.done = nil
                 return
             }
-            if let src = job.source, job.purpose != .keep { self.cache[src] = (dest, Date()) }
+            if let src = job.source { self.cache[src] = (dest, Date()) } // (opened again: the same file, at once)
             job.done?(.success(dest))
             job.done = nil
             // (a Quick Look a later click took the place of is not shown; a file asked for its app or kept always is)
