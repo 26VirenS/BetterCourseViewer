@@ -148,6 +148,14 @@ jobs:
           Shot 'tools-pin' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable,pomo', '--pin-open', 'calc'))
           Shot 'tool-open' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'calc'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
+          # a quiz, taken in the app: its start, a question, the review, the feedback, an access code
+          Shot 'quiz-intro' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011'))
+          Shot 'quiz-question' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011:take'))
+          Shot 'quiz-question-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--open', 'quiz:101:9011:take:2'))
+          Shot 'quiz-review' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011:review'))
+          Shot 'quiz-feedback' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9001:feedback'))
+          Shot 'quiz-code' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'quiz:102:10019'))
+          Shot 'quiz-narrow' '860x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011:take'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'appearance', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))

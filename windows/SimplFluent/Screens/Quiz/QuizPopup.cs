@@ -279,8 +279,7 @@ internal sealed class QuizSheet
         back.VerticalAlignment = VerticalAlignment.Center;
         back.Margin = new Thickness(0, 0, 8, 0);
         var g = K.Columns("auto, auto, *, auto", back.Col(0), tileHost.Col(1), words.Margin(14, 0, 16, 0).Col(2), trailing.Col(3));
-        // (the window's title bar takes the clicks in its band: the header's buttons sit below it)
-        g.Margin = new Thickness(20, 30, 16, 14);
+        g.Margin = new Thickness(20, 16, 16, 14);
         return g;
     }
 

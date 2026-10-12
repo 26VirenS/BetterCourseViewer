@@ -93,6 +93,17 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
             TrailingContent = trailing, CloseWindowByDoubleClickOnIcon = false,
         };
         titleBar.CloseClicked += (_, _) => { };
+        // (a sheet over the window that reaches up into the title bar's band takes its own clicks there, not a drag)
+        titleBar.WndProcInvoked += (_, e) =>
+        {
+            const int WM_NCHITTEST = 0x0084, HTCLIENT = 1;
+            if (e.Message != WM_NCHITTEST || !sheets.IsOpen) return;
+            var l = e.LParam.ToInt64();
+            var at = new Point((short)(l & 0xFFFF), (short)((l >> 16) & 0xFFFF));
+            if (!sheets.Covers(at)) return;
+            e.ReturnValue = (IntPtr)HTCLIENT;
+            e.Handled = true;
+        };
         root.Children.Add(titleBar);
         root.Children.Add(back);
         root.Children.Add(menuButton);
@@ -156,7 +167,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         handoff.Bind(engine);
         engine.PropertyChanged += OnEngine;
         engine.ToolRequested += t => { if (WebWindow.Address(engine.BaseUrl, t) is { } u) new WebWindow(u, t.Title, this).Show(); };
-        engine.QuizRequested += q => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{q.Course}/quizzes/{q.Quiz}"), q.Title, this).Show();
+        engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
         engine.AltaRequested += a => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{a.Course}/assignments/{a.Assignment}"), a.Title, this).Show();
         engine.MacmillanRequested += a => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{a.Course}/assignments/{a.Assignment}"), a.Title, this).Show();
         engine.SettingsRequested += OpenSettings;

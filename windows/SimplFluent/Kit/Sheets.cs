@@ -85,6 +85,19 @@ public sealed class SheetHost : Grid
     public event Action<bool>? OpenChanged;
 
     public bool IsOpen => current != null;
+
+    /// <summary>A point on the screen (device pixels) is on the open sheet's card — the window's title bar lets it be
+    /// the card's (a large sheet reaches up into the title bar's band).</summary>
+    public bool Covers(Point screen)
+    {
+        if (current?.Card is not { IsLoaded: true } card || PresentationSource.FromVisual(card) == null) return false;
+        try
+        {
+            var p = card.PointFromScreen(screen);
+            return p.X >= 0 && p.Y >= 0 && p.X <= card.ActualWidth && p.Y <= card.ActualHeight;
+        }
+        catch (InvalidOperationException) { return false; }
+    }
     public Sheet? Current => current;
 
     public SheetHost()
@@ -142,11 +155,25 @@ public sealed class SheetHost : Grid
         Motion.Unpop(card, Gone);
     }
 
+    private static bool OpenPopupAround(DependencyObject f)
+    {
+        for (var p = f; p != null; p = VisualTreeHelper.GetParent(p) ?? LogicalTreeHelper.GetParent(p))
+        {
+            if (p is System.Windows.Controls.ComboBox { IsDropDownOpen: true }) return true;
+            if (p is System.Windows.Controls.ContextMenu { IsOpen: true } or System.Windows.Controls.MenuItem { IsSubmenuOpen: true }) return true;
+            if (p is System.Windows.Controls.Primitives.Popup { IsOpen: true }) return true;
+            if (p is SheetHost) return false;
+        }
+        return false;
+    }
+
     private void OnKey(object sender, KeyEventArgs e)
     {
         if (current == null) return;
         if (e.Key == Key.Escape && !current.Modal)
         {
+            // (Escape in an open drop-down or menu inside the sheet closes that, not the sheet)
+            if (Keyboard.FocusedElement is DependencyObject f && OpenPopupAround(f)) return;
             var cancel = current.Buttons.LastOrDefault(b => b.Kind == SheetButtonKind.Close);
             if (cancel != null) Press(current, cancel); else Close(current);
             e.Handled = true;
