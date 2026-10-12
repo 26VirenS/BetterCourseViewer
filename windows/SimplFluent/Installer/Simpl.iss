@@ -100,6 +100,9 @@ OutputDir={#OutputDir}
 OutputBaseFilename=Simpl-Setup
 Compression=lzma2/max
 SolidCompression=yes
+; (as small, made on four cores at once: CI makes it in about a third of the time)
+LZMAUseSeparateProcess=yes
+LZMANumBlockThreads=4
 SetupLogging=yes
 
 [Languages]
