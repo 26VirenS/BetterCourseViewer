@@ -53,6 +53,8 @@
     <None Include="..\..\extension\**\*" Exclude="..\..\extension\**\.DS_Store" Link="extension\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <None Include="..\..\ios\SimplCourses\Web\bridge.js" Link="Web\bridge.js" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <None Include="..\..\ios\SimplCourses\Web\login.js" Link="Web\login.js" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <!-- the app's icon as a picture the renderer can draw ("Stay logged in?") -->
+    <None Include="Assets\Simpl-256.png" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>

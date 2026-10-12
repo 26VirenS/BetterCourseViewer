@@ -96,6 +96,12 @@ public sealed class GlassHost : HwndHost
         if (hwnd != IntPtr.Zero) SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 /* NOSIZE | NOMOVE | NOACTIVATE */);
     }
 
+    /// <summary>The keys go to the screens (a field of the app's own come up over the web view).</summary>
+    public void TakeFocus()
+    {
+        if (hwnd != IntPtr.Zero) SetFocus(hwnd);
+    }
+
     private void Frame() => Draw(false);
 
     /// <summary>A frame drawn and presented; with capture, read before it is presented (the back buffer after a present is another).</summary>

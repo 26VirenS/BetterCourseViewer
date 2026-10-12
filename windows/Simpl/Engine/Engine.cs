@@ -28,6 +28,10 @@ public sealed partial class Engine : Observable, IShellListener
 {
     public string Host { get; }
     public Uri BaseUrl { get; }
+    /// <summary>The sign-in: what covers the web view while the school asks for a username and password, and the details kept (the Mac's LoginAssist).</summary>
+    public LoginAssist Login { get; }
+    /// <summary>A page is on its way in the main frame.</summary>
+    public bool Loading { get; private set; }
     /// <summary>The window's bottom layer: the web view, under everything.</summary>
     public WebView2 Web { get; } = new() { DefaultBackgroundColor = System.Drawing.Color.Transparent };
     public AnswerCache Answers { get; }
@@ -94,6 +98,9 @@ public sealed partial class Engine : Observable, IShellListener
         BaseUrl = dev != null && string.Equals(dev.Host, host, StringComparison.OrdinalIgnoreCase) ? dev : new Uri($"https://{host}/");
         Answers = new AnswerCache(BaseUrl.IsDefaultPort ? BaseUrl.Host : $"{BaseUrl.Host}_{BaseUrl.Port}");
         Bridge.Shared.Shell = this;
+        Login = new LoginAssist(BaseUrl.Host, this);
+        Login.OnRestart = () => Web.CoreWebView2?.Navigate(new Uri(BaseUrl, "/").ToString()); // (Start Over: Canvas afresh, which asks the school anew)
+        Login.PropertyChanged += (_, e) => Changed("Login." + e.PropertyName);
     }
 
     // MARK: - Starting
@@ -118,19 +125,36 @@ public sealed partial class Engine : Observable, IShellListener
         core.Settings.AreDevToolsEnabled = true;
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
-        core.Settings.IsGeneralAutofillEnabled = true;
-        core.Settings.IsPasswordAutosaveEnabled = true;
+        // the browser never offers to save a password, and fills nothing in by itself: the sign-in is the app's own
+        // (LoginAssist), and what the student chooses to keep goes into Windows' Credential Manager (LoginVault), never
+        // the browser's store
+        core.Settings.IsGeneralAutofillEnabled = false;
+        core.Settings.IsPasswordAutosaveEnabled = false;
         Bridge.Shared.Register(Web);
         Bridge.Shared.FollowSystemAppearance();
         if (Launch.Flag("demo")) Bridge.Shared.Seed(ScriptBundle.DemoSeed());
         foreach (var s in ScriptBundle.Scripts(Host, shellOn: true)) await core.AddScriptToExecuteOnDocumentCreatedAsync(s);
+        // the sign-in reader, on every page (the school's sign-in pages above all)
+        await core.AddScriptToExecuteOnDocumentCreatedAsync(ScriptBundle.LoginScript(BaseUrl.Host));
         core.WebMessageReceived += OnMessage;
         core.NavigationStarting += (_, e) =>
         {
+            Loading = true;
             ready = false;
             FailCalls("The page went away.");
+            if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var u)) Login.WillLoad(u); // (the saved sign-in page is covered from its first frame)
         };
-        core.NavigationCompleted += (_, _) => PageFinished(Uri.TryCreate(core.Source, UriKind.Absolute, out var u) ? u : null);
+        core.NavigationCompleted += (_, e) =>
+        {
+            Loading = false;
+            var u = Uri.TryCreate(core.Source, UriKind.Absolute, out var parsed) ? parsed : null;
+            PageFinished(u);
+            // (a page that came, whatever it said — a sign-in refused with a 401 is still a page; one that never came is not)
+            if (e.IsSuccess || e.HttpStatusCode > 0) Login.DidLoad(u);
+            else if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled) Login.PageFailed();
+        };
+        Bridge.Shared.SignOutRequested -= SignOut;
+        Bridge.Shared.SignOutRequested += SignOut;
         core.NewWindowRequested += OnNewWindow;
         core.DownloadStarting += OnDownload;
         OpenOnKept();
@@ -247,6 +271,26 @@ public sealed partial class Engine : Observable, IShellListener
     {
         var p = path.ToLowerInvariant();
         return p.StartsWith("/login") || p.StartsWith("/d2l/login") || p.StartsWith("/d2l/lp/auth/login");
+    }
+
+    /// <summary>
+    /// Sign Out (the Mac's AppSession.signOut): the school's session — its cookies and site data — and the saved sign-in
+    /// cleared, or the app would sign straight back in; then the school's sign-in page.
+    /// </summary>
+    public async void SignOut()
+    {
+        Login.Forget();
+        LoginVault.Clear();
+        if (Web.CoreWebView2 is { } core)
+        {
+            try
+            {
+                core.CookieManager.DeleteAllCookies();
+                await core.Profile.ClearBrowsingDataAsync();
+            }
+            catch (Exception e) { Log.Write("sign out: " + e.Message); }
+        }
+        SignedOut();
     }
 
     /// <summary>Signed out: the school's sign-in page at once, and the next account starts afresh.</summary>
@@ -521,6 +565,7 @@ public sealed partial class Engine : Observable, IShellListener
         try
         {
             if (name == "bcv" && m["msg"] is JsonObject body) answer = await Bridge.Shared.Handle(body, Web);
+            else if (name == "bcvLogin" && m["msg"] is JsonObject said) Login.Said(said, e.Source); // (the page's own address, as WebView2 knows it)
         }
         catch (Exception ex) { ok = false; answer = ex.Message; }
         if (Web.CoreWebView2 == null) return;

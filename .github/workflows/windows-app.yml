@@ -43,8 +43,11 @@ jobs:
         shell: bash
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          # (a second one that asks for a sign-in first: the sign-in pictures)
+          node scripts/dev/mock-canvas.mjs 8802 8803 --login > mock-login.log 2>&1 &
           sleep 3
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+          curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
       - name: Pictures
         shell: pwsh
         run: |
@@ -69,6 +72,17 @@ jobs:
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'activity'))
           Shot 'dashboard-narrow' '780x683' 45 ($mock + @('--appearance', 'light'))
           Shot 'school-picker' '1024x681' 10 @('--appearance', 'dark')
+          # the sign-in (the mock with --login, on :8802): the app's own card — light, dark, wide; the card again after a
+          # wrong password; "Logging you in" with its offer (the login "slow" takes twelve seconds); "Stay logged in?"
+          # once Canvas is reached; and the note over a page the student must finish by hand (a one-time code)
+          $login = @('--base-url', 'http://localhost:8802', '--demo')
+          Shot 'sign-in-dark' '1024x681' 14 ($login + @('--appearance', 'dark'))
+          Shot 'sign-in-light' '1024x681' 14 ($login + @('--appearance', 'light'))
+          Shot 'sign-in-light-wide' '1366x778' 14 ($login + @('--appearance', 'light'))
+          Shot 'sign-in-wrong' '1024x681' 16 ($login + @('--appearance', 'light', '--sign-in', 'student:wrong'))
+          Shot 'sign-in-working' '1024x681' 14 ($login + @('--appearance', 'light', '--sign-in', 'slow:demo'))
+          Shot 'sign-in-stay' '1024x681' 40 ($login + @('--appearance', 'light', '--sign-in', 'student:demo'))
+          Shot 'sign-in-handoff' '1024x681' 18 ($login + @('--appearance', 'light', '--sign-in', 'code:demo'))
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
             $log = Join-Path $_.FullName 'simpl.log'
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 30 }

@@ -146,6 +146,21 @@ public static class ScriptBundle
         return scripts;
     }
 
+    /// <summary>
+    /// Web/login.js, the sign-in reader, for every page the engine opens (the Mac's loginScript): the main frame of any
+    /// host — a school's single sign-on is on a host of its own — with the Canvas host filled in, and its messages to
+    /// the app through <c>bcvLogin</c>. WebView2 has no world of its own for it (WebKit's SimplLogin world), so what the
+    /// app calls is kept where the page cannot swap it: <c>window.__simplLogin</c>, neither writable nor configurable,
+    /// and the reader's own name on the window taken away again.
+    /// </summary>
+    public static string LoginScript(string host)
+    {
+        var src = WebFile("login.js").Replace("__CANVAS_HOST__", Json.Str(host.ToLowerInvariant()));
+        return "(function(){if(window.top!==window||!window.__simplNative)return;var webkit={messageHandlers:{bcvLogin:window.__simplNative.handler('bcvLogin')}};try{\n"
+            + src
+            + "\n}catch(e){console.error('[Simpl Courses] login.js failed',e)}var api=self.SimplLogin;if(api){try{delete self.SimplLogin;}catch(e){}try{Object.defineProperty(window,'__simplLogin',{value:api,writable:false,configurable:false,enumerable:false});}catch(e){}}})();\n//# sourceURL=simpl-courses/login.js";
+    }
+
     /// <summary>What a student who has used the app has in storage (the Mac's demoSeed): the setup done, the first-run
     /// pointers seen, this version's notes read.</summary>
     public static JsonObject DemoSeed()

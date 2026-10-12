@@ -16,6 +16,7 @@ public sealed partial class Ui
     private readonly Dictionary<(string, Font, int, int, int, bool), (IDWriteTextLayout Layout, long Used)> layouts = new();
     private string? iconFace;
     private IDWriteInlineObject? ellipsis;
+    private readonly Dictionary<string, ID2D1Bitmap1?> images = new();
     public string? GlassError { get; private set; }
 
     /// <summary>The window's graphics, made (or made again: a lost device).</summary>
@@ -35,6 +36,8 @@ public sealed partial class Ui
     {
         foreach (var l in layouts.Values) l.Layout.Dispose();
         layouts.Clear();
+        foreach (var b in images.Values) b?.Dispose();
+        images.Clear();
         foreach (var f in formats.Values) f.Dispose();
         formats.Clear();
         ellipsis?.Dispose(); ellipsis = null;
@@ -163,6 +166,29 @@ public sealed partial class Ui
 
     public void Line(float x0, float y0, float x1, float y1, Color4 c, float width = 1) =>
         Draw(() => D.DrawLine(new Vector2(x0, y0), new Vector2(x1, y1), Brush(c), width));
+
+    /// <summary>A picture from a file (the app's icon), fitted into a rectangle; read once, kept with the graphics.</summary>
+    public void Image(string path, R r, float opacity = 1)
+    {
+        if (gpu == null) return;
+        if (!images.TryGetValue(path, out var bmp))
+        {
+            try
+            {
+                using var wic = new Vortice.WIC.IWICImagingFactory();
+                using var decoder = wic.CreateDecoderFromFileName(path, System.IO.FileAccess.Read, Vortice.WIC.DecodeOptions.CacheOnLoad);
+                using var frame = decoder.GetFrame(0);
+                using var converter = wic.CreateFormatConverter();
+                converter.Initialize(frame, Vortice.WIC.PixelFormat.Format32bppPBGRA).CheckError();
+                bmp = D.CreateBitmapFromWicBitmap(converter, (BitmapProperties1?)null);
+            }
+            catch (Exception e) { Support.Log.Write($"image {path}: {e.Message}"); bmp = null; }
+            images[path] = bmp;
+        }
+        if (bmp == null) return;
+        var b = bmp;
+        Draw(() => D.DrawBitmap(b, r.Raw, opacity, BitmapInterpolationMode.Linear, null));
+    }
 
     /// <summary>An arc (a spinner's, a ring's), from an angle through a sweep (radians, clockwise from the top).</summary>
     public void Arc(float cx, float cy, float radius, float from, float sweep, Color4 c, float width)

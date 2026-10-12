@@ -109,6 +109,31 @@ public sealed partial class Ui
     /// <summary>The width a glass button takes (to lay one out from the right).</summary>
     public float GlassButtonWidth(string label, bool icon) => Measure(label, Theme.Callout).X + 24 + (icon ? 18 : 0);
 
+    /// <summary>
+    /// A button at a given size (the Mac's bordered button at the large control size, or prominent in the accent): a
+    /// capsule, its words 15 (14 when it is small), a symbol before them; clicked.
+    /// </summary>
+    public bool Button(string id, R r, string label, bool prominent = false, bool enabled = true, string? icon = null)
+    {
+        var f = r.H >= 30 ? Theme.Body : Theme.Callout;
+        var i = Press(id, r, enabled);
+        var press = Animate(id + ":p", i.Held ? 1 : 0, 0.22f, 0.8f);
+        if (prominent) Glass(r, r.H / 2, GlassKind.Panel, T.Accent, enabled ? 0.9f : 0.45f, Shadow.None);
+        else Glass(r, r.H / 2, GlassKind.Panel, null, 0, Shadow.None);
+        var ink = !enabled ? (prominent ? new Color4(1, 1, 1, 0.75f) : T.Ink3) : prominent ? new Color4(1, 1, 1, 1) : T.Ink();
+        var m = Measure(label, f);
+        var iw = icon != null ? 20 : 0;
+        var cx = r.CenterX - (m.X + iw) / 2;
+        if (icon != null) { Icon(icon, cx + 7, r.CenterY, f.Size * 0.9f, ink, FontWeight.SemiBold); cx += iw; }
+        Text(label, cx, r.CenterY - m.Y / 2, f, ink);
+        var veil = Animate(id + ":h", i.Hovered && enabled ? 1 : 0, 0.18f);
+        if (veil + press > 0.01f) Fill(r, r.H / 2, T.Primary(0.05f * veil + 0.06f * press));
+        return i.Clicked;
+    }
+
+    /// <summary>The width <see cref="Button"/> wants for its words (and a symbol before them).</summary>
+    public float ButtonWidth(string label, bool icon = false, float h = 30) => Measure(label, h >= 30 ? Theme.Body : Theme.Callout).X + 32 + (icon ? 20 : 0);
+
     /// <summary>A button that is a link in the accent (the Mac's .link style: "All Courses"); clicked.</summary>
     public bool LinkButton(string id, float x, float y, string label, Font? font = null)
     {
@@ -311,9 +336,11 @@ public sealed partial class Ui
 
     /// <summary>
     /// A field to type in (the toolbar's Search): a click puts the caret in it; typing, Backspace, Ctrl+Backspace,
-    /// Ctrl+V, Escape (clears, then lets go). True when Enter is pressed.
+    /// Ctrl+V, Escape (clears, then lets go). True when Enter is pressed. <paramref name="secret"/> shows a dot for each
+    /// character (a password); <paramref name="boxed"/> draws the Mac's rounded-border field (a well with a hairline
+    /// edge, the accent's ring when focused) in place of a glass bar.
     /// </summary>
-    public bool TextField(string id, R r, ref string text, string placeholder, Font f, string? icon = null, bool glassBar = true)
+    public bool TextField(string id, R r, ref string text, string placeholder, Font f, string? icon = null, bool glassBar = true, bool secret = false, bool boxed = false)
     {
         var i = Press(id, r);
         if (Pressed && i.Hovered) Focus = id;
@@ -352,18 +379,26 @@ public sealed partial class Ui
                 }
             }
         }
-        if (glassBar) Glass(r, r.H / 2, GlassKind.Panel, null, 0, Shadow.None);
+        if (boxed)
+        {
+            const float radius = 6;
+            Fill(r, radius, T.Dark ? Theme.Rgb(30, 30, 32) : new Color4(1, 1, 1, 1));
+            Stroke(r, radius, T.Dark ? new Color4(1, 1, 1, 0.14f) : new Color4(0, 0, 0, 0.14f));
+            if (focused) Stroke(r.Inset(-1.5f), radius + 1.5f, Theme.WithAlpha(T.Accent, 0.55f), 3f);
+        }
+        else if (glassBar) Glass(r, r.H / 2, GlassKind.Panel, null, 0, Shadow.None);
+        var shown = secret ? new string('•', text.Length) : text;
         var x = r.X + 12;
         if (icon != null) { Icon(icon, r.X + 17, r.CenterY, 12.5f, T.Ink2, FontWeight.SemiBold); x = r.X + 30; }
         var room = r.Right - 12 - x;
         var h = Measure("Ag", f).Y;
-        if (text.Length == 0) Text(placeholder, x, r.CenterY - h / 2, f, T.Ink3, room);
+        if (shown.Length == 0) Text(placeholder, x, r.CenterY - h / 2, f, T.Ink3, room);
         else
         {
-            var tw = Measure(text, f).X;
+            var tw = Measure(shown, f).X;
             PushClip(new R(x, r.Y, room, r.H));
             var shift = Math.Max(0, tw - room + 4);
-            Text(text, x - shift, r.CenterY - h / 2, f, T.Ink(), 100000);
+            Text(shown, x - shift, r.CenterY - h / 2, f, T.Ink(), 100000);
             PopClip();
         }
         if (focused)
@@ -372,10 +407,10 @@ public sealed partial class Ui
             var on = ((Time - st.Since) % 1.06) < 0.6;
             if (on)
             {
-                var tw = Math.Min(Measure(text, f).X, room - 4);
+                var tw = Math.Min(Measure(shown, f).X, room - 4);
                 Fill(new R(x + tw + 1, r.CenterY - h * 0.42f, 1.5f, h * 0.84f), T.Accent);
             }
-            Stroke(r, r.H / 2, Theme.WithAlpha(T.Accent, 0.6f), 2f);
+            if (!boxed) Stroke(r, r.H / 2, Theme.WithAlpha(T.Accent, 0.6f), 2f);
         }
         return entered;
     }

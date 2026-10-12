@@ -40,6 +40,8 @@ public static class Glyphs
         ["chart.bar"] = "\uE9D2", ["checkmark.seal"] = "\uE930", ["tray.and.arrow.up"] = "\uE898", ["textformat"] = "\uE8D2",
         ["building.2"] = "\uE80F", ["person.3.sequence"] = "\uE716", ["square.stack.3d.up"] = "\uE8FD", ["arrow.left"] = "\uE72B",
         ["arrow.right"] = "\uE72A", ["chevron.left.small"] = "\uE76B", ["chevron.right.small"] = "\uE76C",
+        // signing in
+        ["lock.shield"] = "\uE72E", ["hand.point.up.left"] = "\uE7C9", ["safari"] = "\uE774", ["arrow.counterclockwise"] = "\uE72C",
     };
 
     public static string Of(string? symbol) =>

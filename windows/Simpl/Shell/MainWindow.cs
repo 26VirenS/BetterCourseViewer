@@ -27,7 +27,10 @@ public sealed class MainWindow : Window
     private Engine.Engine? engine;
     private AppView? view;
     private SchoolPicker? picker;
+    private LoginLayer? login;
+    private LoginOverlay? overlay;
     private HwndSource? source;
+    private string? phaseLogged;
 
     /// <summary>The caption buttons' band: Windows 11's (46 × 32 each, at the top right).</summary>
     public const float CaptionButtonW = 46, CaptionButtonH = 32;
@@ -57,7 +60,12 @@ public sealed class MainWindow : Window
         root.Children.Add(host);
         host.Build = ui =>
         {
-            if (view != null) view.Frame(ui);
+            if (view != null)
+            {
+                // (signing in: the app's own card or "Logging you in" in place of the screens; "Stay logged in?" over them)
+                if (login is { Covers: true }) login.Frame(ui); else view.Frame(ui);
+                login?.StayAlert(ui);
+            }
             else picker?.Frame(ui);
             CaptionButtons(ui);
         };
@@ -98,9 +106,11 @@ public sealed class MainWindow : Window
         engine = new Engine.Engine(schoolHost);
         root.Children.Insert(0, engine.Web);
         view = new AppView(engine, host);
+        login = new LoginLayer(engine);
+        overlay = new LoginOverlay(this, engine);
         engine.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(Engine.Engine.Phase)) Phased();
+            if (e.PropertyName == nameof(Engine.Engine.Phase) || e.PropertyName?.StartsWith("Login", StringComparison.Ordinal) == true) Phased();
             host.Invalidate();
         };
         // what opens over the window, for now as the school's own pages in windows of their own
@@ -117,15 +127,27 @@ public sealed class MainWindow : Window
     private void Phased()
     {
         if (engine == null) return;
-        if (Launch.IsDevelopment) Log.Write($"phase {engine.Phase}");
-        // (signing in: the school's page is what shows; otherwise the app's screens, over it)
-        host.Visibility = engine.Phase == Phase.Web ? Visibility.Collapsed : Visibility.Visible;
-        if (host.Visibility == Visibility.Visible)
+        var covers = engine.Login.Covers;
+        if (Launch.IsDevelopment)
+        {
+            var now = $"phase {engine.Phase}" + (covers ? $", sign-in {engine.Login.Phase}" : "") + (engine.Login.Handoff ? ", handoff" : "") + (engine.Login.AskStay ? ", stay?" : "");
+            if (now != phaseLogged) { phaseLogged = now; Log.Write(now); }
+        }
+        // (signing in: the school's page is what shows — unless the app's own sign-in card or "Logging you in" covers it;
+        // otherwise the app's screens, over it)
+        var screens = engine.Phase != Phase.Web || covers;
+        host.Visibility = screens ? Visibility.Visible : Visibility.Collapsed;
+        if (screens)
         {
             host.BringToTop();
             host.Invalidate();
+            if (covers) host.TakeFocus();
         }
+        overlay?.Update();
     }
+
+    /// <summary>Where the window's content is on screen (pixels) and how big it is (DIPs), for the windows kept over it.</summary>
+    internal (Point Origin, Size Size) ContentBounds() => (root.PointToScreen(new Point(0, 0)), new Size(root.ActualWidth, root.ActualHeight));
 
     // ---- the window's own chrome: the drag band, the edges, the caption buttons ----
 

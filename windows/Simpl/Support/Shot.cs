@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -89,7 +90,31 @@ public static class Shot
         SelectObject(mdc, old);
         try
         {
-            var src = Imaging.CreateBitmapSourceFromHBitmap(bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            BitmapSource src = Imaging.CreateBitmapSourceFromHBitmap(bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            // the app's own windows kept over this one (the sign-in's note over the school's page): drawn on, where they are
+            var overlays = Application.Current.Windows.OfType<Window>().Where(o => o != w && o.IsVisible && o.Owner == w && o.AllowsTransparency && o.Content is Visual).ToList();
+            if (overlays.Count > 0)
+            {
+                var dv = new DrawingVisual();
+                using (var dc = dv.RenderOpen())
+                {
+                    dc.DrawImage(src, new Rect(0, 0, width, height));
+                    foreach (var o in overlays)
+                    {
+                        var m = PresentationSource.FromVisual(o)?.CompositionTarget?.TransformToDevice ?? System.Windows.Media.Matrix.Identity;
+                        var pw = (int)Math.Ceiling(o.ActualWidth * m.M11);
+                        var ph = (int)Math.Ceiling(o.ActualHeight * m.M22);
+                        if (pw <= 0 || ph <= 0) continue;
+                        var rtb = new RenderTargetBitmap(pw, ph, 96 * m.M11, 96 * m.M22, System.Windows.Media.PixelFormats.Pbgra32);
+                        rtb.Render((Visual)o.Content);
+                        var at = o.PointToScreen(new Point(0, 0));
+                        dc.DrawImage(rtb, new Rect(at.X - r.L, at.Y - r.T, pw, ph));
+                    }
+                }
+                var all = new RenderTargetBitmap(width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                all.Render(dv);
+                src = all;
+            }
             var enc = new PngBitmapEncoder();
             enc.Frames.Add(BitmapFrame.Create(src));
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file))!);
