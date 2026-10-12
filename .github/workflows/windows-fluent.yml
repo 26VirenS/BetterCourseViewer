@@ -29,7 +29,7 @@ jobs:
   app:
     name: Simpl for Windows (Windows 11 look)
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
