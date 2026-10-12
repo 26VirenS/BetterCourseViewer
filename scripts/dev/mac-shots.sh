@@ -115,6 +115,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-35-tools 10 -SimplPlace tools
   shoot light-26-school 8 -SimplPicker merced
   shoot light-26b-school-confirm 18 -SimplPicker catcourses -SimplPickerConfirm YES
+  # (1.3.73) the sign-in: Simpl's own card over the school's sign-in page (the mock run with --login, on :8802)
+  BASE=http://localhost:8802 shoot light-60-sign-in 10
   shoot light-27-tour 12 -SimplOpen tour
   # (1.3) themes, To Do's fixed side column, a narrow window, the setup's nicknames
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
@@ -150,6 +152,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
+  BASE=http://localhost:8802 shoot dark-60-sign-in 10
   wait
   keep_crashes
   exit 0
@@ -185,6 +188,7 @@ for MODE in light dark; do
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
   shoot "$MODE-26-school" 8 -SimplPicker merced
   shoot "$MODE-26b-school-confirm" 18 -SimplPicker catcourses -SimplPickerConfirm YES
+  BASE=http://localhost:8802 shoot "$MODE-60-sign-in" 10 # (1.3.73) Simpl's own sign-in card over the school's page
   # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list

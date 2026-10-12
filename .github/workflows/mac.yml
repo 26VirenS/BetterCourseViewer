@@ -99,9 +99,11 @@ jobs:
         if: hashFiles('shots/FAILED') == ''
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          node scripts/dev/mock-canvas.mjs 8802 8803 --login > mock-login.log 2>&1 & # (one that asks for a sign-in first: the sign-in picture)
           node scripts/dev/mock-brightspace.mjs 8860 --open > mock-d2l.log 2>&1 &
           sleep 2
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+          curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
           curl -s -o /dev/null -w "mock brightspace %{http_code}\n" http://localhost:8860/d2l/home
           system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
       - name: Screens

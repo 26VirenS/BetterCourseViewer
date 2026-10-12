@@ -135,7 +135,8 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         // the page's own address, as WebKit knows it — not what the script says it is
         let origin = message.frameInfo.securityOrigin
         let host = origin.host.lowercased()
-        let secure = origin.protocol == "https"
+        // (this machine itself — the mock, in development — is as good as https: nothing leaves it)
+        let secure = origin.protocol == "https" || host == "localhost" || host == "127.0.0.1"
         let error = (body["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         if (body["stale"] as? Bool) == true, host != canvasHost {
             staleSeen()
