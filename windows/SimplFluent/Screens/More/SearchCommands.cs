@@ -67,7 +67,7 @@ internal static class SearchCommands
             .OrderBy(x => x.Rank).ThenBy(x => x.Index)
             .Select(x => x.Command).ToList();
 
-    /// <summary>Every command the box knows, as the Mac's where Windows has the same thing (the Mac's tour is not here).</summary>
+    /// <summary>Every command the box knows, as the Mac's where Windows has the same thing.</summary>
     public static List<SearchCommand> Catalog(Engine.Engine e)
     {
         var lms = e.LmsName;
@@ -111,6 +111,7 @@ internal static class SearchCommands
         c.Add(new() { Name = "settings", Aliases = new[] { "preferences", "options", "prefs" }, Title = "Settings", Hint = "Simpl’s settings", Symbol = SymbolRegular.Settings24, Key = "Ctrl+,", Act = e.AskSettings });
         c.Add(new() { Name = "whatsnew", Aliases = new[] { "changes", "version", "new", "release" }, Title = "What’s New", Hint = "What changed in this version", Symbol = SymbolRegular.Sparkle24, Act = () => e.ShowWhatsNew(WhatsNew.All) });
         c.Add(new() { Name = "setup", Aliases = new[] { "goals" }, Title = "Guided Setup", Hint = "Choose your courses and goals again", Symbol = SymbolRegular.CheckmarkCircle24, Act = e.AskSetup });
+        c.Add(new() { Name = "tour", Aliases = new[] { "welcome", "guide", "intro", "onboarding" }, Title = "Take the Tour", Hint = "A quick look round the app", Symbol = SymbolRegular.Map24, Act = () => (System.Windows.Application.Current.MainWindow as Shell.MainWindow)?.StartTour() });
         c.Add(new() { Name = "browser", Aliases = new[] { "web", "site", "canvas", "brightspace" }, Title = $"Open {lms} in Browser", Hint = "The school’s own site", Symbol = SymbolRegular.Globe24, Act = () => Engine.Engine.OpenExternally(e.BaseUrl) });
         c.Add(new() { Name = "help", Aliases = new[] { "?", "commands" }, Title = "Commands", Hint = "Every command", Symbol = SymbolRegular.AppsList24, Takes = CommandTakes.Commands, Act = () => e.Go(Place.Search("")) });
         return c;
