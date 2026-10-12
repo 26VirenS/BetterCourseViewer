@@ -107,6 +107,8 @@ public sealed partial class DashboardScreen
 
     private static int CardCols(double w) => Math.Max(1, (int)Math.Floor((Math.Max(320, w) * (w >= 900 ? 0.7 : 1) + 16) / (264 + 16)));
 
+    private bool courseCardsShown;
+
     private FrameworkElement CoursesSection(double w)
     {
         var c = courses.Data;
@@ -141,7 +143,9 @@ public sealed partial class DashboardScreen
             grid.Children.Add(card);
         }
         v.Children.Add(grid);
-        Motion.Stagger(grid.Children.OfType<UIElement>(), 40, 20);
+        // (the cards come in one after another the first time they show, not again at every answer or count)
+        if (!courseCardsShown) Motion.Stagger(grid.Children.OfType<UIElement>(), 40, 20);
+        courseCardsShown = true;
         return v;
     }
 

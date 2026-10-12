@@ -208,12 +208,14 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (Tabs.All(t => t.Key != key)) key = "general";
         tab = key;
         Pane();
-        Render();
+        Render(enter: true);
         scroller.ScrollToTop();
         if (Launch.Get("settings-scroll") is { } s && double.TryParse(s, out var off)) Dispatcher.BeginInvoke(() => scroller.ScrollToVerticalOffset(off), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
-    private void Render()
+    /// <summary>The page drawn again: sliding in only when you arrive at it (a tab chosen); a change on it (a toggle, an
+    /// answer, a check for updates) redraws it in place, where it was scrolled to, with nothing moving.</summary>
+    private void Render(bool enter = false)
     {
         var t = Tabs.First(x => x.Key == tab);
         titleHost.Content = K.Text(t.Title, Ty.Title);
@@ -230,8 +232,10 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         content.MaxWidth = 1000;
         content.HorizontalAlignment = HorizontalAlignment.Left;
         var first = scroller.Content == null;
+        var offset = scroller.VerticalOffset;
         scroller.Content = content;
-        if (first || Motion.On) Motion.Enter(content, 0, 20, 360);
+        if (first || enter) Motion.Enter(content, 0, 20, 360);
+        else Dispatcher.BeginInvoke(() => scroller.ScrollToVerticalOffset(offset), System.Windows.Threading.DispatcherPriority.Loaded);
         Shot.Moved();
     }
 

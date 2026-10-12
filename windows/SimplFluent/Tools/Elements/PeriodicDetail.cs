@@ -371,7 +371,7 @@ internal sealed class PTElementPage : Grid
         private static string CloudDetail(ElectronCloud.Sub s)
         {
             var v = s.MeanRadius * ElectronCloud.BohrPm;
-            var pm = v < 10 ? v.ToString("0.0", CultureInfo.InvariantCulture) : ((int)Math.Round(v, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture);
+            var pm = v < 9.95 ? v.ToString("0.0", CultureInfo.InvariantCulture) : ((int)Math.Round(v, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture);
             return $"{s.Name}{PTConfig.Superscript(s.Count)} · effective nuclear charge {s.Zeff.ToString("0.00", CultureInfo.InvariantCulture)} · on average {pm} pm from the nucleus";
         }
 
