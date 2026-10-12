@@ -16,7 +16,8 @@ public sealed class SheetButton
     public SheetButtonKind Kind { get; set; }
     public Action? Click { get; set; }
     public bool Closes { get; set; } = true;
-    /// <summary>The primary button in the critical colour: what it does cannot be undone (Uninstall).</summary>
+    /// <summary>The primary button in the critical colour: what it does cannot be undone (Uninstall). Not the default —
+    /// Enter does not press it and Cancel has the focus when the sheet opens; it takes a click of its own.</summary>
     public bool Danger { get; set; }
     internal Wpf.Ui.Controls.Button? Control;
 
@@ -130,8 +131,9 @@ public sealed class SheetHost : Grid
         Support.Shot.Moved();
         Dispatcher.BeginInvoke(() =>
         {
-            // the first thing to type in, else the default button
-            var first = FirstFocusable(s.Body) ?? (IInputElement?)s.Buttons.FirstOrDefault(b => b.Kind == SheetButtonKind.Primary)?.Control;
+            // the first thing to type in, else the default button (Cancel, when the primary is the critical one)
+            var primary = s.Buttons.FirstOrDefault(b => b.Kind == SheetButtonKind.Primary);
+            var first = FirstFocusable(s.Body) ?? (IInputElement?)(primary is { Danger: true } ? s.Buttons.LastOrDefault(b => b.Kind == SheetButtonKind.Close)?.Control : primary?.Control);
             if (first is UIElement u) { u.Focus(); Keyboard.Focus(first); }
         }, System.Windows.Threading.DispatcherPriority.Input);
     }
@@ -185,7 +187,8 @@ public sealed class SheetHost : Grid
         {
             if (Keyboard.FocusedElement is System.Windows.Controls.Button) return; // (a focused button presses itself)
             var primary = current.Buttons.FirstOrDefault(b => b.Kind == SheetButtonKind.Primary);
-            if (primary?.Control is { IsEnabled: true }) { Press(current, primary); e.Handled = true; }
+            // (the critical one is never Enter's: a tick box focused, Enter would uninstall)
+            if (primary is { Danger: false, Control.IsEnabled: true }) { Press(current, primary); e.Handled = true; }
         }
     }
 

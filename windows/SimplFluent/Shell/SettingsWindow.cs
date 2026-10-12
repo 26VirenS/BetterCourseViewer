@@ -315,7 +315,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     /// <summary>
     /// Uninstall…: Windows 11's question — Simpl removed from this PC, and closing now — with what it keeps kept unless
-    /// the box says otherwise; Uninstall in the critical colour, Cancel the way out.
+    /// the box says otherwise; Uninstall in the critical colour and never the default, Cancel the way out.
     /// </summary>
     private void AskUninstall()
     {
