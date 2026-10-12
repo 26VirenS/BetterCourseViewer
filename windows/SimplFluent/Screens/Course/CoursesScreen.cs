@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using Simpl.Engine;
 using Simpl.Kit;
 using Simpl.Models;
@@ -171,7 +170,7 @@ public sealed class CoursesScreen : Screen
             Text = c.Code, FontSize = 20, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = Brushes.White,
             TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 54, LineHeight = 26,
             LineStackingStrategy = LineStackingStrategy.BlockLineHeight, Margin = new Thickness(16, 14, 64, 12), VerticalAlignment = VerticalAlignment.Top,
-            Effect = new DropShadowEffect { BlurRadius = 4, ShadowDepth = 1, Direction = 270, Opacity = 0.18, Color = Colors.Black },
+            Effect = K.TextShadow(),
         };
         var banner = new Grid
         {

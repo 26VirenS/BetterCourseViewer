@@ -30,7 +30,7 @@ internal sealed class AltaGraphWindow : FluentWindow
         ShowInTaskbar = false;
         ShowActivated = false; // (in front of the popup, the page keeping the keyboard)
         WindowBackdropType = Support.Appearance.Backdrop;
-        if (Support.Shot.Asked) SetResourceReference(BackgroundProperty, B.Window);
+        if (Support.Shot.Asked || Fx.Opaque) SetResourceReference(BackgroundProperty, B.Window);
         ExtendsContentIntoTitleBar = true;
         FontFamily = K.TextFace;
         SetResourceReference(ForegroundProperty, B.Text);

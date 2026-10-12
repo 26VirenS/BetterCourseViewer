@@ -28,7 +28,7 @@ public sealed class WebWindow : FluentWindow
         ExtendsContentIntoTitleBar = true;
         FontFamily = K.TextFace;
         SetResourceReference(ForegroundProperty, B.Text);
-        if (Shot.Asked) SetResourceReference(BackgroundProperty, B.Window);
+        if (Shot.Asked || Fx.Opaque) SetResourceReference(BackgroundProperty, B.Window);
         Placement.Restore(this, "web", 1100, 760, 480, 360);
         if (owner != null) WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var root = new Grid();

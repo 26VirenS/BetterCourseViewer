@@ -44,7 +44,8 @@ public sealed class Bezier : IEasingFunction
 /// <summary>
 /// Windows 11's motion (WinUI's timing): things arriving decelerate into place ("fast out, slow in"), things leaving
 /// accelerate away, and moves on screen take the standard point-to-point curve. Durations are Windows' own: 83, 167,
-/// 250, 333 ms. Under Windows' "Animation effects" off, everything arrives at once.
+/// 250, 333 ms. Under Windows' "Animation effects" off, everything arrives at once — and so where WPF draws without
+/// the graphics card (Fx: render tier 0).
 /// </summary>
 public static class Motion
 {
@@ -55,8 +56,9 @@ public static class Motion
 
     public const int Fast = 83, Normal = 167, Medium = 250, Slow = 333;
 
-    /// <summary>Windows' own "Animation effects" setting (Settings ▸ Accessibility ▸ Visual effects).</summary>
-    public static bool On => SystemParameters.ClientAreaAnimation && Support.Launch.Get("shot") == null;
+    /// <summary>Windows' own "Animation effects" setting (Settings ▸ Accessibility ▸ Visual effects), where this PC can
+    /// draw motion smoothly (Fx).</summary>
+    public static bool On => SystemParameters.ClientAreaAnimation && Fx.Motion && Support.Launch.Get("shot") == null;
 
     public static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(ms));
 

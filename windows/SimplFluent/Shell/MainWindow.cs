@@ -65,7 +65,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         WindowCornerPreference = WindowCornerPreference.Round;
         FontFamily = K.TextFace;
         SetResourceReference(ForegroundProperty, B.Text);
-        if (Shot.Asked) { SetResourceReference(BackgroundProperty, B.Window); ToolTipService.SetIsEnabled(this, false); }
+        if (Shot.Asked || Fx.Opaque) SetResourceReference(BackgroundProperty, B.Window);
+        if (Shot.Asked) ToolTipService.SetIsEnabled(this, false);
         Placement.Restore(this, "main", 1280, 820, 720, 520);
 
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(TitleBarHeight) });
@@ -128,6 +129,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         SourceInitialized += (_, _) => Appearance.Apply();
         Appearance.Changed += () => shell?.Retheme();
         Loaded += (_, _) => Begin();
+        ContentRendered += (_, _) => Fx.Decide(); // (the render tier is known once a frame is drawn)
         Closing += OnClosing;
         StateChanged += (_, _) => Placement.Save(this, "main");
         SizeChanged += (_, _) => { Placement.Save(this, "main"); shell?.WindowWidth(ActualWidth); UpdateTitleButtons(); };

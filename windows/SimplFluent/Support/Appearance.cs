@@ -44,8 +44,12 @@ public static class Appearance
         set { Prefs.Set("appearance", value == "system" ? null : value); Apply(); }
     }
 
-    /// <summary>Light or dark now: as asked at launch (--appearance), else as chosen, else as Windows is set.</summary>
-    public static bool Dark => Launch.Get("appearance") switch
+    private static bool? dark;
+    private static Color? accent;
+
+    /// <summary>Light or dark now: as asked at launch (--appearance), else as chosen, else as Windows is set. Read once
+    /// and kept until the look is worn again (Apply): it is asked per chip and tile.</summary>
+    public static bool Dark => dark ??= Launch.Get("appearance") switch
     {
         "dark" => true,
         "light" => false,
@@ -82,13 +86,15 @@ public static class Appearance
         Apply();
     }
 
-    /// <summary>The backdrop every window wears: Mica where Windows has it (11), a plain ground elsewhere and in the
-    /// screenshot suite's pictures (Windows Server draws no Mica).</summary>
-    public static WindowBackdropType Backdrop => Launch.Get("shot") != null ? WindowBackdropType.None : WindowBackdropType.Mica;
+    /// <summary>The backdrop every window wears: Mica where Windows has it (11), a plain ground elsewhere, in the
+    /// screenshot suite's pictures (Windows Server draws no Mica) and where WPF draws without the graphics card (Fx).</summary>
+    public static WindowBackdropType Backdrop => Launch.Get("shot") != null || Kit.Fx.Opaque ? WindowBackdropType.None : WindowBackdropType.Mica;
 
     /// <summary>At launch, and after a change: light or dark and the accent, for every control and every window.</summary>
     public static void Apply()
     {
+        dark = null; // (read again: --appearance and --theme stay as launched, the rest changes only through here)
+        accent = null;
         if (Application.Current == null) return;
         var theme = Dark ? ApplicationTheme.Dark : ApplicationTheme.Light;
         ApplicationThemeManager.Apply(theme, Backdrop, AccentHex == null);
@@ -100,8 +106,8 @@ public static class Appearance
         Changed?.Invoke();
     }
 
-    /// <summary>The accent now (Windows' own, or the one chosen).</summary>
-    public static Color Accent => AccentHex is { } h && Hex(h) is { } c ? c : ApplicationAccentColorManager.SystemAccent;
+    /// <summary>The accent now (Windows' own, or the one chosen), kept until the look is worn again (Apply).</summary>
+    public static Color Accent => accent ??= AccentHex is { } h && Hex(h) is { } c ? c : ApplicationAccentColorManager.SystemAccent;
 
     public static Color? Hex(string? hex)
     {

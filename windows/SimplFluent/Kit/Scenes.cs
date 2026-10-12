@@ -19,6 +19,11 @@ public static class Scenes
 {
     private static readonly Dictionary<string, ImageSource?> Images = new();
 
+    /// <summary>Each mask inked in each colour it is drawn in (Inked), until the look changes.</summary>
+    private static readonly Dictionary<(ImageSource Mask, Color Ink), BitmapSource> Inks = new();
+
+    static Scenes() => Appearance.Changed += () => Inks.Clear();
+
     /// <summary>The counters in the Dashboard's order: which of a scene's six drawings each wears, so no two look alike.</summary>
     private static readonly string[] Cards = { "today", "tomorrow", "next", "overdue", "unread", "graded" };
 
@@ -72,16 +77,8 @@ public static class Scenes
         if (Of(slot) is not { } pic) return null;
         var side = slot == "side";
         var zoom = Math.Clamp(Appearance.Zoom(slot), 0.5, 3);
-        var brush = new ImageBrush(pic.Mask)
-        {
-            Stretch = Stretch.UniformToFill,
-            AlignmentX = side ? AlignmentX.Center : AlignmentX.Right,
-            AlignmentY = AlignmentY.Bottom,
-        };
-        if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, side ? 0.5 : 1, 1);
-        var ink = new Rectangle { Fill = new SolidColorBrush(pic.Scene ? SceneInk : PhotoInk), OpacityMask = brush, IsHitTestVisible = false };
         var g = new Grid { IsHitTestVisible = false, ClipToBounds = true };
-        g.Children.Add(ink);
+        g.Children.Add(Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1));
         if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = new SolidColorBrush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });
         return g;
     }
@@ -93,12 +90,51 @@ public static class Scenes
         var paper = K.Mix(Page, accent, Appearance.Dark ? 0.1 : 0.12);
         var ink = K.Mix(paper, accent, Appearance.Dark ? 0.34 : 0.3);
         var g = new Grid { Background = new SolidColorBrush(paper), ClipToBounds = true };
-        g.Children.Add(new Rectangle
-        {
-            Fill = new SolidColorBrush(ink),
-            OpacityMask = new ImageBrush(img) { Stretch = Stretch.UniformToFill, AlignmentX = AlignmentX.Right, AlignmentY = AlignmentY.Bottom },
-        });
+        g.Children.Add(Drawn(img, ink, AlignmentX.Right));
         return g;
+    }
+
+    /// <summary>
+    /// A mask drawn in its ink, filling its place: pinned at the foot (and the side asked), zoomed from there. The mask
+    /// is inked once into a picture of its own, drawn as it is — not the ink through an opacity mask, a layer of its
+    /// own drawn again on every frame (on the processor, where WPF draws without the graphics card).
+    /// </summary>
+    private static Rectangle Drawn(ImageSource mask, Color ink, AlignmentX x, double zoom = 1, double originX = 1)
+    {
+        var inked = Inked(mask, ink);
+        var brush = new ImageBrush(inked ?? mask) { Stretch = Stretch.UniformToFill, AlignmentX = x, AlignmentY = AlignmentY.Bottom };
+        if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, originX, 1);
+        // (were the inking to fail: the ink through the mask, as before)
+        return inked != null
+            ? new Rectangle { Fill = brush, IsHitTestVisible = false }
+            : new Rectangle { Fill = new SolidColorBrush(ink), OpacityMask = brush, IsHitTestVisible = false };
+    }
+
+    /// <summary>A mask in a colour: the ink where the mask is, as much as the mask is there (premultiplied), frozen.</summary>
+    private static BitmapSource? Inked(ImageSource mask, Color ink)
+    {
+        if (Inks.TryGetValue((mask, ink), out var have)) return have;
+        if (mask is not BitmapSource src) return null;
+        try
+        {
+            var pbgra = new FormatConvertedBitmap(src, PixelFormats.Pbgra32, null, 0);
+            int w = pbgra.PixelWidth, h = pbgra.PixelHeight;
+            var px = new byte[w * h * 4];
+            pbgra.CopyPixels(px, w * 4, 0);
+            for (var i = 0; i < px.Length; i += 4)
+            {
+                var a = (px[i + 3] * ink.A + 127) / 255;
+                px[i] = (byte)((ink.B * a + 127) / 255);
+                px[i + 1] = (byte)((ink.G * a + 127) / 255);
+                px[i + 2] = (byte)((ink.R * a + 127) / 255);
+                px[i + 3] = (byte)a;
+            }
+            var bmp = BitmapSource.Create(w, h, src.DpiX, src.DpiY, PixelFormats.Pbgra32, null, px, w * 4);
+            bmp.Freeze();
+            Inks[(mask, ink)] = bmp;
+            return bmp;
+        }
+        catch (Exception e) { Log.Write("ink: " + e.Message); return null; }
     }
 
     // ---- a photo of the student's own, inked (lib/theme.js inkOf, the Mac's inkMask) ----
@@ -126,7 +162,11 @@ public static class Scenes
     }
 
     /// <summary>Forget what was inked before (a photo replaced or removed).</summary>
-    public static void Forget() => Images.Clear();
+    public static void Forget()
+    {
+        Images.Clear();
+        Inks.Clear();
+    }
 
     /// <summary>
     /// A photo inked down to two tones, as the web inks it: the darkest part of it (below four fifths of Otsu's split)

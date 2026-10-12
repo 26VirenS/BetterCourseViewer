@@ -420,19 +420,38 @@ public static class K
         {
             try
             {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = u;
-                bmp.DecodePixelWidth = (int)(size * 2);
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
+                var bmp = AvatarImage(u, (int)(size * 2));
                 var photo = new Ellipse { Fill = new ImageBrush(bmp) { Stretch = Stretch.UniformToFill } };
-                bmp.DownloadCompleted += (_, _) => t.Visibility = Visibility.Hidden;
+                // (the initials until the picture is there: at once when it was read before)
+                if (bmp.IsDownloading) bmp.DownloadCompleted += (_, _) => t.Visibility = Visibility.Hidden;
+                else t.Visibility = Visibility.Hidden;
                 g.Children.Add(photo);
             }
             catch { }
         }
         return g;
+    }
+
+    private static readonly Dictionary<(string Url, int Width), BitmapImage> Avatars = new();
+
+    /// <summary>A person's picture at a size, fetched and decoded once and kept while Simpl runs (a few hundred at
+    /// most); one that could not be read is asked for again the next time.</summary>
+    private static BitmapImage AvatarImage(Uri u, int width)
+    {
+        var key = (u.AbsoluteUri, width);
+        if (Avatars.TryGetValue(key, out var have)) return have;
+        if (Avatars.Count >= 300) Avatars.Clear();
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.UriSource = u;
+        bmp.DecodePixelWidth = width;
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.EndInit();
+        void Drop() { if (Avatars.TryGetValue(key, out var b) && ReferenceEquals(b, bmp)) Avatars.Remove(key); }
+        bmp.DownloadFailed += (_, _) => Drop();
+        bmp.DecodeFailed += (_, _) => Drop();
+        Avatars[key] = bmp;
+        return bmp;
     }
 
     /// <summary>Windows 11's indeterminate progress ring.</summary>
@@ -492,9 +511,15 @@ public static class K
         _ => Color.FromRgb(0x86, 0x86, 0x8b),
     };
 
-    /// <summary>A soft shadow under a raised surface (Windows 11's flyout elevation).</summary>
-    public static DropShadowEffect Shadow(double blur = 28, double depth = 8, double opacity = 0.24) =>
-        new() { BlurRadius = blur, ShadowDepth = depth, Direction = 270, Opacity = opacity, Color = Colors.Black, RenderingBias = RenderingBias.Quality };
+    /// <summary>A soft shadow under a raised surface (Windows 11's flyout elevation); none where this PC draws shadows on
+    /// the processor (Fx), the surface's hairline edge alone.</summary>
+    public static DropShadowEffect? Shadow(double blur = 28, double depth = 8, double opacity = 0.24) =>
+        Fx.Shadows ? new() { BlurRadius = blur, ShadowDepth = depth, Direction = 270, Opacity = opacity, Color = Colors.Black, RenderingBias = RenderingBias.Quality } : null;
+
+    /// <summary>A faint shadow under words on a colour (a course card's code), so they lift off it; none where shadows
+    /// are not drawn (Fx).</summary>
+    public static DropShadowEffect? TextShadow() =>
+        Fx.Shadows ? new() { BlurRadius = 4, ShadowDepth = 1, Direction = 270, Opacity = 0.18, Color = Colors.Black } : null;
 }
 
 /// <summary>A stack with room between its children (WinUI's StackPanel.Spacing).</summary>
