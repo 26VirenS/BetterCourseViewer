@@ -64,8 +64,9 @@ public sealed partial class DashboardScreen
         var time = K.Text(row.Time ?? "", Ty.Body, B.Text2).Margin(8, 0, 6, 0);
         time.VerticalAlignment = VerticalAlignment.Top;
         var g = K.Columns("auto, *, auto", check.Col(0), words.Col(1), time.Col(2));
-        var r = row;
-        return K.Subtle(g, string.IsNullOrEmpty(row.Url) ? null : () => engine.OpenWeb(r.Url!, r.Title), new Thickness(4, 10, 4, 10));
+        var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
+        b.Click += (_, _) => WorkPreview.Press(WorkPreview.Work(row, engine, on => Tick(row.Id, on)), b);
+        return b;
     }
 
     // ---- the grades skyline (the Mac's DashSkyline) ----

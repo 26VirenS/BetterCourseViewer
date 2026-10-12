@@ -45,6 +45,8 @@ public sealed class AppShell : Grid, IDisposable
     private readonly Border toast = new();
     private readonly TextBlock toastText;
     private readonly Border scrim = new() { Visibility = Visibility.Collapsed };
+    /// <summary>Where a piece of work's quick look is drawn, over the page (WorkPreview).</summary>
+    private readonly Canvas previewLayer = new() { ClipToBounds = true };
     private readonly HashSet<string> expanded = new();
     private readonly Dictionary<Place, Screen> placeScreens = new();
     private readonly Dictionary<string, Screen> routeScreens = new();
@@ -116,6 +118,9 @@ public sealed class AppShell : Grid, IDisposable
         toast.Bg(B.Flyout).Stroke(B.FlyoutStroke);
         toast.Visibility = Visibility.Collapsed;
         Children.Add(toast.Col(1));
+        Children.Add(previewLayer.Col(1));
+        WorkPreview.Attach(previewLayer, engine);
+        PreviewMouseDown += (_, e) => WorkPreview.ClickedAt(e.GetPosition(previewLayer));
         FilePreview.Shared.PropertyChanged += OnFile;
 
         // the pane over the page while the window is narrow, and what dims the page behind it
@@ -316,6 +321,7 @@ public sealed class AppShell : Grid, IDisposable
             var id = loc.Place.Identity;
             if (!placeScreens.TryGetValue(id, out next!)) placeScreens[id] = next = ScreenFactory.For(engine, loc.Place);
         }
+        WorkPreview.Dismiss();
         if (next != current)
         {
             if (current != null) { current.Hide(); current.HeaderChanged -= Header; }
@@ -400,6 +406,7 @@ public sealed class AppShell : Grid, IDisposable
     public bool Escape()
     {
         if (paneOpen) { ClosePane(); return true; }
+        if (WorkPreview.IsOpen) { WorkPreview.Close(); return true; }
         return current?.Escape() == true;
     }
 
@@ -430,6 +437,8 @@ public sealed class AppShell : Grid, IDisposable
             Grid.SetColumnSpan(page, 2);
             Grid.SetColumn(toast, 0);
             Grid.SetColumnSpan(toast, 2);
+            Grid.SetColumn(previewLayer, 0);
+            Grid.SetColumnSpan(previewLayer, 2);
         }
         else
         {
@@ -445,6 +454,8 @@ public sealed class AppShell : Grid, IDisposable
             Grid.SetColumnSpan(page, 1);
             Grid.SetColumn(toast, 1);
             Grid.SetColumnSpan(toast, 1);
+            Grid.SetColumn(previewLayer, 1);
+            Grid.SetColumnSpan(previewLayer, 1);
         }
         Panel.SetZIndex(paneHolder, narrow ? 10 : 0);
         Panel.SetZIndex(scrim, 9);

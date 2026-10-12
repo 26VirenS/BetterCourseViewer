@@ -230,7 +230,7 @@ public static class K
         b.SetResourceReference(FrameworkElement.StyleProperty, "CardButton");
         SetCorner(b, new CornerRadius(corner));
         if (pad != null) b.Padding = pad.Value;
-        b.Click += (_, _) => click();
+        b.Click += (_, e) => { e.Handled = true; click(); };
         return b;
     }
 
@@ -241,7 +241,8 @@ public static class K
         b.SetResourceReference(FrameworkElement.StyleProperty, "SubtleButton");
         SetCorner(b, new CornerRadius(corner));
         if (pad != null) b.Padding = pad.Value;
-        if (click != null) b.Click += (_, _) => click();
+        // (a press handled where it lands: a button inside a row's own button does not open the row too)
+        if (click != null) b.Click += (_, e) => { e.Handled = true; click(); };
         return b;
     }
 
@@ -250,7 +251,7 @@ public static class K
     {
         var b = new Wpf.Ui.Controls.Button { Content = text, Appearance = accent ? ControlAppearance.Primary : ControlAppearance.Secondary, MinWidth = 96 };
         if (icon is { } i) b.Icon = new SymbolIcon { Symbol = i };
-        if (click != null) b.Click += (_, _) => click();
+        if (click != null) b.Click += (_, e) => { e.Handled = true; click(); };
         return b;
     }
 
@@ -260,7 +261,7 @@ public static class K
         var t = Text(text, ty, B.AccentText);
         var b = new Wpf.Ui.Controls.Button { Content = t, Appearance = ControlAppearance.Transparent, Padding = new Thickness(6, 3, 6, 4), BorderThickness = new Thickness(0), Cursor = Cursors.Hand };
         b.SetResourceReference(Control.BackgroundProperty, "HyperlinkButtonBackground");
-        b.Click += (_, _) => click();
+        b.Click += (_, e) => { e.Handled = true; click(); };
         return b;
     }
 
@@ -273,7 +274,7 @@ public static class K
         b.HorizontalContentAlignment = HorizontalAlignment.Center;
         b.ToolTip = tip;
         System.Windows.Automation.AutomationProperties.SetName(b, tip);
-        b.Click += (_, _) => click();
+        b.Click += (_, e) => { e.Handled = true; click(); };
         return b;
     }
 
@@ -301,7 +302,7 @@ public static class K
             if (chevron) grid.Children.Add(Icon(SymbolRegular.ChevronRight20, 12, B.Text2).Margin(12, 0, 0, 0).Col(3));
             var b = new Button { Content = grid };
             b.SetResourceReference(FrameworkElement.StyleProperty, "RowButton");
-            b.Click += (_, _) => click();
+            b.Click += (_, e) => { e.Handled = true; click(); };
             return b;
         }
         var card = Card(grid, new Thickness(16, 0, 16, 0), 4);

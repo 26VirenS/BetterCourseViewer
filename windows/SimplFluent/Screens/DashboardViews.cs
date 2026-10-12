@@ -53,7 +53,7 @@ public sealed partial class DashboardScreen
             for (var k = 0; k < day.Rows.Count; k++)
             {
                 if (k > 0) rows.Children.Add(K.Divider(84));
-                rows.Children.Add(WorkLine(day.Rows[k], wide));
+                rows.Children.Add(WorkLine(day.Rows[k], day.Title, wide));
             }
             days.Children.Add(K.V(0, head, K.Card(rows, new Thickness(4))));
         }
@@ -63,7 +63,7 @@ public sealed partial class DashboardScreen
 
     /// <summary>The Mac's DashWorkLine: the check; its kind on a tile of its course's colour; its course and kind with its
     /// flags over its title; its points; when it is due.</summary>
-    private FrameworkElement WorkLine(DashRow row, bool wide)
+    private FrameworkElement WorkLine(DashRow row, string day, bool wide)
     {
         var done = Done(row.Id, row.Done);
         var check = new CheckCircle(done, done ? "Mark as not done" : "Mark as done");
@@ -88,8 +88,10 @@ public sealed partial class DashboardScreen
             check.Margin(6, 0, 12, 0).Col(0), tile.Margin(0, 0, 12, 0).Col(1), words.Col(2),
             points.Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3),
             due.Margin(8, 0, 6, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(4));
-        var r = row;
-        return K.Subtle(g, string.IsNullOrEmpty(row.Url) ? null : () => engine.OpenWeb(r.Url!, r.Title), new Thickness(4, 10, 4, 10));
+        // (a click: its quick look, grown out of the row; a double-click: the work whole)
+        var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
+        b.Click += (_, _) => WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b);
+        return b;
     }
 
     // ---- Cards: the courses (the Mac's DashCourseCard, as Windows 11 cards) ----

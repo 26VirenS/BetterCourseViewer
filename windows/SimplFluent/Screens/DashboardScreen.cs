@@ -448,7 +448,9 @@ public sealed partial class DashboardScreen : Screen
             {
                 g.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 12, B.Text3).Margin(8, 0, 0, 0).Col(2));
                 var r = row;
-                v.Children.Add(K.Subtle(g, () => engine.OpenWeb(r.Url!, r.Title), new Thickness(8, 7, 8, 7)));
+                var b = K.Subtle(g, null, new Thickness(8, 7, 8, 7));
+                b.Click += (_, _) => WorkPreview.Press(WorkPreview.Sheet(r, key, engine), b);
+                v.Children.Add(b);
             }
             else v.Children.Add(g.Margin(8, 7, 8, 7));
         }

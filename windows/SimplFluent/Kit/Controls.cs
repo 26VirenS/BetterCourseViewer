@@ -113,8 +113,9 @@ public sealed class CheckCircle : Button
         System.Windows.Automation.AutomationProperties.SetName(this, label);
         MouseEnter += (_, _) => { if (!this.done) hint.Opacity = 1; };
         MouseLeave += (_, _) => hint.Opacity = 0;
-        Click += (_, _) =>
+        Click += (_, e) =>
         {
+            e.Handled = true; // (the row it sits in is not opened by its tick)
             this.done = !this.done;
             Paint(true);
             Toggled?.Invoke(this.done);
