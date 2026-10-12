@@ -72,7 +72,7 @@ jobs:
         if: always()
         with:
           name: shot-showcase
-          path: shot-showcase.png*
+          path: shot-showcase*
       - uses: actions/upload-artifact@v4
         with:
           name: LiquidGlass-Showcase-win64
