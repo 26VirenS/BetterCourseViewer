@@ -9,8 +9,8 @@
 <meta name="theme-color" content="#f2f2f6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20120%20120%22%3E%3Crect%20width%3D%22120%22%20height%3D%22120%22%20rx%3D%2226%22%20fill%3D%22%230a5fd8%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%2218%22%20width%3D%2253%22%20height%3D%2284%22%20rx%3D%2214%22%20fill%3D%22rgba(255%2C255%2C255%2C.35)%22%2F%3E%3Cpath%20d%3D%22M28%2030%20H69%20A30%2030%200%200%201%2069%2090%20H28%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 <style>
-/* the site's own look (public/index.html): the grey ground, the system font, white cards, black buttons — and Report a bug's purple */
-:root { --bg: #f2f2f6; --card: #fff; --ink: #1c1c1e; --ink2: #5c5c60; --ink3: #8e8e93; --line: rgba(60,60,67,.14); --field: #f2f2f7; --accent: #8e44e6; --accent2: #6f2fd0; --tint: rgba(142,68,230,.12); --red: #ff3b30; --green: #1f9d45; }
+/* the site's own look (public/index.html): the grey ground, the system font, white cards, black buttons, its --ease-out — and Report a bug's purple */
+:root { --bg: #f2f2f6; --card: #fff; --ink: #1c1c1e; --ink2: #5c5c60; --ink3: #8e8e93; --line: rgba(60,60,67,.14); --field: #f2f2f7; --accent: #8e44e6; --accent2: #6f2fd0; --tint: rgba(142,68,230,.12); --red: #ff3b30; --green: #1f9d45; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
 @media (prefers-color-scheme: dark) { :root { --bg: #000; --card: #1c1c1e; --ink: #f5f5f7; --ink2: #aeaeb2; --ink3: #8e8e93; --line: rgba(255,255,255,.12); --field: #2c2c2e; --accent: #b67bff; --accent2: #9a5cf0; --tint: rgba(182,123,255,.16); --red: #ff453a; --green: #30d158; } }
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
@@ -91,6 +91,25 @@ textarea:focus, input:focus { border-color: var(--accent); background: var(--car
 .done .tick { width: 64px; height: 64px; border-radius: 32px; background: var(--green); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px rgba(31,157,69,.3); }
 .done h2 { margin: 4px 0 0; font: 700 26px/1.15 -apple-system, "SF Pro Display", Helvetica, sans-serif; letter-spacing: -.03em; }
 .done p { margin: 0; color: var(--ink2); max-width: 440px; }
+/* what answers Send arrives, never in the way: the done box's parts rise in turn as its tick draws itself (as the home page's lock does);
+   a warning or the GitHub offer drops 4px out of what it answers, and goes at once when it no longer applies (all filled backwards only, so nothing is held once in) */
+@media (prefers-reduced-motion: no-preference) {
+  .done > * { animation: done-in 300ms var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 50ms); }
+  .done > :nth-child(2) { --i: 1; } .done > :nth-child(3) { --i: 2; } .done > :nth-child(4) { --i: 3; }
+  .done .tick { animation-name: tick-in; }
+  .done .tick path { stroke-dasharray: 1; animation: draw 340ms var(--ease-out) 160ms backwards; }
+  .err:not(:empty) { animation: msg-in 180ms var(--ease-out) backwards; } /* (only as it fills: the same warning at the next Send stays put) */
+  .fallback { animation: msg-in 220ms var(--ease-out) backwards; }
+  @keyframes done-in { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes tick-in { from { opacity: 0; transform: scale(.96); } }
+  @keyframes draw { from { stroke-dashoffset: 1; } }
+  @keyframes msg-in { from { opacity: 0; transform: translateY(-4px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .done { animation: fade 200ms ease backwards; } /* (the tick already drawn) */
+  .err:not(:empty), .fallback { animation: fade 150ms ease backwards; }
+  @keyframes fade { from { opacity: 0; } }
+}
 footer { max-width: 760px; margin: 0 auto; padding: 0 20px 40px; font-size: 13px; color: var(--ink3); text-align: center; }
 </style>
 </head>
