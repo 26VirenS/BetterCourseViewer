@@ -18,7 +18,7 @@ namespace Simpl.Shell;
 
 /// <summary>
 /// The app once the school is ready (the Mac's MainShell), laid out as Windows 11's Settings app: the navigation pane at
-/// the left — who is signed in at its head (the Settings app's account tile, with the account menu), the search box, the
+/// the left — the search box at its head, who is signed in at its foot (the Mac's account bar, with the account menu that holds Settings), the
 /// places (Dashboard, To Do, Calendar, Grades, Notifications, Inbox, Tools), the courses with their sections and the
 /// groups, and Settings at its foot — and the page at the right: its title (a breadcrumb once something is opened on
 /// it), its commands, and the screen. Below 880 wide the pane folds away behind the title bar's button.
@@ -74,18 +74,17 @@ public sealed class AppShell : Grid, IDisposable
         palette = SearchPalette.Attach(searchBox, engine, window);
         palette.Ran += () => { if (narrow) ClosePane(); };
         var navScroll = new ScrollViewer { Content = nav, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 0, 8) };
-        var settingsRow = K.Subtle(K.Columns("auto, *", K.Icon(SymbolRegular.Settings24, 16, Color.FromRgb(0x76, 0x76, 0x7c), filled: true).Col(0), K.Text("Settings", Ty.Body).Margin(14, 0, 0, 0).Col(1)),
-            window.OpenSettings, new Thickness(12, 0, 8, 0));
-        settingsRow.Height = 36;
-        settingsRow.Margin = new Thickness(4, 4, 4, 12);
-        pane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        // (the Mac's sidebar: the search at the top, the places and courses, and who is signed in at the foot — their
+        // menu holds Settings, as the Mac's account bar does)
+        searchBox.Margin = new Thickness(16, 12, 16, 12);
+        var foot = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Child = account, Padding = new Thickness(0, 6, 0, 6) };
+        foot.SetResourceReference(Border.BorderBrushProperty, B.Divider);
         pane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         pane.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         pane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        pane.Children.Add(account.Row(0));
-        pane.Children.Add(searchBox.Row(1));
-        pane.Children.Add(navScroll.Row(2));
-        pane.Children.Add(settingsRow.Row(3));
+        pane.Children.Add(searchBox.Row(0));
+        pane.Children.Add(navScroll.Row(1));
+        pane.Children.Add(foot.Row(2));
         paneHolder.Child = new Grid { Children = { paneScene, pane } };
         pane.Mark(TourSpot.Pane);
         searchBox.Mark(TourSpot.Search);
@@ -119,7 +118,7 @@ public sealed class AppShell : Grid, IDisposable
         Children.Add(toast.Col(1));
         Children.Add(previewLayer.Col(1));
         WorkPreview.Attach(previewLayer, engine);
-        PreviewMouseDown += (_, e) => WorkPreview.ClickedAt(e.GetPosition(previewLayer));
+        PreviewMouseDown += (_, e) => Pressed(e);
         FilePreview.Shared.PropertyChanged += OnFile;
 
         // the pane over the page while the window is narrow, and what dims the page behind it
@@ -251,18 +250,23 @@ public sealed class AppShell : Grid, IDisposable
         if (narrow) ClosePane();
     }
 
-    /// <summary>Who is signed in, at the pane's head (the Settings app's account tile): a click opens the account menu.</summary>
+    /// <summary>Who is signed in, at the pane's foot (the Mac's account bar): a click opens the account menu, which holds
+    /// Settings.</summary>
     private FrameworkElement AccountTile()
     {
         var me = engine.Snapshot?.Me;
         var name = me?.Name ?? "Signed in";
-        var avatar = K.Avatar(name, me?.Initials, me?.Avatar, 60);
-        var words = K.V(0, K.Text(name, Ty.BodyStrong), K.Text(me?.Email ?? engine.Host, Ty.Caption, B.Text2));
+        var avatar = K.Avatar(name, me?.Initials, me?.Avatar, 36);
+        var nameText = K.Text(name, Ty.BodyStrong);
+        nameText.TextTrimming = TextTrimming.CharacterEllipsis;
+        var mail = K.Text(me?.Email ?? engine.Host, Ty.Caption, B.Text2);
+        mail.TextTrimming = TextTrimming.CharacterEllipsis;
+        var words = K.V(0, nameText, mail);
         words.VerticalAlignment = VerticalAlignment.Center;
-        var grid = K.Columns("auto, *, auto", avatar.Col(0), words.Margin(14, 0, 4, 0).Col(1), K.Icon(SymbolRegular.ChevronDown20, 12, B.Text2).Col(2));
+        var grid = K.Columns("auto, *, auto", avatar.Col(0), words.Margin(12, 0, 4, 0).Col(1), K.Icon(SymbolRegular.MoreHorizontal20, 16, B.Text2).Col(2));
         Button? tile = null;
-        tile = K.Subtle(grid, () => AccountMenu(tile!), new Thickness(12, 10, 12, 10), 6);
-        tile.Margin = new Thickness(4, 4, 4, 8);
+        tile = K.Subtle(grid, () => AccountMenu(tile!), new Thickness(10, 8, 10, 8), 6);
+        tile.Margin = new Thickness(4, 0, 4, 0);
         tile.ToolTip = "Your account";
         System.Windows.Automation.AutomationProperties.SetName(tile, $"{name}, account menu");
         accountTile = tile;
@@ -272,11 +276,11 @@ public sealed class AppShell : Grid, IDisposable
 
     private Button? accountTile;
 
-    /// <summary>The account menu (the Mac's ⋯ by your name): Settings…, What's New, the school's profile, Report a Bug…,
+    /// <summary>The account menu (the Mac's ⋯ by your name), over the account bar: Settings…, What's New, the school's profile, Report a Bug…,
     /// Sign Out…, and Quit Simpl (closing the window only puts Simpl in the notification area).</summary>
     private void AccountMenu(FrameworkElement at)
     {
-        var menu = new ContextMenu { PlacementTarget = at, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, MinWidth = 260 };
+        var menu = new ContextMenu { PlacementTarget = at, Placement = System.Windows.Controls.Primitives.PlacementMode.Top, MinWidth = 260 };
         MenuItem Item(string text, SymbolRegular icon, Action act)
         {
             var mi = new MenuItem { Header = text, Icon = new SymbolIcon { Symbol = icon } };
@@ -294,6 +298,13 @@ public sealed class AppShell : Grid, IDisposable
             $"Your {engine.LmsName} session and any saved sign-in are cleared; settings stay.", "Sign Out", engine.SignOut)));
         menu.Items.Add(Item("Quit Simpl", SymbolRegular.Power24, EraseAll.Quit));
         menu.IsOpen = true;
+    }
+
+    /// <summary>A press anywhere in the window: the quick look and the screen's own panel fold back when it is outside them.</summary>
+    public void Pressed(MouseButtonEventArgs e)
+    {
+        WorkPreview.ClickedAt(e.GetPosition(previewLayer));
+        current?.Pressed(e);
     }
 
     public void FocusSearch()
@@ -344,7 +355,9 @@ public sealed class AppShell : Grid, IDisposable
         if (s.Scrolls)
         {
             var v = s.View;
-            if (s.MaxContentWidth is { } mw) { v.MaxWidth = mw; v.HorizontalAlignment = HorizontalAlignment.Left; }
+            // (a reading width: as wide as the page up to it, from the left — sized, so it never shrinks to its words)
+            if (s.MaxContentWidth is { } mw) { v.MaxWidth = mw; v.Width = Math.Min(mw, ContentWidth); v.HorizontalAlignment = HorizontalAlignment.Left; }
+            else { v.ClearValue(FrameworkElement.WidthProperty); v.ClearValue(FrameworkElement.MaxWidthProperty); v.HorizontalAlignment = HorizontalAlignment.Stretch; }
             scroller.Content = v;
             body.Content = scroller;
         }
@@ -402,6 +415,7 @@ public sealed class AppShell : Grid, IDisposable
 
     private void Widths()
     {
+        if (current is { Scrolls: true, MaxContentWidth: { } mw }) current.View.Width = Math.Min(mw, ContentWidth);
         current?.SetWidth(ContentWidth);
         header.Margin = page.ActualWidth < 560 ? new Thickness(20, 4, 20, 16) : new Thickness(40, 4, 40, 20);
         scroller.Padding = page.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);

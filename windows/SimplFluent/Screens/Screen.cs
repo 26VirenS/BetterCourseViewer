@@ -60,6 +60,10 @@ public abstract class Screen
     /// <summary>What it shows may have changed (the engine's DataVersion): read again.</summary>
     public abstract void Refresh();
 
+    /// <summary>A press anywhere in the window (the pane, the header, the page, the title bar), before it does what it
+    /// does: a panel the screen has open over its page folds back when the press is outside it.</summary>
+    public virtual void Pressed(System.Windows.Input.MouseButtonEventArgs e) { }
+
     /// <summary>Escape pressed with nothing else to take it: true if the screen used it (a panel folded back).</summary>
     public virtual bool Escape() => false;
 

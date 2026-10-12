@@ -110,34 +110,19 @@ public interface ITimerState
 }
 
 /// <summary>
-/// What the tools share across the window (the Mac's ToolsCenter): the tool open on the Tools page, and files and details
-/// handed to a tool for it to take when it opens.
+/// What the tools share across the window (the Mac's ToolsCenter): a tool opened whole, and files and details handed to
+/// it to take when it opens.
 /// </summary>
 public static class ToolsCenter
 {
-    private static string? open;
     private static List<string> handoff = new();
     private static string? handoffTool;
     private static Dictionary<string, string> handoffInfo = new();
 
-    /// <summary>The tool open, or closed, on the Tools page.</summary>
-    public static event Action? OpenChanged;
-
-    /// <summary>The tool open on the Tools page (null: the tiles). Kept while you go elsewhere.</summary>
-    public static string? Open
-    {
-        get => open;
-        set { if (open == value) return; open = value; OpenChanged?.Invoke(); }
-    }
-
-    /// <summary>A tool opened on the Tools page from anywhere (a pin's flyout, a command), with files or details for it.</summary>
-    public static void Show(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
-    {
-        Hand(key, files, info);
-        open = null; // (opened afresh: built again with what it was handed)
-        Open = key;
-        engine.Go(Place.Tools);
-    }
+    /// <summary>A tool opened whole from anywhere (a pin's flyout, a command), with files or details for it: over the
+    /// window, as from its tile.</summary>
+    public static void Show(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null) =>
+        PopUp(key, engine, null, files, info);
 
     /// <summary>A pinned tool opened whole, over the window where you are (the Mac's popUp): the screen stays under it.</summary>
     public static void PopUp(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)

@@ -248,6 +248,7 @@ public sealed partial class AssignmentScreen : Screen
         double PadOf(double w) => w + 80 < 560 ? 20 : 40;
         double RoomOf(double w) => Math.Min(1480, w + 80 - 2 * PadOf(w));
         var wide = RoomOf(now) >= TwoFrom;
+        if (now > 0) root.Width = Math.Min(1480 + 2 * PadOf(now), now + 80);
         // (the side column follows the width without the page being built again)
         if (wide && (RoomOf(before) >= TwoFrom) && root.ColumnDefinitions.Count == 4 && PadOf(before) == PadOf(now))
         {
@@ -278,7 +279,9 @@ public sealed partial class AssignmentScreen : Screen
         root.ColumnDefinitions.Clear();
         root.Children.Clear();
         one.Content = left.Content = side.Content = null;
+        // (as wide as the page, up to the reading width, from the left: sized, never shrunk to what it holds)
         root.MaxWidth = 1480 + 2 * pad;
+        root.Width = Math.Min(root.MaxWidth, PageWidth);
         root.HorizontalAlignment = HorizontalAlignment.Left;
         if (wide)
         {

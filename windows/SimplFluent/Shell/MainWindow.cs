@@ -135,6 +135,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         PreviewKeyDown += OnKey;
         PreviewMouseDown += (_, e) =>
         {
+            // (a press on the title bar, outside the shell, folds back what the shell has open too)
+            if (shell != null && !shell.IsMouseOver) shell.Pressed(e);
             if (e.ChangedButton == MouseButton.XButton1) { engine?.GoBack(); e.Handled = true; }
             if (e.ChangedButton == MouseButton.XButton2) { engine?.GoForward(); e.Handled = true; }
         };
@@ -215,6 +217,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         card = null;
         working = null;
         pageArea.Children.Remove(old.Web);
+        Bridge.Shared.Unregister(old.Web); // (no longer told of storage changes: telling a disposed view failed every save)
         try { old.Web.Dispose(); } catch { }
         handoff.Bind(null);
         ShowPicker();

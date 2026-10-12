@@ -209,10 +209,12 @@ public sealed class TourOverlay : Grid
         }
         if (Prefs.Bool("tour:done") || Launch.IsDevelopment) return;
         var calm = 0;
-        for (var ticks = 0; ticks < 2400 && !Prefs.Bool("tour:done") && !On; ticks++)
+        // (as long as the app is up: a setup or a sign-in that takes a while still has the tour after it, as on the Mac)
+        for (var ticks = 0; !Prefs.Bool("tour:done") && !On; ticks++)
         {
             await Task.Delay(500);
-            var free = engine.Phase == Phase.Native && engine.Snapshot?.SetupDone != false && !window.Sheets.IsOpen && !engine.Login.Covers && engine.Query.Length == 0 && !WorkPreview.IsOpen;
+            var setUp = engine.Snapshot?.SetupDone != false || SetupSheet.Seen;
+            var free = engine.Phase == Phase.Native && setUp && !window.Sheets.IsOpen && !engine.Login.Covers && engine.Query.Length == 0 && !WorkPreview.IsOpen;
             var ready = free && (engine.Courses.Count > 0 || ticks >= 20);
             calm = ready ? calm + 1 : 0;
             if (calm >= 5) { Start(); return; }

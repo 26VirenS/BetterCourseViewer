@@ -65,8 +65,8 @@ public static class ToolsPins
 /// Tools (the Mac's ToolsView and ToolsGrid): the things Simpl does on its own — a citation generator, a focus timer, a
 /// calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge &amp; split PDFs, a PDF
 /// annotator, Image to text, flashcards and a unit converter — a tile each: its symbol on a wash of its colour, its name
-/// and line, and its pin. A tile opens its tool in place, under the page's header ("Tools › Calculator", its pin beside
-/// the title); the tool stays open while you go elsewhere, and Escape or the breadcrumb goes back to the tiles.
+/// and line, and its pin. A tile opens its tool whole, over the window (<see cref="Simpl.Tools.ToolPopup"/>), as a pin's
+/// flyout does; Done or Escape folds it away, back to the tiles.
 /// </summary>
 public sealed class ToolsScreen : Screen
 {
@@ -95,52 +95,13 @@ public sealed class ToolsScreen : Screen
     /// <summary>Where the graphing calculator is (the Mac's GraphWeb.desmos), while it has no view of its own here.</summary>
     private static readonly Uri Desmos = new("https://www.desmos.com/calculator");
 
-    private string? shown;
-    private FrameworkElement? toolView;
+    public ToolsScreen(Engine.Engine engine) : base(engine) { }
 
-    public ToolsScreen(Engine.Engine engine) : base(engine)
-    {
-        Simpl.Tools.ToolsCenter.OpenChanged += () =>
-        {
-            HeaderChange();
-            Render();
-        };
-    }
+    public override string Title => "Tools";
 
-    private Kind? Open => Simpl.Tools.ToolsCenter.Open is { } k ? Kinds.FirstOrDefault(t => t.Key == k) : null;
-
-    public override string Title => Open?.Name ?? "Tools";
-
-    public override string? Subtitle => Open is { } k
-        ? k.Key == "ptable" ? null : k.Note
-        : "Handy things, right here. Pin one and it sits in the title bar on every screen.";
-
-    /// <summary>The tiles, before the tool open: "Tools › Calculator".</summary>
-    public override IReadOnlyList<(string Title, Action Go)> Before =>
-        Open == null ? Array.Empty<(string, Action)>() : new[] { ("Tools", (Action)(() => Simpl.Tools.ToolsCenter.Open = null)) };
-
-    /// <summary>The tool's own controls (the Periodic Table's search) and its pin.</summary>
-    public override FrameworkElement? Commands
-    {
-        get
-        {
-            if (Open is not { } k) return null;
-            var c = Context(k);
-            var row = K.H(8);
-            if (Simpl.Tools.ToolRegistry.Header(c) is { } extra) { extra.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(extra); }
-            row.Children.Add(Simpl.Tools.ToolHeader.PinButton(k, squished: k.Key == "ptable"));
-            return row;
-        }
-    }
+    public override string? Subtitle => "Handy things, right here. Pin one and it sits in the title bar on every screen.";
 
     public override bool Scrolls => false;
-
-    public override bool Escape()
-    {
-        if (Open == null) return false;
-        Simpl.Tools.ToolsCenter.Open = null;
-        return true;
-    }
 
     /// <summary>The focus timer's tile, while a session goes: its phase and what is left, counted down each second.</summary>
     private TextBlock? timerLine;
@@ -149,14 +110,11 @@ public sealed class ToolsScreen : Screen
 
     private static string TimerWords(Simpl.Tools.ITimerState t) => $"{t.PhaseName} · {Simpl.Tools.PinBar.Clock(t.Remaining)}{(t.Paused ? " · Paused" : "")}";
 
-    private void TimerChanged()
-    {
-        if (Open == null) Render(); // (started, paused, a phase over: the tile again)
-    }
+    private void TimerChanged() => Render(); // (started, paused, a phase over: the tile again)
 
     private void Tick()
     {
-        if (timerLine == null || Open != null || Simpl.Tools.ToolRegistry.Timer is not { Active: true } t) return;
+        if (timerLine == null || Simpl.Tools.ToolRegistry.Timer is not { Active: true } t) return;
         timerLine.Text = TimerWords(t);
         timerLine.Foreground = new SolidColorBrush(t.PhaseColor);
     }
@@ -176,15 +134,13 @@ public sealed class ToolsScreen : Screen
         ToolsPins.Changed -= PinsChanged;
         ToolsPins.Changed += PinsChanged;
         // (the screenshot suite: --tool calc opens the Calculator, as the Mac's -SimplTool)
-        if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.Any(t => t.Key == k)) Simpl.Tools.ToolsCenter.Open = k;
+        if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.FirstOrDefault(t => t.Key == k) is { } kind)
+            Application.Current.Dispatcher.BeginInvoke(() => OpenTool(engine, kind, View), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnClock(object? sender, EventArgs e) => Tick();
 
-    private void PinsChanged()
-    {
-        if (Open == null) Render();
-    }
+    private void PinsChanged() => Render();
 
     public override void Hide()
     {
@@ -194,24 +150,8 @@ public sealed class ToolsScreen : Screen
         if (watched != null) { watched.Changed -= TimerChanged; watched = null; }
     }
 
-    private Simpl.Tools.ToolContext Context(Kind k) => new() { Engine = engine, Key = k.Key, Owner = Window.GetWindow(View) };
-
     protected override FrameworkElement Build()
     {
-        if (Open is { } k)
-        {
-            // (the tool kept as it was while it stays open: only a different tool is built afresh)
-            if (shown != k.Key || toolView == null)
-            {
-                shown = k.Key;
-                toolView = Simpl.Tools.ToolRegistry.Full(Context(k)) ?? Simpl.Tools.ToolPopup.Missing(k);
-                Motion.FadeIn(toolView, Motion.Normal);
-            }
-            if (toolView.Parent is ContentControl old) old.Content = null;
-            return toolView;
-        }
-        shown = null;
-        toolView = null;
         timerLine = null;
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
         var grid = new MoreGrid(300, 16, Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true);
@@ -266,17 +206,17 @@ public sealed class ToolsScreen : Screen
         return b;
     }
 
-    /// <summary>A tool opened by its key (a command, a link): on the Tools page.</summary>
+    /// <summary>A tool opened by its key (a command, a link): whole, over the window.</summary>
     public static void OpenTool(Engine.Engine engine, string key, FrameworkElement? from = null)
     {
         if (Kinds.FirstOrDefault(k => k.Key == key) is { } kind) OpenTool(engine, kind, from);
     }
 
-    /// <summary>A tool opened on the Tools page; the graphing calculator, while it has no view of its own here, in a window.</summary>
+    /// <summary>A tool opened whole, over the window where you are — from its tile, its pin, a command alike; the
+    /// graphing calculator, while it has no view of its own here, in a window.</summary>
     public static void OpenTool(Engine.Engine engine, Kind kind, FrameworkElement? from = null)
     {
         if (kind.Key == "graph" && !Simpl.Tools.ToolRegistry.Has("graph")) { engine.OpenBrowser(Desmos, kind.Name); return; }
-        if (engine.Nav.Current.Place.Kind == Engine.PlaceKind.Tools && engine.Nav.Current.Path.Count == 0) Simpl.Tools.ToolsCenter.Open = kind.Key;
-        else Simpl.Tools.ToolsCenter.Show(kind.Key, engine);
+        Simpl.Tools.ToolsCenter.PopUp(kind.Key, engine, from != null ? Window.GetWindow(from) : null);
     }
 }

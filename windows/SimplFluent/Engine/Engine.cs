@@ -372,11 +372,16 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
         await LoadSidebar();
-        if (Snapshot?.SetupDone == false || Launch.Take("setup") != null) { SetupRequested?.Invoke(); return; }
+        // (a first setup quit halfway, or whose save failed, is asked again — the page may have kept some of it)
+        if (Snapshot?.SetupDone == false && !Launch.IsDevelopment) Prefs.Set(SetupPendingKey, true);
+        if (Snapshot?.SetupDone == false || Prefs.Bool(SetupPendingKey) || Launch.Take("setup") != null) { SetupRequested?.Invoke(); return; }
         if (Launch.Take("whatsnew") != null) WhatsNewRequested?.Invoke(WhatsNew.All);
         else if (Launch.Take("settings") != null) SettingsRequested?.Invoke();
         else if (WhatsNew.Due() is { } wn) WhatsNewRequested?.Invoke(wn);
     }
+
+    /// <summary>The first setup not finished yet — quit halfway, or its save failed: asked again at the next start.</summary>
+    public const string SetupPendingKey = "setup:pending";
 
     /// <summary>A place by the name the screenshot suite gives it.</summary>
     public static Place? PlaceNamed(string raw)

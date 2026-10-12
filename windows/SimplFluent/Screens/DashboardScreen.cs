@@ -143,7 +143,6 @@ public sealed partial class DashboardScreen : Screen
         overlay = new Canvas { ClipToBounds = false };
         root.Children.Add(page);
         root.Children.Add(overlay);
-        root.PreviewMouseDown += OutsideClick;
         if (openKey != null) root.Loaded += (_, _) => ShowPanel(animate: !sheetAsked);
         return root;
     }
@@ -210,6 +209,7 @@ public sealed partial class DashboardScreen : Screen
         // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
         var face = new Grid();
         if (Scenes.Backdrop(c.Key) is { } scene) face.Children.Add(scene);
+        else if (!alert) face.Children.Add(Wash(color));
         face.Children.Add(content);
         face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
         var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
@@ -218,6 +218,14 @@ public sealed partial class DashboardScreen : Screen
         System.Windows.Automation.AutomationProperties.SetName(b, $"{FullName(c.Key, c.Label)}: {value?.ToString() ?? "counting"}");
         return b;
     }
+
+    /// <summary>A counter's colour washed across its card (Windows 11's tinted cards): strongest at its symbol's corner,
+    /// fading towards the far one — the panel it grows into wears the same.</summary>
+    private static Border Wash(Color c) => new()
+    {
+        Background = new LinearGradientBrush(K.WithAlpha(c, 0.24), K.WithAlpha(c, 0.05), new Point(0, 0), new Point(1, 1)),
+        CornerRadius = new CornerRadius(7), IsHitTestVisible = false,
+    };
 
     /// <summary>A counter's number and note: never one from before — Overdue and Graded from the counts made on their own, the rest from Today.</summary>
     private (int? Value, string? Note) Count(Counter c)
@@ -271,9 +279,11 @@ public sealed partial class DashboardScreen : Screen
         return true;
     }
 
-    /// <summary>A click anywhere outside the open panel folds it back (the click still does what it does).</summary>
-    private void OutsideClick(object sender, MouseButtonEventArgs e)
+    /// <summary>A press anywhere outside the open panel — the page round it, the pane, the header, the title bar — folds it
+    /// back (the press still does what it does).</summary>
+    public override void Pressed(MouseButtonEventArgs e)
     {
+        if (e.ChangedButton != MouseButton.Left) return;
         if (openKey == null || frame == null) return;
         var p = e.GetPosition(frame);
         if (p.X >= 0 && p.Y >= 0 && p.X <= frame.ActualWidth && p.Y <= frame.ActualHeight) return;
@@ -310,7 +320,8 @@ public sealed partial class DashboardScreen : Screen
         panelRect = new Rect(x, tile.Y, w, h);
         frame = new Border
         {
-            CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = new Canvas { Children = { panelContent } },
+            CornerRadius = new CornerRadius(8), ClipToBounds = true,
+            Child = new Grid { Children = { Wash(CounterColor(key)), new Canvas { Children = { panelContent } } } },
             Effect = K.Shadow(32, 10, 0.22), SnapsToDevicePixels = true,
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
@@ -374,7 +385,7 @@ public sealed partial class DashboardScreen : Screen
         var content = PanelContent(c, openKey, w);
         content.Width = w - 2;
         content.Measure(new Size(w - 2, double.PositiveInfinity));
-        if (frame.Child is Canvas cv) { cv.Children.Clear(); cv.Children.Add(content); }
+        if (frame.Child is Grid g && g.Children.OfType<Canvas>().FirstOrDefault() is { } cv) { cv.Children.Clear(); cv.Children.Add(content); }
         panelContent = content;
         var h = Math.Max(TileRect(openKey).Height, content.DesiredSize.Height + 2);
         Motion.To(frame, FrameworkElement.HeightProperty, h, Motion.Medium, Motion.Decelerate);

@@ -92,6 +92,9 @@ jobs:
           Shot 'dashboard-cards-wide' '1366x778' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'cards'))
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'light', '--dash-view', 'activity'))
           Shot 'dashboard-counter' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next'))
+          Shot 'dashboard-counter-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--sheet', 'unread'))
+          Shot 'dashboard-1080p' '1920x1050' 45 ($mock + @('--appearance', 'dark'))
+          Shot 'grades-1080p' '1920x1050' 45 ($mock + @('--appearance', 'light', '--place', 'grades'))
           Shot 'dashboard-narrow' '780x683' 45 ($mock + @('--appearance', 'light'))
           Shot 'dashboard-narrow-pane' '780x683' 45 ($mock + @('--appearance', 'dark', '--pane-open'))
           Shot 'course-open' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101'))
@@ -184,6 +187,8 @@ jobs:
           # an assignment: a quiz taken, work handed in late, its feedback, Hand In, the rubric
           Shot 'assignment-quiz' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
           Shot 'assignment-narrow' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
+          # (a big window: the page fills its width — the 1920x1080 a laptop or desktop opens at)
+          Shot 'assignment-1080p' '1920x1050' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
           Shot 'assignment-late' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1008'))
           Shot 'assignment-feedback' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1008', '--open', 'feedback'))
           Shot 'assignment-held' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1006'))

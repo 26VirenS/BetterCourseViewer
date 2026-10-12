@@ -45,6 +45,10 @@ public sealed class Bridge
 
     public void Register(Microsoft.Web.WebView2.Wpf.WebView2 view) => views.Add(new WeakReference<Microsoft.Web.WebView2.Wpf.WebView2>(view));
 
+    /// <summary>A web view let go of (before it is disposed): no longer told of storage changes.</summary>
+    public void Unregister(Microsoft.Web.WebView2.Wpf.WebView2 view) =>
+        views.RemoveAll(w => !w.TryGetTarget(out var v) || ReferenceEquals(v, view));
+
     /// <summary>
     /// What the app's settings always are, whatever writes them (the Mac's followingPhone): light or dark follows
     /// Windows ("system"), and Simpl's look is always on — off, the app's own screens would be gone.
@@ -186,8 +190,17 @@ public sealed class Bridge
         var js = $"window.BCVBridge&&BCVBridge.storageChanged({Json.Literal(changes)})";
         foreach (var w in views.ToList())
         {
-            if (!w.TryGetTarget(out var v) || v.CoreWebView2 == null) { views.Remove(w); continue; }
-            _ = v.CoreWebView2.ExecuteScriptAsync(js);
+            // (a page's web view let go of — a school page left, the school's preview, a popup closed — may not be
+            // collected yet: touching it throws, and the save that asked must not fail for it; it is dropped)
+            try
+            {
+                if (!w.TryGetTarget(out var v) || v.CoreWebView2 is not { } core) { views.Remove(w); continue; }
+                _ = core.ExecuteScriptAsync(js).ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            }
+            catch (Exception e) when (e is ObjectDisposedException or InvalidOperationException or System.Runtime.InteropServices.COMException)
+            {
+                views.Remove(w);
+            }
         }
     }
 }

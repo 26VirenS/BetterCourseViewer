@@ -72,8 +72,8 @@ internal static class CalculatorRegistration
 }
 ```
 
-The whole tool opens under the Tools page's header ("Tools › Calculator", its pin beside the title) and, from a pin's
-flyout, over the window (`ToolPopup`); the quick version is the pin's flyout. `ToolContext` hands it the engine, what
+The whole tool opens over the window (`ToolPopup`), from its tile on the Tools page, a pin's flyout or a command
+alike; the quick version is the pin's flyout. `ToolContext` hands it the engine, what
 was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` for the flyout. `ToolKit` has the page, two
 columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
 

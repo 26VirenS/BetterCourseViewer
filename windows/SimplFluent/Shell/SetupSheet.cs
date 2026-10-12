@@ -59,6 +59,9 @@ public sealed class SetupSheet
 
     public static void Show(Engine.Engine engine, Window over) => new SetupSheet(engine).Open(over);
 
+    /// <summary>Shown and put away this run, finished or not (the Mac's sawSetup): the tour may follow it.</summary>
+    public static bool Seen { get; private set; }
+
     private SetupSheet(Engine.Engine engine)
     {
         this.engine = engine;
@@ -72,6 +75,7 @@ public sealed class SetupSheet
         footBorder.SetResourceReference(Border.BorderBrushProperty, "ContentDialogSeparatorBorderBrush");
         root.Children.Add(footBorder.Row(1));
         sheet.Body = root;
+        sheet.Closed += () => Seen = true;
     }
 
     private async void Open(Window over)
@@ -274,6 +278,8 @@ public sealed class SetupSheet
         foreach (var w in new[] { "auto", "*", "auto" }) foot.ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
         var canCancel = d?.Done == true || (d == null && loadError != null);
         if (canCancel) foot.Children.Add(K.Button("Cancel", () => sheet.Close()).Col(0));
+        // (the first run's save failed: never a dead end — it can be done later from Settings)
+        else if (error != null) foot.Children.Add(K.Button("Skip for Now", () => sheet.Close()).Col(0));
         if (d != null && step != Step.Welcome)
         {
             // Windows' PipsPager: a pip for each step after the welcome, the current one longer and in the accent
@@ -341,6 +347,7 @@ public sealed class SetupSheet
         try
         {
             await engine.Call<OK>("setupSave", args);
+            Prefs.Set(Engine.Engine.SetupPendingKey, false);
             engine.DataChanged();
             _ = engine.LoadSidebar(); // (the pane's courses: the ones just chosen, by their new names)
             sheet.Close();
@@ -356,8 +363,10 @@ public sealed class SetupSheet
         }
         catch (Exception e)
         {
+            Log.Write("setup save: " + e);
             error = e.Message;
             forward = true;
+            sheet.Modal = false; // (a save that fails never keeps the student in: Escape, or Skip for Now, lets them go)
             Draw();
         }
         saving = false;
