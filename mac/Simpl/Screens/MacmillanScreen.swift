@@ -58,6 +58,7 @@ struct MacmillanScreen: View {
                 Text("Macmillan Learning").font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
+            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
             // (1.3.72: Save Page Code is in the Developer menu now)
         }
         .controlSize(.large)

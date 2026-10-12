@@ -170,6 +170,7 @@ struct QuizScreen: View {
                 }
             }
             Spacer(minLength: 8)
+            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
             GlassGroup(spacing: 8) {
                 HStack(spacing: 8) {
                     if inAttempt {

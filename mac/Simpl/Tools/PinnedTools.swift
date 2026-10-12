@@ -14,13 +14,15 @@ struct PinnedToolButton: View {
     let engine: Engine
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
+    @ObservedObject private var floats = ToolFloats.shared
     @State private var shown = false
 
     private var live: Bool { kind == .pomo && focus.active }
 
     var body: some View {
         Button {
-            shown.toggle()
+            // (1.3.73: its quick panel pulled out and floating — brought to the front instead of the popover)
+            if floats.isOut(kind) { floats.raise(kind) } else { shown.toggle() }
         } label: {
             if live {
                 PinnedTimerLabel()
@@ -40,11 +42,18 @@ struct PinnedToolButton: View {
                 .environmentObject(engine)
         }
         .contextMenu { menu }
-        // (the screenshot suite: -SimplPinOpen ptable opens that pin's popover a moment after launch)
+        // (the screenshot suite: -SimplPinOpen ptable opens that pin's popover a moment after launch; -SimplPinFloat calc
+        // pulls that pin's panel out, near the window's top right)
         .task {
-            guard UserDefaults.standard.string(forKey: "SimplPinOpen") == kind.rawValue else { return }
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            shown = true
+            let d = UserDefaults.standard
+            if d.string(forKey: "SimplPinOpen") == kind.rawValue {
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                shown = true
+            } else if d.string(forKey: "SimplPinFloat") == kind.rawValue {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard let w = engine.hostView.window, !floats.isOut(kind) else { return }
+                floats.pullOut(kind, engine: engine, topLeft: NSPoint(x: w.frame.maxX - kind.popoverWidth - 48, y: w.frame.maxY - 112), mouse: nil)
+            }
         }
     }
 
@@ -111,7 +120,10 @@ struct PinnedToolPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            content
+            PinnedToolQuick(kind: kind) { info, files in openFull(info: info, files: files) }
+            // (1.3.73) the grip along the foot: dragged, the panel comes out into a window of its own (ToolFloat.swift)
+            PullOutGrip(kind: kind, engine: engine, close: close)
+                .padding(.bottom, -10)
         }
         .padding(16)
         .frame(width: kind.popoverWidth)
@@ -155,15 +167,29 @@ struct PinnedToolPopover: View {
         }
     }
 
-    @ViewBuilder
-    private var content: some View {
+    /// The whole tool (1.2.1): over the window where you are, as a large sheet — not on the Tools page (1.3.73: or, when
+    /// a popup already has the window, on the Tools page of a window more).
+    private func openFull(info: [String: String] = [:], files: [URL] = []) {
+        close()
+        tools.openFull(kind, engine: engine, files: files, info: info)
+    }
+}
+
+/// A tool's quickest use (the popover's, and the pulled-out panel's): the timer's controls, the calculator, Grade
+/// needed's three numbers, the periodic table small, a link to cite, a set to study, a file to drop. `openFull` opens
+/// the whole tool with what was begun here.
+struct PinnedToolQuick: View {
+    let kind: ToolKind
+    let openFull: (_ info: [String: String], _ files: [URL]) -> Void
+
+    var body: some View {
         switch kind {
         case .pomo: FocusTimerCompact()
         case .calc: CalculatorCompact()
-        case .need: GradeNeededCompact { openFull(info: $0) }
-        case .ptable: PeriodicTableCompact { openFull(info: $0) }
-        case .cite: CitationCompact { openFull(info: $0) }
-        case .fc: FlashcardsCompact { openFull(info: $0) }
+        case .need: GradeNeededCompact { openFull($0, []) }
+        case .ptable: PeriodicTableCompact { openFull($0, []) }
+        case .cite: CitationCompact { openFull($0, []) }
+        case .fc: FlashcardsCompact { openFull($0, []) }
         case .graph: GraphCompact()
         case .units: UnitConverterCompact()
         case .conv:
@@ -179,13 +205,7 @@ struct PinnedToolPopover: View {
 
     private func fileDrop(title: String, sub: String, multiple: Bool) -> some View {
         ToolDropZone(title: title, sub: sub, types: kind.accepts ?? [.item], multiple: multiple, tint: kind.color, height: 140) { urls in
-            openFull(files: urls)
+            openFull([:], urls)
         }
-    }
-
-    /// The whole tool (1.2.1): over the window where you are, as a large sheet — not on the Tools page.
-    private func openFull(info: [String: String] = [:], files: [URL] = []) {
-        close()
-        tools.popUp(kind, files: files, info: info)
     }
 }

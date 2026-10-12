@@ -1,0 +1,248 @@
+import AppKit
+import SwiftUI
+
+// (1.3.73) A pin's quick panel pulled out of its popover into a small window of its own, as the web's quick panels come
+// out of their tray: dragged by the grip along its foot, it floats over everything — a quiz or an Alta assignment's
+// popup too — where it is put, stays open, and wears the two lights a Mac window does: red puts it back (Escape too),
+// green opens the whole tool. The panel never takes the app's activation (a nonactivating panel), so what is under it
+// carries on as it was; it hides with the app when another app comes to the front. The pins themselves come to a
+// popup's own bar (PopupPins), since the window's toolbar is under the sheet.
+
+/// The panels out, by tool.
+@MainActor
+final class ToolFloats: ObservableObject {
+    static let shared = ToolFloats()
+
+    @Published private(set) var out: Set<ToolKind> = []
+    private var panels: [ToolKind: ToolFloatPanel] = [:]
+    private var dragMonitor: Any?
+
+    func isOut(_ kind: ToolKind) -> Bool { out.contains(kind) }
+
+    /// The panel made (or brought back) with its top-left corner where the popover's was. `mouse`: the pointer, still
+    /// down on the grip — the panel then follows it until the button is let go.
+    func pullOut(_ kind: ToolKind, engine: Engine, topLeft: NSPoint, mouse: NSPoint?) {
+        let panel = panels[kind] ?? make(kind, engine: engine)
+        panels[kind] = panel
+        let size = panel.frame.size
+        var origin = NSPoint(x: topLeft.x, y: topLeft.y - size.height)
+        if let screen = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame { origin = Self.kept(origin, size: size, in: screen) }
+        panel.setFrameOrigin(origin)
+        panel.orderFront(nil)
+        out.insert(kind)
+        if let mouse { follow(panel, grab: NSPoint(x: mouse.x - origin.x, y: mouse.y - origin.y)) }
+    }
+
+    /// Back into the tray (the red light, Escape): the panel put away.
+    func dock(_ kind: ToolKind) {
+        guard let panel = panels[kind] else { return }
+        panel.orderOut(nil)
+        out.remove(kind)
+    }
+
+    /// A pin pressed while its panel is out: the panel brought to the front.
+    func raise(_ kind: ToolKind) {
+        guard let panel = panels[kind] else { return }
+        panel.orderFront(nil)
+        panel.makeKey()
+    }
+
+    private func make(_ kind: ToolKind, engine: Engine) -> ToolFloatPanel {
+        let panel = ToolFloatPanel(kind: kind)
+        let host = NSHostingController(rootView: ToolFloatView(kind: kind, engine: engine).environmentObject(engine))
+        host.sizingOptions = [.intrinsicContentSize, .preferredContentSize]
+        panel.contentViewController = host
+        host.view.layoutSubtreeIfNeeded()
+        panel.setContentSize(host.view.fittingSize)
+        return panel
+    }
+
+    /// The panel moved with the pointer until the mouse button is let go: the drag that pulled it out carries on, now
+    /// with the panel (the popover it came out of is gone).
+    private func follow(_ panel: ToolFloatPanel, grab: NSPoint) {
+        if let m = dragMonitor { NSEvent.removeMonitor(m); dragMonitor = nil }
+        dragMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self, weak panel] event in
+            guard let self, let panel else { return event }
+            if event.type == .leftMouseUp {
+                if let m = self.dragMonitor { NSEvent.removeMonitor(m); self.dragMonitor = nil }
+                return event
+            }
+            let mouse = NSEvent.mouseLocation
+            var origin = NSPoint(x: mouse.x - grab.x, y: mouse.y - grab.y)
+            if let screen = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame { origin = Self.kept(origin, size: panel.frame.size, in: screen) }
+            panel.setFrameOrigin(origin)
+            return event
+        }
+    }
+
+    /// An origin that keeps the panel on the screen (its head at least).
+    private static func kept(_ origin: NSPoint, size: NSSize, in screen: NSRect) -> NSPoint {
+        NSPoint(x: min(max(origin.x, screen.minX - size.width + 80), screen.maxX - 80),
+                y: min(max(origin.y, screen.minY - size.height + 40), screen.maxY - size.height))
+    }
+}
+
+/// The window a pulled-out panel floats in: no frame of its own (the panel draws its own glass), over everything,
+/// movable by its background, key when clicked (for typing into a tool) without taking the app's activation.
+final class ToolFloatPanel: NSPanel {
+    let kind: ToolKind
+
+    init(kind: ToolKind) {
+        self.kind = kind
+        super.init(contentRect: NSRect(x: 0, y: 0, width: kind.popoverWidth, height: 240),
+                   styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView], backing: .buffered, defer: false)
+        level = .floating
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        isMovableByWindowBackground = true
+        isReleasedWhenClosed = false
+        animationBehavior = .utilityWindow
+        collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
+        // (hidden with the app when another comes to the front — except in the screenshot suite, where several copies run at once)
+        hidesOnDeactivate = UserDefaults.standard.string(forKey: "SimplShotFile") == nil
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    /// Escape: back into the tray.
+    override func cancelOperation(_ sender: Any?) { ToolFloats.shared.dock(kind) }
+}
+
+/// What a pulled-out panel shows: the lights and the tool's name at its head, its pin, and its quick use (the popover's).
+struct ToolFloatView: View {
+    let kind: ToolKind
+    let engine: Engine
+    @ObservedObject private var tools = ToolsCenter.shared
+    @ObservedObject private var floats = ToolFloats.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                QuickLights(name: kind.shortName, dock: { floats.dock(kind) }, full: { openFull() })
+                Spacer(minLength: 8)
+                Button {
+                    tools.togglePin(kind)
+                } label: {
+                    Image(systemName: tools.isPinned(kind) ? "pin.slash" : "pin")
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .help(tools.isPinned(kind) ? "Unpin from the toolbar" : "Pin to the toolbar")
+            }
+            PinnedToolQuick(kind: kind) { info, files in openFull(info: info, files: files) }
+            GripBar()
+                .padding(.bottom, -10)
+                .help("Drag anywhere on the panel to move it")
+        }
+        .padding(16)
+        .frame(width: kind.popoverWidth)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.primary.opacity(0.12), lineWidth: 1))
+    }
+
+    private func openFull(info: [String: String] = [:], files: [URL] = []) {
+        floats.dock(kind)
+        tools.openFull(kind, engine: engine, files: files, info: info)
+    }
+}
+
+/// The two lights a Mac window wears (the web's quickName): red puts the panel back in the tray, green opens the tool
+/// whole; the tool's name beside them. Their marks show while the pointer is over them.
+struct QuickLights: View {
+    let name: String
+    let dock: () -> Void
+    let full: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            light(Color(red: 1, green: 0.37, blue: 0.34), symbol: "xmark", help: "Put it back", action: dock)
+            light(Color(red: 0.16, green: 0.78, blue: 0.25), symbol: "arrow.up.left.and.arrow.down.right", help: "Open \(name)", action: full)
+            Text(name)
+                .font(.sHeadline)
+                .padding(.leading, 4)
+        }
+        .onHover { hover = $0 }
+    }
+
+    private func light(_ color: Color, symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(color)
+                Image(systemName: symbol)
+                    .font(.system(size: 6.5, weight: .black))
+                    .foregroundStyle(.black.opacity(hover ? 0.55 : 0))
+            }
+            .frame(width: 12, height: 12)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+}
+
+/// The grip along a panel's foot (the web's bcv-quick__grip): a short bar, brighter under the pointer.
+struct GripBar: View {
+    @State private var hover = false
+
+    var body: some View {
+        Capsule()
+            .fill(.primary.opacity(hover ? 0.35 : 0.18))
+            .frame(width: 46, height: 4)
+            .frame(maxWidth: .infinity)
+            .frame(height: 20)
+            .contentShape(Rectangle())
+            .onHover { hover = $0 }
+    }
+}
+
+/// The grip along a pin's popover: dragged, the panel comes out of the popover into a window of its own, under the
+/// pointer, and follows it until the button is let go.
+struct PullOutGrip: View {
+    let kind: ToolKind
+    let engine: Engine
+    let close: () -> Void
+    @State private var pulled = false
+
+    var body: some View {
+        GripBar()
+            .help("Drag to pull this out")
+            .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .global).onChanged { _ in
+                guard !pulled else { return }
+                pulled = true
+                let mouse = NSEvent.mouseLocation
+                // (the popover's window is the one under the pointer; the panel is put where it was, then follows)
+                let popover = NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.contains(mouse) }
+                let f = popover?.frame ?? NSRect(x: mouse.x - kind.popoverWidth / 2, y: mouse.y, width: kind.popoverWidth, height: 0)
+                ToolFloats.shared.pullOut(kind, engine: engine, topLeft: NSPoint(x: f.minX, y: f.maxY), mouse: mouse)
+                close()
+            })
+    }
+}
+
+/// The tools pinned to the toolbar, on a popup's own bar (a quiz, an Alta or a Macmillan assignment): the window's
+/// toolbar is under the sheet, so its pins come here — each opens its quick panel over the popup, and pulled out they
+/// float over it.
+struct PopupPins: View {
+    @EnvironmentObject private var engine: Engine
+    @ObservedObject private var tools = ToolsCenter.shared
+    @ObservedObject private var focus = FocusTimer.shared
+
+    var body: some View {
+        let pins = tools.toolbarPins(timerActive: focus.active)
+        if !pins.isEmpty {
+            GlassGroup(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(pins) { kind in
+                        PinnedToolButton(kind: kind, engine: engine)
+                            .labelStyle(.iconOnly)
+                            .glassButton()
+                    }
+                }
+            }
+        }
+    }
+}

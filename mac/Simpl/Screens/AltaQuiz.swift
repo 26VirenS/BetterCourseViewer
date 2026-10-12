@@ -85,6 +85,7 @@ struct AltaQuizScreen: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
+            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
             GlassGroup(spacing: 8) {
                 // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
                 if dev.unlocked && !session.errorLogs.isEmpty {

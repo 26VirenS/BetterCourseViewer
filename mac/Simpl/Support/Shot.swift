@@ -88,6 +88,7 @@ enum Shot {
         // (the window, then what belongs to it over it: its sheets, its child windows, a popover open on it)
         var parts = [w] + w.sheets + (w.attachedSheet.map { [$0] } ?? []) + (w.childWindows ?? []).filter(\.isVisible)
         parts += NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.intersects(w.frame) }
+        parts += NSApp.windows.filter { $0 is ToolFloatPanel && $0.isVisible } // (1.3.73: a quick panel pulled out, floating)
         var seen = Set<Int>()
         parts = parts.filter { seen.insert($0.windowNumber).inserted }
         var rect = w.frame

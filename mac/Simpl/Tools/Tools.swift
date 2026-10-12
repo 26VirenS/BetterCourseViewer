@@ -205,6 +205,20 @@ final class ToolsCenter: ObservableObject {
         popup = k
     }
 
+    /// (1.3.73) A tool opened whole from its pin: in the large sheet over the window — or, when a sheet already has the
+    /// window (a quiz, an Alta or a Macmillan assignment: a second sheet cannot come up), on the Tools page of a window
+    /// more, beside it.
+    func openFull(_ k: ToolKind, engine: Engine?, files: [URL] = [], info: [String: String] = [:]) {
+        let window = engine?.hostView.window
+        let taken = window.map { $0.attachedSheet != nil || !$0.sheets.isEmpty } ?? false
+        if taken {
+            show(k, engine: nil, files: files, info: info)
+            NotificationCenter.default.post(name: .simplOpenWindow, object: "tools")
+        } else {
+            popUp(k, files: files, info: info)
+        }
+    }
+
     /// The files handed to a tool, taken once.
     func takeFiles(for k: ToolKind) -> [URL] {
         guard handoffTool == k, !handoff.isEmpty else { return [] }

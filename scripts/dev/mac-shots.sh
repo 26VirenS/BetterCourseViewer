@@ -88,6 +88,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
   shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
+  shoot light-21f-alta-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable" # (1.3.73: the toolbar's pins on the popup's own bar)
+  shoot light-21g-alta-float 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc # (1.3.73: a quick panel pulled out, floating over the popup)
   shoot light-21d-macmillan 20 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
@@ -182,6 +184,8 @@ for MODE in light dark; do
   shoot "$MODE-21-tool" 16 -SimplOpen tool:101:9
   shoot "$MODE-21a-alta" 20 -SimplOpen alta:104:4003
   shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
+  shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
+  shoot "$MODE-21g-alta-float" 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc
   shoot "$MODE-22-setup" 14 -SimplOpen setup
   shoot "$MODE-23-settings" 12 -SimplOpen settings
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
