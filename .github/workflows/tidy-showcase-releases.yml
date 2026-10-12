@@ -1,0 +1,31 @@
+# The Liquid Glass showcase's pre-releases (windows-glass-*) taken off the Releases page, their tags with them: the
+# showcase's glass is the app's now, and its builds were only ever test builds. Runs once when this file is pushed,
+# and again by hand if more turn up (Run workflow). Nothing else is touched: Simpl's own releases (mac-v*, v*) and
+# the Simpl for Windows previews (windows-app-*) stay.
+name: Tidy the showcase releases
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tidy-showcase-releases.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tidy:
+    name: Delete the windows-glass-* pre-releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete them, tags too
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          n=0
+          for tag in $(gh api "repos/$GH_REPO/releases?per_page=100" --jq '.[] | select(.tag_name | startswith("windows-glass-")) | .tag_name'); do
+            gh release delete "$tag" --cleanup-tag -y && echo "deleted $tag" && n=$((n + 1))
+          done
+          echo "$n deleted"
+          echo "left: $(gh api "repos/$GH_REPO/releases?per_page=100" --jq '[.[] | select(.tag_name | startswith("windows-glass-"))] | length')"
