@@ -86,13 +86,13 @@ public sealed class LoginLayer
         const float headerH = 40 + 8 + 27 + 8 + 17, fieldsH = FieldH + FieldGap + FieldH, buttonsH = ButtonH + 10 + 16;
         var cardH = pad + headerH + gap + fieldsH + gap + noteH + gap + buttonsH + pad;
         var card = new R(MathF.Round((ui.W - cardW) / 2), MathF.Round(TitleBar + (ui.H - TitleBar - cardH) / 2), cardW, cardH);
-        ui.Glass(card, 20, GlassKind.Panel, t.Card, 0.22f, Ui.Shadow.Panel);
+        ui.Glass(card, 20, GlassKind.Panel, null, 0, Ui.Shadow.Panel); // (the Mac's card: a shade lighter than the page by day, darker by night, under a soft, wide shadow)
         var x = card.X + pad;
         var y = card.Y + pad;
 
         // the header: the lock in its shield, "Sign in to your school", where
         ui.Shield(card.CenterX, y + 20, 34, 40, t.Accent);
-        ui.Icon("lock", card.CenterX, y + 21, 15, new Color4(1, 1, 1, 1), FontWeight.SemiBold);
+        ui.Icon("lock", card.CenterX, y + 21, 18, new Color4(1, 1, 1, 1), FontWeight.SemiBold);
         y += 40 + 8;
         ui.Text("Sign in to your school", x, y, Theme.Title2, t.Ink(), inner, TextAlignment.Center);
         y += 27 + 8;
@@ -221,6 +221,7 @@ public sealed class LoginLayer
         var h = pad + 64 + 12 + 16 + 8 + msgH + 16 + 28 + pad;
         var panel = new R(MathF.Round((ui.W - w) / 2), MathF.Round((ui.H - h) / 2 - 40), w, h);
         ui.Glass(panel, 12, GlassKind.Panel, null, 0, Ui.Shadow.Panel);
+        ui.Fill(panel, 12, Theme.WithAlpha(t.Card, t.Dark ? 0.7f : 0.8f)); // (the Mac's alert is all but opaque: the screens show through its glass only faintly)
         var y = panel.Y + pad;
         ui.Image(System.IO.Path.Combine(AppPaths.AppDir, "Assets", "Simpl-256.png"), new R(panel.CenterX - 32, y, 64, 64));
         y += 64 + 12;
