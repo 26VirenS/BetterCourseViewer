@@ -1,6 +1,7 @@
 # Simpl for Windows, made again in Windows 11's look (windows/SimplFluent: WPF with WPF-UI — Mica, the Settings app's
 # navigation and cards, Fluent icons): built on a Windows runner, made into an installer (Simpl-Setup.exe, Inno Setup:
-# windows/SimplFluent/Installer/Simpl.iss) that is tried — installed, opened, pictured, uninstalled — pictured against
+# windows/SimplFluent/Installer/Simpl.iss) that is tried — installed, opened, pictured, updated over an open Simpl as
+# Restart to Update runs it, an update that cannot finish, uninstalled with Simpl open — pictured against
 # the mock Canvas, and — when a commit asks for it with "[preview]" in its message, or by hand (Run workflow) —
 # published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
 # real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
@@ -261,17 +262,14 @@ jobs:
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 25 }
           }
           Get-ChildItem shots
-      - name: Installer, tried (installed, opened, uninstalled)
+      - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled)
         shell: pwsh
         run: |
           $setupLog = Join-Path $env:RUNNER_TEMP 'installer-setup.log'
+          $updateLog = Join-Path $env:RUNNER_TEMP 'installer-update.log'
+          $failedLog = Join-Path $env:RUNNER_TEMP 'installer-update-failed.log'
           $uninstallLog = Join-Path $env:RUNNER_TEMP 'installer-uninstall.log'
           New-Item -ItemType Directory -Force shots | Out-Null
-          function Fail($why) {
-            Write-Host "::error::$why"
-            foreach ($f in @($setupLog, $uninstallLog)) { if (Test-Path $f) { Copy-Item $f shots; Write-Host "--- $f"; Get-Content $f -Tail 60 } }
-            exit 1
-          }
           $dir = Join-Path $env:RUNNER_TEMP 'Simpl test install'   # (a space in it, as a user's own folder may have)
           $exe = Join-Path $dir 'Simpl.exe'
           $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Simpl.lnk'
@@ -279,10 +277,41 @@ jobs:
           # (Settings > Apps' entry: the installer's AppId, as Installer/Simpl.iss and Support/Updates.cs have it)
           $entry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{B65F70B7-E13E-4CCC-9E1C-0B659660D130}_is1'
           # what Simpl keeps is in its own folder, never the program's: there before, and still there after uninstalling
+          # (it is also the folder of the Simpl the update opens again, which is opened with no arguments)
           $data = Join-Path $env:LOCALAPPDATA 'Simpl'
           $kept = Join-Path $data 'kept-by-uninstall.txt'
           New-Item -ItemType Directory -Force $data | Out-Null
           Set-Content $kept 'what Simpl keeps'
+          $prof = Join-Path $env:RUNNER_TEMP 'profile-installed'
+          $prof2 = Join-Path $env:RUNNER_TEMP 'profile-running'
+          # (every log, kept with the pictures: the installer's runs and each Simpl's)
+          $simplLogs = [ordered]@{ 'profile-installed' = $prof; 'profile-running' = $prof2; 'profile-default' = $data }
+          function Keep-Logs {
+            foreach ($f in @($setupLog, $updateLog, $failedLog, $uninstallLog)) { if (Test-Path $f) { Copy-Item $f shots } }
+            foreach ($name in $simplLogs.Keys) {
+              $log = Join-Path $simplLogs[$name] 'simpl.log'
+              if (Test-Path $log) { Copy-Item $log "shots\$name.log" }
+            }
+          }
+          function Fail($why) {
+            Write-Host "::error::$why"
+            Keep-Logs
+            $all = @($setupLog, $updateLog, $failedLog, $uninstallLog) + @($simplLogs.Values | ForEach-Object { Join-Path $_ 'simpl.log' })
+            foreach ($f in $all) { if (Test-Path $f) { Write-Host "--- $f"; Get-Content $f -Tail 60 } }
+            Get-Process Simpl -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            exit 1
+          }
+          # (a log says so; a log that is not there says nothing -- the step runs with $ErrorActionPreference 'stop')
+          function Has($file, $pattern) { (Test-Path $file) -and (Select-String -Path $file -Pattern $pattern -Quiet) }
+          # (the copies of the installed Simpl.exe running now; one ending as it is looked at is not one)
+          function Get-InstalledSimpl { @(Get-Process Simpl -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -eq $exe } catch { $false } }) }
+          # (Setup run as Restart to Update runs it, Support/Updates.cs: no /DIR, so where it is installed; -PassThru
+          # and WaitForExit, never -Wait, which also waits for what Setup starts, and the Simpl it opens stays open)
+          function Start-Update($log) {
+            $p = Start-Process -FilePath dist\Simpl-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', '/LAUNCH', "/LOG=`"$log`"") -PassThru
+            $null = $p.Handle   # (held, so its exit code can be read once it has gone)
+            return $p
+          }
 
           # 1. installed silently, as Simpl's Restart to Update runs it (without /LAUNCH), into a folder of the test's own
           $p = Start-Process -FilePath dist\Simpl-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', "/DIR=`"$dir`"", "/LOG=`"$setupLog`"") -Wait -PassThru
@@ -294,27 +323,86 @@ jobs:
           $app = Get-ItemProperty -Path $entry -ErrorAction SilentlyContinue
           if (-not $app -or $app.DisplayName -ne 'Simpl') { Fail "Simpl is not in Settings > Apps ($entry)" }
           Write-Host "installed: $($app.DisplayName) $($app.DisplayVersion) in $($app.InstallLocation)"
+          # the Start menu shortcut's app id: what makes the window, its taskbar button and the pin one app. Read by the
+          # shell, else as the Start menu's own list files Simpl (given a moment to see the new shortcut). Any id that is
+          # not SimplCourses.Simpl, or none where a reader ran, fails the build; only neither reader running at all is a
+          # warning
+          $id = $null; $how = $null; $ran = $false
           try {
-            $link = (New-Object -ComObject Shell.Application).NameSpace((Split-Path $startMenu)).ParseName('Simpl.lnk')
-            $id = $link.ExtendedProperty('System.AppUserModel.ID')
-            if ($id -eq 'SimplCourses.Simpl') { Write-Host "the Start menu shortcut's app id: $id" } else { Write-Host "::warning::the Start menu shortcut's app id reads '$id'" }
-          } catch { Write-Host "::warning::the Start menu shortcut's app id could not be read: $_" }
+            $v = (New-Object -ComObject Shell.Application).NameSpace((Split-Path $startMenu)).ParseName('Simpl.lnk').ExtendedProperty('System.AppUserModel.ID')
+            $ran = $true
+            if ($v) { $id = "$v"; $how = 'the shell' }
+          } catch { Write-Host "::warning::the shell could not read the Start menu shortcut's app id: $_" }
+          if (-not $how) {
+            $until = (Get-Date).AddSeconds(20)
+            do {
+              try { $listed = @(Get-StartApps -Name 'Simpl' -ErrorAction Stop | Where-Object { $_.Name -eq 'Simpl' }); $ran = $true }
+              catch { Write-Host "::warning::the Start menu's list could not be read: $_"; break }
+              if ($listed.Count -gt 0) { $id = "$($listed[0].AppID)"; $how = "the Start menu's list" } else { Start-Sleep -Seconds 1 }
+            } while (-not $how -and ((Get-Date) -lt $until))
+          }
+          if (-not $ran) { Write-Host "::warning::the Start menu shortcut's app id could not be read at all" }
+          elseif (-not $how) { Fail "the Start menu shortcut has no app id the shell or the Start menu sees" }
+          elseif ($id -ne 'SimplCourses.Simpl') { Fail "the Start menu shortcut's app id reads '$id' ($how), not SimplCourses.Simpl" }
+          else { Write-Host "the Start menu shortcut's app id: $id ($how)" }
 
           # 2. the installed copy opened against the mock: the Dashboard pictured, and Simpl knows it was installed (so
           #    its updates come through the installer)
-          $prof = Join-Path $env:RUNNER_TEMP 'profile-installed'
           $shot = Join-Path $PWD 'shots\installed-dashboard.png'
           $run = Start-Process -FilePath $exe -ArgumentList @('--shot', $shot, '--shot-after', '45', '--profile', $prof, '--window-size', '1024x681', '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light') -PassThru
           if (-not $run.WaitForExit(150000)) { Stop-Process -Id $run.Id -Force -ErrorAction SilentlyContinue; Fail "the installed Simpl did not finish its picture" }
           $log = Join-Path $prof 'simpl.log'
-          if (Test-Path $log) { Copy-Item $log shots\profile-installed.log; Write-Host "--- the installed Simpl's log"; Get-Content $log -Tail 15 }
+          if (Test-Path $log) { Write-Host "--- the installed Simpl's log"; Get-Content $log -Tail 15 }
           if (-not (Test-Path $shot) -or (Get-Item $shot).Length -lt 10000) { Fail "the installed Simpl made no picture of the Dashboard" }
           if (-not (Test-Path $log) -or -not (Select-String -Path $log -Pattern 'starting \(installed\)' -Quiet)) { Fail "the installed Simpl does not know it was installed" }
           Start-Sleep -Seconds 2   # (its web view's helper processes end a moment after it)
 
-          # 3. uninstalled silently: its folder, its shortcut and its entry in Settings > Apps gone; what Simpl keeps, kept
+          # 3. an update over a Simpl left open, exactly as Restart to Update runs it: Setup asks Simpl to quit (the quit
+          #    event), Simpl takes it and goes, Setup sees it gone, puts the new version in place, and /LAUNCH opens it again
+          $open = Start-Process -FilePath $exe -ArgumentList @('--profile', $prof2, '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light') -PassThru
+          $null = $open.Handle
+          Start-Sleep -Seconds 15
+          if ($open.HasExited) { Fail "the installed Simpl did not stay open (it exited with $($open.ExitCode))" }
+          $up = Start-Update $updateLog
+          if (-not $up.WaitForExit(180000)) { Fail "the update did not finish in three minutes" }
+          if ($up.ExitCode -ne 0) { Fail "the update exited with $($up.ExitCode)" }
+          if (-not $open.WaitForExit(10000)) { Fail "the update did not close the Simpl that was open" }
+          if (-not (Has (Join-Path $prof2 'simpl.log') 'quit: asked by Simpl')) { Fail "Simpl never got the installer's request to quit" }
+          if (-not (Has $updateLog 'asked to quit, it had gone')) { Fail "Setup did not see Simpl quit when asked" }
+          $until = (Get-Date).AddSeconds(30)
+          while (-not (Get-InstalledSimpl) -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 500 }
+          $relaunched = @(Get-InstalledSimpl)
+          if ($relaunched.Count -eq 0) { Fail "/LAUNCH did not open Simpl again after the update" }
+          Write-Host "updated over an open Simpl: it quit when asked, and the new version was opened again (pid $($relaunched[0].Id))"
+
+          # 4. an update that cannot finish -- a Simpl that will not quit, here a stand-in holding the mutex every Simpl
+          #    holds: Setup closes the Simpl that can quit, gives up on the other (/SUPPRESSMSGBOXES answers its "still
+          #    open" with Cancel) and, Simpl having quit for the update, opens the copy that was there again
+          $before = @($relaunched | ForEach-Object { $_.Id })
+          $hold = [System.Threading.Mutex]::new($false, 'SimplCourses.Simpl.App')
+          $up = Start-Update $failedLog
+          $ended = $up.WaitForExit(180000)
+          $hold.Dispose()
+          if (-not $ended) { Fail "the update that could not finish did not end" }
+          if ($up.ExitCode -eq 0) { Fail "an update that could not close Simpl said it had succeeded" }
+          if (-not (Has $failedLog 'it was still open after')) { Fail "Setup did not wait for the Simpl that would not quit" }
+          if (-not (Has $failedLog 'opening the copy before it again')) { Fail "Setup did not open the copy before it again" }
+          $until = (Get-Date).AddSeconds(30)
+          $again = @()
+          while ($again.Count -eq 0 -and ((Get-Date) -lt $until)) {
+            Start-Sleep -Milliseconds 500
+            $again = @(Get-InstalledSimpl | Where-Object { $before -notcontains $_.Id })
+          }
+          if ($again.Count -eq 0) { Fail "Simpl was left closed after an update that could not finish" }
+          if (@(Get-InstalledSimpl | Where-Object { $before -contains $_.Id }).Count -gt 0) { Fail "the Simpl open before the failed update was not asked to quit" }
+          Write-Host "an update that could not finish (exit $($up.ExitCode)): the copy that was there opened again (pid $($again[0].Id))"
+
+          # 5. uninstalled silently with Simpl open (the one opened again above): it is asked to quit first; then its
+          #    folder, its shortcut and its entry in Settings > Apps gone; what Simpl keeps, kept
+          if (@(Get-InstalledSimpl).Count -eq 0) { Fail "no installed Simpl was open to try the uninstaller with" }
           $u = Start-Process -FilePath (Join-Path $dir 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$uninstallLog`"") -Wait -PassThru
           if ($u.ExitCode -ne 0) { Fail "the uninstaller exited with $($u.ExitCode)" }
+          if (-not (Has $uninstallLog 'asked to quit, it had gone')) { Fail "the uninstaller did not close the open Simpl" }
           # (its last moment, taking its own .exe and the folder away, comes just after it exits)
           $until = (Get-Date).AddSeconds(30)
           while ((Test-Path $dir) -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 500 }
@@ -322,9 +410,9 @@ jobs:
           if (Test-Path $startMenu) { Fail "the Start menu shortcut is still there after uninstalling" }
           if (Test-Path $entry) { Fail "Simpl is still in Settings > Apps after uninstalling" }
           if (-not (Test-Path $kept)) { Fail "uninstalling took what Simpl keeps ($data)" }
+          Keep-Logs
           Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue
-          foreach ($f in @($setupLog, $uninstallLog)) { if (Test-Path $f) { Copy-Item $f shots } }
-          Write-Host "Simpl-Setup.exe: installed, opened, pictured and uninstalled, as it should be"
+          Write-Host "Simpl-Setup.exe: installed, opened, pictured, updated over an open Simpl, recovered from an update that could not finish, and uninstalled with Simpl open, as it should be"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

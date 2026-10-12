@@ -284,7 +284,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     private async Task PinToTaskbar()
     {
-        var answer = await Taskbar.Ask(this);
+        // (asked for here: a No from Windows, which may be Windows not asking at all, is followed by Simpl's dialog)
+        var answer = await Taskbar.Ask(this, asked: true);
+        if (open != this) return; // (Settings closed meanwhile)
         if (answer == Taskbar.Answer.AlreadyPinned) Say("Simpl is on your taskbar already.");
         else if (answer == Taskbar.Answer.Pinned) Say("Simpl is on your taskbar.");
         if (tab == "general") Render();
@@ -699,7 +701,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         else foreach (var r in known.Take(12))
         {
             var installed = r.Run == Updates.CurrentRun;
-            list.Children.Add(K.Row(SymbolRegular.Box24, $"Simpl {r.Version}{(r.Beta ? " (preview)" : "")}", r.Detail,
+            list.Children.Add(K.Row(SymbolRegular.Box24, $"Simpl {r.Version}{(r.Beta ? " (beta)" : "")}", r.Detail,
                 installed ? K.Text("Installed", Ty.Body, B.Text2) : Enabled(K.Button("Open…", () => Updates.Open(r)), !dev)));
         }
         v.Children.Add(list);

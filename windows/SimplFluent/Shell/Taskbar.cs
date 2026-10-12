@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -19,9 +21,9 @@ namespace Simpl.Shell;
 /// <summary>
 /// Simpl kept on the taskbar, one click away (as a Mac app is kept in the Dock): asked once, when the guided tour has
 /// been followed to its last step's Done — never when it is left early — and any time from Settings ▸ General's Pin to
-/// taskbar…. Nothing is asked when Simpl is pinned already. Where Windows lets an app ask for itself (TaskbarManager),
-/// Windows' own question comes up; elsewhere — most PCs, for an app not from the Store — a dialog shows where Pin to
-/// taskbar is, drawn, while Simpl's taskbar button flashes until it is closed.
+/// taskbar…. Nothing is asked when Simpl is pinned already. For the installed copy, where Windows lets an app ask for
+/// itself (TaskbarManager), Windows' own question comes up; elsewhere — a copy run from its zip, a PC whose Windows does
+/// not ask — a dialog shows where Pin to taskbar is, drawn, while Simpl's taskbar button flashes until it is closed.
 /// </summary>
 public static class Taskbar
 {
@@ -53,18 +55,27 @@ public static class Taskbar
         finally { Shot.Ended(); }
     }
 
-    /// <summary>Pinned already; else Windows' own question where it lets an app ask; else Simpl's dialog.</summary>
-    public static async Task<Answer> Ask(Window over)
+    /// <summary>
+    /// Pinned already; else, for the copy the installer put here, Windows' own question where it lets an app ask (it
+    /// needs a Start menu entry carrying Simpl's app id, which a copy run from its zip has not); else Simpl's dialog.
+    /// <paramref name="asked"/>: the student asked (Settings ▸ General's Pin to taskbar…), so Windows' No is not the
+    /// last word — it may be Windows declining to ask at all — and Simpl's dialog follows it.
+    /// </summary>
+    public static async Task<Answer> Ask(Window over, bool asked = false)
     {
         if (IsPinned()) return Answer.AlreadyPinned;
-        if (await AskWindows() is { } pinned) return pinned ? Answer.Pinned : Answer.NotPinned;
+        if (Updates.Installed && await AskWindows() is { } pinned)
+        {
+            if (pinned) return Answer.Pinned;
+            if (!asked) return Answer.NotPinned; // (after the tour: the student's No, not asked twice)
+        }
         await ShowSheet(over);
         return IsPinned() ? Answer.Pinned : Answer.Shown;
     }
 
     /// <summary>
     /// Windows' own "Pin Simpl to the taskbar?", where it lets an app ask: true pinned, false declined, null where it
-    /// does not (an app not from the Store, unless Microsoft allows it) or cannot say.
+    /// does not (an app not from the Store, unless Microsoft allows it; not in front; no Start menu entry) or cannot say.
     /// </summary>
     private static async Task<bool?> AskWindows()
     {
@@ -73,7 +84,16 @@ public static class Taskbar
             var bar = global::Windows.UI.Shell.TaskbarManager.GetDefault();
             if (bar == null || !bar.IsSupported || !bar.IsPinningAllowed) return null;
             if (await bar.IsCurrentAppPinnedAsync()) return true;
-            return await bar.RequestPinCurrentAppAsync();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            if (await bar.RequestPinCurrentAppAsync()) return true;
+            // (Windows turns a request it will not ask down at once, with no question shown and no error — a No that
+            // quick is not the student's, so Simpl's dialog shows instead)
+            if (clock.ElapsedMilliseconds < 750)
+            {
+                Log.Write($"taskbar: Windows did not ask ({clock.ElapsedMilliseconds} ms)");
+                return null;
+            }
+            return false;
         }
         catch (Exception e)
         {
@@ -100,32 +120,63 @@ public static class Taskbar
         };
         s.Add("Done", SheetButtonKind.Primary);
         s.Add("Not now", SheetButtonKind.Close);
-        // (the main window's button is Simpl's on the taskbar, whichever window the dialog is over; and once Simpl is
-        // pinned, the dialog has done its work and goes by itself)
+        // (the main window's button is Simpl's on the taskbar, whichever window the dialog is over: it flashes while the
+        // dialog shows — not while it waits behind another; and once Simpl is pinned, the dialog has done its work and
+        // goes by itself)
         var button = Application.Current?.MainWindow;
         DispatcherTimer? watch = null;
+        var flashing = false;
+        EventHandler? overClosed = null;
+        // (one ending, whichever way it comes: the flashing and the watching stopped, the caller told — once)
+        void Ended()
+        {
+            watch?.Stop();
+            if (flashing)
+            {
+                flashing = false;
+                Flash(button, false);
+            }
+            if (overClosed != null)
+            {
+                over.Closed -= overClosed;
+                overClosed = null;
+            }
+            closed.TrySetResult();
+        }
+        void FlashIfShown()
+        {
+            if (flashing || watch == null || host.Current != s) return;
+            flashing = true;
+            Flash(button, true);
+        }
+        s.Closed += Ended;
+        // (the window under it closed with the dialog still up — Alt+F4 on Settings: the sheet never says it closed)
+        overClosed = (_, _) => Ended();
+        over.Closed += overClosed;
         if (!Shot.Asked)
         {
-            Flash(button, true);
             watch = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
             watch.Tick += (_, _) =>
             {
-                if (!IsPinned()) return;
+                if (!over.IsVisible) return; // (its window hidden in the notification area: nothing to look at till it is back)
+                if (!IsPinned())
+                {
+                    FlashIfShown();
+                    return;
+                }
                 watch.Stop();
-                s.Close();
+                if (host.Current == s) s.Close();
+                else
+                {
+                    // (still waiting its turn behind another dialog: taken out of the line, never to show)
+                    host.Close(s);
+                    Ended();
+                }
             };
             watch.Start();
         }
-        s.Closed += () =>
-        {
-            if (watch != null)
-            {
-                watch.Stop();
-                Flash(button, false);
-            }
-            closed.TrySetResult();
-        };
         host.Show(s);
+        FlashIfShown();
         return closed.Task;
     }
 
@@ -220,8 +271,26 @@ public static class Taskbar
         Canvas.SetTop(pointer, menuTop + 1 + Pad + Item + Rule + Item / 2 - 3);
         c.Children.Add(pointer);
 
-        var frame = new Border { Width = W + 2, Height = H + 2, CornerRadius = new CornerRadius(8), Child = c, HorizontalAlignment = HorizontalAlignment.Left };
+        var frame = new Drawing { Width = W + 2, Height = H + 2, CornerRadius = new CornerRadius(8), Child = c, HorizontalAlignment = HorizontalAlignment.Left };
+        AutomationProperties.SetName(frame, "Simpl’s taskbar button, right-clicked, with Pin to taskbar chosen");
         return frame.Bg(B.Card2).Stroke(B.CardStroke);
+    }
+
+    /// <summary>
+    /// The drawn taskbar, to a screen reader: one picture, named — not a menu whose words and icons it would read out as
+    /// if they could be chosen.
+    /// </summary>
+    private sealed class Drawing : Border
+    {
+        protected override AutomationPeer OnCreateAutomationPeer() => new Peer(this);
+
+        private sealed class Peer : FrameworkElementAutomationPeer
+        {
+            public Peer(Drawing d) : base(d) { }
+            protected override List<AutomationPeer>? GetChildrenCore() => null;
+            protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Image;
+            protected override string GetClassNameCore() => nameof(Drawing);
+        }
     }
 
     /// <summary>Windows 11's Start: four squares, in the accent.</summary>

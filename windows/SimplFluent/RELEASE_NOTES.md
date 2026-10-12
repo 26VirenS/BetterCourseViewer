@@ -2,7 +2,7 @@
 
 **Simpl-Windows-x64.zip** — the portable choice: unzip anywhere and run **Simpl.exe** (everything it needs is in the folder; it uses Microsoft Edge WebView2, which Windows 10 and 11 already have). The same "More info → Run anyway" applies.
 
-**Simpl for Windows, made again in Windows 11's look — an early preview.** A test build for evaluation, not a release: Simpl's own updates never offer it. The first Windows preview (windows-app-v…) stays available.
+**Simpl for Windows, made again in Windows 11's look — an early preview.** A test build for evaluation, not a release: the Mac app's updates and the first Windows preview's never offer it (this one's own Settings ▸ Updates offers the next Windows 11-look preview). The first Windows preview (windows-app-v…) stays available.
 
 What is in it — the Mac app's screens and steps, in Windows 11's look:
 

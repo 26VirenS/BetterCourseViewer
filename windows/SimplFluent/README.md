@@ -29,7 +29,8 @@ What the installer does:
   `Program.Main` sets first of all (`AppIdentity`), so the window, its taskbar button and the shortcuts are one app and
   pinning pins Simpl; it registers that id's name and picture for notifications (`HKCU\Software\Classes\AppUserModelId`);
 - adds Simpl to Settings ▸ Apps (AppId `{B65F70B7-E13E-4CCC-9E1C-0B659660D130}`, per user); uninstalling removes the
-  program, its shortcuts and that entry and **keeps** `%LOCALAPPDATA%\Simpl`, and says so;
+  program, its shortcuts and that entry and **keeps** `%LOCALAPPDATA%\Simpl` and the saved sign-in in Credential
+  Manager, and says where both are;
 - closes a running Simpl first (it hides in the notification area when its window closes): every Simpl holds the mutex
   `SimplCourses.Simpl.App` (the installer's `AppMutex`), and the installer and uninstaller ask it to quit through the
   event `Local\SimplCourses.Simpl.Quit` (`Instance` in `Program.cs`) — an install someone opens asks first — then wait
@@ -42,16 +43,25 @@ Simpl-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAU
 ```
 
 `/LAUNCH` (the installer's own switch, read in its `[Code]`) waits for Simpl to have quit and opens it again when the
-new version is in place; without it, nothing is opened. `/DIR="…"` installs elsewhere; `/LOG="…"` writes a log.
+new version is in place; if the update cannot finish (another Simpl that will not quit — `/SUPPRESSMSGBOXES` answers
+Setup's "still open" with Cancel — another Setup running, a file it cannot replace), `DeinitializeSetup` opens the
+version that was there, so Simpl is never left closed. Without `/LAUNCH`, nothing is opened. `/DIR="…"` installs
+elsewhere; `/LOG="…"` writes a log.
 Uninstalling silently: `"%LOCALAPPDATA%\Programs\Simpl\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`.
 
 Updates (`Support/Updates.cs`): a copy the installer put here — its uninstall entry names the folder Simpl.exe runs
 from — downloads the new release's Simpl-Setup.exe (checked against the size and SHA-256 GitHub publishes) to
 `%TEMP%\Simpl-Update\<tag>`, and **Restart to Update** runs it with the arguments above and quits Simpl. A portable
-copy opens the release's page, as before. CI tries the installer on every build: it installs silently into a folder
-of its own, checks Simpl.exe, the Start menu shortcut and the Settings ▸ Apps entry, opens the installed Simpl against
-the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed), uninstalls
-silently, and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not.
+copy opens the release's page, as before. Every Windows 11-look build is published as a GitHub pre-release, so a
+**beta** is marked by "beta" in the release's title, not by that flag: with Get beta updates off (the default), the
+usual previews are offered. CI tries the installer on every build: it installs silently into a folder of its own,
+checks Simpl.exe, the Start menu shortcut (and its app id) and the Settings ▸ Apps entry, opens the installed Simpl
+against the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed); runs
+the update exactly as Restart to Update does over a Simpl left open (it must take the quit event, Setup must see it
+go, and `/LAUNCH` must open Simpl again); runs an update that cannot finish (a stand-in holding Simpl's mutex: Setup
+must give up and open the old copy again); uninstalls silently with that Simpl open (the uninstaller must close it),
+and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not. The installer's and each
+Simpl's logs are kept with the pictures.
 
 ## Layout of the code
 

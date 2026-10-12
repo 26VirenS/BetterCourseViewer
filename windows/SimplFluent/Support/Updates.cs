@@ -169,7 +169,11 @@ public static class Updates
                     else size += bytes;
                 }
             DateTime? published = r.TryGetProperty("published_at", out var p) && DateTime.TryParse(p.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d : null;
-            list.Add(new Release(tag, run, $"v{run:000}", r.TryGetProperty("prerelease", out var pre) && pre.GetBoolean(), published, size,
+            // (a beta says so in its title. Not GitHub's pre-release mark: every Windows 11-look build is published as a
+            // pre-release, the usual ones too, and with that as the mark Get beta updates off would never offer one)
+            var title = r.TryGetProperty("name", out var nm) && nm.ValueKind == JsonValueKind.String ? nm.GetString() ?? "" : "";
+            var beta = Regex.IsMatch(title, @"\bbeta\b", RegexOptions.IgnoreCase);
+            list.Add(new Release(tag, run, $"v{run:000}", beta, published, size,
                 r.TryGetProperty("html_url", out var hu) ? hu.GetString() ?? "" : "", r.TryGetProperty("body", out var b) ? b.GetString() : null, setup));
         }
         list.Sort((a, b) => b.Run.CompareTo(a.Run));
@@ -203,10 +207,13 @@ public static class Updates
             Directory.CreateDirectory(dir);
             var file = Path.Combine(dir, SetupName);
             var part = file + ".part";
+            // (a minute with nothing coming — no answer at all, or the download stopping partway: given up, to be tried
+            // again; the minute starts over with each piece that comes)
+            using var stalled = new CancellationTokenSource(TimeSpan.FromMinutes(1));
             using (var req = new HttpRequestMessage(HttpMethod.Get, setup.Url))
             {
                 req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
-                using var res = await Downloads.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                using var res = await Downloads.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, stalled.Token);
                 if (!res.IsSuccessStatusCode) throw new Exception($"GitHub answered {(int)res.StatusCode}.");
                 var total = res.Content.Headers.ContentLength ?? setup.Size;
                 using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -217,8 +224,6 @@ public static class Updates
                     long got = 0;
                     var told = 0.0;
                     int n;
-                    // (a minute with nothing coming: given up, to be tried again)
-                    using var stalled = new CancellationTokenSource();
                     while (true)
                     {
                         stalled.CancelAfter(TimeSpan.FromMinutes(1));
@@ -259,7 +264,18 @@ public static class Updates
     /// </summary>
     public static void InstallAndRestart()
     {
-        if (State != Mode.Ready || downloaded is not { } file || !File.Exists(file)) return;
+        if (State != Mode.Ready) return;
+        if (downloaded is not { } file || !File.Exists(file))
+        {
+            // (the installer downloaded is gone — Windows' Storage Sense or Disk Cleanup empties its temporary files):
+            // Download offered again
+            Log.Write("update: the downloaded installer is gone; Download again");
+            downloaded = null;
+            State = Mode.Available;
+            Message = null;
+            Changed?.Invoke();
+            return;
+        }
         try
         {
             // (through the shell, so it inherits nothing of Simpl's — no handle of it keeps Simpl "open" for the installer)

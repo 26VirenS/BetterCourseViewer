@@ -4,11 +4,13 @@
 ; Easy on the student: installed for them alone, in %LOCALAPPDATA%\Programs\Simpl, so no administrator's permission is
 ; asked; no welcome page and one question (a desktop shortcut too?), then the last page with Open Simpl ticked. A Start
 ; menu shortcut, an entry in Settings > Apps, and an uninstaller that takes the program away and leaves what Simpl keeps
-; (%LOCALAPPDATA%\Simpl -- its settings, grade history and saved sign-in, never in the program's folder).
+; (%LOCALAPPDATA%\Simpl -- its settings, grade history and web view, never in the program's folder -- and the saved
+; sign-in, in Windows' Credential Manager as "Simpl Courses/sign-in").
 ;
 ; An update, as Simpl's Settings > Updates > Restart to Update runs it (Support/Updates.cs):
 ;   Simpl-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAUNCH
-; waits for Simpl to have quit (asking it to, if it has not), puts the new version in place, and (/LAUNCH) opens it.
+; waits for Simpl to have quit (asking it to, if it has not), puts the new version in place, and (/LAUNCH) opens it --
+; or, if it could not (another Simpl that would not quit, a file it could not replace), opens the version that was there.
 ;
 ; Built with:
 ;   ISCC /DAppVersion=0.2.0.12 "/DAppDisplayVersion=0.2.0 (v012)" /DSourceDir=<dist\Simpl> /DOutputDir=<dist> Simpl.iss
@@ -111,10 +113,12 @@ FinishedHeadingLabel=Simpl is installed
 FinishedLabelNoIcons=Simpl is on this PC.
 FinishedLabel=Find Simpl in your Start menu. Your settings and sign-in are kept apart from the app, so they stay through updates.
 ClickFinish=Click Finish to close Setup.
-SetupAppRunningError=Simpl is still open. It may be in the notification area, by the clock.%n%nRight-click its icon there and choose Quit Simpl, then click OK. Or click Cancel to stop.
-UninstallAppRunningError=Simpl is still open. It may be in the notification area, by the clock.%n%nRight-click its icon there and choose Quit Simpl, then click OK. Or click Cancel to stop.
-ConfirmUninstall=Uninstall Simpl from this PC?%n%nYour settings, grade history and saved sign-in stay in AppData\Local\Simpl, in case you install Simpl again. To erase them too, first open Simpl's Settings > Data > Reset everything.
-UninstalledAll=Simpl was removed from this PC.%n%nYour settings and sign-in are still in AppData\Local\Simpl; delete that folder if you no longer want them.
+; (%1: Simpl for the AppMutex check, "Setup" for the SetupMutex one -- another Setup already running -- as Setup
+; fills it in for each)
+SetupAppRunningError=%1 is still open. Close it, then click OK. Or click Cancel to stop.%n%nIf it is Simpl, it may be in the notification area, by the clock: right-click its icon there and choose Quit Simpl.
+UninstallAppRunningError=%1 is still open. It may be in the notification area, by the clock.%n%nRight-click its icon there and choose Quit Simpl, then click OK. Or click Cancel to stop.
+ConfirmUninstall=Uninstall Simpl from this PC?%n%nYour settings, grade history and saved sign-in are kept (in AppData\Local\Simpl and Windows' Credential Manager), in case you install Simpl again. To erase them too, first open Simpl's Settings > Data > Reset everything.
+UninstalledAll=Simpl was removed from this PC.%n%nYour settings are still in AppData\Local\Simpl, and a saved sign-in in Windows' Credential Manager (Simpl Courses/sign-in). Delete them if you no longer want them.
 
 [CustomMessages]
 SimplIsOpen=Simpl is open, so Setup will close it first.%n%nIt opens again at the end if you leave Open Simpl ticked.
@@ -149,6 +153,10 @@ Filename: "{app}\Simpl.exe"; WorkingDir: "{app}"; Flags: nowait; Check: LaunchAf
 [Code]
 const
   EVENT_MODIFY_STATE = $0002;
+
+var
+  { the new version put in place (ssPostInstall): an update that never got there opens the old one again }
+  InstallDone: Boolean;
 
 { kernel32, to ask an open Simpl to quit. (Setup is a 32-bit program, as Inno Setup makes it by default: a handle fits
   in an Integer, and a BOOL is one.) }
@@ -242,6 +250,42 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpSelectTasks then
     WizardForm.NextButton.Caption := SetupMessage(msgButtonInstall);
+end;
+
+{ The new version is in place: ssPostInstall comes only after a successful install (and after the [Run] entries, which
+  also run only then). }
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    InstallDone := True;
+end;
+
+{ An update Simpl ran (Restart to Update) that could not put the new version in place -- another Simpl that would not
+  quit (Setup's check answered Cancel, as /SUPPRESSMSGBOXES does), another Setup running, a file it could not replace:
+  Simpl has quit already and [Run] never comes, so the version that was there is opened again rather than left closed.
+  (Called whenever Setup ends, even before anything is installed.) }
+procedure DeinitializeSetup;
+var
+  Dir, Exe: String;
+  ResultCode: Integer;
+begin
+  if InstallDone or not WizardSilent or not UpdatingFromSimpl then
+    Exit;
+  { (the installed copy's entry in Settings > Apps, named by AppId) }
+  if not RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B65F70B7-E13E-4CCC-9E1C-0B659660D130}_is1',
+    'InstallLocation', Dir) then
+  begin
+    Log('The update did not finish, and no installed Simpl was found to open again.');
+    Exit;
+  end;
+  Exe := AddBackslash(Dir) + 'Simpl.exe';
+  if not FileExists(Exe) then
+  begin
+    Log('The update did not finish, and ' + Exe + ' is not there to open again.');
+    Exit;
+  end;
+  Log('The update did not finish: opening the copy before it again (' + Exe + ').');
+  Exec(Exe, '', Dir, SW_SHOWNORMAL, ewNoWait, ResultCode);
 end;
 
 { Uninstalling, once it is confirmed: an open Simpl is closed before Uninstall's own check that it is not. }
