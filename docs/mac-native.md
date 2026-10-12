@@ -314,7 +314,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   decimal only under 9.95, so never "10.0"), and how much larger it is drawn than in All. The tour's Orbitals step is
   still done by Orbitals alone. `-SimplPTModel cloud` and `-SimplPTSubshell 3d` (or `all`) set the view for the
   screenshot suite (`light-55k-ptable-cloud`, `dark-55l-ptable-cloud`); `-SimplCloudCheck YES` writes the model's test
-  vectors to the console (`cloud-check …`).
+  vectors to the console (`cloud-check …`). Moments that cut now move as the rest of the app does: why a reply, a
+  comment, a hand-in, the setup or a grading scale was not saved fades in and out (what is under it moving on
+  `Motion.snappy`), the Critical Update notice comes down from the top, Match's grid and the school picker crossfade,
+  the tour's end and a set known or learned bounce a green mark once (`FinishMark`), and the radial colour picker
+  shrinks back as it grew before its row closes.
 
 ## Building and running
 

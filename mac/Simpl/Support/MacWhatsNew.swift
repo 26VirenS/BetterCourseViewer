@@ -12,6 +12,7 @@ enum MacWhatsNew {
         Release(version: "1.3.76", date: "2026-10-12", notes: [
             ReleaseNote(kind: "new", title: "Electron cloud model", body: "A Cloud view: dots show where electrons are likely to be."),
             ReleaseNote(kind: "new", title: "One subshell at a time", body: "Pick a subshell such as 3d; the rest of the atom goes grey."),
+            ReleaseNote(kind: "improved", title: "Smoother moments", body: "Errors, signing in and finishing a set or the tour glide."),
         ]),
         Release(version: "1.3.75", date: "2026-10-12", notes: [
             ReleaseNote(kind: "improved", title: "Molecules face you", body: "Chains and rings in the 3D builder lie across the view."),
