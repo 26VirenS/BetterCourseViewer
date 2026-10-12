@@ -161,6 +161,10 @@ jobs:
           Shot 'tool-flashcards-learn' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'fc', '--fc-demo', 'learn'))
           Shot 'tool-flashcards-match' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'fc', '--fc-demo', 'match'))
           Shot 'pin-flashcards' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'cite,fc', '--pin-open', 'fc', '--fc-demo'))
+          Shot 'lewis' '1366x778' 45 ($mock + @('--appearance', 'light', '--lewis', 'NO3-'))
+          Shot 'lewis-benzene' '1366x778' 45 ($mock + @('--appearance', 'dark', '--lewis', 'Benzene'))
+          Shot 'molecule' '1366x778' 45 ($mock + @('--appearance', 'dark', '--molecule', 'CH4'))
+          Shot 'molecule-ethanol' '1024x681' 45 ($mock + @('--appearance', 'light', '--molecule', 'Ethanol'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
           # an assignment: a quiz taken, work handed in late, its feedback, Hand In, the rubric
           Shot 'assignment-quiz' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
