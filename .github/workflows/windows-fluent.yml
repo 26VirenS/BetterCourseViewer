@@ -7,6 +7,8 @@
 # published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
 # real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
 # feeds are not touched.
+# Built once (the installer and the zip a release carries); then, at the same time, the pictures in four parts and the
+# installer tried; a release publishes that one build (windows-fluent-ship.yml publishes a green run's, by hand).
 name: Windows app (Windows 11 look)
 
 on:
@@ -21,33 +23,73 @@ on:
         description: Publish the build as a preview release
         type: boolean
         default: true
+      reuse:
+        description: Publish the green run already made for this commit, if there is one (no build again)
+        type: boolean
+        default: true
+      from_run:
+        description: Or publish this green run (its id), whatever its commit
+        type: string
+        default: ''
 
 permissions:
   contents: write
+  actions: read # (a green run found, and its build downloaded, to publish it)
 
 concurrency:
-  group: windows-fluent
+  # (pushes one after another; a publish beside them, never queued behind a build it does not need)
+  group: windows-fluent-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
-  app:
-    name: Simpl for Windows (Windows 11 look)
+  # (Run workflow, to publish: the run a push already made for this commit, once it is green, is published as it is —
+  #  a minute, not a build and its pictures again; without one, or with reuse off, it is built and tried here)
+  prior:
+    name: The run already made for this commit
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview && inputs.reuse }}
+    runs-on: ubuntu-latest
+    outputs:
+      found: ${{ steps.find.outputs.found }}
+      run: ${{ steps.find.outputs.run }}
+      number: ${{ steps.find.outputs.number }}
+      sha: ${{ steps.find.outputs.sha }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_RUN: ${{ inputs.from_run }}
+        run: |
+          api="repos/${{ github.repository }}/actions/workflows/windows-fluent.yml/runs?head_sha=${{ github.sha }}&event=push&per_page=5"
+          q='.workflow_runs[0] | "\(.id) \(.run_number) \(.status) \(.conclusion) \(.head_sha)"'
+          if [ -n "$FROM_RUN" ]; then api="repos/${{ github.repository }}/actions/runs/$FROM_RUN"; q='"\(.id) \(.run_number) \(.status) \(.conclusion) \(.head_sha)"'; fi
+          # (a push's run still going is waited for, up to half an hour)
+          for i in $(seq 1 120); do
+            read -r id number status conclusion sha < <(gh api "$api" --jq "$q" 2>/dev/null || echo "")
+            [ -z "$id" ] || [ "$id" = "null" ] && { echo "no push run for this commit: built here"; echo "found=false" >> "$GITHUB_OUTPUT"; exit 0; }
+            [ "$status" = "completed" ] && break
+            echo "run $id is $status: waiting"; sleep 15
+          done
+          if [ "$conclusion" != "success" ]; then echo "::error::the run for this commit ($id) ended $conclusion: not published"; exit 1; fi
+          echo "found=true" >> "$GITHUB_OUTPUT"; echo "run=$id" >> "$GITHUB_OUTPUT"; echo "number=$number" >> "$GITHUB_OUTPUT"; echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "publishing run $id (v$(printf '%03d' "$number"))"
+
+  build:
+    name: Build (the app, its installer, its zip)
+    needs: prior
+    if: ${{ !cancelled() && needs.prior.outputs.found != 'true' && needs.prior.result != 'failure' }}
     runs-on: windows-latest
-    # (the pictures, and the installer made and tried: compressing, installing, a picture, uninstalling)
-    timeout-minutes: 75
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - name: Build (Release, win-x64, self-contained)
         shell: bash
         run: |
           # (the build carries its run's number — "0.2.3 (v003)" — as About and Updates name it)
-          n=$(printf '%03d' "${{ github.run_number }}")
+          # (the number the build carries — "0.2.3 (v041)" — is its own run's: the one published, when it is reused)
+          n=$(printf '%03d' "${{ needs.prior.outputs.number || github.run_number }}")
           dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.3 (v$n)"
           test -f dist/Simpl/Simpl.exe
       - name: Installer (Simpl-Setup.exe)
@@ -85,6 +127,41 @@ jobs:
           if (-not (Test-Path dist/Simpl-Setup.exe)) { Write-Host "::error::ISCC made no dist/Simpl-Setup.exe"; exit 1 }
           $size = [math]::Round((Get-Item dist/Simpl-Setup.exe).Length / 1MB, 1)
           Write-Host "Simpl-Setup.exe, version $version ($display): $size MB"
+      - name: Zip
+        shell: bash
+        run: (cd dist && 7z a -tzip -mx=5 ../Simpl-Windows-x64.zip Simpl >/dev/null) && mv Simpl-Windows-x64.zip dist/ && ls -la dist/Simpl-Windows-x64.zip dist/Simpl-Setup.exe
+      # (what a release carries, kept for the pictures, the installer's trial and the release itself: one build)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            dist/Simpl-Setup.exe
+            dist/Simpl-Windows-x64.zip
+          compression-level: 0
+          retention-days: 30
+
+  pictures:
+    name: Pictures (part ${{ matrix.shard }})
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: dist
+      - name: The build
+        shell: bash
+        run: (cd dist && 7z x -y Simpl-Windows-x64.zip >/dev/null) && test -f dist/Simpl/Simpl.exe && ls dist
       - name: Mock Canvas
         shell: bash
         run: |
@@ -96,12 +173,21 @@ jobs:
           curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
       - name: Pictures
         shell: pwsh
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: 4
         run: |
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
           New-Item -ItemType Directory -Force shots | Out-Null
           # (three at a time, each with a profile of its own: each copy of Simpl pictures its own window, then quits)
           $script:running = @()
+          # (this job's share of the pictures: every SHARDS-th, from SHARD — four jobs at once, each three at a time)
+          $shard = [int]$env:SHARD; $shards = [int]$env:SHARDS
+          $script:k = -1; $script:mine = @()
           function Shot($name, $size, $wait, $extra) {
+            $script:k++
+            if ($script:k % $shards -ne $shard) { return }
+            $script:mine += $name
             while (@($script:running | Where-Object { -not $_.HasExited }).Count -ge 3) { Start-Sleep -Milliseconds 400 }
             $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
             $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', "$wait", '--profile', $prof, '--window-size', $size) + $extra
@@ -271,11 +357,46 @@ jobs:
           }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
           # printed whole, with the bridge's own error, so its cause can be read here)
-          $saved = 'shots/profile-setup-saved.log'
-          if (-not (Test-Path $saved)) { Write-Error "setup-saved made no log"; exit 1 }
-          $bad = Select-String -Path $saved -Pattern 'setup save:|setup saved, then|bridge ' -SimpleMatch:$false
-          if ($bad) { Write-Host "--- setup-saved: what failed"; Get-Content $saved; Write-Error "setup's save failed or something after it did (shots/profile-setup-saved.log)"; exit 1 }
+          if ($script:mine -contains 'setup-saved') {
+            $saved = 'shots/profile-setup-saved.log'
+            if (-not (Test-Path $saved)) { Write-Error "setup-saved made no log"; exit 1 }
+            $bad = Select-String -Path $saved -Pattern 'setup save:|setup saved, then|bridge ' -SimpleMatch:$false
+            if ($bad) { Write-Host "--- setup-saved: what failed"; Get-Content $saved; Write-Error "setup's save failed or something after it did (shots/profile-setup-saved.log)"; exit 1 }
+          }
           Get-ChildItem shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-fluent-part-${{ matrix.shard }}
+          path: shots
+
+  installer:
+    name: Installer, tried
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: dist
+      - name: The build
+        shell: bash
+        run: (cd dist && 7z x -y Simpl-Windows-x64.zip >/dev/null) && test -f dist/Simpl/Simpl.exe && ls dist
+      - name: Mock Canvas
+        shell: bash
+        run: |
+          node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          # (a second one that asks for a sign-in first: the sign-in pictures)
+          node scripts/dev/mock-canvas.mjs 8802 8803 --login > mock-login.log 2>&1 &
+          sleep 3
+          curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+          curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
       - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled, uninstalled from Simpl)
         shell: pwsh
         run: |
@@ -488,44 +609,53 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-fluent-shots
+          name: windows-fluent-part-installer
           path: shots
-      - name: Zip
-        shell: bash
-        run: (cd dist && 7z a -tzip -mx=7 ../Simpl-Windows-x64.zip Simpl >/dev/null) && ls -la Simpl-Windows-x64.zip
-      - uses: actions/upload-artifact@v4
+
+  shots:
+    name: The pictures, together
+    needs: [build, pictures, installer]
+    if: ${{ always() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact/merge@v4
         with:
-          name: Simpl-Windows-x64
-          path: Simpl-Windows-x64.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Simpl-Setup
-          path: dist/Simpl-Setup.exe
+          name: windows-fluent-shots
+          pattern: windows-fluent-part-*
+          delete-merged: true
 
   publish:
     name: Publish the preview
-    needs: [app]
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.preview) || contains(github.event.head_commit.message, '[preview]') }}
+    needs: [prior, build, pictures, installer]
+    if: ${{ !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.preview) || contains(github.event.head_commit.message, '[preview]')) && (needs.prior.outputs.found == 'true' || (needs.build.result == 'success' && needs.pictures.result == 'success' && needs.installer.result == 'success')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        if: ${{ needs.prior.outputs.found != 'true' }}
         with:
-          name: Simpl-Windows-x64
-          path: zips
-      - uses: actions/download-artifact@v4
-        with:
-          name: Simpl-Setup
-          path: setup
+          name: release
+          path: release
+      - name: The green run's build
+        if: ${{ needs.prior.outputs.found == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # (a run from before the build was kept as one "release": its installer and its zip apart)
+          gh run download "${{ needs.prior.outputs.run }}" -R "${{ github.repository }}" -n release -D release \
+            || { gh run download "${{ needs.prior.outputs.run }}" -R "${{ github.repository }}" -n Simpl-Setup -D release \
+                 && gh run download "${{ needs.prior.outputs.run }}" -R "${{ github.repository }}" -n Simpl-Windows-x64 -D release; }
+          ls -la release
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          n=$(printf '%03d' "${{ github.run_number }}")
+          # (the number the build carries — "0.2.3 (v041)" — is its own run's: the one published, when it is reused)
+          n=$(printf '%03d' "${{ needs.prior.outputs.number || github.run_number }}")
           tag="windows-fluent-v$n"
           # (the installer first, the portable zip beside it; Simpl's own Updates finds Simpl-Setup.exe by its name)
-          test -f setup/Simpl-Setup.exe
-          gh release create "$tag" setup/Simpl-Setup.exe zips/*.zip --target "${{ github.sha }}" --prerelease \
+          test -f release/Simpl-Setup.exe
+          gh release create "$tag" release/Simpl-Setup.exe release/Simpl-Windows-x64.zip --target "${{ needs.prior.outputs.sha || github.sha }}" --prerelease \
             --title "Simpl for Windows — Windows 11 look, preview (v$n)" \
             --notes-file windows/SimplFluent/RELEASE_NOTES.md
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"
