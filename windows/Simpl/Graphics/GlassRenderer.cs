@@ -138,7 +138,7 @@ public sealed class GlassRenderer : IDisposable
     {
         void Pass(int target, ID3D11ShaderResourceView src, ID3D11PixelShader ps, float tx, float ty, float dx, float dy, float sigma)
         {
-            ctx.PSSetShaderResources(0, new ID3D11ShaderResourceView[] { null!, null! });
+            ctx.PSUnsetShaderResources(0, 2);
             var td = tex[target]!.Description;
             ctx.RSSetViewport(new Viewport(0, 0, td.Width, td.Height));
             ctx.OMSetRenderTargets(rtv[target]!);
@@ -160,7 +160,7 @@ public sealed class GlassRenderer : IDisposable
         var s = Math.Max(sigmaPx / 4f, 0.01f);
         Pass(2, srv[1]!, blurPS, 0, 0, 1, 0, s);
         Pass(3, srv[2]!, blurPS, 0, 0, 0, 1, s);
-        ctx.PSSetShaderResources(0, new ID3D11ShaderResourceView[] { null!, null! });
+        ctx.PSUnsetShaderResources(0, 2);
         return srv[3]!;
     }
 
@@ -198,7 +198,7 @@ public sealed class GlassRenderer : IDisposable
         ctx.PSSetShaderResources(0, new[] { sharp, frost ?? sharp });
         ctx.PSSetSampler(0, sampler);
         ctx.Draw(4, 0);
-        ctx.PSSetShaderResources(0, new ID3D11ShaderResourceView[] { null!, null! });
+        ctx.PSUnsetShaderResources(0, 2);
         ctx.OMSetBlendState(null);
         ctx.RSSetState(raster);
     }
