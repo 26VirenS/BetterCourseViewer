@@ -12,12 +12,15 @@ internal abstract class CoursePart
     protected readonly Engine.Engine engine;
     protected readonly string ctx;
 
-    /// <summary>Build the screen again (an answer came, something was picked).</summary>
+    /// <summary>Build the screen again (something was picked).</summary>
     internal Action Render = () => { };
+    /// <summary>Build the screen again for an answer that came (several close together once; out of view, when shown).</summary>
+    internal Action RenderSoon = () => { };
     /// <summary>The title, the line under it or the commands changed.</summary>
     internal Action HeaderChange = () => { };
     /// <summary>The width the page lays the content out in.</summary>
     internal Func<double> Width = () => 0;
+    private readonly List<Action> drawn = new();
 
     protected CoursePart(Engine.Engine engine, string ctx)
     {
@@ -35,11 +38,19 @@ internal abstract class CoursePart
     public virtual bool LayoutChanges(double before, double now) => false;
     public virtual void Hide() { }
 
-    /// <summary>A loader whose answers build the screen again.</summary>
+    /// <summary>A loader whose answers build the screen again (as a screen's own do: an answer that says what the last one
+    /// did, not at all).</summary>
     protected Loader<T> Watch<T>(Loader<T> l) where T : class
     {
-        l.Changed += () => Render();
+        l.Changed += () => { if (!l.LastSame) RenderSoon(); };
+        drawn.Add(l.Drawn);
         return l;
+    }
+
+    /// <summary>The screen was built: the loaders watched are told (one still reading then shows its answer, whatever it says).</summary>
+    internal void Drawn()
+    {
+        foreach (var d in drawn) d();
     }
 }
 
@@ -56,8 +67,10 @@ public abstract class CoursePartScreen : Screen
     {
         this.part = part;
         part.Render = Render;
+        part.RenderSoon = RenderSoon;
         part.HeaderChange = HeaderChange;
         part.Width = () => Width;
+        WhenBuilt(part.Drawn);
     }
 
     public override string Title => part.Title;
