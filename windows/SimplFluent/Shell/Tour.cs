@@ -90,7 +90,11 @@ public sealed class TourOverlay : Grid
     private readonly Engine.Engine engine;
     private readonly MainWindow window;
     private readonly Path veil = new();
-    private readonly Border ring = new() { BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(10), IsHitTestVisible = false };
+    // (the light and its ring are one shape, so one move carries both: the dim is the window less it)
+    private readonly RectangleGeometry whole = new(), light = new() { RadiusX = 10, RadiusY = 10 };
+    private readonly CombinedGeometry dim;
+    private readonly Path ring = new() { StrokeThickness = 2, IsHitTestVisible = false, Opacity = 0, Visibility = Visibility.Collapsed };
+    private bool ringOn;
     private readonly Border card = new();
     private readonly Canvas layer = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
@@ -113,7 +117,10 @@ public sealed class TourOverlay : Grid
         Visibility = Visibility.Collapsed;
         veil.Fill = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)128 : (byte)72, 0, 0, 0));
         veil.MouseLeftButtonDown += (_, e) => { Nudge(); e.Handled = true; };
-        ring.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+        dim = new CombinedGeometry(GeometryCombineMode.Exclude, whole, light);
+        veil.Data = whole;
+        ring.Data = light;
+        ring.SetResourceReference(Shape.StrokeProperty, B.Accent);
         ring.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 0, Opacity = 0.6, Color = Appearance.Accent };
         layer.Children.Add(veil);
         layer.Children.Add(ring);
@@ -162,22 +169,27 @@ public sealed class TourOverlay : Grid
         WorkPreview.Dismiss();
         if (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0) engine.Go(Place.Dashboard);
         steps = Steps();
-        Show(Math.Clamp(at, 0, steps.Count - 1));
+        index = null;
+        lastHole = null;
+        // (laid out first, so the first step's callout pops where it belongs)
         Visibility = Visibility.Visible;
+        UpdateLayout();
+        Show(Math.Clamp(at, 0, steps.Count - 1));
         timer.Start();
         Motion.FadeIn(this, Motion.Medium);
     }
 
     private void Show(int i)
     {
+        // (from a part lit to the next part, the callout goes with the light, as the Mac's does; the first step and the
+        // last, with nothing lit, pop in place)
+        var shown = index != null && card.ActualHeight > 0;
         index = i;
         since = DateTime.UtcNow;
         seenEvents = Tour.Events;
         advancing = false;
-        lastHole = null;
         BuildCard();
-        Arrange(animate: false);
-        Motion.Pop(card);
+        if (!Arrange(animate: shown, step: true)) Motion.Pop(card);
         Dispatcher.BeginInvoke(() => { if (steps[i].Done == null) Focus(); }, DispatcherPriority.Input);
         Shot.Moved();
     }
@@ -293,30 +305,33 @@ public sealed class TourOverlay : Grid
         card.Bg(B.Flyout).Stroke(B.FlyoutStroke);
     }
 
-    private void Arrange(bool animate)
+    /// <summary>The light, its ring and the callout where the step's part is now; true when they travelled there together
+    /// from the part lit before (a new step's card then goes with them rather than popping).</summary>
+    private bool Arrange(bool animate, bool step = false)
     {
-        if (index is not { } i) return;
+        if (index is not { } i) return false;
         var s = steps[i];
         var size = new Size(ActualWidth, ActualHeight);
-        if (size.Width < 10) return;
+        if (size.Width < 10) return false;
         // (a step waiting a while: Next appears, in case what it asks cannot be done here)
         if (card.Tag is UIElement nx && s.Done != null && (DateTime.UtcNow - since).TotalSeconds > 6) nx.Visibility = Visibility.Visible;
         Rect? hole = s.Spot is { } spot ? Tour.Find(spot, this) : null;
         if (hole is { } h) { h.Inflate(6, 6); hole = h; }
-        if (hole == lastHole && card.ActualHeight > 0 && animate) return;
+        whole.Rect = new Rect(size);
+        if (!step && hole == lastHole && card.ActualHeight > 0 && animate) return false;
+        var from = lastHole;
         lastHole = hole;
-        // the dim, less the light
-        var all = new RectangleGeometry(new Rect(size));
-        veil.Data = hole is { } hh ? new CombinedGeometry(GeometryCombineMode.Exclude, all, new RectangleGeometry(hh, 10, 10)) : all;
+        // the dim, less the light: from one part to the next the light glides as the callout does (Motion.Slow); with
+        // nothing lit on one side, the dim changes at once and the ring fades
+        var travel = animate && Motion.On && from != null && hole != null;
         if (hole is { } r)
         {
-            ring.Visibility = Visibility.Visible;
-            ring.Width = r.Width;
-            ring.Height = r.Height;
-            Canvas.SetLeft(ring, r.X);
-            Canvas.SetTop(ring, r.Y);
+            if (!travel) { light.BeginAnimation(RectangleGeometry.RectProperty, null); light.Rect = r; }
+            else if (r != from) light.BeginAnimation(RectangleGeometry.RectProperty, new System.Windows.Media.Animation.RectAnimation(r, Motion.Ms(Motion.Slow)) { EasingFunction = Motion.Decelerate });
+            veil.Data = dim;
         }
-        else ring.Visibility = Visibility.Collapsed;
+        else veil.Data = whole;
+        Ring(hole != null);
         // the callout beside the lit part: to its right on the window's left side, else under it, over it; in the middle with none
         card.Measure(new Size(320, double.PositiveInfinity));
         var cs = card.DesiredSize;
@@ -330,7 +345,9 @@ public sealed class TourOverlay : Grid
         else if (hr.Y - gap - cs.Height >= margin)
             at = new Point(Math.Clamp(hr.X + hr.Width / 2 - cs.Width / 2, margin, Math.Max(margin, size.Width - cs.Width - margin)), hr.Y - gap - cs.Height);
         else at = new Point((size.Width - cs.Width) / 2, hr.Y + hr.Height / 2 > size.Height / 2 ? margin : size.Height - cs.Height - margin);
-        if (animate && Motion.On)
+        // (a callout not placed yet is placed, never slid from nowhere)
+        var placed = !double.IsNaN(Canvas.GetLeft(card)) && !double.IsNaN(Canvas.GetTop(card));
+        if (placed && (step ? travel : animate && Motion.On))
         {
             Motion.To(card, Canvas.LeftProperty, at.X, Motion.Slow, Motion.Decelerate);
             Motion.To(card, Canvas.TopProperty, at.Y, Motion.Slow, Motion.Decelerate);
@@ -342,5 +359,15 @@ public sealed class TourOverlay : Grid
             Canvas.SetLeft(card, at.X);
             Canvas.SetTop(card, at.Y);
         }
+        return travel && placed;
+    }
+
+    /// <summary>The ring faded in where a part is lit, and out (where it was) when none is (Motion.Normal).</summary>
+    private void Ring(bool on)
+    {
+        if (on == ringOn) return;
+        ringOn = on;
+        if (on) ring.Visibility = Visibility.Visible;
+        Motion.To(ring, OpacityProperty, on ? 1 : 0, Motion.Normal, Motion.Decelerate, 0, () => { if (!ringOn) ring.Visibility = Visibility.Collapsed; });
     }
 }

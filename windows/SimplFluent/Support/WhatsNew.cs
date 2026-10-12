@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.2", "2026-10-12",
+            ("improved", "A smoother tour", "The light and its card glide from one part to the next."),
+            ("improved", "Pins and file notices", "Pins come and go smoothly; a file's notice fades away."),
+            ("fixed", "One Done, Try Again", "A tool has one Done; Try Again shows it's reading at once.")),
         R("0.2.1", "2026-10-12",
             ("new", "Electron cloud model", "A Cloud view: dots show where electrons are likely to be."),
             ("new", "One subshell at a time", "Pick a subshell such as 3d; the rest of the atom goes grey."),

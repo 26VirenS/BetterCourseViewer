@@ -132,7 +132,11 @@ internal sealed class PTTourOverlay
     private const double CardWidth = 300;
     private readonly FrameworkElement tool;
     private readonly Path veil = new() { IsHitTestVisible = false };
-    private readonly Border ring = new() { BorderThickness = new Thickness(2.5), CornerRadius = new CornerRadius(10), IsHitTestVisible = false };
+    // (the light and its ring are one shape, so one move carries both: the dim is the tool's window less it)
+    private readonly RectangleGeometry whole = new(), light = new() { RadiusX = 10, RadiusY = 10 };
+    private readonly CombinedGeometry dim;
+    private readonly Path ring = new() { StrokeThickness = 2.5, IsHitTestVisible = false, Opacity = 0, Visibility = Visibility.Collapsed };
+    private bool ringOn;
     private readonly Border card = new() { Width = CardWidth, Padding = new Thickness(18, 14, 18, 16), CornerRadius = new CornerRadius(8) };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private Canvas? layer;
@@ -144,7 +148,10 @@ internal sealed class PTTourOverlay
     public PTTourOverlay(FrameworkElement tool)
     {
         this.tool = tool;
-        ring.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+        dim = new CombinedGeometry(GeometryCombineMode.Exclude, whole, light);
+        veil.Data = whole;
+        ring.Data = light;
+        ring.SetResourceReference(Shape.StrokeProperty, B.Accent);
         ring.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 0, Opacity = 0.6, Color = Appearance.Accent };
         card.Effect = K.Shadow(36, 10, 0.3);
         card.Bg(B.Flyout).Stroke(B.FlyoutStroke);
@@ -169,8 +176,8 @@ internal sealed class PTTourOverlay
         index = i;
         step = s;
         card.Child = Card(i, count, s, stuck, done, next);
-        Arrange(animate: !fresh && !newStep, force: true);
-        if (newStep) Motion.Pop(card);
+        // (a new step: from a control lit to the next, the card goes with the light; else it pops in place)
+        if (!Arrange(animate: !fresh, force: true, newStep: newStep) && newStep) Motion.Pop(card);
         timer.Start();
         Shot.Moved();
     }
@@ -181,6 +188,10 @@ internal sealed class PTTourOverlay
         foreach (var e in new UIElement[] { veil, ring, card }) if (VisualTreeHelper.GetParent(e) is Panel p) p.Children.Remove(e);
         index = -1;
         lastHole = null;
+        ringOn = false;
+        ring.BeginAnimation(UIElement.OpacityProperty, null);
+        ring.Opacity = 0;
+        ring.Visibility = Visibility.Collapsed;
     }
 
     private static FrameworkElement Card(int i, int count, PTTourStep s, bool stuck, bool done, Action next)
@@ -217,13 +228,14 @@ internal sealed class PTTourOverlay
         return v;
     }
 
-    /// <summary>The dim's hole round the control lit (none yet: a small one in the tool's middle), its ring, and the card
-    /// under it when there is room, else over it.</summary>
-    private void Arrange(bool animate, bool force = false)
+    /// <summary>The dim's hole round the control lit, its ring, and the card under it when there is room, else over it (none
+    /// lit yet: the tool dimmed whole, the card at its middle). True when the light and the card travelled together from
+    /// the control lit before (a new step's card then goes with them rather than popping).</summary>
+    private bool Arrange(bool animate, bool force = false, bool newStep = false)
     {
-        if (layer == null || step == null || card.Parent == null) return;
+        if (layer == null || step == null || card.Parent == null) return false;
         var size = new Size(layer.ActualWidth, layer.ActualHeight);
-        if (size.Width < 10) return;
+        if (size.Width < 10) return false;
         Rect hole;
         if (PTTour.Find(step.Target, layer) is { } found) { found.Inflate(8, 8); hole = found; }
         else
@@ -232,21 +244,31 @@ internal sealed class PTTourOverlay
             try { mid = tool.TranslatePoint(new Point(tool.ActualWidth / 2, tool.ActualHeight / 2), layer); } catch { mid = new Point(size.Width / 2, size.Height / 2); }
             hole = new Rect(mid.X - 1, mid.Y - 1, 2, 2);
         }
-        if (hole == lastHole && size == lastSize && !force) return;
+        if (hole == lastHole && size == lastSize && !force) return false;
+        var from = lastHole is { Width: > 4 } was ? was : (Rect?)null;
         lastHole = hole;
         lastSize = size;
-        veil.Data = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(size)), new RectangleGeometry(hole, 10, 10));
-        ring.Visibility = hole.Width > 4 ? Visibility.Visible : Visibility.Collapsed;
-        ring.Width = hole.Width;
-        ring.Height = hole.Height;
-        Canvas.SetLeft(ring, hole.X);
-        Canvas.SetTop(ring, hole.Y);
+        whole.Rect = new Rect(size);
+        // from one control to the next the light glides as the card does (Motion.Slow); with none lit on one side, the dim
+        // changes at once and the ring fades
+        var lit = hole.Width > 4;
+        var travel = animate && Motion.On && lit && from != null;
+        if (lit)
+        {
+            if (!travel) { light.BeginAnimation(RectangleGeometry.RectProperty, null); light.Rect = hole; }
+            else if (hole != from) light.BeginAnimation(RectangleGeometry.RectProperty, new RectAnimation(hole, Motion.Ms(Motion.Slow)) { EasingFunction = Motion.Decelerate });
+            veil.Data = dim;
+        }
+        else veil.Data = whole;
+        Ring(lit);
         card.Measure(new Size(CardWidth, double.PositiveInfinity));
         var h = card.DesiredSize.Height;
         var below = hole.Bottom + h + 16 < size.Height || hole.Top - h - 16 < 0;
         var x = Math.Min(Math.Max(hole.X + hole.Width / 2 - CardWidth / 2, 16), Math.Max(16, size.Width - CardWidth - 16));
         var y = below ? Math.Min(hole.Bottom + 10, size.Height - h - 8) : Math.Max(hole.Top - h - 10, 8);
-        if (animate && Motion.On)
+        // (a card not placed yet is placed, never slid from nowhere)
+        var placed = !double.IsNaN(Canvas.GetLeft(card)) && !double.IsNaN(Canvas.GetTop(card));
+        if (placed && (newStep ? travel : animate && Motion.On))
         {
             Motion.To(card, Canvas.LeftProperty, x, Motion.Slow, Motion.Decelerate);
             Motion.To(card, Canvas.TopProperty, y, Motion.Slow, Motion.Decelerate);
@@ -258,5 +280,15 @@ internal sealed class PTTourOverlay
             Canvas.SetLeft(card, x);
             Canvas.SetTop(card, y);
         }
+        return travel && placed;
+    }
+
+    /// <summary>The ring faded in round a control lit, and out (where it was) when none is (Motion.Normal).</summary>
+    private void Ring(bool on)
+    {
+        if (on == ringOn) return;
+        ringOn = on;
+        if (on) ring.Visibility = Visibility.Visible;
+        Motion.To(ring, UIElement.OpacityProperty, on ? 1 : 0, Motion.Normal, Motion.Decelerate, 0, () => { if (!ringOn) ring.Visibility = Visibility.Collapsed; });
     }
 }

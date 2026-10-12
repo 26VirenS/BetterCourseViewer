@@ -52,6 +52,8 @@ public sealed class ComposeSheet
     private readonly Grid confirm = new() { Visibility = Visibility.Collapsed };
     private readonly Border confirmCard;
     private Wpf.Ui.Controls.Button? keepButton;
+    /// <summary>"Discard this message?" is up (not on its way out).</summary>
+    private bool asking;
 
     /// <summary>A new message to anyone (the window's New Message, Ctrl+Shift+N, the Inbox's button).</summary>
     public static void Show(Engine.Engine engine, Window over) => Show(engine, over, Array.Empty<Recipient>());
@@ -414,6 +416,8 @@ public sealed class ComposeSheet
     {
         if (sending) return;
         if (message.Text.Trim().Length == 0) { sheet.Close(); return; }
+        asking = true;
+        confirm.IsHitTestVisible = true;
         confirm.Visibility = Visibility.Visible;
         Motion.FadeIn(confirm, Motion.Normal);
         Motion.Pop(confirmCard);
@@ -439,17 +443,27 @@ public sealed class ComposeSheet
         return card;
     }
 
+    /// <summary>Back to writing: the question goes as the sheet's own dialogs do — the smoke fading, the card a touch larger
+    /// as it fades (SheetHost.Close) — and the typing goes on meanwhile.</summary>
     private void KeepWriting()
     {
-        confirm.Visibility = Visibility.Collapsed;
+        asking = false;
+        confirm.IsHitTestVisible = false;
         message.Focus();
+        Motion.FadeOut(confirm, () =>
+        {
+            if (asking) return; // (asked again while it was going)
+            confirm.BeginAnimation(UIElement.OpacityProperty, null);
+            confirm.Visibility = Visibility.Collapsed;
+        }, Motion.Normal);
+        Motion.Unpop(confirmCard, () => { });
     }
 
     /// <summary>The sheet's keys: Escape puts away the people found (the sheet stays), else cancels — or, while asked about
     /// discarding, goes back to writing; Ctrl+Enter sends.</summary>
     private void OnKey(object sender, KeyEventArgs e)
     {
-        if (confirm.Visibility == Visibility.Visible)
+        if (asking)
         {
             if (e.Key == Key.Escape) { KeepWriting(); e.Handled = true; }
             return;

@@ -229,7 +229,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private void SetCover(FrameworkElement? e)
     {
         if (cover.Content == e) return;
+        var was = cover.Content;
         cover.Content = e;
+        // (the splash hands off to the app as the Mac's does: the app fades in where it was, over Motion.Slow — only then;
+        // the picker, the sign-in card and "Logging you in" come and go at once)
+        if (was != null && ReferenceEquals(was, splash) && e != null && ReferenceEquals(e, shell)) Motion.FadeIn(e, Motion.Slow);
         Shot.Moved();
     }
 

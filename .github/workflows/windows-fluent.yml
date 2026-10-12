@@ -45,9 +45,9 @@ jobs:
       - name: Build (Release, win-x64, self-contained)
         shell: bash
         run: |
-          # (the build carries its run's number — "0.2.1 (v003)" — as About and Updates name it)
+          # (the build carries its run's number — "0.2.2 (v003)" — as About and Updates name it)
           n=$(printf '%03d' "${{ github.run_number }}")
-          dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.1 (v$n)"
+          dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.2 (v$n)"
           test -f dist/Simpl/Simpl.exe
       - name: Installer (Simpl-Setup.exe)
         shell: pwsh

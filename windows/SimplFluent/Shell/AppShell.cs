@@ -45,6 +45,9 @@ public sealed class AppShell : Grid, IDisposable
     private readonly ScrollViewer scroller;
     private readonly Border toast = new();
     private readonly TextBlock toastText;
+    private readonly TranslateTransform toastShift = new();
+    private bool toastShown;
+    private int toastTurn;
     private readonly Border scrim = new() { Visibility = Visibility.Collapsed };
     /// <summary>Where a piece of work's quick look is drawn, over the page (WorkPreview).</summary>
     private readonly Canvas previewLayer = new() { ClipToBounds = true };
@@ -114,6 +117,7 @@ public sealed class AppShell : Grid, IDisposable
         toast.Margin = new Thickness(0, 0, 0, 24);
         toast.Effect = K.Shadow(24, 6, 0.2);
         toast.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+        toast.RenderTransform = toastShift;
         toast.Visibility = Visibility.Collapsed;
         Children.Add(toast.Col(1));
         Children.Add(previewLayer.Col(1));
@@ -150,11 +154,36 @@ public sealed class AppShell : Grid, IDisposable
     private void OnFile(object? sender, PropertyChangedEventArgs e)
     {
         var s = FilePreview.Shared.Status;
-        toastText.Text = s ?? "";
+        if (s != null) toastText.Text = s; // (its words kept while it goes)
         var on = s != null;
-        if (on == (toast.Visibility == Visibility.Visible)) return;
-        toast.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        if (on) Motion.Enter(toast, 0, 24, 333);
+        if (on == toastShown) return;
+        toastShown = on;
+        var turn = ++toastTurn;
+        if (on && toast.Visibility == Visibility.Visible)
+        {
+            // (back while it was going: it turns round from where it is)
+            Motion.To(toastShift, TranslateTransform.YProperty, 0, Motion.Normal, Motion.Decelerate);
+            Motion.To(toast, OpacityProperty, 1, Motion.Normal, Motion.Decelerate);
+        }
+        else if (on)
+        {
+            toast.Visibility = Visibility.Visible;
+            Motion.Enter(toast, 0, 24, 333);
+        }
+        else
+        {
+            // it goes the way it came, quicker: down a little, fading (Motion.Normal, decelerating), then folds away
+            Motion.To(toastShift, TranslateTransform.YProperty, 12, Motion.Normal, Motion.Decelerate);
+            Motion.To(toast, OpacityProperty, 0, Motion.Normal, Motion.Decelerate, 0, () =>
+            {
+                if (turn != toastTurn) return;
+                toast.Visibility = Visibility.Collapsed;
+                toast.BeginAnimation(OpacityProperty, null);
+                toast.Opacity = 1;
+                toastShift.BeginAnimation(TranslateTransform.YProperty, null);
+                toastShift.Y = 0;
+            });
+        }
     }
 
     /// <summary>Light, dark or the accent changed: what is drawn with colours of its own is drawn again.</summary>

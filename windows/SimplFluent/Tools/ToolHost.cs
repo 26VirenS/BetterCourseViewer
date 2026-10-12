@@ -379,7 +379,8 @@ public static class Files
 
 // ---- a tool opened whole over the window (the Mac's ToolPopup) ----
 
-/// <summary>A pinned tool opened whole, over the window, in a sheet nearly the window's size: Done closes it.</summary>
+/// <summary>A pinned tool opened whole, over the window, in a sheet nearly the window's size: its heading's Done, or
+/// Escape, closes it.</summary>
 public static class ToolPopup
 {
     public static void Show(string key, Engine.Engine engine, Window? owner)
@@ -398,7 +399,7 @@ public static class ToolPopup
         var g = K.Rows("auto, *", head.Row(0), body.Row(1));
         g.Bg(B.Window);
         sheet.Body = g;
-        sheet.Add("Done", SheetButtonKind.Close);
+        // (one Done, the heading's: no strip of buttons at the foot; Escape still closes it, as a sheet with no Close does)
         Dialogs.Show(sheet, win);
     }
 
@@ -514,31 +515,93 @@ public sealed class PinBar : StackPanel
     /// <summary>The pins as drawn, by key, and what they were drawn for (the keys, and whether the timer was live).</summary>
     private readonly Dictionary<string, Button> buttons = new();
     private string drawn = "";
+    private bool drawnOnce;
+    /// <summary>The pins taken out, on their way (the bar is drawn again once they have gone).</summary>
+    private HashSet<string>? going;
 
     /// <summary>The pins drawn again when they change (pinned, unpinned, moved, the timer started or stopped); each second
-    /// of a running timer only its pin's face is (the buttons stay, so a flyout or a menu stays where it hangs).</summary>
-    private void Draw()
+    /// of a running timer only its pin's face is (the buttons stay, so a flyout or a menu stays where it hangs). A pin
+    /// taken out leaves first, and the rest close up after; a pin just pinned comes in where it lands; a pin moved is
+    /// simply in its new place.</summary>
+    private void Draw() => Draw(again: false);
+
+    private void Draw(bool again)
     {
         Hook();
         var live = timer?.Active == true;
         if (live && !tick.IsEnabled) tick.Start();
         if (!live && tick.IsEnabled) tick.Stop();
+        if (going != null) return;
         var pins = Pins();
         var now = string.Join(",", pins) + (live ? "|live" : "");
-        if (now == drawn)
+        if (now == drawn && !again)
         {
             if (live && buttons.TryGetValue("pomo", out var tb) && ToolsCenter.KindOf("pomo") is { } pk) Dress(tb, pk);
             return;
         }
+        var leaving = buttons.Keys.Where(k => !pins.Contains(k)).ToList();
+        if (leaving.Count > 0 && Motion.On)
+        {
+            going = leaving.ToHashSet();
+            foreach (var k in leaving) Leave(buttons[k], k == leaving[^1] ? Gone : null);
+            return;
+        }
+        var before = drawnOnce ? buttons.Keys.ToHashSet() : null;
         drawn = now;
+        drawnOnce = true;
         Children.Clear();
         buttons.Clear();
         foreach (var key in pins)
-            if (ToolsCenter.KindOf(key) is { } kind) Children.Add(buttons[key] = Pin(kind));
+            if (ToolsCenter.KindOf(key) is { } kind)
+            {
+                var b = buttons[key] = Pin(kind);
+                Children.Add(b);
+                if (before != null && !before.Contains(key)) Arrive(b);
+            }
         if (flyout != null && flyoutKey != null)
         {
             if (buttons.TryGetValue(flyoutKey, out var nb)) flyout.PlacementTarget = nb; else CloseFlyout();
         }
+    }
+
+    /// <summary>The pins taken out have gone: the bar drawn as things are now (one pinned again meanwhile comes in anew).</summary>
+    private void Gone()
+    {
+        if (going == null) return;
+        foreach (var k in going) buttons.Remove(k);
+        going = null;
+        Draw(again: true);
+    }
+
+    /// <summary>A pin just pinned: its symbol up from a touch smaller, fading in (Motion.Medium), so the eye finds where it
+    /// went. Its face only — not the button and its hover fill.</summary>
+    private static void Arrive(Button b)
+    {
+        if (b.Content is not FrameworkElement face) return;
+        var s = new ScaleTransform(0.9, 0.9);
+        face.RenderTransformOrigin = new Point(0.5, 0.5);
+        face.RenderTransform = s;
+        Motion.FromTo(s, ScaleTransform.ScaleXProperty, 0.9, 1, Motion.Medium, Motion.Decelerate);
+        Motion.FromTo(s, ScaleTransform.ScaleYProperty, 0.9, 1, Motion.Medium, Motion.Decelerate);
+        Motion.FadeIn(face, Motion.Normal);
+    }
+
+    /// <summary>A pin taken out: its arrival backwards, quicker — the pin fading, its symbol shrinking a touch (Motion.Normal).</summary>
+    private static void Leave(Button b, Action? done)
+    {
+        b.IsHitTestVisible = false;
+        if (b.Content is FrameworkElement face)
+        {
+            if (face.RenderTransform is not ScaleTransform { IsFrozen: false } s)
+            {
+                s = new ScaleTransform(1, 1);
+                face.RenderTransformOrigin = new Point(0.5, 0.5);
+                face.RenderTransform = s;
+            }
+            Motion.To(s, ScaleTransform.ScaleXProperty, 0.9, Motion.Normal, Motion.Decelerate);
+            Motion.To(s, ScaleTransform.ScaleYProperty, 0.9, Motion.Normal, Motion.Decelerate);
+        }
+        Motion.To(b, OpacityProperty, 0, Motion.Normal, Motion.Decelerate, 0, done);
     }
 
     private Button Pin(ToolsScreen.Kind kind)

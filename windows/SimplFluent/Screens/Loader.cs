@@ -35,11 +35,14 @@ public sealed class Loader<T> where T : class
     /// <summary>Read again at the next Ensure (a tick, a refresh).</summary>
     public void Again() => version = -1;
 
-    /// <summary>Read again now.</summary>
+    /// <summary>Read again now. After a failure (Try Again), the error goes at once, so the spinner shows while it reads.</summary>
     public void Reload(Engine.Engine engine, string name, object? a = null)
     {
         version = -1;
+        var failed = Error != null;
+        Error = null;
         Ensure(engine, name, a);
+        if (failed) Changed?.Invoke();
     }
 
     private async Task Load(Engine.Engine engine, string name, object? a, int gen)
