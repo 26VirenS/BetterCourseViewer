@@ -32,6 +32,7 @@ struct Gfx {
     ComPtr<ID2D1Bitmap1> sceneBitmap;
     ComPtr<ID3D11Texture2D> sceneMips;      // the backdrop and its smaller copies
     ComPtr<ID3D11ShaderResourceView> sceneSRV[8];  // one view per mip level
+    ComPtr<ID3D11ShaderResourceView> sceneAllSRV;  // every level: what GenerateMips fills
     UINT sceneMipCount = 1;
     ComPtr<ID3D11Texture2D> composite;      // the frame so far, for the lenses
     ComPtr<ID3D11ShaderResourceView> compositeSRV;
@@ -89,6 +90,7 @@ struct Gfx {
         sceneBitmap.Reset();
         scene.Reset();
         for (auto& s : sceneSRV) s.Reset();
+        sceneAllSRV.Reset();
         sceneMips.Reset();
         compositeSRV.Reset();
         composite.Reset();
@@ -138,6 +140,7 @@ struct Gfx {
         if (FAILED(device->CreateTexture2D(&md, nullptr, &sceneMips))) return false;
         sceneMips->GetDesc(&md);
         sceneMipCount = std::min<UINT>(md.MipLevels, 8);
+        if (FAILED(device->CreateShaderResourceView(sceneMips.Get(), nullptr, &sceneAllSRV))) return false;
         for (UINT i = 0; i < sceneMipCount; i++) {
             D3D11_SHADER_RESOURCE_VIEW_DESC vd = {};
             vd.Format = td.Format;
@@ -157,7 +160,7 @@ struct Gfx {
     /// The backdrop as drawn, into the frost's texture and its smaller copies, and onto the frame.
     void PublishScene() {
         ctx->CopySubresourceRegion(sceneMips.Get(), 0, 0, 0, 0, scene.Get(), 0, nullptr);
-        ctx->GenerateMips(sceneSRV[0].Get());
+        ctx->GenerateMips(sceneAllSRV.Get()); // (a view of every level: one of a single level fills none below it)
         ComPtr<ID3D11Texture2D> back;
         swap->GetBuffer(0, IID_PPV_ARGS(&back));
         ctx->CopyResource(back.Get(), scene.Get());
