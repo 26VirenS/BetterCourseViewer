@@ -230,6 +230,7 @@ public sealed class LoginLayer
         ui.Text(msg, panel.X + pad, y, Theme.Caption2, t.Ink(), w - 2 * pad, TextAlignment.Center, 0);
         y += msgH + 16;
         var bw = (w - 2 * pad - 8) / 2;
+        ui.Layer(Ui.Overlay + 3); // (the buttons' glass over the panel's fill, not under it: a layer's glass goes under that layer's drawing)
         var no = ui.Button("stay:no", new R(panel.X + pad, y, bw, 28), "Not Now");
         var yes = ui.Button("stay:yes", new R(panel.X + pad + bw + 8, y, bw, 28), "Stay Logged In", prominent: true);
         foreach (var k in ui.Keys)
