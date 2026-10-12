@@ -74,7 +74,7 @@ jobs:
           echo "publishing run $id (v$(printf '%03d' "$number"))"
 
   build:
-    name: Build (the app, its installer, its zip)
+    name: Build (the app, its zip)
     needs: prior
     if: ${{ !cancelled() && needs.prior.outputs.found != 'true' && needs.prior.result != 'failure' }}
     runs-on: windows-latest
@@ -84,6 +84,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      # (the packages the build restores, kept between runs)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('windows/SimplFluent/SimplFluent.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
       - name: Build (Release, win-x64, self-contained)
         shell: bash
         run: |
@@ -92,51 +98,15 @@ jobs:
           n=$(printf '%03d' "${{ needs.prior.outputs.number || github.run_number }}")
           dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=0.2.3 (v$n)"
           test -f dist/Simpl/Simpl.exe
-      - name: Installer (Simpl-Setup.exe)
-        shell: pwsh
-        run: |
-          # Inno Setup's compiler: on GitHub's Windows image when it has it, else from Chocolatey (Inno Setup 7, if that
-          # is what comes, reads the script the same)
-          function Find-Iscc {
-            $onPath = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-            if ($onPath) { return $onPath.Source }
-            foreach ($root in @(${env:ProgramFiles(x86)}, $env:ProgramFiles, (Join-Path $env:LOCALAPPDATA 'Programs'))) {
-              if (-not $root) { continue }
-              $found = Get-ChildItem -Path $root -Filter 'Inno Setup*' -Directory -ErrorAction SilentlyContinue |
-                ForEach-Object { Join-Path $_.FullName 'ISCC.exe' } | Where-Object { Test-Path $_ } | Sort-Object -Descending | Select-Object -First 1
-              if ($found) { return $found }
-            }
-            return $null
-          }
-          $iscc = Find-Iscc
-          if (-not $iscc) {
-            Write-Host "Inno Setup is not on this image: installing it"
-            choco install innosetup -y --no-progress | Out-Host
-            $iscc = Find-Iscc
-          }
-          if (-not $iscc) { Write-Host "::error::Inno Setup's compiler (ISCC.exe) was not found, and could not be installed"; exit 1 }
-          Write-Host "ISCC: $iscc"
-          # the version: the build's own, as About shows it ("0.2.0 (v012)"), and as Windows numbers it (0.2.0.12)
-          $display = (Get-Item dist/Simpl/Simpl.dll).VersionInfo.ProductVersion
-          $number = "$display".Split(' ')[0]
-          if ($number -notmatch '^\d+\.\d+\.\d+$') { $number = '0.0.0' }
-          $version = "$number.${{ github.run_number }}"
-          if (-not $display) { $display = $version }
-          & $iscc "/DAppVersion=$version" "/DAppDisplayVersion=$display" "/DSourceDir=$PWD\dist\Simpl" "/DOutputDir=$PWD\dist" windows\SimplFluent\Installer\Simpl.iss
-          if ($LASTEXITCODE -ne 0) { Write-Host "::error::ISCC failed ($LASTEXITCODE)"; exit 1 }
-          if (-not (Test-Path dist/Simpl-Setup.exe)) { Write-Host "::error::ISCC made no dist/Simpl-Setup.exe"; exit 1 }
-          $size = [math]::Round((Get-Item dist/Simpl-Setup.exe).Length / 1MB, 1)
-          Write-Host "Simpl-Setup.exe, version $version ($display): $size MB"
       - name: Zip
         shell: bash
-        run: (cd dist && 7z a -tzip -mx=5 ../Simpl-Windows-x64.zip Simpl >/dev/null) && mv Simpl-Windows-x64.zip dist/ && ls -la dist/Simpl-Windows-x64.zip dist/Simpl-Setup.exe
-      # (what a release carries, kept for the pictures, the installer's trial and the release itself: one build)
+        run: (cd dist && 7z a -tzip -mx=5 ../Simpl-Windows-x64.zip Simpl >/dev/null) && mv Simpl-Windows-x64.zip dist/ && ls -la dist/Simpl-Windows-x64.zip
+      # (the build, as the portable zip a release carries: pictured, made into the installer and tried, released — one
+      #  build; the installer is made beside the pictures, by the job that tries it)
       - uses: actions/upload-artifact@v4
         with:
           name: release
-          path: |
-            dist/Simpl-Setup.exe
-            dist/Simpl-Windows-x64.zip
+          path: dist/Simpl-Windows-x64.zip
           compression-level: 0
           retention-days: 30
 
@@ -149,12 +119,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
+      # (the mock Canvas is all the pictures take from the repository; Node is on the image)
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          sparse-checkout: scripts/dev
       - uses: actions/download-artifact@v4
         with:
           name: release
@@ -175,13 +145,13 @@ jobs:
         shell: pwsh
         env:
           SHARD: ${{ matrix.shard }}
-          SHARDS: 4
+          SHARDS: 6
         run: |
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
           New-Item -ItemType Directory -Force shots | Out-Null
           # (three at a time, each with a profile of its own: each copy of Simpl pictures its own window, then quits)
           $script:running = @()
-          # (this job's share of the pictures: every SHARDS-th, from SHARD — four jobs at once, each three at a time)
+          # (this job's share of the pictures: every SHARDS-th, from SHARD — six jobs at once, each three at a time)
           $shard = [int]$env:SHARD; $shards = [int]$env:SHARDS
           $script:k = -1; $script:mine = @()
           function Shot($name, $size, $wait, $extra) {
@@ -371,16 +341,13 @@ jobs:
           path: shots
 
   installer:
-    name: Installer, tried
+    name: Installer, made and tried
     needs: build
     if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - uses: actions/download-artifact@v4
         with:
           name: release
@@ -388,6 +355,47 @@ jobs:
       - name: The build
         shell: bash
         run: (cd dist && 7z x -y Simpl-Windows-x64.zip >/dev/null) && test -f dist/Simpl/Simpl.exe && ls dist
+      - name: Installer (Simpl-Setup.exe)
+        shell: pwsh
+        run: |
+          # Inno Setup's compiler: on GitHub's Windows image when it has it, else from Chocolatey (Inno Setup 7, if that
+          # is what comes, reads the script the same)
+          function Find-Iscc {
+            $onPath = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($onPath) { return $onPath.Source }
+            foreach ($root in @(${env:ProgramFiles(x86)}, $env:ProgramFiles, (Join-Path $env:LOCALAPPDATA 'Programs'))) {
+              if (-not $root) { continue }
+              $found = Get-ChildItem -Path $root -Filter 'Inno Setup*' -Directory -ErrorAction SilentlyContinue |
+                ForEach-Object { Join-Path $_.FullName 'ISCC.exe' } | Where-Object { Test-Path $_ } | Sort-Object -Descending | Select-Object -First 1
+              if ($found) { return $found }
+            }
+            return $null
+          }
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            Write-Host "Inno Setup is not on this image: installing it"
+            choco install innosetup -y --no-progress | Out-Host
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { Write-Host "::error::Inno Setup's compiler (ISCC.exe) was not found, and could not be installed"; exit 1 }
+          Write-Host "ISCC: $iscc"
+          # the version: the build's own, as About shows it ("0.2.0 (v012)"), and as Windows numbers it (0.2.0.12)
+          $display = (Get-Item dist/Simpl/Simpl.dll).VersionInfo.ProductVersion
+          $number = "$display".Split(' ')[0]
+          if ($number -notmatch '^\d+\.\d+\.\d+$') { $number = '0.0.0' }
+          $version = "$number.${{ github.run_number }}"
+          if (-not $display) { $display = $version }
+          & $iscc "/DAppVersion=$version" "/DAppDisplayVersion=$display" "/DSourceDir=$PWD\dist\Simpl" "/DOutputDir=$PWD\dist" windows\SimplFluent\Installer\Simpl.iss
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::ISCC failed ($LASTEXITCODE)"; exit 1 }
+          if (-not (Test-Path dist/Simpl-Setup.exe)) { Write-Host "::error::ISCC made no dist/Simpl-Setup.exe"; exit 1 }
+          $size = [math]::Round((Get-Item dist/Simpl-Setup.exe).Length / 1MB, 1)
+          Write-Host "Simpl-Setup.exe, version $version ($display): $size MB"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-setup
+          path: dist/Simpl-Setup.exe
+          compression-level: 0
+          retention-days: 30
       - name: Mock Canvas
         shell: bash
         run: |
@@ -634,7 +642,8 @@ jobs:
       - uses: actions/download-artifact@v4
         if: ${{ needs.prior.outputs.found != 'true' }}
         with:
-          name: release
+          pattern: release*
+          merge-multiple: true
           path: release
       - name: The green run's build
         if: ${{ needs.prior.outputs.found == 'true' }}
@@ -642,10 +651,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # (a run from before the build was kept as one "release": its installer and its zip apart)
-          gh run download "${{ needs.prior.outputs.run }}" -R "${{ github.repository }}" -n release -D release \
-            || { gh run download "${{ needs.prior.outputs.run }}" -R "${{ github.repository }}" -n Simpl-Setup -D release \
-                 && gh run download "${{ needs.prior.outputs.run }}" -R "${{ github.repository }}" -n Simpl-Windows-x64 -D release; }
+          # (the zip as "release" and the installer as "release-setup"; a run from before kept both as "release", and
+          #  one from before that each apart)
+          run="${{ needs.prior.outputs.run }}"
+          get() { gh run download "$run" -R "${{ github.repository }}" -n "$1" -D release 2>/dev/null; }
+          get release || get Simpl-Windows-x64
+          [ -f release/Simpl-Setup.exe ] || get release-setup || get Simpl-Setup
           ls -la release
+          test -f release/Simpl-Setup.exe && test -f release/Simpl-Windows-x64.zip
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
