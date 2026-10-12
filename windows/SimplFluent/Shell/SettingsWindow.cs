@@ -400,13 +400,13 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var v = Column(K.SectionHeader("Reminders", 0));
         var on = new ToggleSwitch { IsChecked = Prefs.Bool("reminders:on") };
         var lead = new ComboBox { MinWidth = 220, ItemsSource = Leads, SelectedItem = Prefs.String("reminders:lead") ?? Leads[3] };
-        lead.SelectionChanged += (_, _) => Prefs.Set("reminders:lead", lead.SelectedItem as string);
+        lead.SelectionChanged += (_, _) => { Prefs.Set("reminders:lead", lead.SelectedItem as string); Notices.SettingsChanged(); };
         var leadRow = K.Row(SymbolRegular.Clock24, "Remind me", null, lead);
         leadRow.Visibility = on.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        on.Checked += (_, _) => { Prefs.Set("reminders:on", true); leadRow.Visibility = Visibility.Visible; };
-        on.Unchecked += (_, _) => { Prefs.Set("reminders:on", false); leadRow.Visibility = Visibility.Collapsed; };
+        on.Checked += (_, _) => { Prefs.Set("reminders:on", true); leadRow.Visibility = Visibility.Visible; Notices.SettingsChanged(); };
+        on.Unchecked += (_, _) => { Prefs.Set("reminders:on", false); leadRow.Visibility = Visibility.Collapsed; Notices.SettingsChanged(); };
         v.Children.Add(K.Group(K.Row(SymbolRegular.AlertOn24, "Due-date reminders", "Alerts for work still to hand in over the next three weeks.", on), leadRow));
-        v.Children.Add(Foot("Set on this PC: nothing is sent anywhere. New work is picked up each time you open Simpl."));
+        v.Children.Add(Foot("Windows notifications from Simpl while it runs — and it keeps running in the notification area with its window closed. Nothing is sent anywhere; new work is picked up as it comes."));
 
         v.Children.Add(K.SectionHeader("New activity"));
         var act = new ToggleSwitch { IsChecked = Prefs.Bool("activity:on") };
@@ -426,11 +426,12 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         }
         var kindsCard = K.Card(boxes.Margin(42, 0, 0, 0), new Thickness(16, 12, 16, 12), 4);
         kindsCard.Visibility = act.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        act.Checked += (_, _) => { Prefs.Set("activity:on", true); kindsCard.Visibility = Visibility.Visible; };
+        act.Checked += (_, _) => { Prefs.Set("activity:on", true); kindsCard.Visibility = Visibility.Visible; Notices.SettingsChanged(); };
         act.Unchecked += (_, _) => { Prefs.Set("activity:on", false); kindsCard.Visibility = Visibility.Collapsed; };
         v.Children.Add(K.Group(K.Row(SymbolRegular.Megaphone24, "New activity", "Alerts when something is posted in your courses.", act), kindsCard));
-        var foot = "Simpl looks about every 3 minutes while it is open — with its window closed too — reading with the sign-in on this PC: nothing is sent anywhere.";
-        if (engine.OnBrightspace) foot += " Brightspace ends a sign-in left unused after a while (your school sets how long): the alerts pause then, until you next open Simpl.";
+        var foot = engine.OnBrightspace
+            ? "Brightspace has no activity stream for Simpl to read: these alerts are for Canvas schools."
+            : "Simpl looks about every 3 minutes while it runs — with its window closed too — reading with the sign-in on this PC: nothing is sent anywhere.";
         v.Children.Add(Foot(foot));
         return v;
     }

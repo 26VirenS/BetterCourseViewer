@@ -9,7 +9,6 @@ using Simpl.Kit;
 using Simpl.SignIn;
 using Simpl.Support;
 using Wpf.Ui.Controls;
-using Wpf.Ui.Tray.Controls;
 using MenuItem = System.Windows.Controls.MenuItem;
 using Image = System.Windows.Controls.Image;
 
@@ -37,7 +36,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private readonly System.Windows.Controls.Button menuButton;
     private readonly ContentControl trailing = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly HandoffBar handoff;
-    private NotifyIcon? tray;
+    private Tray? tray;
 
     private Engine.Engine? engine;
     private AppShell? shell;
@@ -187,6 +186,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         var old = engine;
         engine = null;
         old.PropertyChanged -= OnEngine;
+        Notices.Stop();
         shell?.Dispose();
         shell = null;
         card = null;
@@ -244,7 +244,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         {
             card = null;
             working = null;
-            shell ??= new AppShell(engine, this);
+            if (shell == null) { shell = new AppShell(engine, this); Notices.Start(engine, this); }
             shell.WindowWidth(ActualWidth);
             SetCover(shell);
             pageArea.Visibility = Visibility.Collapsed;
@@ -362,30 +362,17 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (Shot.Asked) return;
         try
         {
-            var menu = new ContextMenu();
-            var open = new MenuItem { Header = "Open Simpl", FontWeight = FontWeights.SemiBold };
-            open.Click += (_, _) => Bring();
-            var settings = new MenuItem { Header = "Settings…" };
-            settings.Click += (_, _) => { Bring(); OpenSettings(); };
-            var quit = new MenuItem { Header = "Quit Simpl" };
-            quit.Click += (_, _) => EraseAll.Quit();
-            menu.Items.Add(open);
-            menu.Items.Add(settings);
-            menu.Items.Add(new Separator());
-            menu.Items.Add(quit);
-            tray = new NotifyIcon
-            {
-                TooltipText = "Simpl", Icon = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")),
-                Menu = menu, MenuOnRightClick = true, FocusOnLeftClick = true,
-                // (drawn once, unseen, so it puts itself in the notification area)
-                Width = 1, Height = 1, Opacity = 0, IsHitTestVisible = false,
-                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
-            };
-            tray.LeftClick += (_, _) => Bring();
-            root.Children.Add(tray);
+            tray = new Tray();
+            tray.Open += Bring;
+            tray.Settings += () => { Bring(); OpenSettings(); };
+            tray.Quit += EraseAll.Quit;
+            Application.Current.Exit += (_, _) => tray?.Dispose();
         }
         catch (Exception e) { Log.Write("tray: " + e.Message); }
     }
+
+    /// <summary>A Windows notification from Simpl (a reminder, new activity), from its icon in the notification area.</summary>
+    public void Notify(string title, string text, Action? click = null) => tray?.Notify(title, text, click);
 
     /// <summary>Closed: kept running in the notification area (Settings ▸ General can turn that off), or quit.</summary>
     private void OnClosing(object? sender, CancelEventArgs e)
@@ -394,7 +381,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (Quitting || Shot.Asked || !Prefs.Bool("keepRunning", true) || tray == null)
         {
             Quitting = true;
-            tray?.Unregister();
+            tray?.Dispose();
+            tray = null;
             Application.Current.Shutdown();
             return;
         }
@@ -403,8 +391,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         foreach (Window w in Application.Current.Windows) if (w != this && w.Owner == this) w.Hide();
         if (!Prefs.Bool("backgroundNoted"))
         {
+            // (the first time: where it went, and how to quit it)
             Prefs.Set("backgroundNoted", true);
-            Log.Write("kept running in the notification area");
+            tray?.Notify("Simpl is still running", "It’s here in the notification area, so reminders and alerts keep coming. Right-click its icon to quit.");
         }
     }
 

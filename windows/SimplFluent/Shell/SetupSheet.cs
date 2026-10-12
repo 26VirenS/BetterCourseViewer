@@ -344,6 +344,15 @@ public sealed class SetupSheet
             engine.DataChanged();
             _ = engine.LoadSidebar(); // (the pane's courses: the ones just chosen, by their new names)
             sheet.Close();
+            // (the Mac's NotificationAsk.afterSetup: once the setup is done, reminders and new-activity alerts are on —
+            // Windows asks nothing for them; Settings ▸ Notifications turns either off)
+            if (!Prefs.Bool("notifications:asked") && !Launch.IsDevelopment)
+            {
+                Prefs.Set("notifications:asked", true);
+                Prefs.Set("reminders:on", true);
+                Prefs.Set("activity:on", true);
+                Notices.SettingsChanged();
+            }
         }
         catch (Exception e)
         {

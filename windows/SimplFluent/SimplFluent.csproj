@@ -34,7 +34,6 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
     <!-- Windows 11's controls for WPF: Mica, the title bar, cards, dialogs, info bars, toggles, Fluent icons -->
     <PackageReference Include="WPF-UI" Version="4.3.0" />
-    <PackageReference Include="WPF-UI.Tray" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>

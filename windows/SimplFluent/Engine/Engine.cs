@@ -287,6 +287,7 @@ public sealed partial class Engine : Observable, IShellListener
     /// </summary>
     public async void SignOut()
     {
+        Notices.Stop();
         Login.Forget();
         LoginVault.Clear();
         if (Web.CoreWebView2 is { } core)
