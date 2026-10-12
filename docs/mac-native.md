@@ -297,6 +297,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   120° and methane from the Lewis maker square — and the Lewis maker, which takes polarity from the 3D shape, called
   CO₂, BF₃, SF₆, XeF₄ and nitrate polar. Ozone's bond dipoles are nothing (one element) and its lone pairs' cancel, so
   it reads nonpolar now (its real dipole is its formal charges', which the model does not count).
+  (1.3.75) A preset laid out afresh with more than one centre (a chain, a ring) is turned to face the viewer, its
+  principal axes across, up and towards the viewer (`VSEPR.face`): ethanol lay along the line of sight, end on.
 
 ## Building and running
 

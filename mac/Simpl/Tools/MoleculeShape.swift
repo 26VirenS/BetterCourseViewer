@@ -102,30 +102,15 @@ enum VSEPR {
             for i in 0..<3 { for j in 0..<3 { s[i][j] += p[i] * q[j] } }
         }
         let (xx, xy, xz, yx, yy, yz, zx, zy, zz) = (s[0][0], s[0][1], s[0][2], s[1][0], s[1][1], s[1][2], s[2][0], s[2][1], s[2][2])
-        var m: [[Double]] = [
+        let m: [[Double]] = [
             [xx + yy + zz, yz - zy, zx - xz, xy - yx],
             [yz - zy, xx - yy - zz, xy + yx, zx + xz],
             [zx - xz, xy + yx, yy - xx - zz, yz + zy],
             [xy - yx, zx + xz, yz + zy, zz - xx - yy],
         ]
-        // (shifted so that every eigenvalue is positive and the largest stays the largest)
-        let shift = m.joined().map(abs).reduce(0, +) + 1e-9
-        for i in 0..<4 { m[i][i] += shift }
-        for _ in 0..<40 {
-            var sq = Array(repeating: [0.0, 0, 0, 0], count: 4)
-            for i in 0..<4 { for j in 0..<4 { for k in 0..<4 { sq[i][j] += m[i][k] * m[k][j] } } }
-            let top = max(sq.joined().map(abs).max() ?? 1, 1e-300)
-            m = sq.map { $0.map { $0 / top } }
-        }
-        // (every column now lies along the leading eigenvector: the longest is taken)
-        var q: [Double] = [1, 0, 0, 0], len = 0.0
-        for j in 0..<4 {
-            let column: [Double] = (0..<4).map { m[$0][j] }
-            let l: Double = column.map { $0 * $0 }.reduce(0, +).squareRoot()
-            if l > len { (q, len) = (column, l) }
-        }
-        guard len > 1e-12 else { return { $0 - ca + cb } }
-        let (w, x, y, z) = (q[0] / len, q[1] / len, q[2] / len, q[3] / len)
+        let q = leading(m)
+        guard q.count == 4 else { return { $0 - ca + cb } }
+        let (w, x, y, z) = (q[0], q[1], q[2], q[3])
         let r0 = V(1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y))
         let r1 = V(2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x))
         let r2 = V(2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y))
@@ -133,6 +118,58 @@ enum VSEPR {
             let d: V = v - ca
             let turned = V(simd_dot(r0, d), simd_dot(r1, d), simd_dot(r2, d))
             return turned + cb
+        }
+    }
+
+    /// The leading eigenvector (unit) of a symmetric matrix: shifted so that every eigenvalue is positive and the
+    /// largest stays the largest, then squared until one direction is left in it, whose longest column is taken.
+    static func leading(_ a: [[Double]]) -> [Double] {
+        let n = a.count
+        var m = a
+        let shift = a.joined().map(abs).reduce(0, +) + 1e-9
+        for i in 0..<n { m[i][i] += shift }
+        for _ in 0..<40 {
+            var sq = Array(repeating: Array(repeating: 0.0, count: n), count: n)
+            for i in 0..<n { for j in 0..<n { for k in 0..<n { sq[i][j] += m[i][k] * m[k][j] } } }
+            let top = max(sq.joined().map(abs).max() ?? 1, 1e-300)
+            m = sq.map { $0.map { $0 / top } }
+        }
+        var best: [Double] = [], len = 0.0
+        for j in 0..<n {
+            let column: [Double] = (0..<n).map { m[$0][j] }
+            let l: Double = column.map { $0 * $0 }.reduce(0, +).squareRoot()
+            if l > len { (best, len) = (column, l) }
+        }
+        return len > 1e-12 ? best.map { $0 / len } : []
+    }
+
+    /// A piece turned about its middle to face the viewer: spread most from side to side, then up and down, least
+    /// towards the viewer (its principal axes), so a chain lies across the view and a flat molecule faces it.
+    static func face(_ part: [Int], pos: inout [V], frame: inout [[V]]) {
+        var c = V(0, 0, 0)
+        for i in part { c += pos[i] }
+        c /= Double(max(part.count, 1))
+        var spread = Array(repeating: [0.0, 0, 0], count: 3)
+        for i in part {
+            let d = pos[i] - c
+            for x in 0..<3 { for y in 0..<3 { spread[x][y] += d[x] * d[y] } }
+        }
+        let e = leading(spread)
+        guard e.count == 3 else { return }
+        let a = V(e[0], e[1], e[2])
+        // (the most along it taken away, the next most is the second axis)
+        var along = 0.0
+        for x in 0..<3 { for y in 0..<3 { along += a[x] * spread[x][y] * a[y] } }
+        for x in 0..<3 { for y in 0..<3 { spread[x][y] -= along * a[x] * a[y] } }
+        let f = leading(spread)
+        var b = f.count == 3 ? flat(V(f[0], f[1], f[2]), a) : V(0, 0, 0)
+        if simd_length(b) < 1e-6 { b = simd_cross(a, abs(a.x) < 0.9 ? V(1, 0, 0) : V(0, 1, 0)) }
+        b = simd_normalize(b)
+        let k = simd_cross(a, b)
+        for i in part {
+            let d = pos[i] - c
+            pos[i] = c + V(simd_dot(d, a), simd_dot(d, b), simd_dot(d, k))
+            frame[i] = frame[i].map { V(simd_dot($0, a), simd_dot($0, b), simd_dot($0, k)) }
         }
     }
 
@@ -180,6 +217,9 @@ enum VSEPR {
                     }
                 }
             }
+            // (laid out afresh, a molecule of more than one centre — a chain, a ring — is turned to face the viewer; one
+            // centre's own directions already do)
+            if !keep && part.filter({ nb[$0].count >= 2 }).count >= 2 { face(part, pos: &pos, frame: &frame) }
             // (never on top of a piece already placed: moved along until it is clear)
             var tries = 0
             while tries < 400, let close = pieces.joined().flatMap({ j in part.map { simd_distance(pos[$0], pos[j]) } }).min(), close < 2.2 {
