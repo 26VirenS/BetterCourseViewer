@@ -423,7 +423,7 @@ public sealed partial class Ui
 
     // ---- scrolling ----
 
-    private sealed class ScrollState { public float Target, Content, Viewport; public Spring? Offset; public double Touched = -10; }
+    private sealed class ScrollState { public float Target, Content, Viewport; public Spring? Offset; public double Touched = -10; public bool Pending; }
 
     /// <summary>
     /// A region that scrolls (the wheel, the touchpad): its offset now. What is drawn until <see cref="EndScroll"/> is
@@ -440,7 +440,13 @@ public sealed partial class Ui
             st.Target = Math.Clamp(st.Target - Wheel, 0, max);
             st.Touched = Time;
         }
-        st.Target = Math.Clamp(st.Target, 0, max);
+        // (an offset asked for before the content's height is known — the first frame — waits a frame to be clamped)
+        if (st.Pending && st.Content <= 0) Animating = true;
+        else
+        {
+            if (st.Pending) { st.Pending = false; st.Offset.Snap(Math.Clamp(st.Target, 0, max)); }
+            st.Target = Math.Clamp(st.Target, 0, max);
+        }
         st.Viewport = viewport.H;
         st.Offset.To(st.Target);
         st.Offset.Step(Dt);
@@ -473,6 +479,7 @@ public sealed partial class Ui
     {
         var st = State<ScrollState>(id);
         st.Target = offset;
+        st.Pending = true;
         st.Offset?.Snap(offset);
     }
 
