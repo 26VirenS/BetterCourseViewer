@@ -385,8 +385,9 @@ final class CloudState {
         let k = 1.0 / frame
         let vs = idx.map { i in SCNVector3(CGFloat(cloud.x[i] * k), CGFloat(cloud.y[i] * k), CGFloat(cloud.zs[i] * k)) }
         let element = SCNGeometryElement(indices: Array(0..<Int32(vs.count)), primitiveType: .point)
-        // (about 1.4 points across at the first zoom, more as it comes closer, 1 to 3 pixels' radius on the screen)
-        element.pointSize = 0.012
+        // (about 1.4 points across at the first zoom, more as it comes closer, 1 to 3 pixels' radius on the screen:
+        // SceneKit takes pointSize as a radius — 0.012, the first try, drew dots twice Windows' width, a solid blob)
+        element.pointSize = 0.006
         element.minimumPointScreenSpaceRadius = 1
         element.maximumPointScreenSpaceRadius = 3
         let g = SCNGeometry(sources: [SCNGeometrySource(vertices: vs)], elements: [element])
