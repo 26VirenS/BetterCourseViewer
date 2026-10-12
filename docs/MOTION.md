@@ -136,7 +136,9 @@ Exits that mirrored nothing, and a few rare moments left flat — each with its 
 - **Flashcards' finish** draws its tick (`ui.drawCheck`) once per round, mastered pass or Match game,
   as a hand-in and a finished quiz do.
 - `ui.afterMotion(el, cap, { reduced: true })` waits for an exit's reduced-motion fade, which it
-  otherwise skips.
+  otherwise skips; `ui.dismiss(el, { reduced: true })` passes it on, so the dropdown's list fades
+  out under reduced motion rather than going in a frame. Two Flashcards sets deleted close together
+  are redrawn once, when the last has left, so neither's fade is cut short.
 
 ## 4. The rules
 

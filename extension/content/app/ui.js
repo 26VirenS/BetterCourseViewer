@@ -304,7 +304,7 @@
     function close(keyed = false) {
       if (!list) return;
       if (keyed) list.remove();
-      else { list.inert = true; dismiss(list); }
+      else { list.inert = true; dismiss(list, { reduced: true }); } // (reduced motion: its 150ms fade, waited for)
       list = null;
       btn.setAttribute('aria-expanded', 'false');
       document.removeEventListener('pointerdown', onAway, true);
@@ -591,8 +591,10 @@
    *  runs. Without the springs, or under reduced motion, is-closing starts the stylesheet's exit and
    *  afterMotion sees it end. Either way the element is removed by EXIT_CAP: a promise that waits on
    *  an animation is raced against the clock, so nothing that never finishes leaves a scrim on the
-   *  page (docs/SAFARI.md §4), and a spring that throws hands over to the stylesheet's exit. */
-  function dismiss(ov) {
+   *  page (docs/SAFARI.md §4), and a spring that throws hands over to the stylesheet's exit. `reduced`:
+   *  under reduced motion its 150ms fade (app.css) is waited for before it goes (ui.afterMotion), rather
+   *  than its going at once. */
+  function dismiss(ov, { reduced = false } = {}) {
     if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return Promise.resolve();
     const exit = (ov._bcvExit = { recalled: false }); // (recall() below can still bring it back, until it is gone)
     const gone = () => { if (exit.recalled) return; try { ov.remove(); } catch { /* already gone */ } };
@@ -609,7 +611,7 @@
       } catch { ov.classList.remove('is-closing', 'bcv-sprung'); } // (the stylesheet's exit instead)
     }
     ov.classList.add('is-closing');
-    return Promise.race([afterMotion(ov), cap]).then(gone, gone);
+    return Promise.race([afterMotion(ov, 450, { reduced }), cap]).then(gone, gone);
   }
   /** Bring back something on its way out (dismiss above), from wherever its exit has got to — the pointer back over
    *  what opened it, say — rather than letting it go and opening a second one beside it. False when it is not leaving. */

@@ -147,16 +147,21 @@
     // A set deleted leaves where it stood, fading as it settles back to .97 (app.css .bcv-fc__deck.is-out),
     // and what is below it slides up into the gap (ui.flipList: each row, the buttons and the hint keyed)
     // rather than jumping. The set is gone from the list, and written, at once; deleted from the keyboard
-    // it simply goes. Reduced motion: a 150ms fade, and the rest land where they belong.
+    // it simply goes. Reduced motion: a 150ms fade, and the rest land where they belong. Two deleted close
+    // together: the list is redrawn once, by the last to finish leaving, so the first does not cut the
+    // second's fade short (outgoing: the rows still on their way out).
+    let outgoing = 0;
     async function deleteSet(d, row, keyed) {
       st.decks = st.decks.filter((x) => x.id !== d.id);
       const saved = persist();
       if (!keyed && row.isConnected) {
         row.inert = true; // (on its way out: not opened, nor deleted twice)
         row.classList.add('is-out');
-        await U.afterMotion(row, 450, { reduced: true });
+        outgoing++;
+        try { await U.afterMotion(row, 450, { reduced: true }); } finally { outgoing--; }
       }
       await saved;
+      if (outgoing) return; // (another still leaving: its redraw closes both gaps)
       if (st.view === 'sets' && p.alive()) U.flipList(body, paint); // (the popup moved on meanwhile: nothing to redraw)
     }
     function setsView() {
