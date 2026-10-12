@@ -47,6 +47,11 @@ public sealed class LoginOverlay : Window
         ResizeMode = ResizeMode.NoResize;
         Focusable = false;
         Content = root;
+        // the band a drag moves the window by (the page under it is a window of its own and would take the drag): under
+        // everything else here, in from the window's edges, which size it
+        var band = new Border { Height = MainWindow.CaptionButtonH - 6, Margin = new Thickness(6, 6, 6, 0), VerticalAlignment = VerticalAlignment.Top, Background = Faint };
+        band.MouseLeftButtonDown += (_, e) => { DragMain(e.ClickCount == 2); e.Handled = true; };
+        root.Children.Add(band);
         note = BuildNote();
         startOver = BuildStartOver();
         BuildCaptions();
@@ -210,6 +215,18 @@ public sealed class LoginOverlay : Window
         g.Children.Add(shape);
         return g;
     }
+
+    /// <summary>A press on the band: the main window moves with the pointer (a double click maximizes or restores it).</summary>
+    private void DragMain(bool doubleClick)
+    {
+        var h = new System.Windows.Interop.WindowInteropHelper(main).Handle;
+        if (h == IntPtr.Zero) return;
+        ReleaseCapture();
+        SendMessageW(h, doubleClick ? 0x00A3 /* WM_NCLBUTTONDBLCLK */ : 0x00A1 /* WM_NCLBUTTONDOWN */, (IntPtr)2 /* HTCAPTION */, IntPtr.Zero);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ReleaseCapture();
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] private static extern IntPtr SendMessageW(IntPtr h, int msg, IntPtr w, IntPtr l);
 
     // ---- colours (Theme's, for WPF) ----
 

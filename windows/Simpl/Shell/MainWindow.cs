@@ -34,12 +34,15 @@ public sealed class MainWindow : Window
 
     /// <summary>The caption buttons' band: Windows 11's (46 × 32 each, at the top right).</summary>
     public const float CaptionButtonW = 46, CaptionButtonH = 32;
-    public bool MaxHover { get; private set; }
+    private bool darkFrame = true;
 
     public MainWindow()
     {
         Title = "Simpl";
-        Background = new SolidColorBrush(Color.FromRgb(22, 22, 24));
+        // (light or dark from the first frame — as asked at launch, else as Windows is set — so nothing flashes dark first)
+        var dark = AppView.Dark(null);
+        host.Ui.T.Dark = dark;
+        Frame(dark);
         var size = (Launch.Get("window-size") ?? "1280x820").Split('x');
         Width = size.Length == 2 && double.TryParse(size[0], out var w) ? w : 1280;
         Height = size.Length == 2 && double.TryParse(size[1], out var h) ? h : 820;
@@ -71,19 +74,18 @@ public sealed class MainWindow : Window
         };
         host.Ground = () => view?.Ground ?? AppView.DefaultGround(host.Ui.T);
         host.Chrome = ChromeAt;
+        host.MaxToggle = () => { if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this); else SystemCommands.MaximizeWindow(this); };
         Shot.Frame = () => host.IsVisible ? host.Pixels() : null;
         SourceInitialized += (_, _) =>
         {
             source = (HwndSource)PresentationSource.FromVisual(this)!;
-            source.AddHook(Hook);
-            var hwnd = source.Handle;
-            var dark = 1;
-            DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref dark, sizeof(int));
+            Frame(darkFrame);
         };
         StateChanged += (_, _) =>
         {
             // (maximized, a window with its own frame runs past the screen by its edges: pulled back in)
             root.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
+            Phased();
             host.Invalidate();
         };
         Loaded += (_, _) => Begin();
@@ -143,10 +145,28 @@ public sealed class MainWindow : Window
         host.Invalidate();
     }
 
+    /// <summary>The window's own frame, light or dark with the screens: its background (seen round the page while a page shows) and its title bar's colour for Windows.</summary>
+    private void Frame(bool dark)
+    {
+        darkFrame = dark;
+        Background = new SolidColorBrush(dark ? Color.FromRgb(22, 22, 24) : Color.FromRgb(245, 245, 247));
+        if (source != null)
+        {
+            var on = dark ? 1 : 0;
+            DwmSetWindowAttribute(source.Handle, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref on, sizeof(int));
+        }
+    }
+
     private void Phased()
     {
         if (engine == null) return;
         var covers = engine.Login.Covers;
+        var dark = AppView.Dark(engine.Snapshot?.Dark);
+        if (dark != darkFrame) Frame(dark);
+        // (a page showing: set in from the window's edges, which then size it — the page is a window of its own, and
+        // would take the pointer there otherwise)
+        var pageShows = engine.Phase == Phase.Web && !covers && WindowState != WindowState.Maximized;
+        engine.Web.Margin = pageShows ? new Thickness(6) : new Thickness(0);
         if (Launch.IsDevelopment)
         {
             var now = $"phase {engine.Phase}" + (covers ? $", sign-in {engine.Login.Phase}" : "") + (engine.Login.Handoff ? ", handoff" : "") + (engine.Login.AskStay ? ", stay?" : "");
@@ -176,12 +196,26 @@ public sealed class MainWindow : Window
     private R MaxRect => new(UiWidth - CaptionButtonW * 2, 0, CaptionButtonW, CaptionButtonH);
     private R CloseRect => new(UiWidth - CaptionButtonW, 0, CaptionButtonW, CaptionButtonH);
 
-    /// <summary>Whether a point (DIPs, in the screens) is the window's to answer: the band at the top with nothing under the pointer, the maximize button (Windows' snap layouts), the edges.</summary>
-    private bool ChromeAt(Vector2 p)
+    /// <summary>What a point (DIPs, in the screens) is to the window: an edge that sizes it (not maximized), its maximize
+    /// button (Windows' snap layouts), the band at the top with nothing under the pointer (a drag moves it); else the screens' (0).</summary>
+    private int ChromeAt(Vector2 p)
     {
-        if (WindowState != WindowState.Maximized && (p.X < 6 || p.Y < 6 || p.X > UiWidth - 6 || p.Y > host.ActualHeight - 6)) return true;
-        if (MaxRect.Contains(p)) return true;
-        return p.Y < Ui.Caption && !host.Ui.HitsAt(p);
+        const int HTCAPTION = 2, HTMAXBUTTON = 9, HTLEFT = 10, HTRIGHT = 11, HTTOP = 12, HTTOPLEFT = 13, HTTOPRIGHT = 14, HTBOTTOM = 15, HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17;
+        if (WindowState != WindowState.Maximized)
+        {
+            const float edge = 6;
+            bool l = p.X < edge, r = p.X > UiWidth - edge, t = p.Y < edge, b = p.Y > (float)host.ActualHeight - edge;
+            if (t && l) return HTTOPLEFT;
+            if (t && r) return HTTOPRIGHT;
+            if (b && l) return HTBOTTOMLEFT;
+            if (b && r) return HTBOTTOMRIGHT;
+            if (l) return HTLEFT;
+            if (r) return HTRIGHT;
+            if (t) return HTTOP;
+            if (b) return HTBOTTOM;
+        }
+        if (MaxRect.Contains(p)) return HTMAXBUTTON;
+        return p.Y < Ui.Caption && !host.Ui.HitsAt(p) ? HTCAPTION : 0;
     }
 
     /// <summary>Minimize, maximize (or restore) and close, as Windows 11 draws them, over everything at the top right.</summary>
@@ -195,60 +229,13 @@ public sealed class MainWindow : Window
         if (min.Hovered) ui.Fill(MinRect, hoverWash);
         ui.Glyph("", MinRect.CenterX, MinRect.CenterY, 10, ink);
         if (min.Clicked) SystemCommands.MinimizeWindow(this);
-        // (the maximize button is hit-tested by the window itself, for snap layouts: its hover comes from there)
-        if (MaxHover) ui.Fill(MaxRect, hoverWash);
+        // (the maximize button is hit-tested as the window's own, for snap layouts: its hover and its press come from there)
+        if (host.MaxHover) ui.Fill(MaxRect, hoverWash);
         ui.Glyph(WindowState == WindowState.Maximized ? "" : "", MaxRect.CenterX, MaxRect.CenterY, 10, ink);
         var close = ui.Press("win:close", CloseRect);
         if (close.Hovered) ui.Fill(CloseRect, new Vortice.Mathematics.Color4(0.77f, 0.17f, 0.11f, 1));
         ui.Glyph("", CloseRect.CenterX, CloseRect.CenterY, 10, close.Hovered ? new Vortice.Mathematics.Color4(1, 1, 1, 1) : ink);
         if (close.Clicked) SystemCommands.CloseWindow(this);
-    }
-
-    /// <summary>The window's messages: the maximize button answered as Windows' own (snap layouts on hover, a click maximizes or restores).</summary>
-    private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        const int WM_NCHITTEST = 0x0084, WM_NCLBUTTONDOWN = 0x00A1, WM_NCLBUTTONUP = 0x00A2, WM_NCMOUSEMOVE = 0x00A0, WM_NCMOUSELEAVE = 0x02A2, WM_MOUSEMOVE = 0x0200;
-        const int HTMAXBUTTON = 9;
-        switch (msg)
-        {
-            case WM_NCHITTEST:
-            {
-                var p = PointFromScreen(new Point((short)(lParam.ToInt64() & 0xffff), (short)((lParam.ToInt64() >> 16) & 0xffff)));
-                var v = new Vector2((float)p.X - (float)root.Margin.Left, (float)p.Y - (float)root.Margin.Top);
-                if (MaxRect.Contains(v) && host.IsVisible)
-                {
-                    handled = true;
-                    return (IntPtr)HTMAXBUTTON;
-                }
-                break;
-            }
-            case WM_NCMOUSEMOVE:
-                SetMaxHover(wParam.ToInt64() == HTMAXBUTTON);
-                break;
-            case WM_NCMOUSELEAVE:
-            case WM_MOUSEMOVE:
-                SetMaxHover(false);
-                break;
-            case WM_NCLBUTTONDOWN:
-                if (wParam.ToInt64() == HTMAXBUTTON) { handled = true; return IntPtr.Zero; }
-                break;
-            case WM_NCLBUTTONUP:
-                if (wParam.ToInt64() == HTMAXBUTTON)
-                {
-                    handled = true;
-                    if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this); else SystemCommands.MaximizeWindow(this);
-                    return IntPtr.Zero;
-                }
-                break;
-        }
-        return IntPtr.Zero;
-    }
-
-    private void SetMaxHover(bool on)
-    {
-        if (MaxHover == on) return;
-        MaxHover = on;
-        host.Invalidate();
     }
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);

@@ -20,8 +20,28 @@ public sealed class GlassHost : HwndHost
     public readonly Ui Ui = new();
     /// <summary>The window's screens, a frame of them.</summary>
     public Action<Ui>? Build;
-    /// <summary>Whether a point (DIPs) belongs to the window's chrome — its title bar's drag area, its edges, its caption buttons — rather than the screens.</summary>
-    public Func<Vector2, bool>? Chrome;
+    /// <summary>
+    /// What a point (DIPs) is to the window rather than the screens, as a hit-test code: HTCAPTION (2) for the band at the
+    /// top a drag moves it by, HTLEFT…HTBOTTOMRIGHT (10–17) for the edges that size it, HTMAXBUTTON (9) for its maximize
+    /// button; 0 for the screens' own. (The web view under the screens is a window too, so a press here is handed to the
+    /// window itself rather than let fall through.)
+    /// </summary>
+    public Func<Vector2, int>? Chrome;
+    /// <summary>The pointer is over the window's maximize button (Windows' snap layouts come up there).</summary>
+    public bool MaxHover { get; private set; }
+    /// <summary>The maximize button pressed: maximize, or restore.</summary>
+    public Action? MaxToggle;
+
+    private const int HTCAPTION = 2, HTMAXBUTTON = 9, HTLEFT = 10, HTRIGHT = 11, HTTOP = 12, HTTOPLEFT = 13, HTTOPRIGHT = 14, HTBOTTOM = 15, HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17;
+
+    private int ChromeCode(Vector2 p) => Chrome?.Invoke(p) ?? 0;
+
+    private void SetMaxHover(bool on)
+    {
+        if (MaxHover == on) return;
+        MaxHover = on;
+        Invalidate();
+    }
 
     /// <summary>The colour under everything.</summary>
     public Func<Color4> Ground = () => new Color4(0.08f, 0.08f, 0.09f, 1);
@@ -147,23 +167,55 @@ public sealed class GlassHost : HwndHost
         {
             case 0x0084: // WM_NCHITTEST
             {
-                // the title bar's band (the toolbar's) with no control under the pointer, and the window's edges: the
-                // window's own (a drag moves it, its edges size it, its caption buttons answer)
+                // everything here is the screens' — but the maximize button is said to be the window's, so Windows brings
+                // its snap layouts up over it; a drag of the title bar's band or of an edge is handed to the window from
+                // the press itself (WM_LBUTTONDOWN below)
                 handled = true;
                 var sx = (short)(lParam.ToInt64() & 0xffff);
                 var sy = (short)((lParam.ToInt64() >> 16) & 0xffff);
                 var pt = new POINT { X = sx, Y = sy };
                 ScreenToClient(h, ref pt);
                 var p = new Vector2(pt.X / scale, pt.Y / scale);
-                if (Chrome != null && Chrome(p)) return (IntPtr)(-1); // HTTRANSPARENT
-                return (IntPtr)1; // HTCLIENT
+                return (IntPtr)(ChromeCode(p) == HTMAXBUTTON ? HTMAXBUTTON : 1 /* HTCLIENT */);
+            }
+            case 0x00A0: // WM_NCMOUSEMOVE (over the maximize button)
+                SetMaxHover(wParam.ToInt64() == HTMAXBUTTON);
+                break;
+            case 0x02A2: // WM_NCMOUSELEAVE
+                SetMaxHover(false);
+                break;
+            case 0x00A1: // WM_NCLBUTTONDOWN
+                if (wParam.ToInt64() == HTMAXBUTTON) { handled = true; return IntPtr.Zero; }
+                break;
+            case 0x00A2: // WM_NCLBUTTONUP
+                if (wParam.ToInt64() == HTMAXBUTTON) { handled = true; MaxToggle?.Invoke(); return IntPtr.Zero; }
+                break;
+            case 0x0020: // WM_SETCURSOR: the sizing arrows at the window's edges
+            {
+                GetCursorPos(out var cp);
+                ScreenToClient(h, ref cp);
+                var cursor = ChromeCode(new Vector2(cp.X / scale, cp.Y / scale)) switch
+                {
+                    HTLEFT or HTRIGHT => 32644, // IDC_SIZEWE
+                    HTTOP or HTBOTTOM => 32645, // IDC_SIZENS
+                    HTTOPLEFT or HTBOTTOMRIGHT => 32642, // IDC_SIZENWSE
+                    HTTOPRIGHT or HTBOTTOMLEFT => 32643, // IDC_SIZENESW
+                    _ => 0,
+                };
+                if (cursor != 0)
+                {
+                    SetCursor(LoadCursorW(IntPtr.Zero, cursor));
+                    handled = true;
+                    return (IntPtr)1;
+                }
+                break;
             }
             case 0x0014: // WM_ERASEBKGND
                 handled = true;
                 return (IntPtr)1;
-            case 0x0087: // WM_GETDLGCODE: every key is the screens'
+            case 0x0087: // WM_GETDLGCODE: every key is the screens', Tab and the arrows too
                 handled = true;
-                return (IntPtr)0x0004;
+                return (IntPtr)(0x0004 | 0x0002 | 0x0001);
             case 0x0200: // WM_MOUSEMOVE
                 ui.Mouse = new Vector2((short)(lParam.ToInt64() & 0xffff) / scale, (short)((lParam.ToInt64() >> 16) & 0xffff) / scale);
                 if (!tracking)
@@ -181,13 +233,28 @@ public sealed class GlassHost : HwndHost
                 break;
             case 0x0201: // WM_LBUTTONDOWN
             case 0x0203: // WM_LBUTTONDBLCLK
-                ui.Mouse = new Vector2((short)(lParam.ToInt64() & 0xffff) / scale, (short)((lParam.ToInt64() >> 16) & 0xffff) / scale);
+            {
+                var sx = (short)(lParam.ToInt64() & 0xffff);
+                var sy = (short)((lParam.ToInt64() >> 16) & 0xffff);
+                ui.Mouse = new Vector2(sx / scale, sy / scale);
+                var code = ChromeCode(ui.Mouse);
+                if (code == HTCAPTION || (code >= HTLEFT && code <= HTBOTTOMRIGHT))
+                {
+                    // the window's own: a drag of the band moves it, of an edge sizes it; a double click on the band maximizes it
+                    ReleaseCapture();
+                    var pt = new POINT { X = sx, Y = sy };
+                    ClientToScreen(h, ref pt);
+                    SendMessageW(GetAncestor(h, 2 /* GA_ROOT */), msg == 0x0203 ? 0x00A3 /* WM_NCLBUTTONDBLCLK */ : 0x00A1 /* WM_NCLBUTTONDOWN */, (IntPtr)code, (IntPtr)((pt.Y << 16) | (pt.X & 0xffff)));
+                    handled = true;
+                    return IntPtr.Zero;
+                }
                 ui.Down = ui.Pressed = true;
                 SetCapture(h);
                 SetFocus(h);
                 Invalidate();
                 handled = true;
                 return IntPtr.Zero;
+            }
             case 0x0202: // WM_LBUTTONUP
                 ui.Down = false;
                 ui.Released = true;
@@ -237,6 +304,19 @@ public sealed class GlassHost : HwndHost
         Invalidate();
     }
 
+    /// <summary>Tab is the screens' (a field to the next): WPF would otherwise move its own focus away from them on it.</summary>
+    protected override bool TranslateAcceleratorCore(ref MSG msg, System.Windows.Input.ModifierKeys modifiers)
+    {
+        if (msg.message == 0x0100 /* WM_KEYDOWN */ && (long)msg.wParam == 0x09)
+        {
+            Ui.Shift = (modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+            Ui.Keys.Add(Key.Tab);
+            Invalidate();
+            return true;
+        }
+        return base.TranslateAcceleratorCore(ref msg, modifiers);
+    }
+
     // ---- Win32 ----
 
     private delegate IntPtr WndProcDelegate(IntPtr h, uint msg, IntPtr w, IntPtr l);
@@ -268,6 +348,11 @@ public sealed class GlassHost : HwndHost
     [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr h);
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] private static extern bool ScreenToClient(IntPtr h, ref POINT p);
+    [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr h, ref POINT p);
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32.dll")] private static extern IntPtr SetCursor(IntPtr cursor);
+    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr h, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr SendMessageW(IntPtr h, int msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr h);
     [DllImport("user32.dll")] private static extern IntPtr SetCapture(IntPtr h);
     [DllImport("user32.dll")] private static extern bool ReleaseCapture();

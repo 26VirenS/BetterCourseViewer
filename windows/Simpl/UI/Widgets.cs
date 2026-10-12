@@ -183,12 +183,12 @@ public sealed partial class Ui
         return i;
     }
 
-    /// <summary>The sidebar's row: a filled rounded rectangle when chosen, a wash under the pointer; clicked.</summary>
+    /// <summary>The sidebar's row: filled with the accent when chosen (the Mac's, its window active: its words and symbol then white), a wash under the pointer; clicked.</summary>
     public Interaction SideRowWash(string id, R r, bool selected)
     {
         var i = Press(id, r);
         var h = Animate(id + ":h", !selected && i.Hovered ? 1 : 0, 0.14f);
-        if (selected) Fill(r, 8, T.Selected);
+        if (selected) Fill(r, 8, T.Accent);
         else if (h > 0.01f) Fill(r, 8, T.Primary(0.06f * h));
         return i;
     }

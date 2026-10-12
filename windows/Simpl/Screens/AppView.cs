@@ -276,8 +276,8 @@ public sealed class AppView
             var chev = new R(r.Right - 14 - 16, r.CenterY - 9, 18, 18);
             var textRight = chev.X - 8;
             if (engine.CoursesLive && c.Unread is > 0) textRight -= ui.CountLabel(c.Unread.Value, chev.X - 8, r.CenterY) + 8;
-            Lines.Text(ui, c.Code, 48, r.CenterY - 9, Theme.Body, t.Ink(), textRight - 48);
-            if (ui.IconButton("side:c:open:" + c.Id, chev, isOpen ? "chevron.down" : "chevron.right", true, 11.5f, t.Ink2, FontWeight.SemiBold))
+            Lines.Text(ui, c.Code, 48, r.CenterY - 9, Theme.Body, on ? new Color4(1, 1, 1, 1) : t.Ink(), textRight - 48);
+            if (ui.IconButton("side:c:open:" + c.Id, chev, isOpen ? "chevron.down" : "chevron.right", true, 11.5f, on ? new Color4(1, 1, 1, 0.85f) : t.Ink2, FontWeight.SemiBold))
             {
                 if (!open.Remove(ctx)) { open.Add(ctx); _ = engine.LoadSections(ctx); }
             }
@@ -301,12 +301,13 @@ public sealed class AppView
         if (!engine.OnBrightspace && engine.Groups.Count > 0)
         {
             var r = new R(RowX, y, RowW, RowH);
-            var i = ui.SideRowWash("side:groups", r, current == Place.Groups);
-            ui.Icon("person.2", 38, r.CenterY, 16, t.Ink2);
-            Lines.Text(ui, "Groups", 57, r.CenterY - 9, Theme.Body, t.Ink(), r.Right - 57 - 40);
+            var groupsOn = current == Place.Groups;
+            var i = ui.SideRowWash("side:groups", r, groupsOn);
+            ui.Icon("person.2", 38, r.CenterY, 16, groupsOn ? new Color4(1, 1, 1, 1) : t.Accent);
+            Lines.Text(ui, "Groups", 57, r.CenterY - 9, Theme.Body, groupsOn ? new Color4(1, 1, 1, 1) : t.Ink(), r.Right - 57 - 40);
             var chev = new R(r.Right - 14 - 16, r.CenterY - 9, 18, 18);
             var groupsOpen = open.Contains("groups");
-            if (ui.IconButton("side:groups:open", chev, groupsOpen ? "chevron.down" : "chevron.right", true, 11.5f, t.Ink2, FontWeight.SemiBold))
+            if (ui.IconButton("side:groups:open", chev, groupsOpen ? "chevron.down" : "chevron.right", true, 11.5f, groupsOn ? new Color4(1, 1, 1, 0.85f) : t.Ink2, FontWeight.SemiBold))
             {
                 if (!open.Remove("groups")) open.Add("groups");
             }
@@ -318,9 +319,10 @@ public sealed class AppView
                 {
                     var gr = new R(RowX, y, RowW, RowH);
                     var p = Place.Home("groups/" + g.Id);
-                    var gi = ui.SideRowWash("side:g:" + g.Id, gr, current == p);
+                    var gOn = current == p;
+                    var gi = ui.SideRowWash("side:g:" + g.Id, gr, gOn);
                     ui.Fill(new R(27 + 20, gr.CenterY - 6.5f, 13, 13), 4, Theme.Hex(g.Color));
-                    Lines.Text(ui, g.Name, 48 + 21, gr.CenterY - 9, Theme.Body, t.Ink(), gr.Right - 69 - 12);
+                    Lines.Text(ui, g.Name, 48 + 21, gr.CenterY - 9, Theme.Body, gOn ? new Color4(1, 1, 1, 1) : t.Ink(), gr.Right - 69 - 12);
                     if (gi.Clicked) engine.Go(p);
                     y += RowH;
                 }
@@ -350,17 +352,20 @@ public sealed class AppView
         var t = ui.T;
         var r = new R(RowX, y, RowW, RowH);
         var i = ui.SideRowWash(id, r, on);
-        if (glyph) ui.Glyph(icon, 38 + indent, r.CenterY, 15, t.Ink2);
-        else ui.Icon(icon, 38 + indent, r.CenterY, 16, t.Ink2);
+        // (the Mac's sidebar: the symbols in the accent, the chosen row filled with it and its words white)
+        var white = new Color4(1, 1, 1, 1);
+        var symbol = on ? white : t.Accent;
+        if (glyph) ui.Glyph(icon, 38 + indent, r.CenterY, 15, symbol);
+        else ui.Icon(icon, 38 + indent, r.CenterY, 16, symbol);
         var right = r.Right - 16;
         if (badge > 0)
         {
             var s = badge.ToString();
             var m = ui.Measure(s, Theme.Caption);
-            Lines.Text(ui, s, right - m.X, r.CenterY - 7.5f, Theme.Caption, t.Ink2);
+            Lines.Text(ui, s, right - m.X, r.CenterY - 7.5f, Theme.Caption, on ? new Color4(1, 1, 1, 0.8f) : t.Ink2);
             right -= m.X + 10;
         }
-        Lines.Text(ui, label, 57 + indent, r.CenterY - 9, Theme.Body, t.Ink(), right - 57 - indent);
+        Lines.Text(ui, label, 57 + indent, r.CenterY - 9, Theme.Body, on ? white : t.Ink(), right - 57 - indent);
         return i.Clicked;
     }
 
