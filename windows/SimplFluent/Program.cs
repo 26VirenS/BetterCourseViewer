@@ -15,6 +15,7 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        Perf.Begin();
         AppIdentity.Claim();              // (first of all: the window, its taskbar button and the shortcuts are one app)
         Launch.Parse(args);
         Instance.WaitForPrevious();       // (opened again by Reset Everything: the copy before it gone first)
@@ -38,6 +39,7 @@ public static class Program
         }
         Appearance.Apply();
         var main = new Shell.MainWindow();
+        Perf.Watch(main);
         Instance.ShowRequested += main.Bring;
         Instance.QuitRequested += () =>
         {

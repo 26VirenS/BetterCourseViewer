@@ -92,6 +92,7 @@ public abstract class Screen
             var first = !built;
             built = true;
             FrameworkElement content;
+            var perfAt = Support.Perf.Stamp();
             try { content = Build(); }
             catch (Exception e)
             {
@@ -99,6 +100,7 @@ public abstract class Screen
                 content = K.LoadState(e.Message, Render);
             }
             host.Content = content;
+            Support.Perf.Built(GetType().Name, perfAt, first);
             if (first && !gone) Motion.Enter(content, 0, 28, 420);
             Support.Shot.Moved();
         });

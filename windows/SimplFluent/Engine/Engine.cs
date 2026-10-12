@@ -518,6 +518,7 @@ public sealed partial class Engine : Observable, IShellListener
             var done = new TaskCompletionSource<(bool Ok, string Text)>();
             calls[id] = done;
             Shot.Began();
+            var perfAt = Perf.CallStarted(name);
             try
             {
                 await Web.CoreWebView2.ExecuteScriptAsync($"window.__simplCall&&window.__simplCall({id},{Json.Str(name)},{Json.Literal(a)})");
@@ -537,6 +538,7 @@ public sealed partial class Engine : Observable, IShellListener
             {
                 calls.Remove(id);
                 Shot.Ended();
+                Perf.CallEnded(name, perfAt);
             }
         }
         throw last;

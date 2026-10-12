@@ -77,6 +77,44 @@ and checks the folder, the shortcut and the entry are gone and Simpl's data fold
 uninstalls from Simpl itself (`--uninstall yes`: Simpl must start its uninstaller and quit, and the uninstaller — both
 its phases — must finish), checking the same. The installer's and each Simpl's logs are kept with the pictures.
 
+## Performance
+
+Every simpl.log (`%LOCALAPPDATA%\Simpl`, a student's too) says how Simpl runs, in lines that begin `perf:`
+(`Support/Perf.cs`). Once, when the first answers are in (or after a minute), how the start went, in ms from the
+process's start — `main`, the `window` drawn, the `kept shell` (the app's screens on what was kept, before the page is
+asked for), the `webview` started, the page asked for (`nav`) and come (`page`), the counts live (`engine ready`), the
+`first screen` built and drawn, its `first data` in and shown — and what it runs on: the render tier (0 is software:
+no graphics WPF can use), Windows' animation effects, Windows and the processor against Simpl's own (`emulated`: an x64
+Simpl on an ARM PC), the processors, memory, the display's scale, the PC's maker and model (a VM says so) and WebView2.
+Then at two minutes, every ten and at exit, four lines: the engine's calls by name (how many, the median, the 95th
+percentile, the longest; most time first), the screens switched to (drawn, then their answers shown), the window's
+stalls (input kept waiting over 200 ms, probed twice a second while the window shows) and memory (.NET's, the
+process's, the web view's processes').
+
+`--perf-walk <folder>` walks one fixed route once the first answers are in — To Do, the Calendar, Grades, the Inbox, a
+course, an assignment, Notifications, the New task sheet, Settings, Tools, a search typed a letter at a time, the
+window dragged and resized, the Dashboard again — writes `perf.json` and `perf.txt` there (and the table to
+simpl.log), and quits. Each step: drawn (`ui`), its answers in and shown (`data`), the builds and calls it took, the
+longest stall, the frames in its first 700 ms and the longest gap between them, the memory it allocated.
+`--perf-name warm` names the files `perf-warm.*`; `--perf-course` and `--perf-assignment` choose what is opened (else
+the first course, and the first assignment To Do lists); `--perf-timeout` (150 s) ends a walk that cannot finish,
+writing what it has; a first setup still to answer stops it, with a note. The walk only looks: New task and Settings
+are opened and closed, nothing saved.
+
+On a student's own PC: quit Simpl from the notification area (right-click its icon, Quit), then from Command Prompt
+(a copy from the zip: its own Simpl.exe):
+
+```
+"%LOCALAPPDATA%\Programs\Simpl\Simpl.exe" --perf-walk "%USERPROFILE%\Desktop"
+```
+
+`perf.txt` lands on the desktop; its first two lines say what the PC is, which decides most of the rest.
+
+CI's Performance walk, beside the pictures, does the same against the mock twice with one profile — `cold`, then
+`warm` (the answers kept) — prints both tables in its log and the run's summary, keeps them as `windows-fluent-perf`
+and with the pictures, and compares each with the last green run's (before, after, the change). It only reports: a
+slower number never fails a run, and nothing waits for it but the pictures' merge.
+
 ## Layout of the code
 
 | Folder | What is there |

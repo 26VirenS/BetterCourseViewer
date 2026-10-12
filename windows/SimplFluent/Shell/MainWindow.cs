@@ -165,6 +165,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         picker = null;
         if (Launch.DevBaseUrl == null) Prefs.Set("school", schoolHost);
         engine = new Engine.Engine(schoolHost);
+        Perf.Engine(engine);
         Grid.SetRow(engine.Web, 1);
         pageArea.Children.Add(engine.Web);
         handoff.Bind(engine);
