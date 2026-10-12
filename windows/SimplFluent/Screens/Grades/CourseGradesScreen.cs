@@ -384,6 +384,7 @@ public sealed class CourseGradesScreen : Screen
         {
             if (!barShown) return;
             barShown = false;
+            pageHost.Padding = new Thickness(0);
             Motion.FadeOut(barHost, () =>
             {
                 if (barShown) return;
@@ -396,6 +397,8 @@ public sealed class CourseGradesScreen : Screen
         barHost.Child = WhatIfBar(d);
         if (barShown) return;
         barShown = true;
+        // (room under the list for the bar, so the last rows — their scores to type — scroll clear of it)
+        pageHost.Padding = new Thickness(0, 0, 0, 88);
         barHost.BeginAnimation(UIElement.OpacityProperty, null);
         barHost.Opacity = 1;
         barHost.Visibility = Visibility.Visible;

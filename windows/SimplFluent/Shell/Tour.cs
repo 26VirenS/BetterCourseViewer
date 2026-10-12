@@ -48,6 +48,36 @@ public static class Tour
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// A step's part, out of sight in its scrolling list (below the fold, or under what floats at the page's foot — the
+    /// What-If bar), scrolled to stand a little above the list's middle, as the Mac's tour scrolls to its part. The part
+    /// taken is the first in the list. True once there is one to show (scrolled or already in sight).
+    /// </summary>
+    internal static bool Reveal(TourSpot spot, FrameworkElement over)
+    {
+        if (!Spots.TryGetValue(spot, out var list)) return false;
+        var source = PresentationSource.FromVisual(over);
+        FrameworkElement? first = null;
+        ScrollViewer? within = null;
+        var firstAt = double.MaxValue;
+        foreach (var w in list.ToList())
+        {
+            if (!w.TryGetTarget(out var e) || !e.IsVisible || e.ActualWidth < 2 || source == null || PresentationSource.FromVisual(e) != source) continue;
+            ScrollViewer? sv = null;
+            for (DependencyObject? p = VisualTreeHelper.GetParent(e); p != null; p = VisualTreeHelper.GetParent(p))
+                if (p is ScrollViewer found) { sv = found; break; }
+            if (sv == null) return true; // (not in a list: where it is, it is seen)
+            double at;
+            try { at = e.TranslatePoint(new Point(0, 0), sv).Y + sv.VerticalOffset; } catch { continue; }
+            if (at < firstAt) { firstAt = at; first = e; within = sv; }
+        }
+        if (first == null || within == null) return false;
+        var top = firstAt - within.VerticalOffset;
+        if (top >= 24 && top + first.ActualHeight <= within.ViewportHeight - 120) return true;
+        within.ScrollToVerticalOffset(Math.Max(0, firstAt - within.ViewportHeight * 0.4));
+        return true;
+    }
+
     /// <summary>Where a part is in an element's coordinates, or null when none is on screen.</summary>
     internal static Rect? Find(TourSpot spot, FrameworkElement over)
     {
@@ -95,6 +125,7 @@ public sealed class TourOverlay : Grid
     private readonly CombinedGeometry dim;
     private readonly Path ring = new() { StrokeThickness = 2, IsHitTestVisible = false, Opacity = 0, Visibility = Visibility.Collapsed };
     private bool ringOn;
+    private bool revealed;
     private readonly Border card = new();
     private readonly Canvas layer = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
@@ -185,6 +216,7 @@ public sealed class TourOverlay : Grid
         // last, with nothing lit, pop in place)
         var shown = index != null && card.ActualHeight > 0;
         index = i;
+        revealed = false;
         since = DateTime.UtcNow;
         seenEvents = Tour.Events;
         advancing = false;
@@ -315,6 +347,8 @@ public sealed class TourOverlay : Grid
         if (size.Width < 10) return false;
         // (a step waiting a while: Next appears, in case what it asks cannot be done here)
         if (card.Tag is UIElement nx && s.Done != null && (DateTime.UtcNow - since).TotalSeconds > 6) nx.Visibility = Visibility.Visible;
+        // (the step's part brought into sight first, once a step, when it waits out of sight in its list)
+        if (!revealed && s.Spot is { } wanted) revealed = Tour.Reveal(wanted, this);
         Rect? hole = s.Spot is { } spot ? Tour.Find(spot, this) : null;
         if (hole is { } h) { h.Inflate(6, 6); hole = h; }
         whole.Rect = new Rect(size);
