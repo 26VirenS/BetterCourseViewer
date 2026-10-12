@@ -99,7 +99,7 @@ public sealed class AppShell : Grid, IDisposable
         header.Children.Add(titleHost.Col(0));
         header.Children.Add(commandsHost.Col(1));
         header.Margin = new Thickness(40, 4, 40, 20);
-        scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(40, 0, 40, 40) };
+        scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(40, 0, 40, 0) };
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.Children.Add(header.Row(0));
@@ -387,6 +387,8 @@ public sealed class AppShell : Grid, IDisposable
             // (a reading width: as wide as the page up to it, from the left — sized, so it never shrinks to its words)
             if (s.MaxContentWidth is { } mw) { v.MaxWidth = mw; v.Width = Math.Min(mw, ContentWidth); v.HorizontalAlignment = HorizontalAlignment.Left; }
             else { v.ClearValue(FrameworkElement.WidthProperty); v.ClearValue(FrameworkElement.MaxWidthProperty); v.HorizontalAlignment = HorizontalAlignment.Stretch; }
+            // (the room at the page's foot is the page's own, so it scrolls: a scroller's padding would stand still under it)
+            v.Margin = new Thickness(0, 0, 0, Foot);
             scroller.Content = v;
             body.Content = scroller;
         }
@@ -447,8 +449,12 @@ public sealed class AppShell : Grid, IDisposable
         if (current is { Scrolls: true, MaxContentWidth: { } mw }) current.View.Width = Math.Min(mw, ContentWidth);
         current?.SetWidth(ContentWidth);
         header.Margin = page.ActualWidth < 560 ? new Thickness(20, 4, 20, 16) : new Thickness(40, 4, 40, 20);
-        scroller.Padding = page.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);
+        scroller.Padding = page.ActualWidth < 560 ? new Thickness(20, 0, 20, 0) : new Thickness(40, 0, 40, 0);
+        if (current is { Scrolls: true }) current.View.Margin = new Thickness(0, 0, 0, Foot);
     }
+
+    /// <summary>The room under a page that scrolls with the shell.</summary>
+    private double Foot => page.ActualWidth < 560 ? 32 : 40;
 
     public bool Escape()
     {

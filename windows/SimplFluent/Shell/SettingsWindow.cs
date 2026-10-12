@@ -141,7 +141,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
         // the category: its title, then its rows
         var page = K.Rows("auto, *", titleHost.Margin(40, 4, 40, 20).Row(0), scroller.Row(1));
-        scroller.Padding = new Thickness(40, 0, 40, 40);
+        scroller.Padding = new Thickness(40, 0, 40, 0);
         body.Children.Add(page.Col(1));
         Grid.SetRow(body, 1);
         root.Children.Add(body);
@@ -233,6 +233,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         };
         content.MaxWidth = 1000;
         content.HorizontalAlignment = HorizontalAlignment.Left;
+        // (the room at the foot is the pane's own, so it scrolls with it)
+        content.Margin = new Thickness(content.Margin.Left, content.Margin.Top, content.Margin.Right, content.Margin.Bottom + 40);
         var first = scroller.Content == null;
         var offset = scroller.VerticalOffset;
         scroller.Content = content;

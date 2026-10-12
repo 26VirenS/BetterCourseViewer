@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.5", "2026-10-12",
+            ("fixed", "No strip behind the What-If bar", "The page runs under it now, all the way to the window's edge."),
+            ("improved", "Pages scroll to the edge", "Every page, Settings and To Do scroll right to the bottom of the window.")),
         R("0.2.4", "2026-10-12",
             ("fixed", "The tour finds its part", "It scrolls to what it points at, clear of the What-If bar."),
             ("fixed", "The What-If bar", "The last rows scroll clear of it, scores and all.")),

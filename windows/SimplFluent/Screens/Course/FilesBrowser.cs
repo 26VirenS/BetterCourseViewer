@@ -91,15 +91,17 @@ internal sealed class CourseFilesPart : CoursePart
         Detach(list);
         Detach(pane);
         rows.Clear();
-        list.Content = Lists(d, wide);
+        var lists = Lists(d, wide);
+        lists.Margin = new Thickness(lists.Margin.Left, lists.Margin.Top, lists.Margin.Right, lists.Margin.Bottom + pad); // (room at the foot that scrolls with the list)
+        list.Content = lists;
         list.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => list.ScrollToVerticalOffset(offset));
         if (!wide)
         {
-            list.Padding = new Thickness(pad, 0, pad, pad);
+            list.Padding = new Thickness(pad, 0, pad, 0);
             return list;
         }
         // the list on the left, the file picked on the right (it stays put while the list scrolls)
-        list.Padding = new Thickness(pad, 0, 16, pad);
+        list.Padding = new Thickness(pad, 0, 16, 0);
         var g = new Grid();
         var listCol = new ColumnDefinition { Width = new GridLength(ListWidth(page)) };
         g.ColumnDefinitions.Add(listCol);

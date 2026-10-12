@@ -105,7 +105,8 @@ public sealed partial class TodoScreen : Screen
             // the list in its own column; the side column beside it, its top level with the list's first card
             foreach (var c in new[] { "*", "12", "320", pad.ToString(System.Globalization.CultureInfo.InvariantCulture) })
                 root.ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(c) });
-            listScroller.Padding = new Thickness(pad, 0, 12, 40);
+            listScroller.Padding = new Thickness(pad, 0, 12, 0);
+            listHost.Margin = new Thickness(0, 0, 0, 40); // (room at the foot that scrolls with the list)
             listHost.Content = List(d);
             var overview = Overview(d);
             overview.Margin = new Thickness(0, sideTop, 0, 24);
@@ -118,7 +119,8 @@ public sealed partial class TodoScreen : Screen
         }
         else
         {
-            listScroller.Padding = new Thickness(pad, 0, pad, 40);
+            listScroller.Padding = new Thickness(pad, 0, pad, 0);
+            listHost.Margin = new Thickness(0, 0, 0, 40);
             sideScroller.Content = null;
             listHost.Content = K.V(22, Summary(d, width), List(d));
             root.Children.Add(Adopt(listScroller));

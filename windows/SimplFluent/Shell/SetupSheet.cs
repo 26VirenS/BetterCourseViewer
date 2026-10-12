@@ -174,7 +174,7 @@ public sealed class SetupSheet
     }
 
     private static FrameworkElement Scroll(UIElement content) =>
-        new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(30, 0, 30, 20) };
+        new ScrollViewer { Content = new Border { Child = content, Padding = new Thickness(0, 0, 0, 20) }, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(30, 0, 30, 0) };
 
     private FrameworkElement Courses(SetupChoices data)
     {

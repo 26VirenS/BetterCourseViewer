@@ -201,7 +201,10 @@ public sealed class CourseGradesScreen : Screen
         }
         // (the shell's own page margins, as it gives a page that scrolls with it)
         var pad = Width + 80 < 560 ? 20 : 40;
-        scroller.Padding = new Thickness(pad, 0, pad, whatIf ? 104 : 40);
+        scroller.Padding = new Thickness(pad, 0, pad, 0);
+        // (the room at the foot is the page's, so it scrolls; with What-If on it is room for the bar, so the last rows,
+        // their scores to type, scroll clear of it — a scroller's own padding would stand still, a strip under the bar)
+        pageHost.Margin = new Thickness(0, 0, 0, whatIf ? 104 : 40);
         var w = Width;
 
         // the field being typed in stays as it is through the rebuild, and keeps the keyboard
@@ -384,7 +387,6 @@ public sealed class CourseGradesScreen : Screen
         {
             if (!barShown) return;
             barShown = false;
-            pageHost.Padding = new Thickness(0);
             Motion.FadeOut(barHost, () =>
             {
                 if (barShown) return;
@@ -397,8 +399,6 @@ public sealed class CourseGradesScreen : Screen
         barHost.Child = WhatIfBar(d);
         if (barShown) return;
         barShown = true;
-        // (room under the list for the bar, so the last rows — their scores to type — scroll clear of it)
-        pageHost.Padding = new Thickness(0, 0, 0, 88);
         barHost.BeginAnimation(UIElement.OpacityProperty, null);
         barHost.Opacity = 1;
         barHost.Visibility = Visibility.Visible;
