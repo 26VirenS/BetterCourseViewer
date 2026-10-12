@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Simpl for Windows, made again with Windows 11's own look: the Mac app's screens, steps and layouts (mac/Simpl),
+       drawn with Windows 11's controls — Mica, the Settings app's navigation and cards, Fluent icons and motion — through
+       WPF-UI. Underneath, as before, the student's Canvas or Brightspace runs in a web view (WebView2, the extension's own
+       scripts in it) and answers what the app's screens show. The first Windows app (windows/Simpl) stays as it was. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Simpl</RootNamespace>
+    <AssemblyName>Simpl</AssemblyName>
+    <ApplicationIcon>Assets\Simpl.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>Simpl.Program</StartupObject>
+    <Product>Simpl</Product>
+    <Company>Simpl Courses</Company>
+    <Description>Simpl for Windows</Description>
+    <Version>0.2.0</Version>
+    <FileVersion>0.2.0.1</FileVersion>
+    <InformationalVersion>0.2.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <NoWarn>$(NoWarn);CA1416;WPF0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
+    <!-- Windows 11's controls for WPF: Mica, the title bar, cards, dialogs, info bars, toggles, Fluent icons -->
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="WPF-UI.Tray" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Simpl.ico" />
+    <Resource Include="Assets\Simpl-256.png" />
+  </ItemGroup>
+
+  <!-- The extension the engine runs (the same files the Mac and iPhone apps carry), and the bridge and sign-in reader
+       the apps share — beside the app, as loose files. -->
+  <ItemGroup>
+    <None Include="..\..\extension\**\*" Exclude="..\..\extension\**\.DS_Store" Link="extension\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\ios\SimplCourses\Web\bridge.js" Link="Web\bridge.js" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\ios\SimplCourses\Web\login.js" Link="Web\login.js" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="Assets\Simpl-256.png" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+</Project>
