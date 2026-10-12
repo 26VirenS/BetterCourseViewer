@@ -108,6 +108,7 @@ public sealed class SheetHost : Grid
         Children.Add(smoke);
         Panel.SetZIndex(this, 1000);
         PreviewKeyDown += OnKey;
+        SizeChanged += (_, _) => { if (current?.Card is { } c) Fit(c); };
     }
 
     public void Show(Sheet s)
@@ -244,7 +245,6 @@ public sealed class SheetHost : Grid
             Child = grid, Width = s.Width, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             Effect = K.Shadow(64, 24, 0.32), SnapsToDevicePixels = true, ClipToBounds = false,
-            MaxWidth = 900,
         };
         if (s.Height is { } h) card.Height = h;
         card.SetResourceReference(Border.BackgroundProperty, "ContentDialogBackground");
@@ -256,10 +256,15 @@ public sealed class SheetHost : Grid
         KeyboardNavigation.SetControlTabNavigation(card, KeyboardNavigationMode.Cycle);
         KeyboardNavigation.SetDirectionalNavigation(card, KeyboardNavigationMode.Cycle);
         card.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        // keep the sheet inside a small window
-        SizeChanged += (_, e) => { card.MaxHeight = Math.Max(200, e.NewSize.Height - 48); card.MaxWidth = Math.Max(280, e.NewSize.Width - 48); };
-        card.MaxHeight = Math.Max(200, ActualHeight > 0 ? ActualHeight - 48 : 2000);
+        Fit(card); // (kept inside a small window: see the host's SizeChanged)
         return card;
+    }
+
+    /// <summary>A card kept inside the window, 24 from each edge.</summary>
+    private void Fit(Border card)
+    {
+        card.MaxHeight = Math.Max(200, ActualHeight > 0 ? ActualHeight - 48 : 2000);
+        card.MaxWidth = Math.Max(280, ActualWidth > 0 ? ActualWidth - 48 : 2000);
     }
 
     private static IInputElement? FirstFocusable(DependencyObject root)

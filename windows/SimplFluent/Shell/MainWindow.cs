@@ -168,8 +168,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.PropertyChanged += OnEngine;
         engine.ToolRequested += t => { if (WebWindow.Address(engine.BaseUrl, t) is { } u) new WebWindow(u, t.Title, this).Show(); };
         engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
-        engine.AltaRequested += a => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{a.Course}/assignments/{a.Assignment}"), a.Title, this).Show();
-        engine.MacmillanRequested += a => new WebWindow(new Uri(engine.BaseUrl, $"/courses/{a.Course}/assignments/{a.Assignment}"), a.Title, this).Show();
+        engine.AltaRequested += a => Simpl.Screens.AltaPopup.Show(engine, a, this);
+        engine.MacmillanRequested += a => Simpl.Screens.MacmillanPopup.Show(engine, a, this);
         engine.SettingsRequested += OpenSettings;
         engine.WhatsNewRequested += d => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); };
         engine.SetupRequested += () => SetupSheet.Show(engine, this);
