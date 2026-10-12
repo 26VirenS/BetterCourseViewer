@@ -313,7 +313,7 @@ internal sealed class MarkPages : Grid
                     Point tl = S(q[0], q[1]), tr = S(q[2], q[3]), bl = S(q[4], q[5]), br = S(q[6], q[7]);
                     if (mark.Kind == "Highlight")
                     {
-                        c.Children.Add(new Polygon { Points = new PointCollection { tl, tr, br, bl }, Fill = new SolidColorBrush(K.WithAlpha(color, 0.42 * Math.Max(0.3, mark.Opacity))) });
+                        c.Children.Add(new Polygon { Points = new PointCollection { tl, tr, br, bl }, Fill = new SolidColorBrush(K.WithAlpha(color, mark.Opacity < 1 ? Math.Max(0.2, mark.Opacity) : 0.42)) });
                         continue;
                     }
                     var at = mark.Kind == "Underline" ? 0.08 : 0.5;
@@ -325,7 +325,8 @@ internal sealed class MarkPages : Grid
                 break;
             case "Text":
             {
-                var r = m.Shown(mark);
+                // (a note stands upright from its rectangle's top left corner, however the page is turned)
+                var r = new Rect(S(mark.X1, mark.Y2), new Size(22, 22));
                 var icon = new Canvas { Width = 22, Height = 22 };
                 icon.Children.Add(new Rectangle { Width = 19, Height = 19, RadiusX = 2, RadiusY = 2, Fill = new SolidColorBrush(color), Stroke = new SolidColorBrush(Color.FromRgb(0x40, 0x40, 0x40)), StrokeThickness = 0.8 });
                 Canvas.SetLeft(icon.Children[0], 1.5);

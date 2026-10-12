@@ -351,6 +351,13 @@ internal sealed class MarkModel
             m.Contents = "Text";
             m.FontSize = 14;
         }
+        else
+        {
+            // (viewers keep a note upright from the top left corner of its rectangle in the page's own points: that corner
+            // is put where the note goes on the page as seen)
+            var (ux, uy) = box.ToPdf(x, y);
+            (m.X1, m.Y2, m.X2, m.Y1) = (ux, uy, ux + 22, uy - 22);
+        }
         Insert(m);
         Dirty = true;
         SelPage = SelFrom = SelTo = -1;

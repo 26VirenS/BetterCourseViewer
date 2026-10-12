@@ -220,6 +220,7 @@ internal sealed class GraphPane : Grid
             }
             web.Hold(this);
             Paint();
+            Settle();
         };
         Unloaded += (_, _) =>
         {
@@ -231,6 +232,25 @@ internal sealed class GraphPane : Grid
     }
 
     private void SheetChanged(bool _) => Paint();
+
+    /// <summary>
+    /// The whole tool's web view, a window of its own, follows the pane only when the page is laid out again — not while
+    /// what holds it slides or grows into place (a sheet arriving, the page's entrance): laid out again once those are done.
+    /// </summary>
+    private void Settle()
+    {
+        if (web.Compact) return;
+        var n = 0;
+        var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        t.Tick += (_, _) =>
+        {
+            n++;
+            if (!IsLoaded || n > 6) { t.Stop(); return; }
+            if (n % 2 == 1) Host.Margin = new Thickness(0.01);
+            else Host.Margin = new Thickness(0);
+        };
+        t.Start();
+    }
 
     /// <summary>Over this pane: a sheet it is not in, or the window's narrow navigation pane.</summary>
     private bool Covered()

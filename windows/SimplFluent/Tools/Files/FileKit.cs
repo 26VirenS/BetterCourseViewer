@@ -113,14 +113,14 @@ internal static class FileKit
     }
 
     /// <summary>
-    /// The files a launch hands the tool open first (the screenshot suite: --tool-file C:\a.pdf, several joined by "|",
-    /// or --tool-file sample for a PDF of a page of notes made on the spot).
+    /// The files a launch hands the tool open first (the screenshot suite: --tool-file C:\a.pdf, several joined by "|";
+    /// "sample" for a PDF of two pages of a student's notes made on the spot, so --tool-file "sample|sample" is two).
     /// </summary>
     public static IReadOnlyList<string> Launched()
     {
         if (Launch.Take("", "tool-file") is not { Length: > 0 } v) return Array.Empty<string>();
-        if (v == "sample") return Sample() is { } s ? new[] { s } : Array.Empty<string>();
-        return v.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(File.Exists).ToList();
+        return v.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(p => p == "sample" ? Sample() : p).OfType<string>().Where(File.Exists).ToList();
     }
 
     /// <summary>A PDF of two pages of a student's notes (for the screenshot suite).</summary>
