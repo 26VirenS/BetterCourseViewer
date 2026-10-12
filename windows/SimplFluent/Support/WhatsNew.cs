@@ -27,7 +27,9 @@ public static class WhatsNew
     public static readonly List<Release> Releases = new()
     {
         R("0.2.3", "2026-10-12",
-            ("new", "Uninstall in Settings", "Settings ▸ General removes Simpl, and your data if you ask.")),
+            ("new", "Uninstall in Settings", "Settings ▸ General removes Simpl, and your data if you ask."),
+            ("fixed", "Files in replies", "A reply's attached files show under it, even with no words."),
+            ("fixed", "Setup's last step", "Once your choices are saved, it no longer says it couldn't.")),
         R("0.2.2", "2026-10-12",
             ("improved", "A smoother tour", "The light and its card glide from one part to the next."),
             ("improved", "Pins and file notices", "Pins come and go smoothly; a file's notice fades away."),

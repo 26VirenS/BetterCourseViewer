@@ -220,23 +220,24 @@ public sealed class TopicScreen : Screen
     private FrameworkElement Attachments(List<Attachment> files)
     {
         var v = K.V(4, K.Divider().Margin(8, 0, 8, 4), K.Text("Attached", Ty.Caption, B.Text2).Strong().Margin(8, 0, 0, 2));
-        var blue = K.Tone("blue");
-        foreach (var f in files)
-        {
-            var file = f;
-            void Open() { if (engine.Absolute(file.Url) is { } u) FilePreview.Open(u, file.Name, engine.Web); }
-            var g = K.Columns("auto, *", K.IconTile(SymbolRegular.Attach24, blue, 30).Margin(0, 0, 12, 0).Col(0),
-                K.Wrapped(f.Name, Ty.Body, B.Text, 2).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1));
-            var b = K.Subtle(g, Open, new Thickness(8, 7, 8, 7), 6);
-            b.ToolTip = $"Open {f.Name}";
-            b.ContextMenu = MoreKit.Menu(
-                ("Open", SymbolRegular.Open24, Open),
-                ("Copy Link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(file.Url)?.ToString())));
-            v.Children.Add(b);
-        }
+        foreach (var f in files) v.Children.Add(FileRow(f));
         // (the rows' words line up with the post's, their wash reaching into the card's margin)
         v.Margin = new Thickness(-8, 0, -8, 0);
         return v;
+    }
+
+    /// <summary>A file attached to the post or to a reply.</summary>
+    private FrameworkElement FileRow(Attachment file)
+    {
+        void Open() { if (engine.Absolute(file.Url) is { } u) FilePreview.Open(u, file.Name, engine.Web); }
+        var g = K.Columns("auto, *", K.IconTile(SymbolRegular.Attach24, K.Tone("blue"), 30).Margin(0, 0, 12, 0).Col(0),
+            K.Wrapped(file.Name, Ty.Body, B.Text, 2).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1));
+        var b = K.Subtle(g, Open, new Thickness(8, 7, 8, 7), 6);
+        b.ToolTip = $"Open {file.Name}";
+        b.ContextMenu = MoreKit.Menu(
+            ("Open", SymbolRegular.Open24, Open),
+            ("Copy Link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(file.Url)?.ToString())));
+        return b;
     }
 
     // ---- the replies ----
@@ -286,11 +287,23 @@ public sealed class TopicScreen : Screen
         {
             var head = K.H(9, K.Avatar(e.Author, null, e.Avatar, 30), K.Text(e.Author, Ty.BodyStrong).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
             if (e.When is { Length: > 0 } w) head.Children.Add(K.Text(w, Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
-            FrameworkElement body = e.Rich == true && e.Html is { Length: > 0 } h
-                ? new RichText(h, Link, engine.BaseUrl)
-                : new RichText(WebUtility.HtmlEncode(e.Text).Replace("\r\n", "\n").Replace("\n", "<br>"), Link, engine.BaseUrl);
-            body.Margin = new Thickness(39 - 4, 0, -4, 0); // (RichText's own inset of 4)
-            var v = K.V(6, head, body);
+            var v = K.V(6, head);
+            if (e.Rich == true && e.Html is { Length: > 0 } || e.Text.Length > 0)
+            {
+                FrameworkElement body = e.Rich == true && e.Html is { Length: > 0 } h
+                    ? new RichText(h, Link, engine.BaseUrl)
+                    : new RichText(WebUtility.HtmlEncode(e.Text).Replace("\r\n", "\n").Replace("\n", "<br>"), Link, engine.BaseUrl);
+                body.Margin = new Thickness(39 - 4, 0, -4, 0); // (RichText's own inset of 4)
+                v.Children.Add(body);
+            }
+            // (the files the reply came with — a reply may be a file and nothing else)
+            if (e.Attachments is { Count: > 0 } files)
+            {
+                var list = K.V(0);
+                foreach (var f in files) list.Children.Add(FileRow(f));
+                list.Margin = new Thickness(39 - 8, 0, 0, 0); // (39, less the row's own 8 of wash)
+                v.Children.Add(list);
+            }
             if (d.CanReply == true) v.Children.Add(ReplyLink(e));
             inner = v;
         }

@@ -501,6 +501,7 @@ public sealed class Entry
     public int Depth { get; set; }
     public string? Parent { get; set; }
     public bool? Deleted { get; set; }
+    public List<Attachment>? Attachments { get; set; }
 }
 
 public sealed class TopicData

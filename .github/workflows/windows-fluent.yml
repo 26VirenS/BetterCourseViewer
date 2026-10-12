@@ -229,6 +229,8 @@ jobs:
           Shot 'tool-graph' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'graph'))
           Shot 'pin-graph' '1366x778' 50 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-open', 'graph'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
+          # (tall enough for the replies: one is a file and nothing else, shown with its file)
+          Shot 'topic-replies' '1366x1050' 45 ($mock + @('--appearance', 'dark', '--push', '/courses/101/discussion_topics/7003'))
           # an assignment: a quiz taken, work handed in late, its feedback, Hand In, the rubric
           Shot 'assignment-quiz' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
           Shot 'assignment-narrow' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
