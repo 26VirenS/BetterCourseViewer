@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -218,6 +219,9 @@ internal sealed class PTElementPage : Grid
         private readonly SelectorBar selector;
         private readonly Atom3DView atom = new();
         private readonly ContentControl lower = new() { Focusable = false };
+        /// <summary>The look last drawn in (light or dark, and the accent of the chosen chip).</summary>
+        private bool? shownDark;
+        private Color? shownAccent;
 
         public ModelCard(PTElementPage page)
         {
@@ -239,11 +243,13 @@ internal sealed class PTElementPage : Grid
             PTKit.RoundClip(frame, 8);
             Card = K.Card(K.V(10, head, frame, lower), new Thickness(16));
             Card.TourTarget("ptModel");
-            // (light and dark: the cloud's dots and the legend's colours follow)
+            // (light and dark: the cloud's dots and the legend's colours follow — and a change made while the card was
+            // away, the app keeping its screens, is caught up when it comes back)
             Card.Loaded += (_, _) =>
             {
                 Appearance.Changed -= OnAppearance;
                 Appearance.Changed += OnAppearance;
+                if (shownDark != Appearance.Dark || shownAccent != Appearance.Accent) Refresh();
             };
             Card.Unloaded += (_, _) => Appearance.Changed -= OnAppearance;
             Refresh();
@@ -260,6 +266,8 @@ internal sealed class PTElementPage : Grid
 
         public void Refresh()
         {
+            shownDark = Appearance.Dark;
+            shownAccent = Appearance.Accent;
             var sub = page.Subshell;
             atom.Show(page.e, page.show, sub, page.cloudFocus);
             lower.Content = page.show switch
@@ -316,9 +324,13 @@ internal sealed class PTElementPage : Grid
                     () => page.cloudFocus = id));
             }
 
-            // (the legend: each type's electrons, or the chosen subshell's and the rest's; the nucleus on the right)
-            FrameworkElement Part(string text, Color c, bool outlined = false)
+            // (the legend: each type's electrons, or the chosen subshell's and the rest's; the nucleus on the right — read
+            // out as one, in words: "s, 2 electrons; p, 4 electrons; Nucleus")
+            var said = new List<string>();
+            static string Electrons(int count) => count == 1 ? "1 electron" : $"{count.ToString(CultureInfo.InvariantCulture)} electrons";
+            FrameworkElement Part(string text, string words, Color c, bool outlined = false)
             {
+                said.Add(words);
                 var dot = new Ellipse { Width = 9, Height = 9, Fill = new SolidColorBrush(c), VerticalAlignment = VerticalAlignment.Center };
                 if (outlined)
                 {
@@ -336,18 +348,19 @@ internal sealed class PTElementPage : Grid
                 {
                     var kind = t;
                     var count = cloud.Subs.Where(s => s.L == kind).Sum(s => s.Count);
-                    if (count > 0) Add(Part($"{"spdf"[t]} · {count.ToString(CultureInfo.InvariantCulture)} e⁻", TypeColor(t)));
+                    if (count > 0) Add(Part($"{"spdf"[t]} · {count.ToString(CultureInfo.InvariantCulture)} e⁻", $"{"spdf"[t]}, {Electrons(count)}", TypeColor(t)));
                 }
             }
             else
             {
-                Add(Part($"{chosen.Name} · {chosen.Count.ToString(CultureInfo.InvariantCulture)} e⁻", TypeColor(chosen.L)));
+                Add(Part($"{chosen.Name} · {chosen.Count.ToString(CultureInfo.InvariantCulture)} e⁻", $"{chosen.Name}, {Electrons(chosen.Count)}", TypeColor(chosen.L)));
                 var rest = cloud.Subs.Where(s => !ReferenceEquals(s, chosen)).Sum(s => s.Count);
-                if (rest > 0) Add(Part($"Rest · {rest.ToString(CultureInfo.InvariantCulture)} e⁻", K.Hex(dark ? CloudRaster.RestDark : CloudRaster.RestLight), outlined: true));
+                if (rest > 0) Add(Part($"Rest · {rest.ToString(CultureInfo.InvariantCulture)} e⁻", $"Rest, {Electrons(rest)}", K.Hex(dark ? CloudRaster.RestDark : CloudRaster.RestLight), outlined: true));
             }
-            var nucleus = Part("Nucleus", K.Hex(dark ? CloudRaster.NucleusDark : CloudRaster.NucleusLight));
+            var nucleus = Part("Nucleus", "Nucleus", K.Hex(dark ? CloudRaster.NucleusDark : CloudRaster.NucleusLight));
             nucleus.VerticalAlignment = VerticalAlignment.Top;
-            var legend = K.Columns("*, auto", parts.Col(0), nucleus.Col(1));
+            var legend = new ReadAsOne { Child = K.Columns("*, auto", parts.Col(0), nucleus.Col(1)) };
+            System.Windows.Automation.AutomationProperties.SetName(legend, string.Join("; ", said));
 
             var detail = chosen == null ? null : K.Wrapped(CloudDetail(chosen), Ty.Caption, B.Text).Tabular();
             var caption = K.Wrapped(CloudCaption(cloud, chosen), Ty.Caption, B.Text2);
@@ -419,6 +432,22 @@ internal sealed class PTElementPage : Grid
             var total = page.e.Number + page.e.Neutrons;
             if (total > 72) g.Children.Add(K.Text($"72 of {total} nucleons drawn", Ty.Caption, B.Text2).Col(4));
             return g;
+        }
+    }
+
+    /// <summary>Parts read out as one piece of text, by its automation name (the Mac's .accessibilityElement(children:
+    /// .combine)): a screen reader hears the whole legend, not each dot's words on their own.</summary>
+    private sealed class ReadAsOne : Border
+    {
+        protected override AutomationPeer OnCreateAutomationPeer() => new Peer(this);
+
+        private sealed class Peer : FrameworkElementAutomationPeer
+        {
+            public Peer(FrameworkElement owner) : base(owner) { }
+            protected override List<AutomationPeer>? GetChildrenCore() => null;
+            protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Text;
+            protected override bool IsControlElementCore() => true;
+            protected override bool IsContentElementCore() => true;
         }
     }
 

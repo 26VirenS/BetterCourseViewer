@@ -183,6 +183,13 @@ internal sealed class Atom3DView : Border
         var cloudShown = mode == PTModel.Cloud;
         var built = scene;
         if (!cloudShown && built == null) return;
+        // (the cloud is drawn in software: scrolled out of sight — still "visible" to WPF — it rests, its last picture
+        // kept, and turns on from there when it comes back)
+        if (cloudShown && !OnScreen())
+        {
+            last = r.RenderingTime;
+            return;
+        }
         if (last is { } l)
         {
             var dt = (r.RenderingTime - l).TotalSeconds;
@@ -203,6 +210,26 @@ internal sealed class Atom3DView : Border
         }
         last = r.RenderingTime;
         if (cloudShown) cloud.Draw();
+    }
+
+    /// <summary>Whether some of the view is inside every scrolling area it sits in (WPF calls an element scrolled out of
+    /// its page visible all the same).</summary>
+    private bool OnScreen()
+    {
+        var bounds = new Rect(RenderSize);
+        for (var p = VisualTreeHelper.GetParent(this); p != null; p = VisualTreeHelper.GetParent(p))
+        {
+            if (p is not ScrollViewer sv) continue;
+            try
+            {
+                if (!TransformToAncestor(sv).TransformBounds(bounds).IntersectsWith(new Rect(0, 0, sv.ActualWidth, sv.ActualHeight))) return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return true;
+            }
+        }
+        return true;
     }
 }
 
@@ -231,7 +258,10 @@ internal sealed class CloudPicture : FrameworkElement
     private Quaternion turn = Quaternion.Identity;
     private double distance = CloudRaster.CameraDistance;
     private bool dirty;
-    private TimeSpan lastDraw = TimeSpan.FromSeconds(-1);
+    /// <summary>The spin's beat: a draw every 1/30 s, give or take a few ms for when frames happen to come (at 60 Hz the
+    /// second frame after a draw is 33.3 ms on, a hair either side of the beat).</summary>
+    private static readonly TimeSpan Beat = TimeSpan.FromSeconds(1.0 / 30), Slack = TimeSpan.FromMilliseconds(5);
+    private TimeSpan due;
 
     public CloudPicture()
     {
@@ -311,7 +341,7 @@ internal sealed class CloudPicture : FrameworkElement
     {
         if (!dirty || cloud is not { } c || ActualWidth < 1 || ActualHeight < 1) return;
         var now = clock.Elapsed;
-        if (!force && (now - lastDraw).TotalSeconds < 1.0 / 30) return;
+        if (!force && now < due - Slack) return;
         var dpi = VisualTreeHelper.GetDpi(this);
         var w = (int)Math.Round(ActualWidth * dpi.DpiScaleX);
         var h = (int)Math.Round(ActualHeight * dpi.DpiScaleY);
@@ -333,7 +363,9 @@ internal sealed class CloudPicture : FrameworkElement
         raster.Draw(x, y, z, c.SubIndex, subL, focus, frame, r, distance, dpi.DpiScaleY, dark);
         bitmap.WritePixels(new Int32Rect(0, 0, w, h), raster.Pixels, w * 4, 0);
         dirty = false;
-        lastDraw = now;
+        // (on the beat, the next is one beat on: steady 30 a second at 60, 90 or 120 Hz, and never more than 30 at any
+        // rate; input, or a beat missed, starts it afresh from now)
+        due = force || now > due + Slack ? now + Beat : due + Beat;
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
