@@ -322,6 +322,7 @@ public sealed class CourseGradesScreen : Screen
         toggle.Unchecked += (_, _) => SetWhatIf(false);
         toggle.ToolTip = whatIf ? "Turn What-If off: your real scores come back" : "What-If: try scores and see where your grade would land";
         AutomationProperties.SetName(toggle, "What-If Scores");
+        Shell.Tour.Mark(toggle, Shell.TourSpot.WhatIfSwitch);
         var row = K.Columns("auto, *, auto", icon.Margin(0, 0, 12, 0).Col(0), words.Col(1), toggle.Margin(8, 0, 0, 0).Col(2));
         var v = K.V(10, row);
         if (whatIf && (d.GpaIf != null || drafts.Count > 0 || added.Count > 0))
@@ -404,6 +405,7 @@ public sealed class CourseGradesScreen : Screen
     private void SetWhatIf(bool on)
     {
         if (on == whatIf) return;
+        Shell.Tour.Did(on ? Shell.TourEvent.WhatIfOn : Shell.TourEvent.WhatIfOff); // (the tour's what-if steps)
         applying.Stop();
         if (!on)
         {
@@ -674,7 +676,13 @@ public sealed class CourseGradesScreen : Screen
             PlaceholderText = "—", Width = 66, MinWidth = 0, TextAlignment = TextAlignment.Right, ClearButtonEnabled = false,
             VerticalAlignment = VerticalAlignment.Center,
         }.Tabular();
-        tb.TextChanged += (_, _) => { if (!quiet) Typed(id, tb.Text); };
+        tb.TextChanged += (_, _) =>
+        {
+            if (quiet) return;
+            Typed(id, tb.Text);
+            Shell.Tour.Did(Shell.TourEvent.WhatIfEdited); // (the tour's "Change a score")
+        };
+        Shell.Tour.Mark(tb, Shell.TourSpot.WhatIfScore);
         tb.PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter) { ApplyNow(); e.Handled = true; }

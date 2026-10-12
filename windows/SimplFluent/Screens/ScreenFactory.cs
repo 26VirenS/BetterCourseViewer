@@ -14,6 +14,13 @@ public static class ScreenFactory
         PlaceKind.Todo => new TodoScreen(engine),
         PlaceKind.Calendar => new CalendarScreen(engine),
         PlaceKind.Notifications => new NotificationsScreen(engine),
+        PlaceKind.Grades => new GradesScreen(engine),
+        PlaceKind.Courses => new CoursesScreen(engine),
+        PlaceKind.Home when p.Ctx != null => new ContextHomeScreen(engine, p.Ctx),
+        PlaceKind.Section when p.Arg == "grades" && p.Ctx is { } ctx && ctx.StartsWith("courses/") => new CourseGradesScreen(engine, ctx),
+        PlaceKind.Section when p.Ctx != null && p.Arg != null => new SectionScreen(engine, p.Ctx, p.Arg),
+        PlaceKind.Inbox => new InboxScreen(engine),
+        PlaceKind.Groups => new GroupsScreen(engine),
         PlaceKind.Search => new SearchScreen(engine, p.Arg ?? ""),
         PlaceKind.ExternalTools => new ExternalToolsScreen(engine),
         PlaceKind.Tools => new ToolsScreen(engine),
@@ -29,6 +36,11 @@ public static class ScreenFactory
         return r.Kind switch
         {
             RouteKind.Topic => new TopicScreen(engine, r.A, r.B),
+            RouteKind.Conversation => new ConversationScreen(engine, r.A),
+            RouteKind.Page => new PageScreen(engine, r.A, r.B),
+            RouteKind.Folder => new FolderScreen(engine, r.A, r.B, r.C),
+            RouteKind.Section when r.B == "grades" && r.A.StartsWith("courses/") => new CourseGradesScreen(engine, r.A),
+            RouteKind.Section => new SectionScreen(engine, r.A, r.B),
             RouteKind.Web => new WebScreen(engine, engine.Absolute(r.A), string.IsNullOrEmpty(r.B) ? engine.LmsName : r.B),
             _ => new WebScreen(engine, UrlOf(engine, r), TitleOf(r)),
         };

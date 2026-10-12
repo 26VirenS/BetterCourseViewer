@@ -138,16 +138,8 @@ public sealed partial class TodoScreen
         unit.ContextMenu = menu;
         unit.ContextMenuOpening += (_, _) => FillMenu(menu, row);
 
-        // its quick look, under it while it is open
-        var slot = new Border { Visibility = Visibility.Collapsed };
-        if (previewId == row.Id)
-        {
-            slot.Child = PreviewCard(row);
-            slot.Visibility = Visibility.Visible;
-        }
         rowButtons[row.Id] = press;
-        slots[row.Id] = slot;
-        return K.V(0, unit, slot);
+        return unit;
     }
 
     /// <summary>A row's priority as a flag at its end, a menu of the four levels under it (the Mac's TodoPriorityMenu): the

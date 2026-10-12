@@ -296,6 +296,7 @@ public sealed class GradesScreen : Screen
     {
         var color = K.Hex(r.Color);
         var rings = GradesKit.Rings(r.Pct, color, GradesKit.Bands(r.Cats), 3, 48, 5.5, 3.5, 1.5);
+        rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover); // (the tour's "A quick breakdown")
         var words = K.V(2, K.Text(r.Code, Ty.BodyStrong));
         if (!string.IsNullOrEmpty(r.Name) && r.Name != r.Code) words.Children.Add(K.Text(r.Name!, Ty.Caption, B.Text2));
         words.Children.Add(K.Text(GradesKit.GradedLine(r), Ty.Caption, B.Text3));
@@ -383,6 +384,8 @@ public sealed class GradesScreen : Screen
     {
         var color = K.Hex(r.Color);
         var rings = GradesKit.Rings(r.Pct, color, GradesKit.Bands(r.Cats), 3, 66, 7, 4.5, 2);
+        Shell.Tour.Mark(rings, Shell.TourSpot.GradeRing);
+        rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover);
         var words = K.V(2, K.Text(r.Code, Ty.BodyStrong));
         if (!string.IsNullOrEmpty(r.Name) && r.Name != r.Code) words.Children.Add(K.Text(r.Name!, Ty.Caption, B.Text2));
         words.Children.Add(K.Text(GradesKit.GradedLine(r), Ty.Caption, B.Text3));
@@ -410,6 +413,7 @@ public sealed class GradesScreen : Screen
         }
         var content = K.V(14, header, groups);
         var card = K.CardButton(content, () => engine.Go(Place.Section($"courses/{r.Id}", "grades")), 8, new Thickness(18));
+        Shell.Tour.Mark(card, Shell.TourSpot.GradeDetails); // (the tour's "What if?": a card opens every grade)
         card.VerticalContentAlignment = VerticalAlignment.Top;
         card.ToolTip = $"{r.Code}: every assignment’s grade, and what-if scores";
         AutomationProperties.SetName(card, Spoken(r));
@@ -434,6 +438,8 @@ public sealed class GradesScreen : Screen
 
         // its rings, code and name, score, letter and target
         var rings = GradesKit.Rings(row.Pct, color, GradesKit.Bands(row.Cats), 4, 124, 11, 7, 2.5);
+        Shell.Tour.Mark(rings, Shell.TourSpot.GradeRing);
+        rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover);
         var words = K.V(5, K.Wrapped(row.Code, Ty.Subtitle, B.Text, 2));
         if (!string.IsNullOrEmpty(row.Name) && row.Name != row.Code) words.Children.Add(K.Wrapped(row.Name!, Ty.Body, B.Text2, 2));
         var score = new WrapPanel { Orientation = Orientation.Horizontal };
@@ -449,6 +455,7 @@ public sealed class GradesScreen : Screen
         // its own grades, its home, its grading scale
         var every = K.Button("Every Grade & What-If", () => engine.Go(Place.Section($"courses/{row.Id}", "grades")), accent: true, icon: SymbolRegular.Wand24);
         every.ToolTip = "Every assignment’s grade, and scores to try";
+        Shell.Tour.Mark(every, Shell.TourSpot.GradeDetails);
         var open = K.Button("Open Course", () => engine.Go(Place.Home($"courses/{row.Id}")), icon: SymbolRegular.ArrowUpRight24);
         var scaleButton = K.Button("Grading Scale…", () => GradesSheets.Scale(engine, row.Id, row.Code, row.Scale ?? scale, row.OwnScale == true), icon: SymbolRegular.Options24);
         scaleButton.ToolTip = row.OwnScale == true ? "Your instructor’s cutoffs for each letter" : "Set each letter’s cutoff as your instructor did";

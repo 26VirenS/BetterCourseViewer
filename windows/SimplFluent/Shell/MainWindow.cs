@@ -162,6 +162,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.SettingsRequested += OpenSettings;
         engine.WhatsNewRequested += d => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); };
         engine.SetupRequested += () => SetupSheet.Show(engine, this);
+        engine.NewMessageRequested += () => Simpl.Screens.ComposeSheet.Show(engine, this);
+        Simpl.Screens.CourseCompose.Hook = (to, context) => Simpl.Screens.ComposeSheet.Show(engine, this, new[] { to }, context);
         engine.NewTaskRequested += () =>
         {
             if (Simpl.Screens.CalendarScreen.TakeNewTaskDay() is { } day) Simpl.Screens.NewTaskSheet.StartDay = day;
@@ -375,6 +377,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (ctrl && e.Key == Key.OemComma) { OpenSettings(); e.Handled = true; return; }
         if (ctrl && e.Key == Key.R || e.Key == Key.F5) { engine?.Refresh(); e.Handled = true; return; }
         if (ctrl && e.Key == Key.F) { shell?.FocusSearch(); e.Handled = true; return; }
+        if (ctrl && (Keyboard.Modifiers & ModifierKeys.Shift) != 0 && e.Key == Key.N) { engine?.AskNewMessage(); e.Handled = true; return; }
         if (ctrl && e.Key == Key.N) { engine?.AskNewTask(); e.Handled = true; }
     }
 

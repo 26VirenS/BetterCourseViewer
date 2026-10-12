@@ -481,6 +481,8 @@ public sealed class PinBar : StackPanel
         Orientation = Orientation.Horizontal;
         VerticalAlignment = VerticalAlignment.Center;
         Margin = new Thickness(0, 0, 6, 0);
+        // (the screenshot suite: --pin calc,ptable pins those tools first)
+        if (Launch.Take("", "pin") is { Length: > 0 } pinned) Prefs.Set("pinnedTools", pinned);
         ToolsPins.Changed += Draw;
         tick.Tick += (_, _) => { if (timer?.Active == true) Draw(); };
         Loaded += (_, _) => { Hook(); Draw(); };

@@ -74,15 +74,9 @@ public sealed partial class TodoScreen : Screen
     public override void Hide()
     {
         base.Hide();
-        ClosePreview(animated: false); // (the window gone somewhere else takes the quick look with it)
+        WorkPreview.Dismiss(); // (the window gone somewhere else takes the quick look with it)
     }
 
-    public override bool Escape()
-    {
-        if (previewId == null) return false;
-        ClosePreview();
-        return true;
-    }
 
     // ---- the page ----
 
@@ -99,12 +93,10 @@ public sealed partial class TodoScreen : Screen
         var sub = d == null ? null : string.Join(" · ", new[] { TodoWords.Text(d.Sub), $"{d.Done} of {d.Total} done" }.Where(s => s != null));
         if (sub != subtitle) { subtitle = sub; HeaderChange(); }
         if (d == null) return K.LoadState(data.Error, () => data.Reload(engine, "todo"));
-        if (previewId != null && FindRow(previewId) == null) { previewId = null; previewToken++; } // (its row has gone: so has its quick look)
 
         var width = Math.Max(320, Width);
         var pad = Pad(width);
         rowButtons.Clear();
-        slots.Clear();
         firstCard = null;
         side = null;
         var root = new Grid();
@@ -131,7 +123,6 @@ public sealed partial class TodoScreen : Screen
             listHost.Content = K.V(22, Summary(d, width), List(d));
             root.Children.Add(Adopt(listScroller));
         }
-        root.PreviewMouseDown += OutsideClick;
         ShotPreview(d);
         return root;
     }
@@ -257,6 +248,6 @@ public sealed partial class TodoScreen : Screen
         shotAsked = true;
         await Task.Delay(1200);
         if (Launch.Take("preview") == null) return;
-        if (FindRow(first.Id) is { } row) OpenPreview(row);
+        if (FindRow(first.Id) is { } row) Press(row);
     }
 }
