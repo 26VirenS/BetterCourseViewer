@@ -305,14 +305,16 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   hydrogen-like orbital (its radial nodes kept) whose exponent gives it the mean radius of Slater's orbital for Slater's
   Z_eff (summed in whole hundredths), its electrons in its real orbitals by Hund's rule; the dots come from a radial
   table per (n, l) (inverse CDF) and |Y|² by rejection, drawn by SplitMix64 seeded with the atomic number in a fixed
-  order — up to 40 000 for an atom, by electron. Drawn to scale as SceneKit points (`AtomScene.cloud`, `CloudState`),
-  one node a kind (s, p, d, f, grey): ink in light, light that adds up in dark; the nucleus a dot on a halo over them,
-  not to scale; tipped so z stands up, turning once in 40 s and a few dots drawn afresh ten times a second, unless
-  Reduce Motion is on or the screenshot suite is picturing it. Chips under it choose All or one subshell: that one
-  coloured, the rest grey, the view framed by its 95% radius, its Z_eff and mean distance said, and how much larger it
-  is drawn than in All. The tour's Orbitals step is still done by Orbitals alone. `-SimplPTModel cloud` and
-  `-SimplPTSubshell 3d` (or `all`) set the view for the screenshot suite (`light-55k-ptable-cloud`,
-  `dark-55l-ptable-cloud`); `-SimplCloudCheck YES` writes the model's test vectors to the console (`cloud-check …`).
+  order — 12 000 + 1 500 a proton, 40 000 at most, shared out by electron with at least 600 to a subshell (so a few
+  heavy atoms have a little more: Rg 40 200, the most). Drawn to scale as SceneKit points (`AtomScene.cloud`,
+  `CloudState`), one node a kind (s, p, d, f, grey): ink in light, light that adds up in dark; the nucleus a dot on a
+  halo over them, not to scale; tipped so z stands up, turning once in 40 s and a few dots drawn afresh ten times a
+  second, unless Reduce Motion is on or the screenshot suite is picturing it. Chips under it choose All or one subshell:
+  that one coloured, the rest grey, the view framed by its 95% radius, its Z_eff and mean distance said (in pm, to one
+  decimal only under 9.95, so never "10.0"), and how much larger it is drawn than in All. The tour's Orbitals step is
+  still done by Orbitals alone. `-SimplPTModel cloud` and `-SimplPTSubshell 3d` (or `all`) set the view for the
+  screenshot suite (`light-55k-ptable-cloud`, `dark-55l-ptable-cloud`); `-SimplCloudCheck YES` writes the model's test
+  vectors to the console (`cloud-check …`).
 
 ## Building and running
 

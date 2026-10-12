@@ -319,10 +319,11 @@ enum ElectronCloud {
     /// Under the nucleus's dot, so it shows on a crowded core.
     static func haloColor(dark: Bool) -> NSColor { NSColor(ptHex: dark ? "1c1c1e" : "ffffff") }
 
-    /// "2p² · effective nuclear charge 3.25 · on average 81 pm from the nucleus".
+    /// "2p² · effective nuclear charge 3.25 · on average 81 pm from the nucleus". One decimal below 9.95 pm, where it
+    /// still reads under 10; from there a whole number (holmium's 3s at 9.97 pm reads "10", not "10.0").
     static func detail(_ s: Sub) -> String {
         let v = s.meanRadius * bohrPm
-        let pm = v < 10 ? String(format: "%.1f", v) : String(Int(v.rounded()))
+        let pm = v < 9.95 ? String(format: "%.1f", v) : String(Int(v.rounded()))
         return "\(s.id)\(PTConfig.superscript(s.count)) · effective nuclear charge \(String(format: "%.2f", s.zeff)) · on average \(pm) pm from the nucleus"
     }
 
