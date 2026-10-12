@@ -341,6 +341,7 @@ private struct TopicComposer: View {
     @State private var sending = false
     @State private var error: String?
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var empty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -374,6 +375,7 @@ private struct TopicComposer: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.sCallout)
                     .foregroundStyle(.red)
+                    .transition(.opacity)
             }
             HStack(spacing: 10) {
                 Text("⌘↩ to post · esc to cancel")
@@ -406,14 +408,18 @@ private struct TopicComposer: View {
     private func go() {
         guard !empty, !sending else { return }
         sending = true
-        error = nil
+        withAnimation(errorMotion) { error = nil }
         Task {
             do {
                 try await send(text)
             } catch {
-                self.error = error.localizedDescription
+                withAnimation(errorMotion) { self.error = error.localizedDescription }
             }
             sending = false
         }
     }
+
+    /// (1.3.76) Why it could not be posted fades in and out, the buttons under it moving on the snappy spring, as the
+    /// Inbox's reply bar has it; under Reduce Motion a short ease.
+    private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
 }

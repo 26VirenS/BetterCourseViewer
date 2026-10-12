@@ -970,6 +970,7 @@ private struct CommentComposer: View {
     @State private var sending = false
     @State private var error: String?
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var empty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -1001,6 +1002,7 @@ private struct CommentComposer: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.sCallout)
                     .foregroundStyle(.red)
+                    .transition(.opacity)
             }
             HStack(spacing: 8) {
                 Text("⌘↩ to send · esc to cancel")
@@ -1032,16 +1034,20 @@ private struct CommentComposer: View {
     private func go() {
         guard !empty, !sending else { return }
         sending = true
-        error = nil
+        withAnimation(errorMotion) { error = nil }
         Task {
             do {
                 try await send(text)
             } catch {
-                self.error = error.localizedDescription
+                withAnimation(errorMotion) { self.error = error.localizedDescription }
             }
             sending = false
         }
     }
+
+    /// (1.3.76) Why it could not be sent fades in and out, the buttons under it moving on the snappy spring, as the
+    /// Inbox's reply bar has it; under Reduce Motion a short ease.
+    private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
 }
 
 /// Hand In, as a sheet over the assignment: the kinds it takes from here (text, a web address, files — chosen in an
@@ -1066,6 +1072,7 @@ private struct HandInSheet: View {
     let done: () async -> Void
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var type: String
     @State private var text = ""
     @State private var url = ""
@@ -1555,7 +1562,7 @@ private struct HandInSheet: View {
     private func submit() {
         guard ready, !sending else { return }
         sending = true
-        error = nil
+        withAnimation(errorMotion) { error = nil }
         var args: [String: Any] = ["course": assignment.course, "id": assignment.id, "type": type, "comment": note]
         switch type {
         case "online_text_entry": args["text"] = text
@@ -1568,9 +1575,13 @@ private struct HandInSheet: View {
                 dismiss()
                 await done() // (after the sheet goes: the assignment shows the work arriving)
             } catch {
-                self.error = error.localizedDescription
+                withAnimation(errorMotion) { self.error = error.localizedDescription }
             }
             sending = false
         }
     }
+
+    /// (1.3.76) Why it could not be handed in comes and goes as a row of the form does (its own insert and removal),
+    /// on the snappy spring; under Reduce Motion a short ease.
+    private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
 }

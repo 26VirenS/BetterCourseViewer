@@ -470,7 +470,7 @@ struct SetupScreen: View {
     private func save(_ d: SetupChoices) async {
         guard !saving else { return }
         saving = true
-        error = nil
+        withAnimation(errorMotion) { error = nil }
         let picked = d.courses.filter { chosen.contains($0.id) }
         let nicks = Dictionary(picked.map { ($0.id, nicknames[$0.id] ?? "") }, uniquingKeysWith: { first, _ in first })
         let aims = Dictionary(picked.map { ($0.id, targets[$0.id] ?? "A+") }, uniquingKeysWith: { first, _ in first })
@@ -482,10 +482,14 @@ struct SetupScreen: View {
             dismiss()
             Task { await NotificationAsk.afterSetup(engine) } // (1.2.1: notifications asked for, once the setup is done)
         } catch {
-            self.error = error.localizedDescription
+            withAnimation(errorMotion) { self.error = error.localizedDescription }
         }
         saving = false
     }
+
+    /// (1.3.76) Why it could not be saved comes and goes as a row of the read-back does (its own insert and removal),
+    /// on the snappy spring; under Reduce Motion a short ease.
+    private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
 }
 
 /// A rare moment's pieces arriving one after another (the setup's welcome): each rises a little and fades in, a beat

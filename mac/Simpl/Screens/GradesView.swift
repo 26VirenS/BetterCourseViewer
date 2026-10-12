@@ -1921,6 +1921,7 @@ private struct GradingScaleSheet: View {
     let own: Bool
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var values: [String: String] = [:]
     @State private var error: String?
     @State private var saving = false
@@ -1994,17 +1995,17 @@ private struct GradingScaleSheet: View {
         for s in letters {
             let raw = (values[s.letter] ?? "").trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "%", with: "")
             guard let v = Double(raw), v >= 0, v <= 100 else {
-                error = "\(s.letter) needs a percentage from 0 to 100."
+                withAnimation(errorMotion) { error = "\(s.letter) needs a percentage from 0 to 100." }
                 return nil
             }
             guard v < last else {
-                error = "\(s.letter)’s cutoff must be lower than the letter above it."
+                withAnimation(errorMotion) { error = "\(s.letter)’s cutoff must be lower than the letter above it." }
                 return nil
             }
             last = v
             out[s.letter.replacingOccurrences(of: "−", with: "-")] = v
         }
-        error = nil
+        withAnimation(errorMotion) { error = nil }
         return out
     }
 
@@ -2018,7 +2019,11 @@ private struct GradingScaleSheet: View {
             engine.changed()
             dismiss()
         } catch {
-            self.error = error.localizedDescription
+            withAnimation(errorMotion) { self.error = error.localizedDescription }
         }
     }
+
+    /// (1.3.76) Why the scale could not be saved comes and goes as a row of the form does (its own insert and removal),
+    /// on the snappy spring; under Reduce Motion a short ease.
+    private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
 }
