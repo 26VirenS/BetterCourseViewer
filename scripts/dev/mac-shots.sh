@@ -140,12 +140,9 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset Benzene
   SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NaNO₃"
   SIZE=1440x920 shoot light-55d-ptable-molecule 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Ethanol
-  # (1.3.74) shapes laid out by VSEPR: carbon dioxide straight and water at 104.5° (the facts list the centre's angles),
-  # and the Lewis maker's polarity from them — CO₂ and XeF₄ nonpolar
+  # (1.3.74) shapes laid out by VSEPR: carbon dioxide straight, water bent
   SIZE=1440x920 shoot light-55k-molecule-co2 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule "Carbon dioxide"
   SIZE=1440x920 shoot light-55l-molecule-water 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Water
-  SIZE=1440x920 shoot light-55m-lewis-co2 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "CO₂"
-  SIZE=1440x920 shoot light-55n-lewis-xef4 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "XeF₄"
   # (1.3.59) the tour, at its Draw your own step; (1.3.61) and at its first, the table's carbon lit
   SIZE=1440x920 shoot light-55h-ptable-tour 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 4
   SIZE=1440x920 shoot light-55i-ptable-tour-start 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 0
