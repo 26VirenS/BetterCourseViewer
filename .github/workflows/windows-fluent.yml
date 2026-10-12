@@ -205,6 +205,7 @@ jobs:
           Shot 'preview' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'preview'))
           Shot 'tour-start' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'tour'))
           Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:12'))
+          Shot 'tour-score' '1280x600' 45 ($mock + @('--appearance', 'dark', '--place', 'section:courses/101:grades', '--what-if', '--open', 'tour:5'))
           Shot 'taskbar-ask' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'taskbar'))
           Shot 'theme-dusk' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme', 'Dusk'))
           # To Do, Calendar, Notifications
