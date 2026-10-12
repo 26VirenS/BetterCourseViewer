@@ -37,14 +37,18 @@ public sealed class Loader<T> where T : class
     {
         Loading = true;
         Support.Shot.Began();
+        var started = DateTime.UtcNow;
+        if (Support.Launch.IsDevelopment) Support.Log.Write($"read {name}…");
         try
         {
             Data = await engine.Call<T>(name, a);
             Error = null;
+            if (Support.Launch.IsDevelopment) Support.Log.Write($"read {name}: {(DateTime.UtcNow - started).TotalSeconds:0.0}s");
         }
         catch (Exception e)
         {
             if (Data == null) Error = e.Message;
+            Support.Log.Write($"read {name} failed after {(DateTime.UtcNow - started).TotalSeconds:0.0}s: {e.Message}");
         }
         finally
         {

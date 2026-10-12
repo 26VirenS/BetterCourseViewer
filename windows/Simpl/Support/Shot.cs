@@ -40,6 +40,7 @@ public static class Shot
             var quiet = everBegan && inFlight == 0 && (DateTime.UtcNow - lastActivity).TotalSeconds > 2.5;
             if (since < 3 || (since < after && !(settle && quiet && since > 8))) return;
             t.Stop();
+            Log.Write($"picture at {since:0.0}s (in flight {inFlight}, quiet {quiet})");
             Take(file);
             Application.Current.Shutdown();
         };

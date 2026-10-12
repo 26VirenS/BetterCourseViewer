@@ -87,6 +87,7 @@ public sealed class MainWindow : Window
     private void Phased()
     {
         if (engine == null) return;
+        if (Launch.IsDevelopment) Log.Write($"phase {engine.Phase}");
         // (signing in: the school's page is what shows; otherwise the app's screens, over it)
         host.Visibility = engine.Phase == Phase.Web ? Visibility.Collapsed : Visibility.Visible;
         if (host.Visibility == Visibility.Visible)
