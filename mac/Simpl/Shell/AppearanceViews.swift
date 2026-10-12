@@ -13,6 +13,8 @@ import SwiftUI
 struct RadialColorPicker: View {
     let value: AppearanceStore.Custom
     let change: (AppearanceStore.Custom) -> Void
+    /// (1.3.76) On its way out: it shrinks back and fades as it grew in, before its row is taken away.
+    var leaving = false
     var done: () -> Void = {}
     @State private var mode: Mode?
     @State private var shown = UserDefaults.standard.string(forKey: "SimplShotFile") != nil // (a screenshot: already in)
@@ -54,8 +56,8 @@ struct RadialColorPicker: View {
         }
         .frame(width: size, height: size)
         .shadow(color: .black.opacity(0.28), radius: 24, y: 14)
-        .scaleEffect(shown || reduceMotion ? 1 : 0.92)
-        .opacity(shown ? 1 : 0)
+        .scaleEffect((shown && !leaving) || reduceMotion ? 1 : 0.92)
+        .opacity(shown && !leaving ? 1 : 0)
         .onAppear { withAnimation(Motion.gentle) { shown = true } }
         .contentShape(Circle())
         .gesture(

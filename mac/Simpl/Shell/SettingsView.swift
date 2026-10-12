@@ -296,6 +296,8 @@ private struct AppearancePane: View {
     @ObservedObject private var store = AppearanceStore.shared
     @State private var look = AppLook(rawValue: UserDefaults.standard.string(forKey: "SimplAppearance") ?? "") ?? .system
     @State private var picking = false
+    /// (1.3.76) The picker going: its row stays until it has shrunk back and faded (closePicker).
+    @State private var leaving = false
     @State private var slot: PhotoSlot = AppearancePane.launchSlot
 
     /// The screenshot suite's -SimplPhotoSlot graded (or another place): the editor opens on it.
@@ -346,9 +348,7 @@ private struct AppearancePane: View {
                 }
                 // (1.3.2) the picker in the pane, under the colours, as the web's opens in its panel
                 if picking {
-                    RadialColorPicker(value: store.custom, change: { store.setCustom($0) }, done: {
-                        withAnimation(Motion.gentle) { picking = false }
-                    })
+                    RadialColorPicker(value: store.custom, change: { store.setCustom($0) }, leaving: leaving, done: closePicker)
                     .padding(.vertical, 18)
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
@@ -428,7 +428,14 @@ private struct AppearancePane: View {
     private var customDot: some View {
         let on = store.wearingCustom
         return Button {
-            withAnimation(Motion.gentle) { picking.toggle() }
+            if picking && !leaving {
+                closePicker()
+            } else {
+                withAnimation(Motion.gentle) { // (pressed again on its way out, it comes back from where it is)
+                    leaving = false
+                    picking = true
+                }
+            }
             if !store.wearingCustom { store.setCustom(store.custom) }
         } label: {
             ZStack {
@@ -444,6 +451,19 @@ private struct AppearancePane: View {
         .buttonStyle(.plain)
         .help("Any colour")
         .accessibilityLabel(Text("Custom colour"))
+    }
+
+    /// (1.3.76) The picker put away as it came: it shrinks back to 0.92 and fades on the gentle spring (fades only,
+    /// under Reduce Motion), and then its row closes. (A grouped form's row comes and goes by the form's own animation,
+    /// not surely by a transition of its own; so the way out is the picker's, as the way in is.)
+    private func closePicker() {
+        guard picking, !leaving else { return }
+        withAnimation(Motion.gentle) {
+            leaving = true
+        } completion: {
+            guard leaving else { return } // (opened again on its way out: it stays)
+            withAnimation(Motion.gentle) { picking = false }
+        }
     }
 }
 
