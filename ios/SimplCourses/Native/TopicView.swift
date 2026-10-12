@@ -104,9 +104,11 @@ struct TopicView: View {
         guard posted else { return }
         posted = false
         Task {
+            // (a topic that wanted a reply first showed none before it: every reply is new, so the page stays put)
+            let gated = model.data?.needFirst == true
             let before = Set(model.data?.entries.map(\.id) ?? [])
             await model.load(engine, "topic", ["ctx": ctx, "id": id], animated: true)
-            jump = model.data?.entries.first { !before.contains($0.id) }?.id
+            if !gated { jump = model.data?.entries.first { !before.contains($0.id) }?.id }
             engine.changed()
         }
     }
@@ -219,7 +221,8 @@ struct ReplySheet: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                // (not while sending, as a message's or a hand-in's: what was sent reloads when the sheet goes, 1.7.5)
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(sending) }
                 ToolbarItem(placement: .confirmationAction) {
                     if sending {
                         ProgressView()
