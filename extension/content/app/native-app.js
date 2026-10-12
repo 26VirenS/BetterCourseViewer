@@ -1213,7 +1213,11 @@
         const p = people.get(String(e.user_id)) || {};
         const avatar = p.avatar_image_url && !/avatar-50|no_pic|dotted_pic/.test(p.avatar_image_url) ? p.avatar_image_url : null;
         const html = e.deleted ? '' : clean(e.message || '');
-        entries.push({ id: String(e.id), author: e.deleted ? '' : (p.display_name || 'Someone'), avatar, when: whenText(e.created_at), text: e.deleted ? 'This reply was deleted.' : textOf(e.message, 4000), html, rich: /<(img|iframe|video|table|math|pre)\b|equation_image/i.test(e.message || ''), depth: Math.min(depth, 4), parent: parent || null, deleted: !!e.deleted });
+        // (a reply's own files: the view gives one as `attachment`, newer Canvas as `attachments` — a reply may be a file alone)
+        const files = e.deleted ? [] : [...(Array.isArray(e.attachments) ? e.attachments : []), ...(e.attachment ? [e.attachment] : [])];
+        const seen = new Set();
+        const attachments = files.map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url && !seen.has(x.url) && seen.add(x.url));
+        entries.push({ id: String(e.id), author: e.deleted ? '' : (p.display_name || 'Someone'), avatar, when: whenText(e.created_at), text: e.deleted ? 'This reply was deleted.' : textOf(e.message, 4000), html, rich: /<(img|iframe|video|table|math|pre)\b|equation_image/i.test(e.message || ''), depth: Math.min(depth, 4), parent: parent || null, deleted: !!e.deleted, attachments });
         walk(e.replies, depth + 1, String(e.id));
       }
     };

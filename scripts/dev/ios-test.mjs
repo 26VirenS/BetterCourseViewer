@@ -293,6 +293,8 @@ try {
   const replied = await nc('reply', { ctx, id: '7003', text: 'First line\nsecond line\n\nNew paragraph' });
   const tAfter = await nc('topic', { ctx, id: '7003' });
   check(!disc.error && !!open7003 && tBefore.canReply && tBefore.entries.length > 0 && tBefore.entries.every((e) => 'depth' in e && e.text !== undefined) && replied.ok && tAfter.entries.length === tBefore.entries.length + 1 && tAfter.entries.some((e) => /First line<br>second line/.test(e.html)), `discussions in sections, a topic with its replies threaded by depth, and a reply from the phone posted as Canvas's paragraphs: ${JSON.stringify({ sections: disc.sections.map((x) => `${x.title}:${x.rows.length}`), before: tBefore.entries.length, after: tAfter.entries.length })}`);
+  const fileOnly = tBefore.entries.find((e) => e.id === 'e3');
+  check(!!fileOnly && fileOnly.text === '' && fileOnly.attachments?.length === 1 && /W8 Discussion Worksheet/.test(fileOnly.attachments[0].name) && /\/files\/att9\/download/.test(fileOnly.attachments[0].url) && tBefore.entries.filter((e) => e.id !== 'e3').every((e) => Array.isArray(e.attachments) && e.attachments.length === 0), `a reply that is a file and nothing else comes with its file: ${JSON.stringify(fileOnly)}`);
   check((await nc('reply', { ctx, id: '7003', text: '   ' })).error === 'Write a reply first.', 'an empty reply is refused with a reason');
   const mods = await nc('modules', { ctx });
   const markable = mods.modules.flatMap((m) => m.items.map((it) => ({ m, it }))).find((x) => x.it.markable);

@@ -116,6 +116,8 @@ struct Entry: Codable, Identifiable, Hashable {
     var depth: Int
     var parent: String?
     var deleted: Bool?
+    /// (Mac 1.3.76, iPhone 1.7.5) The files the reply came with.
+    var attachments: [Attachment]?
 }
 
 struct TopicData: Codable {

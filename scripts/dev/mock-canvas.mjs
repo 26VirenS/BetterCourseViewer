@@ -240,7 +240,7 @@ const topicFull = (courseId, id) => {
 const entries = new Map();
 const viewFor = (topicId) => ({
   participants: [{ id: '8', display_name: 'Alan Aguilar', avatar_image_url: null }, { id: '9', display_name: 'Wail Ahmed', avatar_image_url: null }, { id: '7', display_name: 'Sam Student', avatar_image_url: null }],
-  view: [{ id: 'e1', user_id: '8', created_at: ago(20 * H), message: '<p>Factory work pulled children out of the home, which changed who raised them.</p>', replies: [{ id: 'e2', user_id: '9', created_at: ago(10 * H), message: '<p>Agreed, and schooling laws followed.</p>', replies: [] }] }, ...(entries.get(topicId) || [])],
+  view: [{ id: 'e1', user_id: '8', created_at: ago(20 * H), message: '<p>Factory work pulled children out of the home, which changed who raised them.</p>', replies: [{ id: 'e2', user_id: '9', created_at: ago(10 * H), message: '<p>Agreed, and schooling laws followed.</p>', replies: [] }, { id: 'e3', user_id: '8', created_at: ago(6 * H), message: '', attachment: { id: 'att9', display_name: 'W8 Discussion Worksheet - More Newton’s Laws.pdf', filename: 'w8-worksheet.pdf', 'content-type': 'application/pdf', size: 184320, url: '/files/att9/download?download_frd=1' }, replies: [] }] }, ...(entries.get(topicId) || [])],
 });
 const pages = {
   101: [

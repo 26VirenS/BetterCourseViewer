@@ -166,8 +166,15 @@ struct TopicView: View {
                     }
                     if e.rich == true, let h = e.html, !h.isEmpty {
                         RichText(html: h)
-                    } else {
+                    } else if !e.text.isEmpty {
                         Text(e.text).font(.subheadline).textSelection(.enabled)
+                    }
+                    // (1.7.5) the files the reply came with — a reply may be a file and nothing else
+                    ForEach(e.attachments ?? []) { f in
+                        Button { engine.openFile(f.url, name: f.name) } label: {
+                            InfoRow(title: f.name, symbol: "paperclip", tint: .blue)
+                        }
+                        .buttonStyle(.plain)
                     }
                     if d.canReply == true {
                         Button {

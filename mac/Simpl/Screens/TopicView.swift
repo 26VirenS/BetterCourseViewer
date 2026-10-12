@@ -141,20 +141,23 @@ struct TopicView: View {
                 .padding(.bottom, 4)
             CardHeading(text: "Attached")
                 .padding(.horizontal, 8)
-            ForEach(files) { f in
-                RowLink { engine.openFile(f.url, name: f.name) } label: {
-                    InfoRow(title: f.name, symbol: "paperclip", tint: .blue)
-                }
-                .help("Open \(f.name) in Quick Look")
-                .contextMenu {
-                    Button("Quick Look") { engine.openFile(f.url, name: f.name) }
-                    Button("Copy Link") {
-                        if let u = engine.absolute(f.url) { copyToPasteboard(u.absoluteString) }
-                    }
-                }
-            }
+            ForEach(files) { f in fileRow(f) }
         }
         .padding(.horizontal, -8) // (the rows' words line up with the post's, their wash reaching into the card's margin)
+    }
+
+    /// A file attached to the post or to a reply: opened in Quick Look.
+    private func fileRow(_ f: Attachment) -> some View {
+        RowLink { engine.openFile(f.url, name: f.name) } label: {
+            InfoRow(title: f.name, symbol: "paperclip", tint: .blue)
+        }
+        .help("Open \(f.name) in Quick Look")
+        .contextMenu {
+            Button("Quick Look") { engine.openFile(f.url, name: f.name) }
+            Button("Copy Link") {
+                if let u = engine.absolute(f.url) { copyToPasteboard(u.absoluteString) }
+            }
+        }
     }
 
     /// Every reply in reading order, threaded by depth; or why there are none to see.
@@ -241,7 +244,7 @@ struct TopicView: View {
                 Group {
                     if e.rich == true, let h = e.html, !h.isEmpty {
                         RichText(html: h)
-                    } else {
+                    } else if !e.text.isEmpty {
                         Text(e.text)
                             .font(.sBody)
                             .textSelection(.enabled)
@@ -249,6 +252,13 @@ struct TopicView: View {
                     }
                 }
                 .padding(.leading, 39)
+                // (1.3.76) the files the reply came with — a reply may be a file and nothing else
+                if let files = e.attachments, !files.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(files) { f in fileRow(f) }
+                    }
+                    .padding(.leading, 31) // (39, less the row's own 8 of wash)
+                }
                 if d.canReply == true {
                     Button { reply(to: e) } label: {
                         Label("Reply", systemImage: "arrowshape.turn.up.left")
