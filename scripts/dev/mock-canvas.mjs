@@ -900,6 +900,76 @@ function ltiSubmission(id, base, possible) {
 }
 // test-only switches: POST /__mock/config {"calendarFail": true} — cacheable: API answers carry a ten-minute max-age
 const mockConfig = { calendarFail: false, cacheable: false, bareSequence: false };
+
+// ---- a school's sign-in (--login, or POST /__mock/config {"login": true}) ----------------------------------------
+// For the apps' sign-in pictures and tests: every page and API answer needs the session cookie the sign-in sets. Without
+// it, pages go to /login/canvas — Canvas's own form — and the API answers 401. Any login with the password "demo" gets
+// in; the login "slow" takes twelve seconds about it (the apps' "Logging you in"); "code" is sent on to a one-time code
+// page first (a step the apps hand over to the student); any other password is refused with Canvas's words.
+const loginMode = process.argv.includes('--login') || process.env.MOCK_LOGIN === '1';
+const cookiesOf = (req) => Object.fromEntries((req.headers.cookie || '').split(';').map((p) => p.trim()).filter(Boolean).map((p) => { const i = p.indexOf('='); return i < 0 ? [p, ''] : [p.slice(0, i), p.slice(i + 1)]; }));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const loginCss = `body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#394B58;display:flex;align-items:center;justify-content:center;color:#2d3b45}
+.ic-Login{background:#fff;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.3);width:400px;max-width:92vw;padding:28px 32px 24px;box-sizing:border-box}
+.ic-Login-header__logo{font-size:24px;font-weight:700;color:#0b2b52;margin:0 0 20px;text-align:center}
+.ic-Label{display:block;font-size:14px;font-weight:600;margin:0 0 6px}
+.ic-Input{width:100%;box-sizing:border-box;border:1px solid #c7cdd1;border-radius:3px;padding:8px 10px;font-size:16px;height:40px;margin:0 0 16px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075)}
+.ic-Input:focus{border-color:#0374b5;box-shadow:0 0 0 2px #0374b5;outline:none}
+.ic-Login__actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ic-Login__actions-left{font-size:13px;display:flex;flex-direction:column;gap:6px}
+.ic-Login__forgot{color:#0374b5;text-decoration:none}
+.Button--login{background:#0374b5;color:#fff;border:0;border-radius:3px;padding:10px 20px;font-size:16px;cursor:pointer}
+.ic-flash-error{background:#fdf2f2;border:1px solid #e0061f;color:#8a0c1e;border-radius:3px;padding:10px 12px;margin:0 0 16px;font-size:14px}
+.ic-Login__note{font-size:13px;color:#6b7780;margin:14px 0 0;text-align:center}`;
+function loginPage({ error = '', user = '' } = {}) {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Log In to Canvas</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>${loginCss}</style></head>
+<body class="ic-Login-Body"><div class="ic-Login"><h1 class="ic-Login-header__logo">Mock University</h1>
+${error ? `<div class="ic-flash-error" role="alert">${esc(error)}</div>` : ''}
+<form id="login_form" action="/login/canvas" method="post" accept-charset="UTF-8">
+<input type="hidden" name="authenticity_token" value="${esc(CSRF)}">
+<label class="ic-Label" for="pseudonym_session_unique_id">Login</label>
+<input type="text" name="pseudonym_session[unique_id]" id="pseudonym_session_unique_id" class="ic-Input" autocomplete="username" autocapitalize="none" value="${esc(user)}">
+<label class="ic-Label" for="pseudonym_session_password">Password</label>
+<input type="password" name="pseudonym_session[password]" id="pseudonym_session_password" class="ic-Input" autocomplete="current-password">
+<div class="ic-Login__actions"><div class="ic-Login__actions-left"><label><input type="checkbox" name="pseudonym_session[remember_me]" id="pseudonym_session_remember_me" value="1"> Stay signed in</label><a class="ic-Login__forgot" href="#">Forgot Password?</a></div><button type="submit" class="Button Button--login">Log In</button></div>
+</form><p class="ic-Login__note">A mock sign-in: any login with the password “demo”.</p></div></body></html>`;
+}
+function codePage() {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Verify it’s you</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>${loginCss}</style></head>
+<body><div class="ic-Login"><h1 class="ic-Login-header__logo">Mock University</h1><p style="font-size:15px;margin:0 0 16px">We sent a code to your phone. Enter it to finish signing in.</p>
+<form id="code_form" action="/login/code" method="post" accept-charset="UTF-8">
+<label class="ic-Label" for="code">Verification code</label>
+<input type="text" name="code" id="code" class="ic-Input" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456">
+<div class="ic-Login__actions"><span></span><button type="submit" class="Button Button--login">Verify</button></div>
+</form></div></body></html>`;
+}
+/** The sign-in's gate, when it is on: true when this request was answered by it. */
+function signInGate(req, res, path, raw) {
+  if (!(loginMode || mockConfig.login)) return false;
+  const html = (status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', ...headers }); res.end(body); return true; };
+  const go = (location, headers = {}) => { res.writeHead(302, { location, ...headers }); res.end(); return true; };
+  if (path === '/login/canvas') {
+    if (req.method !== 'POST') return html(200, loginPage());
+    const p = new URLSearchParams(raw);
+    const user = p.get('pseudonym_session[unique_id]') || '';
+    const pass = p.get('pseudonym_session[password]') || '';
+    const answer = () => {
+      if (pass !== 'demo') return html(200, loginPage({ error: 'Please verify your username or password and try again.', user }));
+      if (user === 'code') return go('/login/code', { 'set-cookie': 'mock_pending=1; Path=/' });
+      return go('/', { 'set-cookie': 'mock_session=1; Path=/' });
+    };
+    if (user === 'slow') setTimeout(answer, 12000); else answer();
+    return true;
+  }
+  if (path === '/login/code') {
+    if (req.method === 'POST') return go('/', { 'set-cookie': 'mock_session=1; Path=/' });
+    return html(200, codePage());
+  }
+  if (cookiesOf(req).mock_session === '1') return false;
+  if (path.startsWith('/api/')) { res.writeHead(401, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ status: 'unauthenticated', errors: [{ message: 'user authorization required' }] })); return true; }
+  if (req.method === 'GET' && !path.startsWith('/dist/') && !path.startsWith('/images/') && !path.startsWith('/__mock/')) return go('/login/canvas');
+  return false;
+}
 on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
 // test-only: the last API request as it arrived (its headers say whether the extension asked for a fresh answer)
 let lastApi = null;
@@ -1281,6 +1351,7 @@ const server = http.createServer((req, res) => {
       body = {};
     }
     if (path.startsWith('/cc/')) return ccMock(req, res, path, raw); // (the conversion service, another host altogether)
+    if (signInGate(req, res, path, raw)) return; // (a school's sign-in, when the mock is run with --login)
     // (Mac 1.3.17) a stand-in for a Knewton Alta assignment's player: Alta's shell (its header, Practice, the Current
     // objective card) round a question drawn as Learnosity draws one, and Alta's content answer — plain JSON, fetched by
     // the page as Alta's own is — with Check Answer and Next Question as Alta has them
