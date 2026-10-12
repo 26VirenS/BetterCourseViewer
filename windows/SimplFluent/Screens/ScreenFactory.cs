@@ -35,6 +35,7 @@ public static class ScreenFactory
         if (Registry.Route?.Invoke(engine, r) is { } s) return s;
         return r.Kind switch
         {
+            RouteKind.Assignment => new AssignmentScreen(engine, r.A, r.B),
             RouteKind.Topic => new TopicScreen(engine, r.A, r.B),
             RouteKind.Conversation => new ConversationScreen(engine, r.A),
             RouteKind.Page => new PageScreen(engine, r.A, r.B),

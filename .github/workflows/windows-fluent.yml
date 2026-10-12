@@ -148,6 +148,16 @@ jobs:
           Shot 'tools-pin' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable,pomo', '--pin-open', 'calc'))
           Shot 'tool-open' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'calc'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
+          # an assignment: a quiz taken, work handed in late, its feedback, Hand In, the rubric
+          Shot 'assignment-quiz' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
+          Shot 'assignment-narrow' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
+          Shot 'assignment-late' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1008'))
+          Shot 'assignment-feedback' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1008', '--open', 'feedback'))
+          Shot 'assignment-held' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1006'))
+          Shot 'hand-in' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4002', '--open', 'handin'))
+          Shot 'assignment-rubric' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4001'))
+          Shot 'rubric' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'course:104', '--push', '/courses/104/assignments/4001', '--open', 'rubric'))
+          Shot 'rubric-grid' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4001', '--open', 'rubric:grid'))
           # a quiz, taken in the app: its start, a question, the review, the feedback, an access code
           Shot 'quiz-intro' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011'))
           Shot 'quiz-question' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011:take'))
