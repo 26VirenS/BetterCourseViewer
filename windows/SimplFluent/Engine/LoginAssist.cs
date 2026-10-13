@@ -20,8 +20,8 @@ namespace Simpl.Engine;
 /// - a school page that says the sign-in went stale ("Stale Request", an expired request): started again from Canvas
 ///   by itself, once a minute at most; and on every school page shown, Start Over does the same by hand.
 ///
-/// The details are kept, when the student says so, in Windows' Credential Manager (LoginVault) — never by the browser,
-/// whose own password saving is off.
+/// The details are kept, when the student says so, encrypted in Simpl's own vault (LoginVault) — never by the browser,
+/// whose own password saving is off. Nothing here writes them down anywhere else, the log included.
 /// </summary>
 public sealed class LoginAssist : Observable
 {

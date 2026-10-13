@@ -4,8 +4,8 @@
 ; Easy on the student: installed for them alone, in %LOCALAPPDATA%\Programs\Simpl, so no administrator's permission is
 ; asked; no welcome page and one question (a desktop shortcut too?), then the last page with Open Simpl ticked. A Start
 ; menu shortcut, an entry in Settings > Apps, and an uninstaller that takes the program away and leaves what Simpl keeps
-; (%LOCALAPPDATA%\Simpl -- its settings, grade history and web view, never in the program's folder -- and the saved
-; sign-in, in Windows' Credential Manager as "Simpl Courses/sign-in").
+; (%LOCALAPPDATA%\Simpl -- its settings, grade history, saved sign-in and web view, never in the program's folder; what
+; is the student's encrypted by Simpl itself, its key held by the PC's TPM and Windows: Support/Vault.cs).
 ;
 ; An update, as Simpl's Settings > Updates > Restart to Update runs it (Support/Updates.cs):
 ;   Simpl-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAUNCH
@@ -127,8 +127,8 @@ ClickFinish=Click Finish to close Setup.
 ; fills it in for each)
 SetupAppRunningError=%1 is still open. Close it, then click OK. Or click Cancel to stop.%n%nIf it is Simpl, it may be in the notification area, by the clock: right-click its icon there and choose Quit Simpl.
 UninstallAppRunningError=%1 is still open. It may be in the notification area, by the clock.%n%nRight-click its icon there and choose Quit Simpl, then click OK. Or click Cancel to stop.
-ConfirmUninstall=Uninstall Simpl from this PC?%n%nYour settings, grade history and saved sign-in are kept (in AppData\Local\Simpl and Windows' Credential Manager), in case you install Simpl again. To erase them too, first open Simpl's Settings > Data > Reset everything.
-UninstalledAll=Simpl was removed from this PC.%n%nYour settings are still in AppData\Local\Simpl, and a saved sign-in in Windows' Credential Manager (Simpl Courses/sign-in). Delete them if you no longer want them.
+ConfirmUninstall=Uninstall Simpl from this PC?%n%nYour settings, grade history and saved sign-in are kept, encrypted (in AppData\Local\Simpl), in case you install Simpl again. To erase them too, first open Simpl's Settings > Data > Reset everything.
+UninstalledAll=Simpl was removed from this PC.%n%nYour settings and saved sign-in are still in AppData\Local\Simpl, encrypted. Delete that folder if you no longer want them.
 
 [CustomMessages]
 SimplIsOpen=Simpl is open, so Setup will close it first.%n%nIt opens again at the end if you leave Open Simpl ticked.

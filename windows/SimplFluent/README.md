@@ -28,14 +28,14 @@ What the installer does:
 
 - installs for the current user only, with no administrator prompt (`PrivilegesRequired=lowest`), into
   `%LOCALAPPDATA%\Programs\Simpl` — never Simpl's own data folder, `%LOCALAPPDATA%\Simpl` (settings, grade history,
-  the web view's data; the saved sign-in is in Credential Manager);
+  the saved sign-in, the web view's data; Data and encryption, below);
 - asks one thing — a desktop shortcut too? (unticked) — then installs; the last page has **Open Simpl** ticked;
 - makes a Start menu shortcut (and the desktop one), both carrying Simpl's app id `SimplCourses.Simpl`, the one
   `Program.Main` sets first of all (`AppIdentity`), so the window, its taskbar button and the shortcuts are one app and
   pinning pins Simpl; it registers that id's name and picture for notifications (`HKCU\Software\Classes\AppUserModelId`);
 - adds Simpl to Settings ▸ Apps (AppId `{B65F70B7-E13E-4CCC-9E1C-0B659660D130}`, per user); uninstalling removes the
-  program, its shortcuts and that entry and **keeps** `%LOCALAPPDATA%\Simpl` and the saved sign-in in Credential
-  Manager, and says where both are;
+  program, its shortcuts and that entry and **keeps** `%LOCALAPPDATA%\Simpl` (the saved sign-in in it, encrypted), and
+  says where it is;
 - closes a running Simpl first (it hides in the notification area when its window closes): every Simpl holds the mutex
   `SimplCourses.Simpl.App` (the installer's `AppMutex`), and the installer and uninstaller ask it to quit through the
   event `Local\SimplCourses.Simpl.Quit` (`Instance` in `Program.cs`) — an install someone opens asks first — then wait
@@ -105,6 +105,47 @@ account's monthly 5,000 (about a dozen a run).
 
 A signature names the publisher at once (Settings ▸ Apps, UAC, the download's properties) and lets Smart App Control
 run Simpl; SmartScreen's warning on a new download fades as the signed releases build their reputation.
+
+## Data and encryption
+
+What Simpl keeps of the student's in `%LOCALAPPDATA%\Simpl` is encrypted by Simpl itself (`Support/Vault.cs`), with
+nothing to unlock:
+
+- **Encrypted**: the preferences (`prefs.json`), the extension's storage (`storage.json`: settings, grade history,
+  goals), the answers kept for a quick start (`Answers\`), the flashcards (`flashcards.json`) and the saved sign-in
+  (`login.bin`; no longer Windows' Credential Manager). Each is AES-256-GCM, its file beginning `SIMPLENC`, bound to
+  what it is (one file cannot be passed off as another); an answer's file and its school's folder are named by an
+  HMAC under the key, so the names say nothing either.
+- **The key**: 32 random bytes made the first time, kept in `vault.key` wrapped twice: by an RSA-2048 key in this PC's
+  TPM that cannot be exported (the Platform Crypto Provider, this user's keys, `SimplCourses.Simpl.Vault`; a
+  `--profile` has one of its own), RSA-OAEP SHA-256 (SHA-1 on a TPM that refuses it); then by Windows for this user
+  (DPAPI). A PC or VM with no TPM keeps the DPAPI wrap alone. `Program.Main` starts unwrapping it first of all, on a
+  worker (the TPM takes 50–300 ms). A new vault is kept by DPAPI alone for the seconds the TPM takes to make its key,
+  then by both. Settings ▸ Data ▸ Encryption says which holds it; simpl.log's `vault:` lines say what happened.
+- **Not encrypted, on purpose**: simpl.log (for a bug report; no password or username is written to it, the
+  screenshot suite's `--sign-in` included); what the student saves where they choose (exports, CSVs, converted files);
+  files opened in another app or previewed (Windows' temporary folder, as they are, for the app that opens them); the
+  photos chosen for the backgrounds and the themes' drawings; `--perf-walk` and `--shot` output; and `WebView2\`,
+  Chromium's own profile (the school's site data and cache), whose cookies Chromium encrypts itself with DPAPI.
+- **From an earlier Simpl**: a plain file is read once and written over sealed (the preferences and the storage within
+  a second of starting, the flashcards as it starts); the answers kept in plain text are deleted (only a cache); a
+  sign-in in Credential Manager (`Simpl Courses/sign-in`) is moved into `login.bin` and deleted there. The first
+  Windows app (`windows/Simpl`) shares the folder and cannot read sealed files: going back to it starts it afresh.
+- **A key that cannot be opened** (the TPM cleared, the folder copied to another PC or user): one line in simpl.log,
+  `vault.key` and what it sealed moved to `Unreadable-<date>-<time>\` (not deleted: put back, they open again if the
+  key ever does), the answers deleted, and a new vault made. Simpl never stops or asks.
+- **Erasing**: Reset Everything and Uninstall's "Also erase" delete `vault.key`, the TPM's key, `login.bin`, anything
+  set aside and the rest, so what was sealed can never be opened again, wherever a copy went. Reset Everything keeps
+  the flashcard sets (as the Mac does), sealed again under a new vault; Uninstall's erase deletes them too.
+
+What this protects is data at rest: the files copied or backed up, read by another Windows account or an
+administrator browsing the disk, or a lost disk. What it cannot stop: a program running as the same Windows user,
+while Simpl is installed, can ask the TPM and DPAPI to unwrap the key just as Simpl does. Only an unlock prompt
+(Windows Hello) closes that, and the student chose to have none.
+
+CI checks it on every push: one part of the pictures (part 1, which signs in with the mock's login) fails if any
+profile's `prefs.json`, `storage.json`, `flashcards.json`, `login.bin` or kept answer does not begin with `SIMPLENC`,
+or if any file in a profile, WebView2's included, holds the mock's sign-in in plain text.
 
 ## Performance
 

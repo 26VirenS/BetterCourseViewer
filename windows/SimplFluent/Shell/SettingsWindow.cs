@@ -74,7 +74,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent photo picture"),
         ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts activity announcements"),
         ("grades", "Grades", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8), "gpa goal history record what-if track"),
-        ("data", "Data", SymbolRegular.Database24, Color.FromRgb(0x00, 0x99, 0xbc), "export import reset erase everything backup"),
+        ("data", "Data", SymbolRegular.Database24, Color.FromRgb(0x00, 0x99, 0xbc), "export import reset erase everything backup encryption encrypted security privacy tpm"),
         ("updates", "Updates", SymbolRegular.ArrowSync24, Color.FromRgb(0x10, 0x89, 0x3e), "version update beta automatic check earlier download install restart"),
         ("about", "About", SymbolRegular.Info24, Color.FromRgb(0x00, 0x78, 0xd4), "version interface uninstall"),
     };
@@ -269,7 +269,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             v.Children.Add(K.Group(K.Row(SymbolRegular.Key24, $"Saved for {saved.User}", $"Sign-in page: {saved.Host}", forget)));
         }
         else v.Children.Add(K.Row(SymbolRegular.Key24, "Not saved", "When your school’s sign-in page comes up, sign in with Simpl’s card and answer Stay Logged In."));
-        v.Children.Add(Foot("Kept in Windows’ Credential Manager on this PC only: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too."));
+        var holder = KeyHolder() is { } h ? $", with its key held by {h}" : "";
+        v.Children.Add(Foot($"Kept inside Simpl on this PC only, encrypted{holder}: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too."));
 
         if (engine.Phase == Phase.Native)
         {
@@ -322,8 +323,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     /// </summary>
     private void AskUninstall()
     {
-        var kept = $"Left unticked, they stay on this PC (in {AppPaths.Root} and Windows’ Credential Manager) in case you install Simpl again.";
-        var erased = $"Erased from this PC first, with your goals and saved pages, as Data ▸ Reset everything erases them. This can’t be undone. Your {engine.LmsName} account is not affected.";
+        var kept = $"Left unticked, they stay on this PC, encrypted, in {AppPaths.Root}, in case you install Simpl again.";
+        var erased = $"Erased from this PC first, with your goals, saved pages and flashcards, and Simpl’s encryption key. This can’t be undone. Your {engine.LmsName} account is not affected.";
         var note = K.Wrapped(kept, Ty.Caption, B.Text2);
         const string eraseWords = "Also erase my settings, grade history and saved sign-in";
         var erase = new CheckBox { Content = K.Wrapped(eraseWords, Ty.Body, B.Text), IsChecked = false };
@@ -656,18 +657,31 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     // ---- Data ----
 
+    /// <summary>Who holds the key Simpl's data is encrypted with (Support/Vault.cs), in Settings' words; null when nothing
+    /// could keep it (it lasts while Simpl runs).</summary>
+    private static string? KeyHolder() => Vault.Protection switch
+    {
+        VaultProtection.Tpm => "this PC’s security chip (TPM)",
+        VaultProtection.WindowsAccount => "your Windows account",
+        _ => null,
+    };
+
     private FrameworkElement DataPane()
     {
         var v = Column(K.SectionHeader("Data", 0));
+        // (what Simpl keeps here is encrypted, and what holds its key: Support/Vault.cs)
+        var encryption = K.Row(SymbolRegular.ShieldLock24, "Encryption", KeyHolder() is { } holder
+            ? $"Simpl’s data on this PC is encrypted (AES-256). Its key is held by {holder}."
+            : "Simpl’s data on this PC is encrypted (AES-256), but Windows couldn’t keep its key, so what Simpl stores lasts only while it runs.");
         if (engine.Phase == Phase.Native)
         {
             var buttons = K.H(8, K.Button("Import…", () => Import("settingsImport", "JSON|*.json;*.txt|All files|*.*")), K.Button("Export…", () => _ = Export("settingsExport", "json", "JSON|*.json")));
-            v.Children.Add(K.Row(SymbolRegular.ArrowSwap24, "Settings", "Your preferences, grade history and goals, as a file.", buttons));
+            v.Children.Add(K.Group(encryption, K.Row(SymbolRegular.ArrowSwap24, "Settings", "Your preferences, grade history and goals, as a file.", buttons)));
             v.Children.Add(Foot(engine.OnBrightspace
                 ? "Brightspace data is never kept here: only your preferences, grade history and goals, and the course nicknames, colours, tasks and ticks Brightspace has no place for. Your Brightspace account and favourites live on Brightspace."
                 : "Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas."));
         }
-        else v.Children.Add(K.Row(SymbolRegular.Info24, "Not yet", $"Data settings appear once {engine.LmsName} has loaded and you are signed in."));
+        else v.Children.Add(K.Group(encryption, K.Row(SymbolRegular.Info24, "Not yet", $"Data settings appear once {engine.LmsName} has loaded and you are signed in.")));
 
         v.Children.Add(K.SectionHeader("Reset"));
         var reset = K.Button("Reset everything…", () => Dialogs.Confirm(this, "Erase everything and restart Simpl?",

@@ -7,9 +7,11 @@ namespace Simpl.Support;
 /// Settings ▸ General ▸ Uninstall Simpl (Windows' own Settings ▸ Apps ▸ Uninstall, asked from Simpl): for a copy
 /// Simpl-Setup.exe put here, its uninstaller — the one its entry in Settings ▸ Apps names — started with its progress
 /// showing, and Simpl quit at once, for real (not to the notification area), so the uninstaller finds it gone and takes
-/// the program, its shortcuts and that entry away. What Simpl keeps stays (%LOCALAPPDATA%\Simpl, the saved sign-in in
-/// Credential Manager) unless it is erased first, as Reset Everything erases it. A copy run from its zip is removed by
-/// deleting its folder; a development run never uninstalls anything.
+/// the program, its shortcuts and that entry away. What Simpl keeps stays (%LOCALAPPDATA%\Simpl, sealed by the vault,
+/// the saved sign-in with it) unless it is erased first, as Reset Everything erases it — the vault's key too (vault.key
+/// and the TPM's), the flashcards with it, and a sign-in an earlier Simpl kept in Credential Manager and this one never
+/// moved in (LoginVault.Clear deletes that as well). A copy run from its zip is removed by deleting its folder; a
+/// development run never uninstalls anything.
 /// </summary>
 public static class Uninstall
 {
@@ -86,6 +88,8 @@ public static class Uninstall
         {
             Erasing = true;
             await EraseAll.Erase(engine);
+            // (and a sign-in an earlier Simpl kept in Credential Manager, never moved into the vault: gone too)
+            LoginVault.ForgetOld();
         }
         EraseAll.Quit();
         return null;

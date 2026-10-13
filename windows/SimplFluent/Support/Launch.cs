@@ -26,6 +26,13 @@ public static class Launch
 
     public static string? Get(string name) => Args.TryGetValue(name, out var v) ? v : null;
 
+    /// <summary>The arguments as the log says them: a sign-in's (--sign-in user:pass, the screenshot suite's) left out —
+    /// a password is never written down, the mock's either.</summary>
+    public static string Said(string[] args) => string.Join(' ', args.Select((a, i) =>
+        i > 0 && string.Equals(args[i - 1], "--sign-in", StringComparison.OrdinalIgnoreCase) && !a.StartsWith("--") ? "…"
+        : a.StartsWith("--sign-in=", StringComparison.OrdinalIgnoreCase) ? "--sign-in=…"
+        : a));
+
     public static bool Flag(string name) => Args.TryGetValue(name, out var v) && v is "true" or "yes" or "YES" or "1";
 
     public static double Number(string name, double fallback) =>

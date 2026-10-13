@@ -9,7 +9,8 @@ namespace Simpl.Engine;
 /// <summary>
 /// What the screens were last told, kept on disk for the school signed in to (the Mac's AnswerCache): a screen opens
 /// on what it showed last time at once, and the live answer replaces it when it is in. Only reads are kept; signing
-/// out clears it all.
+/// out clears it all. Each answer is sealed by the vault, in a file whose name — and its school's folder's — is the
+/// vault's HMAC of what it holds, so neither the school nor what was read can be told from the names.
 /// </summary>
 public sealed class AnswerCache
 {
@@ -21,6 +22,7 @@ public sealed class AnswerCache
         "syllabus", "dashCourses", "dashList", "dashActivity", "dashSkyline", "externalTools",
     };
 
+    private readonly string school;
     private readonly string dir;
     private readonly Dictionary<string, string> memory = new();
     private readonly List<string> order = new();
@@ -29,28 +31,33 @@ public sealed class AnswerCache
     /// <summary>The cache of one school: <paramref name="key"/> is its host (and port).</summary>
     public AnswerCache(string key)
     {
-        var safe = string.Concat(key.Select(c => char.IsLetterOrDigit(c) || c is '.' or '-' ? c : '_'));
-        dir = Path.Combine(AppPaths.Answers, safe);
+        school = key;
+        dir = Path.Combine(AppPaths.Answers, Vault.FileName("answers-school:" + key));
         Task.Run(() =>
         {
             try
             {
                 Directory.CreateDirectory(dir);
                 var cutoff = DateTime.UtcNow.AddDays(-30); // (what has not been read in a month, let go)
-                foreach (var f in Directory.EnumerateFiles(dir, "*.json"))
+                foreach (var f in Directory.EnumerateFiles(dir, "*.bin"))
                     if (File.GetLastWriteTimeUtc(f) < cutoff) File.Delete(f);
+                // (what an earlier Simpl kept in plain text — a folder per school, a .json per answer — only a cache:
+                // deleted, not sealed)
+                foreach (var f in Directory.EnumerateFiles(AppPaths.Answers, "*.json", SearchOption.AllDirectories)) File.Delete(f);
+                foreach (var d in Directory.EnumerateDirectories(AppPaths.Answers))
+                    if (!string.Equals(d, dir, StringComparison.OrdinalIgnoreCase) && !Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d);
             }
             catch { }
         });
     }
 
-    /// <summary>The file a read is kept in: its name and its arguments, in a stable order.</summary>
+    /// <summary>The name a read is kept under: its name and its arguments, in a stable order, hashed.</summary>
     public static string? FileName(string name, JsonObject args)
     {
         if (!Reads.Contains(name)) return null;
         var sorted = Sort(args).ToJsonString();
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(name + "|" + sorted));
-        return Convert.ToHexString(hash).ToLowerInvariant() + ".json";
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static JsonNode? Sort(JsonNode? n) => n switch
@@ -60,6 +67,12 @@ public sealed class AnswerCache
         _ => n?.DeepClone(),
     };
 
+    /// <summary>What a kept answer is sealed for: this school's, this read's — so no file opens as another.</summary>
+    private string Purpose(string f) => "answers:" + school + "/" + f;
+
+    /// <summary>Its file: named by the vault, from its purpose.</summary>
+    private string PathOf(string f) => Path.Combine(dir, Vault.FileName(Purpose(f)) + ".bin");
+
     public string? Text(string name, JsonObject args)
     {
         var f = FileName(name, args);
@@ -67,9 +80,15 @@ public sealed class AnswerCache
         if (memory.TryGetValue(f, out var t)) return t;
         try
         {
-            var text = File.ReadAllText(Path.Combine(dir, f));
-            Remember(f, text);
-            return text;
+            var read = Vault.Read(PathOf(f), Purpose(f), cache: true);
+            try
+            {
+                if (read.State != VaultState.Sealed) return null;
+                var text = read.Text!;
+                Remember(f, text);
+                return text;
+            }
+            finally { read.Zero(); }
         }
         catch { return null; }
     }
@@ -80,8 +99,7 @@ public sealed class AnswerCache
         var f = FileName(name, args);
         if (f == null) return;
         Remember(f, text);
-        var path = Path.Combine(dir, f);
-        Task.Run(() => { try { Directory.CreateDirectory(dir); File.WriteAllText(path, text); } catch { } });
+        Task.Run(() => { try { Directory.CreateDirectory(dir); Vault.Write(PathOf(f), text, Purpose(f)); } catch { } });
     }
 
     private void Remember(string f, string text)
@@ -91,7 +109,7 @@ public sealed class AnswerCache
         while (order.Count > 48) { memory.Remove(order[0]); order.RemoveAt(0); }
     }
 
-    /// <summary>Nothing kept from here on (Reset Everything: the app is about to restart, erased).</summary>
+    /// <summary>Nothing kept from here on (Reset Everything and Uninstall's erase: Simpl is about to restart or quit).</summary>
     public void Stop() { stopped = true; memory.Clear(); order.Clear(); }
 
     /// <summary>Everything kept, gone (signing out).</summary>

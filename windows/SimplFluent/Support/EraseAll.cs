@@ -6,25 +6,36 @@ namespace Simpl.Support;
 
 /// <summary>
 /// Settings ▸ Data ▸ Reset Everything (the Mac's EraseAll): everything Simpl keeps on this PC erased — the preferences,
-/// the extension's storage, the answers kept, the saved sign-in, the school's cookies and site data, the photos — and
-/// Simpl opened again as if it were new. No step may hold it up: each has a few seconds, then the next goes on; the new
-/// copy waits for this one to have quit (--after) before it clears the web data this one was still using. Uninstall
-/// Simpl's "Also erase…" erases the same, then quits instead.
+/// the extension's storage, the answers kept, the saved sign-in, the school's cookies and site data, the photos, and
+/// the vault's key (Vault.Erase: what it sealed can never be opened again, wherever a copy went) — and Simpl opened again
+/// as if it were new. The flashcard sets are the student's own work and stay, as on the Mac: sealed again under the new
+/// vault. No step may hold it up: each has a few seconds, then the next goes on; the new copy waits for this one to have
+/// quit (--after) before it clears the web data this one was still using. Uninstall Simpl's "Also erase…" erases the
+/// same, the flashcards too (no vault is left to keep them), then quits instead.
 /// </summary>
 public static class EraseAll
 {
     public static async Task Run(Engine.Engine? engine)
     {
+        byte[]? cards = null;
+        try { cards = Tools.FlashcardStore.Take(); } catch (Exception e) { Log.Write("erase: flashcards: " + e.Message); }
         await Erase(engine);
+        if (cards != null)
+        {
+            Vault.Renew();
+            Tools.FlashcardStore.Put(cards);
+        }
         Restart(erased: true);
     }
 
     /// <summary>Everything Simpl keeps erased, this copy left running only to restart or quit: nothing it still holds is
-    /// written back (the preferences and the extension's storage stay erased).</summary>
+    /// written back (the preferences and the extension's storage stay erased, the answers stop being kept, and the vault
+    /// seals nothing more).</summary>
     public static async Task Erase(Engine.Engine? engine)
     {
         Log.Write("erase: everything");
-        try { LoginVault.Clear(); } catch (Exception e) { Log.Write("erase vault: " + e.Message); }
+        engine?.Answers.Stop();
+        try { LoginVault.Clear(); } catch (Exception e) { Log.Write("erase sign-in: " + e.Message); }
         if (engine?.Web.CoreWebView2 is { } core)
         {
             try
@@ -36,11 +47,19 @@ public static class EraseAll
         }
         try { Engine.Bridge.Shared.EraseStorage(); } catch (Exception e) { Log.Write("erase storage: " + e.Message); }
         Prefs.Erase();
-        try { File.Delete(AppPaths.Storage); } catch { }
-        foreach (var d in new[] { AppPaths.Answers, Appearance.PhotosDir })
+        foreach (var f in new[] { AppPaths.Storage, AppPaths.Login, AppPaths.Flashcards })
+        {
+            try { File.Delete(f); } catch { }
+            try { File.Delete(f + ".tmp"); } catch { }
+        }
+        var dirs = new List<string> { AppPaths.Answers, Appearance.PhotosDir };
+        // (what a vault that could not be opened once set aside: sealed with a key that is gone, or going now)
+        try { dirs.AddRange(Directory.EnumerateDirectories(AppPaths.Root, "Unreadable-*")); } catch { }
+        foreach (var d in dirs)
         {
             try { if (Directory.Exists(d)) Directory.Delete(d, true); } catch { }
         }
+        try { Vault.Erase(); } catch (Exception e) { Log.Write("erase: the vault: " + e.Message); }
     }
 
     /// <summary>Simpl opened afresh: a new copy started (it waits for this one), and this one gone at once.</summary>

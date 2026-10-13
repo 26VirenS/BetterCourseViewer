@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,7 +11,8 @@ namespace Simpl.Tools;
 
 // Flashcards' sets and the text work on them (the Mac's Flashcards.swift, its model half): a set is a title and its
 // terms, written here, pasted in (one card a line, the term and the definition split by a tab, a comma or a dash) or
-// imported from a two-column CSV, kept on this PC in a file of the app's own — flashcards.json, in the Mac's format.
+// imported from a two-column CSV, kept on this PC in a file of the app's own — flashcards.json, in the Mac's format,
+// sealed by the vault (Support/Vault.cs). A set exported as CSV goes where the student says, as plain text.
 
 /// <summary>A card: its term and definition, how far Learn has it, its star, and its Flashcards mark.</summary>
 public sealed class FCCard
@@ -67,8 +69,10 @@ public sealed class FCDeck
 }
 
 /// <summary>
-/// The sets (the Mac's FlashcardStore), kept in flashcards.json in the app's folder; a change is written at once, except
-/// typing in the editor, which is written once a pause comes.
+/// The sets (the Mac's FlashcardStore), kept in flashcards.json in the app's folder, sealed by the vault; a change is
+/// written at once, except typing in the editor, which is written once a pause comes. A file an earlier Simpl kept in
+/// plain text is sealed as the app starts (<see cref="SealSoon"/>), or when it is first read, whichever comes first; one
+/// that cannot be opened is set aside by the vault, never written over.
 /// </summary>
 public static class FlashcardStore
 {
@@ -78,13 +82,16 @@ public static class FlashcardStore
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, NumberHandling = JsonNumberHandling.AllowReadingFromString,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
+    private const string Purpose = "flashcards";
+    /// <summary>The file: read, written, sealed — one at a time (the window's thread, and the seal as the app starts).</summary>
+    private static readonly object FileGate = new();
     private static List<FCDeck>? decks;
     private static DispatcherTimer? pending;
 
     /// <summary>A set or a card changed (a view on screen draws itself again).</summary>
     public static event Action? Changed;
 
-    private static string FilePath => Path.Combine(AppPaths.Root, "flashcards.json");
+    private static string FilePath => AppPaths.Flashcards;
 
     public static IReadOnlyList<FCDeck> Decks => decks ??= Load();
 
@@ -137,40 +144,86 @@ public static class FlashcardStore
     public static void Write()
     {
         pending?.Stop();
-        try
-        {
-            var tmp = FilePath + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(All, Options), new UTF8Encoding(false));
-            File.Move(tmp, FilePath, true);
-        }
+        var json = JsonSerializer.SerializeToUtf8Bytes(All, Options);
+        try { lock (FileGate) Vault.Write(FilePath, json, Purpose); }
         catch (Exception e) { Log.Write($"flashcards: {e.Message}"); }
+        finally { CryptographicOperations.ZeroMemory(json); }
     }
 
     private static List<FCDeck> Load()
     {
-        try
+        lock (FileGate)
         {
-            if (File.Exists(FilePath) && JsonSerializer.Deserialize<List<FCDeck>>(File.ReadAllText(FilePath), Options) is { } list)
+            var file = Vault.Read(FilePath, Purpose);
+            try
             {
-                // (as the Mac reads a card: anything missing takes its default)
-                foreach (var d in list)
+                if (file.Plain != null && JsonSerializer.Deserialize<List<FCDeck>>(file.Plain, Options) is { } list)
                 {
-                    d.Id = string.IsNullOrEmpty(d.Id) ? FCCard.NewId() : d.Id;
-                    d.Name ??= "";
-                    d.Cards ??= new();
-                    d.Cards.RemoveAll(c => c == null);
-                    foreach (var c in d.Cards)
+                    // (as the Mac reads a card: anything missing takes its default)
+                    foreach (var d in list)
                     {
-                        c.Id = string.IsNullOrEmpty(c.Id) ? FCCard.NewId() : c.Id;
-                        c.Term ??= "";
-                        c.Def ??= "";
+                        d.Id = string.IsNullOrEmpty(d.Id) ? FCCard.NewId() : d.Id;
+                        d.Name ??= "";
+                        d.Cards ??= new();
+                        d.Cards.RemoveAll(c => c == null);
+                        foreach (var c in d.Cards)
+                        {
+                            c.Id = string.IsNullOrEmpty(c.Id) ? FCCard.NewId() : c.Id;
+                            c.Term ??= "";
+                            c.Def ??= "";
+                        }
                     }
+                    // (kept in plain text by an earlier Simpl: sealed now, over it, as it was)
+                    if (file.Legacy)
+                    {
+                        try { Vault.Write(FilePath, file.Plain, Purpose); }
+                        catch (Exception e) { Log.Write($"flashcards: not sealed yet: {e.Message}"); }
+                    }
+                    return list.Where(d => d != null).ToList();
                 }
-                return list.Where(d => d != null).ToList();
             }
+            catch (Exception e) { Log.Write($"flashcards: {e.Message}"); }
+            finally { file.Zero(); }
         }
-        catch (Exception e) { Log.Write($"flashcards: {e.Message}"); }
         return new List<FCDeck>();
+    }
+
+    /// <summary>A flashcards.json an earlier Simpl kept in plain text, sealed on a worker as the app starts (Program.Main)
+    /// — not left as it was until Flashcards is next opened.</summary>
+    public static void SealSoon() => Task.Run(async () =>
+    {
+        await Vault.Ready;
+        lock (FileGate)
+        {
+            if (decks != null || !File.Exists(FilePath)) return; // (read already: sealed then)
+            var file = Vault.Read(FilePath, Purpose);
+            try { if (file.Legacy && file.Plain != null) Vault.Write(FilePath, file.Plain, Purpose); }
+            catch (Exception e) { Log.Write($"flashcards: {e.Message}"); }
+            finally { file.Zero(); }
+        }
+    });
+
+    /// <summary>
+    /// Reset Everything keeps the student's sets, as the Mac's does: their JSON taken before the vault is erased (the sets
+    /// as they are now, when they were read), to be put back sealed under the new vault (<see cref="Put"/>). Null: none.
+    /// </summary>
+    public static byte[]? Take()
+    {
+        pending?.Stop();
+        if (decks != null) return decks.Count == 0 ? null : JsonSerializer.SerializeToUtf8Bytes(decks, Options);
+        lock (FileGate)
+        {
+            var file = Vault.Read(FilePath, Purpose);
+            return file.Plain;
+        }
+    }
+
+    /// <summary>The sets <see cref="Take"/> took, sealed under the vault made after the erase.</summary>
+    public static void Put(byte[] json)
+    {
+        try { lock (FileGate) Vault.Write(FilePath, json, Purpose); }
+        catch (Exception e) { Log.Write($"flashcards: kept through the reset: {e.Message}"); }
+        finally { CryptographicOperations.ZeroMemory(json); }
     }
 }
 

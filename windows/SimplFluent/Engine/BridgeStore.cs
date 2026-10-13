@@ -7,14 +7,15 @@ using Simpl.Support;
 namespace Simpl.Engine;
 
 /// <summary>
-/// The extension's <c>storage.local</c>: one JSON file (%LOCALAPPDATA%\Simpl\storage.json), mirrored in memory — the
-/// Mac's BridgeStore. Values are whatever the scripts store (settings, preferences, cached Canvas answers). Used on the
-/// UI thread; the file is read as the app starts (<see cref="Preload"/>), and each write is coalesced, put into words on
-/// the UI thread and written off it, one after another.
+/// The extension's <c>storage.local</c>: one JSON file (%LOCALAPPDATA%\Simpl\storage.json, sealed by the vault), mirrored
+/// in memory — the Mac's BridgeStore. Values are whatever the scripts store (settings, preferences, cached Canvas
+/// answers). Used on the UI thread; the file is read and opened as the app starts (<see cref="Preload"/>, once the vault
+/// is open), and each write is coalesced, put into words on the UI thread, sealed and written off it, one after another.
 /// </summary>
 public sealed class BridgeStore
 {
-    private static Task<JsonObject>? preloaded;
+    private const string Purpose = "storage";
+    private static Task<(JsonObject Data, bool Legacy)>? preloaded;
 
     private JsonObject data;
     private readonly string file = AppPaths.Storage;
@@ -24,22 +25,33 @@ public sealed class BridgeStore
     private readonly object gate = new();
     private bool erased;
 
-    /// <summary>storage.json read on a worker as the app starts (Program.Main), for the store to take once it is made.</summary>
-    public static void Preload() => preloaded ??= Task.Run(() => Load());
-
-    private static JsonObject Load()
+    /// <summary>storage.json read on a worker as the app starts (Program.Main, just after the vault began opening: this
+    /// waits for it), for the store to take once it is made.</summary>
+    public static void Preload() => preloaded ??= Task.Run(async () =>
     {
-        try { if (File.Exists(AppPaths.Storage)) return JsonNode.Parse(File.ReadAllText(AppPaths.Storage)) as JsonObject ?? new JsonObject(); } catch { }
-        return new JsonObject();
+        await Vault.Ready;
+        return Load();
+    });
+
+    /// <summary>What storage.json holds, and whether it was plain text an earlier Simpl kept (to be written sealed).</summary>
+    private static (JsonObject Data, bool Legacy) Load()
+    {
+        var read = Vault.Read(AppPaths.Storage, Purpose);
+        try { if (read.Plain != null) return (JsonNode.Parse(read.Plain) as JsonObject ?? new JsonObject(), read.Legacy); } catch { }
+        finally { read.Zero(); }
+        return (new JsonObject(), false);
     }
 
     public BridgeStore()
     {
         // (read as the app started — in by now, as a rule; else read here)
-        data = preloaded?.GetAwaiter().GetResult() ?? Load();
+        var (loaded, legacy) = preloaded?.GetAwaiter().GetResult() ?? Load();
+        data = loaded;
         preloaded = null;
         saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         saveTimer.Tick += (_, _) => { saveTimer.Stop(); SaveSoon(); };
+        // (kept in plain text by an earlier Simpl: written sealed in a moment, over it)
+        if (legacy) ScheduleSave();
     }
 
     /// <summary>Chrome's shapes: nothing/null = everything, a key, a list of keys, or {key: default}.</summary>
@@ -148,12 +160,7 @@ public sealed class BridgeStore
         lock (gate)
         {
             if (erased) return; // (erased meanwhile: nothing written after it)
-            try
-            {
-                var tmp = file + ".tmp";
-                File.WriteAllText(tmp, text);
-                File.Move(tmp, file, true);
-            }
+            try { Vault.Write(file, text, Purpose); }
             catch { /* the next change tries again */ }
         }
     }

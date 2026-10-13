@@ -366,7 +366,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         var e = engine;
         var icon = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 64, Height = 64, HorizontalAlignment = HorizontalAlignment.Left };
         var body = K.V(14, icon,
-            K.Wrapped("Simpl keeps your username and password on this PC only, locked in Windows’ Credential Manager, and signs you in when your school asks again. Two-step codes still come to you.", Ty.Body, B.Text));
+            K.Wrapped("Simpl keeps your username and password on this PC only, encrypted inside Simpl, and signs you in when your school asks again. Two-step codes still come to you.", Ty.Body, B.Text));
         var s = new Sheet { Title = "Stay logged in?", Body = body, Width = 420 };
         s.Add("Stay Logged In", SheetButtonKind.Primary, () => e.Login.Stay(true));
         s.Add("Not Now", SheetButtonKind.Close, () => e.Login.Stay(false));

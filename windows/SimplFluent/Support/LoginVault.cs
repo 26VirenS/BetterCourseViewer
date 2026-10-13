@@ -1,5 +1,6 @@
+using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Simpl.Support;
@@ -11,62 +12,65 @@ namespace Simpl.Support;
 public sealed record SavedLogin(string Host, string User, string Pass, DateTime SavedAt);
 
 /// <summary>
-/// Where the saved sign-in is kept (the Mac's LoginVault, its Keychain): Windows' own Credential Manager, which locks it
-/// to this user on this PC — encrypted with the account's own secret, never roamed — where it can be seen and removed
-/// under Control Panel ▸ Credential Manager ▸ Windows Credentials as "Simpl Courses/sign-in". The browser underneath never
-/// sees it: WebView2's own password saving and autofill are off (Engine). A development run (the mock, a demo, a
-/// picture) keeps nothing past the run.
+/// Where the saved sign-in is kept (the Mac's LoginVault, its Keychain): inside Simpl, in login.bin, sealed by the vault
+/// (Vault) — so it is encrypted with a key this PC's TPM and Windows hold for this user alone, never roamed. It is held
+/// in memory only as sealed, and opened each time it is asked for. The browser underneath never sees it: WebView2's own
+/// password saving and autofill are off (Engine). A development run (the mock, a demo, a picture) keeps nothing past the
+/// run. An earlier Simpl kept it in Windows' Credential Manager as "Simpl Courses/sign-in": found there, it is moved
+/// into the vault and deleted from there (and deleted again whenever the sign-in is forgotten, should it be back).
 /// </summary>
 public static class LoginVault
 {
+    /// <summary>Where an earlier Simpl kept it: Credential Manager's generic credential of this name.</summary>
     public const string Target = "Simpl Courses/sign-in";
+    private const string Purpose = "login";
     /// <summary>Raised when the saved sign-in is kept or forgotten (Settings shows it).</summary>
     public static event Action? Changed;
+    private static readonly object Gate = new();
     private static SavedLogin? memory;
+    /// <summary>login.bin's bytes, sealed, once read (null: none kept).</summary>
+    private static byte[]? kept;
+    private static bool read;
+
+    /// <summary>login.bin read (and a sign-in an earlier Simpl kept in Credential Manager moved in) on a worker as the app
+    /// starts, once the vault is open, so asking for it later reads nothing from disk.</summary>
+    public static void Preload()
+    {
+        if (Launch.IsDevelopment) return;
+        _ = Task.Run(async () =>
+        {
+            await Vault.Ready;
+            lock (Gate) Ensure();
+        });
+    }
 
     public static SavedLogin? Load()
     {
         if (Launch.IsDevelopment) return memory;
-        var ptr = IntPtr.Zero;
+        byte[]? plain = null;
         try
         {
-            if (!CredReadW(Target, CRED_TYPE_GENERIC, 0, out ptr) || ptr == IntPtr.Zero) return null;
-            var c = Marshal.PtrToStructure<CREDENTIAL>(ptr);
-            if (c.CredentialBlob == IntPtr.Zero || c.CredentialBlobSize == 0) return null;
-            var bytes = new byte[c.CredentialBlobSize];
-            Marshal.Copy(c.CredentialBlob, bytes, 0, bytes.Length);
-            return JsonSerializer.Deserialize<SavedLogin>(Encoding.UTF8.GetString(bytes), Json.Options);
+            lock (Gate)
+            {
+                Ensure();
+                if (kept == null) return null;
+                plain = Vault.Open(kept, Purpose);
+            }
+            return plain == null ? null : JsonSerializer.Deserialize<SavedLogin>(plain, Json.Options);
         }
         catch { return null; }
-        finally { if (ptr != IntPtr.Zero) CredFree(ptr); }
+        finally { if (plain != null) CryptographicOperations.ZeroMemory(plain); }
     }
 
     public static bool Save(SavedLogin login)
     {
         bool ok;
         if (Launch.IsDevelopment) { memory = login; ok = true; }
-        else
+        else lock (Gate)
         {
-            var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(login, Json.Script));
-            var blob = Marshal.AllocHGlobal(bytes.Length);
-            try
-            {
-                Marshal.Copy(bytes, 0, blob, bytes.Length);
-                var c = new CREDENTIAL
-                {
-                    Type = CRED_TYPE_GENERIC,
-                    TargetName = Target,
-                    Comment = "Simpl's sign-in at " + login.Host,
-                    CredentialBlobSize = (uint)bytes.Length,
-                    CredentialBlob = blob,
-                    Persist = CRED_PERSIST_LOCAL_MACHINE,
-                    UserName = login.User,
-                };
-                ok = CredWriteW(ref c, 0);
-                if (!ok) Log.Write($"vault: the credential could not be written ({Marshal.GetLastWin32Error()})");
-            }
-            catch (Exception e) { Log.Write("vault: " + e.Message); ok = false; }
-            finally { Marshal.FreeHGlobal(blob); }
+            read = true;
+            ok = Keep(login);
+            if (ok) ForgetOld();
         }
         Changed?.Invoke();
         return ok;
@@ -75,11 +79,99 @@ public static class LoginVault
     public static void Clear()
     {
         memory = null;
-        if (!Launch.IsDevelopment) { try { CredDeleteW(Target, CRED_TYPE_GENERIC, 0); } catch { } }
+        if (!Launch.IsDevelopment)
+        {
+            lock (Gate)
+            {
+                read = true;
+                kept = null;
+                try { File.Delete(AppPaths.Login); } catch (Exception e) { Log.Write("sign-in: login.bin could not be deleted: " + e.Message); }
+                try { File.Delete(AppPaths.Login + ".tmp"); } catch { }
+            }
+            ForgetOld();
+        }
         Changed?.Invoke();
     }
 
-    private const uint CRED_TYPE_GENERIC = 1, CRED_PERSIST_LOCAL_MACHINE = 2;
+    /// <summary>(Under Gate.) login.bin read once; none there, an earlier Simpl's from Credential Manager moved in.</summary>
+    private static void Ensure()
+    {
+        if (read) return;
+        read = true;
+        try
+        {
+            byte[]? data = null;
+            try { data = File.ReadAllBytes(AppPaths.Login); }
+            catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException) { }
+            if (data != null)
+            {
+                var plain = Vault.Open(data, Purpose);
+                if (plain != null)
+                {
+                    CryptographicOperations.ZeroMemory(plain);
+                    kept = data;
+                }
+                else if (Vault.SetAside(AppPaths.Login) is { } dir) Log.Write($"sign-in: login.bin could not be opened with this vault's key: moved to {dir}");
+                return;
+            }
+            if (ReadOld() is not { } old) return;
+            if (Keep(old))
+            {
+                ForgetOld();
+                Log.Write("sign-in: moved from Windows' Credential Manager into Simpl's vault");
+            }
+        }
+        catch (Exception e) { Log.Write("sign-in: login.bin could not be read: " + e.Message); }
+    }
+
+    /// <summary>(Under Gate.) Sealed into login.bin, and held as sealed.</summary>
+    private static bool Keep(SavedLogin login)
+    {
+        var plain = JsonSerializer.SerializeToUtf8Bytes(login, Json.Script);
+        try
+        {
+            kept = Vault.Write(AppPaths.Login, plain, Purpose);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.Write("sign-in: could not be kept: " + e.Message);
+            return false;
+        }
+        finally { CryptographicOperations.ZeroMemory(plain); }
+    }
+
+    // ---- what an earlier Simpl kept in Credential Manager ----
+
+    private static SavedLogin? ReadOld()
+    {
+        var ptr = IntPtr.Zero;
+        byte[]? bytes = null;
+        try
+        {
+            if (!CredReadW(Target, CRED_TYPE_GENERIC, 0, out ptr) || ptr == IntPtr.Zero) return null;
+            var c = Marshal.PtrToStructure<CREDENTIAL>(ptr);
+            if (c.CredentialBlob == IntPtr.Zero || c.CredentialBlobSize == 0) return null;
+            bytes = new byte[c.CredentialBlobSize];
+            Marshal.Copy(c.CredentialBlob, bytes, 0, bytes.Length);
+            return JsonSerializer.Deserialize<SavedLogin>(bytes, Json.Options);
+        }
+        catch { return null; }
+        finally
+        {
+            if (bytes != null) CryptographicOperations.ZeroMemory(bytes);
+            if (ptr != IntPtr.Zero) CredFree(ptr);
+        }
+    }
+
+    /// <summary>Credential Manager's copy deleted, if there is one (never in a development run).</summary>
+    public static void ForgetOld()
+    {
+        if (Launch.IsDevelopment) return;
+        try { CredDeleteW(Target, CRED_TYPE_GENERIC, 0); } catch { }
+    }
+
+    private const uint CRED_TYPE_GENERIC = 1;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct CREDENTIAL
@@ -98,7 +190,6 @@ public static class LoginVault
         public string? UserName;
     }
 
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool CredWriteW(ref CREDENTIAL credential, uint flags);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool CredReadW(string target, uint type, uint flags, out IntPtr credential);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool CredDeleteW(string target, uint type, uint flags);
     [DllImport("advapi32.dll")] private static extern void CredFree(IntPtr buffer);

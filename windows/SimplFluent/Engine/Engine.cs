@@ -143,8 +143,8 @@ public sealed partial class Engine : Observable, IShellListener
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
         // the browser never offers to save a password, and fills nothing in by itself: the sign-in is the app's own
-        // (LoginAssist), and what the student chooses to keep goes into Windows' Credential Manager (LoginVault), never
-        // the browser's store
+        // (LoginAssist), and what the student chooses to keep goes into Simpl's own vault (LoginVault), never the
+        // browser's store
         core.Settings.IsGeneralAutofillEnabled = false;
         core.Settings.IsPasswordAutosaveEnabled = false;
         Bridge.Shared.Register(Web);

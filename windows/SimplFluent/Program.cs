@@ -21,7 +21,10 @@ public static class Program
         Instance.WaitForPrevious();       // (opened again by Reset Everything: the copy before it gone first)
         EraseAll.FinishIfAsked();         // (and what it could not delete, deleted now)
         if (!Instance.Claim()) return;    // (already open: that one is brought forward instead)
-        Engine.BridgeStore.Preload();     // (the extension's storage read meanwhile, off this thread)
+        Vault.Preload();                  // (the vault's key unwrapped by the TPM and Windows meanwhile, off this thread)
+        Engine.BridgeStore.Preload();     // (the extension's storage read meanwhile, once the vault is open)
+        LoginVault.Preload();             // (and the saved sign-in, an earlier Simpl's moved into the vault)
+        Tools.FlashcardStore.SealSoon();  // (and flashcards an earlier Simpl kept in plain text, sealed)
         var app = new App();
         app.InitializeComponent();
         app.DispatcherUnhandledException += (_, e) =>
@@ -31,7 +34,7 @@ public static class Program
         };
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("fatal: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("task: " + e.Exception); e.SetObserved(); };
-        Log.Write($"Simpl for Windows {WhatsNew.Current} starting{(Updates.Installed ? " (installed)" : "")}: {string.Join(' ', args)}");
+        Log.Write($"Simpl for Windows {WhatsNew.Current} starting{(Updates.Installed ? " (installed)" : "")}: {Launch.Said(args)}");
         if (!Launch.IsDevelopment)
         {
             AppIdentity.Register();

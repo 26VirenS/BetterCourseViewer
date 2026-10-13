@@ -6,15 +6,20 @@ namespace Simpl.Support;
 
 /// <summary>
 /// Where the app keeps its files: %LOCALAPPDATA%\Simpl (or, with --profile, a folder of its own — the screenshot suite
-/// runs several copies at once, each apart).
+/// runs several copies at once, each apart). What is the student's is sealed by the vault (Vault): the preferences, the
+/// extension's storage, the answers kept, the flashcards and the saved sign-in; vault.key holds its key, wrapped.
 /// </summary>
 public static class AppPaths
 {
     public static string Root { get; } = Make(Launch.Get("profile") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Simpl"));
+    /// <summary>Chromium's own profile, as WebView2 keeps it (its cookies encrypted by Chromium itself, with DPAPI).</summary>
     public static string WebData => Make(Path.Combine(Root, "WebView2"));
     public static string Answers => Make(Path.Combine(Root, "Answers"));
     public static string Storage => Path.Combine(Root, "storage.json");
     public static string PrefsFile => Path.Combine(Root, "prefs.json");
+    public static string Flashcards => Path.Combine(Root, "flashcards.json");
+    public static string Login => Path.Combine(Root, "login.bin");
+    public static string VaultKey => Path.Combine(Root, "vault.key");
     /// <summary>The folder the app runs from: the extension and the bridge are beside it.</summary>
     public static string AppDir => AppContext.BaseDirectory;
 
@@ -26,9 +31,11 @@ public static class AppPaths
 }
 
 /// <summary>
-/// The app's own preferences (the Mac's UserDefaults): a small JSON file. A change is in memory at once, for every
-/// reader; the file is written a moment after the changes stop (a window dragged changes its place dozens of times a
-/// second), off the UI thread, and as the app ends if anything is still to be written.
+/// The app's own preferences (the Mac's UserDefaults): a small JSON file, sealed by the vault. A change is in memory at
+/// once, for every reader; the file is written a moment after the changes stop (a window dragged changes its place
+/// dozens of times a second), off the UI thread, and as the app ends if anything is still to be written. The first read
+/// waits for the vault to open (Program.Main began opening it first of all); a file an earlier Simpl kept in plain text
+/// is read as it is and written sealed a moment later.
 /// </summary>
 public static class Prefs
 {
@@ -39,6 +46,7 @@ public static class Prefs
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
     private static readonly TimeSpan Quiet = TimeSpan.FromMilliseconds(500);
     private const long LongestWait = 2000; // ms
+    private const string Purpose = "prefs";
     private static JsonObject? data;
     private static bool erased, dirty, armed;
     private static long armedAt;
@@ -52,8 +60,13 @@ public static class Prefs
         get
         {
             if (data != null) return data;
-            try { data = JsonNode.Parse(File.ReadAllText(AppPaths.PrefsFile)) as JsonObject; } catch { data = null; }
-            return data ??= new JsonObject();
+            var file = Vault.Read(AppPaths.PrefsFile, Purpose);
+            try { data = file.Plain != null ? JsonNode.Parse(file.Plain) as JsonObject : null; } catch { data = null; }
+            finally { file.Zero(); }
+            data ??= new JsonObject();
+            // (kept in plain text by an earlier Simpl: written sealed in a moment, over it)
+            if (file.Legacy) Changed();
+            return data;
         }
     }
 
@@ -131,12 +144,7 @@ public static class Prefs
                 json = Data.ToJsonString(Indented);
             }
             // (WriteGate held from here to the move: Erase waits for it, so erased cannot turn true in between)
-            try
-            {
-                var tmp = AppPaths.PrefsFile + ".tmp";
-                File.WriteAllText(tmp, json);
-                File.Move(tmp, AppPaths.PrefsFile, true);
-            }
+            try { Vault.Write(AppPaths.PrefsFile, json, Purpose); }
             catch
             {
                 lock (Gate) dirty = true; // (the next change, or the app's end, tries again)
