@@ -319,7 +319,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         else row = K.Row(SymbolRegular.Key24, "Not saved", "When your school’s sign-in page comes up, sign in with Simpl’s card and answer Stay Logged In.");
         var group = K.Group(row);
         if (!locked && hello == false)
-            group.Children.Add(K.Row(SymbolRegular.PersonPasskey24, "Windows Hello", "Not set up on this PC",
+            group.Children.Add(K.Row(SymbolRegular.Fingerprint24, "Windows Hello", "Not set up on this PC",
                 K.Button("Sign-in options", () => Engine.Engine.OpenExternally(new Uri("ms-settings:signinoptions")))));
         v.Children.Add(group);
         var holder = KeyHolder() is { } h ? $", with its key held by {h}" : "";
