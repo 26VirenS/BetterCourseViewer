@@ -6925,7 +6925,9 @@ try {
     check((await texts('.bcv-need__big'))[0] === '95%' && (await texts('.bcv-need__line'))[0] === 'on Midterm 2 to finish with an A (93%).' && (await texts('.bcv-need__grid .bcv-tool__hint'))[1] === "Midterms is 57% of the grade; this is 100 points of the group's 200." && (await texts('.bcv-need__row')).join(' | ') === 'A+ out of reach | A 95% | A− 84% | B+ 74% | B 60% | B− 49% | C+ 39% | C 25% | C− 14% | D already there', `the answer: 95% on Midterm 2 for an A, the piece's share explained, and every letter's price under it (${(await texts('.bcv-need__row')).join(' | ')})`);
     await shot(page, '41-grade-needed');
     await ntPicks[1].$eval('.bcv-picker', (e) => e.click());
-    const ntOpts = await texts('.bcv-picker__list .bcv-picker__opt');
+    // (the open list's alone: the course list picked from a moment ago is still on its way out — its exit plays, under
+    //  load for a while — and its rows were read with these)
+    const ntOpts = await texts('.bcv-picker__list:not(.is-closing) .bcv-picker__opt');
     check(ntOpts.slice(0, 4).join(' | ') === 'Midterm 2 · 28.5% | Midterm 1 · 28.5% | Final Exam · 25% | Qz01 · 9%' && ntOpts[ntOpts.length - 1] === 'Something else…' && !ntOpts.some((o) => /Lec01|Qz00|Skills_Check/.test(o)), `the pieces are the ungraded work, heaviest first, graded and omitted work left out, Something else last (${ntOpts.join(' | ')})`);
     await page.click('.bcv-picker__list .bcv-picker__opt[data-value="1017"]');
     await page.waitForTimeout(200);
