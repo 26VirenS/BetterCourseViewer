@@ -208,6 +208,10 @@ public sealed partial class DashboardScreen : Screen
     /// <summary>A one-row tile's padding at its sides, its symbol's size and the room between the symbol and its words.</summary>
     private const double RowPad = 12, RowSymbol = 22, RowGap = 8;
 
+    /// <summary>The narrowest one-row tiles' padding at their sides (the Mac's too): on a 1024 window the longest name,
+    /// Next 7 days, has room at its own size in them only so — at 12 it was shrunk a little to fit.</summary>
+    private const double RowPadTight = 10;
+
     /// <summary>
     /// How the counters are laid out for a page and a window this wide: on a window 1024 wide or wider, one row of six —
     /// told by the window, so a page that narrows as the pane or the rail takes room never puts them back in two rows —
@@ -328,7 +332,7 @@ public sealed partial class DashboardScreen : Screen
         }
         line.Height = 32;
         var content = K.V(0, head, line);
-        content.Margin = new Thickness(RowPad, 8, RowPad, 8);
+        content.Margin = roomy ? new Thickness(RowPad, 8, RowPad, 8) : new Thickness(RowPadTight, 8, RowPadTight, 8);
         return TileButton(c, content, value, alert, color);
     }
 
