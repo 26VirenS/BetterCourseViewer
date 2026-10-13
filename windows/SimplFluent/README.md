@@ -429,8 +429,9 @@ with between page loads, and moves between its screens with view transitions onl
 knows by `BCVBridge.native`. `bridge.js` sets that because `Engine/ScriptBundle.cs` hands it a stand-in for WebKit's
 message handler (the local `webkit`), exactly as the Mac's and the iPhone's web views have the real one; so nothing is
 read twice over (the app's reading ahead and the page's), the page keeps no more of the school's answers in the
-extension's storage than it did before (the courses' assignments, for the Dashboard's counts), and the web screens
-change as they did before.
+extension's storage than it did before (the courses' assignments, for the Dashboard's counts), and a web screen takes
+no picture of the one before it to move from: it arrives by its own entrance (the app shows each one in place, so a
+220 ms fade on the house ease-out, where it rose before), and the app's pages make the move between them.
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
 
