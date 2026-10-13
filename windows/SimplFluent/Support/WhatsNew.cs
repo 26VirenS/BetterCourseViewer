@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.7", "2026-10-13",
+            ("new", "Your data, encrypted", "Your sign-in, settings, saved pages and flashcards are encrypted, with the key held by this PC's security chip."),
+            ("improved", "Pinned tools in colour", "Each pinned tool shows in its own colour on the title bar, easy to spot in light or dark.")),
         R("0.2.6", "2026-10-12",
             ("improved", "A quicker start", "Your Dashboard from last time shows at once while Simpl connects."),
             ("improved", "Smoother switching", "The sidebar and header stay put, and a page is drawn again only when it changed."),
