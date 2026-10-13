@@ -6,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace Simpl.Kit;
 
@@ -446,7 +445,7 @@ public sealed class RichText : RichTextBox
         {
             var comma = abs.IndexOf(',');
             if (comma > 0 && abs[..comma].Contains("base64"))
-                try { img.Source = Decode(Convert.FromBase64String(abs[(comma + 1)..])); } catch { return null; }
+                try { if (Decoding.Picture(Convert.FromBase64String(abs[(comma + 1)..])) is { } p) Decoding.Show(img, p); } catch { return null; }
             return img;
         }
         if (!Uri.TryCreate(abs, UriKind.Absolute, out var u) || u.Scheme is not ("http" or "https")) return null;
@@ -463,23 +462,9 @@ public sealed class RichText : RichTextBox
             using var res = await Http.SendAsync(req);
             if (!res.IsSuccessStatusCode) return;
             var bytes = await res.Content.ReadAsByteArrayAsync();
-            img.Source = Decode(bytes);
+            // (decoded off the window's thread, no wider than the screen needs)
+            if (await Task.Run(() => Decoding.Picture(bytes)) is { } p) Decoding.Show(img, p);
         }
         catch { /* a picture that will not come: nothing drawn */ }
-    }
-
-    private static BitmapSource? Decode(byte[] bytes)
-    {
-        try
-        {
-            var b = new BitmapImage();
-            b.BeginInit();
-            b.CacheOption = BitmapCacheOption.OnLoad;
-            b.StreamSource = new System.IO.MemoryStream(bytes);
-            b.EndInit();
-            b.Freeze();
-            return b;
-        }
-        catch { return null; }
     }
 }

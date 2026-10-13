@@ -202,13 +202,10 @@ internal static class CourseFiles
 
     private static FrameworkElement Picture(string path)
     {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.UriSource = new Uri(path);
-        bmp.EndInit();
-        bmp.Freeze();
-        return new Image { Source = bmp, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var img = new Image { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        // (no wider than the screen needs: a phone's photo is 48 MB decoded whole)
+        if (Kit.Decoding.Picture(path) is { } p) Kit.Decoding.Show(img, p);
+        return img;
     }
 
     private static FrameworkElement Text(string path)
@@ -227,7 +224,11 @@ internal static class CourseFiles
         return new ScrollViewer { Content = t, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 
-    /// <summary>A PDF's pages, drawn by Windows' own PDF renderer at the pane's width, one under another as they come.</summary>
+    /// <summary>
+    /// A PDF's pages, drawn by Windows' own PDF renderer at the pane's width, one under another: each drawn as it comes
+    /// near the part of the pane shown, and let go again once far from it, its place kept the same size meanwhile (all
+    /// sixty pages drawn at the pane's width are 4 MB a page at 150 % scaling, a quarter of a gigabyte for one file).
+    /// </summary>
     private static FrameworkElement Pdf(string path, double width)
     {
         var pages = new Stack { Orientation = Orientation.Vertical, Spacing = 12, Margin = new Thickness(12) };
@@ -235,40 +236,177 @@ internal static class CourseFiles
         var reading = K.Reading("Drawing the pages…");
         pages.Children.Add(reading);
         var w = Math.Max(200, width - 24);
+        PdfSheets? sheets = null;
         scroller.Loaded += async (_, _) =>
         {
+            if (sheets != null) { sheets.Fill(); return; }
             if (pages.Tag != null) return;
             pages.Tag = "drawn";
-            try { await DrawPdf(path, pages, w, VisualTreeHelper.GetDpi(scroller).PixelsPerDip, () => scroller.IsLoaded); }
+            try
+            {
+                sheets = await PdfSheets.Open(path, scroller, pages, w, VisualTreeHelper.GetDpi(scroller).PixelsPerDip);
+                await sheets.FillNow();
+            }
             catch (Exception e) { pages.Children.Add(K.Empty(SymbolRegular.Warning24, "The pages could not be drawn. " + e.Message)); }
             pages.Children.Remove(reading);
         };
+        // (a pane taken away gives its pages back; they are drawn again if it comes back)
+        scroller.Unloaded += (_, _) => sheets?.LetGo(all: true);
+        scroller.ScrollChanged += (_, _) => sheets?.Fill();
         return scroller;
     }
 
-    private static async Task DrawPdf(string path, Stack pages, double width, double scale, Func<bool> wanted)
+    /// <summary>A PDF's pages in a pane: a sheet each, the size its page will be, drawn while near what is shown.</summary>
+    private sealed class PdfSheets
     {
-        var file = await global::Windows.Storage.StorageFile.GetFileFromPathAsync(path);
-        var doc = await global::Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
-        var count = Math.Min(doc.PageCount, 60u);
-        for (uint i = 0; i < count; i++)
+        private sealed class Sheet
         {
-            if (!wanted()) return;
-            using var page = doc.GetPage(i);
-            using var stream = new global::Windows.Storage.Streams.InMemoryRandomAccessStream();
-            await page.RenderToStreamAsync(stream, new global::Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = (uint)Math.Round(width * scale) });
-            var bmp = new BitmapImage();
-            bmp.BeginInit();
-            bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.StreamSource = stream.AsStream();
-            bmp.EndInit();
-            bmp.Freeze();
-            var img = new Image { Source = bmp, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly };
-            var sheet = new Border { Child = img, BorderThickness = new Thickness(1), Effect = K.Shadow(8, 1, 0.12), HorizontalAlignment = HorizontalAlignment.Center };
-            sheet.Stroke(B.CardStroke);
-            pages.Children.Insert(Math.Max(0, pages.Children.Count - 1), sheet);
+            public required Image Img;
+            public required ImageSource Blank;
+            public BitmapSource? Drawn;
+            public bool Failed;
         }
-        if (doc.PageCount > count) pages.Children.Add(K.Text($"{doc.PageCount} pages in all: open it to read the rest.", Ty.Caption, B.Text2).Center());
+
+        /// <summary>How far past what is shown pages are drawn, and kept, in heights of the pane.</summary>
+        private const double DrawAhead = 1.5, KeepAhead = 4;
+
+        private readonly global::Windows.Data.Pdf.PdfDocument doc;
+        private readonly ScrollViewer scroller;
+        private readonly List<Sheet> sheets = new();
+        private readonly uint across;
+        private bool filling, again;
+
+        private PdfSheets(global::Windows.Data.Pdf.PdfDocument doc, ScrollViewer scroller, uint across)
+        {
+            this.doc = doc;
+            this.scroller = scroller;
+            this.across = across;
+        }
+
+        /// <summary>The document read and a blank sheet laid for each page (up to 60), the size each will be once drawn.</summary>
+        public static async Task<PdfSheets> Open(string path, ScrollViewer scroller, Stack pages, double width, double scale)
+        {
+            var file = await global::Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            var doc = await global::Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+            var across = (uint)Math.Round(width * scale);
+            var made = new PdfSheets(doc, scroller, across);
+            var count = Math.Min(doc.PageCount, 60u);
+            for (uint i = 0; i < count; i++)
+            {
+                double tall;
+                using (var page = doc.GetPage(i)) tall = page.Size.Width > 0 ? Math.Round(across * page.Size.Height / page.Size.Width) : across;
+                var blank = Blank(across, Math.Max(1, tall));
+                var img = new Image { Source = blank, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly };
+                var sheet = new Border { Child = img, BorderThickness = new Thickness(1), Effect = K.Shadow(8, 1, 0.12), HorizontalAlignment = HorizontalAlignment.Center };
+                sheet.Stroke(B.CardStroke);
+                pages.Children.Insert(Math.Max(0, pages.Children.Count - 1), sheet);
+                made.sheets.Add(new Sheet { Img = img, Blank = blank });
+            }
+            if (doc.PageCount > count) pages.Children.Add(K.Text($"{doc.PageCount} pages in all: open it to read the rest.", Ty.Caption, B.Text2).Center());
+            return made;
+        }
+
+        /// <summary>Nothing drawn, the size of a page drawn <paramref name="w"/> by <paramref name="h"/> pixels at 96 dpi.</summary>
+        private static ImageSource Blank(double w, double h)
+        {
+            var d = new DrawingImage(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, w, h))));
+            d.Freeze();
+            return d;
+        }
+
+        /// <summary>The pages near what is shown drawn (soon), the far ones let go.</summary>
+        public void Fill()
+        {
+            if (filling) { again = true; return; }
+            _ = FillNow();
+        }
+
+        public async Task FillNow()
+        {
+            if (filling) { again = true; return; }
+            filling = true;
+            try
+            {
+                do
+                {
+                    again = false;
+                    // (once laid out: where each sheet is is known only then)
+                    await scroller.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    LetGo(all: false);
+                    while (scroller.IsLoaded && Next() is { } i)
+                    {
+                        var s = sheets[i];
+                        try
+                        {
+                            byte[] png;
+                            using (var page = doc.GetPage((uint)i))
+                            using (var stream = new global::Windows.Storage.Streams.InMemoryRandomAccessStream())
+                            {
+                                await page.RenderToStreamAsync(stream, new global::Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = across });
+                                using var ms = new MemoryStream();
+                                stream.AsStream().CopyTo(ms);
+                                png = ms.ToArray();
+                            }
+                            // (decoded off the window's thread)
+                            var bmp = await Task.Run(() =>
+                            {
+                                var b = new BitmapImage();
+                                b.BeginInit();
+                                b.CacheOption = BitmapCacheOption.OnLoad;
+                                b.StreamSource = new MemoryStream(png, writable: false);
+                                b.EndInit();
+                                b.Freeze();
+                                return b;
+                            });
+                            s.Drawn = bmp;
+                            s.Img.Source = bmp;
+                            // (let go again later at the size it was drawn)
+                            s.Blank = Blank(bmp.Width, bmp.Height);
+                        }
+                        catch { s.Failed = true; /* (a page that cannot be drawn stays blank; the rest are drawn) */ }
+                    }
+                } while (again && scroller.IsLoaded);
+            }
+            finally { filling = false; }
+        }
+
+        /// <summary>Where a sheet is against what the pane shows: its top and bottom, in heights of the pane from its top.</summary>
+        private (double Top, double Bottom)? Place(int i)
+        {
+            var img = sheets[i].Img;
+            var h = scroller.ViewportHeight;
+            if (!img.IsLoaded || h <= 0 || !scroller.IsAncestorOf(img)) return null;
+            var top = img.TransformToAncestor(scroller).Transform(new Point(0, 0)).Y;
+            return (top / h, (top + img.ActualHeight) / h);
+        }
+
+        /// <summary>The page to draw next: the one shown first, then the nearest beyond it.</summary>
+        private int? Next()
+        {
+            int? best = null;
+            var bestDist = double.MaxValue;
+            for (var i = 0; i < sheets.Count; i++)
+            {
+                if (sheets[i].Drawn != null || sheets[i].Failed || Place(i) is not { } p) continue;
+                if (p.Bottom < -DrawAhead || p.Top > 1 + DrawAhead) continue;
+                var dist = p.Bottom < 0 ? -p.Bottom : p.Top > 1 ? p.Top - 1 : 0;
+                if (dist < bestDist) { best = i; bestDist = dist; }
+            }
+            return best;
+        }
+
+        /// <summary>The pages far from what is shown (all of them, when the pane is gone) back to blank sheets.</summary>
+        public void LetGo(bool all)
+        {
+            for (var i = 0; i < sheets.Count; i++)
+            {
+                var s = sheets[i];
+                if (s.Drawn == null) continue;
+                if (!all && Place(i) is { } p && p.Bottom >= -KeepAhead && p.Top <= 1 + KeepAhead) continue;
+                s.Img.Source = s.Blank;
+                s.Drawn = null;
+            }
+        }
     }
 
     /// <summary>A film (or a sound) to play, stopped until Play is pressed.</summary>

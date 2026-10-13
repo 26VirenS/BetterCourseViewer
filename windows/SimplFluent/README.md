@@ -307,7 +307,9 @@ was let go, so it is built from what was kept.
 Resources looked up (`Kit/FlatResources.cs`): WPF-UI keeps its control styles in 91 merged dictionaries, and every
 style or theme colour WPF looked up for an element searched them one after another — again for each element each time
 the part of a page it is in was added to another (pages are built from the bottom up). A trace of the walk put a fifth
-of the window's busy time there. At start they are copied into one dictionary, in WPF-UI's order; the theme's own
+of the window's busy time there (half the walk's busy time went once they were one). They are copied into one
+dictionary, in WPF-UI's order, a few milliseconds at a time while the window is idle at start (making every style
+took 170 ms in one go, and the window waited for it), and the copy put in WPF-UI's place once whole; the theme's own
 dictionary stays apart (WPF-UI swaps it), and the accent is written over all of it as before. `--no-flatten` leaves
 them as they were. A screen let go is taken out of the window once nothing else is happening, not while the next page
 comes in.
@@ -320,6 +322,11 @@ processes' memory back); and Windows takes what Simpl is not using out of RAM (i
 window brought straight back has everything where it was; back in view, the page has its pace again at once. One
 browser (`Engine.WebEnvironment`) serves every web view, with its network service in its own process
 (`NetworkServiceInProcess2`: one process fewer). `--no-tidy` (any run) leaves memory as .NET and WebView2 keep it.
+
+Pictures and files (`Kit/Decoding.cs`): a picture in a page or a course's files is decoded no wider than 2,400 pixels
+(a phone's photo, decoded whole, is 48 MB), off the window's thread, and drawn at the size it would have had. A PDF in
+a course's files is drawn a page at a time as it comes near what the pane shows and let go again once four heights of
+the pane away, its place kept the same size meanwhile, rather than all sixty of its first pages at once.
 
 CI's Performance walk, beside the pictures, does the same against the mock twice with one profile — `cold`, then
 `warm` (the answers kept) — prints both tables in its log and the run's summary, keeps them as `windows-fluent-perf`
@@ -338,7 +345,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | --- | --- |
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). |
-| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
+| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
 | `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
