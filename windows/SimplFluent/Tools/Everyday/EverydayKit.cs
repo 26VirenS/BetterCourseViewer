@@ -22,13 +22,7 @@ internal static class Everyday
     /// The Mac's ToolPage: the tool's body scrolling under its header, as wide as the window allows up to its widest, and
     /// centred past that.
     /// </summary>
-    public static ScrollViewer Page(FrameworkElement content, double maxWidth = 1480)
-    {
-        var sv = ToolKit.Page(content, maxWidth);
-        // (the whole width, not only what the content asks for: the tools' columns and keys share it out)
-        content.HorizontalAlignment = HorizontalAlignment.Stretch;
-        return sv;
-    }
+    public static ScrollViewer Page(FrameworkElement content, double maxWidth = 1480) => ToolKit.Page(content, maxWidth);
 
     /// <summary>The Mac's PageSection: its heading (and what is at its right) over its content.</summary>
     public static Stack Section(string title, UIElement content, string? trailing = null, UIElement? action = null) =>

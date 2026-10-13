@@ -181,10 +181,11 @@ public static class ToolsCenter
 /// <summary>The pieces every tool is made of, so they look one family.</summary>
 public static class ToolKit
 {
-    /// <summary>A tool's scrolling body: the page's side margins, its content as wide as the window allows.</summary>
+    /// <summary>A tool's scrolling body: the page's side margins, its content as wide as the window allows up to its
+    /// widest, and centred past that (the Mac's ToolPage).</summary>
     public static ScrollViewer Page(UIElement content, double maxWidth = 1480, double spacing = 20)
     {
-        if (content is FrameworkElement fe) { fe.MaxWidth = maxWidth; fe.HorizontalAlignment = HorizontalAlignment.Left; }
+        if (content is FrameworkElement fe) Fit(fe, maxWidth);
         var sv = new ScrollViewer
         {
             Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -197,42 +198,22 @@ public static class ToolKit
     /// <summary>A tool's scrolling body made of parts one under another.</summary>
     public static ScrollViewer Page(double spacing, params UIElement?[] parts) => Page(K.V(spacing, parts));
 
+    /// <summary>
+    /// A page's content given the page's whole width up to its widest (a page kept, with new content, too): its columns
+    /// share out the page, not what their content happens to ask for.
+    /// </summary>
+    public static void Fit(FrameworkElement content, double maxWidth)
+    {
+        content.MaxWidth = maxWidth;
+        content.HorizontalAlignment = HorizontalAlignment.Stretch;
+    }
+
     /// <summary>Two columns side by side on a wide window (the work and its side panel), one over the other on a narrow one.</summary>
     public static FrameworkElement Columns(UIElement main, UIElement side, double sideWidth = 380, double breakpoint = 900, double spacing = 28)
     {
-        var g = new Grid();
-        g.Children.Add(main);
-        g.Children.Add(side);
-        var wide = (bool?)null;
-        void Lay()
-        {
-            var w = g.ActualWidth >= breakpoint;
-            if (wide == w) return;
-            wide = w;
-            g.ColumnDefinitions.Clear();
-            g.RowDefinitions.Clear();
-            if (w)
-            {
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(spacing) });
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(sideWidth) });
-                Grid.SetColumn(main, 0); Grid.SetRow(main, 0);
-                Grid.SetColumn(side, 2); Grid.SetRow(side, 0);
-            }
-            else
-            {
-                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(spacing) });
-                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                Grid.SetColumn(main, 0); Grid.SetRow(main, 0);
-                Grid.SetColumn(side, 0); Grid.SetRow(side, 2);
-            }
-        }
-        g.SizeChanged += (_, _) => Lay();
-        g.Loaded += (_, _) => Lay();
         if (main is FrameworkElement m) m.VerticalAlignment = VerticalAlignment.Top;
         if (side is FrameworkElement s) s.VerticalAlignment = VerticalAlignment.Top;
-        return g;
+        return new ToolColumns(main, side, sideWidth, breakpoint, spacing);
     }
 
     /// <summary>A labelled field: its label over it, a hint under it, a word after it (a unit, "%").</summary>
@@ -312,6 +293,66 @@ public static class ToolKit
     /// <summary>A section's card of a tool: its heading over its content.</summary>
     public static FrameworkElement Section(string title, UIElement content, UIElement? trailing = null) =>
         K.V(10, trailing == null ? K.Text(title, Ty.BodyStrong) : K.Columns("*, auto", K.Text(title, Ty.BodyStrong).Col(0), trailing.Col(1)), K.Card(content, new Thickness(16)));
+}
+
+/// <summary>
+/// The work and its side panel (the Mac's ToolColumns): side by side when the width given holds the breakpoint, the
+/// side at its own width and the work taking the rest, one over the other below that. The choice is made from the width
+/// offered as it is measured, never from its own size, and it takes the whole of that width either way — so its width
+/// cannot feed back into the choice, and it lands the same whatever order the layout happens in.
+/// </summary>
+internal sealed class ToolColumns : Panel
+{
+    private readonly UIElement main, side;
+    private readonly double sideWidth, breakpoint, spacing;
+
+    public ToolColumns(UIElement main, UIElement side, double sideWidth, double breakpoint, double spacing)
+    {
+        this.main = main;
+        this.side = side;
+        this.sideWidth = sideWidth;
+        this.breakpoint = breakpoint;
+        this.spacing = spacing;
+        Children.Add(main);
+        Children.Add(side);
+    }
+
+    private bool Wide(double width) => !double.IsInfinity(width) && width >= breakpoint;
+
+    private double MainWidth(double width) => Math.Max(0, width - spacing - sideWidth);
+
+    protected override Size MeasureOverride(Size available)
+    {
+        var w = available.Width;
+        if (Wide(w))
+        {
+            main.Measure(new Size(MainWidth(w), available.Height));
+            side.Measure(new Size(sideWidth, available.Height));
+            return new Size(w, Math.Max(main.DesiredSize.Height, side.DesiredSize.Height));
+        }
+        main.Measure(new Size(w, double.PositiveInfinity));
+        side.Measure(new Size(w, double.PositiveInfinity));
+        // (no width to fill, as in a row: as wide as the wider of the two)
+        var width = double.IsInfinity(w) ? Math.Max(main.DesiredSize.Width, side.DesiredSize.Width) : w;
+        return new Size(width, main.DesiredSize.Height + spacing + side.DesiredSize.Height);
+    }
+
+    protected override Size ArrangeOverride(Size final)
+    {
+        var w = final.Width;
+        if (Wide(w))
+        {
+            main.Arrange(new Rect(0, 0, MainWidth(w), final.Height));
+            side.Arrange(new Rect(MainWidth(w) + spacing, 0, sideWidth, final.Height));
+        }
+        else
+        {
+            var top = main.DesiredSize.Height;
+            main.Arrange(new Rect(0, 0, w, top));
+            side.Arrange(new Rect(0, top + spacing, w, side.DesiredSize.Height));
+        }
+        return final;
+    }
 }
 
 /// <summary>Windows' own dialogs for a tool's files, and the checks on what was dropped (the Mac's ToolFiles).</summary>

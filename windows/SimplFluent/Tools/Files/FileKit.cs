@@ -107,7 +107,7 @@ internal static class FileKit
     public static ScrollViewer Page(ScrollViewer? page, UIElement content, double maxWidth = 1480)
     {
         if (page == null) return ToolKit.Page(content, maxWidth);
-        if (content is FrameworkElement fe) { fe.MaxWidth = maxWidth; fe.HorizontalAlignment = HorizontalAlignment.Left; }
+        if (content is FrameworkElement fe) ToolKit.Fit(fe, maxWidth);
         page.Content = content;
         return page;
     }
