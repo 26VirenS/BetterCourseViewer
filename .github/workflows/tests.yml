@@ -1,0 +1,94 @@
+# The extension's suites (scripts/dev/test-all.mjs: every suite, the smoke suite in its shards — Playwright's Chromium
+# with the extension loaded, against the mock Canvas and the mock Brightspace) on every push that changes what they
+# test, and by hand (Actions → Tests → Run workflow). Before this they ran only on a developer's machine, and a release
+# came within a step of going out with four suites failing. (On the Windows branch: its own copy of the extension, the
+# one Simpl for Windows' engine runs, and the suites as they are on this branch.) A failed suite fails the run: its failed checks are in the
+# log (and as annotations), each suite's whole log in the run's artifact test-logs. A newer push cancels the run before
+# it: only the newest is worth waiting for. docs/CI.md says what runs when and how to read a failure.
+name: Tests
+
+on:
+  push:
+    paths:
+      - 'extension/**'
+      - 'scripts/dev/**'
+      - 'ios/SimplCourses/Resources/**' # (the test school the ios and test-school suites read)
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suites:
+    name: Every suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # (the version the suites are written against; the browser it downloads is kept between runs under its number)
+      PLAYWRIGHT_VERSION: 1.56.1
+      # (the smoke shards take no pictures: a picture is for a person to look at, and nobody looks at these)
+      BCV_NO_SHOTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # (Playwright installed where the suites look for it — require('playwright'), else `npm root -g` — and its
+      #  Chromium and Chromium's headless shell, ~280 MB: the extension's suites open the one (channel 'chromium', where
+      #  extensions load), the page suites (report, alta) the other; from the cache when this version's are there)
+      - name: Playwright's Chromium, kept
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-chromium-and-shell
+      - name: Playwright
+        run: |
+          npm install -g --no-fund --no-audit "playwright@$PLAYWRIGHT_VERSION"
+          # (nothing downloaded when the cache had them; the libraries they need are the image's, else apt's)
+          playwright install chromium
+          playwright install-deps chromium >/dev/null
+          echo "playwright $(playwright --version); $(nproc) cores, $(free -g | awk '/Mem:/ {print $2}') GB"
+      # (each suite's time from the last run: test-all starts the longest first)
+      - name: The last run's times
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/dev/out/timings.json
+          key: test-timings-${{ github.run_id }}
+          restore-keys: test-timings-
+      - name: Every suite
+        id: suites
+        run: |
+          set -o pipefail
+          # (one suite a core: a suite keeps one busy, and several of the checks read motion and timing as it happens)
+          node scripts/dev/test-all.mjs --jobs "$(nproc)" 2>&1 | tee test-all.txt
+      - name: What failed
+        if: failure() && steps.suites.outcome == 'failure'
+        run: |
+          # (each failed suite, and each of its failed checks, as an annotation on the run; and in the run's summary)
+          # (a suite failed twice — under load, then alone — is in the list twice: its second time is the one that counts)
+          {
+            echo '### Failed suites'
+            echo '```'
+            awk '/^[✓✗]/ { show = /^✗/ } show; /suites? failed/' test-all.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          awk '/^[✓✗]/ { suite = /^✗/ ? $2 : "" } /^    - / && suite { sub(/^    - /, ""); print "::error title=" suite "::" substr($0, 1, 400) }' test-all.txt | head -60
+      - name: Keep the times for the next run
+        if: always() && steps.suites.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: scripts/dev/out/timings.json
+          key: test-timings-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-logs
+          path: |
+            scripts/dev/out/logs/
+            test-all.txt
+          retention-days: 14

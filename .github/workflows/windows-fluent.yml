@@ -10,7 +10,9 @@
 # feeds are not touched.
 # Built once (the installer and the zip a release carries); then, at the same time, the pictures in four parts and the
 # installer tried; a release publishes that one build (windows-fluent-ship.yml publishes a green run's, by hand). Beside
-# them, the performance walk, which only reports: no release waits for it.
+# them, the performance walk, which only reports: no release waits for it; and the models' unit tests with the
+# compiler's warnings (windows/SimplFluent.Tests, scripts/dev/check-warnings.py), then every picture and log checked
+# (check-shots.py, scan-logs.py), which a release does wait for (docs/CI.md).
 name: Windows app (Windows 11 look)
 
 on:
@@ -18,6 +20,16 @@ on:
     branches: [claude/windows-liquid-glass]
     paths:
       - 'windows/SimplFluent/**'
+      - 'windows/SimplFluent.Tests/**'
+      # (what the app carries beside it: the extension the engine runs, the bridge and the sign-in reader)
+      - 'extension/**'
+      - 'ios/SimplCourses/Web/bridge.js'
+      - 'ios/SimplCourses/Web/login.js'
+      - 'scripts/dev/check-shots.py'
+      - 'scripts/dev/scan-logs.py'
+      - 'scripts/dev/check-warnings.py'
+      - 'scripts/dev/*-checks.json'
+      - 'scripts/dev/baselines/windows-*'
       - '.github/workflows/windows-fluent.yml'
   workflow_dispatch:
     inputs:
@@ -43,9 +55,11 @@ permissions:
   actions: read # (a green run found, and its build downloaded, to publish it)
 
 concurrency:
-  # (pushes one after another; a publish beside them, never queued behind a build it does not need)
-  group: windows-fluent-${{ github.event_name }}
-  cancel-in-progress: false
+  # (pushes one after another, a newer push cancelling the run before it — only the newest is worth waiting for; a
+  #  publish beside them, never queued behind a build it does not need. A run that publishes is never cancelled: Run
+  #  workflow, and a push asking for a [preview], each have a group of their own that cancels nothing)
+  group: windows-fluent-${{ github.event_name }}${{ contains(github.event.head_commit.message, '[preview]') && '-preview' || '' }}
+  cancel-in-progress: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '[preview]') }}
 
 jobs:
   # (Run workflow, to publish: the run a push already made for this commit, once it is green, is published as it is —
@@ -172,6 +186,37 @@ jobs:
           path: dist/Simpl-Windows-x64.zip
           compression-level: 0
           retention-days: 30
+
+  # (the models' unit tests — windows/SimplFluent.Tests: the chemistry, the calculator, the vault's and the sign-in's
+  #  seals, the bridge's JSON — and the compiler's warnings against the ones already known
+  #  (scripts/dev/baselines/windows-warnings.txt): beside the build, on a runner of their own; a release waits for them)
+  tests:
+    name: Unit tests and compiler warnings
+    needs: prior
+    if: ${{ !cancelled() && needs.prior.outputs.found != 'true' && needs.prior.result != 'failure' }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-tests-${{ runner.os }}-${{ hashFiles('windows/SimplFluent/SimplFluent.csproj', 'windows/SimplFluent.Tests/SimplFluent.Tests.csproj') }}
+          restore-keys: nuget-tests-${{ runner.os }}-
+      - name: Unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test windows/SimplFluent.Tests/SimplFluent.Tests.csproj -c Release -nologo --logger "console;verbosity=normal" 2>&1 | tee test.log
+      - name: No new compiler warnings
+        if: ${{ !cancelled() && hashFiles('test.log') != '' }}
+        shell: bash
+        run: python scripts/dev/check-warnings.py test.log --baseline scripts/dev/baselines/windows-warnings.txt
 
   pictures:
     name: Pictures (part ${{ matrix.shard }})
@@ -446,10 +491,15 @@ jobs:
           PhoneTest 'hand-in-phone-photos' 7 @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1013', '--open', 'handin') @(
             @{ Path = $photo; Type = 'image/jpeg'; Name = 'IMG_0001.jpg' }, @{ Path = $photo; Type = 'image/jpeg'; Name = 'IMG_0002.jpg' }, @{ Path = "$env:RUNNER_TEMP/phone-song.mp3"; Type = 'audio/mpeg'; Name = 'Song.mp3' })
           foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+          # (the pictures this part was to take, for the checks: each must be there — scripts/dev/check-shots.py)
+          $script:mine | Set-Content "shots/expected-part-$shard.txt"
           Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
             $log = Join-Path $_.FullName 'simpl.log'
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 25 }
+            # (the page's own errors, when it had any: Support/PageErrors.cs, read by the checks)
+            $pageLog = Join-Path $_.FullName 'page-errors.log'
+            if (Test-Path $pageLog) { Copy-Item $pageLog "shots/$($_.Name).page-errors.log" }
           }
           # Send from Phone took the files: the server's answers, and the log saying each file is in the hand-in
           $phoneBad = @()
@@ -1108,9 +1158,41 @@ jobs:
           name: windows-fluent-part-installer
           path: shots
 
+  # (what the parts made, read before anyone has to: every picture each part was to take there and showing something —
+  #  scripts/dev/check-shots.py — and every Simpl's log free of exceptions, crashes and errors — scan-logs.py; what is
+  #  plain or harmless on purpose is in shot-checks.json and log-checks.json, each with its reason. The performance
+  #  walk's part is not waited for: it only reports)
+  checks:
+    name: Pictures and logs checked
+    needs: [build, pictures, installer]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/dev
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: windows-fluent-part-[0-9]*
+          path: shots
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-fluent-part-installer
+          path: shots
+      - name: Every picture shows something
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow
+          cat shots/expected-part-*.txt > expected.txt
+          "$RUNNER_TEMP/py/bin/python" scripts/dev/check-shots.py shots --app windows --expect expected.txt --report shot-checks.txt
+      - name: The logs are clean
+        if: ${{ !cancelled() }}
+        run: python3 scripts/dev/scan-logs.py --app windows 'shots/profile-*.log'
+
   shots:
     name: The pictures, together
-    needs: [build, pictures, installer, perf]
+    needs: [build, pictures, installer, perf, checks]
     if: ${{ always() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -1122,8 +1204,8 @@ jobs:
 
   publish:
     name: Publish the preview
-    needs: [prior, build, pictures, installer]
-    if: ${{ !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.preview) || contains(github.event.head_commit.message, '[preview]')) && (needs.prior.outputs.found == 'true' || (needs.build.result == 'success' && needs.pictures.result == 'success' && needs.installer.result == 'success')) }}
+    needs: [prior, build, pictures, installer, tests, checks]
+    if: ${{ !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.preview) || contains(github.event.head_commit.message, '[preview]')) && (needs.prior.outputs.found == 'true' || (needs.build.result == 'success' && needs.pictures.result == 'success' && needs.installer.result == 'success' && needs.tests.result == 'success' && needs.checks.result == 'success')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
