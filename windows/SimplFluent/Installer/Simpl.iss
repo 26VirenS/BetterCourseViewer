@@ -7,7 +7,8 @@
 ; (%LOCALAPPDATA%\Simpl -- its settings, grade history, saved sign-in and web view, never in the program's folder; what
 ; is the student's encrypted by Simpl itself, its key held by the PC's TPM and Windows: Support/Vault.cs).
 ;
-; An update, as Simpl's Settings > Updates > Restart to Update runs it (Support/Updates.cs):
+; An update, as Simpl runs it (Support/Updates.cs: by itself once nothing is open that it must not cut off, or when
+; Settings > Updates > Restart to Update is pressed):
 ;   Simpl-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LAUNCH
 ; waits for Simpl to have quit (asking it to, if it has not), puts the new version in place, and (/LAUNCH) opens it --
 ; or, if it could not (another Simpl that would not quit, a file it could not replace), opens the version that was there.

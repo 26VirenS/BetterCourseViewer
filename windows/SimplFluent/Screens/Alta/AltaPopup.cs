@@ -93,6 +93,8 @@ internal sealed class AltaPopupView
         sheet = AltaLook.Popup(root, over);
         railColumn.Width = new GridLength(sheet.Width >= 960 ? 290 : 240);
         sheet.Closed += Cleanup;
+        // (no update goes in while it is open: Support/Updates.cs, the Mac's UpdateHold)
+        sheet.Closed += Support.Updates.Hold("Knewton Alta", "when you close Knewton Alta").Dispose;
         session.Changed += Update;
         layer.Gone += Update;
         Support.Appearance.Changed += OnAppearance;

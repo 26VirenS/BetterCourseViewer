@@ -35,6 +35,9 @@ public static class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("fatal: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("task: " + e.Exception); e.SetObserved(); };
         Log.Write($"Simpl for Windows {WhatsNew.Current} starting{(Updates.Installed ? " (installed)" : "")}: {Launch.Said(args)}");
+        // (opened again by an update: where the window was, so it opens there; and the Mac's Pause updates, asked for here)
+        Updates.ReadResume();
+        if (Launch.Get("pause-updates") is { } pause) Updates.Paused = pause is "on" or "yes" or "true";
         if (!Launch.IsDevelopment)
         {
             AppIdentity.Register();

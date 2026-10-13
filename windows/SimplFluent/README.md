@@ -63,20 +63,88 @@ real. Not `/SUPPRESSMSGBOXES`: it would answer the uninstaller's one remaining b
 A copy run from its zip says it is removed by deleting its folder (Open Folder); a development run has the button off.
 `--uninstall yes` does the same as the sheet's Uninstall, keeping what Simpl keeps — for the installed copy only.
 
-Updates (`Support/Updates.cs`): a copy the installer put here — its uninstall entry names the folder Simpl.exe runs
-from — downloads the new release's Simpl-Setup.exe (checked against the size and SHA-256 GitHub publishes) to
-`%TEMP%\Simpl-Update\<tag>`, and **Restart to Update** runs it with the arguments above and quits Simpl. A portable
-copy opens the release's page, as before. Every Windows 11-look build is published as a GitHub pre-release, so a
-**beta** is marked by "beta" in the release's title, not by that flag: with Get beta updates off (the default), the
-usual previews are offered. CI tries the installer on every build: it installs silently into a folder of its own,
+Updates (`Support/Updates.cs`, below): a copy the installer put here — its uninstall entry names the folder Simpl.exe
+runs from — downloads the new release's Simpl-Setup.exe to `%TEMP%\Simpl-Update\<tag>` and runs it with the arguments
+above as Simpl quits: by itself at a quiet moment, or when **Restart to Update** is pressed. A portable copy opens the
+release's page, as before. Every Windows 11-look build is published as a GitHub pre-release, so a **beta** is marked
+by "beta" in the release's title, not by that flag: with Get beta updates off (the default), the usual previews are
+offered. CI tries the installer on every build: it installs silently into a folder of its own,
 checks Simpl.exe, the Start menu shortcut (and its app id) and the Settings ▸ Apps entry, opens the installed Simpl
-against the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed); runs
+against the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed); plays an
+update that comes by itself through the installed Simpl (below: held while a quiz is open, put in once it closes,
+Simpl opened again where it was); runs
 the update exactly as Restart to Update does over a Simpl left open (it must take the quit event, Setup must see it
 go, and `/LAUNCH` must open Simpl again); runs an update that cannot finish (a stand-in holding Simpl's mutex: Setup
 must give up and open the old copy again); uninstalls silently with that Simpl open (the uninstaller must close it),
 and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not; then installs again and
 uninstalls from Simpl itself (`--uninstall yes`: Simpl must start its uninstaller and quit, and the uninstaller — both
 its phases — must finish), checking the same. The installer's and each Simpl's logs are kept with the pictures.
+
+## Updates
+
+Simpl keeps itself up to date as the Mac app does (`mac/Simpl/Support/Updater.swift`), in `Support/Updates.cs` and the
+window's side of it, `Shell/UpdateWatch.cs`:
+
+- **When it looks**: at launch when the last look is over an hour old, then every hour (looked at every ten minutes and
+  whenever Simpl comes to the front, so a PC asleep does not count its hours) — one request for GitHub's releases of
+  this repository, the `windows-fluent-v<run>` ones, compared by run number. **Check for updates automatically** (on)
+  turns it off. A development run (the mock, a demo, a picture) never looks.
+- **Install updates automatically** (on): a copy the installer put here downloads the newest version's Simpl-Setup.exe
+  by itself — picked up where it stopped (an HTTP range), tried again 2, 10, 30 and then 60 minutes after a failure,
+  and not on a metered connection (Windows' own word for a phone's hotspot or a capped plan; Download fetches it
+  anyway) — and checks it: its size, that it is a program and not a web page, the SHA-256 GitHub publishes for it, and,
+  when this copy is Authenticode-signed (Signing, above), that Windows trusts its signature (WinVerifyTrust; revocation
+  not looked up, so nothing is asked of anyone) and that it is signed by this copy's own publisher (the certificate's
+  subject). An installer kept from before (Simpl quit before it went in) is checked and used rather than fetched again.
+- **When it goes in**: at once, unless something is open that an update must not cut off — then it waits, and goes in
+  as soon as all of it is closed. What holds it: a quiz, a Knewton Alta or Macmillan assignment, a page of the school's
+  in the window (each holds while it is open, the Mac's `UpdateHold`); any dialog over the window (Hand In, the setup,
+  a message, a task, a tool opened whole, Sign out?… — all but What's New, which is only there to be read), a dialog in
+  Settings, a window of a page of the school's or a tool's (`WebWindow`), Alta's graph; Windows' own Open and Save
+  dialogs; the tour; the sign-in while it is on screen; Simpl opening; and, for a moment, a menu or a flyout, the quick
+  look, a file on its way. Besides, with Simpl in front it waits for half a minute without a key or a click (the
+  student may be reading); behind other windows, five seconds. Going in, the notice at the top of the window says so
+  for a moment (a key or a click then, or something opened, and it waits again), where the window is is noted —
+  its place and what is opened on it, and whether it was in front, behind (or minimized) or in the notification area —
+  what Simpl keeps is written out, and the installer runs with `/LAUNCH` as Simpl quits. The new version opens where
+  the student was: in front as it was; minimized, taking nothing from the app in front, when it was behind; in the
+  notification area, out of sight, its engine running as ever, when it was there (`updates:resume`, used once, within
+  half an hour).
+- **What the student sees**: Settings ▸ Updates says where it stands — found, downloading, "Version v132 is ready —
+  Simpl updates when you close the quiz, and opens again where you were", installing — with Restart to Update to put it
+  in at once, whatever is open (the Mac's Update Now). The notice in the title bar's band (under it on a narrow window),
+  over everything in the window, sheets too: "Simpl updates to v132 when you close the quiz." for a few seconds, once for
+  each thing it waits for; "Updating Simpl to v132 — it opens again in a moment." as it goes in. Nothing interrupts:
+  no question is asked, and the notice takes no clicks.
+- **A Critical Update**: a release whose notes carry `<!-- simpl-critical -->` (the workflow's Run workflow ▸ critical
+  adds it, with a line saying so, as `scripts/release-mac-native.sh` does for the Mac). Every installed copy older than
+  it downloads the newest and puts it in whatever Install updates automatically, the pause or a metered connection say,
+  and a failed download is tried again every ten minutes. Unlike the Mac's, it still waits for what is open — a quiz,
+  a hand-in, a dialog — though only five seconds for the student's own typing; its notice stays while it waits
+  ("Critical Update v132 installs when you close the quiz."). Turning Check for updates automatically off stops every
+  look, a Critical Update's too: the student asked Simpl not to look.
+- **Paused** (the Mac's Developer ▸ Pause updates): `Simpl.exe --pause-updates on` (with Simpl quit; `off` again) keeps
+  the hourly look but installs nothing by itself, a Critical Update apart. Settings ▸ Updates says so.
+- **A copy run from its zip** cannot put a version in its own place: it says one is available, and Download opens its
+  page. Install updates automatically is off there, and says why.
+
+`simpl.log`'s `update:` lines say each step: found, downloaded and checked (or why not), `held (quiz)`, `no longer held
+(by quiz)`, `where it was: grades, the window hidden`, `installing …, and quitting`; and, opened again, `back after
+updating to v132`, `opened again at grades`.
+
+**Trying it** (a development run only): `--update-test <file>` plays an update through against a local file — the
+next run number is found at once, its installer that file (its SHA-256 the file's; `--update-test-sha <hex>` to try a
+mismatch), downloaded into the profile's `Update\` and checked, held and put in as above: the file is run as the
+installer, so give it a Simpl-Setup.exe. `--update-test-installed` acts as a copy the installer put here,
+`--update-test-critical` as a Critical Update, `--update-test-hold quiz` holds as an open quiz would (for Settings'
+pictures), `--update-test-close <s>` closes what is open over the window after that long, and `--update-test-tray`
+closes the window to the notification area a moment after it opens. With `--shot` nothing is ever run: the notice of
+an update going in stays for the picture. CI pictures Settings ▸ Updates (`settings-updates-waiting`, `-dark`, `-zip`)
+and the notice (`update-waiting-quiz`, `update-critical-quiz`, `update-restarting`) this way, with the build's own
+Simpl.exe as the file, and plays one through for real in the installer job (2b): the installed Simpl with a quiz open
+and its window in the notification area, the installer just made as the next version — every step logged in its
+order, the installer run and Simpl opened again, then that profile opened again: at the Grades, out of sight, its
+engine running.
 
 ## Signing
 

@@ -57,6 +57,9 @@ public class Sheet
     public bool Bare { get; set; }
     /// <summary>Escape and a click outside do nothing (a step that must be answered).</summary>
     public bool Modal { get; set; }
+    /// <summary>An update waits while it is open (Support/Updates.cs): every sheet but one only there to be read when the
+    /// student likes (What's New), which would otherwise hold up every update for a Simpl kept in the notification area.</summary>
+    public bool HoldsUpdates { get; set; } = true;
     public event Action? Closed;
     internal SheetHost? Host;
     internal Border? Card;

@@ -22,6 +22,8 @@ public sealed class WebScreen : Screen
     private readonly Grid root = new();
     private readonly Grid holder = new();
     private WebView2? web;
+    /// <summary>No update goes in while the page shows (Support/Updates.cs): what the student is doing on it is the school's.</summary>
+    private Updates.Holding? updateHold;
 
     public WebScreen(Engine.Engine engine, Uri? url, string title) : this(engine, url, () => title) { }
 
@@ -81,6 +83,7 @@ public sealed class WebScreen : Screen
 
     private async void Start()
     {
+        updateHold ??= Updates.Hold($"a page of {engine.LmsName}’s", $"when you leave this {engine.LmsName} page");
         web = new WebView2 { DefaultBackgroundColor = System.Drawing.Color.Transparent };
         holder.Children.Add(web);
         if (covered) web.Visibility = Visibility.Hidden;
@@ -117,6 +120,8 @@ public sealed class WebScreen : Screen
     public override void Hide()
     {
         base.Hide();
+        updateHold?.Dispose();
+        updateHold = null;
         try { web?.Dispose(); } catch { }
         web = null;
         holder.Children.Clear();

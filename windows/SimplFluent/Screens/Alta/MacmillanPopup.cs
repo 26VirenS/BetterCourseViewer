@@ -64,6 +64,8 @@ internal sealed class MacmillanPopupView
     {
         sheet = AltaLook.Popup(root, over);
         sheet.Closed += Cleanup;
+        // (no update goes in while it is open: Support/Updates.cs, the Mac's UpdateHold)
+        sheet.Closed += Support.Updates.Hold("Macmillan Learning", "when you close Macmillan Learning").Dispose;
         over.PreviewKeyDown += OnKey;
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>

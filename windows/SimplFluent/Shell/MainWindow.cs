@@ -142,6 +142,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
             if (e.ChangedButton == MouseButton.XButton1) { engine?.GoBack(); e.Handled = true; }
             if (e.ChangedButton == MouseButton.XButton2) { engine?.GoForward(); e.Handled = true; }
         };
+        // (updates: what the window has open that one waits for, where it is, its notice — Shell/UpdateWatch.cs)
+        UpdateWatch.Attach(this, root, () => engine, () => tour?.On == true);
     }
 
     // ---- beginning: the school, then its engine ----

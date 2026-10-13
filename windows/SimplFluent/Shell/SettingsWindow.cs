@@ -780,29 +780,43 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     private FrameworkElement UpdatesPane()
     {
-        var dev = Updates.IsDevelopmentRun;
+        var dev = Updates.Off;
         var found = Updates.Found;
+        var critical = Updates.Critical && found != null;
+        // (it goes in by itself: a Critical Update always; another while Install updates automatically is on, not paused)
+        var byItself = Updates.InstallsHere && (critical || (Updates.InstallAutomatically && !Updates.Paused));
         var v = Column(K.SectionHeader("Simpl for Windows", 0));
         var status = Updates.State switch
         {
             Updates.Mode.Checking => "Checking…",
             Updates.Mode.UpToDate => "You’re up to date",
-            Updates.Mode.Available => $"Version {found?.Version} is available",
+            Updates.Mode.Available => critical ? $"Critical Update {found?.Version} is available" : $"Version {found?.Version} is available",
             Updates.Mode.Downloading => $"Downloading version {found?.Version}…",
+            Updates.Mode.Ready when byItself => critical ? $"Critical Update {found?.Version} is ready" : $"Version {found?.Version} is ready",
             Updates.Mode.Ready => $"Version {found?.Version} is ready to install",
+            Updates.Mode.Installing => $"Installing version {found?.Version}…",
             Updates.Mode.Failed => Updates.Message ?? "Could not check.",
             _ => dev ? "Updates are off in a development run." : "Not checked yet",
         };
         var when = Updates.State switch
         {
-            Updates.Mode.Downloading => null,
+            Updates.Mode.Downloading => byItself ? "It installs by itself once it’s here, and Simpl opens again where you were." : null,
+            Updates.Mode.Ready when byItself => Updates.Waiting is { When: { } w }
+                ? $"Simpl updates {w}, and opens again where you were."
+                : "Simpl updates at the next quiet moment, and opens again where you were.",
             Updates.Mode.Ready => "Simpl closes, updates and opens again in a few seconds, your settings and sign-in as they were.",
+            Updates.Mode.Installing => "Simpl closes, and opens again by itself where you were.",
+            Updates.Mode.Available when Updates.HeldForMetered => "This PC is on a metered connection: Simpl waits for another to download it, or choose Download.",
+            Updates.Mode.Failed when found != null && byItself => "Simpl tries again in a while." + (Updates.LastCheck is { } l ? " Last checked " + Ago(l) : ""),
             _ => Updates.LastCheck is { } last ? "Last checked " + Ago(last) : null,
         };
+        if (critical && Updates.State is Updates.Mode.Available or Updates.Mode.Downloading or Updates.Mode.Ready)
+            when = (when != null ? when + " " : "") + "A Critical Update installs whatever these settings say.";
+        if (Updates.Paused && !dev) when = (when != null ? when + " " : "") + "Updates are paused (--pause-updates): only a Critical Update installs by itself.";
         // (Download: fetched here for a copy the installer put here, then Restart to Update; else the version's page)
         FrameworkElement action = Updates.State switch
         {
-            Updates.Mode.Checking => K.Spinner(20),
+            Updates.Mode.Checking or Updates.Mode.Installing => K.Spinner(20),
             Updates.Mode.Downloading => new Border(),
             Updates.Mode.Available or Updates.Mode.Failed when found != null => K.Button("Download", () => _ = Updates.Download(), accent: true),
             Updates.Mode.Ready => K.Button("Restart to Update", Updates.InstallAndRestart, accent: true),
@@ -825,13 +839,15 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         }
         var icon = Updates.State switch
         {
+            _ when critical && Updates.State != Updates.Mode.Failed => SymbolRegular.Warning24,
             Updates.Mode.Available or Updates.Mode.Downloading => SymbolRegular.ArrowDownload24,
-            Updates.Mode.Ready => SymbolRegular.ArrowClockwise24,
+            Updates.Mode.Ready or Updates.Mode.Installing => SymbolRegular.ArrowClockwise24,
             Updates.Mode.Failed => SymbolRegular.ErrorCircle24,
             _ => SymbolRegular.ArrowSyncCheckmark24,
         };
+        var orange = Updates.State == Updates.Mode.Failed || critical;
         var big = K.Columns("auto, *, auto",
-            K.IconTile(icon, Updates.State == Updates.Mode.Failed ? Color.FromRgb(0xe3, 0x6c, 0x0a) : Appearance.Accent, 48).Col(0),
+            K.IconTile(icon, orange ? Color.FromRgb(0xe3, 0x6c, 0x0a) : Appearance.Accent, 48).Col(0),
             words.Margin(16, 0, 16, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1),
             action.Col(2));
         v.Children.Add(K.Card(big, new Thickness(20), 4));
@@ -839,12 +855,19 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var auto = new ToggleSwitch { IsChecked = Updates.Automatic, IsEnabled = !dev };
         auto.Checked += (_, _) => Updates.Automatic = true;
         auto.Unchecked += (_, _) => Updates.Automatic = false;
+        // (a copy run from its zip cannot put a version in its own place: the toggle is off, and says why)
+        var install = new ToggleSwitch { IsChecked = Updates.Installed && Updates.InstallAutomatically, IsEnabled = !dev && Updates.Installed };
+        install.Checked += (_, _) => Updates.InstallAutomatically = true;
+        install.Unchecked += (_, _) => Updates.InstallAutomatically = false;
         var beta = new ToggleSwitch { IsChecked = Updates.Beta, IsEnabled = !dev };
         beta.Checked += (_, _) => Updates.Beta = true;
         beta.Unchecked += (_, _) => Updates.Beta = false;
         v.Children.Add(K.Group(
             K.Row(SymbolRegular.Info24, "Version", Updates.Installed ? "Installed with Simpl-Setup.exe" : null, K.Text(Updates.Version, Ty.Body, B.Text2)),
-            K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version now and then, and says so here when there is one.", auto),
+            K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version when it opens and every hour, and says so here when there is one.", auto),
+            K.Row(SymbolRegular.ArrowDownload24, "Install updates automatically", Updates.Installed || dev
+                ? "A new version goes in when it arrives, and Simpl opens again where you were — never while a quiz, a tool or a dialog is open."
+                : "This copy wasn’t installed with Simpl-Setup.exe, so it can’t put a new version in its own place: Download opens the version’s page.", install),
             K.Row(SymbolRegular.Beaker24, "Get beta updates", "Try new features before everyone else. A beta may have rough edges; turn this off to go back to the usual releases when the next one comes out.", beta)));
 
         // the versions published before
@@ -863,8 +886,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         }
         v.Children.Add(list);
         v.Children.Add(Foot(Updates.Installed
-            ? "Simpl was installed with Simpl-Setup.exe: a new version downloads here, and Restart to Update installs it. An earlier version opens on its own page."
-            : "A version opens on its own page, its downloads there: Simpl-Setup.exe installs Simpl (and from then on, updates install from here), or unzip Simpl-Windows-x64.zip over this copy to take its place."));
+            ? "Simpl was installed with Simpl-Setup.exe: a new version downloads here and is checked against the checksum published with it — and, once Simpl is signed, against its publisher — before it installs, by itself or with Restart to Update. An earlier version opens on its own page; to stay on one, turn Install updates automatically off first."
+            : "A version opens on its own page, its downloads there: Simpl-Setup.exe installs Simpl (and from then on, updates install themselves), or unzip Simpl-Windows-x64.zip over this copy to take its place."));
         return v;
     }
 

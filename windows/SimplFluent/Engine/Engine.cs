@@ -355,14 +355,21 @@ public sealed partial class Engine : Observable, IShellListener
         Web.CoreWebView2?.Navigate(new Uri(BaseUrl, "/").ToString());
     }
 
-    /// <summary>Where the window opens, as the screenshot suite asks (--place todo, course:101, section:courses/101:assignments).</summary>
+    /// <summary>Where the window opens, as the screenshot suite asks (--place todo, course:101, section:courses/101:assignments),
+    /// or where an update left it (Support/Updates.cs: its place, and what was opened on it).</summary>
     private void TakeLaunchPlace()
     {
         if (launchPlaceTaken) return;
         launchPlaceTaken = true;
-        if (Launch.Get("place") is { } p && PlaceNamed(p) is { } place)
+        var resumed = Updates.TakeResumedPlace();
+        if ((Launch.Get("place") ?? resumed?.Place) is { } p && PlaceNamed(p) is { } place)
         {
             Nav.Replace(place);
+            if (resumed is { Path: var opened } && Launch.Get("place") == null)
+            {
+                if (opened.Count > 0) Nav.SetPath(opened);
+                Log.Write($"update: opened again at {p}{(opened.Count > 0 ? $" with {opened.Count} opened on it" : "")}");
+            }
             NavVersion++;
             if (place.Ctx is { } ctx)
             {

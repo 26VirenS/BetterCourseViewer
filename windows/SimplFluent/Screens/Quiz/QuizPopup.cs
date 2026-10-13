@@ -62,6 +62,8 @@ internal sealed class QuizSheet
     private bool? paneWide;
     private int holds;
     private bool closed, askingCode;
+    /// <summary>No update goes in while the quiz is open (Support/Updates.cs; the Mac's UpdateHold).</summary>
+    private Support.Updates.Holding? updateHold;
     private bool? clockLow;
     private DateTime instructionsClosedAt;
 
@@ -127,6 +129,7 @@ internal sealed class QuizSheet
     public void Open()
     {
         Simpl.Shell.Dialogs.Show(sheet, over);
+        updateHold = Support.Updates.Hold("quiz", "when you close the quiz");
         over.SizeChanged += WindowSized;
         Engine.PropertyChanged += EngineChanged;
         Present(false);
@@ -441,6 +444,7 @@ internal sealed class QuizSheet
     {
         if (closed) return;
         closed = true;
+        updateHold?.Dispose();
         tick.Stop();
         if (instructions != null) instructions.IsOpen = false;
         over.SizeChanged -= WindowSized;
