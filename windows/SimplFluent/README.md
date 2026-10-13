@@ -435,9 +435,9 @@ where it must be); the student looks it over and presses Submit on the PC — no
   this computer to Wi-Fi to use your phone." The first time, before it listens, the panel says Windows will ask whether
   Simpl may use the network (choose Allow) — `phoneAsked` in prefs.json remembers it was said.
 - **Photos into one PDF.** For an assignment that takes PDFs and not pictures, *Combine photos into one PDF*: each photo
-  turned upright (`WinImage.Read`, its EXIF orientation), no larger than 2200 pixels, a JPEG page each in the order they
-  came, on Letter (or A4 where the region is metric), landscape for a wide photo (`PhotoPdf`, PDFsharp), as one PDF named
-  for the assignment, replaced in the hand-in as each photo comes.
+  turned upright (its EXIF orientation), no larger than 2200 pixels, a JPEG page each in the order they came (WPF's own
+  codecs, off the window's thread), on Letter (or A4 where the region is metric), landscape for a wide photo (`PhotoPdf`,
+  PDFsharp), as one PDF named for the assignment, replaced in the hand-in as each photo comes.
 - **The code** is QRCoder's (MIT, correction M) module matrix drawn by `PhoneQrView` in one `OnRender` on one clock
   (`CompositionTarget.Rendering`, only while it arrives): softly rounded modules, dark on white even in dark mode, four
   modules of quiet space. The panel grows from the button (96% to full, fading in, 240 ms, cubic-bezier(0.23, 1, 0.32,

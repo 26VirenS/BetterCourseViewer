@@ -13,7 +13,6 @@ using PdfSharp.Pdf;
 using QRCoder;
 using Simpl.Kit;
 using Simpl.Support;
-using Simpl.Tools;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
 using TextBlock = System.Windows.Controls.TextBlock;
@@ -45,7 +44,6 @@ internal sealed class PhoneHandIn
         public ImageSource? Thumb;
         public System.Windows.Controls.ProgressBar? Bar;
         public TextBlock? Words;
-        public bool InHandIn => State is "added" or "page";
     }
 
     /// <summary>A file for the hand-in (its name, its type, its bytes) — with <c>Photos</c>, the photos' PDF made again, in
@@ -68,6 +66,8 @@ internal sealed class PhoneHandIn
     private readonly TextBlock addedWords = K.Text("", Ty.Body, B.Text2);
     private readonly Wpf.Ui.Controls.Button done;
     private readonly Stack list = new() { Orientation = Orientation.Vertical, Spacing = 0 };
+    /// <summary>The panel's top layer: the code on its way into the corner.</summary>
+    private readonly Canvas flight = new() { IsHitTestVisible = false };
 
     private Phase phase = Phase.Starting;
     private PhoneSetup? setup;
@@ -141,6 +141,7 @@ internal sealed class PhoneHandIn
         foot.Margin = new Thickness(24, 6, 24, 16);
         var grid = K.Rows("auto, *, auto", head.Row(0), scroll.Row(1), foot.Row(2));
         root.Children.Add(grid);
+        root.Children.Add(flight);
         root.RenderTransform = new ScaleTransform(1, 1);
         System.Windows.Automation.AutomationProperties.SetName(root, "Send from Phone");
     }
@@ -424,25 +425,31 @@ internal sealed class PhoneHandIn
             if (Motion.On) Motion.FadeIn(arriving, Motion.Normal); else if (Plain) Fade(arriving, 0, 1, 150);
             Shot.Moved();
         }
-        if (!Motion.On || qrBox == null || waitingView == null || !qrBox.IsLoaded) { Swap(); return; }
-        // the big code flies into the corner where the small one will be, while what was under it fades
-        var from = qrBox.TranslatePoint(new Point(qrBox.ActualWidth / 2, qrBox.ActualHeight / 2), root);
-        var to = iconHost.TranslatePoint(new Point(23, 23), root);
-        var k = 46 / Math.Max(1, qrBox.ActualWidth);
+        if (!Motion.On || qr == null || qrBox == null || waitingView == null || !qrBox.IsLoaded) { Swap(); return; }
+        // the big code flies into the corner where the small one will be, while what was under it fades: a copy of it on
+        // the panel's top layer (the scrolling part under the heading would cut it off), the code itself hidden meanwhile
+        var from = qrBox.TranslatePoint(new Point(0, 0), root);
+        var to = iconHost.TranslatePoint(new Point(0, 0), root);
+        var size = Math.Max(1, qrBox.ActualWidth);
         var sc = new ScaleTransform(1, 1);
         var tr = new TranslateTransform();
-        qrBox.RenderTransformOrigin = new Point(0.5, 0.5);
-        qrBox.RenderTransform = new TransformGroup { Children = { sc, tr } };
+        var flyer = new PhoneQrView(qr, settled: true) { Width = size, Height = size, RenderTransformOrigin = new Point(0, 0) };
+        flyer.RenderTransform = new TransformGroup { Children = { sc, tr } };
+        Canvas.SetLeft(flyer, from.X);
+        Canvas.SetTop(flyer, from.Y);
+        flight.Children.Add(flyer);
+        qrBox.Opacity = 0;
         foreach (var other in ((Panel)waitingView).Children.OfType<UIElement>().Where(x => x != qrBox)) Motion.FromTo(other, UIElement.OpacityProperty, 1, 0, Motion.Fast, Motion.Accelerate);
         Motion.FadeOut(iconHost, () => { }, Motion.Fast);
-        Motion.FromTo(sc, ScaleTransform.ScaleXProperty, 1, k, Motion.Slow, Strong);
-        Motion.FromTo(sc, ScaleTransform.ScaleYProperty, 1, k, Motion.Slow, Strong);
+        Motion.FromTo(sc, ScaleTransform.ScaleXProperty, 1, 46 / size, Motion.Slow, Strong);
+        Motion.FromTo(sc, ScaleTransform.ScaleYProperty, 1, 46 / size, Motion.Slow, Strong);
         Motion.FromTo(tr, TranslateTransform.XProperty, 0, to.X - from.X, Motion.Slow, Strong);
         Motion.FromTo(tr, TranslateTransform.YProperty, 0, to.Y - from.Y, Motion.Slow, Strong, 0, () =>
         {
             iconHost.BeginAnimation(UIElement.OpacityProperty, null);
             iconHost.Opacity = 1;
             Swap();
+            flight.Children.Clear();
         });
     }
 
@@ -548,7 +555,8 @@ internal sealed class PhoneHandIn
     /// <summary>How many of the phone's files are in the hand-in, by the Done button (which is lit once there are some).</summary>
     private void Count()
     {
-        var n = items.Count(i => i.InHandIn);
+        // (the files the phone's things made in the hand-in: each added one, and the photos' PDF once)
+        var n = items.Count(i => i.State == "added") + (items.Any(i => i.State == "page") ? 1 : 0);
         addedWords.Text = n == 0 ? "" : n == 1 ? "1 file in your hand-in" : $"{n} files in your hand-in";
         addedWords.Fg(B.Text2);
         done.Appearance = n > 0 ? ControlAppearance.Primary : ControlAppearance.Secondary;
@@ -797,21 +805,41 @@ internal sealed class PhoneQrView : FrameworkElement
 
 /// <summary>
 /// Photos made into one PDF for Send from Phone (the Mac's PhotoPDF): each turned upright (its camera's orientation),
-/// made no larger than 2200 pixels on its long side and saved as a JPEG of good quality, then laid on a page of the
+/// made no larger than 2200 pixels on its long side and saved as a JPEG of good quality (WPF's own codecs), then laid on a page of the
 /// region's paper — Letter where it is used, A4 elsewhere — turned to landscape for a wide photo, a page each, in order.
 /// </summary>
 internal static class PhotoPdf
 {
     public sealed record Page(byte[] Jpeg, int Width, int Height);
 
-    public static async Task<Page?> Make(byte[] data)
+    /// <summary>A photo made a page, away from the window's thread (WPF's own codecs, which need nothing awaited).</summary>
+    public static Task<Page?> Make(byte[] data) => Task.Run(() => MakeNow(data));
+
+    private static Page? MakeNow(byte[] data)
     {
         try
         {
-            var d = await WinImage.Read(data, 2200);
-            using var bitmap = d.Bitmap;
-            var jpeg = await WinImage.Write(bitmap, global::Windows.Graphics.Imaging.BitmapEncoder.JpegEncoderId, 0.72);
-            return new Page(jpeg, bitmap.PixelWidth, bitmap.PixelHeight);
+            using var input = new MemoryStream(data);
+            var decoder = BitmapDecoder.Create(input, BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+            BitmapSource image = decoder.Frames[0];
+            // (the way the camera was held: a quarter, half or three-quarter turn)
+            var turn = 0;
+            try
+            {
+                if (decoder.Frames[0].Metadata is BitmapMetadata m && m.ContainsQuery("System.Photo.Orientation") && m.GetQuery("System.Photo.Orientation") is ushort o)
+                    turn = o switch { 6 => 90, 3 => 180, 8 => 270, _ => 0 };
+            }
+            catch { }
+            var big = Math.Max(image.PixelWidth, image.PixelHeight);
+            if (big > 2200) image = new TransformedBitmap(image, new ScaleTransform(2200.0 / big, 2200.0 / big));
+            if (turn != 0) image = new TransformedBitmap(image, new RotateTransform(turn));
+            if (image.Format != PixelFormats.Bgr24 && image.Format != PixelFormats.Bgr32 && image.Format != PixelFormats.Gray8)
+                image = new FormatConvertedBitmap(image, PixelFormats.Bgr24, null, 0);
+            var encoder = new JpegBitmapEncoder { QualityLevel = 72 };
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using var output = new MemoryStream();
+            encoder.Save(output);
+            return new Page(output.ToArray(), image.PixelWidth, image.PixelHeight);
         }
         catch (Exception e)
         {
