@@ -1072,7 +1072,11 @@ jobs:
           #    event), Simpl takes it and goes, Setup sees it gone, puts the new version in place, and /LAUNCH opens it again
           $open = Start-Process -FilePath $exe -ArgumentList @('--profile', $prof2, '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light') -PassThru
           $null = $open.Handle
-          Start-Sleep -Seconds 15
+          # (up once its log says its engine has started — "perf: start", as the walk measures it — not after a set wait;
+          #  half a minute at most)
+          $until = (Get-Date).AddSeconds(30)
+          while (-not $open.HasExited -and -not (Has (Join-Path $prof2 'simpl.log') 'perf: start') -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 250 }
+          Write-Host "the Simpl to update over: up in $([math]::Round(30 - ($until - (Get-Date)).TotalSeconds, 1)) s"
           if ($open.HasExited) { Fail "the installed Simpl did not stay open (it exited with $($open.ExitCode))" }
           $up = Start-Update $updateLog
           if (-not $up.WaitForExit(180000)) { Fail "the update did not finish in three minutes" }
