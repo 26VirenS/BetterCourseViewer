@@ -263,7 +263,7 @@ try {
   const convInfo = await nc('convertInfo', { allowed: ['pdf'] });
   const converted = await nc('convertFile', { name: 'notes.txt', type: 'text/plain', data: Buffer.from('Lab notes\nLine two').toString('base64'), allowed: ['pdf'] });
   const pdfHead = converted.data ? Buffer.from(converted.data, 'base64').subarray(0, 5).toString() : '';
-  check(!convInfo.error && convInfo.exts.includes('txt') && /converted to PDF/.test(convInfo.line) && converted.converted === true && converted.name === 'notes.pdf' && pdfHead === '%PDF-', `the hand-in converts a file of another type to one the assignment takes: ${JSON.stringify({ exts: convInfo.exts, line: convInfo.line, name: converted.name, type: converted.type, head: pdfHead, error: converted.error })}`);
+  check(!convInfo.error && convInfo.exts.includes('txt') && /^[A-Z].* converted to PDF/.test(convInfo.line) && converted.converted === true && converted.name === 'notes.pdf' && pdfHead === '%PDF-', `the hand-in converts a file of another type to one the assignment takes: ${JSON.stringify({ exts: convInfo.exts, line: convInfo.line, name: converted.name, type: converted.type, head: pdfHead, error: converted.error })}`);
   // (2.99.27) a course's grading scale, as its instructor set it: the course's letter follows it; the standard scale again after
   const gBefore = await nc('grades');
   const course = gBefore.rows.find((r) => r.pct !== null && r.pct > 90 && r.pct < 93) || gBefore.rows.find((r) => r.pct !== null);
@@ -304,7 +304,8 @@ try {
   check(!mods.error && mods.modules.length > 0 && mods.modules.every((m) => m.items.every((it) => it.header || it.url)) && !mods.modules.flatMap((m) => m.items).some((it) => /undefined/.test(it.url || '')) && !!markable && marked?.ok && nowDone?.done === true, `modules with every item's address and requirement; a "Mark done" item marked from the phone: ${JSON.stringify({ modules: mods.modules.map((m) => `${m.name}:${m.items.length}`), marked: markable?.it.title, done: nowDone?.done })}`);
   if (markable) await nc('markDone', { ctx, module: markable.m.id, item: markable.it.id, done: false });
   const asg = await nc('assignments', { ctx });
-  check(!asg.error && asg.sections.length > 0 && asg.sections.every((x) => ['Overdue', 'Upcoming', 'Undated', 'Past'].includes(x.title)) && asg.sections.flatMap((x) => x.rows).every((r) => r.status?.word && /\/assignments\/\d+$/.test(r.url)), `assignments by when they are due, each with its status: ${JSON.stringify(asg.sections.map((x) => `${x.title}:${x.rows.length}`))}`);
+  const asgRows = asg.sections?.flatMap((x) => x.rows) || [];
+  check(!asg.error && asg.sections.length > 0 && asg.sections.every((x) => ['Overdue', 'Upcoming', 'Undated', 'Past'].includes(x.title)) && asgRows.every((r) => /\/assignments\/\d+$/.test(r.url)) && (asg.sections.find((x) => x.title === 'Past')?.rows || []).every((r) => r.status?.word) && !asgRows.some((r) => r.status?.word === 'Not submitted') && asgRows.some((r) => r.status === null), `assignments by when they are due — a chip only for what is out of the ordinary (a score, Submitted, Missing…), never a plain "Not submitted" on work still to do: ${JSON.stringify(asg.sections.map((x) => `${x.title}:${x.rows.map((r) => r.status?.word || '-').join('|')}`))}`);
   // (Mac 1.3.8) work handed in as a file: the file carries Canvas's viewer for it (the teacher's marks), the work its page in Canvas
   let withFile = null;
   for (const cid of ['101', '102', '103', '104']) {
@@ -331,7 +332,7 @@ try {
   const pageAround = await nc('neighbours', { ctx: 'courses/101', type: 'Page', id: 'nope-no-such-page' });
   check(!around.error && (around.prev || around.next) && [around.prev, around.next].filter(Boolean).every((x) => x.name && /\/courses\/101\/assignments\/\d+/.test(x.url)) && !pageAround.error, `Previous / Next for the Mac: an assignment's neighbours, and nothing (not an error) for a page it cannot place: ${JSON.stringify({ around, pageAround })}`);
   const a12 = await nc('assignment', { course: '101', id: '1012' });
-  check(!a12.error && a12.canSubmit && a12.types.includes('online_text_entry') && a12.types.includes('online_upload') && a12.status?.word && a12.due && a12.points, `an assignment for the app: its facts, its instructions, and the ways it can be handed in from the phone: ${JSON.stringify({ title: a12.title, types: a12.types, due: a12.due, points: a12.points, status: a12.status })}`);
+  check(!a12.error && a12.canSubmit && a12.types.includes('online_text_entry') && a12.types.includes('online_upload') && a12.status === null && /^\w{3} \d{1,2}(, \d{4})? at \d{1,2}:\d{2} [AP]M$/.test(a12.due) && a12.dueLine === `Due ${a12.due}` && a12.factsLine === `${a12.dueLine} · ${a12.points} · ${a12.attemptsText}` && a12.points, `an assignment for the app: its facts (one line of them too), its instructions, no chip while it is simply still to do, and the ways it can be handed in from the phone: ${JSON.stringify({ title: a12.title, types: a12.types, due: a12.due, facts: a12.factsLine, points: a12.points, status: a12.status })}`);
   const sentText = await nc('submit', { course: '101', id: '1012', type: 'online_text_entry', text: 'My answer\n\nwith two paragraphs', comment: 'Sent from the phone' });
   const a12b = await nc('assignment', { course: '101', id: '1012' });
   check(sentText.ok && /Submitted/.test(a12b.status?.word || '') && !!a12b.submitted && a12b.resubmit, `a text entry handed in from the phone (with a comment): ${JSON.stringify({ sentText, status: a12b.status, submitted: a12b.submitted })}`);
@@ -368,6 +369,79 @@ try {
   const bar = cg.groups.filter((g) => g.weight > 0);
   const cgPts = await nc('courseGrades', { id: '102', fresh: true });
   check(cg.weighted && bar.length > 0 && Math.abs(bar.reduce((s, g) => s + g.weight, 0) - 100) < 0.5 && bar.every((g) => typeof g.graded === 'boolean') && !cgPts.weighted && cgPts.groups.every((g) => g.weight === null), `a weighted course's groups carry their share of the grade for the breakdown bar; a course by points carries none: ${JSON.stringify({ weighted: bar.map((g) => `${g.name} ${g.weight} ${g.graded}`), points: cgPts.groups.map((g) => g.weight) })}`);
+  // ---- (2.99.33) the UI review's fixes in the engine: every app shows the same words, figures and dates, made here once ----
+  console.log('the engine says it once, for every app (2.99.33)');
+  // the counters say what they count, and an empty one says so in words
+  const t34 = await nc('today');
+  const lab = Object.fromEntries(t34.counters.map((c) => [c.key, c]));
+  check(lab.unread.label === 'Announcements' && /^\d+ unread · (\d+ courses?|.+)$|^All caught up$/.test(lab.unread.note) && lab.graded.label === 'Graded this week' && lab.today.label === 'Due today' && lab.tomorrow.label === 'Tomorrow' && t34.counters.every((c) => !/^0 /.test(c.note || '') && !/\b0 points\b/.test(c.note || '')) && t34.load.every((l) => l.text === `${l.done} / ${l.total} handed in`) && t34.loadCaption === 'Handed in this week' && t34.list.rows.every((r) => 'kind' in r && 'pts' in r), `the counters' labels say what they count (Announcements "3 unread · 2 courses", Graded this week), no "0 points total", and the week's load in words: ${JSON.stringify({ counters: t34.counters.map((c) => `${c.label}: ${c.note || ''}`), load: t34.load.map((l) => l.text) })}`);
+  // the Announcements sheet: each row names its course (the sidebar's name, in its colour) and the day, never "unread" again
+  const un34 = await nc('todaySheet', { key: 'unread' });
+  const unRows = un34.sections.flatMap((x) => x.rows);
+  const sidebarNames = new Set((await nc('courses')).rows.map((r) => r.code));
+  check(un34.title === 'Announcements' && /unread/.test(un34.note) && unRows.length > 0 && unRows.every((r) => !/unread|Posted/.test(r.sub) && sidebarNames.has(r.course) && /^\w{3} \d{1,2}(, \d{4})?$/.test(r.when) && r.sub === `${r.course} · ${r.when}`) && new Set(unRows.map((r) => r.color)).size > 1, `the Announcements sheet: "F26-PHYS 008 01 · Oct 12" under each title, in its course's colour: ${JSON.stringify({ note: un34.note, rows: unRows.map((r) => `${r.sub} ${r.color}`) })}`);
+  // a counter's rows carry their facts one by one for the apps' own columns (the due time on the right, no "Assignment ·" in front)
+  const nx34 = (await nc('todaySheet', { key: 'next' })).sections.flatMap((x) => x.rows);
+  check(nx34.length > 0 && nx34.every((r) => r.course && r.kind && /\d{1,2}:\d{2} [AP]M$/.test(r.when) && !/^(Assignment|Quiz|Discussion) · /.test(r.sub.slice(r.course.length + 3))), `the next-7-days sheet's rows: course, kind, detail and the due time apart: ${JSON.stringify(nx34.slice(0, 3).map((r) => [r.course, r.kind, r.detail, r.when, r.sub]))}`);
+  // the term GPA rounded once, half up (the mock's 3.425 is 3.43 on every app), and the goal's gap from that figure
+  const gr34 = await nc('grades');
+  const half = (v, p) => Math.floor(Math.abs(v) * 10 ** p + 0.5 + 1e-9 * Math.max(1, Math.abs(v) * 10 ** p)) / 10 ** p;
+  check(Math.abs(gr34.gpa - 3.425) < 1e-9 && gr34.gpaText === '3.43' && gr34.gpaShown === 3.43 && gr34.goalText === '4.00' && gr34.goalLine === `${(gr34.goal - 3.43).toFixed(2)} below goal` && gr34.goalGap === -half(gr34.goal - 3.43, 2), `the term GPA rounded once, half up — 3.425 is 3.43 — and the goal's gap worked out from 3.43, so the two add up: ${JSON.stringify({ gpa: gr34.gpa, text: gr34.gpaText, goal: gr34.goalText, line: gr34.goalLine })}`);
+  // a course with a hidden total says why, and the GPA's note names it; no bare N/A anywhere
+  const hid = gr34.rows.find((r) => r.id === '103');
+  check(hid && hid.pctText === '–' && hid.why === 'Hidden by instructor' && hid.hidden === true && /hidden by the instructor/.test(gr34.gpaNote) && /^From 4 courses, each counting equally\./.test(gr34.gpaNote) && !gr34.rows.some((r) => r.pctText === 'N/A') && gr34.rows.filter((r) => r.pct !== null).every((r) => r.pctText === `${half(r.pct, 1).toFixed(1).replace(/\.0$/, '')}%`), `a hidden total: '–' and "Hidden by instructor", and the GPA's note says what it leaves out: ${JSON.stringify({ row: hid && [hid.pctText, hid.why], note: gr34.gpaNote })}`);
+  // one graded count for the overview and the course's own page; What-If starts from the LMS's own total
+  const m101 = gr34.rows.find((r) => r.id === '101');
+  const cgOn = await nc('courseGrades', { id: '101', on: true });
+  const cgOff = await nc('courseGrades', { id: '101' });
+  check(m101.gradedText === cgOff.gradedText && m101.graded === cgOff.graded && m101.total === cgOff.totalItems && /^\d+ of \d+ graded/.test(m101.gradedText) && cgOn.whatIf && cgOn.total === cgOff.total && cgOn.total === 92.4 && cgOn.letter === 'A−' && cgOn.totalText === '92.4%' && /Simpl’s own estimate differs from Canvas’s total by [\d.]+ points\./.test(cgOn.estimateNote) && cgOff.note === 'Canvas’s total, weighted across the groups with graded work.' && !/A-/.test(cgOff.note) && cgOff.gpaText === gr34.gpaText, `one graded count on the Grades overview and the course's page (${m101.gradedText}); What-If turned on with nothing typed keeps Canvas's 92.4% A− (it jumped to Simpl's own reading), and says how far Simpl's own reading is: ${JSON.stringify({ overview: m101.gradedText, page: cgOff.gradedText, on: [cgOn.total, cgOn.letter, cgOn.estimateNote], note: cgOff.note })}`);
+  // a score tried moves the total from Canvas's, by what it changes
+  const wRow = cgOff.rows.find((r) => r.effective === null && r.possible > 0 && r.counted && weightedIds.has(r.groupId));
+  const cgTry = await nc('courseGrades', { id: '101', tried: { [wRow.id]: 0 } });
+  check(cgTry.whatIf && cgTry.total !== null && cgTry.total < 92.4 && /moved by the scores you tried/.test(cgTry.note), `a zero tried moves What-If's total down from Canvas's 92.4%: ${JSON.stringify({ tried: wRow.name, total: cgTry.total, note: cgTry.note })}`);
+  // the grade as one figure: 81.25 is 81.3%, the ring's whole percent, its band, one chip; the rubric's mark is the points given
+  const rub = await nc('assignment', { course: '104', id: '4001' });
+  const corr = rub.rubric.find((r) => r.name === 'Correctness');
+  const work = rub.rubric.find((r) => r.name === 'Work shown');
+  check(rub.status?.word === 'Graded' && rub.grade.pctText === '100%' && rub.grade.pctWhole === 100 && rub.grade.band === 'A' && rub.grade.chip === `${rub.grade.text} · ${rub.grade.letter}` && corr.adjusted === true && corr.score === 4 && corr.markText === 'Your mark · 4 pts' && corr.ratings.find((x) => x.got)?.value === 3 && work.adjusted === false && work.markText === 'Your mark', `a graded assignment: the chip says Graded (the grade card has the score), the grade in one chip; a criterion marked Partial (3) but given 4 says "Your mark · 4 pts": ${JSON.stringify({ status: rub.status, chip: rub.grade.chip, corr: [corr.score, corr.adjusted, corr.markText] })}`);
+  const late34 = await nc('assignment', { course: '101', id: '1008' });
+  check(late34.status?.word === 'Late' && late34.grade.band === 'F' && late34.grade.pctText === '0%' && /^Submitted \w{3} \d{1,2} at \d{1,2}:\d{2} [AP]M · late$/.test(late34.submitted), `work graded late: the chip says Late, the grade's band F (for its colour), the hand-in time written as every other: ${JSON.stringify({ status: late34.status, band: late34.grade.band, submitted: late34.submitted })}`);
+  // times: "11:59 PM" in every answer, never "11:59pm"; dates with the year only when it is not this year
+  const lower = (o) => JSON.stringify(o).match(/\b\d{1,2}:\d{2}(am|pm)\b/gi)?.filter((x) => /[ap]m$/.test(x)) || [];
+  const timed = [await nc('assignments', { ctx: 'courses/101' }), await nc('notifications'), await nc('home', { ctx: 'courses/101' }), await nc('modules', { ctx: 'courses/101' }), await nc('quizzes', { ctx: 'courses/101' }), await nc('discussions', { ctx: 'courses/101' }), await nc('externalTools'), late34, rub];
+  check(timed.every((x) => !x.error) && timed.every((x) => lower(x).length === 0), `every time in the answers is "11:59 PM", never "11:59pm": ${JSON.stringify(timed.flatMap(lower).slice(0, 5))}`);
+  // notifications: each fact once
+  const nf34 = (await nc('notifications')).days.flatMap((d) => d.rows);
+  // (the overdue one was dismissed above: Due soon's are written the same way)
+  const soon34 = nf34.filter((r) => r.cat === 'soon' || r.cat === 'overdue');
+  check(soon34.length > 0 && soon34.every((r) => (r.cat === 'overdue' ? /^[^·]+ · (Missing|Not handed in)( · \d+ pts)? · was due \w{3} \d{1,2} at \d{1,2}:\d{2} [AP]M$/ : /^[^·]+ · \w+( · \d+ pts)? · Due \w{3} \d{1,2} at \d{1,2}:\d{2} [AP]M$/).test(r.sub)) && !nf34.some((r) => /hours past|days past|no submission|not started/.test(r.sub)), `a notification's line says each fact once: ${JSON.stringify(soon34.map((r) => r.sub))}`);
+  // a quiz's attempts said once, counting the one under way; the access code's rule not said twice
+  const qi34 = await nc('quizIntro', { course: '101', quiz: '9011' });
+  check(qi34.note === 'This is your only attempt' && !qi34.rules.some((r) => r.symbol === 'bolt.fill' || r.symbol === 'key.fill') && qi34.attemptsText === '0 of 1 attempt used' && qi34.facts[2] === `Due ${qi34.facts[2].slice(4)}` && /at \d{1,2}:\d{2} [AP]M$/.test(qi34.facts[2]), `a quiz's intro says its attempts once ("This is your only attempt"), in the assignment's words for its facts: ${JSON.stringify({ note: qi34.note, rules: qi34.rules.map((r) => r.symbol), attempts: qi34.attemptsText, facts: qi34.facts })}`);
+  // one course name: the sidebar's, and a second line only for something new
+  const dc34 = await nc('dashCourses');
+  const ac34 = await nc('allCourses');
+  const home34 = await nc('home', { ctx: 'courses/101' });
+  const setup34 = await nc('setupInfo');
+  check(dc34.rows.find((r) => r.id === '101')?.altName === '' && dc34.rows.find((r) => r.id === '103')?.altName === 'PHYS-008HL' && dc34.rows.every((r) => r.unreadText === (r.unread ? `${r.unread} new` : '')) && dc34.rows.find((r) => r.id === '103')?.scoreText === '–' && home34.sub === 'Fall 2026' && gr34.rows.find((r) => r.id === '101')?.altName === '' && ac34.current.find((r) => r.id === '101')?.altName === '' && setup34.courses.find((c) => c.id === '101')?.sub === 'Fall 2026 · Yue Lei' && setup34.courses.find((c) => c.id === '101')?.label === 'F26-MATH 021 20' && cgOff.altName === '' && ac34.subs.past === '2 past courses' && ac34.subs.future === 'None yet' && ac34.sub === ac34.subs.current, `a course named once ("F26-MATH 021 20", never again as "MATH-021-20"), a card's badge "1 new", the course home's line its term alone, and Courses' line for each filter: ${JSON.stringify({ card: dc34.rows.find((r) => r.id === '101'), home: home34.sub, subs: ac34.subs })}`);
+  // search: the same words, the same rows in the same order, each course by the sidebar's name
+  const srch1 = await nc('search', { q: 'lab' });
+  const srch2 = await nc('search', { q: 'lab' });
+  const sMath = await nc('search', { q: 'math' });
+  const flat = (x) => x.groups.map((g) => `${g.title}:${g.rows.map((r) => r.url).join(',')}`).join(' | ');
+  check(flat(srch1) === flat(srch2) && sMath.groups.find((g) => g.title === 'Courses')?.rows[0]?.title === 'F26-MATH 021 20' && srch1.groups.flatMap((g) => g.rows).every((r) => !/MATH-021-20|PHYS-008-01/.test(r.sub)), `search answers in one order, run after run, each course by the sidebar's name: ${JSON.stringify(srch1.groups.map((g) => `${g.title}:${g.rows.map((r) => r.title).join('|')}`))}`);
+  // a file to a message: uploaded, named on the message, and there when the conversation is read
+  const up34 = await nc('messageUpload', { name: 'notes.txt', type: 'text/plain', data: Buffer.from('Lab notes').toString('base64') });
+  const sent34 = await nc('sendMessage', { recipients: ['12'], subject: 'With a file', body: 'See the file', attachments: [up34.id] });
+  const inb34 = await nc('inbox', { scope: 'inbox' });
+  const conv34 = await nc('conversation', { id: inb34.rows.find((r) => r.subject === 'With a file')?.id });
+  check(!up34.error && up34.id && up34.name === 'notes.txt' && sent34.ok && conv34.messages?.[0]?.attachments?.some((x) => x.name === 'notes.txt'), `a file sent with a new message (planning-18): uploaded to the student's files, then named on the message: ${JSON.stringify({ up: up34, sent: sent34, files: conv34.messages?.[0]?.attachments })}`);
+  // a group's course by its name (its code for a tooltip); What's New's dates as the app writes them; To Do's figures
+  const grp34 = await nc('groups');
+  const wn34 = await nc('whatsNew');
+  const td34 = await nc('todo', { group: 'date' });
+  const files34 = await nc('files', { ctx: 'courses/101' });
+  check(grp34.current[0]?.course === 'Academic Success Resource Site (2026-27)' && grp34.current[0]?.courseCode === 'ASRS' && wn34.releases.every((r) => /^\w{3} \d{1,2}(, \d{4})?$/.test(r.dateText)) && td34.left + td34.done === td34.total && td34.leftText === `${td34.left} left` && Number.isInteger(td34.overdue) && files34.files.every((f) => ['PDF', 'Image', 'Spreadsheet', 'Text', 'Document', 'Slides', 'Video', 'Audio', 'Archive', 'Web page', 'File'].includes(f.typeText)), `a group's course by its name, What's New dated "Oct 12", To Do's "17 left", a file's type in one vocabulary: ${JSON.stringify({ group: grp34.current[0], dates: wn34.releases.map((r) => r.dateText), todo: [td34.leftText, td34.overdueText], types: files34.files.map((f) => f.typeText) })}`);
   // (1.3) a quiz taken in the app's own screens: every Classic kind, saved, flagged, handed in, its feedback read
   await sp.evaluate(() => fetch('/__mock/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: true, moreTypes: true }) }));
   const qi = await nc('quizIntro', { course: '101', quiz: '9011' });
@@ -379,7 +453,9 @@ try {
   check(!qb.error && ['choice', 'multi', 'number', 'match', 'drops', 'essay', 'file'].every((k) => kinds.includes(k)) && qa.timed && !!qa.endAt && qa.questions.every((q) => q.html && q.id && q.n) && qk('match').matches.length >= 3 && qk('drops').blanks.length === 2 && qk('drops').blanks.every((b) => b.options.length >= 2) && /<span style="[^"]*">1<\/span>/.test(qk('drops').html) && qk('choice').options.length >= 2 && qa.questions.some((q) => q.points !== null), `an attempt begun from the app: every kind, a match's list, a blank's own options and its numbered mark in the words, the clock's end, each question's points: ${JSON.stringify({ kinds, endAt: qa.endAt, error: qb.error, drops: qk('drops')?.html })}`);
   const mc = qk('choice'), ma = qk('multi'), nu = qk('number'), mt = qk('match'), dr = qk('drops'), es = qk('essay');
   // (1.4) the review's one line per question reads a formula picture as maths, never as its LaTeX ("\\vec{v}")
-  check(!/\\/.test(ma.plain) && /vector quantities, such as v\?/.test(ma.plain), `the review's line reads a formula as maths, not LaTeX commands: ${JSON.stringify(ma.plain)}`);
+  check(!/\\/.test(ma.plain) && /vector quantities, such as v\u20d7\?/.test(ma.plain), `the review's line reads a formula as maths, not LaTeX commands — a vector keeps its arrow (v⃗, never a bare v): ${JSON.stringify(ma.plain)}`);
+  // (2.99.33) each blank's menu carries the words around it, so the choice reads beside its sentence ("the ___ of")
+  check(dr.blanks.length === 2 && dr.blanks.every((b) => /___/.test(b.around || '')) && /\bthe ___ of\b/.test(dr.blanks[0].around), `a blank carries the words either side of it for its menu's label: ${JSON.stringify(dr.blanks.map((b) => b.around))}`);
   const saves = [
     await nc('quizAnswer', { course: '101', quiz: '9011', question: mc.id, value: { pick: mc.options[0].id } }),
     await nc('quizAnswer', { course: '101', quiz: '9011', question: ma.id, value: { picks: [ma.options[0].id, ma.options[2].id] } }),
@@ -401,7 +477,9 @@ try {
   const at1 = (qi2.attempts || [])[0];
   check(!qi2.error && at1 && at1.attempt >= 1 && (at1.score === null ? !!at1.why : /^[\d.]+ \/ [\d.]+$/.test(at1.score)), `a quiz's intro lists its attempts, each with its score (or why it is not shown): ${JSON.stringify({ attempts: qi2.attempts, keptNote: qi2.keptNote, error: qi2.error })}`);
   const qasg = await nc('quizAssignment', { course: '101', quiz: '9011' });
-  check(!qasg.error && qasg.title === 'Lec06-PreQuiz' && qasg.id === '1011' && !!qasg.status, `a quiz's card reads the quiz's own assignment (its grade and when it was handed in): ${JSON.stringify({ title: qasg.title, id: qasg.id, status: qasg.status, grade: qasg.grade, error: qasg.error })}`);
+  const qown = await nc('assignment', { course: '101', id: '1011' });
+  // ((2.99.33) its chip, as the assignment's own: none for work simply still to do, never a plain "Not submitted")
+  check(!qasg.error && qasg.title === 'Lec06-PreQuiz' && qasg.id === '1011' && 'status' in qasg && JSON.stringify(qasg.status) === JSON.stringify(qown.status) && JSON.stringify(qasg.grade) === JSON.stringify(qown.grade) && qasg.status?.word !== 'Not submitted', `a quiz's card reads the quiz's own assignment (its grade and when it was handed in): ${JSON.stringify({ title: qasg.title, id: qasg.id, status: qasg.status, grade: qasg.grade, error: qasg.error })}`);
   const qp = await nc('quizBegin', { course: '101', quiz: '9014' }); // (Lec07: one question at a time, no going back — read from Canvas's own take page)
   const qpa = qp.attempt || {};
   const qn = qpa.questions?.length ? await nc('quizGo', { course: '101', quiz: '9014', move: 'next' }) : null;

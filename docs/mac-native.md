@@ -8,6 +8,16 @@ popovers, context menus, Quick Look, a Settings window and a window for each ext
 asked of the page (`BCVNative.call`, `extension/content/app/native-app.js`), exactly as on the iPhone, so the Mac, the
 iPhone and the web count the same things the same way.
 
+Since 2.99.33 the page also **writes** what the apps show, once, for the Mac, Windows and the iPhone alike: every
+percentage to one decimal rounded half up (`pctText`, "81.3%"), the term GPA to two (`gpaText` "3.43", with the goal's
+gap worked out from that figure, `goalLine`), letters with the real minus sign, every date and time one way ("Oct 12 at
+11:59 PM", the year only when it is not this year, `dueLine`, `factsLine`), a course by the sidebar's name with a
+second name only when it says something new (`altName`, `detail`), a chip only for what is out of the ordinary (no
+plain "Not submitted"), one graded count for the Grades overview and a course's page (`gradedText`), What-If starting
+from the school's own total (`estimateNote` when Simpl's reading differs), a rubric mark that is the points given
+(`markText`), the words around a quiz's blank (`around`), and a file sent with an Inbox message (`messageUpload`, then
+`attachments`). The apps show these strings as they come rather than formatting the numbers themselves.
+
 It is named **Simpl** with the bundle id `com.simplcourses.mac`, so it never collides with the Safari container app
 (`Simpl Courses`) on the same Mac.
 

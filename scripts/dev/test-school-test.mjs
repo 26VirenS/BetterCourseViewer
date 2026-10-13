@@ -171,6 +171,13 @@ const stored = await same('the file sent', 'POST', uploadPath, { 'content-type':
 check(stored.json().display_name === 'essay.pdf', 'the file is kept under its name');
 const handed = await same('the hand-in', 'POST', '/api/v1/courses/104/assignments/4002/submissions', WRITE, JSON.stringify({ submission: { submission_type: 'online_upload', file_ids: [stored.json().id] } }));
 check(handed.json().workflow_state === 'submitted', 'the work is handed in');
+// (2.99.33) a file for an Inbox message: the student's own files, the same two steps, then named on the message sent
+const mpre = await same("a message file's first step", 'POST', '/api/v1/users/self/files', WRITE, JSON.stringify({ name: 'notes.txt', size: 9, content_type: 'text/plain', parent_folder_path: 'conversation attachments' }));
+check(String(mpre.json().upload_url || '').startsWith(`${ORIGIN}/__upload/`), `a message's file goes to the test school's own address too (${mpre.json().upload_url})`);
+const mpart = `--${boundary}\r\nContent-Disposition: form-data; name="key"\r\n\r\nusers/x\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="notes.txt"\r\nContent-Type: text/plain\r\n\r\nLab notes\r\n--${boundary}--\r\n`;
+const mstored = await same("the message's file sent", 'POST', String(mpre.json().upload_url).slice(ORIGIN.length), { 'content-type': `multipart/form-data; boundary=${boundary}` }, mpart);
+const mailed = await same('a message with the file', 'POST', '/api/v1/conversations', WRITE, JSON.stringify({ recipients: ['12'], subject: 'Lab notes', body: 'Here are my notes.', attachment_ids: [mstored.json().id] }));
+check(mailed.json()?.[0]?.messages?.[0]?.attachments?.[0]?.display_name === 'notes.txt', 'the message names its file');
 const quiz = await same('a quiz begun', 'POST', '/api/v1/courses/101/quizzes/9011/submissions', WRITE, JSON.stringify({}));
 check(quiz.json().quiz_submissions?.[0]?.workflow_state === 'untaken', 'the attempt is open');
 await same("the quiz's own take page, now an attempt is open", 'GET', '/courses/101/quizzes/9011/take');
@@ -218,6 +225,10 @@ const todo = settled ? await nc('todo', { group: 'date' }) : null;
 const row = todo?.sections?.flatMap((s) => s.rows).find((x) => x.id);
 const ticked = row ? await nc('complete', { id: row.id, done: true }) : null;
 check(ticked?.ok === true, `a row ticked is marked done on the planner: ${JSON.stringify(ticked)}`);
+// (2.99.33) the engine's own words on the test school too (the counters say what they count, the GPA is written once)
+const grades = settled ? await nc('grades') : null;
+check(today?.counters?.find((c) => c.key === 'unread')?.label === 'Announcements' && today?.counters?.find((c) => c.key === 'graded')?.label === 'Graded this week' && /^\d\.\d\d$/.test(grades?.gpaText || '') && grades?.goalText === '4.00', `the engine's words and figures on the test school: ${JSON.stringify({ labels: today?.counters?.map((c) => c.label), gpa: grades?.gpaText, goal: grades?.goalText })}`);
+
 check(shellErrors.length === 0, `the interface ran without an error${shellErrors.length ? `: ${shellErrors.join(' | ')}` : ''}`);
 
 check(pageErrors.length === 0, `the hidden page ran without an error${pageErrors.length ? `: ${pageErrors.join(' | ')}` : ''}`);
