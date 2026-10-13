@@ -182,11 +182,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.78) Send from Phone: its panel with the code; the phone connected and two files in (posted by phone_send); a
   # PDF-only assignment's photos made into one PDF, and a kind it does not take refused
-  shoot light-12c-hand-in-phone 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
-  printf 'Notes from class, sent from a phone.\n' > "$OUT_ABS/phone-notes.txt"
-  printf 'ID3 not really music\n' > "$OUT_ABS/phone-song.mp3"
+  shoot light-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  printf 'Notes from class, sent from a phone.\n' > "$HOMES/phone-notes.txt"
+  printf 'ID3 not really music\n' > "$HOMES/phone-song.mp3"
   shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
-  phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$OUT_ABS/phone-notes.txt=Notes.txt"
+  phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
   curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
   shoot light-22-setup 14 -SimplOpen setup
   shoot light-53-whats-new 12 -SimplOpen whatsnew
@@ -222,9 +222,9 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
-  shoot dark-12c-hand-in-phone 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  shoot dark-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
-  phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$OUT_ABS/phone-song.mp3=Song.mp3"
+  phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
   wait
   phone_check
   keep_crashes
@@ -244,7 +244,7 @@ for MODE in light dark; do
   shoot "$MODE-10-assignment" 14 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
   shoot "$MODE-11-course-grades" 14 -SimplPlace section:courses/101:grades
   shoot "$MODE-12-hand-in" 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
-  shoot "$MODE-12c-hand-in-phone" 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  shoot "$MODE-12c-hand-in-phone" 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot "$MODE-13-discussion" 14 -SimplPlace course:101 -SimplPush /courses/101/discussion_topics/7003
   shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
   shoot "$MODE-15-files" 12 -SimplPlace section:courses/101:files

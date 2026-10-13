@@ -42,10 +42,10 @@ final class PhoneSession: ObservableObject {
         var state = ItemState.sending
         var thumb: NSImage?
 
-        /// In the hand-in: added, or a page of the photos' PDF.
-        var inHandIn: Bool {
+        /// A page of the photos' PDF.
+        var isPage: Bool {
             if case .page = state { return true }
-            return state == .added
+            return false
         }
     }
 
@@ -631,7 +631,6 @@ struct PhonePanel: View {
                 PhoneQRCode(qr: qr, shown: session.shown)
                     .matchedGeometryEffect(id: "qr", in: space)
                     .frame(width: 46, height: 46)
-                    .help("Scan this again to send from another phone")
             } else {
                 IconTile(symbol: "iphone", color: accent, size: 38)
             }
@@ -643,7 +642,8 @@ struct PhonePanel: View {
                 Text(connected ? "Take photos or choose files on your phone." : title)
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(connected ? 2 : 1)
+                    .fixedSize(horizontal: false, vertical: true)
                     .id(connected)
                     .transition(.opacity)
             }
@@ -701,22 +701,26 @@ struct PhonePanel: View {
                 }
                 .padding(.vertical, 18)
                 .frame(maxWidth: .infinity)
+            } else if session.items.count <= 4 {
+                rows
             } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(Array(session.items.enumerated()), id: \.element.id) { i, item in
-                            if i > 0 { Divider().padding(.leading, 48) }
-                            PhoneItemRow(item: item, pdfName: session.pdfName)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
-                    }
-                }
-                .frame(height: min(236, CGFloat(session.items.count) * 53))
+                ScrollView { rows }
+                    .frame(height: 236)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(Theme.well, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var rows: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(session.items.enumerated()), id: \.element.id) { i, item in
+                if i > 0 { Divider().padding(.leading, 48) }
+                PhoneItemRow(item: item, pdfName: session.pdfName)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
     }
 
     private var whereNote: some View {
@@ -767,7 +771,9 @@ struct PhonePanel: View {
     }
 
     private var footer: some View {
-        let added = session.items.filter(\.inHandIn).count
+        // (the files the phone's things made in the hand-in: each added one, and the photos' PDF once)
+        let files = session.items.filter { $0.state == .added }.count
+        let added = files + (session.items.contains(where: \.isPage) ? 1 : 0)
         return HStack(spacing: 10) {
             if added > 0 {
                 Label(added == 1 ? "1 file in your hand-in" : "\(added) files in your hand-in", systemImage: "checkmark.circle.fill")
