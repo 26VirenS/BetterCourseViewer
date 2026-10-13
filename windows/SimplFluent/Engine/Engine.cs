@@ -188,6 +188,7 @@ public sealed partial class Engine : Observable, IShellListener
             return;
         }
         var core = Web.CoreWebView2;
+        PageErrors.Watch(core); // (the screenshot suite's runs: the page's own errors in simpl.log, for CI to read)
         // (a development run may ask the page to keep to little memory throughout: --web-memory low)
         if (Launch.IsDevelopment && Launch.Get("web-memory") == "low") core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Low;
         core.Settings.AreDevToolsEnabled = true;
