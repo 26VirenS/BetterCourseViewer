@@ -149,6 +149,15 @@ jobs:
           echo "$checked kept files checked, $plain not encrypted; $outside sign-in or cookie files outside the Keychain"
           if [ "$checked" -eq 0 ]; then echo "::warning::no kept data found to check"; fi
           [ "$plain" -eq 0 ] && [ "$outside" -eq 0 ] && [ "$enclave" -eq 0 ]
+      # (1.3.78) Send from Phone: mac-shots.sh sent files to Hand In's own server as a phone's page does — the page
+      # opened, a wrong key refused, a photo and a text file taken, a PDF-only assignment's photos made into one PDF and
+      # an mp3 refused — and read the app's consoles for them in the hand-in (shots/phone-check.txt)
+      - name: Send from Phone took the files
+        if: hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || (contains(github.event.head_commit.message, '[full shots]') && 'full' || 'quick')) == 'quick'
+        run: |
+          cat shots/phone-test.txt 2>/dev/null || true
+          test -s shots/phone-check.txt || { echo "::error::mac-shots.sh wrote no phone-check.txt"; exit 1; }
+          if grep -q '^FAIL' shots/phone-check.txt; then grep '^FAIL' shots/phone-check.txt | sed 's/^/::error::/'; exit 1; fi
       - name: Push the pictures to the mac-shots branch
         if: always()
         env:
