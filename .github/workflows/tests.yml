@@ -38,18 +38,18 @@ jobs:
         with:
           node-version: 22
       # (Playwright installed where the suites look for it — require('playwright'), else `npm root -g` — and its
-      #  Chromium, ~170 MB, from the cache when this version's is there)
+      #  Chromium and Chromium's headless shell, ~280 MB: the extension's suites open the one (channel 'chromium', where
+      #  extensions load), the page suites (report, alta) the other; from the cache when this version's are there)
       - name: Playwright's Chromium, kept
-        id: browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
+          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-chromium-and-shell
       - name: Playwright
         run: |
           npm install -g --no-fund --no-audit "playwright@$PLAYWRIGHT_VERSION"
-          # (the browser downloaded only when the cache had none; the libraries it needs are the image's, else apt's)
-          if [ "${{ steps.browsers.outputs.cache-hit }}" != true ]; then playwright install --no-shell chromium; fi
+          # (nothing downloaded when the cache had them; the libraries they need are the image's, else apt's)
+          playwright install chromium
           playwright install-deps chromium >/dev/null
           echo "playwright $(playwright --version); $(nproc) cores, $(free -g | awk '/Mem:/ {print $2}') GB"
       # (each suite's time from the last run: test-all starts the longest first)
