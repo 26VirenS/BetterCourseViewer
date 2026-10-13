@@ -84,11 +84,13 @@ jobs:
         with:
           path: scripts/dev/out/timings.json
           key: test-timings-${{ github.run_id }}
+      # (every suite's log, half a megabyte: kept a fortnight after a failure, a week after a pass — a suite that passed
+      #  only alone, on its retry, left its first time's log too, <suite>.first.log, to find what the load did to it)
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ !cancelled() && steps.suites.outcome != 'skipped' }}
         with:
           name: test-logs
           path: |
             scripts/dev/out/logs/
             test-all.txt
-          retention-days: 14
+          retention-days: ${{ steps.suites.outcome == 'failure' && 14 || 7 }}
