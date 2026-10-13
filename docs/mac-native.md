@@ -320,6 +320,18 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `Motion.snappy`), the Critical Update notice comes down from the top, Match's grid and the school picker crossfade,
   the tour's end and a set known or learned bounce a green mark once (`FinishMark`), and the radial colour picker
   shrinks back as it grew before its row closes.
+  (1.3.77) External Tools: the cards stand in columns of their own heights (`Masonry`, a `Layout`: as many 320–480 pt
+  columns as fit, each card measured at the column's width and put in the shortest column so far), so a short card no
+  longer leaves a hole beside a tall one; a course's chip is offered at most its line's width (`WrapLayout`) and cuts a
+  long name short; a tool known only by its site no longer shows it twice. A tool used in assignments or module items
+  (`instances`, native-app.js `externalTools`, which now gives each course its `items` and each tool its `next`) is a
+  card that is a button as a whole (it gives a little under a press, unless Reduce Motion is on): it says the next still
+  to do and how many there are, and opens a popover beside it listing every one (`ToolPlacesList`: under each course's
+  name when there are several, each with its line and status, the next tagged; a filter past eight; arrow keys, Return,
+  Escape), the chosen one opened as a chip opens its course (Knewton Alta and Macmillan in their popups, the rest in the
+  tool window). Its chips stay for the courses where it is also a tab. `-SimplExternalToolList knewton` opens the list of
+  the first tool whose name has that word (the screenshot suite's `light-36b-external-tools-list` and
+  `dark-36b-external-tools-list`).
 
 ## Data and encryption
 
