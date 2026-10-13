@@ -34,9 +34,10 @@ enum AltaHook {
       var reveal = function () {};
       var veilAgain = function () {};
       if (window.top === window) {
-        var showing = false;
+        var showing = false, firstVeil = 0;
         var veils = /knewton|alta/i.test(location.hostname + location.pathname);
         reveal = function (how) {
+          if (firstVeil) { clearTimeout(firstVeil); firstVeil = 0; }
           if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
           if (!showing) { showing = true; post({ kind: 'shown', how: how || '' }); }
         };
@@ -65,8 +66,9 @@ enum AltaHook {
             };
             putVeil();
           }
-          // (never longer than this, whatever happens)
-          setTimeout(function () { reveal('timeout'); }, 9000);
+          // (never longer than this, whatever happens — the first veil's: once the page has been shown it stands down,
+          // and a veil put back between Alta's parts keeps its own time, never cut short by this one going off later)
+          firstVeil = setTimeout(function () { firstVeil = 0; reveal('timeout'); }, 9000);
         } else {
           var revealSoon = function () { if (document.documentElement) reveal('not alta'); else setTimeout(revealSoon, 10); };
           revealSoon();
