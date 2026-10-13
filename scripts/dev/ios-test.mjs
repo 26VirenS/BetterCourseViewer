@@ -374,7 +374,12 @@ try {
   // the counters say what they count, and an empty one says so in words
   const t34 = await nc('today');
   const lab = Object.fromEntries(t34.counters.map((c) => [c.key, c]));
-  check(lab.unread.label === 'Announcements' && /^\d+ unread · (\d+ courses?|.+)$|^All caught up$/.test(lab.unread.note) && lab.graded.label === 'Graded this week' && lab.today.label === 'Due today' && lab.tomorrow.label === 'Tomorrow' && t34.counters.every((c) => !/^0 /.test(c.note || '') && !/\b0 points\b/.test(c.note || '')) && t34.load.every((l) => l.text === `${l.done} / ${l.total} handed in`) && t34.loadCaption === 'Handed in this week' && t34.list.rows.every((r) => 'kind' in r && 'pts' in r), `the counters' labels say what they count (Announcements "3 unread · 2 courses", Graded this week), no "0 points total", and the week's load in words: ${JSON.stringify({ counters: t34.counters.map((c) => `${c.label}: ${c.note || ''}`), load: t34.load.map((l) => l.text) })}`);
+  check(lab.unread.fullLabel === 'Announcements' && /^\d+ unread · (\d+ courses?|.+)$|^All caught up$/.test(lab.unread.fullNote) && lab.graded.fullLabel === 'Graded this week' && lab.today.fullLabel === 'Due today' && lab.tomorrow.fullLabel === 'Tomorrow' && t34.counters.every((c) => !/^0 /.test(c.note || '') && !/\b0 points\b/.test(c.note || '')) && t34.load.every((l) => l.text === `${l.done} / ${l.total} handed in`) && t34.loadCaption === 'Handed in this week' && t34.list.rows.every((r) => 'kind' in r && 'pts' in r), `the counters' full names say what they count (Announcements "3 unread · 2 courses", Graded this week), no "0 points total", and the week's load in words: ${JSON.stringify({ counters: t34.counters.map((c) => `${c.fullLabel}: ${c.fullNote || ''}`), load: t34.load.map((l) => l.text) })}`);
+  // the name every tile fits (what an app that reads only `label` shows: the iPhone's three across, a row of six on a
+  // narrow window) is the short one, and its line says the rest — "Unread" with "announcements · 2 courses", "Graded"
+  // with "this week · …" — never a full name cut short
+  const tc34 = await nc('todayCounts', { kept: false });
+  check(t34.counters.every((c) => c.fullLabel && c.label.length <= c.fullLabel.length) && lab.unread.label === 'Unread' && /^(announcements? · .+|All caught up)$/.test(lab.unread.note) && lab.graded.label === 'Graded' && lab.next.label === 'Next 7 days' && lab.today.fullNote === lab.today.note && /^(this week · .+ points?|No grades posted this week)$/.test(tc34.gradedNote) && (tc34.gradedNote === 'No grades posted this week' ? tc34.gradedFullNote === tc34.gradedNote : `this week · ${tc34.gradedFullNote}` === tc34.gradedNote), `each tile's name that always fits and the line that says the rest ("Unread" · "announcements · 2 courses", "Graded" · "this week · …"), and the full ones beside: ${JSON.stringify({ unread: [lab.unread.label, lab.unread.note, lab.unread.fullLabel, lab.unread.fullNote], graded: [lab.graded.label, tc34.gradedNote, lab.graded.fullLabel, tc34.gradedFullNote] })}`);
   // the Announcements sheet: each row names its course (the sidebar's name, in its colour) and the day, never "unread" again
   const un34 = await nc('todaySheet', { key: 'unread' });
   const unRows = un34.sections.flatMap((x) => x.rows);
@@ -417,13 +422,17 @@ try {
   check(soon34.length > 0 && soon34.every((r) => (r.cat === 'overdue' ? /^[^·]+ · (Missing|Not handed in)( · \d+ pts)? · was due \w{3} \d{1,2} at \d{1,2}:\d{2} [AP]M$/ : /^[^·]+ · \w+( · \d+ pts)? · Due \w{3} \d{1,2} at \d{1,2}:\d{2} [AP]M$/).test(r.sub)) && !nf34.some((r) => /hours past|days past|no submission|not started/.test(r.sub)), `a notification's line says each fact once: ${JSON.stringify(soon34.map((r) => r.sub))}`);
   // a quiz's attempts said once, counting the one under way; the access code's rule not said twice
   const qi34 = await nc('quizIntro', { course: '101', quiz: '9011' });
-  check(qi34.note === 'This is your only attempt' && !qi34.rules.some((r) => r.symbol === 'bolt.fill' || r.symbol === 'key.fill') && qi34.attemptsText === '0 of 1 attempt used' && qi34.facts[2] === `Due ${qi34.facts[2].slice(4)}` && /at \d{1,2}:\d{2} [AP]M$/.test(qi34.facts[2]), `a quiz's intro says its attempts once ("This is your only attempt"), in the assignment's words for its facts: ${JSON.stringify({ note: qi34.note, rules: qi34.rules.map((r) => r.symbol), attempts: qi34.attemptsText, facts: qi34.facts })}`);
+  check(qi34.note === 'This is your only attempt' && !qi34.rules.some((r) => r.symbol === 'bolt.fill' || r.symbol === 'key.fill') && qi34.attemptsText === '0 of 1 attempt used' && qi34.facts[2] === `Due ${qi34.facts[2].slice(4)}` && /at \d{1,2}:\d{2} [AP]M$/.test(qi34.facts[2]) && qi34.factsLine === `${qi34.facts[2]} · ${qi34.facts[1].replace(/ points?$/, (w) => (w === ' point' ? ' pt' : ' pts'))} · ${qi34.attemptsText}`, `a quiz's intro says its attempts once ("This is your only attempt"), in the assignment's words for its facts, and the one-column facts line with the quiz's own attempts: ${JSON.stringify({ note: qi34.note, rules: qi34.rules.map((r) => r.symbol), attempts: qi34.attemptsText, facts: qi34.facts, line: qi34.factsLine })}`);
   // one course name: the sidebar's, and a second line only for something new
   const dc34 = await nc('dashCourses');
   const ac34 = await nc('allCourses');
   const home34 = await nc('home', { ctx: 'courses/101' });
   const setup34 = await nc('setupInfo');
-  check(dc34.rows.find((r) => r.id === '101')?.altName === '' && dc34.rows.find((r) => r.id === '103')?.altName === 'PHYS-008HL' && dc34.rows.every((r) => r.unreadText === (r.unread ? `${r.unread} new` : '')) && dc34.rows.find((r) => r.id === '103')?.scoreText === '–' && home34.sub === 'Fall 2026' && gr34.rows.find((r) => r.id === '101')?.altName === '' && ac34.current.find((r) => r.id === '101')?.altName === '' && setup34.courses.find((c) => c.id === '101')?.sub === 'Fall 2026 · Yue Lei' && setup34.courses.find((c) => c.id === '101')?.label === 'F26-MATH 021 20' && cgOff.altName === '' && ac34.subs.past === '2 past courses' && ac34.subs.future === 'None yet' && ac34.sub === ac34.subs.current, `a course named once ("F26-MATH 021 20", never again as "MATH-021-20"), a card's badge "1 new", the course home's line its term alone, and Courses' line for each filter: ${JSON.stringify({ card: dc34.rows.find((r) => r.id === '101'), home: home34.sub, subs: ac34.subs })}`);
+  check(dc34.rows.find((r) => r.id === '101')?.altName === '' && dc34.rows.find((r) => r.id === '103')?.altName === '' && ac34.current.find((r) => r.code.startsWith('Academic Success'))?.altName === 'ASRS' && dc34.rows.every((r) => r.unreadText === (r.unread ? `${r.unread} new` : '')) && dc34.rows.find((r) => r.id === '103')?.scoreText === '–' && home34.sub === 'Fall 2026' && gr34.rows.find((r) => r.id === '101')?.altName === '' && ac34.current.find((r) => r.id === '101')?.altName === '' && setup34.courses.find((c) => c.id === '101')?.sub === 'Fall 2026 · Yue Lei' && setup34.courses.find((c) => c.id === '101')?.label === 'F26-MATH 021 20' && cgOff.altName === '' && ac34.subs.past === '2 past courses' && ac34.subs.future === 'None yet' && ac34.sub === ac34.subs.current, `a course named once ("F26-MATH 021 20", never again as "MATH-021-20"; nor "PHYS-008HL" under "F26-PHYS 008HL 01/PHYS 008L 01", which says it already — "ASRS" under its long name does say more), a card's badge "1 new", the course home's line its term alone, and Courses' line for each filter: ${JSON.stringify({ card: dc34.rows.find((r) => r.id === '101'), home: home34.sub, subs: ac34.subs })}`);
+  // a course's score as every card, row and bar shows it: "92.4%" or "–", and whole half up for a figure of whole percents
+  const sky34 = await nc('dashSkyline');
+  const wholeOk = (r) => (r.score === null ? r.scoreText === '–' && r.scoreWhole === null : r.scoreText === `${half(r.score, 1).toFixed(1).replace(/\.0$/, '')}%` && r.scoreWhole === half(half(r.score, 1), 0));
+  check(sky34.courses?.length > 0 && sky34.courses.every(wholeOk) && dc34.rows.every(wholeOk) && ac34.current.every(wholeOk) && dc34.rows.find((r) => r.id === '101')?.scoreWhole === 92, `a course's score as text and as a whole percent, half up, on the cards, the lists and the Dashboard's bars: ${JSON.stringify(sky34.courses?.map((c) => [c.code, c.scoreText, c.scoreWhole]))}`);
   // search: the same words, the same rows in the same order, each course by the sidebar's name
   const srch1 = await nc('search', { q: 'lab' });
   const srch2 = await nc('search', { q: 'lab' });
@@ -442,6 +451,35 @@ try {
   const td34 = await nc('todo', { group: 'date' });
   const files34 = await nc('files', { ctx: 'courses/101' });
   check(grp34.current[0]?.course === 'Academic Success Resource Site (2026-27)' && grp34.current[0]?.courseCode === 'ASRS' && wn34.releases.every((r) => /^\w{3} \d{1,2}(, \d{4})?$/.test(r.dateText)) && td34.left + td34.done === td34.total && td34.leftText === `${td34.left} left` && Number.isInteger(td34.overdue) && files34.files.every((f) => ['PDF', 'Image', 'Spreadsheet', 'Text', 'Document', 'Slides', 'Video', 'Audio', 'Archive', 'Web page', 'File'].includes(f.typeText)), `a group's course by its name, What's New dated "Oct 12", To Do's "17 left", a file's type in one vocabulary: ${JSON.stringify({ group: grp34.current[0], dates: wn34.releases.map((r) => r.dateText), todo: [td34.leftText, td34.overdueText], types: files34.files.map((f) => f.typeText) })}`);
+  // every figure half up on its decimal value, whatever the binary double holds — the store's own (a group's percent, a
+  // score's points) as the answers' — and a negative one the same way from zero
+  const rounded = await sp.evaluate(() => { const S = self.BCV.store; return { r: [[3.425, 2], [81.25, 1], [2.5, 0], [-2.5, 0], [1.005, 2], [72.5, 0], [(87 / 120) * 100, 0], [4.35, 1], [-0.575, 2]].map(([v, p]) => S.roundHalfUp(v, p)), pts: [4.35, 0.15, 12, 2.25].map(S.fmtPts) }; });
+  check(rounded.r.join() === '3.43,81.3,3,-3,1.01,73,73,4.4,-0.58' && rounded.pts.join() === '4.4,0.2,12,2.3', `numbers round half up on their decimal value (3.425 → 3.43, 81.25 → 81.3, 2.5 → 3, −2.5 → −3, 87 of 120 → 73%; points 4.35 → 4.4): ${JSON.stringify(rounded)}`);
+  // dates as every other is written: the year only when it is not this year (a page edited, a message), a sheet's day
+  // with its weekday ("Tue, Oct 13"), work due tomorrow under "Tomorrow"; an empty total '–' like every empty score
+  const pg34 = await nc('pages', { ctx: 'courses/101' });
+  const ib34 = await nc('inbox', { scope: 'inbox' });
+  const tdy34 = await nc('todaySheet', { key: 'today' });
+  const nfd34 = (await nc('notifications')).days.map((d) => d.title);
+  const cg106 = await nc('courseGrades', { id: '106', fresh: true });
+  const thisYear = String(new Date().getFullYear());
+  const tomorrowDate = new Date(Date.now() + 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  check(pg34.rows.some((r) => /Edited/.test(r.sub)) && !pg34.rows.some((r) => r.sub.includes(thisYear)) && ib34.rows.every((r) => /^(\d{1,2}:\d{2} [AP]M|\w{3} \d{1,2}(, \d{4})?)$/.test(r.when)) && /· \w{3}, \w{3} \d{1,2}$/.test(tdy34.note) && !nfd34.includes(tomorrowDate) && (cg106.total !== null || cg106.totalText === '–'), `a date carries its year only when it is not this year, a sheet's day reads "Tue, Oct 13", tomorrow's work sits under Tomorrow, a course with nothing graded totals '–': ${JSON.stringify({ pages: pg34.rows.map((r) => r.sub), inbox: ib34.rows.map((r) => r.when), note: tdy34.note, days: nfd34, empty: [cg106.total, cg106.totalText] })}`);
+  // (2.99.33) what a figure is worked out from is the figure shown: a ring's whole percent and a grade's band and letter
+  // from the one-decimal percent beside them (89.96 is shown "90%", its ring 90 and its letter an A−); an empty score "–"
+  const graded34 = [];
+  for (const id of ['1001', '1008', '1010', '1011', '1012']) { const a = await nc('assignment', { course: '101', id }); if (a.grade) graded34.push(a.grade); }
+  const cgRows34 = (await nc('courseGrades', { id: '101', fresh: true })).rows;
+  check(graded34.length > 0 && graded34.every((g) => g.pct === null || (g.pctWhole === half(half(g.pct, 1), 0) && g.pctText === `${half(g.pct, 1).toFixed(1).replace(/\.0$/, '')}%` && (!/^[A-F][+−]?$/.test(g.letter || '') || g.band === g.letter[0]))) && cgRows34.every((r) => /^(–|\d+(\.\d)?)\/\d+(\.\d)?$/.test(r.scoreText)), `a grade's ring, band and letter agree with its percent as shown; an empty row score "–/30": ${JSON.stringify(graded34.map((g) => [g.pctText, g.pctWhole, g.letter, g.band]))}`);
+  // the Dashboard's Coming up days: each day's date as every date is written, saying only what its title does not
+  const dl34 = await nc('dashList');
+  const WEEKDAY = /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/;
+  check(dl34.days.length > 0 && dl34.days.every((d) => (['Today', 'Tomorrow', 'Yesterday'].includes(d.title) ? /^\w{3}, \w{3} \d{1,2}(, \d{4})?$/ : WEEKDAY.test(d.title) ? /^\w{3} \d{1,2}(, \d{4})?$/ : WEEKDAY).test(d.date)), `Coming up's days: "Today" over "Tue, Oct 13", "Thursday" over "Oct 15", never "Tuesday, October 13": ${JSON.stringify(dl34.days.map((d) => [d.title, d.date]))}`);
+  // Canvas's own words about a lock carry its times as every time is written ("12am" is "12:00 AM")
+  await sp.route('**/api/v1/courses/101/pages/locked-notes*', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ title: 'Locked notes', url: 'locked-notes', body: '<p>Notes</p>', locked_for_user: true, lock_explanation: 'This page is locked until Oct 20 at 12am. The unit closes Oct 19 at 11:59pm.' }) }));
+  const lockedPg34 = await nc('page', { ctx: 'courses/101', slug: 'locked-notes' });
+  await sp.unroute('**/api/v1/courses/101/pages/locked-notes*');
+  check(lockedPg34.lockText === 'This page is locked until Oct 20 at 12:00 AM. The unit closes Oct 19 at 11:59 PM.' && lockedPg34.html === '', `a lock's reason in Canvas's words, its times written as every other: ${JSON.stringify(lockedPg34.lockText)}`);
   // (1.3) a quiz taken in the app's own screens: every Classic kind, saved, flagged, handed in, its feedback read
   await sp.evaluate(() => fetch('/__mock/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: true, moreTypes: true }) }));
   const qi = await nc('quizIntro', { course: '101', quiz: '9011' });
@@ -495,7 +533,14 @@ try {
   const su2 = await nc('setupInfo');
   const snapSetup = await nc('snapshot');
   const saved2 = await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: su.courses.find((c) => c.id === first)?.target || 'A+' }, tracking: su.tracking, goal: su.goal });
-  check(!su.error && su.done === true && su.courses.length > 0 && onIds.length > 0 && su.grades.join() === 'C,B,B+,A-,A,A+' && saved1.ok && saved1.courses === onIds.length && su2.courses.find((c) => c.id === first)?.target === 'B+' && su2.goal === 3.7 && su2.courses.filter((c) => c.on).length === onIds.length && snapSetup.setupDone === true && saved2.ok, `the iPhone's setup: the current courses (the chosen ones ticked), the targets and the goal written and read back, the courses left as chosen, the snapshot says it is done: ${JSON.stringify({ courses: su.courses?.length, on: onIds.length, target: su2.courses?.find((c) => c.id === first)?.target, goal: su2.goal, setupDone: snapSetup.setupDone, error: su.error || saved1.error })}`);
+  check(!su.error && su.done === true && su.courses.length > 0 && onIds.length > 0 && su.grades.join() === 'C,B,B+,A−,A,A+' && saved1.ok && saved1.courses === onIds.length && su2.courses.find((c) => c.id === first)?.target === 'B+' && su2.goal === 3.7 && su2.courses.filter((c) => c.on).length === onIds.length && snapSetup.setupDone === true && saved2.ok, `the iPhone's setup: the current courses (the chosen ones ticked), the targets and the goal written and read back, the courses left as chosen, the snapshot says it is done: ${JSON.stringify({ courses: su.courses?.length, on: onIds.length, target: su2.courses?.find((c) => c.id === first)?.target, goal: su2.goal, setupDone: snapSetup.setupDone, error: su.error || saved1.error })}`);
+  // (2.99.33) the targets with the real minus ("A−"), as every screen writes a letter; one sent back either way is kept as
+  // "A-", the spelling the Grades screen's own target keeps (setTarget)
+  const savedMinus = await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: 'A−' }, tracking: su.tracking, goal: su.goal });
+  const suMinus = await nc('setupInfo');
+  const keptMinus = await sp.evaluate((id) => self.BCV.store.pref('gradeTargets').then((t) => t?.[id] ?? null), first);
+  await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: su.courses.find((c) => c.id === first)?.target || 'A+' }, tracking: su.tracking, goal: su.goal });
+  check(savedMinus.ok && suMinus.courses.find((c) => c.id === first)?.target === 'A−' && keptMinus === 'A-', `a setup target sent back as "A−" is kept as "A-" and read back as "A−": ${JSON.stringify({ read: suMinus.courses?.find((c) => c.id === first)?.target, kept: keptMinus })}`);
   // (1.3) What's New after an update is marked seen when the app's sheet is really up, not when it is asked for:
   // a sheet held back (a sign-in still under way) comes up later, still due
   await sp.evaluate(() => self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.99.2' }));
@@ -510,6 +555,7 @@ try {
   const si1 = await nc('settingsSave', { tracking: true, goal: 3.456, whatIf: false });
   const hi = await nc('historyImport', { text: 'date,term_gpa\n2026-01-12,3.512\n2026-01-13,3.6' });
   const hi2 = await nc('historyImport', { text: 'date,term_gpa\n2026-01-12,2.0' });
+  const grTrend = await nc('grades');
   const he = await nc('historyExport');
   const ri = await nc('recordImport', { text: 'course,grade,credits\nMATH 21,A,4\nWRI 10,B,4\nPE 1,P,1', name: 'past.csv' });
   const rc = await nc('recordClear');
@@ -517,6 +563,7 @@ try {
   const sBad = await nc('settingsImport', { text: 'not json' });
   const sGood = await nc('settingsImport', { text: se.text });
   const si2 = await nc('settingsSave', { tracking: si0.tracking, goal: si0.goal, whatIf: si0.whatIf });
+  check(grTrend.trend?.length >= 2 && grTrend.trend.every((p) => p.gpaText === half(p.gpa, 2).toFixed(2) && /^\w{3} \d{1,2}(, \d{4})?$/.test(p.dateText)), `the GPA history's days as the chart's readout writes them ("Jan 12 · 3.51"): ${JSON.stringify(grTrend.trend?.map((p) => `${p.dateText} · ${p.gpaText}`))}`);
   check(!si0.error && typeof si0.history === 'string' && typeof si0.recordNote === 'string' && si1.tracking && si1.goal === 3.46 && si1.whatIf === false && !hi.error && /Imported 2 days/.test(hi.message) && hi.info.days >= 2 && /Nothing new/.test(hi2.message) && he.text.split('\n')[0] === 'date,term_gpa' && he.text.includes('2026-01-12,3.512') && !ri.error && /^3\.50 across 2 courses/.test(ri.message) && /1 skipped/.test(ri.message) && /^3\.50 across 2 courses before this term$/.test(ri.info.record) && /past\.csv/.test(ri.info.recordNote) && rc.record === null && rc.tracking && se.name.endsWith('.json') && JSON.parse(se.text).appearance && /not a settings export/.test(sBad.error || '') && sGood.ok && si2.goal === si0.goal && si2.whatIf === si0.whatIf, `Settings in the app: the switches and goal saved and read back, a GPA history imported (a day already here kept) and exported, a record read from a CSV and cleared, the settings exported and imported (a wrong file refused): ${JSON.stringify({ si0, si1: [si1.tracking, si1.goal, si1.whatIf], hi: hi.message || hi.error, hi2: hi2.message, he: he.text?.slice(0, 60), ri: ri.message || ri.error, rec: ri.info?.record, note: ri.info?.recordNote, rc: rc.record, bad: sBad.error, good: sGood })}`);
   // (1.4.8) due-date reminders: what is still to hand in, for the phone to set its own alerts with
   const rm = await nc('reminders');
