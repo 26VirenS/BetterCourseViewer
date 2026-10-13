@@ -94,7 +94,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
-  shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
+  shoot light-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
@@ -161,7 +161,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
-  shoot dark-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
+  shoot dark-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
   wait

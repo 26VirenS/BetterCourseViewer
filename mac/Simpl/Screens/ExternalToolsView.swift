@@ -147,11 +147,12 @@ struct ExternalToolsView: View {
         // (a popover shows for the app in front: the suite runs several copies at once, so this one is brought forward,
         // its window made key, before the list is asked for — as a student's own click always is)
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
-            try? await Task.sleep(nanoseconds: 200_000_000)
         }
-        try? await Task.sleep(nanoseconds: UserDefaults.standard.string(forKey: "SimplShotFile") != nil ? 1_500_000_000 : 600_000_000)
+        // (for a picture, at once: a popover shows only while its app is in front, and the suite starts other copies
+        // that take the front a few seconds after this one starts)
+        if UserDefaults.standard.string(forKey: "SimplShotFile") == nil { try? await Task.sleep(nanoseconds: 600_000_000) }
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
     }
