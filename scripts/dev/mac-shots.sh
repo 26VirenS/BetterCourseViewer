@@ -127,13 +127,16 @@ keep_crashes() {
 # course and an assignment, then each again — the console's "[Simpl] open <screen>: <ms> (<where from>)" lines are the
 # time of each first visit and each visit again. The walks run last, by themselves (the copies picturing the rest slow
 # them, and unevenly): the app as it is, and as it loaded before 1.3.78 (-SimplPlain: nothing held or read ahead, the
-# Dashboard not kept), side by side, so the two are timed alike.
+# Dashboard not kept), side by side, so the two are timed alike — against a Canvas a quarter of a second away, as a
+# school's is (its assignment lists 0.6 s: the web's fluid suite's), not the mock's instant answers.
 WALK="todo,grades,calendar,notifications,inbox,course:101,externaltools,dashboard,todo,grades,calendar,notifications,inbox,course:101,push:/courses/101/assignments/1001,back,externaltools,dashboard"
 walks() {
   MODE=light
-  shoot light-01w-walk 160 -SimplWalk "$WALK"
-  shoot light-01v-walk-plain 160 -SimplWalk "$WALK" -SimplPlain YES
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":{"/assignments$":600,"":250}}' http://localhost:8800/__mock/config || true
+  shoot light-01w-walk 200 -SimplWalk "$WALK"
+  shoot light-01v-walk-plain 200 -SimplWalk "$WALK" -SimplPlain YES
   wait
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":null}' http://localhost:8800/__mock/config || true
 }
 
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
