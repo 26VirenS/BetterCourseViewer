@@ -8,6 +8,9 @@ name: Mac app
 
 on:
   push:
+    # (never on the Windows branch: its copy of the Mac's sources is not the Mac's, and its run would take the Mac
+    #  branch's place in the mac-app group, cancelling the one going, and on the mac-shots branch)
+    branches-ignore: [claude/windows-liquid-glass]
     paths:
       - 'mac/**'
       - 'ios/SimplCourses/App/AppSession.swift'

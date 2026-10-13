@@ -5,6 +5,9 @@ name: iOS screenshots
 
 on:
   push:
+    # (never on the Windows branch: its copy of the iPhone's sources is not the iPhone's, and its run would take the Mac
+    #  branch's place in the ios-shots group, cancelling the one going, and on the ios-shots branch)
+    branches-ignore: [claude/windows-liquid-glass]
     paths:
       - 'ios/**'
       - 'extension/content/app/native-app.js'

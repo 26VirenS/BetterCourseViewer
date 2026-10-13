@@ -21,7 +21,8 @@ In Tests, Mac app, iOS build, iOS screenshots and the Windows app's push runs, a
 Windows app's Run workflow and a push asking for a `[preview]` keep groups of their own, and Package, Site and the
 Mac's release have no cancelling at all. A push that changes only `docs/` runs nothing. The Windows branch runs its
 own Tests workflow on its own copy of the extension and suites (every suite but `test-school`: the iPhone's test school
-is not on that branch).
+is not on that branch); its copies of Mac app and iOS screenshots never run there (a run of either would take the Mac
+branch's place in its concurrency group and on `mac-shots` or `ios-shots`).
 
 ## The checks that fail a run
 
