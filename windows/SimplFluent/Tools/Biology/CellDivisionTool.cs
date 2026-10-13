@@ -414,7 +414,7 @@ internal sealed class DivMiniCell : FrameworkElement
     {
         var dark = Appearance.Dark;
         var rect = new Rect(2, 2, Math.Max(0, ActualWidth - 4), Math.Max(0, ActualHeight - 4));
-        dc.DrawRoundedRectangle(DivColors.Brush(DivColors.Of(DivInk.Cytoplasm, dark)), DivColors.Pen(DivColors.Of(DivInk.Membrane, dark), 1, 1), rect, 10, 10);
+        dc.DrawRoundedRectangle(DivColors.Brush(DivColors.Of(DivInk.Cytoplasm, dark), 1.6), DivColors.Pen(DivColors.Of(DivInk.Membrane, dark), 1, 1), rect, 10, 10);
         var n = Math.Max(chromatids.Count, 1);
         var gap = rect.Width / (n + 1);
         var unit = (rect.Height - 16) / 7;
@@ -433,7 +433,7 @@ internal sealed class DivMiniCell : FrameworkElement
                 var from = cy + (top + len - cy) * chiasma;
                 dc.DrawLine(DivColors.Pen(DivColors.Of(DivPainter.Parent(1 - c.Id.Homolog), dark), 1, 5), new Point(x, from), new Point(x, top + len));
             }
-            dc.DrawEllipse(DivColors.Brush(DivColors.Of(DivInk.Centromere, dark)), dark ? DivColors.Pen(Colors.White, 0.6, 0.8) : null, new Point(x, cy), 2.5, 2.5);
+            dc.DrawEllipse(DivColors.Brush(DivColors.Of(DivInk.Centromere, dark)), null, new Point(x, cy), 2.5, 2.5);
         }
     }
 }

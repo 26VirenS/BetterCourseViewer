@@ -20,34 +20,49 @@ namespace Simpl.Tools;
 // Between steps the drawing is the two keyframes mixed (BioStepAnimator, 600 ms, eased), or crossfaded in 200 ms with
 // Windows' animations off.
 
-/// <summary>Cell Division's colours, light and dark (the chromosomes' are §3.8's maternal red and paternal blue).</summary>
+/// <summary>Cell Division's inks, light and dark, the Mac's (DivColors in CellDivisionCanvas.swift): a colour and its
+/// opacity, so the cell lets the card show through in either appearance; the chromosomes are §3.8's maternal red and
+/// paternal blue.</summary>
 internal static class DivColors
 {
-    public static Color Of(DivInk ink, bool dark) => ink switch
+    public static Color Of(DivInk ink, bool dark)
     {
-        DivInk.Cytoplasm => K.Hex(dark ? "#1d3436" : "#e3f1f0"),
-        DivInk.Membrane => K.Hex(dark ? "#9fb6b8" : "#55676a"),
-        DivInk.Wall => K.Hex(dark ? "#6e9a4e" : "#9cc47a"),
-        DivInk.Nucleoplasm => K.Hex(dark ? "#253f43" : "#d3e6e8"),
-        DivInk.Envelope => K.Hex(dark ? "#8fa6aa" : "#6f8286"),
-        DivInk.Nucleolus => K.Hex(dark ? "#5e6d72" : "#aab4b9"),
-        DivInk.Furrow => K.Hex(dark ? "#ff7aa8" : "#e8508a"),
-        DivInk.CellPlate => K.Hex(dark ? "#e2b85a" : "#a77b16"),
-        DivInk.Plate => K.Hex(dark ? "#aeaeb2" : "#7c7c82"),
-        DivInk.Microtubule => K.Hex(dark ? "#5fd1bd" : "#2f9a88"),
-        DivInk.Aster => K.Hex(dark ? "#5fd1bd" : "#2f9a88"),
-        DivInk.Centrosome => K.Hex(dark ? "#ffd60a" : "#d9a406"),
-        DivInk.Centriole => K.Hex(dark ? "#ffcf70" : "#8a5a00"),
-        DivInk.Maternal => BioPalette.Maternal.ToColor(dark),
-        DivInk.Paternal => BioPalette.Paternal.ToColor(dark),
-        DivInk.Centromere => K.Hex(dark ? "#141416" : "#1d1d1f"),
-        _ => K.Hex(dark ? "#000000" : "#1d1d1f"),
-    };
+        var (hex, alpha) = ink switch
+        {
+            DivInk.Cytoplasm => ("#14b8a6", dark ? 0.12 : 0.09),
+            DivInk.Membrane => (dark ? "#f5f5f7" : "#1d1d1f", 0.55),
+            DivInk.Wall => (dark ? "#8bbf3f" : "#65a30d", 0.45),
+            DivInk.Nucleoplasm => (dark ? "#aeaeb2" : "#6e6e73", dark ? 0.08 : 0.07),
+            DivInk.Envelope => (dark ? "#f5f5f7" : "#1d1d1f", 0.45),
+            DivInk.Nucleolus => (dark ? "#aeaeb2" : "#6e6e73", 0.35),
+            DivInk.Furrow => (dark ? "#ff7aa8" : "#e8508a", 0.9),
+            DivInk.CellPlate => (dark ? "#ffd60a" : "#c79a00", 0.9),
+            DivInk.Plate => (dark ? "#aeaeb2" : "#8e8e93", 0.9),
+            DivInk.Microtubule or DivInk.Aster => (dark ? "#4fd1a5" : "#2e9e78", dark ? 0.7 : 0.75),
+            DivInk.Centrosome => (dark ? "#ffd60a" : "#d9a406", 1.0),
+            DivInk.Centriole => (dark ? "#ffd60a" : "#9a6b00", 1.0),
+            DivInk.Maternal => (BioPalette.Maternal.HexFor(dark), 1.0),
+            DivInk.Paternal => (BioPalette.Paternal.HexFor(dark), 1.0),
+            DivInk.Edge => ("#000000", dark ? 0.5 : 0.3),
+            DivInk.Centromere => (dark ? "#f5f5f7" : "#1d1d1f", dark ? 0.9 : 0.85),
+            _ => (dark ? "#f5f5f7" : "#1d1d1f", 1.0),
+        };
+        var c = K.Hex(hex);
+        return Color.FromArgb((byte)Math.Round(255 * alpha), c.R, c.G, c.B);
+    }
 
-    /// <summary>A frozen brush of a colour at an opacity (made fresh: opacities change every frame while a step moves).</summary>
+    /// <summary>An ink's colour without its opacity (a recombinant part mixes two parents' colours).</summary>
+    public static Color Solid(DivInk ink, bool dark)
+    {
+        var c = Of(ink, dark);
+        return Color.FromRgb(c.R, c.G, c.B);
+    }
+
+    /// <summary>A frozen brush of a colour at an opacity (multiplying the colour's own), made fresh: opacities change every
+    /// frame while a step moves.</summary>
     public static SolidColorBrush Brush(Color c, double alpha = 1)
     {
-        var b = new SolidColorBrush(Color.FromArgb((byte)Math.Round(255 * Math.Clamp(alpha, 0, 1) * c.A / 255.0), c.R, c.G, c.B));
+        var b = new SolidColorBrush(Color.FromArgb((byte)Math.Round(255 * Math.Clamp(alpha * c.A / 255.0, 0, 1)), c.R, c.G, c.B));
         b.Freeze();
         return b;
     }
@@ -84,7 +99,8 @@ internal sealed class DivisionDrawing : FrameworkElement
     public int? LitChromatid { get; set; }
     /// <summary>A point lit (a hovered label's anchor that is not a chromatid).</summary>
     public DivPoint? LitPoint { get; set; }
-    public int? SelectedChromatid { get; set; }
+    /// <summary>The picked chromosome's chromatids (both, while its sisters are joined), outlined in the accent.</summary>
+    public IReadOnlySet<int> Selected { get; set; } = new HashSet<int>();
 
     /// <summary>A chromatid pressed (its index), or empty space (null).</summary>
     public event Action<int?>? ChromatidPressed;
@@ -188,9 +204,7 @@ internal sealed class DivisionDrawing : FrameworkElement
                 case DivDisc disc:
                     if (disc.Alpha <= 0.005) break;
                     var r = Math.Max(0.8, disc.R * s);
-                    if (disc.Ink == DivInk.Centromere && dark)
-                        dc.DrawEllipse(DivColors.Brush(DivColors.Of(disc.Ink, dark), disc.Alpha), DivColors.Pen(Colors.White, disc.Alpha * 0.7, 1), fit.P(disc.C), r, r);
-                    else dc.DrawEllipse(DivColors.Brush(DivColors.Of(disc.Ink, dark), disc.Alpha), null, fit.P(disc.C), r, r);
+                    dc.DrawEllipse(DivColors.Brush(DivColors.Of(disc.Ink, dark), disc.Alpha), null, fit.P(disc.C), r, r);
                     break;
                 case DivChromatidPrimitive ch:
                     Chromatid(dc, ch.Paint, fit, dark, lights);
@@ -243,31 +257,28 @@ internal sealed class DivisionDrawing : FrameworkElement
         var w = Math.Max(1.4, c.Width * fit.Scale);
         var whole = Poly(c.Points, 0, c.Points.Length - 1, fit);
         dc.PushOpacity(Math.Clamp(c.Alpha, 0, 1));
-        var lit = lights && (LitChromatid == c.Index || SelectedChromatid == c.Index);
-        if (lit)
-        {
-            var accent = Appearance.Accent;
-            dc.DrawGeometry(null, DivColors.Pen(accent, 0.9, w + 6), whole);
-        }
-        var own = DivColors.Of(c.Runs[0].Ink, dark);
-        dc.DrawGeometry(null, DivColors.Pen(K.Mix(own, Colors.Black, dark ? 0.5 : 0.38), 1, w + 1.6), whole);
+        var lit = lights && (LitChromatid == c.Index || Selected.Contains(c.Index));
+        if (lit) dc.DrawGeometry(null, DivColors.Pen(Appearance.Accent, 0.9, w + 7), whole);
+        // (an edge a little wider than the colour, so a chromatid reads against the cell and its sister)
+        dc.DrawGeometry(null, DivColors.Pen(DivColors.Of(DivInk.Edge, dark), 1, w + 1.4), whole);
         foreach (var run in c.Runs)
         {
-            var colour = K.Mix(DivColors.Of(run.Ink, dark), DivColors.Of(run.Other, dark), Math.Clamp(run.Mix, 0, 1));
+            var colour = K.Mix(DivColors.Solid(run.Ink, dark), DivColors.Solid(run.Other, dark), Math.Clamp(run.Mix, 0, 1));
             dc.DrawGeometry(null, DivColors.Pen(colour, 1, w), Poly(c.Points, run.From, run.To, fit));
         }
-        if (c.K > 0.3 && w > 4)
-            dc.DrawGeometry(null, DivColors.Pen(Colors.White, 0.28 * DivMath.Smoothstep(0.3, 1, c.K), Math.Max(1, w * 0.26)), whole);
+        if (c.K > 0.3)
+            dc.DrawGeometry(null, DivColors.Pen(Colors.White, 0.22 * c.K, Math.Max(1, w * 0.28)), whole);
         dc.Pop();
     }
 
+    /// <summary>A cell's ploidy on a pill: in the accent, or orange when the cell has a chromosome too many or too few.</summary>
     private void DrawBadge(DrawingContext dc, string text, Point at, bool dark)
     {
-        var tint = BioColors.Tool("divide");
-        var ink = dark ? K.Mix(tint, Colors.White, 0.3) : K.Mix(tint, Colors.Black, 0.35);
-        var ft = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, Badge, 14, DivColors.Brush(ink), VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        var rect = new Rect(at.X - ft.Width / 2 - 8, at.Y - ft.Height / 2 - 2, ft.Width + 16, ft.Height + 4);
-        dc.DrawRoundedRectangle(DivColors.Brush(dark ? Color.FromRgb(0x2b, 0x2b, 0x2e) : Colors.White, 0.92), DivColors.Pen(tint, 0.6, 1), rect, rect.Height / 2, rect.Height / 2);
+        var odd = text.Contains('+') || text.Contains('−');
+        var tint = odd ? ChemKit.Orange : Appearance.Accent;
+        var ft = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, Badge, 13, DivColors.Brush(K.Darkened(tint)), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var rect = new Rect(at.X - ft.Width / 2 - 9, at.Y - ft.Height / 2 - 3, ft.Width + 18, ft.Height + 6);
+        dc.DrawRoundedRectangle(DivColors.Brush(dark ? Color.FromRgb(0x2b, 0x2b, 0x2e) : Colors.White, 0.9), DivColors.Pen(dark ? Colors.White : Colors.Black, 0.12, 1), rect, rect.Height / 2, rect.Height / 2);
         dc.DrawText(ft, new Point(at.X - ft.Width / 2, at.Y - ft.Height / 2));
     }
 
@@ -371,6 +382,20 @@ internal sealed class DivisionStageView : Grid
         Draw(steps.Phase());
     }
 
+    /// <summary>The picked chromatid and, while they are joined, its sister (the Mac's: a chromosome is picked whole).</summary>
+    private HashSet<int> Picked(DivisionSequence seq, int step)
+    {
+        var set = new HashSet<int>();
+        if (!labelsAllowed || CellDivisionModel.Selected is not { } sel || !sel.StartsWith("chromatid:", StringComparison.Ordinal) || !int.TryParse(sel[10..], out var i)) return set;
+        var f = seq.Keyframes[Math.Clamp(step, 0, seq.Keyframes.Count - 1)].Frame;
+        if (i < 0 || i >= f.Chromatids.Length) return set;
+        set.Add(i);
+        var c = f.Chromatids[i];
+        var sister = new DivChromatidID(c.Id.Pair, c.Id.Homolog, 1 - c.Id.Sister).Index;
+        if (c.Joined && sister < f.Chromatids.Length && f.Chromatids[sister].Joined) set.Add(sister);
+        return set;
+    }
+
     private BioStepPhase Mapped(BioStepPhase p)
     {
         var seq = sequence();
@@ -386,7 +411,7 @@ internal sealed class DivisionStageView : Grid
         drawing.Sequence = seq;
         drawing.Phase = ph;
         drawing.RoomForLabels = labelsAllowed && CellDivisionModel.ShowLabels;
-        drawing.SelectedChromatid = CellDivisionModel.Selected is { } sel && sel.StartsWith("chromatid:", StringComparison.Ordinal) && int.TryParse(sel[10..], out var ci) ? ci : null;
+        drawing.Selected = Picked(seq, ph.To);
         drawing.InvalidateVisual();
         var step = ph.To;
         if (step >= 0 && step < seq.Stages.Count)
@@ -445,9 +470,9 @@ internal sealed class DivisionStageView : Grid
         overlay.Children.Add(new Path { Data = leaders, Stroke = DivColors.Brush(ink, 0.55), StrokeThickness = 1, IsHitTestVisible = false });
         foreach (var pl in placed)
         {
-            var dot = new Ellipse { Width = 6, Height = 6, Fill = DivColors.Brush(ink, 0.8), IsHitTestVisible = false };
-            Canvas.SetLeft(dot, pl.AnchorX - 3);
-            Canvas.SetTop(dot, pl.AnchorY - 3);
+            var dot = new Ellipse { Width = 3, Height = 3, Fill = DivColors.Brush(ink, 0.8), IsHitTestVisible = false };
+            Canvas.SetLeft(dot, pl.AnchorX - 1.5);
+            Canvas.SetTop(dot, pl.AnchorY - 1.5);
             overlay.Children.Add(dot);
         }
         foreach (var pl in placed)
@@ -500,11 +525,20 @@ internal sealed class DivisionStageView : Grid
         Canvas.SetLeft(b, x);
         Canvas.SetTop(b, y);
         b.Width = w;
-        // (hovering a label lights its part in the drawing)
-        b.MouseEnter += (_, _) => Light(def, anchor, true);
-        b.MouseLeave += (_, _) => Light(def, anchor, false);
-        b.GotKeyboardFocus += (_, _) => Light(def, anchor, true);
-        b.LostKeyboardFocus += (_, _) => Light(def, anchor, false);
+        // (hovering a label outlines it in the accent and lights its part in the drawing)
+        void Hover(bool on)
+        {
+            if (!chosen)
+            {
+                if (on) face.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+                else face.SetResourceReference(Border.BorderBrushProperty, B.CardStroke);
+            }
+            Light(def, anchor, on);
+        }
+        b.MouseEnter += (_, _) => Hover(true);
+        b.MouseLeave += (_, _) => Hover(false);
+        b.GotKeyboardFocus += (_, _) => Hover(true);
+        b.LostKeyboardFocus += (_, _) => Hover(false);
         return b;
     }
 

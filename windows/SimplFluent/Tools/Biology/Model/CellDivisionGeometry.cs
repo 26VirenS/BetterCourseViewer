@@ -369,14 +369,16 @@ public sealed class DivCellKey
         Membrane = membrane;
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<DivRegion, DivCellKey> Made = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(DivRegion, int), DivCellKey> Made = new();
 
     /// <summary>The outline of a region, worked out once and kept (a few kinds of cell, used again whenever an option
     /// changes; nothing changes an outline once made — a mix makes a new one).</summary>
-    public static DivCellKey For(DivRegion region) => Made.GetOrAdd(region, r => new DivCellKey(r));
+    public static DivCellKey For(DivRegion region, int side = 0) => Made.GetOrAdd((region, side), k => new DivCellKey(k.Item1, k.Item2));
 
-    /// <summary>The outline of a region, round its centre of area.</summary>
-    public DivCellKey(DivRegion region)
+    /// <summary>The outline of a region, round its centre of area. <paramref name="side"/> −1 or 1: only the outline to the
+    /// left (x ≤ its centre) or the right is drawn — two slots tracing the same cell, each drawing half of it, become two
+    /// cells later by easing apart, with the outline drawn once meanwhile.</summary>
+    public DivCellKey(DivRegion region, int side = 0)
     {
         var g = region.Centroid;
         Radii = new double[Samples];
@@ -400,7 +402,8 @@ public sealed class DivCellKey
             else wall = region.WallY;
             // (a cut not drawn reaches a little past the line, so the parts' fills meet without a seam)
             Radii[i] = lo + (wall ? 0 : 0.004);
-            Membrane[i] = wall ? 1 : 0;
+            var mine = side == 0 || side * d.X >= -1e-9;
+            Membrane[i] = wall && mine ? 1 : 0;
         }
         Centre = g;
     }

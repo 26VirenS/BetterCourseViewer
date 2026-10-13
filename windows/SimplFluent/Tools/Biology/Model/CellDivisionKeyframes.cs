@@ -216,7 +216,12 @@ public sealed class DivisionBuilder
         if (o.Plant) shape = DivShape.Box(DivPoint.Zero, 0.95, 0.95, 0.14);
         else if (pinch is { } w) shape = DivShape.Pinched(1, w);
         else shape = DivShape.Disk(DivPoint.Zero, 1);
-        if (Meiosis) return Quarters.Select(q => DivCellKey.For(new DivRegion(shape, q.X, q.Y))).ToArray();
+        // (meiosis: an animal cell's halves each traced by two slots, each drawing its own side, until meiosis II parts
+        //  them; a plant cell, which does not move as it divides, in quarters whose new walls appear)
+        if (Meiosis)
+            return Quarters.Select(q => o.Plant
+                ? DivCellKey.For(new DivRegion(shape, q.X, q.Y))
+                : DivCellKey.For(new DivRegion(shape, KeepY: q.Y), q.X)).ToArray();
         return new[] { 1, -1 }.Select(s => DivCellKey.For(new DivRegion(shape, KeepY: s))).ToArray();
     }
 
@@ -227,7 +232,7 @@ public sealed class DivisionBuilder
         if (Meiosis)
             return Quarters.Select(s => o.Plant
                 ? DivCellKey.For(new DivRegion(box, s.X, s.Y, WallY: true))
-                : DivCellKey.For(new DivRegion(DivShape.Disk(new DivPoint(0, s.Y * D), 0.72), KeepX: s.X))).ToArray();
+                : DivCellKey.For(new DivRegion(DivShape.Disk(new DivPoint(0, s.Y * D), 0.72)), s.X)).ToArray();
         return new[] { 1, -1 }.Select(s => o.Plant
             ? DivCellKey.For(new DivRegion(box, KeepY: s, WallY: true))
             : DivCellKey.For(new DivRegion(DivShape.Disk(new DivPoint(0, s * D), 0.72)))).ToArray();
@@ -416,12 +421,12 @@ public sealed class DivisionBuilder
         {
             DivStageKey.G1 => new DivLabelDef("chromatin", "Chromosomes (chromatin)", DivAnchor.Arm(l0, 0.8)),
             DivStageKey.S => new DivLabelDef("replication", "DNA copied (S phase)", DivAnchor.Arm(l0, 0.8)),
-            _ => new DivLabelDef("sisters", "Sister chromatids (threads)", DivAnchor.Arm(l0, 0.8)),
+            _ => new DivLabelDef("sisters", "Sister chromatids", DivAnchor.Arm(l0, 0.8)),
         });
-        labels.Add(new DivLabelDef("homologs", "Homolog (from the other parent)", DivAnchor.Arm(Index(0, 1, 0), 0.7)));
+        labels.Add(new DivLabelDef("homologs", "Homolog (other parent)", DivAnchor.Arm(Index(0, 1, 0), 0.7)));
         labels.Add(new DivLabelDef("chromatin", "Short chromosome", DivAnchor.Arm(s0, 0.9)));
         if (!o.Plant) labels.Add(new DivLabelDef("centrosome", s == DivStageKey.G2 ? "2 centrosomes + centrioles" : "Centrosome + centrioles", DivAnchor.Pole(Top)));
-        labels.Add(o.Plant ? new DivLabelDef("wall", "Cell wall", DivAnchor.Cell(0, 30)) : new DivLabelDef("membrane", "Cell membrane", DivAnchor.Cell(0, 100)));
+        labels.Add(o.Plant ? new DivLabelDef("wall", "Cell wall", DivAnchor.Cell(0, 112)) : new DivLabelDef("membrane", "Cell membrane", DivAnchor.Cell(0, 100)));
         return new DivisionKeyframe { Frame = f, Labels = labels, Style = DivCountStyle.Cell };
     }
 
@@ -493,7 +498,7 @@ public sealed class DivisionBuilder
         var l0 = Index(0, 0, 0);
         var labels = new List<DivLabelDef>
         {
-            new("envelope", "Nuclear envelope breaking down", DivAnchor.Nucleus(0, DivMath.Radians(-30))),
+            new("envelope", "Envelope breaking down", DivAnchor.Nucleus(0, DivMath.Radians(-30))),
             new("kinetochore", "Kinetochore microtubules", DivAnchor.Fibre(l0, 0.5)),
             new("centromere", "Centromere (kinetochore)", DivAnchor.Centromere(Index(1, 0, 0))),
             new("chromosome", "Chromosome", DivAnchor.Arm(Index(0, 1, 0), 0.9)),
@@ -565,8 +570,8 @@ public sealed class DivisionBuilder
         var l0 = Index(0, 0, 0);
         var labels = new List<DivLabelDef>
         {
-            new("daughterChromosome", "Chromosome (was a sister chromatid)", DivAnchor.Arm(l0, 0.85)),
-            new("kinetochore", "Kinetochore microtubules (shortening)", DivAnchor.Fibre(Index(1, 0, 0), 0.5)),
+            new("daughterChromosome", "Daughter chromosome", DivAnchor.Arm(l0, 0.85)),
+            new("kinetochore", "Kinetochore microtubules", DivAnchor.Fibre(Index(1, 0, 0), 0.5)),
             new("polar", "Polar microtubules", DivAnchor.Polar(0, 0.55)),
             o.Plant ? new("pole", "Spindle pole", DivAnchor.Pole(Top)) : new("centrosome", "Centrosome", DivAnchor.Pole(Top)),
         };
@@ -583,7 +588,7 @@ public sealed class DivisionBuilder
         var f = Frame(WholeCells(pinch: 0.1), ns, ps, Spindles(polar: 0.35), CellPlates(first: 0.55, firstAlpha: 1), Furrows(half: 0.1, alpha: 1), ks);
         var labels = new List<DivLabelDef>
         {
-            new("envelope", "Nuclear envelope (re-forming)", DivAnchor.Nucleus(0, DivMath.Radians(150))),
+            new("envelope", "Envelope re-forming", DivAnchor.Nucleus(0, DivMath.Radians(150))),
             new("chromosome", "Chromosomes decondensing", DivAnchor.Nucleus(1, DivMath.Radians(-150))),
             o.Plant ? new("cellplate", "Cell plate", DivAnchor.CellPlate(0, 0.9)) : new("furrow", "Cleavage furrow", DivAnchor.Furrow(0, 1)),
             new("nucleus", "Two nuclei", DivAnchor.Nucleus(1, DivMath.Radians(-20))),
@@ -617,9 +622,9 @@ public sealed class DivisionBuilder
         var labels = new List<DivLabelDef>
         {
             new("daughter", "Daughter cell (2n)", DivAnchor.Cell(0, 110)),
-            new("daughter", "Identical daughter cell (2n)", DivAnchor.Cell(1, 40)),
+            new("daughter", "Identical daughter (2n)", DivAnchor.Cell(1, 40)),
             new("nucleus", "Nucleus", DivAnchor.Nucleus(1, DivMath.Radians(-160))),
-            o.Plant ? new("cellplate", "New cell wall (from the cell plate)", DivAnchor.CellPlate(0, 0.85)) : new("furrow", "Membranes sealed", DivAnchor.Cell(0, 0)),
+            o.Plant ? new("cellplate", "New cell wall", DivAnchor.CellPlate(0, 0.85)) : new("furrow", "Membranes sealed", DivAnchor.Cell(0, 0)),
         };
         return new DivisionKeyframe
         {
@@ -699,7 +704,7 @@ public sealed class DivisionBuilder
             new("tetrad", "Tetrad (bivalent)", DivAnchor.Arm(Index(1, Upper(1), 0), 0.9)),
             new("homologs", "Homologs paired (synapsis)", DivAnchor.ShortArm(Index(0, 1 - a, 0), 0.9)),
             new("sisters", "Sister chromatids", DivAnchor.Arm(Index(0, a, 0), 0.95)),
-            new("envelope", "Nuclear envelope breaking down", DivAnchor.Nucleus(0, DivMath.Radians(-40))),
+            new("envelope", "Envelope breaking down", DivAnchor.Nucleus(0, DivMath.Radians(-40))),
             new("spindle", "Spindle forming", DivAnchor.Polar(0, 0.5)),
         };
         if (Crossing) labels.Add(new DivLabelDef("chiasma", "Chiasma (crossing over)", DivAnchor.Arm(Index(0, a, 1), o.Chiasma)));
@@ -785,12 +790,12 @@ public sealed class DivisionBuilder
         var labels = new List<DivLabelDef>
         {
             new("homologs", "Homologs separating", DivAnchor.Arm(Index(0, 1 - a, 0), 0.9)),
-            new("sisters", "Sister chromatids stay together", DivAnchor.Arm(Index(N - 1, Upper(N - 1), 0), 0.9)),
+            new("sisters", "Sisters stay together", DivAnchor.Arm(Index(N - 1, Upper(N - 1), 0), 0.9)),
             new("kinetochore", "Kinetochore microtubules", DivAnchor.Fibre(Index(0, a, 0), 0.5)),
         };
         if (Crossing) labels.Add(new DivLabelDef("recombinant", "Recombinant chromatid", DivAnchor.Arm(Index(0, a, RecombinantSister(a)), 0.95)));
         if (o.Nondisjunction == DivisionNondisjunction.MeiosisI)
-            labels.Add(new DivLabelDef("nondisjunction", "Nondisjunction: both to one pole", DivAnchor.Arm(Index(1, 1 - Upper(1), 0), 0.9)));
+            labels.Add(new DivLabelDef("nondisjunction", "Nondisjunction", DivAnchor.Arm(Index(1, 1 - Upper(1), 0), 0.9)));
         return new DivisionKeyframe { Frame = f, Labels = labels, Style = DivCountStyle.AnaphaseI };
     }
 
@@ -927,9 +932,9 @@ public sealed class DivisionBuilder
         var first = contents[0].Chromosomes[0];
         var labels = new List<DivLabelDef>
         {
-            new("spindle", "Spindle forming in each cell", DivAnchor.Polar(1, 0.5)),
-            new("chromosome", "Chromosome (two chromatids)", DivAnchor.Arm(Index(first.Pair, first.Homolog, 0), 0.9)),
-            new("noS", "No DNA copying since meiosis I", DivAnchor.Cell(2, 20)),
+            new("spindle", "Spindle (each cell)", DivAnchor.Polar(1, 0.5)),
+            new("chromosome", "Still 2 chromatids", DivAnchor.Arm(Index(first.Pair, first.Homolog, 0), 0.9)),
+            new("noS", "No new DNA copy", DivAnchor.Cell(2, 20)),
         };
         if (!o.Plant) labels.Add(new DivLabelDef("centrosome", "Centrosomes", DivAnchor.Pole(1)));
         return new DivisionKeyframe { Frame = f, Labels = labels, Style = DivCountStyle.PerCellPlain };
@@ -957,7 +962,7 @@ public sealed class DivisionBuilder
         var first = SecondDivisionContents()[0].Chromosomes[0];
         var labels = new List<DivLabelDef>
         {
-            new("plate", "Metaphase plate (each cell)", DivAnchor.Plate(1, 0.95)),
+            new("plate", "Metaphase plate", DivAnchor.Plate(1, 0.95)),
             new("kinetochore", "Kinetochore microtubules", DivAnchor.Fibre(Index(first.Pair, first.Homolog, 0), 0.45)),
             new("sisters", "Sister chromatids", DivAnchor.Arm(Index(first.Pair, first.Homolog, 1), 0.9)),
             o.Plant ? new("pole", "Spindle pole", DivAnchor.Pole(3)) : new("centrosome", "Centrosome", DivAnchor.Pole(3)),
@@ -994,12 +999,12 @@ public sealed class DivisionBuilder
         var first = SecondDivisionContents()[0].Chromosomes[0];
         var labels = new List<DivLabelDef>
         {
-            new("daughterChromosome", "Sister chromatids separating", DivAnchor.Arm(Index(first.Pair, first.Homolog, 0), 0.9)),
+            new("daughterChromosome", "Sisters separating", DivAnchor.Arm(Index(first.Pair, first.Homolog, 0), 0.9)),
             new("kinetochore", "Kinetochore microtubules", DivAnchor.Fibre(Index(first.Pair, first.Homolog, 1), 0.5)),
             new("polar", "Polar microtubules", DivAnchor.Polar(2, 0.6)),
         };
         if (o.Nondisjunction == DivisionNondisjunction.MeiosisII)
-            labels.Add(new DivLabelDef("nondisjunction", "Nondisjunction: sisters stay together", DivAnchor.Arm(Index(1, Upper(1), 0), 0.9)));
+            labels.Add(new DivLabelDef("nondisjunction", "Nondisjunction", DivAnchor.Arm(Index(1, Upper(1), 0), 0.9)));
         return new DivisionKeyframe { Frame = f, Labels = labels, Style = DivCountStyle.AnaphaseII };
     }
 
