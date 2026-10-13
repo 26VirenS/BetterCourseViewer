@@ -271,6 +271,9 @@ jobs:
             while (@($script:running | Where-Object { -not $_.HasExited }).Count -ge 3) { Start-Sleep -Milliseconds 400 }
             $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
             $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', "$wait", '--profile', $prof, '--window-size', $size) + $extra
+            # (Start-Process joins its arguments with spaces as they are: one with a space in it — a cross typed as
+            #  "AaBb x AaBb" — goes in quotes, or Simpl would read it as three)
+            $argList = @($argList | ForEach-Object { if ("$_" -match '\s') { '"' + $_ + '"' } else { $_ } })
             $script:running += Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
           }
           $mock = @('--base-url', 'http://localhost:8800', '--demo')
@@ -480,6 +483,91 @@ jobs:
           #  trees, the busiest, behind the numbers — last in the list, so every picture above keeps its part)
           Shot 'theme-city-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'City'))
           Shot 'theme-forest-1024' '1024x681' 45 ($mock + @('--appearance', 'dark', '--theme', 'Forest'))
+          # the biology toolkit's other nine tools, each page in a launch's state (--tool <key> --tool-state <page>:…,
+          # windows/SimplFluent/Tools/Biology/README.md), light and dark (after the others, so every picture above keeps
+          # its part). Gene Expression: transcription, translation, splicing, a prokaryote's coupled genes, the codon
+          # table and wheel, the reading frames, sickle cell and a frameshift, and its pin's codon lookup
+          $inTools = $mock + @('--place', 'tools')
+          Shot 'bio-gene-transcribe' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'gene', '--tool-state', 'express:step=40'))
+          Shot 'bio-gene-translate' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'gene', '--tool-state', 'express:step=92'))
+          Shot 'bio-gene-splice' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'gene', '--tool-state', 'express:step=87'))
+          Shot 'bio-gene-prokaryote' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'gene', '--tool-state', 'express:prokaryote:step=45'))
+          Shot 'bio-gene-codons' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'gene', '--tool-state', 'codons:find=Lys'))
+          Shot 'bio-gene-wheel' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'gene', '--tool-state', 'codons:wheel:find=Leu'))
+          Shot 'bio-gene-frames' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'gene', '--tool-state', 'frames:seq=GCGCTATAAAAGGCGCGTCGAGCTCGGTACCACTCAGCGCCACCATGGCCTTCAGGTAAGTATCTTCTTTCCTAACTTTCAGCGATTGGCAGAAAGGCTAAGCAATAAAGCC'))
+          Shot 'bio-gene-sickle' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'gene', '--tool-state', 'mutations:sickle'))
+          Shot 'bio-gene-frameshift' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'gene', '--tool-state', 'mutations:mut=c.6_7insA'))
+          Shot 'pin-gene' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'gene', '--pin-open', 'gene', '--tool-state', 'codon=UGG'))
+          # Genetics Crosses (a dihybrid, an X-linked cross, the forked diagram, why these gametes, the probability, chi-square,
+          # a pedigree) and Hardy–Weinberg (calculated, tested, drift simulated, a recessive lethal selected against), and
+          # their pins
+          Shot 'bio-cross-dihybrid' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'cross', '--tool-state', 'cross:cross=AaBb x AaBb'))
+          Shot 'bio-cross-xlinked' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'cross', '--tool-state', 'cross:cross=X^A X^a x X^a Y'))
+          Shot 'bio-cross-forked' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'cross', '--tool-state', 'cross:cross=AaBbCc x AaBbCc:forked'))
+          Shot 'bio-cross-why' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'cross', '--tool-state', 'cross:cross=AaBb x AaBb:why'))
+          Shot 'bio-cross-probability' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'cross', '--tool-state', 'probability:prob=AaBbCc x AaBbCc:target=aa,B_,Cc:children=3'))
+          Shot 'bio-cross-chi' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'cross', '--tool-state', 'chi:obs=315,108,101,32'))
+          Shot 'bio-cross-pedigree' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'cross', '--tool-state', 'pedigree:example=xr:mode=xd:select=2'))
+          Shot 'bio-popgen-calculate' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'popgen', '--tool-state', 'calculate:q2=0.16'))
+          Shot 'bio-popgen-test' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'popgen', '--tool-state', 'test:counts=50,30,20'))
+          Shot 'bio-popgen-simulate' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'popgen', '--tool-state', 'simulate:n=10:p0=0.5:seed=7:reps=5:gens=100'))
+          Shot 'bio-popgen-lethal' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'popgen', '--tool-state', 'simulate:infinite:preset=recessiveLethal:gens=50'))
+          Shot 'pin-cross' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'cross', '--pin-open', 'cross', '--tool-state', 'cross=Aa x aa'))
+          Shot 'pin-popgen' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'popgen', '--pin-open', 'popgen', '--tool-state', 'q2=0.16'))
+          # the Biomolecule Builder: amino acids, a peptide's helix and sheet, a protein's tertiary and quaternary levels, a
+          # DNA strand, sugars' anomers, sucrose split, cellulose, and the lipids compared
+          Shot 'bio-biomol-amino' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'amino:aa=W:colour=part'))
+          Shot 'bio-biomol-amino-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'biomol', '--tool-state', 'amino:aa=K'))
+          Shot 'bio-biomol-peptide' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'proteins:hbonds:ribbon=over'))
+          Shot 'bio-biomol-helix-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'biomol', '--tool-state', 'proteins:ss=helix:colour=part'))
+          Shot 'bio-biomol-sheet' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'proteins:sheet'))
+          Shot 'bio-biomol-tertiary' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'proteins:level=tertiary:core'))
+          Shot 'bio-biomol-quaternary' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'biomol', '--tool-state', 'proteins:level=quaternary'))
+          Shot 'bio-biomol-strand' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'nucleic:strand:seq=ATGCGT:complement'))
+          Shot 'bio-biomol-anomers' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'carbs:anomers'))
+          Shot 'bio-biomol-sucrose' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'carbs:di=SUC:split'))
+          Shot 'bio-biomol-cellulose' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biomol', '--tool-state', 'carbs:poly=cellulose'))
+          Shot 'bio-biomol-lipids' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'biomol', '--tool-state', 'lipids:lipid=compare'))
+          # DNA & RNA (the Mac's launch words): the double helix with its grooves and measures, atom by atom, unzipped; a
+          # nucleotide numbered, the base pairs; a strand's facts; replication's fork at two steps; tRNA's cloverleaf and
+          # L-shape, the mRNA strip and the ribosomes
+          Shot 'bio-dna-helix' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'helix'))
+          Shot 'bio-dna-helix-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'dna', '--tool-state', 'helix'))
+          Shot 'bio-dna-grooves' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'helix:grooves:measure'))
+          Shot 'bio-dna-atoms' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'helix:style=atoms:pair=10'))
+          Shot 'bio-dna-unzip' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'helix:unzip=0.5'))
+          Shot 'bio-dna-nucleotide' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'nucleotides:mol=DT:numbers'))
+          Shot 'bio-dna-nucleotide-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'dna', '--tool-state', 'nucleotides:mol=DT:numbers'))
+          Shot 'bio-dna-pairs' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'nucleotides:pairs'))
+          Shot 'bio-dna-sequence' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'sequence'))
+          Shot 'bio-dna-replication' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'replication:step=4'))
+          Shot 'bio-dna-replication-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'dna', '--tool-state', 'replication:step=4'))
+          Shot 'bio-dna-okazaki' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'replication:step=6'))
+          Shot 'bio-dna-trna' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'rna:view=cloverleaf:modified:base=34'))
+          Shot 'bio-dna-trna-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'dna', '--tool-state', 'rna:view=cloverleaf:modified:base=34'))
+          Shot 'bio-dna-trna3d' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'rna:view=lshape'))
+          Shot 'bio-dna-mrna' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'rna:view=mrna'))
+          Shot 'bio-dna-ribosome' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'dna', '--tool-state', 'rna:view=ribosomes'))
+          # Cell Division, light and dark: metaphase labelled, prophase I's tetrads and chiasma, nondisjunction's gametes, a
+          # plant cell's telophase, a recombinant chromosome's card, mitosis beside meiosis, and the cell cycle's wheel
+          foreach ($d in @(@('mitosis', 'mitosis:step=6'), @('meiosis', 'meiosis:step=4'), @('gametes', 'meiosis:step=11:nd=1'), @('plant', 'mitosis:plant:step=8'),
+                           @('pick', 'meiosis:step=5:pick=0'), @('compare', 'compare:step=3'), @('cycle', 'cycle:gate=g1s:cancer'))) {
+            Shot "bio-divide-$($d[0])" '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'divide', '--tool-state', $d[1]))
+            Shot "bio-divide-$($d[0])-dark" '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'divide', '--tool-state', $d[1]))
+          }
+          # the Bio Lab Calculator (a dilution's steps, statistics, a cell's surface area to volume, its pin), Enzyme Lab
+          # (competitive inhibition, too hot) and Photosynthesis & Respiration (the map at night, respiration's steps,
+          # photosynthesis, a carbon atom traced)
+          Shot 'bio-lab-dilution' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'biolab', '--tool-state', 'solutions:calc=dilution:steps'))
+          Shot 'bio-lab-stats-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'biolab', '--tool-state', 'stats:calc=stats:steps'))
+          Shot 'bio-lab-cells-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'biolab', '--tool-state', 'cells:calc=sav:mode=sphere:r=9.6:steps'))
+          Shot 'pin-biolab' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'biolab', '--pin-open', 'biolab'))
+          Shot 'bio-enzyme-competitive' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'enzyme', '--tool-state', 'competitive'))
+          Shot 'bio-enzyme-denatured-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'enzyme', '--tool-state', 'denatured'))
+          Shot 'bio-energy-map' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'energy', '--tool-state', 'map:respire:night'))
+          Shot 'bio-energy-respiration-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'energy', '--tool-state', 'respiration:step=9'))
+          Shot 'bio-energy-photosynthesis' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'energy', '--tool-state', 'photosynthesis:step=6'))
+          Shot 'bio-energy-atoms' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'energy', '--tool-state', 'atoms:trace=carbon:step=4'))
           # Send from Phone, tried as a phone would (one part each): Simpl's hand-in panel with --phone-test says its
           # server's address in simpl.log (on 127.0.0.1 too); the page is opened, a wrong key tried, then each file posted
           # as the phone's page posts it (X-File-Name, its type, its length) with Invoke-WebRequest; what came back goes
