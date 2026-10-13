@@ -24,19 +24,22 @@ GENERATED = re.compile(r"(^|/)(obj|build|DerivedData|\.build)/|\.g\.(cs|i\.cs)$|
 def read(log, root):
     """The warnings in a build log: {(file, line, col, key)}, file relative to the repository's root."""
     seen = set()
-    marker = "/" + os.path.basename(os.path.normpath(root)) + "/"
+    # (Windows' paths as well as the others': D:\a\…\windows\… and /Users/runner/…/mac/…, compared with forward slashes)
+    top = root.replace("\\", "/").rstrip("/")
+    marker = "/" + top.rsplit("/", 1)[-1] + "/"
     with open(log, encoding="utf-8", errors="replace") as f:
         for raw in f:
-            raw = raw.rstrip("\n")
+            raw = raw.rstrip("\n").removeprefix("##[warning]")
             m = SWIFT.match(raw) or DOTNET.match(raw)
             if not m:
                 continue
             path = m.group("file").replace("\\", "/")
-            # (the runner's checkout, wherever it is: the path from the repository's own folders on)
-            if path.startswith(root.rstrip("/") + "/"):
-                path = path[len(root.rstrip("/")) + 1:]
+            # (the runner's checkout, wherever it is: the path from the repository's own folders on — after the last
+            #  of the checkout's name, which a runner's path may hold twice: D:/a/BetterCourseViewer/BetterCourseViewer/)
+            if path.lower().startswith(top.lower() + "/"):
+                path = path[len(top) + 1:]
             elif marker in path:
-                path = path.split(marker)[-1]
+                path = path[path.rfind(marker) + len(marker):]
             elif re.match(r"^[A-Za-z]:/", path) or path.startswith("/"):
                 continue  # (outside the repository: a package's, the SDK's)
             if GENERATED.search(path):
