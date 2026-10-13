@@ -1319,8 +1319,9 @@
   }
   const VT_OK = typeof document.startViewTransition === 'function';
   // (a browser drawing without graphics acceleration — html.bcv-noblur, content/early.js — takes a tenth of a second to
-  // take the picture a view transition starts from, every time: there the screen's own entrance plays the move instead)
-  const vtHere = () => VT_OK && !phone() && !U.reducedMotion() && !html.classList.contains('bcv-noblur');
+  // take the picture a view transition starts from, every time: there the screen's own entrance plays the move instead;
+  // and the apps move between their own screens themselves)
+  const vtHere = () => VT_OK && !phone() && !self.BCVBridge?.native && !U.reducedMotion() && !html.classList.contains('bcv-noblur');
   let vt = null; // { t, scope }: the transition playing
   /** Runs `update` (the DOM change that puts the new screen in) as a view transition of `scope` — the
    *  main column, or a course's own column within its kept shell — moving `kind`'s way. Without view
