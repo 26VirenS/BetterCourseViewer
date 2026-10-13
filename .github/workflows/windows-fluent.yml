@@ -188,7 +188,8 @@ jobs:
           retention-days: 30
 
   # (the models' unit tests — windows/SimplFluent.Tests: the chemistry, the calculator, the vault's and the sign-in's
-  #  seals, the bridge's JSON — and the compiler's warnings against the ones already known
+  #  seals, the bridge's JSON, the biology toolkit's data and algorithms against its specification's test vectors (its
+  #  self-check all OK) — and the compiler's warnings against the ones already known
   #  (scripts/dev/baselines/windows-warnings.txt): beside the build, on a runner of their own; a release waits for them)
   tests:
     name: Unit tests and compiler warnings
@@ -403,6 +404,14 @@ jobs:
           Shot 'tool-ocr' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ocr', '--tool-file', 'sample'))
           Shot 'tool-graph' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'graph'))
           Shot 'pin-graph' '1366x778' 50 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-open', 'graph'))
+          # the biology toolkit (windows/SimplFluent/Tools/Biology): its section of the Tools page (its self-check in the
+          # log, checked below), a tool opened in a launch's state, a pin's flyout, and the foundation's 3D view with its
+          # labels, step-through and sequence text (--bio-demo), light and dark
+          Shot 'tools-biology' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tools-scroll', 'biology', '--bio-check'))
+          Shot 'bio-tool' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'dna', '--tool-state', 'sequence'))
+          Shot 'pin-bio' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'gene,cell', '--pin-open', 'cell'))
+          Shot 'bio-foundation' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--bio-demo'))
+          Shot 'bio-foundation-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--bio-demo'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
           # (tall enough for the replies: one is a file and nothing else, shown with its file)
           Shot 'topic-replies' '1366x1050' 45 ($mock + @('--appearance', 'dark', '--push', '/courses/101/discussion_topics/7003'))
@@ -535,6 +544,14 @@ jobs:
             if (-not (Test-Path $saved)) { Write-Error "setup-saved made no log"; exit 1 }
             $bad = Select-String -Path $saved -Pattern 'setup save:|setup saved, then|bridge ' -SimpleMatch:$false
             if ($bad) { Write-Host "--- setup-saved: what failed"; Get-Content $saved; Write-Error "setup's save failed or something after it did (shots/profile-setup-saved.log)"; exit 1 }
+          }
+          # the biology toolkit's self-check, as tools-biology ran it in the app (--bio-check): a summary, every line OK
+          if ($script:mine -contains 'tools-biology') {
+            $bio = 'shots/profile-tools-biology.log'
+            $sum = if (Test-Path $bio) { Select-String -Path $bio -Pattern 'bio-check summary (\d+)/(\d+) (OK|FAIL)' | Select-Object -Last 1 } else { $null }
+            if (-not $sum) { Write-Error "tools-biology's log has no bio-check summary (shots/profile-tools-biology.log)"; exit 1 }
+            Write-Host "biology self-check: $($sum.Matches[0].Value)"
+            if ($sum.Matches[0].Groups[3].Value -ne 'OK') { Select-String -Path $bio -Pattern 'bio-check \S+ \S+ FAIL' | ForEach-Object { Write-Host "::error::$($_.Line)" }; exit 1 }
           }
           Get-ChildItem shots
       # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
