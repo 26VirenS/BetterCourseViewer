@@ -7,10 +7,26 @@ on:
   push:
     paths:
       - 'ios/**'
+      - 'scripts/dev/mock-canvas.mjs' # (the test school the app carries is made from it)
+      - 'scripts/dev/make-test-school.mjs'
       - '.github/workflows/ios.yml'
   workflow_dispatch:
 
 jobs:
+  # The test school (test.simpl.com) the app carries is the mock Canvas made into a page's script by
+  # scripts/dev/make-test-school.mjs, and committed (the app's build has no Node step): it must be what the generator
+  # makes of the mock as it is now. A change to the mock without running the generator fails here.
+  test-school:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The test school is the mock as it is now
+        run: |
+          node scripts/dev/make-test-school.mjs
+          git diff --exit-code -- ios/SimplCourses/Resources/TestSchool || { echo "::error::ios/SimplCourses/Resources/TestSchool is stale: run node scripts/dev/make-test-school.mjs and commit what it writes"; exit 1; }
+          test -z "$(git status --porcelain -- ios/SimplCourses/Resources/TestSchool)" || { git status --porcelain -- ios/SimplCourses/Resources/TestSchool; echo "::error::make-test-school.mjs wrote files that are not committed"; exit 1; }
+          node --check ios/SimplCourses/Resources/TestSchool/mock.js
+
   build:
     runs-on: macos-26 # (Xcode 26: the iOS 26 SDK, whose bars and controls are Liquid Glass; the app's native shell uses its APIs)
     steps:
