@@ -1,5 +1,6 @@
 # The website: site/ laid over the site branch, which Cloudflare deploys (scripts/publish-site.sh) — whenever site/
-# changes on the default branch, after a Simpl for Mac release (its download address, /download/mac-app), when a
+# changes on the default branch, after a Simpl for Mac release (its download address, /download/mac-app) or a run of
+# the Windows app's workflow (its installer, /download/windows), when a
 # release is published, promoted, edited or deleted by hand, every hour (so the download addresses and update feeds
 # always point at the newest builds), or by hand (Actions → Site → Run workflow). The Package workflow does the same at
 # every release.
@@ -11,8 +12,10 @@ on:
       - 'site/**'
       - 'scripts/publish-site.sh'
       - '.github/workflows/site.yml'
+  # (a Windows preview's release is made by the Windows workflow on its own branch, whose tag carries no Site workflow
+  # of this kind: the Windows download address, /download/windows, follows it from here)
   workflow_run:
-    workflows: ['Simpl for Mac release']
+    workflows: ['Simpl for Mac release', 'Windows app (Windows 11 look)']
     types: [completed]
   # a release published, promoted from beta, edited, taken back or deleted by hand: the download addresses and the
   # update feeds follow it at once
