@@ -227,7 +227,7 @@ const ticked = row ? await nc('complete', { id: row.id, done: true }) : null;
 check(ticked?.ok === true, `a row ticked is marked done on the planner: ${JSON.stringify(ticked)}`);
 // (2.99.33) the engine's own words on the test school too (the counters say what they count, the GPA is written once)
 const grades = settled ? await nc('grades') : null;
-check(today?.counters?.find((c) => c.key === 'unread')?.label === 'Announcements' && today?.counters?.find((c) => c.key === 'graded')?.label === 'Graded this week' && /^\d\.\d\d$/.test(grades?.gpaText || '') && grades?.goalText === '4.00', `the engine's words and figures on the test school: ${JSON.stringify({ labels: today?.counters?.map((c) => c.label), gpa: grades?.gpaText, goal: grades?.goalText })}`);
+check(today?.counters?.find((c) => c.key === 'unread')?.fullLabel === 'Announcements' && today?.counters?.find((c) => c.key === 'unread')?.label === 'Unread' && today?.counters?.find((c) => c.key === 'graded')?.fullLabel === 'Graded this week' && /^\d\.\d\d$/.test(grades?.gpaText || '') && grades?.goalText === '4.00', `the engine's words and figures on the test school: ${JSON.stringify({ labels: today?.counters?.map((c) => `${c.label} / ${c.fullLabel}`), gpa: grades?.gpaText, goal: grades?.goalText })}`);
 
 check(shellErrors.length === 0, `the interface ran without an error${shellErrors.length ? `: ${shellErrors.join(' | ')}` : ''}`);
 

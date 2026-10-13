@@ -1702,11 +1702,12 @@
       const possible = items.reduce((s, r) => s + r.possible, 0);
       return {
         ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted, dropped: dropped.map((r) => r.name),
-        pct: possible > 0 ? Math.round((earned / possible) * 100) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
+        // (2.99.33) a whole percent, half up on the decimal figure (87 of 120 is 72.5: 73, where Math.round read 72.4999…)
+        pct: possible > 0 ? roundHalfUp((earned / possible) * 100, 0) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
       };
     });
     const scored = groupStats.filter((g) => g.graded);
-    const round1 = (x) => Math.round(x * 10) / 10; // (one decimal, as Canvas shows a total: 89.5 is not 90)
+    const round1 = (x) => roundHalfUp(x, 1); // (one decimal, as Canvas shows a total: 89.5 is not 90)
     let total = null;
     let note = '';
     if (weighted) {
@@ -1782,7 +1783,20 @@
     };
   }
   function fmtPts(n) {
-    return Number.isInteger(n) ? String(n) : Number(n).toFixed(1).replace(/\.0$/, '');
+    // (2.99.33) half up on the decimal figure, as every number the apps show: 4.35 is 4.4, never the 4.3 toFixed reads
+    // in the binary 4.34999…
+    return Number.isInteger(n) ? String(n) : (roundHalfUp(n, 1) ?? Number(n)).toFixed(1).replace(/\.0$/, '');
+  }
+  /** (2.99.33) Decimal half-up rounding, whatever the binary double holds: 3.425 (held as 3.42499…) → 3.43, 81.25 →
+   *  81.3, 72.5 → 73; a negative figure rounds the same way from zero (−2.5 → −3). Every figure Simpl shows goes
+   *  through this (native-app.js: pctFmt, gpaFmt), so the Mac, Windows and the iPhone read one number the same. */
+  function roundHalfUp(v, places = 0) {
+    const n = Number(v);
+    if (v === null || v === undefined || v === '' || !Number.isFinite(n)) return null;
+    const m = 10 ** places;
+    const x = Math.abs(n) * m;
+    const r = Math.floor(x + 0.5 + 1e-9 * Math.max(1, x)) / m;
+    return n < 0 ? -r : r;
   }
   /** Where a planner item stands (a To Do row, the Dashboard's list, the phone's), in the same words
    *  workStatus() uses for an assignment: [{ word, kind }] — the state first (Excused, Graded,
@@ -1841,7 +1855,7 @@
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
-    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts,
+    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts, roundHalfUp,
     notifications, notifState, setNotifState, notifUnread,
     homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, uploadMessageFile, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };
