@@ -12,7 +12,12 @@ namespace Simpl.Screens;
 
 public sealed partial class DashboardScreen
 {
-    private static bool previewShot;
+    private static bool previewShot, previewPressed;
+    /// <summary>(the screenshot suite's --open preview) the first row's id, and its quick look as that row is now: the
+    /// page can be drawn again between the row's coming and the press.</summary>
+    private static string? previewId;
+    private static FrameworkElement? previewRow;
+    private static Action? previewPress;
 
     private FrameworkElement Main(Today d, double w) => View switch
     {
@@ -94,11 +99,28 @@ public sealed partial class DashboardScreen
         // (a click: its quick look, grown out of the row; a double-click: the work whole)
         var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
         b.Click += (_, _) => WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b);
-        // (the screenshot suite: --open preview opens the first row's quick look once it is on screen)
-        if (!previewShot && Launch.Get("open") == "preview")
+        // (the screenshot suite: --open preview opens the first row's quick look once it is on screen — that row as it
+        //  is then, drawn again or not)
+        if (Launch.Get("open") == "preview")
         {
-            previewShot = true;
-            b.Loaded += async (_, _) => { await Task.Delay(1500); WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b); };
+            if (!previewShot)
+            {
+                previewShot = true;
+                previewId = row.Id;
+            }
+            if (row.Id == previewId)
+            {
+                previewRow = b;
+                previewPress = () => WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b);
+                b.Loaded += async (_, _) =>
+                {
+                    if (previewPressed) return;
+                    previewPressed = true;
+                    await Task.Delay(1500);
+                    for (var i = 0; i < 30 && previewRow is { IsLoaded: false }; i++) await Task.Delay(100);
+                    previewPress?.Invoke();
+                };
+            }
         }
         return b;
     }

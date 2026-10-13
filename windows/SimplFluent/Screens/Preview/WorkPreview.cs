@@ -103,10 +103,20 @@ public static class WorkPreview
         var face = new CardFace(it, engine, w);
         face.Measure(new Size(w, double.PositiveInfinity));
         var h = face.DesiredSize.Height;
-        // below its row where there is room, else over it; level with the row's start, kept inside the page
-        var x = Math.Clamp(from0.X, 12, Math.Max(12, room - w - 12));
-        var below = from0.Bottom + 6;
-        var y = below + h <= host.ActualHeight - 12 ? below : Math.Max(12, from0.Y - h - 6);
+        // below its row where there is room, else over it; level with the row's start, kept inside the page (a row no
+        // longer shown — the page drawn again under the press — has no place: the middle of the page, a third down)
+        double x, y;
+        if (from0.IsEmpty)
+        {
+            x = Math.Max(12, (room - w) / 2);
+            y = Math.Max(12, (host.ActualHeight - h) / 3);
+        }
+        else
+        {
+            x = Math.Clamp(from0.X, 12, Math.Max(12, room - w - 12));
+            var below = from0.Bottom + 6;
+            y = below + h <= host.ActualHeight - 12 ? below : Math.Max(12, from0.Y - h - 6);
+        }
         if (y + h > host.ActualHeight - 12) y = Math.Max(12, host.ActualHeight - 12 - h);
         var target = new Rect(x, y, w, h);
         card = new Border
