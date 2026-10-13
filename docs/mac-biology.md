@@ -220,7 +220,8 @@ and `CellExplorerChecks.swift` (the `cell.…` self-check lines: counts, the 250
 the empty cutaway wedge, the same twice, explode and fade, chloroplasts, the dented vacuole, left-handed flagella, true
 scale, labels, SA:V, the membrane).
 
-Scene ids: `organelle:<part>:<n>` (a click selects the part: every `organelle:<part>:…` glows), `inside:<part>:…` (Look
+Scene ids: `organelle:<part>:<n>` (a click selects the part: every `organelle:<part>:…` glows; ribosomes, pores, actin and
+fimbriae are drawn in clusters, `organelle:<part>:g<x>_<y>_<z>`, so a selection is dozens of objects, not thousands), `inside:<part>:…` (Look
 inside's labels), `cell:<kind>` (Compare), `part:<id>…` and `side:outside|inside` (Membrane). Remembered:
 `SimplBio.cell.cutaway|labels|trueScale|gramPositive|hidden.<kind>|membrane.*`. The cells are turned 32° and tilted
 22° in the scene (a three-quarter view into the cut); the membrane 30° and 26°.

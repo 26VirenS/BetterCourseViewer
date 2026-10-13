@@ -255,6 +255,7 @@ struct CEMembranePage: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
+                .allowsHitTesting(false)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
             }
         }
