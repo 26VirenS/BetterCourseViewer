@@ -111,19 +111,27 @@ jobs:
         env:
           SHOTS: ${{ github.event.inputs.shots || (contains(github.event.head_commit.message, '[full shots]') && 'full' || 'quick') }}
         run: bash scripts/dev/mac-shots.sh
-      # (1.3.76) what the app kept while it was pictured is sealed by its vault (mac/Simpl/Support/Vault.swift): the
-      # extension's storage, the kept answers, the flashcards, the sign-in and the cookies each start "SIMPLENC". Each
-      # worker of mac-shots.sh has a home of its own (/tmp/simpl-shots.*/home*); this Mac's own home is looked in too.
+      # (1.3.76) what the app kept while it was pictured is sealed by its vault (mac/Simpl/Support/Vault.swift), whose key
+      # is kept in the login Keychain: the extension's storage, the kept answers and the flashcards each start "SIMPLENC".
+      # The sign-in and the cookies are Keychain items of their own, so no login.bin or cookies.bin may be found (an
+      # early 1.3.76 build's files). Each worker of mac-shots.sh has a home of its own (/tmp/simpl-shots.*/home*); this
+      # Mac's own home is looked in too. Where the vault's key is (vault.key's mode) is printed: "keychain", or "file"
+      # when the runner's Keychain would not take it (a notice, not a failure); "se" (the Secure Enclave) fails.
       - name: Kept data is encrypted
         if: hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none'
         run: |
           dirs=()
+          enclave=0
           for h in /tmp/simpl-shots.*/home* "$HOME"; do
             for d in "Application Support/SimplCourses" "Application Support/com.simplcourses.mac" "Application Support/Simpl" "Caches/Answers"; do
               if [ -d "$h/Library/$d" ]; then dirs+=("$h/Library/$d"); fi
             done
-            if [ -f "$h/Library/Application Support/Simpl/vault.key" ]; then
-              echo "vault.key in $h: $(grep -o '"mode":"[a-z]*"' "$h/Library/Application Support/Simpl/vault.key")"
+            key="$h/Library/Application Support/Simpl/vault.key"
+            if [ -f "$key" ]; then
+              mode="$(grep -o '"mode":"[a-z]*"' "$key" | cut -d'"' -f4 || true)"
+              echo "vault.key in $h: mode ${mode:-unknown}"
+              if [ "$mode" = file ]; then echo "::notice::the vault's key in $h is in vault.key itself: this runner's Keychain would not take it"; fi
+              if [ "$mode" = se ]; then enclave=$((enclave + 1)); echo "::error::the vault's key in $h is still held by the Secure Enclave"; fi
             fi
           done
           if [ ${#dirs[@]} -eq 0 ]; then echo "::warning::no kept data found to check"; exit 0; fi
@@ -132,10 +140,15 @@ jobs:
           while IFS= read -r -d '' f; do
             checked=$((checked + 1))
             if [ "$(head -c 8 "$f")" != SIMPLENC ]; then plain=$((plain + 1)); echo "::error::not encrypted: $f"; fi
-          done < <(find "${dirs[@]}" -type f -size +0 \( -name storage.json -o -name flashcards.json -o -name login.bin -o -name cookies.bin -o -path '*/Caches/Answers/*' \) -print0)
-          echo "$checked kept files checked, $plain not encrypted"
+          done < <(find "${dirs[@]}" -type f -size +0 \( -name storage.json -o -name flashcards.json -o -path '*/Caches/Answers/*' \) -print0)
+          outside=0
+          while IFS= read -r -d '' f; do
+            outside=$((outside + 1))
+            echo "::error::kept outside the Keychain: $f"
+          done < <(find "${dirs[@]}" -type f \( -name login.bin -o -name cookies.bin \) -print0)
+          echo "$checked kept files checked, $plain not encrypted; $outside sign-in or cookie files outside the Keychain"
           if [ "$checked" -eq 0 ]; then echo "::warning::no kept data found to check"; fi
-          [ "$plain" -eq 0 ]
+          [ "$plain" -eq 0 ] && [ "$outside" -eq 0 ] && [ "$enclave" -eq 0 ]
       - name: Push the pictures to the mac-shots branch
         if: always()
         env:
