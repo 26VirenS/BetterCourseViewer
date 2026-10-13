@@ -15,7 +15,8 @@ own: GitHub lets a workflow tag a commit only if the commit itself leaves the wo
 ## Installing
 
 Each preview ships two ways: **Simpl-Setup.exe**, the installer, and **Simpl-Windows-x64.zip**, the same folder to
-unzip anywhere (portable). Neither is code-signed yet: SmartScreen's "More info → Run anyway". The installer is
+unzip anywhere (portable). Both are code-signed once the repository has a signing account (Signing, below); until
+then SmartScreen asks ("More info → Run anyway"). The installer is
 Inno Setup 6's (`Installer/Simpl.iss`; Inno Setup 7 compiles it too), compiled by CI right after `dotnet publish`, the
 build's version passed in:
 
@@ -76,6 +77,34 @@ must give up and open the old copy again); uninstalls silently with that Simpl o
 and checks the folder, the shortcut and the entry are gone and Simpl's data folder is not; then installs again and
 uninstalls from Simpl itself (`--uninstall yes`: Simpl must start its uninstaller and quit, and the uninstaller — both
 its phases — must finish), checking the same. The installer's and each Simpl's logs are kept with the pictures.
+
+## Signing
+
+CI signs with **Azure Artifact Signing** (Microsoft's signing service, about $9.99 a month; an individual must be in
+the US or Canada) as soon as the repository has its six Actions **variables** — none is a secret: GitHub signs in to
+Azure with OIDC, so no password or key is kept anywhere. Without them, nothing is signed and nothing fails.
+
+| Variable | What it is |
+| --- | --- |
+| `SIGNING_ENDPOINT` | the account's region endpoint, e.g. `https://eus.codesigning.azure.net` (East US) |
+| `SIGNING_ACCOUNT` | the Artifact Signing account's name |
+| `SIGNING_PROFILE` | its certificate profile's name (Public Trust) |
+| `AZURE_CLIENT_ID` | the app registration's Application (client) ID |
+| `AZURE_TENANT_ID` | the Directory (tenant) ID |
+| `AZURE_SUBSCRIPTION_ID` | the subscription the account is in |
+
+The app registration has a federated credential for GitHub Actions — repository `26VirenS/BetterCourseViewer`, entity
+Branch, `claude/windows-liquid-glass` (pushes and Run workflow both run there) — and the **Artifact Signing
+Certificate Profile Signer** role on the signing account.
+
+What is signed: the build job signs every `.exe` and `.dll` in the published folder that nobody signed (Simpl's own,
+WPF-UI's, PDFsharp's; .NET's and WebView2's are Microsoft's already), so the zip and the installer carry them signed;
+the installer job has Inno Setup sign `Simpl-Setup.exe` and its uninstaller (`ISCC /DSign /Ssimpl=…`, `SignTool` in
+`Installer/Simpl.iss`). Both check the signatures, and the log says who signed. Each signature counts against the
+account's monthly 5,000 (about a dozen a run).
+
+A signature names the publisher at once (Settings ▸ Apps, UAC, the download's properties) and lets Smart App Control
+run Simpl; SmartScreen's warning on a new download fades as the signed releases build their reputation.
 
 ## Performance
 

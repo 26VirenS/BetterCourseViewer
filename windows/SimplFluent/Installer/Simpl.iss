@@ -105,6 +105,13 @@ LZMAUseSeparateProcess=yes
 LZMANumBlockThreads=4
 SetupLogging=yes
 
+; signed, when CI has a way to sign (Artifact Signing; windows/SimplFluent/README.md, Signing): ISCC /DSign
+; "/Ssimpl=<signtool ... $f>" signs Setup itself and its uninstaller, so neither is from an unknown publisher
+#ifdef Sign
+SignTool=simpl
+SignedUninstaller=yes
+#endif
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
