@@ -29,19 +29,22 @@ launch() {
   local school=(-SimplBaseURL "${BASE:-http://localhost:8800}")
   [ "${BASE:-}" = "test-school" ] && school=(-canvasHost test.simpl.com)
   local settle="${SETTLE:-yes}"
-  case "$name $*" in *warmup*|*-settle*|*" tool:"*|test-01-sign-in*) settle=no ;; esac
+  case "$name $*" in *-settle*|*" tool:"*|test-01-sign-in*) settle=no ;; esac
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   sleep 0.5
   xcrun simctl launch --console-pty booted "$BID" "${school[@]}" -setupOpened YES -SimplDemo YES -SimplShotSettle YES "$@" > "$OUT/console-$name.txt" 2>&1 &
-  local t0=$SECONDS i=0
-  while [ $i -lt $((wait * 4)) ]; do
-    [ "$settle" = yes ] && grep -q "shot: settled" "$OUT/console-$name.txt" 2>/dev/null && break
-    sleep 0.25
-    i=$((i + 1))
-  done
-  [ "$settle" = yes ] && sleep 0.5 # (the frame after the last change drawn)
-  local how="after ${wait}s"
-  [ $i -lt $((wait * 4)) ] && how="settled"
+  # (timed by the clock, not by counting naps: with the simulator busy a nap of a quarter second took twice that, and
+  #  a count of them stretched a 40-second wait to 83)
+  local t0=$SECONDS how="after ${wait}s"
+  if [ "$settle" = yes ]; then
+    while [ $((SECONDS - t0)) -lt "$wait" ]; do
+      if grep -q "shot: settled" "$OUT/console-$name.txt" 2>/dev/null; then how="settled"; break; fi
+      sleep 0.3
+    done
+    sleep 0.5 # (the frame after the last change drawn)
+  else
+    sleep "$wait"
+  fi
   xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name ($((SECONDS - t0))s, $how)" || echo "no shot $name"
   echo "$name $((SECONDS - t0))s $how" >> "$OUT/shot-times.txt"
 }
