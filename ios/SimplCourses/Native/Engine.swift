@@ -132,6 +132,36 @@ final class Engine: ObservableObject, ShellListener {
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             if self?.phase == .starting { self?.setPhase(.web) }
         }
+        watchForSettled()
+    }
+
+    // MARK: - The simulator suite's "settled"
+
+    /// The answers asked of the page and not yet given, and when the last one was asked or came (or the page last loaded).
+    private var shotBusy = 0
+    private var shotActivity = Date()
+
+    /// (The simulator suite, scripts/dev/ios-shots.sh, launches with -SimplShotSettle YES.) Once the app's own screens
+    /// are up, the page loaded, the sign-in done, a web screen asked for drawn, no popup still to go up, and nothing
+    /// asked of the page for a moment and a half, "[Simpl Courses] shot: settled" is printed — once — on the console the
+    /// suite reads, and its picture is taken then instead of after a set wait (the wait it gives is now only the
+    /// longest). Nothing of this runs without it.
+    private func watchForSettled() {
+        guard UserDefaults.standard.bool(forKey: "SimplShotSettle") else { return }
+        let began = Date()
+        Task { [weak self] in
+            for _ in 0..<480 { // (two minutes at most)
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard let self = self else { return }
+                if self.web.webView.isLoading { self.shotActivity = Date() }
+                let up = Date().timeIntervalSince(began), quiet = Date().timeIntervalSince(self.shotActivity)
+                let drawn = self.active.map { self.revealed.contains($0) } ?? true
+                if up >= 3, self.phase == .native, self.web.login.settled, drawn, self.queuedPopups.isEmpty, self.shotBusy == 0, quiet >= 1.5 {
+                    print("[Simpl Courses] shot: settled at \(String(format: "%.1f", up)) s")
+                    return
+                }
+            }
+        }
     }
 
     // MARK: - What the page says
@@ -280,6 +310,12 @@ final class Engine: ObservableObject, ShellListener {
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready
     /// (a page load under way), and tries once more if the page went away mid-call.
     func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async throws -> T {
+        shotBusy += 1 // (the simulator suite's picture waits for the page's answers: watchForSettled)
+        shotActivity = Date()
+        defer {
+            shotBusy = max(0, shotBusy - 1)
+            shotActivity = Date()
+        }
         var lastError: Error = EngineError.notReady(lmsName)
         for attempt in 0..<3 {
             await whenReady()
