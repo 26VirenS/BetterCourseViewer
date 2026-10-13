@@ -25,6 +25,7 @@ struct CoursesView: View {
             }
         }
         .navigationTitle("Courses")
+        .openTimed("Courses", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Picker("Show", selection: $filter.animation(Motion.gentle)) {

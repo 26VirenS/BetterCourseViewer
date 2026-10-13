@@ -21,6 +21,7 @@ struct ContextHome: View {
         }
         .navigationTitle(model.data?.title ?? "")
         .navigationSubtitle(model.data?.sub ?? "")
+        .openTimed(ctx.hasPrefix("groups/") ? "Group home" : "Course home", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: "/\(ctx)", title: model.data?.title ?? "")

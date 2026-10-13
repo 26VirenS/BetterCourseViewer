@@ -53,6 +53,7 @@ struct DashboardView: View {
             }
         }
         .navigationTitle("Dashboard")
+        .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar { toolbarItems }
         .task(id: engine.dataVersion) { await load() }
         .onChange(of: chosen) { _, _ in Task { await loadView() } }

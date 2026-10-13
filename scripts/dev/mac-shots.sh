@@ -79,11 +79,17 @@ keep_crashes() {
   done
 }
 
+# (1.3.78) a walk through the app as a student's clicks would make it (Support/OpenClock.swift): each root place, a
+# course and an assignment, then each again — the console's "[Simpl] open <screen>: <ms> (<where from>)" lines are the
+# time of each first visit and each visit again
+WALK="todo,grades,calendar,notifications,inbox,course:101,externaltools,dashboard,todo,grades,calendar,notifications,inbox,course:101,push:/courses/101/assignments/1001,back,externaltools,dashboard"
+
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
 # SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
 if [ "${SHOTS:-full}" = quick ]; then
   MODE=light
   shoot light-01-dashboard 12
+  shoot light-01w-walk 60 -SimplWalk "$WALK"
   shoot light-01d-dashboard-counter 14 -SimplSheet next
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
@@ -212,6 +218,7 @@ for MODE in light dark; do
 done
 # (1.2) in light only: more of the redesign, and the narrow window's layouts
 MODE=light
+shoot light-01w-walk 60 -SimplWalk "$WALK"
 shoot light-01c-dashboard-activity 14 -SimplDashView activity
 shoot light-02b-courses-past 12 -SimplPlace courses -SimplCoursesFilter past
 shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4

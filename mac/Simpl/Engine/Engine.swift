@@ -162,6 +162,7 @@ final class Engine: ObservableObject, ShellListener {
 
     func start() {
         guard primary == nil else { return } // (a window more: the main window's page is already there)
+        OpenClock.navigated() // (1.3.78: the first screen is timed from here)
         web.loadIfNeeded()
         openOnKept()
         // a page that never says (a school's sign-in on another host, a page that failed): shown as it is
@@ -305,6 +306,7 @@ final class Engine: ObservableObject, ShellListener {
         // (the screenshot suite: -SimplPush /courses/101/assignments/1001)
         takeLaunchPlace()
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty { openWeb(push, title: "") }
+        Walk.startIfAsked(self) // (1.3.78: the screenshot suite's walk, -SimplWalk)
         if let q = LaunchOpen.take("quiz:") {
             let parts = q.split(separator: ":").map(String.init)
             if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && (parts[2] == "take" || parts[2] == "review"), startAt: parts.count > 3 ? Int(parts[3]) : nil, feedback: parts.count > 2 && parts[2] == "feedback", review: parts.count > 2 && parts[2] == "review") }
@@ -562,6 +564,7 @@ final class Engine: ObservableObject, ShellListener {
 
     /// A place picked: shown at its root, the change cross-faded.
     func go(_ place: Place, animated: Bool = true) {
+        OpenClock.navigated()
         if animated {
             withAnimation(.easeInOut(duration: 0.2)) { nav.go(place) }
         } else {
@@ -573,14 +576,17 @@ final class Engine: ObservableObject, ShellListener {
 
     /// A screen pushed on the place showing (on the same short curve as Back and Forward).
     func push(_ route: Route) {
+        OpenClock.navigated()
         withAnimation(.easeInOut(duration: 0.2)) { nav.push(route) }
     }
 
     func goBack() {
+        OpenClock.navigated()
         withAnimation(.easeInOut(duration: 0.2)) { nav.goBack() }
     }
 
     func goForward() {
+        OpenClock.navigated()
         withAnimation(.easeInOut(duration: 0.2)) { nav.goForward() }
     }
 
@@ -598,6 +604,7 @@ final class Engine: ObservableObject, ShellListener {
         default:
             // (1.2.10) a course's screen opens in its course: the course chosen in the sidebar, the screen on it
             if let place = Engine.place(of: route), nav.current.place.ctx != place.ctx {
+                OpenClock.navigated()
                 withAnimation(.easeInOut(duration: 0.2)) { nav.push(route, in: place) }
                 if let ctx = place.ctx { Task { await loadSections(ctx) } }
             } else {

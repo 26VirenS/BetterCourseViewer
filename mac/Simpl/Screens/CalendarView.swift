@@ -76,6 +76,7 @@ struct CalendarView: View {
         }
         .navigationTitle("Calendar")
         .navigationSubtitle(periodTitle)
+        .openTimed("Calendar", ready: data != nil, source: "fetched")
         .toolbar { toolbarItems }
         .task(id: engine.dataVersion) {
             if !modeRead {

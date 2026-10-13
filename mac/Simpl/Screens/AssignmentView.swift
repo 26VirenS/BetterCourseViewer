@@ -49,6 +49,7 @@ struct AssignmentView: View {
         }
         .navigationTitle(model.data?.title ?? "Assignment")
         .navigationSubtitle(model.data?.context ?? "")
+        .openTimed("Assignment", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 NeighbourButtons(ctx: "courses/\(course)", type: "Assignment", id: id) // (a quiz's too: the next opens as a page, not a quiz)

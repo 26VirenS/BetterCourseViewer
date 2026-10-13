@@ -686,6 +686,7 @@ private struct SectionLoaded<T: Decodable, Content: View>: View {
         }
         .navigationTitle(title)
         .navigationSubtitle(subtitle ?? "")
+        .openTimed("Section \(title)", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: canvasURL, title: title)

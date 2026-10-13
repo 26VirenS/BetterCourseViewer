@@ -40,6 +40,7 @@ struct GradesView: View {
         }
         .navigationTitle("Grades")
         .navigationSubtitle(data?.term ?? "")
+        .openTimed("Grades", ready: data != nil, source: "fetched")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: engine.canvasURL(for: .grades)?.absoluteString, title: "Grades")
@@ -1080,6 +1081,7 @@ struct CourseGradesView: View {
         }
         .navigationTitle(sectionTitle)
         .navigationSubtitle(data?.code ?? "")
+        .openTimed("Course grades", ready: data != nil, source: "fetched")
         .toolbar { toolbarItems }
         .task(id: engine.dataVersion) { await load(fresh: true, animated: false) }
         .sheet(item: $addingTo) { g in

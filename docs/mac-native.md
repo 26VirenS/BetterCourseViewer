@@ -462,3 +462,10 @@ errors and warnings and the built app go to the `mac-shots` branch. Nothing is s
 `SIMPLENC` mark, and no `login.bin` or `cookies.bin` may be found (the sign-in and the cookies are Keychain items: Data
 and encryption, above), or the run fails. Where each worker's vault keeps its key (`vault.key`'s mode) is printed:
 `keychain`, or `file` when the runner's Keychain would not take it.
+(1.3.78) Every screen's open is timed on the console — `[Simpl] open Grades: 14 ms (cached)`: from the press that
+opened it (a sidebar row, a link, Back) to the frame with its content, and where that content came from (`cached`, this
+session's answer in memory; `kept`, an answer kept from before, its counts held back until the `live` one is in;
+`fetched`, asked of the page while the screen waited; `alive`, a screen never put away) — and both picture sets take
+`light-01w-walk`: the app walks through its places as a student's clicks would (`-SimplWalk`, Support/OpenClock.swift),
+each root place, a course and an assignment and then each again, so its console has the time of every first visit and
+every visit again.

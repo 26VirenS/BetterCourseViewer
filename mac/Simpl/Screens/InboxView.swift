@@ -29,6 +29,8 @@ struct InboxView: View {
     @State private var width: CGFloat = 0
     /// (1.2) The list's width as last dragged (0: as the window's width suggests).
     @AppStorage("SimplInboxListWidth") private var listWidth: Double = 0
+    /// (1.3.78) Where the list shown first came from, for the console's open line (OpenClock).
+    @State private var shownFrom = "fetched"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -36,6 +38,7 @@ struct InboxView: View {
             .background(PageGround())
             .navigationTitle(shown.label)
             .navigationSubtitle(subtitle)
+            .openTimed("Inbox", ready: model.data != nil, source: shownFrom)
             .toolbar { toolbar }
             .task(id: engine.dataVersion) { await load() }
             .onChange(of: scope) { _, _ in switchMailbox() }
@@ -438,6 +441,7 @@ struct InboxView: View {
         store.bind(engine)
         let wanted = scope
         if model.data == nil, let kept = store.lists[wanted] {
+            shownFrom = "cached"
             model.data = kept
         }
         do {
@@ -784,6 +788,7 @@ struct GroupsView: View {
             }
         }
         .navigationTitle("Groups")
+        .openTimed("Groups", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: "/groups", title: "Groups")

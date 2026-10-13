@@ -41,6 +41,7 @@ struct TodoView: View {
         }
         .navigationTitle("To Do")
         .navigationSubtitle(doneLine)
+        .openTimed("To Do", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
