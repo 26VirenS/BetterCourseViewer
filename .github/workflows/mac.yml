@@ -24,6 +24,11 @@ on:
       - 'scripts/dev/make-mac-project.py'
       - 'scripts/dev/mac-shots.sh'
       - 'scripts/dev/mock-brightspace.mjs'
+      - 'scripts/dev/check-shots.py'
+      - 'scripts/dev/scan-logs.py'
+      - 'scripts/dev/check-warnings.py'
+      - 'scripts/dev/*-checks.json'
+      - 'scripts/dev/baselines/mac-*'
       - '.github/workflows/mac.yml'
   workflow_dispatch:
     inputs:
@@ -32,6 +37,10 @@ on:
         default: quick
         type: choice
         options: [quick, full, none]
+      clean:
+        description: 'Build from clean (every file compiled, so every warning is seen: the baseline of scripts/dev/check-warnings.py)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -57,6 +66,7 @@ jobs:
       # (1.3.1) the last build's intermediates, and every file not changed since dated as it was then: only what changed
       # is compiled again (scripts/dev/mtime-cache.py)
       - name: The last build
+        if: ${{ !inputs.clean }}
         uses: actions/cache/restore@v4
         with:
           path: build
@@ -158,6 +168,21 @@ jobs:
           cat shots/phone-test.txt 2>/dev/null || true
           test -s shots/phone-check.txt || { echo "::error::mac-shots.sh wrote no phone-check.txt"; exit 1; }
           if grep -q '^FAIL' shots/phone-check.txt; then grep '^FAIL' shots/phone-check.txt | sed 's/^/::error::/'; exit 1; fi
+      # (what the run made, read before anyone has to, each check whatever the others found — docs/CI.md: every picture
+      #  there and showing something, scripts/dev/check-shots.py; the app's consoles free of exceptions, crashes and
+      #  errors, scan-logs.py; no compiler warning that is not already known, check-warnings.py. Their lists of what is
+      #  plain or harmless on purpose are shot-checks.json, log-checks.json and baselines/, each entry with its reason.)
+      - name: Every picture shows something
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none' }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow
+          "$RUNNER_TEMP/py/bin/python" scripts/dev/check-shots.py shots --app mac --pattern '*-app.png' --expect shots/shot-times.txt --report shots/shot-checks.txt
+      - name: The consoles are clean
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none' }}
+        run: python3 scripts/dev/scan-logs.py --app mac 'shots/console-*.txt' 'shots/crash-*.txt'
+      - name: No new compiler warnings
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && hashFiles('build.log') != '' }}
+        run: python3 scripts/dev/check-warnings.py build.log --baseline scripts/dev/baselines/mac-warnings.txt
       - name: Push the pictures to the mac-shots branch
         if: always()
         env:

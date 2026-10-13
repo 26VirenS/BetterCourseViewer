@@ -1,4 +1,4 @@
-# Builds the extension zips on every push (download them from the run's Artifacts),
+# Builds the extension zips on every push that changes them (download them from the run's Artifacts),
 # and on a version tag (v2.1.0, …) also publishes a GitHub Release with the zips and,
 # once the four Chrome Web Store secrets are set, uploads the Chrome build to the store
 # and publishes it. See docs/chrome-web-store.md for the one-time setup.
@@ -7,7 +7,12 @@ name: Package
 on:
   push:
     branches: ['**']
-    tags: ['v*']
+    tags: ['v*'] # (a tag's push is never held back by the paths below: GitHub reads them for branches only)
+    paths:
+      - 'extension/**'
+      - 'scripts/package.sh'
+      - 'scripts/chrome-manifest.py'
+      - '.github/workflows/package.yml'
   workflow_dispatch:
 
 permissions:

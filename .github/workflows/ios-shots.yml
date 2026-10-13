@@ -1,6 +1,9 @@
 # The iPhone app built with Xcode 26 (its tab bar, navigation bars and sheets in Liquid Glass) and run on
 # the iOS Simulator against the mock Canvas: every native screen pictured in light and dark
 # (scripts/dev/ios-shots.sh), the pictures and the build log pushed to the ios-shots branch to be looked at.
+# The simulator boots while the app builds (the last build's intermediates kept: only what changed is compiled again),
+# each picture is taken as soon as the app says it has settled, and the pictures, the app's consoles and the build's
+# warnings are checked before they are pushed (docs/CI.md).
 name: iOS screenshots
 
 on:
@@ -10,6 +13,11 @@ on:
       - 'extension/content/app/native-app.js'
       - 'scripts/dev/ios-shots.sh'
       - 'scripts/dev/mock-brightspace.mjs'
+      - 'scripts/dev/check-shots.py'
+      - 'scripts/dev/scan-logs.py'
+      - 'scripts/dev/check-warnings.py'
+      - 'scripts/dev/*-checks.json'
+      - 'scripts/dev/baselines/ios-*'
       - '.github/workflows/ios-shots.yml'
   workflow_dispatch:
 
@@ -26,29 +34,76 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      # (the simulator boots meanwhile — two minutes and more on a fresh runner — beside the build, not after it)
+      - name: Boot the simulator
+        run: |
+          DEV=$(xcrun simctl list devices available | grep -E "iPhone 17 Pro \(" | head -1 | grep -oE "[0-9A-F-]{36}")
+          echo "device $DEV"
+          echo "DEV=$DEV" >> "$GITHUB_ENV"
+          nohup xcrun simctl boot "$DEV" > boot.log 2>&1 &
+      # (the last build's intermediates, every file not changed since dated as it was then: only what changed is
+      #  compiled again — scripts/dev/mtime-cache.py, as the Mac app's workflow does; the iOS build workflow's too)
+      - name: The last build
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: ios-sim-debug-${{ github.sha }}
+          restore-keys: ios-sim-debug-
+      - name: Unchanged files keep their dates
+        run: python3 scripts/dev/mtime-cache.py restore build
       - name: Build for the iOS Simulator
         run: |
           set -o pipefail
           xcodebuild -version
-          xcodebuild -project ios/SimplCourses.xcodeproj -scheme SimplCourses -configuration Debug \
-            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          build() {
+            xcodebuild -project ios/SimplCourses.xcodeproj -scheme SimplCourses -configuration Debug \
+              -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO COMPILER_INDEX_STORE_ENABLE=NO build 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          }
+          build
+          # (an incremental build that failed is tried once more from clean: a stale intermediate is never the answer)
+          if ! grep -q "BUILD SUCCEEDED" build.log && [ -f build/.mtimes-ns.json ]; then
+            echo "::warning::incremental build failed; building clean"
+            rm -rf build
+            build
+          fi
           mkdir -p shots
           grep -E "error:" -B2 -A8 build.log | head -400 > shots/build-errors.txt || true
           grep -E "warning:.*Native/" build.log | sort -u | head -200 > shots/build-warnings.txt || true
           grep -q "BUILD SUCCEEDED" build.log || { cat shots/build-errors.txt; exit 1; }
+      - name: Keep this build for the next
+        run: python3 scripts/dev/mtime-cache.py save build
+      - name: Save the build
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: ios-sim-debug-${{ github.sha }}
       - name: Simulator and mock Canvas
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
           node scripts/dev/mock-brightspace.mjs 8860 --open > mock-d2l.log 2>&1 &
-          DEV=$(xcrun simctl list devices available | grep -E "iPhone 17 Pro \(" | head -1 | grep -oE "[0-9A-F-]{36}")
-          echo "device $DEV"
-          xcrun simctl boot "$DEV"
           xcrun simctl bootstatus "$DEV" -b
+          cat boot.log
           xcrun simctl install booted "build/Build/Products/Debug-iphonesimulator/Simpl Courses.app"
+          # (up when they answer, not after a set time)
+          for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8860/d2l/home && break; sleep 0.5; done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
       - name: Screens
         run: bash scripts/dev/ios-shots.sh
+      # (what the run made, read before anyone has to, each check whatever the others found — docs/CI.md: every picture
+      #  there and showing something, scripts/dev/check-shots.py; the app's consoles free of exceptions, crashes and
+      #  errors, scan-logs.py; no compiler warning that is not already known, check-warnings.py)
+      - name: Every picture shows something
+        if: ${{ !cancelled() && hashFiles('shots/shot-times.txt') != '' }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow
+          "$RUNNER_TEMP/py/bin/python" scripts/dev/check-shots.py shots --app ios --expect shots/shot-times.txt --report shots/shot-checks.txt
+      - name: The consoles are clean
+        if: ${{ !cancelled() && hashFiles('shots/shot-times.txt') != '' }}
+        run: python3 scripts/dev/scan-logs.py --app ios 'shots/console-*.txt' 'shots/crash-*.txt'
+      - name: No new compiler warnings
+        if: ${{ !cancelled() && hashFiles('build.log') != '' }}
+        run: python3 scripts/dev/check-warnings.py build.log --baseline scripts/dev/baselines/ios-warnings.txt
       - name: Push the pictures to the ios-shots branch
         if: always()
         env:
