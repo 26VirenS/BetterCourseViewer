@@ -216,6 +216,22 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (`Tools/Biology/Model` is Foundation only and checked by CI's Models job, with the toolkit's self-check). A launch
   opens a tool in a state for pictures: `-SimplTool cell -SimplToolState plant:cutaway`; `-SimplBioCheck YES` prints
   the self-check. The foundation's API, for the tools' builders: `docs/mac-biology.md`.
+  The *Biomolecule Builder* (`Tools/Biology/BiomoleculeTool.swift` and `Biomol*.swift`; its models in
+  `Model/Biomol*.swift`, checked by the Models job as `biomol.*`): five pages sharing one state (`BiomolState`) and the
+  chemistry builder's look (CPK colours and radii; ball and stick, space filling, sticks; Colour by element, part or
+  class; Show H; the pH 7 form; labels with leader lines). *Amino acids*: the 20 by class with their R groups sketched
+  in 2D, each in 3D from its template with its card and the CORN rule, and its D-form mirror image. *Proteins*: a
+  sequence (up to 40) whose secondary structure is painted residue by residue, built as §6.4 says (NeRF backbone,
+  template side chains, the clash relief, proline's rule; a Pro outside a helix keeps its ring's φ), with backbone
+  H-bonds, a cartoon over or instead of the atoms, a residue added or removed playing its dehydration or hydrolysis,
+  and the β-sheet demo; and the four levels — beads, a helix beside a sheet, ubiquitin (its core and surface,
+  denatured into a seeded random coil by morphing and back) and haemoglobin with its hemes. *Nucleic acids*: the
+  nucleotides and ATP, and a DNA strand built nucleotide by nucleotide on the B-DNA model with its phosphodiester bonds.
+  *Carbohydrates*: five rings with numbered carbons and α or β read from the atoms, four disaccharides split and joined
+  by water, and five polysaccharides as hexagon glyphs. *Lipids*: fatty acids, tristearin, POPC and cholesterol, with
+  esters, the cis kink and head and tails. *Open in Molecule Builder* hands the atoms to the Periodic Table's builder,
+  which keeps their shape (`MoleculeModel.load(handOff:)`, `fixedShape`: no VSEPR). Launch flags for pictures:
+  `-SimplTool biomol -SimplToolState <page>:<options>` (`BiomoleculeTool.apply` lists them).
   (1.3.55) The Lewis and 3D builders' presets are one grouped dropdown each (`PresetMenu`; `LewisPresets.sections`,
   `MoleculeModel.presetSections`) instead of rows of chips, and an element (the central atom, or the one to draw) is a
   card — symbol, name, valence electrons, most it holds — with a Change menu of the main-group elements by group

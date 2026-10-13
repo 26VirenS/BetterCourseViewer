@@ -66,6 +66,9 @@ final class MoleculeModel: ObservableObject {
     @Published private(set) var title = ""
     /// Raised when the model is new (a preset, the Lewis maker's): the view frames it afresh.
     @Published private(set) var framing = 0
+    /// (1.3.78) A molecule handed over by the Biomolecule Builder keeps its shape: its coordinates come from measured
+    /// structures, so VSEPR does not lay it out again (until it is cleared or a preset is loaded).
+    @Published private(set) var fixedShape = false
     private var nextID = 1
 
     static let presets = ["Water", "Ammonia", "Methane", "Carbon dioxide", "Formaldehyde", "Ethylene", "Acetylene", "Ethanol",
@@ -230,7 +233,47 @@ final class MoleculeModel: ObservableObject {
         selected = nil
         message = nil
         title = ""
+        fixedShape = false
         framing += 1
+    }
+
+    /// (1.3.78) A molecule handed over whole by the Biomolecule Builder ("Open in Molecule Builder"): its title, its atoms
+    /// where they are and its bonds with their orders, as BiomolHandOff writes them ("title …", "atom C x y z",
+    /// "bond i j order"). It keeps its shape (`fixedShape`). Returns whether there was a molecule in the text.
+    @discardableResult
+    func load(handOff text: String) -> Bool {
+        var name = ""
+        var list: [(symbol: String, pos: SIMD3<Double>)] = []
+        var pairs: [(a: Int, b: Int, order: Int)] = []
+        for line in text.split(separator: "\n") {
+            let f = line.split(separator: " ").map(String.init)
+            guard let head = f.first else { continue }
+            if head == "title" {
+                name = f.dropFirst().joined(separator: " ")
+            } else if head == "atom", f.count == 5, let x = Double(f[2]), let y = Double(f[3]), let z = Double(f[4]) {
+                list.append((f[1], SIMD3(x, y, z)))
+            } else if head == "bond", f.count == 4, let a = Int(f[1]), let b = Int(f[2]), let o = Int(f[3]) {
+                pairs.append((a, b, o))
+            }
+        }
+        guard !list.isEmpty else { return false }
+        clear()
+        title = name
+        let centre = list.map(\.pos).reduce(SIMD3<Double>(0, 0, 0), +) / Double(list.count)
+        var ids: [Int] = []
+        for a in list {
+            atoms.append(MBAtom(id: nextID, symbol: a.symbol, pos: a.pos - centre))
+            ids.append(nextID)
+            nextID += 1
+        }
+        for p in pairs where p.a >= 0 && p.b >= 0 && p.a < ids.count && p.b < ids.count {
+            bonds.append(MBBond(id: nextID, a: ids[p.a], b: ids[p.b], order: p.order))
+            nextID += 1
+        }
+        fixedShape = true
+        selected = nil
+        framing += 1
+        return true
     }
 
     // MARK: Presets and the Lewis maker
@@ -333,7 +376,7 @@ final class MoleculeModel: ObservableObject {
     /// faces as it was drawn. The lone pairs are kept for drawing (and the dipole).
     func relax(keep: Bool = true) {
         let n = atoms.count
-        guard n > 0 else { lonePairs = []; return }
+        guard n > 0, !fixedShape else { lonePairs = []; return }
         let index = Dictionary(uniqueKeysWithValues: atoms.enumerated().map { ($0.element.id, $0.offset) })
         let links: [(a: Int, b: Int, length: Double)] = bonds.compactMap { b in
             guard let i = index[b.a], let j = index[b.b] else { return nil }
@@ -509,7 +552,9 @@ struct MoleculeBuilder: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card(radius: 14)
             }
-            Text("Each atom's bonds and lone pairs are set out as VSEPR has them, lone pairs squeezing the bonds a little, so water bends and ammonia forms a pyramid. Bond angles are the model's, near the real ones.")
+            Text(model.fixedShape
+                 ? "From the Biomolecule Builder: each atom where measured structures put it, so the bond angles are the real ones. VSEPR does not reshape it."
+                 : "Each atom's bonds and lone pairs are set out as VSEPR has them, lone pairs squeezing the bonds a little, so water bends and ammonia forms a pyramid. Bond angles are the model's, near the real ones.")
                 .font(.sCaption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

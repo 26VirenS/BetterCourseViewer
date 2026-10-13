@@ -416,6 +416,8 @@ struct PeriodicTableTool: View {
             if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
             if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { nav.page = v }
             if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
+            // (1.3.78) a molecule handed over by the Biomolecule Builder, shown in the molecule builder as it is
+            if let text = ToolsCenter.shared.takeInfo("molecule"), molecule.load(handOff: text) { nav.page = .molecules }
             let n = d.integer(forKey: "SimplPTElement")
             if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
             // (the tour: its step for the screenshot suite, -SimplPTTour 5; else on the first opening, and not while
