@@ -56,7 +56,7 @@ struct ExternalToolsData: Codable {
 /// is found, and each course it is in, a press away (Knewton Alta and Macmillan in their own popups, the rest in the
 /// tool window). A filter narrows them by name, site or course.
 ///
-/// (1.3.77) The cards stand in columns of their own heights (`Masonry`), each in the shortest column so far, so a short
+/// (1.3.77) The cards stand in columns of their own heights (`ToolColumns`), each in the shortest column so far, so a short
 /// card beside a tall one leaves no hole under it; a long course name is cut short inside its chip. A tool used in
 /// assignments or module items is a card that is a button as a whole: it says the next of them still to do and how many
 /// there are, and a press opens the list of every one of them beside it (`ToolPlacesList`), to choose the one to open —
@@ -99,13 +99,13 @@ struct ExternalToolsView: View {
                         if shown.isEmpty {
                             Text("No tool matches “\(query)”.").font(.sBody).foregroundStyle(.secondary)
                         } else {
-                            // (1.3.77) columns of their own heights, not rows as tall as their tallest card
-                            Masonry(spacing: 16) {
-                                ForEach(shown) { t in
-                                    ToolCard(tool: t, listed: listedBinding(t),
-                                             openTab: { c in open(t, in: c) },
-                                             choose: { c, item in choose(t, c, item) })
-                                }
+                            // (1.3.77) columns of their own heights, not rows as tall as their tallest card: plain stacks side
+                            // by side, each card put in the column with least in it (a popover would not show from a card
+                            // placed by a Layout of the app's own)
+                            ToolColumns(tools: shown) { t in
+                                ToolCard(tool: t, listed: listedBinding(t),
+                                         openTab: { c in open(t, in: c) },
+                                         choose: { c, item in choose(t, c, item) })
                             }
                             .animation(reduceMotion ? nil : Motion.gentle, value: shown.map(\.id))
                         }
@@ -759,55 +759,39 @@ private struct PlacesListHeightKey: PreferenceKey {
 
 // MARK: - Layouts
 
-/// (1.3.77) Cards in columns of their own heights: as many columns at least `minColumn` wide as the width holds (one at
-/// least), the width shared out among them (`maxColumn` each at most, what is left over at the trailing side), and each
-/// card, in order, measured at the column's width and put at the foot of the shortest column so far (the leftmost of
-/// equals) — so no card waits for a taller neighbour's row to end.
-private struct Masonry: Layout {
-    var minColumn: CGFloat = 320
-    var maxColumn: CGFloat = 480
-    var spacing: CGFloat = 16
+/// (1.3.77) The cards in columns of their own heights, not rows as tall as their tallest card: as many 320pt columns as
+/// the page has room for (Page's width), plain stacks side by side, each card in turn put in the column whose cards are
+/// the shortest so far — reckoned by what each draws: its next, its list's foot, its rows of chips. (A Layout of the
+/// app's own placed them before, and a card's popover would not show from it.)
+private struct ToolColumns<Card: View>: View {
+    let tools: [ExternalToolsData.Tool]
+    @ViewBuilder let card: (ExternalToolsData.Tool) -> Card
+    @Environment(\.pageWidth) private var pageWidth
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = usableWidth(proposal)
-        return CGSize(width: width, height: arrange(subviews, width: width).height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let frames = arrange(subviews, width: bounds.width).frames
-        for (v, f) in zip(subviews, frames) {
-            v.place(at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY), anchor: .topLeading,
-                    proposal: ProposedViewSize(width: f.width, height: f.height))
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            ForEach(Array(columns().enumerated()), id: \.offset) { _, column in
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(column) { t in card(t) }
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+            }
         }
     }
 
-    /// The width offered, or one column's when none is (an ideal size asked for).
-    private func usableWidth(_ proposal: ProposedViewSize) -> CGFloat {
-        if let w = proposal.width, w.isFinite { return max(0, w) }
-        return maxColumn
-    }
-
-    /// How many columns, and how wide each.
-    private func columns(_ width: CGFloat) -> (count: Int, width: CGFloat) {
-        let count = max(1, Int(((width + spacing) / (minColumn + spacing)).rounded(.down)))
-        let each = (width - spacing * CGFloat(count - 1)) / CGFloat(count)
-        return (count, max(0, min(maxColumn, each)))
-    }
-
-    /// Each card's frame (from the layout's top left) and the tallest column's height.
-    private func arrange(_ subviews: Subviews, width: CGFloat) -> (frames: [CGRect], height: CGFloat) {
-        let (count, each) = columns(width)
-        var tops = Array(repeating: CGFloat(0), count: count)
-        var frames: [CGRect] = []
-        frames.reserveCapacity(subviews.count)
-        for v in subviews {
-            let h = v.sizeThatFits(ProposedViewSize(width: each, height: nil)).height
-            var column = 0
-            for i in 1..<count where tops[i] < tops[column] { column = i }
-            frames.append(CGRect(x: CGFloat(column) * (each + spacing), y: tops[column], width: each, height: h))
-            tops[column] += h + spacing
+    private func columns() -> [[ExternalToolsData.Tool]] {
+        let width = pageWidth ?? 700
+        let count = max(1, min(tools.count, Int((width + 16) / (320 + 16))))
+        var cols = Array(repeating: [ExternalToolsData.Tool](), count: count)
+        var heights = Array(repeating: CGFloat(0), count: count)
+        for t in tools {
+            let tabs = t.courses.filter { $0.open["tool"] != nil }.count
+            let estimate: CGFloat = 90 + (t.listable ? (t.next != nil ? 110 : 50) : 0) + CGFloat((tabs + 1) / 2) * 36
+            let i = heights.indices.min(by: { heights[$0] < heights[$1] }) ?? 0
+            cols[i].append(t)
+            heights[i] += estimate + 16
         }
-        return (frames, max(0, (tops.max() ?? 0) - spacing))
+        return cols
     }
 }
 
