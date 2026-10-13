@@ -19,9 +19,9 @@ namespace Simpl.Shell;
 /// <summary>
 /// The app once the school is ready (the Mac's MainShell), laid out as Windows 11's Settings app: the navigation pane at
 /// the left — the search box at its head, who is signed in at its foot (the Mac's account bar, with the account menu that holds Settings), the
-/// places (Dashboard, To Do, Calendar, Grades, Notifications, Inbox, Tools), the courses with their sections and the
-/// groups, and Settings at its foot — and the page at the right: its title (a breadcrumb once something is opened on
-/// it), its commands, and the screen. Below 880 wide the pane folds away behind the title bar's button.
+/// places (Dashboard, To Do, Calendar, Grades, Notifications, Inbox, Tools, External Tools), the courses with their
+/// sections and the groups, and Settings at its foot — and the page at the right: its title (a breadcrumb once something
+/// is opened on it), its commands, and the screen. Below 880 wide the pane folds away behind the title bar's button.
 /// </summary>
 public sealed class AppShell : Grid, IDisposable
 {
@@ -211,7 +211,7 @@ public sealed class AppShell : Grid, IDisposable
 
     private static readonly Color Blue = Color.FromRgb(0x00, 0x78, 0xd4), Green = Color.FromRgb(0x10, 0x89, 0x3e), Red = Color.FromRgb(0xd1, 0x34, 0x38),
         Purple = Color.FromRgb(0x88, 0x64, 0xd8), Orange = Color.FromRgb(0xe3, 0x6c, 0x0a), Teal = Color.FromRgb(0x00, 0x99, 0xbc), Gray = Color.FromRgb(0x76, 0x76, 0x7c),
-        Gold = Color.FromRgb(0xc1, 0x8a, 0x00);
+        Gold = Color.FromRgb(0xc1, 0x8a, 0x00), Orchid = Color.FromRgb(0xc2, 0x39, 0xb3);
 
     /// <summary>
     /// The pane brought up to date (after every step and every new count): who is signed in drawn again only when they
@@ -238,6 +238,9 @@ public sealed class AppShell : Grid, IDisposable
             new() { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = snap?.InboxUnread ?? 0, Go = () => GoPlace(Place.Inbox) },
             new() { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools), Spot = TourSpot.ToolsRow },
         };
+        // (the Mac's: right under Tools, every tool the school provides in the courses — Canvas's, so not on Brightspace)
+        if (!engine.OnBrightspace)
+            list.Add(new NavEntry { Key = "externaltools", Title = "External Tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools) });
         var courses = engine.Courses;
         if (courses.Count > 0)
         {
@@ -293,7 +296,6 @@ public sealed class AppShell : Grid, IDisposable
         PlaceKind.Home => p.Ctx,
         PlaceKind.Section => $"{p.Ctx}:{p.Arg}",
         PlaceKind.Search => null,
-        PlaceKind.ExternalTools => "tools",
         _ => p.Kind.ToString().ToLowerInvariant(),
     };
 
