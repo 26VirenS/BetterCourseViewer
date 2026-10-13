@@ -585,9 +585,10 @@ jobs:
 
   # (how quickly Simpl starts and moves about, and how much memory it and its web view take, walked against the mock —
   #  Support/PerfWalk.cs: a fresh profile, cold, then the same one again, warm — and compared with the last green
-  #  run's; for now also the same warm walk without reading ahead (--no-prefetch), to see what reading ahead costs and
-  #  gives, and once under dotnet-trace, where the window's time goes; it only reports: a slower number never fails the
-  #  run, and nothing waits for it but the pictures' merge)
+  #  run's: with its own numbers, and with its build walked again here, on this same runner, between this one's walks
+  #  (one runner's processor and memory move the numbers more than most changes do). For now also once under
+  #  dotnet-trace, where the window's time goes. It only reports: a slower number never fails the run, and nothing
+  #  waits for it but the pictures' merge)
   perf:
     name: Performance walk
     needs: build
@@ -615,27 +616,39 @@ jobs:
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
           for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && break; sleep 0.5; done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
-      - name: The last green run's walk
+      - name: The run to compare with, its walk and its build
         continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}
+          MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          # (the newest green push run of this branch that kept a walk: its numbers are the "before")
-          mkdir -p prev
-          gh run list -R "$GITHUB_REPOSITORY" --workflow windows-fluent.yml --branch "$BRANCH" --event push --status success -L 5 \
-            --json databaseId,number,headSha --jq '.[] | "\(.databaseId) \(.number) \(.headSha)"' > runs.txt 2>/dev/null || true
+          # (the newest green push run of this branch that kept a walk — or the one the commit names, "[perf-base <run
+          #  id>]": its numbers are the "before", and its build, kept 30 days, is walked again here)
+          mkdir -p prev base
+          named=$(printf '%s' "$MESSAGE" | sed -n 's/.*\[perf-base \([0-9][0-9]*\)\].*/\1/p' | head -1)
+          if [ -n "$named" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$named" --jq '"\(.id) \(.run_number) \(.head_sha)"' > runs.txt 2>/dev/null || true
+          else
+            gh run list -R "$GITHUB_REPOSITORY" --workflow windows-fluent.yml --branch "$BRANCH" --event push --status success -L 5 \
+              --json databaseId,number,headSha --jq '.[] | "\(.databaseId) \(.number) \(.headSha)"' > runs.txt 2>/dev/null || true
+          fi
           while read -r id number sha; do
             [ -n "$id" ] || continue
             if gh run download "$id" -R "$GITHUB_REPOSITORY" -n windows-fluent-perf -D prev >/dev/null 2>&1 && [ -f prev/perf-warm.json ]; then
               echo "run #$number (${sha:0:7})" > prev/from.txt
+              if gh run download "$id" -R "$GITHUB_REPOSITORY" -n release -D base >/dev/null 2>&1 && (cd base && 7z x -y Simpl-Windows-x64.zip >/dev/null) && [ -f base/Simpl/Simpl.exe ]; then
+                echo "its build, to walk here too: base/Simpl"
+              else
+                echo "its build is no longer kept: compared with its numbers only"
+              fi
               break
             fi
             rm -rf prev && mkdir -p prev
           done < runs.txt
           if [ -f prev/from.txt ]; then echo "comparing with $(cat prev/from.txt)"; else echo "no earlier walk to compare with"; fi
-      - name: Walk (cold, then warm; then warm without reading ahead)
+      - name: Walk (the build compared with, then this one; cold, then warm)
         shell: pwsh
         run: |
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
@@ -646,20 +659,23 @@ jobs:
           } catch { Write-Host "animation effects left as they are: $_" }
           New-Item -ItemType Directory -Force shots | Out-Null
           $prof = Join-Path $env:RUNNER_TEMP 'profile-perf'
+          $baseProf = Join-Path $env:RUNNER_TEMP 'profile-perf-base'
           $mock = @('--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light')
           $fence = '```'
-          # (each: its name and what it adds; one profile for all — the cold walk fills it — and no --window-size, so
-          #  where the window is, and the prefs that keep it, are walked too. A choice to try is one word, or
-          #  --browser-args=a;b, so Start-Process passes it as one argument)
-          $walks = @(
-            @('cold', @()), @('warm', @()),
-            @('noprefetch', @('--no-prefetch'))
-          )
+          # (each: its name, the build, its profile, what it adds. One profile for each build — its cold walk fills it —
+          #  and no --window-size, so where the window is, and the prefs that keep it, are walked too. The build
+          #  compared with goes first each time, so neither finds the runner warmer)
+          $walks = @()
+          $hasBase = Test-Path base/Simpl/Simpl.exe
+          if ($hasBase) { $walks += ,@('base-cold', 'base/Simpl/Simpl.exe', $baseProf, @()) }
+          $walks += ,@('cold', 'dist/Simpl/Simpl.exe', $prof, @())
+          if ($hasBase) { $walks += ,@('base-warm', 'base/Simpl/Simpl.exe', $baseProf, @()) }
+          $walks += ,@('warm', 'dist/Simpl/Simpl.exe', $prof, @())
           foreach ($w in $walks) {
             $run = $w[0]
-            $argList = $mock + @('--profile', $prof, '--perf-walk', "$PWD/shots", '--perf-name', $run, '--perf-course', '101', '--perf-assignment', '1001', '--perf-timeout', '240') + $w[1]
+            $argList = $mock + @('--profile', $w[2], '--perf-walk', "$PWD/shots", '--perf-name', $run, '--perf-course', '101', '--perf-assignment', '1001', '--perf-timeout', '240') + $w[3]
             $began = Get-Date
-            $p = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            $p = Start-Process -FilePath $w[1] -ArgumentList $argList -PassThru
             if (-not $p.WaitForExit(300000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; Write-Host "::warning::the $run walk was still going after five minutes: stopped" }
             Write-Host "$run walk: $([math]::Round(((Get-Date) - $began).TotalSeconds)) s"
             $txt = "shots/perf-$run.txt"
@@ -671,6 +687,8 @@ jobs:
           }
           $log = Join-Path $prof 'simpl.log'
           if (Test-Path $log) { Copy-Item $log shots/profile-perf.log }
+          $log = Join-Path $baseProf 'simpl.log'
+          if (Test-Path $log) { Copy-Item $log shots/profile-perf-base.log }
           Get-ChildItem shots
       - name: Where the window's time goes (the warm walk under dotnet-trace)
         continue-on-error: true
@@ -739,15 +757,15 @@ jobs:
             return out;
           };
           const out = [];
+          // (first against that run's build walked here, on this runner; then against the numbers it had on its own)
+          for (const run of ['cold', 'warm']) {
+            const before = read(`shots/perf-base-${run}.json`), after = read(`shots/perf-${run}.json`);
+            if (before && after) out.push(...table(`${run}, ms and MB, against ${from}'s build walked on this runner (${after.env?.cpu || ''})`, before, after));
+          }
           for (const run of ['cold', 'warm']) {
             const before = from ? read(`prev/perf-${run}.json`) : null, after = read(`shots/perf-${run}.json`);
             if (!before || !after) { out.push(`${run}: nothing to compare (${after ? 'no earlier walk' : 'no walk this time'})`, ''); continue; }
-            out.push(...table(`${run}, ms and MB, against ${from}`, before, after));
-          }
-          const warm = read('shots/perf-warm.json');
-          for (const v of ['noprefetch']) {
-            const after = read(`shots/perf-${v}.json`);
-            if (warm && after) out.push(...table(`${v}, against this run's warm walk`, warm, after));
+            out.push(...table(`${run}, ms and MB, against ${from} as it ran (${before.env?.cpu || ''})`, before, after));
           }
           console.log(out.join('\n'));
           if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Performance walk, against ${from || 'nothing earlier'}\n\n\`\`\`\n${out.join('\n')}\n\`\`\`\n`);
