@@ -357,6 +357,79 @@ public static class CEParts
     }
 }
 
+// ---- "In this model" (§5.1.6) ----
+
+public sealed partial class CEModel
+{
+    /// <summary>The card's "In this model:" line: how many the model has and how big they are drawn, at this scale (§4.1
+    /// item 7: the selected organelle's size on its card), and how many the cutaway hides (the Mac's words, word for word).</summary>
+    public string ModelLine(CEPart p)
+    {
+        var n = Placed.GetValueOrDefault(p.Id);
+        var teaching = !Options.TrueScale;
+        var kind = Options.Kind;
+        string Enlarged(string trueText)
+        {
+            if (teaching && p.Factor > 1)
+            {
+                var times = p.Factor >= 5 ? $"about {(int)Math.Round(p.Factor, MidpointRounding.AwayFromZero)}" : Math.Abs(p.Factor - 1.5) < 1e-9 ? "1.5" : $"{(int)p.Factor}";
+                return $" — drawn {times}× their true size (real: {trueText})";
+            }
+            return p.Factor > 1 ? " — at their true size" : "";
+        }
+        var free = Extra.GetValueOrDefault("vesicle.free");
+        var golgi = Extra.GetValueOrDefault("vesicle.golgi");
+        var s = (kind, p.Id) switch
+        {
+            (_, "pm") => kind == CEKind.Bacterium ? "A shell 0.01 µm thick round the cytoplasm" : "A shell 0.08 µm thick, translucent (a real bilayer is 4–5 nm: too thin to see at this size)",
+            (_, "nucleus") => $"One, {(kind == CEKind.Animal ? "6.4" : "6.0")} µm across, its envelope's two membranes drawn 0.05 µm apart",
+            (_, "pore") => $"{Count(n)} rings 0.18 µm across (real nuclei have thousands)",
+            (_, "nucleolus") => $"One, about {(kind == CEKind.Animal ? "1.8" : "1.7")} µm across",
+            (_, "chromatin") => $"{n} strands, drawn as tubes 0.12 µm thick",
+            (_, "rer") => $"{n} curved sheets round the nucleus, 0.06 µm thick, studded with {Count(Extra.GetValueOrDefault("ribosome.er"))} ribosomes",
+            (_, "ser") => $"A network of {Extra.GetValueOrDefault("ser.segments")} branching tubes 0.1 µm across",
+            (CEKind.Animal, "golgi") => "One stack of 5 cisternae, about 1.6 µm across, beside the nucleus",
+            (_, "golgi") => $"{n} small stacks of 4 cisternae, 0.8 µm across",
+            (_, "mito") => $"{n} mitochondria, each 2.2 µm long and 0.9 µm wide",
+            (_, "lysosome") => $"{n}, each 0.6 µm across",
+            (_, "peroxisome") => $"{n}, each 0.5 µm across, with a crystalline core",
+            (_, "vesicle") => (free > 0 ? $"{free} in the cytoplasm and {golgi} at the Golgi" : $"{golgi} at the Golgi stacks")
+                + (teaching ? ", 0.12–0.3 µm across" : ", 0.08–0.2 µm across") + Enlarged("50–100 nm for transport vesicles"),
+            (CEKind.Bacterium, "ribosome") => $"{Count(Extra.GetValueOrDefault("ribosome.free"))}, {(teaching ? "0.04" : "0.02")} µm across, outside the nucleoid"
+                + Enlarged("about 20 nm; 10,000–70,000 in a cell"),
+            (_, "ribosome") => $"{Count(Extra.GetValueOrDefault("ribosome.free"))} free and {Count(Extra.GetValueOrDefault("ribosome.er"))} on the rough ER, each {(teaching ? "0.12" : "0.03")} µm across"
+                + Enlarged("25–30 nm; millions in a cell"),
+            (_, "centrosome") => "Two centrioles at right angles, each 0.2 × 0.45 µm, in a cloud of protein",
+            (CEKind.Plant, "microtubule") => $"{n} in a cortical array just inside the membrane" + Enlarged("25 nm wide"),
+            (_, "microtubule") => $"{n} running from the centrosome to the cortex" + Enlarged("25 nm wide"),
+            (_, "actin") => $"{n} short filaments {(kind == CEKind.Plant ? "in the cytoplasm" : "under the membrane")}" + Enlarged("about 7 nm wide"),
+            (_, "intermediate") => $"{n} wavy filaments from the nucleus outward" + Enlarged("8–12 nm wide"),
+            (_, "cytoplasm") => "The tinted faces where the cutaway cuts the cell",
+            (CEKind.Animal, "flagellum") => "One, 10 µm long and 0.25 µm across",
+            (_, "flagellum") => $"{n}, each 6 µm long, a helix 0.4 µm across with a hook and a basal body" + Enlarged("about 20 nm wide"),
+            (_, "fimbria") => $"{n} hairs 0.4–0.9 µm long" + Enlarged("3–10 nm wide"),
+            (_, "sexpilus") => "One, 2 µm long" + Enlarged("about 9 nm wide"),
+            (_, "wall") => kind == CEKind.Plant ? "A wall 0.5 µm thick round the whole cell"
+                : Options.GramPositive ? "A thick wall, 0.05 µm (Gram-positive)" : "A thin wall, 0.02 µm, under the outer membrane (Gram-negative)",
+            (_, "plasmodesma") => $"{n} channels 0.12 µm across through the wall",
+            (_, "vacuole") => "One, 37 × 19 × 19 µm: about half the cell's volume here, up to 80–90% in a mature cell",
+            (_, "chloroplast") => $"{n} lenses 5.0 × 2.4 µm, each with 14 grana (real: 40–60) of 10 thylakoids",
+            (_, "amyloplast") => $"{n}, each 2 µm long, with starch grains",
+            (_, "capsule") => "A layer 0.15 µm thick, translucent",
+            (_, "outer") => "A shell 0.012 µm thick, outside the thin wall",
+            (_, "nucleoid") => "One chromosome drawn as a tangle of 600 steps in a region 1.3 × 0.64 µm",
+            (_, "plasmid") => $"{n} small loops 0.14–0.2 µm across",
+            _ => n > 0 ? $"{n}" : "",
+        };
+        var hidden = n - Shown.GetValueOrDefault(p.Id);
+        if (Options.Cutaway && hidden > 0 && n > 1) s += $". {Count(hidden)} of them are in the part cut away";
+        return s.Length == 0 ? "" : s + ".";
+    }
+
+    /// <summary>A count with its thousands grouped ("1,500").</summary>
+    public static string Count(int x) => x.ToString("#,0", CultureInfo.InvariantCulture);
+}
+
 // ---- the Compare page (§4.1 item 8, §5.1.4) ----
 
 /// <summary>A Compare row: the table's words (animal, plant, bacterium) and the cell and part a press opens (the first

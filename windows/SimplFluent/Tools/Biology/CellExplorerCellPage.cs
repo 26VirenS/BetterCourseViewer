@@ -376,7 +376,8 @@ internal sealed class CellPage : Grid
             CellUI.Fact("Function", p.Function),
             CellUI.Fact("Structure", p.StructureText),
             CellUI.Fact("Size", p.Size),
-            CellUI.Fact("In this model", CEParts.InThisModel(p, trueScale) + DrawnCount(p, model)),
+            // (what the model has of it, at this scale; §5.1's Model column until the cell is built)
+            CellUI.Fact("In this model", model?.ModelLine(p) is { Length: > 0 } line ? line : CEParts.InThisModel(p, trueScale)),
         };
         var found = p.FoundInText + (p.FoundInNotes.Count > 0 ? "\n" + string.Join("\n", p.FoundInNotes) : "");
         rows.Add(CellUI.Fact("Found in", found));
@@ -420,23 +421,6 @@ internal sealed class CellPage : Grid
         var b = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(10), Background = K.Brush(K.WithAlpha(tone, Appearance.Dark ? 0.16 : 0.1)), Child = row };
         System.Windows.Automation.AutomationProperties.SetName(b, "Common mix-up: " + CellUI.Plain(text));
         return b;
-    }
-
-    /// <summary>" 24 drawn here; 3 cut away." — how many the model placed and how many show.</summary>
-    private static string DrawnCount(CEPart p, CEModel? m)
-    {
-        if (m == null) return "";
-        var placed = m.Placed.GetValueOrDefault(p.Id);
-        var shown = m.Shown.GetValueOrDefault(p.Id);
-        if (p.Id == "ribosome")
-        {
-            var free = m.Extra.GetValueOrDefault("ribosome.free");
-            var er = m.Extra.GetValueOrDefault("ribosome.er");
-            var line = er > 0 ? $" Here {free:#,0} free and {er:#,0} on the rough ER" : $" Here {free:#,0}";
-            return line + (shown < free + er ? $"; {free + er - shown:#,0} in the cut-away part." : ".");
-        }
-        if (placed <= 1) return "";
-        return $" Here {placed:#,0}" + (shown < placed ? $"; {placed - shown} in the cut-away part." : ".");
     }
 
     private void ZoomTo(string part)

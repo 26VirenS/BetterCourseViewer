@@ -130,8 +130,18 @@ public static partial class BioSelfCheck
             && Centres(plantTrue).Count == Centres(plant).Count && Centres(plantTrue).Zip(Centres(plant)).All(z => BioV.Distance(z.First, z.Second) < 1e-9);
         r.Check("cell.true-scale", $"{total}ribosomes", total >= 19_000 && total <= 20_000 && sameRest
             && Math.Abs((trueScale.Instances.FirstOrDefault(i => i.Part == "ribosome")?.Radius ?? 0) - 0.010) < 1e-12);
-        // (Windows: the true-scale cells, with their 20,000 ribosomes, still within what Viewport3D draws smoothly)
-        r.Check("cell.true-scale.triangles", $"{plantTrue.Triangles}", plantTrue.Triangles < 400_000);
+
+        // (every part's card says what the model has of it)
+        var lines = new[] { animal, plant, bacterium }.SelectMany(m => CEParts.All(m.Options.Kind).Select(m.ModelLine)).ToList();
+        r.Check("cell.card-model-lines", $"{lines.Count(l => l.Length > 0)}/{lines.Count}", lines.All(l => l.Length > 0));
+        if (CEParts.Part(CEKind.Animal, "mito") is { } mito && CEParts.Part(CEKind.Animal, "ribosome") is { } ribosome)
+        {
+            r.Same("cell.card-mito", animal.ModelLine(mito), "24 mitochondria, each 2.2 µm long and 0.9 µm wide. 2 of them are in the part cut away.");
+            r.Check("cell.card-ribosome", animal.ModelLine(ribosome),
+                animal.ModelLine(ribosome).StartsWith($"{CEModel.Count(1500)} free and {CEModel.Count(2500)} on the rough ER, each 0.12 µm across — drawn 4× their true size", StringComparison.Ordinal));
+        }
+        var plantWhole = CEBuild.Build(new CEBuildOptions(CEKind.Plant, Cutaway: false));
+        r.Check("cell.plant-whole.triangles", $"{plantWhole.Triangles}", plantWhole.Triangles < 250_000);
 
         // (labels: every part drawn has somewhere to point)
         var missing = new[] { animal, plant, bacterium }.SelectMany(m => m.PartsShown.Where(p => !m.Anchors.ContainsKey(p)).Select(p => $"{m.Options.Kind.Id()}.{p}")).ToList();
@@ -149,6 +159,9 @@ public static partial class BioSelfCheck
         var compare = CEBuild.CompareScene(false);
         r.Check("cell.compare-scene", $"{compare.Items.Count}items", compare.Items.Select(i => i.Id).ToHashSet().SetEquals(new[] { "cell:animal", "cell:plant", "cell:bacterium" })
             && compare.Labels.Count == 3);
+
+        // (Windows: the true-scale cells, with their 20,000 ribosomes, still within what Viewport3D draws smoothly)
+        r.Check("cell.true-scale.triangles", $"{plantTrue.Triangles}", plantTrue.Triangles < 400_000);
     }
 
     private static void CellMembraneChecks(BioCheckReport r)
@@ -159,7 +172,10 @@ public static partial class BioSelfCheck
         // (Windows: within what Viewport3D draws smoothly; the Mac allows 600k)
         r.Check("cell.membrane.triangles", $"{m.Triangles}", m.Triangles < 400_000);
         r.Check("cell.membrane.labels", $"{m.Content.Labels.Count}", m.Content.Labels.Count == 12 && CEMembrane.Parts.Count == 12);
-        r.Check("cell.membrane.carrier", $"{m.Carrier.Count}helices", m.Carrier.Count == 7);
+        var moving = CEMembrane.Moving();
+        var sameCarrier = moving.Carrier.Zip(m.Carrier).All(z => BioV.Distance(z.First.Centre, z.Second.Centre) < 1e-9
+            && Math.Abs(z.First.Inside.AxisAngle.Degrees - z.Second.Inside.AxisAngle.Degrees) < 1e-9);
+        r.Check("cell.membrane.carrier", $"{m.Carrier.Count}helices", m.Carrier.Count == 7 && moving.Carrier.Count == 7 && sameCarrier);
         // (the bilayer's thickness: head centres 3.9 nm apart, about 4.8 nm across the heads)
         r.Near("cell.membrane.thickness", 2 * CEMembrane.HeadY + 0.9, 4.8, 1e-9, 2);
         // (the quaternion of a frame turns as the frame does)

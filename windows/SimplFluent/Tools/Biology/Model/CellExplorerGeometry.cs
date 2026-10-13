@@ -330,6 +330,94 @@ public static class CERecipes
     public static (BioMesh Outer, BioMesh Inner, BioMesh Caps) Shell(BioRadius outer, BioRadius inner, bool cut, int rings, int segments) =>
         CEGeo.SplitShell(BioShapes.Radial(outer, rings, segments, cut ? BioCut.Octant : null, inner));
 
+    /// <summary>
+    /// A box-like star-shaped surface (a rounded box, the plant's wall) meshed on a box's six faces rather than a sphere's
+    /// latitudes and longitudes, so its edges and corners run along grid lines instead of across them: each face of the
+    /// box <paramref name="h"/> (the shape's own proportions) is an n × n grid, every grid point sent along its direction to
+    /// <paramref name="radius"/>. Cut, the octant x, y, z &gt; 0 is left out (its boundaries are grid lines: n even).
+    /// </summary>
+    public static BioMesh BoxSurface(BioVec h, int n, bool cut, BioRadius radius, bool inward = false)
+    {
+        var faces = new (BioVec N, BioVec U, BioVec V)[]
+        {
+            (new(1, 0, 0), new(0, 1, 0), new(0, 0, 1)), (new(-1, 0, 0), new(0, 0, 1), new(0, 1, 0)),
+            (new(0, 1, 0), new(0, 0, 1), new(1, 0, 0)), (new(0, -1, 0), new(1, 0, 0), new(0, 0, 1)),
+            (new(0, 0, 1), new(1, 0, 0), new(0, 1, 0)), (new(0, 0, -1), new(0, 1, 0), new(1, 0, 0)),
+        };
+        var m = Math.Max(2, n + n % 2);
+        var mesh = new BioMesh();
+        foreach (var f in faces)
+        {
+            BioVec Q(double s, double t)
+            {
+                var p = f.N + f.U * s + f.V * t;
+                return new BioVec(p.X * h.X, p.Y * h.Y, p.Z * h.Z);
+            }
+            BioVec Point(double s, double t)
+            {
+                var d = BioV.Unit(Q(s, t));
+                return d * radius(d);
+            }
+            var b = mesh.Positions.Count;
+            const double e = 1e-4;
+            for (var j = 0; j <= m; j++)
+                for (var i = 0; i <= m; i++)
+                {
+                    double s = -1 + 2.0 * i / m, t = -1 + 2.0 * j / m;
+                    var p = Point(s, t);
+                    var nrm = BioV.Cross(Point(s + e, t) - Point(s - e, t), Point(s, t + e) - Point(s, t - e));
+                    if (BioV.Dot(nrm, p) < 0) nrm = -nrm;
+                    mesh.Vertex(p, inward ? -nrm : nrm);
+                }
+            for (var j = 0; j < m; j++)
+                for (var i = 0; i < m; i++)
+                {
+                    double s = -1 + 2 * (i + 0.5) / m, t = -1 + 2 * (j + 0.5) / m;
+                    if (cut && CEGeo.InWedge(Q(s, t))) continue;
+                    int a = b + j * (m + 1) + i, c1 = a + 1, c = a + m + 1 + 1, d = a + m + 1;
+                    if (inward)
+                    {
+                        mesh.Triangle(a, c, c1);
+                        mesh.Triangle(a, d, c);
+                    }
+                    else
+                    {
+                        mesh.Triangle(a, c1, c);
+                        mesh.Triangle(a, c, d);
+                    }
+                }
+        }
+        return mesh;
+    }
+
+    /// <summary>The cut faces of a box-meshed shell (BoxSurface's), between its outer and inner walls, through the very grid
+    /// points its walls' cut edges have: on the plane x = 0 from +y to +z, on y = 0 from +z to +x, on z = 0 from +x to +y.</summary>
+    public static BioMesh BoxCaps(BioVec h, int n, BioRadius outer, BioRadius inner)
+    {
+        var m = Math.Max(2, n + n % 2) / 2;
+        var mesh = new BioMesh();
+        // (each plane's edge: along one face from its axis to the box's edge, then down the next face to the other axis)
+        var edges = new (BioVec Facing, Func<double, BioVec> A, Func<double, BioVec> B)[]
+        {
+            (new BioVec(1, 0, 0), k => new BioVec(0, 1, k), k => new BioVec(0, k, 1)),
+            (new BioVec(0, 1, 0), k => new BioVec(k, 0, 1), k => new BioVec(1, 0, k)),
+            (new BioVec(0, 0, 1), k => new BioVec(1, k, 0), k => new BioVec(k, 1, 0)),
+        };
+        foreach (var e in edges)
+        {
+            var dirs = new List<BioVec>();
+            for (var i = 0; i <= m; i++) dirs.Add(e.A((double)i / m));
+            for (var i = m - 1; i >= 0; i--) dirs.Add(e.B((double)i / m));
+            var ds = dirs.Select(d => BioV.Unit(new BioVec(d.X * h.X, d.Y * h.Y, d.Z * h.Z))).ToList();
+            for (var k = 0; k < ds.Count - 1; k++)
+            {
+                BioVec d0 = ds[k], d1 = ds[k + 1];
+                mesh.FlatQuad(d0 * outer(d0), d1 * outer(d1), d1 * inner(d1), d0 * inner(d0), e.Facing);
+            }
+        }
+        return mesh;
+    }
+
     /// <summary>The cut faces of a cell's inside, between <paramref name="inner"/> (the vacuole, or nothing: the centre) and
     /// <paramref name="outer"/> (the membrane's inner wall), on the three planes of the octant cut: the cytoplasm's "tinted
     /// cap" (§5.1.1).</summary>
@@ -473,9 +561,9 @@ public static class CERecipes
     /// §5.1.5 Mitochondrion, its long axis along y: the outer membrane (capsule r 0.45, cylinder 1.3: 2.2 µm long)
     /// translucent, the inner (r 0.40) opaque. Whole, the cristae are hidden inside the opaque inner membrane and are left
     /// out; cut lengthwise (the half z &gt; 0 removed), both membranes are shells with their cut faces, the inner's inside is
-    /// the matrix's tint, and the nine cristae show.
+    /// the matrix's tint, and the nine cristae show. <paramref name="fine"/>: meshed finer, for Look inside.
     /// </summary>
-    public static CEShape Mitochondrion(bool half) => half ? MitoHalf.Value : MitoWhole.Value;
+    public static CEShape Mitochondrion(bool half, bool fine = false) => !half ? MitoWhole.Value : fine ? MitoHalfFine.Value : MitoHalf.Value;
 
     private static readonly Lazy<CEShape> MitoWhole = new(() =>
     {
@@ -486,15 +574,18 @@ public static class CERecipes
         return s;
     });
 
-    private static readonly Lazy<CEShape> MitoHalf = new(() =>
+    private static readonly Lazy<CEShape> MitoHalf = new(() => MakeMitoHalf(12, 24));
+    private static readonly Lazy<CEShape> MitoHalfFine = new(() => MakeMitoHalf(24, 48));
+
+    private static CEShape MakeMitoHalf(int rings, int segments)
     {
         var s = new CEShape();
         const double l = 1.3;
-        var o = CEGeo.SplitShell(BioShapes.Radial(BioShapes.CapsuleRadius(0.45, l), 12, 24, BioCut.Half, BioShapes.CapsuleRadius(0.435, l)));
+        var o = CEGeo.SplitShell(BioShapes.Radial(BioShapes.CapsuleRadius(0.45, l), rings, segments, BioCut.Half, BioShapes.CapsuleRadius(0.435, l)));
         s.Add(o.Outer, alpha: 0.45, roughness: 0.3, order: 3);
         s.Add(o.Inner, alpha: 0.45, roughness: 0.3, order: 3);
         s.Add(o.Caps, CERole.Cap, alpha: 1);
-        var i = CEGeo.SplitShell(BioShapes.Radial(BioShapes.CapsuleRadius(0.40, l), 12, 24, BioCut.Half, BioShapes.CapsuleRadius(0.38, l)));
+        var i = CEGeo.SplitShell(BioShapes.Radial(BioShapes.CapsuleRadius(0.40, l), rings, segments, BioCut.Half, BioShapes.CapsuleRadius(0.38, l)));
         s.Add(i.Outer, roughness: 0.55);
         s.Add(i.Inner, CERole.Named("matrix"), roughness: 0.6);
         s.Add(i.Caps, CERole.Cap);
@@ -506,7 +597,7 @@ public static class CERecipes
         }
         s.Add(cristae, CERole.Dark, roughness: 0.55);
         return s;
-    });
+    }
 
     /// <summary>A crista at height y: a flat sheet across the inner membrane (radius 0.39, into the membrane) from its
     /// attached side to 75% of the inner diameter, 0.05 µm thick, its free edge rounded; only z ≤ 0 when cut.</summary>
@@ -578,21 +669,22 @@ public static class CERecipes
     /// a granum is drawn as one stack the discs' size, <paramref name="detail"/> draws every disc; stroma lamellae joining
     /// neighbouring grana at alternating heights (0.12 µm wide, 0.02 thick); two starch grains; and, in detail, 70S
     /// ribosomes and a loop of DNA. Cut lengthwise (z &gt; 0 removed), the envelope is two shells and only the grana on the
-    /// kept side are drawn.
+    /// kept side are drawn. <paramref name="fine"/>: meshed finer, for Look inside.
     /// </summary>
-    public static CEShape Chloroplast(bool detail, bool half, double ribosomeRadius) =>
-        !detail && !half ? ChloroplastWhole.Value : MakeChloroplast(detail, half, ribosomeRadius);
+    public static CEShape Chloroplast(bool detail, bool half, double ribosomeRadius, bool fine = false) =>
+        !detail && !half ? ChloroplastWhole.Value : MakeChloroplast(detail, half, ribosomeRadius, fine);
 
-    private static CEShape MakeChloroplast(bool detail, bool half, double ribosomeRadius)
+    private static CEShape MakeChloroplast(bool detail, bool half, double ribosomeRadius, bool fine = false)
     {
         var s = new CEShape();
+        var (rings, segments) = fine ? (28, 56) : (16, 32);
         BioRadius Lens(double scale) => BioShapes.LensRadius(5.0 * scale, 2.4 * scale);
         if (half)
         {
-            var o = CEGeo.SplitShell(BioShapes.Radial(Lens(1), 16, 32, BioCut.Half, Lens(0.985)));
+            var o = CEGeo.SplitShell(BioShapes.Radial(Lens(1), rings, segments, BioCut.Half, Lens(0.985)));
             s.Add(o.Outer, alpha: 0.35, roughness: 0.3, order: 3);
             s.Add(o.Caps, CERole.Cap, alpha: 1);
-            var i = CEGeo.SplitShell(BioShapes.Radial(Lens(0.96), 16, 32, BioCut.Half, Lens(0.945)));
+            var i = CEGeo.SplitShell(BioShapes.Radial(Lens(0.96), rings, segments, BioCut.Half, Lens(0.945)));
             s.Add(i.Outer, alpha: 0.4, roughness: 0.3, order: 2);
             s.Add(i.Inner, CERole.Named("stroma"), alpha: 0.55, roughness: 0.4, order: 2);
             s.Add(i.Caps, CERole.Cap, alpha: 1);

@@ -113,16 +113,30 @@ public sealed partial class CEBuilder
         (Model.Area, Model.Volume) = CEGeo.AreaVolume(BioShapes.Radial(pmOut, 48, 96));
 
         _ = Rng.UnitVector(); // (the "Golgi side" g: drawn as in every cell; the plant's stacks are free organelles)
-        CellShell("wall", wallOut, wallIn, 48, 96, 0, darkOuter: true);
-        CellShell("pm", pmOut, pmIn, 48, 96, 8);
-        // (the central vacuole first: a rounded box with a blob's ripple, dented by the nucleus)
-        var v = BioShapes.Radial(vac, 40, 80);
+        // (the wall and the membrane meshed on the box's own faces, so the rounded edges run along the grid; the
+        // membrane's outer face, hidden behind the opaque wall, left out)
+        const int grid = 32;
+        var wallColour = parts.TryGetValue("wall", out var wp) ? wp.Colour : new BioHexPair("#8fae5a", "#b3d17c");
+        var wall = new CEShape();
+        wall.Add(CERecipes.BoxSurface(half, grid, Cut, wallOut), CERole.Colour(CEGeo.Darker(wallColour, 0.15)), roughness: 0.7);
+        wall.Add(CERecipes.BoxSurface(half, grid, Cut, wallIn, inward: true), roughness: 0.6);
+        if (Cut) wall.Add(CERecipes.BoxCaps(half, grid, wallOut, wallIn), CERole.Cap, alpha: 1, roughness: 0.6);
+        Add("wall", wall, BioVec.Zero, 28, shell: true);
+        var membrane = new CEShape();
+        membrane.Add(CERecipes.BoxSurface(half, grid, Cut, pmIn, inward: true), roughness: 0.25, order: 8);
+        if (Cut) membrane.Add(CERecipes.BoxCaps(half, grid, pmOut, pmIn), CERole.Cap, alpha: 1, roughness: 0.6, order: 8);
+        Add("pm", membrane, BioVec.Zero, 28, shell: true);
+        // (the central vacuole first: a rounded box with a blob's ripple, dented by the nucleus — each tonoplast point
+        // nearer than R + 0.4 µm to the nucleus's centre moved out to that distance, facing the nucleus)
+        var v = CERecipes.BoxSurface(new BioVec(18.5, 9.5, 9.5), 24, false, vac);
         for (var i = 0; i < v.Positions.Count; i++)
         {
             var p = BioMesh.D(v.Positions[i]);
-            if (BioV.Distance(p, n) < r + 0.4) v.Positions[i] = BioMesh.F(n + BioV.Unit(p - n) * (r + 0.4));
+            if (BioV.Distance(p, n) >= r + 0.4) continue;
+            var q = n + BioV.Unit(p - n) * (r + 0.4);
+            v.Positions[i] = BioMesh.F(q);
+            v.Normals[i] = BioMesh.F(BioV.Unit(n - q));
         }
-        v = BioShapes.SmoothNormals(v);
         var vs = new CEShape();
         vs.Add(v, roughness: 0.2, order: 4);
         Add("vacuole", vs, BioVec.Zero, 19);
@@ -192,6 +206,7 @@ public sealed partial class CEBuilder
             var angle = Rng.Uniform(0, 360);
             var x = BioV.Rotate(CEGeo.Perpendicular(fp.N), fp.N, angle);
             var f = new BioFrame(fp.P, x, fp.N, BioV.Cross(x, fp.N));
+            lenses.Add(f);
             if (Hidden(fp.P)) { Skip("chloroplast"); continue; }
             var halfCut = Crossing(fp.P, 2.5);
             var frame = halfCut ? CEGeo.Frame(fp.N, cameraDirection, fp.P) : f;
@@ -599,7 +614,7 @@ public sealed partial class CEBuilder
             {
                 if (!Model.Anchors.TryGetValue(part, out var a) || Model.Instances[a.Instance].Frame is not { } f) return new List<CEInstance>();
                 var half = CEGeo.Frame(f.Y, cameraDirection, f.Origin);
-                var shape = part == "mito" ? CERecipes.Mitochondrion(true) : CERecipes.Chloroplast(true, true, o.TrueScale ? 0.01 : 0.02);
+                var shape = part == "mito" ? CERecipes.Mitochondrion(true, fine: true) : CERecipes.Chloroplast(true, true, o.TrueScale ? 0.01 : 0.02, fine: true);
                 var b = new CEBuilder(o);
                 b.Add(part, shape.Placed(half), f.Origin, Model.Instances[a.Instance].Radius, frame: f);
                 out_ = b.Model.Instances;

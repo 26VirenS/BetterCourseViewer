@@ -313,17 +313,24 @@ public static class CEMembrane
                 if (p.Role == "carrier") out_.Carrier.Add((d.Apply(at), Turn(tangent, -tilt), Turn(tangent, tilt)));
             }
             if (p.Role == "carrier" && carrierAnimated) continue;
-            if (p.Role is not "channel" and not "carrier")
+            if (p.Role == "channel")
             {
-                // (loops capping a closed protein, top and bottom)
-                var cap = BioShapes.Radial(BioShapes.Blob(BioShapes.EllipsoidRadius(1.5, 0.45, 1.5), new BioBlob(unchecked(Seed + (ulong)k), 0.1)), 10, 20);
-                bundle.Append(cap.Translated(c + new BioVec(0, 2.3, 0)));
-                bundle.Append(cap.Translated(c + new BioVec(0, -2.3, 0)));
+                // (the pore's mouths: a ring at each face, standing out of the heads)
+                var ring = BioShapes.Torus(1.25, 0.5, 28, 10);
+                bundle.Append(ring.Translated(c + new BioVec(0, 2.75, 0)));
+                bundle.Append(ring.Translated(c + new BioVec(0, -2.75, 0)));
+            }
+            else if (p.Role != "carrier")
+            {
+                // (a closed protein's loops and domains, outside and inside: they stick out past the heads)
+                var cap = BioShapes.Radial(BioShapes.Blob(BioShapes.EllipsoidRadius(1.9, 1.0, 1.9), new BioBlob(unchecked(Seed + (ulong)k), 0.1)), 12, 24);
+                bundle.Append(cap.Translated(c + new BioVec(0, 2.95, 0)));
+                bundle.Append(cap.Translated(c + new BioVec(0, -2.95, 0)));
             }
             if (proteins || p.Role is "channel" or "carrier") Put(id, bundle, colour, roughness: 0.4);
             if (p.Role == "glyco")
             {
-                if (glyco) Put($"part:glycoprotein:{glycoCount}", GlycoChain(c + new BioVec(0.4, 2.75, 0.2), ref rng), Sugar, roughness: 0.45);
+                if (glyco) Put($"part:glycoprotein:{glycoCount}", GlycoChain(c + new BioVec(0.4, 4.1, 0.2), ref rng), Sugar, roughness: 0.45);
                 glycoCount++;
             }
         }
@@ -342,7 +349,7 @@ public static class CEMembrane
         out_.Arrow = (d.Apply(new BioVec(ch.X, 5.5, Half + 1.2)), d.Apply(new BioVec(ch.X, -5.5, Half + 1.2)));
         out_.Up = d.ApplyVector(new BioVec(0, 1, 0));
         out_.Triangles = items.Sum(i => i.Mesh.TriangleCount);
-        out_.Content = new BioSceneContent { Items = items, Labels = Labels(), Frame = new BioSphere(BioVec.Zero, 33) };
+        out_.Content = new BioSceneContent { Items = items, Labels = Labels(), Frame = new BioSphere(BioVec.Zero, 26) };
         return out_;
     }
 
@@ -445,11 +452,11 @@ public static class CEMembrane
             L("part:bilayer:heads", "Hydrophilic head (polar)", new BioVec(-16, HeadY, Half - 0.5), 11, new BioVec(0, 0.4, 1)),
             L("part:bilayer:tails", "Hydrophobic tails (nonpolar)", new BioVec(Half - 0.5, -0.9, -6), 10, new BioVec(1, 0, 0)),
             L("part:cholesterol", "Cholesterol", new BioVec(Half - 0.4, 1.0, 12), 7, new BioVec(1, 0, 0)),
-            L("part:integral", "Integral (transmembrane) protein", new BioVec(plain.X, 2.75, plain.Z), 9),
-            L("part:integral:channel", "Channel protein", new BioVec(ch.X, 2.3, ch.Z + 1.3), 9),
+            L("part:integral", "Integral (transmembrane) protein", new BioVec(plain.X, 3.9, plain.Z), 9),
+            L("part:integral:channel", "Channel protein", new BioVec(ch.X, 3.2, ch.Z + 1.25), 9),
             L("part:integral:carrier", "Carrier protein", new BioVec(ca.X, 2.4, ca.Z), 9),
             L("part:peripheral", "Peripheral protein", new BioVec(PeripheralPlaces[0].X, -HeadY - 1.9, PeripheralPlaces[0].Z + 1.4), 8),
-            L("part:glycoprotein", "Glycoprotein", new BioVec(g.X + 0.4, 4.2, g.Z + 0.2), 8),
+            L("part:glycoprotein", "Glycoprotein", new BioVec(g.X + 0.4, 5.6, g.Z + 0.2), 8),
             L("part:glycolipid", "Glycolipid", new BioVec(GlycolipidPlaces[3].X, HeadY + 2.0, GlycolipidPlaces[3].Z), 7),
             L("side:outside", "Extracellular side", new BioVec(-22, 6.5, Half + 1), 6),
             L("side:inside", "Cytoplasm side", new BioVec(-22, -7.5, Half + 1), 6),

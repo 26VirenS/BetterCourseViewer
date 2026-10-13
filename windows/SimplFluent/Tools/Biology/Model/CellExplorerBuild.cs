@@ -47,7 +47,7 @@ public sealed class CEInstance
 public readonly record struct CEAnchor(int Instance, BioVec Point, BioVec? Normal);
 
 /// <summary>A built cell.</summary>
-public sealed class CEModel
+public sealed partial class CEModel
 {
     public CEModel(CEBuildOptions options) => Options = options;
 
@@ -204,6 +204,18 @@ public sealed partial class CEBuilder
     private BioVec nucleusCentre;
     private double nucleusRadius;
     private readonly BioVec cameraDirection;
+    /// <summary>The plant's chloroplasts' frames: the smooth ER keeps off their lenses (not their bounding spheres, which
+    /// would fill the thin layer of cytoplasm).</summary>
+    private readonly List<BioFrame> lenses = new();
+
+    /// <summary>Whether a point is within <paramref name="gap"/> of a chloroplast's lens (5.0 × 2.4 µm, as an oblate spheroid).</summary>
+    private bool NearLens(BioVec p, double gap) => lenses.Any(f =>
+    {
+        var q = p - f.Origin;
+        double x = BioV.Dot(q, f.X), y = BioV.Dot(q, f.Y), z = BioV.Dot(q, f.Z);
+        double a = 2.5 + gap, c = 1.2 + gap;
+        return (x * x + z * z) / (a * a) + y * y / (c * c) < 1;
+    });
 
     public CEBuilder(CEBuildOptions o)
     {
@@ -448,16 +460,14 @@ public sealed partial class CEBuilder
     }
 
     /// <summary>A sheet's ribosomes: at seeded points on its outer face (two draws each, θ then φ), 0.04 µm out (scaled with
-    /// the ribosome); a point where the sheet is not (the Golgi's cone, the plant's vacuole) drawn again — tested where a
-    /// teaching-scale ribosome would sit, so true scale makes the same draws and the rest of the cell stays as it was; one
-    /// in the cutaway's wedge counted but not drawn.</summary>
+    /// the ribosome); a point where the sheet is not (the Golgi's cone, the plant's vacuole) drawn again, and one in the
+    /// cutaway's wedge counted but not drawn — each decided on the sheet itself, so the draws are the same at either scale.</summary>
     private void BoundRibosomes(int i, int count, BioVec centre, BioVec? g, ref BioRandom r)
     {
         var n = nucleusCentre;
         var phi = SheetPhi(i);
         var theta = SheetTheta;
         var offset = 0.03 + RibosomeRadius * (0.04 / 0.06);
-        var teachingOffset = 0.03 + (o.Kind == CEKind.Bacterium ? 0.020 : 0.06) * (0.04 / 0.06);
         var mesh = RibosomeMesh;
         int placedHere = 0, tries = 0;
         while (placedHere < count && tries < count * 20)
@@ -465,13 +475,13 @@ public sealed partial class CEBuilder
             tries++;
             var t = theta.Lo + (theta.Hi - theta.Lo) * r.Uniform();
             var p = phi.Lo + (phi.Hi - phi.Lo) * r.Uniform();
-            var dir = BioShapes.Direction(t, p);
-            var pos = n + dir * (SheetRadius(i, t, p) + offset);
-            if (g is { } gg && BioV.Angle(pos - n, gg) < 25) continue;
-            if (o.Kind == CEKind.Plant && !outsideVacuole(n + dir * (SheetRadius(i, t, p) + teachingOffset), 0.1)) continue;
+            var onSheet = n + BioShapes.Direction(t, p) * SheetRadius(i, t, p);
+            var pos = n + BioShapes.Direction(t, p) * (SheetRadius(i, t, p) + offset);
+            if (g is { } gg && BioV.Angle(onSheet - n, gg) < 25) continue;
+            if (o.Kind == CEKind.Plant && !outsideVacuole(onSheet, 0.1)) continue;
             placedHere++;
             CEModel.Bump(Model.Extra, "ribosome.er");
-            if (RerRemoved(pos, null)) { Skip("ribosome"); continue; }
+            if (RerRemoved(onSheet, null)) { Skip("ribosome"); continue; }
             var sh = new CEShape();
             sh.Add(mesh.Translated(pos), roughness: 0.5);
             Add("ribosome", sh, pos, RibosomeRadius, explodeFrom: centre);
@@ -491,7 +501,7 @@ public sealed partial class CEBuilder
         var phi = SheetPhi(i);
         var tips = new List<(BioVec P, BioVec D, int Tree)>();
         var tries = 0;
-        while (tips.Count < 6 && tries < 100)
+        while (tips.Count < 6 && tries < 400)
         {
             tries++;
             var t = 4 * Rng.Uniform();
@@ -506,6 +516,8 @@ public sealed partial class CEBuilder
             }
             var p = n + BioShapes.Direction(th, ph) * SheetRadius(i, th, ph);
             if (g is { } gg && BioV.Angle(p - n, gg) < 25) continue;
+            // (a seed only where the sheet is: not in the plant's vacuole)
+            if (!outsideVacuole(p, 0.3) || !inside(p, 0.3)) continue;
             tips.Add((p, BioV.Unit(p - n), tips.Count));
         }
         var segments = Enumerable.Range(0, tips.Count).Select(_ => new List<(BioVec A, BioVec B)>()).ToList();
@@ -518,8 +530,8 @@ public sealed partial class CEBuilder
                 if (total >= 160) break;
                 var d = CEGeo.Cone(tip.D, 35, ref Rng);
                 var end = tip.P + d * 0.35;
-                // (a tip stops near the membrane, another organelle or the vacuole)
-                if (!inside(end, 0.6) || placer.NearSer(end, 0.6) || !outsideVacuole(end, 0.3)) continue;
+                // (a tip stops near the membrane, another organelle, the vacuole or a chloroplast)
+                if (!inside(end, 0.6) || placer.NearSer(end, 0.6) || !outsideVacuole(end, 0.3) || NearLens(end, 0.3)) continue;
                 segments[tip.Tree].Add((tip.P, end));
                 placer.Add((tip.P + end) / 2, 0.2);
                 total++;
