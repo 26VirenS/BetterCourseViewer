@@ -394,6 +394,56 @@ jobs:
             if ($bad) { Write-Host "--- setup-saved: what failed"; Get-Content $saved; Write-Error "setup's save failed or something after it did (shots/profile-setup-saved.log)"; exit 1 }
           }
           Get-ChildItem shots
+      # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
+      #  pictures left them, sign-in-stay's among them: prefs.json, storage.json, flashcards.json, login.bin and every
+      #  answer kept must begin with the vault's SIMPLENC, vault.key with SIMPLVK1; and no file in them, WebView2's
+      #  included, may hold the mock's sign-in in plain text — scripts/dev/mock-canvas.mjs lets in any login with the
+      #  password "demo", and the shots type student, slow and code. The vault's own lines say whether this runner's TPM
+      #  took the key.)
+      - name: Encrypted at rest
+        if: ${{ matrix.shard == 1 }}
+        shell: pwsh
+        run: |
+          $began = Get-Date
+          # (the web views' helper processes let go of their files a moment after Simpl quits)
+          for ($i = 0; $i -lt 20 -and (Get-Process msedgewebview2 -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 250 }
+          $latin1 = [System.Text.Encoding]::Latin1
+          $utf16 = [System.Text.Encoding]::Unicode
+          # the mock's sign-in as the shots type it (--sign-in user:demo), as it would be kept (JSON), and as its form
+          # posts it — in UTF-8 and in UTF-16 (Windows' and Chromium's own strings)
+          $plain = @('student:demo', 'slow:demo', 'code:demo', '"pass":"demo"', '"pass": "demo"', '"password":"demo"', '"password": "demo"', 'password]=demo', 'password%5D=demo')
+          $needles = @($plain | ForEach-Object { @{ Name = $_; Text = $_ }; @{ Name = "$_ (UTF-16)"; Text = $latin1.GetString($utf16.GetBytes($_)) } })
+          $mustSeal = @('prefs.json', 'storage.json', 'flashcards.json', 'login.bin')
+          $bad = [System.Collections.Generic.List[string]]::new()
+          $seen = @{}; $files = 0; $bytes = 0L; $held = 0
+          $profiles = @(Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory)
+          foreach ($prof in $profiles) {
+            foreach ($f in Get-ChildItem $prof.FullName -Recurse -File -Force -ErrorAction SilentlyContinue) {
+              $rel = $f.FullName.Substring($prof.FullName.Length + 1)
+              try { $data = [System.IO.File]::ReadAllBytes($f.FullName) } catch { $held++; continue }
+              $files++; $bytes += $data.Length
+              $kind = if ($mustSeal -contains $rel) { $rel } elseif ($rel -like 'Answers\*') { 'answers' } elseif ($rel -eq 'vault.key') { 'vault.key' } else { $null }
+              if ($kind) {
+                $seen[$kind] = 1 + [int]$seen[$kind]
+                $want = if ($kind -eq 'vault.key') { 'SIMPLVK1' } else { 'SIMPLENC' }
+                if ($latin1.GetString($data, 0, [Math]::Min(8, $data.Length)) -cne $want) { $bad.Add("$($prof.Name)\$rel does not begin with $want") }
+              }
+              $text = $latin1.GetString($data)
+              foreach ($n in $needles) {
+                if ($text.IndexOf($n.Text, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $bad.Add("$($prof.Name)\$rel holds the mock's sign-in in plain text: $($n.Name)") }
+              }
+              # (simpl.log, the one plain file of Simpl's own: not the password, nor a username, even on their own)
+              if ($rel -eq 'simpl.log' -and $text -cmatch '(?<![\w-])(demo|student|slow)(?![\w-])') { $bad.Add("$($prof.Name)\simpl.log names the mock's password or a username: $($Matches[0])") }
+            }
+          }
+          $took = [Math]::Round(((Get-Date) - $began).TotalSeconds, 1)
+          Write-Host "checked $($profiles.Count) profiles: $files files, $([Math]::Round($bytes / 1MB)) MB, in $took s ($held still held by a web view, left out)"
+          foreach ($k in @('prefs.json', 'storage.json', 'flashcards.json', 'login.bin', 'answers', 'vault.key')) { Write-Host "  $k sealed: $([int]$seen[$k])" }
+          # (each start's vault, as its log says: made or opened, and whether the TPM took its key)
+          $profiles | ForEach-Object { $l = Join-Path $_.FullName 'simpl.log'; if (Test-Path $l) { Select-String -Path $l -Pattern ' vault: ' | ForEach-Object { ($_.Line -replace '^\S+ ', '') -replace '\d+ ms', 'n ms' } } } | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" }
+          if ([int]$seen['storage.json'] -eq 0 -or [int]$seen['answers'] -eq 0 -or [int]$seen['vault.key'] -eq 0) { $bad.Add("nothing to check: no storage.json, kept answer or vault.key in this part's profiles") }
+          if ($bad.Count -gt 0) { $bad | ForEach-Object { Write-Host "::error::$_" }; exit 1 }
+          Write-Host "encrypted at rest: every store sealed, and the mock's sign-in in plain text nowhere"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
