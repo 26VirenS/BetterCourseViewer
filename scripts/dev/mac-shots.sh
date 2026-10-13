@@ -128,8 +128,10 @@ keep_crashes() {
 # time of each first visit and each visit again. The walks run last, by themselves (the copies picturing the rest slow
 # them, and unevenly): the app as it is, and as it loaded before 1.3.78 (-SimplPlain: nothing held or read ahead, the
 # Dashboard not kept), side by side, so the two are timed alike — against a Canvas a quarter of a second away, as a
-# school's is (its assignment lists 0.6 s: the web's fluid suite's), not the mock's instant answers.
-WALK="todo,grades,calendar,notifications,inbox,course:101,externaltools,dashboard,todo,grades,calendar,notifications,inbox,course:101,push:/courses/101/assignments/1001,back,externaltools,dashboard"
+# school's is (its assignment lists 0.6 s: the web's fluid suite's), not the mock's instant answers. Last, the
+# assignment opened from the Dashboard — its course's place, made with the assignment on it — and Back: the console
+# says "open Assignment" there, not the course's list.
+WALK="todo,grades,calendar,notifications,inbox,course:101,externaltools,dashboard,todo,grades,calendar,notifications,inbox,course:101,push:/courses/101/assignments/1001,back,externaltools,dashboard,push:/courses/101/assignments/1001,back"
 walks() {
   MODE=light
   curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":{"/assignments$":600,"":250}}' http://localhost:8800/__mock/config || true
