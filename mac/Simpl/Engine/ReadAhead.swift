@@ -264,19 +264,19 @@ extension Engine {
         case .folder(let ctx, let id, _):
             return [.read("files", id.isEmpty ? ["ctx": ctx] : ["ctx": ctx, "folder": id], FilesData.self)]
         case .course(let id):
-            return reads(for: .home("courses/\(id)"), engine: engine)
+            return reads(for: Place.home("courses/\(id)"), engine: engine)
         case .group(let id):
-            return reads(for: .home("groups/\(id)"), engine: engine)
+            return reads(for: Place.home("groups/\(id)"), engine: engine)
         case .section(let ctx, let kind):
-            return reads(for: .section(ctx, kind), engine: engine)
+            return reads(for: Place.section(ctx, kind), engine: engine)
         case .groups:
-            return reads(for: .groups, engine: engine)
+            return reads(for: Place.groups, engine: engine)
         case .inbox:
-            return reads(for: .inbox, engine: engine)
+            return reads(for: Place.inbox, engine: engine)
         case .notifications:
-            return reads(for: .notifications, engine: engine)
+            return reads(for: Place.notifications, engine: engine)
         case .calendar:
-            return reads(for: .calendar, engine: engine)
+            return reads(for: Place.calendar, engine: engine)
         case .topic, .conversation, .web:
             return []
         }
