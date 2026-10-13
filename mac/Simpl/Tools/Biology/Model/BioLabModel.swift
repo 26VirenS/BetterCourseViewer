@@ -663,7 +663,8 @@ final class BioLabValues {
         if !field(id).exact, let s = ns.compactMap(\.sigFigs).min() {
             if least == nil || s < least! {
                 least = s
-                leastShown = "\(BioLabFormat.plain(ns.first { $0.sigFigs == s }?.value ?? 0)) in \(symbol(id))"
+                let name = symbol(id).isEmpty ? field(id).label.lowercased() : symbol(id)
+                leastShown = "\(BioLabFormat.plain(ns.first { $0.sigFigs == s }?.value ?? 0)) in \(name)"
             }
         }
         return ns.map(\.value)
