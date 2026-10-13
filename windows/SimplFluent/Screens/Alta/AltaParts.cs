@@ -98,12 +98,12 @@ internal static class AltaParts
         var tile = new Grid { Height = 32, ClipToBounds = true };
         var face = new Border { CornerRadius = new CornerRadius(4) };
         if (o.Current) face.Bg(B.Accent);
-        else if (o.Mastered) face.Background = new SolidColorBrush(K.WithAlpha(accent, 0.18));
+        else if (o.Mastered) face.Background = K.Brush(K.WithAlpha(accent, 0.18));
         else face.Bg(B.Subtle);
         tile.Children.Add(face);
         if (!o.Current && !o.Mastered && o.Mastery > 0)
         {
-            var rise = new Border { VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(K.WithAlpha(accent, 0.16)) };
+            var rise = new Border { VerticalAlignment = VerticalAlignment.Bottom, Background = K.Brush(K.WithAlpha(accent, 0.16)) };
             tile.Children.Add(rise);
             var f = o.Mastery;
             var f0 = Math.Clamp(from ?? f, 0, 1);
@@ -196,7 +196,7 @@ internal static class AltaParts
         {
             var orange = K.Darkened(K.Tone("orange"));
             var note = K.Wrapped(cover.Note, Ty.Body);
-            note.Foreground = new SolidColorBrush(orange);
+            note.Foreground = K.Brush(orange);
             v.Children.Add(K.Columns("auto, *", K.Icon(SymbolRegular.Sparkle24, 16, orange).Margin(0, 2, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), note.Col(1)));
         }
         var label = StartLabel(cover);

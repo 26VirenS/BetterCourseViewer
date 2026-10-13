@@ -56,6 +56,16 @@ public static class Motion
 
     public const int Fast = 83, Normal = 167, Medium = 250, Slow = 333;
 
+    /// <summary>
+    /// The one motion pages move in, here as on the Mac and in the extension: a strong ease-out — quick to start, long to
+    /// settle (CSS's cubic-bezier(0.23, 1, 0.32, 1)) — over <see cref="Page"/>: a page going deeper, coming back, or
+    /// another place crossfading in, and the pane's mark moving to its row with it.
+    /// </summary>
+    public static readonly Bezier Out = new(0.23, 1, 0.32, 1);
+
+    /// <summary>How long a page takes to come in (and the pane's mark to reach its row).</summary>
+    public const int Page = 220;
+
     /// <summary>Windows' own "Animation effects" setting (Settings ▸ Accessibility ▸ Visual effects), where this PC can
     /// draw motion smoothly (Fx).</summary>
     public static bool On => SystemParameters.ClientAreaAnimation && Fx.Motion && Support.Launch.Get("shot") == null;

@@ -231,10 +231,10 @@ public static class Taskbar
         Place(2, K.Icon(SymbolRegular.Folder24, 20, Color.FromRgb(0xE0, 0xA1, 0x1B)));
         Place(3, K.Icon(SymbolRegular.Globe24, 20, B.Text2));
         // Simpl: lit, as its button is while it flashes; the pill under it says it is open
-        var lit = new Border { CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(K.WithAlpha(accent, 0.26)) };
+        var lit = new Border { CornerRadius = new CornerRadius(4), Background = K.Brush(K.WithAlpha(accent, 0.26)) };
         var pill = new Border
         {
-            Width = 16, Height = 3, CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(accent),
+            Width = 16, Height = 3, CornerRadius = new CornerRadius(1.5), Background = K.Brush(accent),
             VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 1),
         };
         Place(4, lit, new Image { Source = Logo, Width = 24, Height = 24 }, pill);
@@ -300,7 +300,7 @@ public static class Taskbar
         for (var i = 0; i < 4; i++)
             g.Children.Add(new Rectangle
             {
-                Width = 8.4, Height = 8.4, RadiusX = 1.2, RadiusY = 1.2, Fill = new SolidColorBrush(accent),
+                Width = 8.4, Height = 8.4, RadiusX = 1.2, RadiusY = 1.2, Fill = K.Brush(accent),
                 HorizontalAlignment = i % 2 == 0 ? HorizontalAlignment.Left : HorizontalAlignment.Right,
                 VerticalAlignment = i < 2 ? VerticalAlignment.Top : VerticalAlignment.Bottom,
             });
@@ -317,7 +317,7 @@ public static class Taskbar
             Height = 32, CornerRadius = new CornerRadius(4),
             Child = K.Columns("36, *", icon.Col(0), K.Text(text, Ty.Body).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1)),
         };
-        if (chosen) row.Background = new SolidColorBrush(K.WithAlpha(Appearance.Accent, 0.18));
+        if (chosen) row.Background = K.Brush(K.WithAlpha(Appearance.Accent, 0.18));
         return row;
     }
 

@@ -107,7 +107,8 @@ public sealed partial class DashboardScreen
 
     private static int CardCols(double w) => Math.Max(1, (int)Math.Floor((Math.Max(320, w) * (w >= 900 ? 0.7 : 1) + 16) / (264 + 16)));
 
-    private bool courseCardsShown;
+    /// <summary>The cards have come in: true from the start (the page comes in as a whole); a switch to Cards brings them in one after another.</summary>
+    private bool courseCardsShown = true;
 
     private FrameworkElement CoursesSection(double w)
     {
@@ -143,7 +144,7 @@ public sealed partial class DashboardScreen
             grid.Children.Add(card);
         }
         v.Children.Add(grid);
-        // (the cards come in one after another the first time they show, not again at every answer or count)
+        // (the cards come in one after another when Cards is chosen, not with the page, nor at every answer or count)
         if (!courseCardsShown) Motion.Stagger(grid.Children.OfType<UIElement>(), 40, 20);
         courseCardsShown = true;
         return v;
@@ -209,6 +210,7 @@ public sealed partial class DashboardScreen
         bodyStack.Margin = new Thickness(16, 12, 16, 14);
         var content = K.Rows("auto, auto", hero.Row(0), bodyStack.Row(1));
         var card = K.CardButton(content, () => engine.OpenWeb(course.Url, course.Code), 8, new Thickness(0));
+        Ahead.On(card, build => engine.PrepareWeb(course.Url, build));
         card.VerticalContentAlignment = VerticalAlignment.Top;
         // (the hero's corners follow the card's)
         hero.Clip = null;
@@ -221,9 +223,9 @@ public sealed partial class DashboardScreen
 
     private static Border Pill(string text, Color back, Color fore, SymbolRegular? icon = null)
     {
-        var t = new TextBlock { Text = text, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(fore), VerticalAlignment = VerticalAlignment.Center };
+        var t = new TextBlock { Text = text, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = K.Brush(fore), VerticalAlignment = VerticalAlignment.Center };
         var row = K.H(4, icon is { } i ? K.Icon(i, 12, fore, filled: true) : null, t);
-        return new Border { Background = new SolidColorBrush(back), CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 2, 8, 3), Child = row };
+        return new Border { Background = K.Brush(back), CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 2, 8, 3), Child = row };
     }
 
     // ---- Activity (the Mac's DashActivityList) ----

@@ -16,8 +16,9 @@ namespace Simpl.Support;
 /// --perf-walk &lt;folder&gt;: once the app's own screens are up and their first answers in, one fixed walk through
 /// it — the Dashboard, To Do, the Calendar, Grades, the Inbox, a course, an assignment, Notifications, New task,
 /// Settings, Tools, a search typed, the window dragged and resized, the Dashboard again — each step timed with Perf's
-/// numbers; memory read once the start has settled, after the walk, and after the window has been minimized a while
-/// (then brought back, timed); all written to perf[-name].json and perf[-name].txt in the folder and to simpl.log,
+/// numbers (and how each screen came in: its page kept, built from the answers kept, or read); a screen shown a while
+/// ago again (Grades), its page let go since; memory read once the start has settled, after the walk, after it has
+/// been left alone a while, and after the window has been minimized a while (then brought back, timed); all written to perf[-name].json and perf[-name].txt in the folder and to simpl.log,
 /// and then Simpl quits. It only looks: New task and Settings are opened and closed with nothing saved. --perf-name
 /// (the files' suffix), --perf-course and --perf-assignment (what is opened; else the first course, and the first
 /// assignment To Do lists), --perf-minimized (how long the window stays minimized, 30 s; 0: not), --perf-timeout
@@ -105,11 +106,19 @@ public static class PerfWalk
             await Drag(m);
             await Resize(m);
             await Go("Dashboard (again)", () => e.Go(Place.Dashboard));
-            // memory after the walk, settled as the start was; then after a while minimized, and the window back
+            // a screen shown a while ago, its page let go since: made again from the answers kept
+            await Go("Grades (again)", () => e.Go(Place.Grades));
+            await Go("Dashboard (last)", () => e.Go(Place.Dashboard));
+            // memory after the walk, settled as the start was; then left alone a while; then after a while minimized,
+            // and the window back
             stage = "the walk settling";
             await Perf.Quiet(2000, 20_000);
             if (finished) return;
             Remember("walked");
+            stage = "left alone";
+            await Perf.Quiet(16_000, 40_000);
+            if (finished) return;
+            Remember("idle");
             await Minimized(m);
             Finish(null);
         }
@@ -139,11 +148,14 @@ public static class PerfWalk
         if (finished) return;
         stage = name;
         var k = new Mark();
+        Perf.TakeOpen();
         act();
         var shown = await Perf.Idle();
         var settled = await Perf.Settle(k.T0, shown, StepLimit);
         await k.FramesFor(700);
-        rows.Add(k.Row(name, Perf.Ms(k.T0, shown), settled is { } t ? Perf.Ms(k.T0, t) : null, settled == null ? Late : null));
+        // (how the shell brought it in: its page kept, built from the answers kept, or waiting for the page)
+        var how = Perf.TakeOpen() is { } o ? $"opened {o.How}" : null;
+        rows.Add(k.Row(name, Perf.Ms(k.T0, shown), settled is { } t ? Perf.Ms(k.T0, t) : null, settled == null ? (how != null ? how + "; " : "") + Late : how));
         await Task.Delay(250);
     }
 

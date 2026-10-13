@@ -74,7 +74,7 @@ internal static class QuizUi
     /// <summary>What a coloured line at its left edge marks (an answer, the worked solution): no wash, no box.</summary>
     public static FrameworkElement Edge(UIElement child, Color color, double alpha = 0.65)
     {
-        var bar = new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(K.WithAlpha(color, alpha)) };
+        var bar = new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Background = K.Brush(K.WithAlpha(color, alpha)) };
         return K.Columns("3, 11, *", bar.Col(0), child.Col(2));
     }
 
@@ -232,7 +232,7 @@ internal sealed class QuizAskLayer : Grid
     public QuizAskLayer()
     {
         Visibility = Visibility.Collapsed;
-        smoke.Background = new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)110 : (byte)70, 0, 0, 0));
+        smoke.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)110 : (byte)70, 0, 0, 0));
         smoke.MouseLeftButtonDown += (_, e) => e.Handled = true;
         Children.Add(smoke);
     }

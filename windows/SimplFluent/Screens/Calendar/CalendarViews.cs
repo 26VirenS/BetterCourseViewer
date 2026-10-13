@@ -276,7 +276,7 @@ public sealed partial class CalendarScreen
         if (!string.IsNullOrEmpty(ev.Time)) meta.Children.Add(K.Text(ev.Time!, Ty.Caption, B.Text2).Margin(0, 1, 6, 1));
         if (Flag(ev) is { } f) meta.Children.Add(K.Chip(f.Word, CalendarKit.Tone(f.Kind)));
         if (meta.Children.Count > 0) words.Children.Add(meta);
-        var bar = new Border { Width = 3.5, CornerRadius = new CornerRadius(1.75), Background = new SolidColorBrush(K.Hex(ev.Color)), Margin = new Thickness(0, 0, 8, 0) };
+        var bar = new Border { Width = 3.5, CornerRadius = new CornerRadius(1.75), Background = K.Brush(K.Hex(ev.Color)), Margin = new Thickness(0, 0, 8, 0) };
         var g = K.Columns("auto, *", bar.Col(0), words.Col(1));
         var b = K.Subtle(g, null, new Thickness(3, 6, 6, 6), 8);
         b.Click += (_, _) => peek.Press(ev, b);

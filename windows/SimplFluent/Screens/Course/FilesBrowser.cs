@@ -223,7 +223,7 @@ internal sealed class CourseFilesPart : CoursePart
     /// <summary>The row picked: the accent's wash under it (deeper while the list has the keyboard), its name in bold.</summary>
     private void Wash(Button row, bool on)
     {
-        row.Background = on ? new SolidColorBrush(K.WithAlpha(Appearance.Accent, list.IsKeyboardFocusWithin ? 0.2 : 0.12)) : Brushes.Transparent;
+        row.Background = on ? K.Brush(K.WithAlpha(Appearance.Accent, list.IsKeyboardFocusWithin ? 0.2 : 0.12)) : Brushes.Transparent;
         AutomationProperties.SetItemStatus(row, on ? "Selected" : "");
     }
 

@@ -197,8 +197,8 @@ internal static class GradesKit
     {
         var v = Math.Clamp(value ?? 0, 0, 1);
         var g = new Grid { Height = height, VerticalAlignment = VerticalAlignment.Center };
-        g.Children.Add(new Border { CornerRadius = new CornerRadius(height / 2), Background = new SolidColorBrush(K.WithAlpha(color, 0.16)) });
-        var fill = new Border { CornerRadius = new CornerRadius(height / 2), Background = new SolidColorBrush(color), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
+        g.Children.Add(new Border { CornerRadius = new CornerRadius(height / 2), Background = K.Brush(K.WithAlpha(color, 0.16)) });
+        var fill = new Border { CornerRadius = new CornerRadius(height / 2), Background = K.Brush(color), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
         g.Children.Add(fill);
         Border? tick = null;
         if (mark != null)
@@ -279,8 +279,8 @@ internal static class GradesKit
                 ? new Rectangle { RadiusX = 7, RadiusY = 7, Fill = new LinearGradientBrush(K.Mix(color, Colors.White, 0.14), color, 90) }
                 : new Rectangle
                 {
-                    RadiusX = 7, RadiusY = 7, Fill = new SolidColorBrush(K.WithAlpha(color, 0.08)),
-                    Stroke = new SolidColorBrush(K.WithAlpha(color, 0.75)), StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4 / 1.5, 3 / 1.5 },
+                    RadiusX = 7, RadiusY = 7, Fill = K.Brush(K.WithAlpha(color, 0.08)),
+                    Stroke = K.Brush(K.WithAlpha(color, 0.75)), StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4 / 1.5, 3 / 1.5 },
                 };
             piece.ToolTip = $"{g.Name} · {Share(g.Weight ?? 0)} of grade{(g.Graded == true ? "" : " · nothing graded yet")}";
             piece.MouseEnter += (_, _) => { hovered = g.Id; Update(); };

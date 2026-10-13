@@ -212,9 +212,9 @@ internal sealed class QuizTakePane : IQuizPane
         var swatch = new Border { Width = 13, Height = 13, CornerRadius = new CornerRadius(3.5) };
         switch (f)
         {
-            case Face.Current: swatch.Background = new SolidColorBrush(s.Tint); break;
-            case Face.Done: swatch.Background = new SolidColorBrush(K.WithAlpha(s.Tint, 0.2)); break;
-            case Face.Flagged: swatch.Bg(B.Subtle); swatch.BorderBrush = new SolidColorBrush(QuizUi.Orange); swatch.BorderThickness = new Thickness(1.5); break;
+            case Face.Current: swatch.Background = K.Brush(s.Tint); break;
+            case Face.Done: swatch.Background = K.Brush(K.WithAlpha(s.Tint, 0.2)); break;
+            case Face.Flagged: swatch.Bg(B.Subtle); swatch.BorderBrush = K.Brush(QuizUi.Orange); swatch.BorderThickness = new Thickness(1.5); break;
             default: swatch.Bg(B.Subtle).Stroke(B.CardStroke); break;
         }
         return K.H(10, swatch, K.Text(text, Ty.Caption, B.Text2));
@@ -359,12 +359,12 @@ internal sealed class QuizTile : Button
         var flagged = q.Flagged;
         if (current)
         {
-            face.Background = new SolidColorBrush(tint);
+            face.Background = K.Brush(tint);
             text.Foreground = Brushes.White; // (on the quiz's own colour)
         }
         else if (done)
         {
-            face.Background = new SolidColorBrush(K.WithAlpha(tint, Support.Appearance.Dark ? 0.32 : 0.18));
+            face.Background = K.Brush(K.WithAlpha(tint, Support.Appearance.Dark ? 0.32 : 0.18));
             text.Foreground = QuizUi.Ink(tint);
         }
         else
@@ -372,11 +372,11 @@ internal sealed class QuizTile : Button
             face.Bg(B.Subtle);
             text.Fg(B.Text2);
         }
-        if (flagged && !current) { face.BorderBrush = new SolidColorBrush(QuizUi.Orange); face.BorderThickness = new Thickness(1.5); }
+        if (flagged && !current) { face.BorderBrush = K.Brush(QuizUi.Orange); face.BorderThickness = new Thickness(1.5); }
         else if (!current && !done) face.Stroke(B.CardStroke);
         else face.BorderThickness = new Thickness(0);
         flag.Visibility = flagged ? Visibility.Visible : Visibility.Collapsed;
-        flag.Foreground = new SolidColorBrush(current ? Colors.White : QuizUi.Orange);
+        flag.Foreground = K.Brush(current ? Colors.White : QuizUi.Orange);
         spinner.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
         text.Visibility = loading ? Visibility.Hidden : Visibility.Visible;
         face.Opacity = sealedOff ? 0.35 : 1;
@@ -472,7 +472,7 @@ internal sealed class QuizQuestionPage
         if (flagButton == null) return;
         flagButton.Content = q.Flagged ? "Flagged" : "Flag";
         var icon = new SymbolIcon { Symbol = SymbolRegular.Flag24, Filled = q.Flagged };
-        if (q.Flagged) icon.Foreground = new SolidColorBrush(QuizUi.Orange);
+        if (q.Flagged) icon.Foreground = K.Brush(QuizUi.Orange);
         flagButton.Icon = icon;
         flagButton.ToolTip = q.Flagged ? "Remove the flag (F)" : "Flag this question to come back to it (F)";
         System.Windows.Automation.AutomationProperties.SetName(flagButton, q.Flagged ? "Flagged for review" : "Flag for review");
@@ -487,7 +487,7 @@ internal sealed class QuizQuestionPage
         {
             var on = q.Kind == "multi" ? q.Picks.Contains(o.Id) : q.Pick == o.Id;
             mark.IsChecked = on;
-            wash.Background = on ? new SolidColorBrush(K.WithAlpha(s.Tint, Support.Appearance.Dark ? 0.24 : 0.14)) : Brushes.Transparent;
+            wash.Background = on ? K.Brush(K.WithAlpha(s.Tint, Support.Appearance.Dark ? 0.24 : 0.14)) : Brushes.Transparent;
             if (on) letter.Foreground = QuizUi.Ink(s.Tint); else letter.Fg(B.Text2);
         }
         if (q.Kind == "file") FileArea();
@@ -625,7 +625,7 @@ internal sealed class QuizQuestionPage
             var badge = new Border
             {
                 MinWidth = 28, Height = 28, CornerRadius = new CornerRadius(14), Padding = new Thickness(6, 0, 6, 0),
-                Background = new SolidColorBrush(K.WithAlpha(s.Tint, 0.16)), VerticalAlignment = VerticalAlignment.Center,
+                Background = K.Brush(K.WithAlpha(s.Tint, 0.16)), VerticalAlignment = VerticalAlignment.Center,
             };
             var n = K.Text($"{b.N}", Ty.Caption).Digits().Center();
             n.FontWeight = FontWeights.Bold;
@@ -724,9 +724,9 @@ internal sealed class QuizQuestionPage
         if (dropEdge == null || dropIcon == null || dropWords == null) return;
         if (dropping)
         {
-            dropEdge.Stroke = new SolidColorBrush(s.Tint);
-            dropEdge.Fill = new SolidColorBrush(K.WithAlpha(s.Tint, 0.1));
-            dropIcon.Foreground = new SolidColorBrush(s.Tint);
+            dropEdge.Stroke = K.Brush(s.Tint);
+            dropEdge.Fill = K.Brush(K.WithAlpha(s.Tint, 0.1));
+            dropIcon.Foreground = K.Brush(s.Tint);
         }
         else
         {

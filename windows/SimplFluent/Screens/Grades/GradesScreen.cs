@@ -41,7 +41,6 @@ public sealed class GradesScreen : Screen
     private bool showAll;
     private FrameworkElement? commands;
     private string? lastSub;
-    private bool cardsShown;
 
     // what a change of the goal moves, in place (the buttons pressed keep the keyboard)
     private TextBlock? goalText;
@@ -228,7 +227,7 @@ public sealed class GradesScreen : Screen
         var color = K.Tone(up ? "green" : "orange");
         var words = K.Text(up ? $"+{diff.ToString("0.00", Inv)} above goal" : $"{Math.Abs(diff).ToString("0.00", Inv)} below goal", Ty.Body).Tabular();
         words.FontWeight = FontWeights.Medium;
-        words.Foreground = new SolidColorBrush(K.Darkened(color));
+        words.Foreground = K.Brush(K.Darkened(color));
         return K.H(6, K.Icon(up ? SymbolRegular.ArrowCircleUp24 : SymbolRegular.ArrowCircleDown24, 18, color, filled: true), words);
     }
 
@@ -372,9 +371,6 @@ public sealed class GradesScreen : Screen
             Grid.SetRow(card, (k / cols) * 2);
             grid.Children.Add(card);
         }
-        // (the cards come in one after another the first time they show, not at every answer)
-        if (!cardsShown) Motion.Stagger(grid.Children.OfType<UIElement>(), 40, 20);
-        cardsShown = true;
         return grid;
     }
 
@@ -413,6 +409,7 @@ public sealed class GradesScreen : Screen
         }
         var content = K.V(14, header, groups);
         var card = K.CardButton(content, () => engine.Go(Place.Section($"courses/{r.Id}", "grades")), 8, new Thickness(18));
+        Ahead.On(card, build => engine.Prepare(Place.Section($"courses/{r.Id}", "grades"), build));
         Shell.Tour.Mark(card, Shell.TourSpot.GradeDetails); // (the tour's "What if?": a card opens every grade)
         card.VerticalContentAlignment = VerticalAlignment.Top;
         card.ToolTip = $"{r.Code}: every assignment’s grade, and what-if scores";
@@ -547,6 +544,7 @@ public sealed class GradesScreen : Screen
         var g = K.Columns("auto, *, auto", K.Dot(color, 9).Margin(0, 0, 12, 0).Col(0), words.Col(1), end.Margin(8, 0, 0, 0).Col(2));
         var b = K.Subtle(g, r.Url is { } u ? () => engine.GoTo(u, r.Name) : null, new Thickness(8, 8, 8, 8));
         if (r.Url is { } url) b.ContextMenu = GradesKit.Menu(GradesKit.LinkItems(engine, url, r.Name, "Open Assignment"));
+        if (r.Url != null) Ahead.On(b, build => engine.PrepareWeb(r.Url, build));
         return b;
     }
 
@@ -630,6 +628,7 @@ public sealed class GradesScreen : Screen
             GradesKit.Letter(item.Band).Margin(8, 0, 8, 0).Col(2), score.Col(3));
         var b = K.Subtle(g, () => engine.GoTo(item.Url, item.Name), new Thickness(8, 8, 8, 8));
         if (!string.IsNullOrEmpty(item.Url)) b.ContextMenu = GradesKit.Menu(GradesKit.LinkItems(engine, item.Url!, item.Name));
+        Ahead.On(b, build => engine.PrepareWeb(item.Url, build));
         return b;
     }
 }

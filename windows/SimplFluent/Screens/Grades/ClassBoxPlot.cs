@@ -111,7 +111,7 @@ public sealed class ClassBoxPlot : Grid
         if (stats.Mine is { } me)
         {
             var s = 12 * Grow("me");
-            Put(new Ellipse { Width = s, Height = s, Fill = new SolidColorBrush(tint) }.Stroke(B.Solid, 2), X(me) - s / 2, mid - s / 2);
+            Put(new Ellipse { Width = s, Height = s, Fill = K.Brush(tint) }.Stroke(B.Solid, 2), X(me) - s / 2, mid - s / 2);
         }
         if (lit is { } i && i < marks.Count) Tip(marks[i], w);
 

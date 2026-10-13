@@ -256,7 +256,7 @@ public sealed class CourseGradesScreen : Screen
         {
             var letter = K.Text(whatIf ? $"{l} with what-if" : l, Ty.BodyLarge);
             letter.FontWeight = FontWeights.SemiBold;
-            letter.Foreground = new SolidColorBrush(K.Darkened(whatIf ? orange : color));
+            letter.Foreground = K.Brush(K.Darkened(whatIf ? orange : color));
             words.Children.Add(letter);
         }
         words.Children.Add(TargetPicker(d));
@@ -275,8 +275,8 @@ public sealed class CourseGradesScreen : Screen
         var card = K.Card(inner, new Thickness(0));
         if (whatIf)
         {
-            inner.Background = new SolidColorBrush(K.WithAlpha(orange, Appearance.Dark ? 0.12 : 0.08));
-            card.BorderBrush = new SolidColorBrush(K.WithAlpha(orange, 0.45));
+            inner.Background = K.Brush(K.WithAlpha(orange, Appearance.Dark ? 0.12 : 0.08));
+            card.BorderBrush = K.Brush(K.WithAlpha(orange, 0.45));
         }
         return card;
     }
@@ -365,7 +365,7 @@ public sealed class CourseGradesScreen : Screen
     {
         var orange = GradesKit.Orange;
         var label = K.Text("What-If", Ty.BodyStrong);
-        label.Foreground = new SolidColorBrush(K.Darkened(orange));
+        label.Foreground = K.Brush(K.Darkened(orange));
         var row = K.H(12, K.H(6, K.Icon(SymbolRegular.Wand24, 16, orange), label), K.Text(d.TotalText, Ty.BodyStrong).Tabular());
         if (d.Letter is { } l) row.Children.Add(GradesKit.Letter(l));
         if (d.GpaIf is { } g)
@@ -374,7 +374,7 @@ public sealed class CourseGradesScreen : Screen
             row.Children.Add(K.Text($"Term GPA {g.ToString("0.00", GradesKit.Inv)}", Ty.Body, B.Text2).Tabular());
         }
         foreach (var c in row.Children.OfType<FrameworkElement>()) c.VerticalAlignment = VerticalAlignment.Center;
-        var tint = new Border { Child = row, Padding = new Thickness(20, 12, 20, 12), CornerRadius = new CornerRadius(7), Background = new SolidColorBrush(K.WithAlpha(orange, 0.08)) };
+        var tint = new Border { Child = row, Padding = new Thickness(20, 12, 20, 12), CornerRadius = new CornerRadius(7), Background = K.Brush(K.WithAlpha(orange, 0.08)) };
         var bar = new Border { Child = tint, CornerRadius = new CornerRadius(8), Effect = K.Shadow(24, 6, 0.2) };
         bar.Bg(B.Flyout).Stroke(B.FlyoutStroke);
         AutomationProperties.SetName(bar, $"What-If: {d.TotalText}{(d.Letter is { } sl ? ", " + sl : "")}{(d.GpaIf is { } sg ? $", term GPA {sg.ToString("0.00", GradesKit.Inv)}" : "")}");
@@ -646,7 +646,7 @@ public sealed class CourseGradesScreen : Screen
             }
         }
         tb.FontWeight = tried ? FontWeights.SemiBold : FontWeights.Normal;
-        if (tried) tb.Foreground = new SolidColorBrush(K.Darkened(GradesKit.Orange));
+        if (tried) tb.Foreground = K.Brush(K.Darkened(GradesKit.Orange));
         else tb.SetResourceReference(Control.ForegroundProperty, B.Text);
         AutomationProperties.SetName(tb, $"What-if score for {r.Name}, out of {GradesKit.Num(r.Possible)}");
         var outOf = K.Text($"/ {GradesKit.Num(r.Possible)}", Ty.Caption, B.Text2).Tabular();

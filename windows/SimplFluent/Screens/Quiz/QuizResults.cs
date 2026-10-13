@@ -377,7 +377,7 @@ internal sealed class QuizFeedbackPane : IQuizPane
         n.VerticalAlignment = VerticalAlignment.Center;
         if (Ink(r.Verdict) is { } c)
         {
-            face.Background = new SolidColorBrush(K.WithAlpha(c, Support.Appearance.Dark ? 0.3 : 0.18));
+            face.Background = K.Brush(K.WithAlpha(c, Support.Appearance.Dark ? 0.3 : 0.18));
             n.Foreground = QuizUi.Ink(c);
         }
         else
@@ -473,7 +473,7 @@ internal sealed class QuizFeedbackPane : IQuizPane
             var name = K.Text(FilterNames[k], on ? Ty.BodyStrong : Ty.Body);
             var g = K.Columns("*, auto", name.Col(0), K.Text($"{n[k]}", Ty.Body, B.Text2).Digits().Col(1));
             var wash = new Border { Child = g, Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(6) };
-            wash.Background = on ? new SolidColorBrush(K.WithAlpha(s.Tint, Support.Appearance.Dark ? 0.24 : 0.15)) : Brushes.Transparent;
+            wash.Background = on ? K.Brush(K.WithAlpha(s.Tint, Support.Appearance.Dark ? 0.24 : 0.15)) : Brushes.Transparent;
             var at = k;
             var b = K.Subtle(wash, () => SetFilter(at), new Thickness(0), 6);
             System.Windows.Automation.AutomationProperties.SetName(b, $"{FilterNames[k]}, {n[k]}{(on ? ", showing" : "")}");

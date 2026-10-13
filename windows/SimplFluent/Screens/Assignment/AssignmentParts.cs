@@ -306,7 +306,7 @@ internal static class AssignKit
             if (web.CoreWebView2 != null) return;
             try
             {
-                var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Simpl.Engine.Engine.BrowserArguments));
+                var env = await Simpl.Engine.Engine.WebEnvironment();
                 await web.EnsureCoreWebView2Async(env);
                 if (web.CoreWebView2 is not { } core) return; // (let go of while it started)
                 core.Settings.IsPasswordAutosaveEnabled = false;
@@ -560,7 +560,7 @@ internal sealed class AssignClassPlot : FrameworkElement
 
     private static Brush Solid(Color c, double a)
     {
-        var b = new SolidColorBrush(Color.FromArgb((byte)(c.A * a), c.R, c.G, c.B));
+        var b = K.Brush(Color.FromArgb((byte)(c.A * a), c.R, c.G, c.B));
         b.Freeze();
         return b;
     }

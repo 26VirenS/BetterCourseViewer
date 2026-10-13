@@ -135,7 +135,7 @@ public sealed class SchoolConfirm : Grid
         public TextBlockLike(string s)
         {
             Element = K.Text(s, Ty.Body);
-            Element.Foreground = new SolidColorBrush(Color.FromArgb(115, 0, 0, 0));
+            Element.Foreground = K.Brush(Color.FromArgb(115, 0, 0, 0));
             Element.HorizontalAlignment = HorizontalAlignment.Center;
         }
     }

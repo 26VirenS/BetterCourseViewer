@@ -274,9 +274,9 @@ course, an assignment, Notifications, the New task sheet, Settings, Tools, a sea
 window dragged and resized, the Dashboard again — writes `perf.json` and `perf.txt` there (and the table to
 simpl.log), and quits. Each step: drawn (`ui`), its answers in and shown (`data`), the builds and calls it took, the
 longest stall, the frames in its first 700 ms and the longest gap between them, the memory it allocated. Memory is
-read three times — `settled` (the start done: nothing asked of the page for two seconds), `walked` (the same, after
-the walk) and `minimized` (the window minimized for `--perf-minimized` seconds, 30; 0 leaves it out) — then the window
-is brought back and timed (`Restore`). `--perf-name warm` names the files `perf-warm.*`; `--perf-course` and
+read four times — `settled` (the start done: nothing asked of the page for two seconds), `walked` (the same, after
+the walk), `idle` (left alone sixteen seconds) and `minimized` (the window minimized for `--perf-minimized` seconds,
+30; 0 leaves it out) — then the window is brought back and timed (`Restore`). `--perf-name warm` names the files `perf-warm.*`; `--perf-course` and
 `--perf-assignment` choose what is opened (else the first course, and the first assignment To Do lists);
 `--perf-timeout` (240 s) ends a walk that cannot finish, writing what it has; a first setup still to answer stops it,
 with a note. The walk only looks: New task and Settings are opened and closed, nothing saved.
@@ -290,10 +290,26 @@ On a student's own PC: quit Simpl from the notification area (right-click its ic
 
 `perf.txt` lands on the desktop; its first two lines say what the PC is, which decides most of the rest.
 
+A development run also says, as each screen comes in, how long it took and how: `perf: open Grades 12 ms (cached)` —
+`kept` (its page was kept: nothing built), `cached` (built at once from the answers kept), `read` (nothing kept: it
+waited for the page). The walk notes the same beside each step; its `Grades (again)` comes back to a screen whose page
+was let go, so it is built from what was kept.
+
+Memory given back (`Support/MemoryTidy.cs`): left alone ten seconds — nothing pressed or typed in the window, nothing
+asked of the page, a good deal made and thrown away since — .NET collects and hands its free memory back to Windows
+(once a minute at most). Minimized or in the notification area for twenty seconds: the same; the page (and the
+graphing calculator's) asked to keep to little memory (`MemoryUsageTargetLevel` Low — WebView2 then hands its own
+processes' memory back); and Windows takes what Simpl is not using out of RAM (its working set). Never sooner, so a
+window brought straight back has everything where it was; back in view, the page has its pace again at once. One
+browser (`Engine.WebEnvironment`) serves every web view, with its network service in its own process
+(`NetworkServiceInProcess2`: one process fewer). `--no-tidy` (any run) leaves memory as .NET and WebView2 keep it.
+
 CI's Performance walk, beside the pictures, does the same against the mock twice with one profile — `cold`, then
 `warm` (the answers kept) — prints both tables in its log and the run's summary, keeps them as `windows-fluent-perf`
 and with the pictures, and compares each with the last green run's (before, after, the change: the timings, all the
-calls' time, and memory at each of its three moments — all of it, then Simpl's and WebView2's). It only reports: a
+calls' time, and memory at each of its moments — all of it, then Simpl's and WebView2's). For now it also walks the
+warm profile with `--no-prefetch`, against the warm walk, and once under dotnet-trace (`windows-fluent-trace`, kept a
+week: the sampled stacks, as speedscope reads them). It only reports: a
 slower number never fails a run, and nothing waits for it but the pictures' merge.
 
 ## Layout of the code
@@ -302,8 +318,8 @@ slower number never fails a run, and nothing waits for it but the pictures' merg
 | --- | --- |
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). |
-| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states), `B` (theme brush keys), `Motion` (WinUI curves and transitions), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder). |
@@ -336,8 +352,48 @@ public sealed class TodoScreen : Screen
   `K.SectionHeader` and `K.Row`.
 - Surfaces: `K.Card` (8 radius; 4 for Settings rows), `K.CardButton`, `K.Subtle` for rows in a list. Lists sit in a card
   with `K.Divider` between rows. Dialogs are `Sheet`s shown with `Dialogs.Show(sheet, window)`.
-- Motion: `Motion.Enter` / `Stagger` for content arriving, `SlideIn` for steps, `DrillIn` for something opened;
-  everything respects Windows' "Animation effects" and is off in the screenshot suite.
+- Motion: the shell brings the page in (below, Pages); a screen animates only what changes on it at the student's
+  word — `Motion.Enter` / `Stagger` for a regrouped list or a filter's cards, `SlideIn` for steps, `DrillIn` for
+  something opened over it — never its content as it first shows. Everything respects Windows' "Animation effects"
+  and is off in the screenshot suite.
+- Something that leads to another screen (a row, a card) gets it ready ahead of the click:
+  `Ahead.On(element, build => engine.PrepareWeb(url, build))` (or `engine.Prepare(place, build)`).
+- A screen whose `Refresh` does more than read overrides `ReadAhead` (what the prefetch asks of it); one that listens to
+  something outside itself undoes it in `Release`; one with something of the student's in it (a reply being written)
+  says `Busy`.
+
+## Pages
+
+`Shell/AppShellPages.cs`: the page area is a deck of pages, each kept screen's page with its own scroller (so each
+keeps where it was scrolled), the one showing on top and the rest folded away — not laid out, not drawn — until shown
+again. A screen is built at once as it is shown (`Show(now: true)`), from the answers kept when there are some, so the
+page comes in with what it shows; one with nothing read yet keeps the page before it up while its first answer comes
+(300 ms at most), never coming in empty to fill in after.
+
+One motion, here as on the Mac and in the extension: going deeper (a piece of work opened) slides the page in from
+32 px to the right as it fades in, the one before drifting 16 px left as it fades out; Back is the reverse; another
+place in the pane crossfades, the page lifting 8 px; the title fades in with it and the pane's mark slides to its row
+in the same time and curve — 220 ms, decelerating hard (`Motion.Out`, CSS's `cubic-bezier(0.23, 1, 0.32, 1)`). Only
+the pages' transforms and opacity move (never their layout), each drawn once into a picture of itself while it moves
+(`BitmapCache`, at the display's scale, where the graphics card draws), so every frame is drawn; a move interrupted
+by another carries on from where the pages are, nothing queued. A page holding a window of its own (a web view) cannot
+move or fade, so it changes at once. Windows' "Animation effects" off: pages simply change.
+
+What is kept, against memory: the Dashboard's page always (its cards stay loaded; coming back to it is instant, and
+its answers read again in the background — a while after they came — update its cards in place); of the rest, the
+last three screens shown keep their pages; any screen with something of the student's in it is kept. Every other is
+let go — page, tree and screen — and made again when next shown, at once, from the answers kept in memory (the last
+few megabytes of them, `AnswerCache`) or sealed on disk. Answers are read again (stale while they are) once they are
+two minutes old, or when something changes them (a tick, a hand-in: `DataVersion`); one the page gave less than 90
+seconds ago, nothing changed since, is taken as it is.
+
+Reading ahead (`Shell/Prefetch.cs`): once the start has settled — the counts live, nothing asked of the page for a
+moment — the root places (To Do, the Calendar, Grades, Notifications, the Inbox, All Courses) and each course's home
+(the first twelve) are read, one screen at a time (two or three reads at once at most), a breath between, waiting
+whenever the student's own screens are asking: the school is asked at the pace of a student clicking through, not all
+at once. A pointer resting 90 ms on a pane's row, a course's card or a row of work has its screen read; pressed, the
+screen is built and laid out too, unseen (`Kit/Ahead.cs`), so the click only has to bring it in. `--no-prefetch` (any
+run) reads nothing ahead.
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
 

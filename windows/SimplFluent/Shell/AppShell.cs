@@ -23,7 +23,7 @@ namespace Simpl.Shell;
 /// sections and the groups, and Settings at its foot — and the page at the right: its title (a breadcrumb once something
 /// is opened on it), its commands, and the screen. Below 880 wide the pane folds away behind the title bar's button.
 /// </summary>
-public sealed class AppShell : Grid, IDisposable
+public sealed partial class AppShell : Grid, IDisposable
 {
     public const double PaneWidth = 304;
     public const double NarrowBelow = 880;
@@ -41,8 +41,6 @@ public sealed class AppShell : Grid, IDisposable
     private readonly Grid header = new();
     private readonly ContentControl titleHost = new() { Focusable = false };
     private readonly ContentControl commandsHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
-    private readonly ContentControl body = new() { Focusable = false };
-    private readonly ScrollViewer scroller;
     private readonly Border toast = new();
     private readonly TextBlock toastText;
     private readonly TranslateTransform toastShift = new();
@@ -57,8 +55,7 @@ public sealed class AppShell : Grid, IDisposable
     /// <summary>When each kept screen was last shown (a count of showings), so the least lately shown are let go first.</summary>
     private readonly Dictionary<Screen, long> shownAt = new();
     private long showings;
-    /// <summary>How many screens are kept to come back to: those pushed on a place, and courses' and groups' pages.</summary>
-    private const int KeptRoutes = 12, KeptPages = 8;
+    private readonly Prefetcher prefetch;
     private Screen? current;
     private bool narrow, paneOpen, sheetOpen;
     private int lastNav = -1;
@@ -108,11 +105,10 @@ public sealed class AppShell : Grid, IDisposable
         header.Children.Add(titleHost.Col(0));
         header.Children.Add(commandsHost.Col(1));
         header.Margin = new Thickness(40, 4, 40, 20);
-        scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(40, 0, 40, 0) };
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.Children.Add(header.Row(0));
-        page.Children.Add(body.Row(1));
+        page.Children.Add(deck.Row(1));
         page.SizeChanged += (_, _) => Widths();
         Children.Add(page.Col(1));
 
@@ -135,18 +131,24 @@ public sealed class AppShell : Grid, IDisposable
         FilePreview.Shared.PropertyChanged += OnFile;
 
         // the pane over the page while the window is narrow, and what dims the page behind it
-        scrim.Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
+        scrim.Background = K.Brush(Color.FromArgb(1, 0, 0, 0));
         scrim.MouseLeftButtonDown += (_, _) => ClosePane();
         Grid.SetColumnSpan(scrim, 2);
         Children.Add(scrim);
 
         engine.PropertyChanged += OnEngine;
+        engine.PrepareRequested += OnPrepare;
+        prefetch = new Prefetcher(engine, loc => ScreenAt(loc, make: false) != null, () => ContentWidth);
         Updates();
         Navigate();
         paneScene.Content = Scenes.Backdrop("side");
         BuildPane();
         _ = engine.LoadSidebar();
+        prefetch.Start();
     }
+
+    /// <summary>A screen is being read ahead now (a pointer resting on another waits its turn).</summary>
+    private bool PrefetchBusy => prefetch.Busy;
 
     // ---- what the engine says ----
 
@@ -204,7 +206,7 @@ public sealed class AppShell : Grid, IDisposable
         BuildPane(redraw: true);
         headerDrawn = null;
         Header();
-        current?.Render();
+        RestyleScreens();
     }
 
     // ---- the pane ----
@@ -228,19 +230,21 @@ public sealed class AppShell : Grid, IDisposable
             account.Content = AccountTile();
         }
         var snap = engine.Snapshot;
+        // (a pointer resting on a row reads its screen; pressed, builds it: Kit.Ahead)
+        Action<bool> Ready(Place p) => build => engine.Prepare(p, build);
         var list = new List<NavEntry>
         {
-            new() { Key = "dashboard", Title = "Dashboard", Icon = SymbolRegular.Home24, Tint = Blue, Go = () => GoPlace(Place.Dashboard), Spot = TourSpot.DashboardRow },
-            new() { Key = "todo", Title = "To Do", Icon = SymbolRegular.TaskListLtr24, Tint = Green, Go = () => GoPlace(Place.Todo) },
-            new() { Key = "calendar", Title = "Calendar", Icon = SymbolRegular.CalendarLtr24, Tint = Red, Go = () => GoPlace(Place.Calendar) },
-            new() { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades), Spot = TourSpot.GradesRow },
-            new() { Key = "notifications", Title = "Notifications", Icon = SymbolRegular.Alert24, Tint = Orange, Badge = snap?.NotifUnread ?? 0, Go = () => GoPlace(Place.Notifications) },
-            new() { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = snap?.InboxUnread ?? 0, Go = () => GoPlace(Place.Inbox) },
-            new() { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools), Spot = TourSpot.ToolsRow },
+            new() { Key = "dashboard", Title = "Dashboard", Icon = SymbolRegular.Home24, Tint = Blue, Go = () => GoPlace(Place.Dashboard), Prepare = Ready(Place.Dashboard), Spot = TourSpot.DashboardRow },
+            new() { Key = "todo", Title = "To Do", Icon = SymbolRegular.TaskListLtr24, Tint = Green, Go = () => GoPlace(Place.Todo), Prepare = Ready(Place.Todo) },
+            new() { Key = "calendar", Title = "Calendar", Icon = SymbolRegular.CalendarLtr24, Tint = Red, Go = () => GoPlace(Place.Calendar), Prepare = Ready(Place.Calendar) },
+            new() { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades), Prepare = Ready(Place.Grades), Spot = TourSpot.GradesRow },
+            new() { Key = "notifications", Title = "Notifications", Icon = SymbolRegular.Alert24, Tint = Orange, Badge = snap?.NotifUnread ?? 0, Go = () => GoPlace(Place.Notifications), Prepare = Ready(Place.Notifications) },
+            new() { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = snap?.InboxUnread ?? 0, Go = () => GoPlace(Place.Inbox), Prepare = Ready(Place.Inbox) },
+            new() { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools), Prepare = Ready(Place.Tools), Spot = TourSpot.ToolsRow },
         };
         // (the Mac's: right under Tools, every tool the school provides in the courses — Canvas's, so not on Brightspace)
         if (!engine.OnBrightspace)
-            list.Add(new NavEntry { Key = "externaltools", Title = "External Tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools) });
+            list.Add(new NavEntry { Key = "externaltools", Title = "External Tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools), Prepare = Ready(Place.ExternalTools) });
         var courses = engine.Courses;
         if (courses.Count > 0)
         {
@@ -253,6 +257,7 @@ public sealed class AppShell : Grid, IDisposable
                 {
                     Key = ctx, Title = label, Square = K.Hex(c.Color, Blue), Letter = Initial(label),
                     Go = () => { expanded.Add(ctx); GoPlace(Place.Home(ctx)); },
+                    Prepare = Ready(Place.Home(ctx)),
                     Expanded = expanded.Contains(ctx),
                     Toggle = open => { if (open) { expanded.Add(ctx); _ = engine.LoadSections(ctx); } else expanded.Remove(ctx); BuildPane(); },
                     Spot = c == courses[0] ? TourSpot.FirstCourse : null,
@@ -263,10 +268,11 @@ public sealed class AppShell : Grid, IDisposable
                     {
                         Key = $"{ctx}:{s.Kind}", Title = s.Label, Icon = Glyph.Section(s.Kind), Tint = K.Hex(c.Color, Blue),
                         Go = () => GoPlace(Place.Section(ctx, s.Kind)),
+                        Prepare = Ready(Place.Section(ctx, s.Kind)),
                     }).ToList();
                 list.Add(entry);
             }
-            list.Add(new NavEntry { Key = "courses", Title = "All Courses", Icon = SymbolRegular.Library24, Tint = Gold, Go = () => GoPlace(Place.Courses) });
+            list.Add(new NavEntry { Key = "courses", Title = "All Courses", Icon = SymbolRegular.Library24, Tint = Gold, Go = () => GoPlace(Place.Courses), Prepare = Ready(Place.Courses) });
         }
         var groups = engine.Groups;
         if (groups.Count > 0)
@@ -275,7 +281,7 @@ public sealed class AppShell : Grid, IDisposable
             foreach (var g in groups)
             {
                 var ctx = $"groups/{g.Id}";
-                list.Add(new NavEntry { Key = ctx, Title = g.Name, Icon = SymbolRegular.People24, Tint = Teal, Go = () => GoPlace(Place.Home(ctx)) });
+                list.Add(new NavEntry { Key = ctx, Title = g.Name, Icon = SymbolRegular.People24, Tint = Teal, Go = () => GoPlace(Place.Home(ctx)), Prepare = Ready(Place.Home(ctx)) });
             }
         }
         if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
@@ -372,99 +378,6 @@ public sealed class AppShell : Grid, IDisposable
 
     // ---- the page ----
 
-    /// <summary>The place and what is pushed on it, shown: its screen (kept for the place, made anew for a pushed one),
-    /// the header with its breadcrumb and commands.</summary>
-    private void Navigate()
-    {
-        if (engine.NavVersion == lastNav && current != null) return;
-        lastNav = engine.NavVersion;
-        var loc = engine.Nav.Current;
-        Screen next;
-        if (loc.Path.Count > 0)
-        {
-            var r = loc.Path[^1];
-            var key = r.ToString();
-            if (!routeScreens.TryGetValue(key, out next!)) routeScreens[key] = next = ScreenFactory.For(engine, r);
-        }
-        else
-        {
-            var id = loc.Place.Identity;
-            if (!placeScreens.TryGetValue(id, out next!)) placeScreens[id] = next = ScreenFactory.For(engine, loc.Place);
-        }
-        WorkPreview.Dismiss();
-        if (next != current)
-        {
-            if (current != null) { current.Hide(); current.HeaderChanged -= Header; }
-            current = next;
-            current.HeaderChanged += Header;
-            Mount(current);
-        }
-        current.SetWidth(ContentWidth);
-        current.Show();
-        shownAt[current] = ++showings;
-        Trim(loc);
-        Header();
-        scroller.ScrollToTop();
-    }
-
-    /// <summary>
-    /// The screens kept to come back to, bounded: past <see cref="KeptRoutes"/> pushed screens and <see cref="KeptPages"/>
-    /// courses' and groups' pages, the least lately shown are let go (hidden already; opened again, they start afresh).
-    /// Never the one showing, the place and the screens under it (Back), the app's own places, or Search.
-    /// </summary>
-    private void Trim(Location loc)
-    {
-        if (routeScreens.Count > KeptRoutes)
-        {
-            var under = loc.Path.Select(r => r.ToString()).ToHashSet();
-            foreach (var key in Oldest(routeScreens, routeScreens.Count - KeptRoutes, k => !under.Contains(k)))
-            {
-                shownAt.Remove(routeScreens[key]);
-                routeScreens.Remove(key);
-            }
-        }
-        static bool Page(Place p) => p.Kind is PlaceKind.Home or PlaceKind.Section;
-        var pages = placeScreens.Keys.Count(Page);
-        if (pages > KeptPages)
-        {
-            var here = loc.Place.Identity;
-            foreach (var key in Oldest(placeScreens, pages - KeptPages, k => Page(k) && k != here))
-            {
-                shownAt.Remove(placeScreens[key]);
-                placeScreens.Remove(key);
-            }
-        }
-    }
-
-    /// <summary>Up to <paramref name="over"/> of the kept screens that may go, the least lately shown first (never the one showing).</summary>
-    private List<TKey> Oldest<TKey>(Dictionary<TKey, Screen> kept, int over, Func<TKey, bool> may) where TKey : notnull =>
-        kept.Where(kv => kv.Value != current && may(kv.Key))
-            .OrderBy(kv => shownAt.GetValueOrDefault(kv.Value))
-            .Take(over)
-            .Select(kv => kv.Key)
-            .ToList();
-
-    private void Mount(Screen s)
-    {
-        scroller.Content = null;
-        if (s.Scrolls)
-        {
-            var v = s.View;
-            // (a reading width: as wide as the page up to it, from the left — sized, so it never shrinks to its words)
-            if (s.MaxContentWidth is { } mw) { v.MaxWidth = mw; v.Width = Math.Min(mw, ContentWidth); v.HorizontalAlignment = HorizontalAlignment.Left; }
-            else { v.ClearValue(FrameworkElement.WidthProperty); v.ClearValue(FrameworkElement.MaxWidthProperty); v.HorizontalAlignment = HorizontalAlignment.Stretch; }
-            // (the room at the page's foot is the page's own, so it scrolls: a scroller's padding would stand still under it)
-            v.Margin = new Thickness(0, 0, 0, Foot);
-            scroller.Content = v;
-            body.Content = scroller;
-        }
-        else
-        {
-            s.View.Margin = new Thickness(0);
-            body.Content = s.View;
-        }
-    }
-
     /// <summary>The title (a breadcrumb: the place, then what is opened on it — each part but the last goes back to it),
     /// the line under it, and the screen's own commands.</summary>
     private void Header()
@@ -480,7 +393,7 @@ public sealed class AppShell : Grid, IDisposable
             {
                 var n = i + 1;
                 var r = loc.Path[i];
-                var t = routeScreens.TryGetValue(r.ToString(), out var rs) ? rs.Title : ScreenFactory.TitleOf(r);
+                var t = CrumbTitle(r);
                 crumbs.Add((t, () => engine.SetPath(loc.Path.Take(n).ToList())));
             }
         }
@@ -520,11 +433,8 @@ public sealed class AppShell : Grid, IDisposable
 
     private void Widths()
     {
-        if (current is { Scrolls: true, MaxContentWidth: { } mw }) current.View.Width = Math.Min(mw, ContentWidth);
-        current?.SetWidth(ContentWidth);
+        PageWidths();
         header.Margin = page.ActualWidth < 560 ? new Thickness(20, 4, 20, 16) : new Thickness(40, 4, 40, 20);
-        scroller.Padding = page.ActualWidth < 560 ? new Thickness(20, 0, 20, 0) : new Thickness(40, 0, 40, 0);
-        if (current is { Scrolls: true }) current.View.Margin = new Thickness(0, 0, 0, Foot);
     }
 
     /// <summary>The room under a page that scrolls with the shell.</summary>
@@ -641,9 +551,12 @@ public sealed class AppShell : Grid, IDisposable
 
     public void Dispose()
     {
+        prefetch.Stop();
         palette.Dispose();
         engine.PropertyChanged -= OnEngine;
+        engine.PrepareRequested -= OnPrepare;
         FilePreview.Shared.PropertyChanged -= OnFile;
-        current?.Hide();
+        foreach (var s in placeScreens.Values.Concat(routeScreens.Values).ToList()) Release(s);
+        current = null;
     }
 }

@@ -519,7 +519,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     private FrameworkElement ColourDot(string? hex, Color colour, string name)
     {
         var on = Appearance.AccentHex == hex;
-        var dot = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(colour) };
+        var dot = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Background = K.Brush(colour) };
         if (on) dot.Child = K.Icon(SymbolRegular.Checkmark24, 18, Colors.White);
         var ring = new Border { Padding = new Thickness(3), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(2), Child = dot, Margin = new Thickness(0, 0, 6, 6) };
         if (on) ring.SetResourceReference(Border.BorderBrushProperty, B.Text); else ring.BorderBrush = Brushes.Transparent;

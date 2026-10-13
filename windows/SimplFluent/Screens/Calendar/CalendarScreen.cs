@@ -105,6 +105,23 @@ public sealed partial class CalendarScreen : Screen
         peek.Dismiss();
     }
 
+    /// <summary>Read ahead, unseen: the month (or week, or list) it would show, nothing else.</summary>
+    protected override void ReadAhead()
+    {
+        if (!modeRead)
+        {
+            modeRead = true;
+            ReadMode();
+        }
+        cal.Ensure(engine, "calendar", Args());
+    }
+
+    public override void Release()
+    {
+        base.Release();
+        if (hooked != null) { hooked.PreviewKeyDown -= WindowKey; hooked = null; }
+    }
+
     public override bool Escape()
     {
         if (!peek.IsOpen) return false;

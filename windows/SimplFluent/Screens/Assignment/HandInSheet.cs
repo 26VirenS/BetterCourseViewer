@@ -195,7 +195,7 @@ internal sealed class HandInSheet
         overlay.Children.Add(new Rectangle
         {
             RadiusX = 8, RadiusY = 8, StrokeThickness = 2, StrokeDashArray = new DoubleCollection { 4, 2.5 }, Margin = new Thickness(8),
-            Fill = new SolidColorBrush(K.WithAlpha(Appearance.Accent, 0.07)), Stroke = new SolidColorBrush(Appearance.Accent),
+            Fill = K.Brush(K.WithAlpha(Appearance.Accent, 0.07)), Stroke = K.Brush(Appearance.Accent),
         });
         var label = new Border
         {

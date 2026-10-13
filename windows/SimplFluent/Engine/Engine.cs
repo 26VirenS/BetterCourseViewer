@@ -12,6 +12,10 @@ namespace Simpl.Engine;
 
 public enum Phase { Starting, Web, Native }
 
+/// <summary>How the window last moved: a place picked, a screen pushed, Back, Forward, a place's root, the steps under a
+/// screen set, or the place taken over in place (a search typed further).</summary>
+public enum NavMove { Go, Push, Back, Forward, Root, Path, Replace }
+
 public sealed class EngineException : Exception
 {
     public EngineException(string message) : base(message) { }
@@ -43,6 +47,14 @@ public sealed partial class Engine : Observable, IShellListener
     private int navVersion;
     /// <summary>Bumps whenever the window moves (a place, a push, Back, Forward).</summary>
     public int NavVersion { get => navVersion; private set => Set(ref navVersion, value); }
+    /// <summary>How it last moved (set before <see cref="NavVersion"/> says it did): the shell's page comes in to match.</summary>
+    public NavMove LastMove { get; private set; }
+
+    private int callsInFlight;
+    /// <summary>Calls into the page not answered yet, and when the last one began or ended (Environment.TickCount64): the
+    /// prefetch keeps out of the way of the screens' own.</summary>
+    public int CallsInFlight => callsInFlight;
+    public long LastCallAt { get; private set; }
 
     private Snapshot? snapshot;
     public Snapshot? Snapshot { get => snapshot; private set => Set(ref snapshot, value); }
@@ -114,8 +126,24 @@ public sealed partial class Engine : Observable, IShellListener
     /// engine's, under the app's screens) keeps its timers and its pace. A development run may add more
     /// (--browser-args, ';' between them), their features merged with these.</summary>
     public static string BrowserArguments { get; } = MergeArguments(
-        "--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion",
+        "--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion" +
+        // (the network service in the browser's own process, not a process of its own: measured, 12 MB less committed
+        //  and 35 MB less in RAM, the calls no slower)
+        " --enable-features=NetworkServiceInProcess2",
         Launch.IsDevelopment ? Launch.Get("browser-args")?.Replace(';', ' ') : null);
+
+    private static Task<CoreWebView2Environment>? environment;
+
+    /// <summary>
+    /// The one browser every web view of Simpl's runs in (the engine, the school's pages, the tools, the previews): one
+    /// environment, made once, on Simpl's web data with <see cref="BrowserArguments"/> — so all share one browser
+    /// process, one GPU process and one network service, made once.
+    /// </summary>
+    public static Task<CoreWebView2Environment> WebEnvironment()
+    {
+        if (environment is { IsFaulted: false, IsCanceled: false } e) return e;
+        return environment = CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(BrowserArguments));
+    }
 
     /// <summary>Two sets of browser arguments as one: Chromium takes only the last --enable-features and the last
     /// --disable-features, so each is made one list.</summary>
@@ -149,8 +177,7 @@ public sealed partial class Engine : Observable, IShellListener
         {
             // (the page runs as briskly with the app's own screens over it as when it is shown: nothing of it is put to
             // sleep for being out of sight)
-            var options = new CoreWebView2EnvironmentOptions(BrowserArguments);
-            var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, options);
+            var env = await WebEnvironment();
             await Web.EnsureCoreWebView2Async(env);
         }
         catch (Exception e)
@@ -288,6 +315,18 @@ public sealed partial class Engine : Observable, IShellListener
         _ = Web.CoreWebView2.ExecuteScriptAsync(js);
     }
 
+    /// <summary>
+    /// The page asked to keep to little memory (the window minimized or in the notification area a while:
+    /// Support.MemoryTidy) — WebView2 then hands back what its processes are not using — or for its pace again. Measured:
+    /// minimized, its processes' working set from 342 MB to 53; its calls no slower once back to normal.
+    /// </summary>
+    public void Lean(bool on)
+    {
+        if (Web.CoreWebView2 is not { } core) return;
+        if (Launch.IsDevelopment && Launch.Get("web-memory") == "low") return; // (kept low throughout)
+        core.MemoryUsageTargetLevel = on ? CoreWebView2MemoryUsageTargetLevel.Low : CoreWebView2MemoryUsageTargetLevel.Normal;
+    }
+
     private void SetPhase(Phase p)
     {
         IdlePage(p == Phase.Native);
@@ -350,6 +389,7 @@ public sealed partial class Engine : Observable, IShellListener
         CountsLive = false;
         CoursesLive = false;
         Nav.Replace(Place.Dashboard);
+        LastMove = NavMove.Replace;
         NavVersion++;
         SetPhase(Phase.Web);
         Web.CoreWebView2?.Navigate(new Uri(BaseUrl, "/").ToString());
@@ -370,6 +410,7 @@ public sealed partial class Engine : Observable, IShellListener
                 if (opened.Count > 0) Nav.SetPath(opened);
                 Log.Write($"update: opened again at {p}{(opened.Count > 0 ? $" with {opened.Count} opened on it" : "")}");
             }
+            LastMove = NavMove.Replace;
             NavVersion++;
             if (place.Ctx is { } ctx)
             {
@@ -528,10 +569,11 @@ public sealed partial class Engine : Observable, IShellListener
     public async Task<T> Call<T>(string name, object? args = null)
     {
         var a = ArgsOf(args);
+        var asked = DataVersion;
         var text = await Read(name, a);
         // (decoded off the window's thread: a long answer holds up nothing on screen)
         var answer = await Task.Run(() => Decode<T>(name, text));
-        Answers.Keep(text, name, a);
+        Answers.Keep(text, name, a, asked);
         return answer;
     }
 
@@ -605,6 +647,8 @@ public sealed partial class Engine : Observable, IShellListener
             var done = new TaskCompletionSource<(bool Ok, string Text)>();
             calls[id] = done;
             Shot.Began();
+            callsInFlight++;
+            LastCallAt = Environment.TickCount64;
             var perfAt = Perf.CallStarted(name);
             try
             {
@@ -627,6 +671,8 @@ public sealed partial class Engine : Observable, IShellListener
             {
                 calls.Remove(id);
                 Shot.Ended();
+                callsInFlight = Math.Max(0, callsInFlight - 1);
+                LastCallAt = Environment.TickCount64;
                 Perf.CallEnded(name, perfAt);
             }
         }
@@ -753,26 +799,35 @@ public sealed partial class Engine : Observable, IShellListener
 
     // MARK: - Where the window is
 
-    private void Moved() => NavVersion++;
+    private void Moved(NavMove how)
+    {
+        LastMove = how;
+        NavVersion++;
+    }
 
     /// <summary>A place picked: shown at its root.</summary>
     public void Go(Place place)
     {
         Nav.Go(place);
-        Moved();
+        Moved(NavMove.Go);
         if (place.Ctx is { } ctx) _ = LoadSections(ctx);
     }
 
     /// <summary>A screen pushed on the place showing.</summary>
-    public void Push(Route route) { Nav.Push(route); Moved(); }
+    public void Push(Route route) { Nav.Push(route); Moved(NavMove.Push); }
 
-    public void GoBack() { Nav.GoBack(); Moved(); }
+    public void GoBack() { Nav.GoBack(); Moved(NavMove.Back); }
 
-    public void GoForward() { Nav.GoForward(); Moved(); }
+    public void GoForward() { Nav.GoForward(); Moved(NavMove.Forward); }
 
-    public void PopToRoot() { Nav.PopToRoot(); Moved(); }
+    public void PopToRoot() { Nav.PopToRoot(); Moved(NavMove.Root); }
 
-    public void SetPath(IReadOnlyList<Route> path) { Nav.SetPath(path); Moved(); }
+    public void SetPath(IReadOnlyList<Route> path)
+    {
+        var deeper = path.Count > Nav.Current.Path.Count;
+        Nav.SetPath(path);
+        Moved(deeper ? NavMove.Path : NavMove.Back);
+    }
 
     /// <summary>
     /// A native screen by its route: a course, a group, a section, the Inbox and the roots are places in the sidebar; an
@@ -794,10 +849,34 @@ public sealed partial class Engine : Observable, IShellListener
         if (PlaceOf(route) is { } place && Nav.Current.Place.Ctx != place.Ctx)
         {
             Nav.Push(route, place);
-            Moved();
+            Moved(NavMove.Push);
             if (place.Ctx is { } ctx) _ = LoadSections(ctx);
         }
         else Push(route);
+    }
+
+    /// <summary>The shell, asked to get a screen ready ahead of a click (Kit.Ahead): read it — and, pressed, build it unseen.</summary>
+    public event Action<Place, Route?, bool>? PrepareRequested;
+
+    /// <summary>A place about to be picked: its screen read ahead (and, <paramref name="build"/>, built unseen).</summary>
+    public void Prepare(Place place, bool build) => PrepareRequested?.Invoke(place, null, build);
+
+    /// <summary>The school's address about to be opened: the screen it opens read ahead, when it is one of the app's own.</summary>
+    public void PrepareWeb(string? url, bool build)
+    {
+        if (string.IsNullOrEmpty(url) || NativeRoute(url, "") is not { } route) return;
+        switch (route.Kind)
+        {
+            case RouteKind.Course: Prepare(Place.Home($"courses/{route.A}"), build); return;
+            case RouteKind.Group: Prepare(Place.Home($"groups/{route.A}"), build); return;
+            case RouteKind.Groups: Prepare(Place.Groups, build); return;
+            case RouteKind.Inbox: Prepare(Place.Inbox, build); return;
+            case RouteKind.Notifications: Prepare(Place.Notifications, build); return;
+            case RouteKind.Calendar: Prepare(Place.Calendar, build); return;
+            case RouteKind.Section: Prepare(Place.Section(route.A, route.B), build); return;
+            case RouteKind.Web: return;
+        }
+        PrepareRequested?.Invoke(PlaceOf(route) ?? Nav.Current.Place, route, build);
     }
 
     /// <summary>The place in its course a screen belongs under.</summary>
@@ -931,7 +1010,7 @@ public sealed partial class Engine : Observable, IShellListener
     {
         var q = text.Trim();
         if (q.Length == 0) return;
-        if (Nav.Current.Place.Kind == PlaceKind.Search && Nav.Current.Path.Count == 0) { Nav.Replace(Place.Search(q)); Moved(); }
+        if (Nav.Current.Place.Kind == PlaceKind.Search && Nav.Current.Path.Count == 0) { Nav.Replace(Place.Search(q)); Moved(NavMove.Replace); }
         else Go(Place.Search(q));
     }
 

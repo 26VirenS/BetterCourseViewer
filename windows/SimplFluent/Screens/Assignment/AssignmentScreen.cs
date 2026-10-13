@@ -352,7 +352,7 @@ public sealed partial class AssignmentScreen : Screen
         var row = new WrapPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(K.IconTile(KindGlyph(d.Kind), color, 28).Margin(0, 2, 10, 2));
         var kind = K.Text(d.Kind ?? "Assignment", Ty.BodyStrong);
-        kind.Foreground = new SolidColorBrush(K.Darkened(color));
+        kind.Foreground = K.Brush(K.Darkened(color));
         kind.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(kind.Margin(0, 0, 10, 0));
         if (!string.IsNullOrEmpty(d.Context))
@@ -678,8 +678,8 @@ public sealed partial class AssignmentScreen : Screen
         dropOverlay.Children.Clear();
         var frame = new Rectangle
         {
-            RadiusX = 12, RadiusY = 12, Stroke = new SolidColorBrush(color), StrokeThickness = 2.5, StrokeDashArray = new DoubleCollection { 4, 2.6 },
-            Fill = new SolidColorBrush(K.WithAlpha(color, 0.06)), Margin = new Thickness(14),
+            RadiusX = 12, RadiusY = 12, Stroke = K.Brush(color), StrokeThickness = 2.5, StrokeDashArray = new DoubleCollection { 4, 2.6 },
+            Fill = K.Brush(K.WithAlpha(color, 0.06)), Margin = new Thickness(14),
         };
         dropOverlay.Children.Add(frame);
         var words = K.V(8,

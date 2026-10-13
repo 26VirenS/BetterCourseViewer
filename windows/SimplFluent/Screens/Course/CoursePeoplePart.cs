@@ -91,7 +91,7 @@ public static class CourseCompose
         var token = new Border
         {
             Child = K.Text(to.Name, Ty.Body).Strong(), Padding = new Thickness(10, 3, 10, 4), CornerRadius = new CornerRadius(12),
-            HorizontalAlignment = HorizontalAlignment.Left, Background = new SolidColorBrush(K.WithAlpha(Support.Appearance.Accent, Support.Appearance.Dark ? 0.3 : 0.16)),
+            HorizontalAlignment = HorizontalAlignment.Left, Background = K.Brush(K.WithAlpha(Support.Appearance.Accent, Support.Appearance.Dark ? 0.3 : 0.16)),
         };
         var subject = new TextBox { PlaceholderText = "Optional", MaxLength = 255 };
         var message = new TextBox
@@ -126,7 +126,7 @@ public static class CourseCompose
             catch (Exception e)
             {
                 var why = K.Wrapped(e.Message, Ty.Caption);
-                why.Foreground = new SolidColorBrush(K.Tone("red"));
+                why.Foreground = K.Brush(K.Tone("red"));
                 Status(K.Columns("auto, *", K.Icon(SymbolRegular.Warning24, 14, K.Tone("red"), filled: true).Margin(0, 1, 8, 0).Col(0), why.Col(1)));
             }
             sending = false;

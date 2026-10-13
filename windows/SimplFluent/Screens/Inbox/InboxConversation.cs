@@ -43,7 +43,7 @@ public sealed class ConversationScreen : Screen
             var on = thread.Starred;
             var star = K.Button(on ? "Unstar" : "Star", () => thread.SetStarred(!thread.Starred));
             var icon = new SymbolIcon { Symbol = SymbolRegular.Star24, Filled = on };
-            if (on) icon.Foreground = new SolidColorBrush(K.Tone("yellow"));
+            if (on) icon.Foreground = K.Brush(K.Tone("yellow"));
             star.Icon = icon;
             star.ToolTip = on ? "Unstar (Ctrl+Shift+L)" : "Star (Ctrl+Shift+L)";
             star.IsEnabled = thread.Data != null;

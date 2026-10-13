@@ -116,7 +116,7 @@ public sealed class ToolsScreen : Screen
     {
         if (timerLine == null || Simpl.Tools.ToolRegistry.Timer is not { Active: true } t) return;
         timerLine.Text = TimerWords(t);
-        timerLine.Foreground = new SolidColorBrush(t.PhaseColor);
+        timerLine.Foreground = K.Brush(t.PhaseColor);
     }
 
     public override void Refresh()
@@ -171,7 +171,7 @@ public sealed class ToolsScreen : Screen
         if (kind.Key == "pomo" && Simpl.Tools.ToolRegistry.Timer is { Active: true } t)
         {
             timerLine = K.Text(TimerWords(t), Ty.BodyStrong);
-            timerLine.Foreground = new SolidColorBrush(t.PhaseColor);
+            timerLine.Foreground = K.Brush(t.PhaseColor);
             Simpl.Tools.FontFeatureExtensions.FontFeatures(timerLine);
             words.Children.Add(timerLine);
         }
@@ -200,7 +200,7 @@ public sealed class ToolsScreen : Screen
         b.HorizontalAlignment = HorizontalAlignment.Right;
         b.VerticalAlignment = VerticalAlignment.Top;
         b.Margin = new Thickness(0, 10, 10, 0);
-        if (on) b.Background = new SolidColorBrush(K.WithAlpha(kind.Color, 0.2));
+        if (on) b.Background = K.Brush(K.WithAlpha(kind.Color, 0.2));
         b.ToolTip = on ? $"Unpin {kind.Name} from the title bar" : $"Pin {kind.Name} to the title bar";
         System.Windows.Automation.AutomationProperties.SetName(b, on ? $"Unpin {kind.Name}" : $"Pin {kind.Name}");
         return b;

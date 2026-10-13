@@ -43,7 +43,8 @@ public sealed class CoursesScreen : Screen
     private int filter;
     private FrameworkElement? commands;
     private string? shownSub;
-    private bool cardsEntered;
+    /// <summary>The cards have come in: true from the start (the page comes in as a whole); a new filter brings them in one after another.</summary>
+    private bool cardsEntered = true;
 
     public CoursesScreen(Engine.Engine engine) : base(engine)
     {
@@ -147,7 +148,7 @@ public sealed class CoursesScreen : Screen
             Grid.SetRow(card, (k / cols) * 2);
             grid.Children.Add(card);
         }
-        // the cards come in one after another, the first time they show (and when the filter changes)
+        // the cards come in one after another when the filter changes (with the page, they come in as it does)
         if (!cardsEntered)
         {
             cardsEntered = true;
@@ -180,7 +181,7 @@ public sealed class CoursesScreen : Screen
         banner.Children.Add(code);
         if (c.Unread is int n && n > 0)
         {
-            var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), FontSize = 12, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(color), VerticalAlignment = VerticalAlignment.Center };
+            var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), FontSize = 12, FontWeight = FontWeights.Bold, Foreground = K.Brush(color), VerticalAlignment = VerticalAlignment.Center };
             var pill = new Border
             {
                 Background = Brushes.White, CornerRadius = new CornerRadius(11), Padding = new Thickness(9, 3, 9, 4),
@@ -224,6 +225,7 @@ public sealed class CoursesScreen : Screen
 
         var content = K.Rows("auto, auto, *, auto, auto", banner.Row(0), facts.Row(1), K.Divider().Margin(14, 0, 14, 0).Row(3), links.Row(4));
         var card = K.CardButton(content, () => engine.OpenWeb(c.Url, c.Code), 8, new Thickness(0));
+        Ahead.On(card, build => engine.PrepareWeb(c.Url, build));
         card.VerticalAlignment = VerticalAlignment.Stretch;
         // (the banner's corners follow the card's)
         content.SizeChanged += (_, e) => content.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
@@ -250,8 +252,8 @@ public sealed class CoursesScreen : Screen
     private static FrameworkElement HandedIn(CourseProgress p, Color color)
     {
         var share = Math.Clamp((double)p.Done / Math.Max(p.Total, 1), 0, 1);
-        var track = new Border { Height = 5, CornerRadius = new CornerRadius(2.5), Background = new SolidColorBrush(K.WithAlpha(color, 0.16)) };
-        var fill = new Border { Height = 5, CornerRadius = new CornerRadius(2.5), Background = new SolidColorBrush(color), HorizontalAlignment = HorizontalAlignment.Left };
+        var track = new Border { Height = 5, CornerRadius = new CornerRadius(2.5), Background = K.Brush(K.WithAlpha(color, 0.16)) };
+        var fill = new Border { Height = 5, CornerRadius = new CornerRadius(2.5), Background = K.Brush(color), HorizontalAlignment = HorizontalAlignment.Left };
         var bar = new Grid { Height = 5, Children = { track, fill } };
         bar.SizeChanged += (_, e) => fill.Width = share > 0 ? Math.Max(5, e.NewSize.Width * share) : 0;
         return CourseKit.Capped(bar, 200).Margin(0, 2, 0, 0);

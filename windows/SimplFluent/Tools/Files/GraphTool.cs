@@ -98,7 +98,7 @@ internal sealed class GraphWeb
         starting = true;
         try
         {
-            environment ??= CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Engine.Engine.BrowserArguments));
+            environment ??= Engine.Engine.WebEnvironment();
             await ensure(await environment);
             core = get();
             if (core == null) throw new InvalidOperationException("The web view did not start.");
@@ -161,19 +161,36 @@ internal sealed class GraphWeb
         Changed?.Invoke();
     }
 
-    /// <summary>A pane shown: the web view moves into it.</summary>
+    /// <summary>A pane shown: the web view moves into it (and has its pace again).</summary>
     public void Hold(GraphPane p)
     {
         holders.Remove(p);
         holders.Add(p);
         Place();
+        Level(low: false);
     }
 
-    /// <summary>A pane gone: the web view goes back to the one shown before it, if one still shows.</summary>
+    /// <summary>A pane gone: the web view goes back to the one shown before it, if one still shows; shown nowhere, the
+    /// graph is kept (it survives the tool closing) but its page keeps to little memory until it is shown again.</summary>
     public void Release(GraphPane p)
     {
         if (!holders.Remove(p)) return;
         p.Dispatcher.BeginInvoke(Place, System.Windows.Threading.DispatcherPriority.Loaded);
+        if (holders.Count == 0) Level(low: true);
+    }
+
+    /// <summary>The window away a while (Support.MemoryTidy): both kept graphs keep to little memory; back, the one
+    /// shown has its pace again.</summary>
+    public static void Lean(bool on)
+    {
+        foreach (var g in new[] { Full, Mini }) g.Level(on || g.holders.Count == 0);
+    }
+
+    private void Level(bool low)
+    {
+        if (core == null) return;
+        try { core.MemoryUsageTargetLevel = low ? CoreWebView2MemoryUsageTargetLevel.Low : CoreWebView2MemoryUsageTargetLevel.Normal; }
+        catch (Exception e) { Log.Write("graph: " + e.Message); }
     }
 
     private void Place()

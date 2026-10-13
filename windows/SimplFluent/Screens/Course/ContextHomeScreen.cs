@@ -208,6 +208,7 @@ public sealed class ContextHomeScreen : Screen
     {
         var row = CourseKit.RowLink(CourseKit.ARowView(r, color), () => engine.GoTo(r.Url, r.Title));
         CourseKit.WorkMenu(row, engine, r);
+        Ahead.On(row, build => engine.PrepareWeb(r.Url, build));
         return row;
     }
 

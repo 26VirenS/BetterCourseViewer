@@ -264,7 +264,7 @@ internal sealed class AltaSession
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
         try
         {
-            var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Simpl.Engine.Engine.BrowserArguments));
+            var env = await Simpl.Engine.Engine.WebEnvironment();
             await Web.EnsureCoreWebView2Async(env);
         }
         catch (Exception e)

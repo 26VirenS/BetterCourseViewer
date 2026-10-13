@@ -82,6 +82,7 @@ internal abstract class CourseListPart<T> : CoursePart where T : class
     {
         var b = CourseKit.RowLink(CourseKit.ARowView(row, color), () => engine.GoTo(row.Url, row.Title));
         CourseKit.WorkMenu(b, engine, row);
+        Ahead.On(b, build => engine.PrepareWeb(row.Url, build));
         return b;
     }
 

@@ -146,7 +146,7 @@ public sealed class TourOverlay : Grid
         this.engine = engine;
         this.window = window;
         Visibility = Visibility.Collapsed;
-        veil.Fill = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)128 : (byte)72, 0, 0, 0));
+        veil.Fill = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)128 : (byte)72, 0, 0, 0));
         veil.MouseLeftButtonDown += (_, e) => { Nudge(); e.Handled = true; };
         dim = new CombinedGeometry(GeometryCombineMode.Exclude, whole, light);
         veil.Data = whole;

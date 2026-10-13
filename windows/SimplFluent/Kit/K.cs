@@ -177,7 +177,7 @@ public static class K
 
     public static SymbolIcon Icon(SymbolRegular s, double size, Color color, bool filled = false)
     {
-        var i = new SymbolIcon { Symbol = s, Filled = filled, FontSize = size, Foreground = new SolidColorBrush(color), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var i = new SymbolIcon { Symbol = s, Filled = filled, FontSize = size, Foreground = Brush(color), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         return i;
     }
 
@@ -319,12 +319,12 @@ public static class K
     public static Border Chip(string text, Color tint, bool strong = false)
     {
         var t = Text(text, Ty.Caption);
-        t.Foreground = new SolidColorBrush(Darkened(tint));
+        t.Foreground = Brush(Darkened(tint));
         t.FontWeight = strong ? FontWeights.SemiBold : FontWeights.Medium;
         return new Border
         {
             Child = t, Padding = new Thickness(8, 1, 8, 2), CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)56 : (byte)36, tint.R, tint.G, tint.B)),
+            Background = Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)56 : (byte)36, tint.R, tint.G, tint.B)),
             VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left,
         };
     }
@@ -343,20 +343,20 @@ public static class K
         return new Border
         {
             Width = size, Height = size, CornerRadius = new CornerRadius(size * 0.25),
-            Background = solid ? new SolidColorBrush(color) : new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)52 : (byte)30, color.R, color.G, color.B)),
+            Background = solid ? Brush(color) : Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)52 : (byte)30, color.R, color.G, color.B)),
             Child = icon, VerticalAlignment = VerticalAlignment.Center,
         };
     }
 
     /// <summary>A dot of a colour (a course's).</summary>
-    public static Ellipse Dot(Color c, double size = 8) => new() { Width = size, Height = size, Fill = new SolidColorBrush(c), VerticalAlignment = VerticalAlignment.Center };
+    public static Ellipse Dot(Color c, double size = 8) => new() { Width = size, Height = size, Fill = Brush(c), VerticalAlignment = VerticalAlignment.Center };
 
     /// <summary>Windows 11's progress bar: a thin track, a rounded bar of the colour over it.</summary>
     public static FrameworkElement Bar(double fraction, Color color, double height = 4)
     {
         var track = new Border { Height = height, CornerRadius = new CornerRadius(height / 2) }.Bg(B.StrongFill);
         track.Opacity = 1;
-        var fill = new Border { Height = height, CornerRadius = new CornerRadius(height / 2), Background = new SolidColorBrush(color), HorizontalAlignment = HorizontalAlignment.Left };
+        var fill = new Border { Height = height, CornerRadius = new CornerRadius(height / 2), Background = Brush(color), HorizontalAlignment = HorizontalAlignment.Left };
         var g = new Grid { Height = height, VerticalAlignment = VerticalAlignment.Center };
         var trackHolder = new Border { Height = 1, CornerRadius = new CornerRadius(0.5), VerticalAlignment = VerticalAlignment.Center }.Bg(B.StrongStroke);
         g.Children.Add(trackHolder);
@@ -376,7 +376,7 @@ public static class K
         if (fraction is { } f && f > 0)
             g.Children.Add(new Path
             {
-                Data = ArcGeometry(size, thickness, Math.Clamp(f, 0, 1)), Stroke = new SolidColorBrush(color), StrokeThickness = thickness,
+                Data = ArcGeometry(size, thickness, Math.Clamp(f, 0, 1)), Stroke = Brush(color), StrokeThickness = thickness,
                 StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
             });
         if (inside != null) g.Children.Add(inside);
@@ -434,13 +434,13 @@ public static class K
 
     private static readonly Dictionary<(string Url, int Width), BitmapImage> Avatars = new();
 
-    /// <summary>A person's picture at a size, fetched and decoded once and kept while Simpl runs (a few hundred at
-    /// most); one that could not be read is asked for again the next time.</summary>
+    /// <summary>A person's picture at a size, fetched and decoded once — at the size it is drawn, never larger — and kept
+    /// while Simpl runs (the last hundred or so); one that could not be read is asked for again the next time.</summary>
     private static BitmapImage AvatarImage(Uri u, int width)
     {
         var key = (u.AbsoluteUri, width);
         if (Avatars.TryGetValue(key, out var have)) return have;
-        if (Avatars.Count >= 300) Avatars.Clear();
+        if (Avatars.Count >= 96) Avatars.Clear();
         var bmp = new BitmapImage();
         bmp.BeginInit();
         bmp.UriSource = u;
@@ -463,7 +463,7 @@ public static class K
     /// <summary>The Mac's LoadState: a spinner in the middle of the page, or why it could not load and Try Again.</summary>
     public static FrameworkElement LoadState(string? error, Action retry)
     {
-        if (error == null) return new Grid { MinHeight = 320, Children = { Spinner(32) } };
+        if (error == null) return new Grid { MinHeight = 320, Children = { Spinner(32) }, Tag = PlaceholderMark };
         var again = Button("Try Again", retry, accent: true);
         again.HorizontalAlignment = HorizontalAlignment.Center;
         var v = V(12,
@@ -476,6 +476,11 @@ public static class K
         v.MaxWidth = 420;
         return new Grid { MinHeight = 360, Children = { v } };
     }
+
+    private static readonly object PlaceholderMark = new();
+
+    /// <summary>A screen's content that is only the spinner it shows while nothing has been read (<see cref="LoadState"/>).</summary>
+    public static bool IsPlaceholder(FrameworkElement e) => ReferenceEquals(e.Tag, PlaceholderMark);
 
     /// <summary>Nothing to show: a quiet symbol and a line, inside a card's room.</summary>
     public static FrameworkElement Empty(SymbolRegular icon, string text)
@@ -492,7 +497,19 @@ public static class K
 
     public static Color Hex(string? hex, Color? fallback = null) => Support.Appearance.Hex(hex) ?? fallback ?? Color.FromRgb(0x8a, 0x8a, 0x8a);
 
-    public static SolidColorBrush Brush(Color c) => new(c);
+    private static readonly Dictionary<Color, SolidColorBrush> BrushesMade = new();
+
+    /// <summary>A colour's brush: made once and frozen — shared by everything drawn in that colour, and drawn without WPF
+    /// watching it for changes (a brush that changes is made with new SolidColorBrush, as the periodic table's are).</summary>
+    public static SolidColorBrush Brush(Color c)
+    {
+        if (BrushesMade.TryGetValue(c, out var b)) return b;
+        if (BrushesMade.Count >= 4096) BrushesMade.Clear();
+        b = new SolidColorBrush(c);
+        b.Freeze();
+        BrushesMade[c] = b;
+        return b;
+    }
 
     public static Color Mix(Color a, Color b, double t) => Color.FromArgb(
         (byte)(a.A + (b.A - a.A) * t), (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));

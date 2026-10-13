@@ -79,7 +79,7 @@ public static class Scenes
         var zoom = Math.Clamp(Appearance.Zoom(slot), 0.5, 3);
         var g = new Grid { IsHitTestVisible = false, ClipToBounds = true };
         g.Children.Add(Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1));
-        if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = new SolidColorBrush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });
+        if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = K.Brush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });
         return g;
     }
 
@@ -89,7 +89,7 @@ public static class Scenes
         if (Load($"Theme{scene}{image}") is not { } img) return null;
         var paper = K.Mix(Page, accent, Appearance.Dark ? 0.1 : 0.12);
         var ink = K.Mix(paper, accent, Appearance.Dark ? 0.34 : 0.3);
-        var g = new Grid { Background = new SolidColorBrush(paper), ClipToBounds = true };
+        var g = new Grid { Background = K.Brush(paper), ClipToBounds = true };
         g.Children.Add(Drawn(img, ink, AlignmentX.Right));
         return g;
     }
@@ -107,7 +107,7 @@ public static class Scenes
         // (were the inking to fail: the ink through the mask, as before)
         return inked != null
             ? new Rectangle { Fill = brush, IsHitTestVisible = false }
-            : new Rectangle { Fill = new SolidColorBrush(ink), OpacityMask = brush, IsHitTestVisible = false };
+            : new Rectangle { Fill = K.Brush(ink), OpacityMask = brush, IsHitTestVisible = false };
     }
 
     /// <summary>A mask in a colour: the ink where the mask is, as much as the mask is there (premultiplied), frozen.</summary>

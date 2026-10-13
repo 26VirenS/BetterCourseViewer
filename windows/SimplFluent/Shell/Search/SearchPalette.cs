@@ -354,7 +354,7 @@ public sealed partial class SearchPalette : IDisposable
                 Text = Initial(it.Title), FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, FontFamily = K.SmallFace,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             };
-            g = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(K.Hex(it.Color, Color.FromRgb(0x00, 0x78, 0xd4))), Child = letter };
+            g = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(K.Hex(it.Color, Color.FromRgb(0x00, 0x78, 0xd4))), Child = letter };
         }
         else if (it.Color is { Length: > 0 } c) g = K.Icon(it.Symbol, 16, K.Hex(c), it.Filled);
         else g = K.Icon(it.Symbol, 16, B.AccentText, it.Filled);

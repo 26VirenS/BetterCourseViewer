@@ -77,6 +77,7 @@ public sealed class InboxScreen : Screen
     public InboxScreen(Engine.Engine engine) : base(engine)
     {
         inbox.Changed += () => Arrived();
+        WhenReading(() => inbox.Loading);
         if (View is ContentControl page) page.VerticalContentAlignment = VerticalAlignment.Stretch; // (the panes fill the page's height)
 
         // ---- the list: the switcher, the filter and the course menu, the course chosen; then the conversations ----
@@ -200,6 +201,9 @@ public sealed class InboxScreen : Screen
         if (listening) { InboxStore.DraftChanged -= OnDraft; listening = false; }
     }
 
+    /// <summary>Read ahead, unseen: the mailbox's conversations, nothing drawn (shown, the answer kept is taken up).</summary>
+    protected override void ReadAhead() => inbox.Ensure(engine, "inbox", new { scope });
+
     private void OnDraft(string id)
     {
         if (rowViews.TryGetValue(id, out var v)) Paint(v);
@@ -208,6 +212,7 @@ public sealed class InboxScreen : Screen
     /// <summary>The school answered (or could not).</summary>
     private void Arrived()
     {
+        if (Away && !mounted) return; // (read ahead: taken up when the screen is shown)
         if (inbox.Data is { } d) { Adopt(d, fresh: true, animate: switching); return; }
         switching = false;
         Dim(false);
@@ -472,7 +477,7 @@ public sealed class InboxScreen : Screen
         words.FontWeight = FontWeights.Medium;
         var content = K.H(7, K.Dot(tone, 8), words, K.Icon(SymbolRegular.Dismiss24, 10, B.Text2));
         var b = K.Subtle(content, () => SetCourse(null), new Thickness(12, 4, 10, 5), 14);
-        b.Background = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)60 : (byte)40, tone.R, tone.G, tone.B));
+        b.Background = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)60 : (byte)40, tone.R, tone.G, tone.B));
         b.HorizontalAlignment = HorizontalAlignment.Left;
         b.ToolTip = "Show Every Course";
         System.Windows.Automation.AutomationProperties.SetName(b, $"{name}, show every course");

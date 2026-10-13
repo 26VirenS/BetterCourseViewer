@@ -38,9 +38,10 @@ public static class Perf
         ("page", "page"), ("engine-ready", "engine ready"), ("first-screen", "first screen"), ("first-data", "first data"),
     };
 
-    // the engine's calls: in flight now, the last one's end, and when the window was idle after the last to end
+    // the engine's calls: in flight now, the last one's end, and when the window was idle after the last to end; and
+    // the screens' builds still to come (an answer in, its build a moment behind)
     private static readonly Dictionary<string, Series> calls = new();
-    private static int inFlight;
+    private static int inFlight, buildsDue;
     private static long lastActivity, endSeq, idleSeq, idleAt;
     private static long callCount, buildCount;
     private static double callMs, buildMs;
@@ -145,7 +146,7 @@ public static class Perf
                 callCount++;
                 callMs += ms;
                 Of(calls, name).Add(ms);
-                if (inFlight == 0) seq = ++endSeq;
+                if (inFlight == 0 && buildsDue == 0) seq = ++endSeq;
             }
             // (nothing left in flight: when the window has done what the answer asked of it — built, laid out — it is idle)
             if (seq > 0) Application.Current?.Dispatcher.InvokeAsync(() => Safe(() => { lock (Gate) if (seq == endSeq) { idleSeq = seq; idleAt = Ticks(); } }), DispatcherPriority.ContextIdle);
@@ -155,6 +156,52 @@ public static class Perf
 
     /// <summary>Now, for <see cref="Built"/> (Screen.Render, before Build).</summary>
     public static long Stamp() => Stopwatch.GetTimestamp();
+
+    /// <summary>A screen's build asked for (+1) or done (-1): what was asked is not in and shown until it is built.</summary>
+    public static void BuildDue(int change)
+    {
+        try
+        {
+            long seq = 0;
+            lock (Gate)
+            {
+                buildsDue = Math.Max(0, buildsDue + change);
+                lastActivity = Stopwatch.GetTimestamp();
+                if (change < 0 && buildsDue == 0 && inFlight == 0) seq = ++endSeq;
+            }
+            // (the last build done: when the window has laid it out and drawn it, it is idle — as after a call's answer)
+            if (seq > 0) Application.Current?.Dispatcher.InvokeAsync(() => Safe(() => { lock (Gate) if (seq == endSeq) { idleSeq = seq; idleAt = Ticks(); } }), DispatcherPriority.ContextIdle);
+        }
+        catch { }
+    }
+
+    private static (string Screen, string How, double Ms)? lastOpen;
+
+    /// <summary>
+    /// A screen brought in by the shell, and how: its page kept (nothing to build), built at once from the answers kept
+    /// ("cached"), or waiting for the page's first answer ("read"); once the window is idle after it, how long that took
+    /// — said in a development run's simpl.log ("perf: open Grades 12 ms (cached)"), and kept for the walk's step.
+    /// </summary>
+    public static void Opened(string screen, string how, long at)
+    {
+        _ = Then(async () =>
+        {
+            var ms = Ms(at, await Idle());
+            lock (Gate) lastOpen = (screen, how, ms);
+            if (Launch.IsDevelopment) Log.Write(Fmt($"perf: open {screen} {ms:0} ms ({how})"));
+        });
+    }
+
+    /// <summary>The last screen brought in, taken (the walk's step notes it).</summary>
+    internal static (string Screen, string How, double Ms)? TakeOpen()
+    {
+        lock (Gate)
+        {
+            var o = lastOpen;
+            lastOpen = null;
+            return o;
+        }
+    }
 
     /// <summary>A screen built and put in place (Screen.Render).</summary>
     public static void Built(string screen, long at, bool first)
@@ -256,7 +303,7 @@ public static class Perf
             if (Ms(from, now) > limitMs || wanted?.Invoke() == false) return null;
             lock (Gate)
             {
-                if (inFlight == 0)
+                if (inFlight == 0 && buildsDue == 0)
                 {
                     if (lastActivity < from) { if (Ms(Math.Max(from, shown), now) >= 300) return shown; }
                     else if (Ms(lastActivity, now) >= 300 && idleSeq == endSeq) return Math.Max(idleAt, shown);
@@ -274,7 +321,7 @@ public static class Perf
         while (Ms(from, Ticks()) < limitMs)
         {
             lock (Gate)
-                if (inFlight == 0 && Ms(Math.Max(lastActivity, from), Ticks()) >= quietMs) return true;
+                if (inFlight == 0 && buildsDue == 0 && Ms(Math.Max(lastActivity, from), Ticks()) >= quietMs) return true;
             await Task.Delay(100);
         }
         return false;

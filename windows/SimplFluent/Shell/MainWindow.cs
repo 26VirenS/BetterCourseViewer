@@ -126,6 +126,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         sheets.OpenChanged += _ => Phased();
 
         AddTray();
+        MemoryTidy.Watch(this, () => engine);
         SourceInitialized += (_, _) => Appearance.Apply();
         Appearance.Changed += () => shell?.Retheme();
         Loaded += (_, _) => Begin();

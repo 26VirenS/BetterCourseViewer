@@ -49,7 +49,6 @@ public sealed class GroupsScreen : Screen
 
     protected override bool LayoutChanges(double before, double now) => Cols(before) != Cols(now);
 
-    private bool cardsShown;
 
     protected override FrameworkElement Build()
     {
@@ -60,7 +59,6 @@ public sealed class GroupsScreen : Screen
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         if (d.Current.Count > 0) page.Children.Add(Section("Current", d.Current));
         if (d.Past.Count > 0) page.Children.Add(Section("Past", d.Past));
-        cardsShown = true;
         return page;
     }
 
@@ -89,8 +87,6 @@ public sealed class GroupsScreen : Screen
             Grid.SetRow(card, (k / cols) * 2);
             grid.Children.Add(card);
         }
-        // (the cards come in one after another the first time they show, not at every answer)
-        if (!cardsShown) Motion.Stagger(grid.Children.OfType<UIElement>(), 40, 20);
         return K.V(0, Heading.Section(title, rows.Count.ToString()), grid);
     }
 

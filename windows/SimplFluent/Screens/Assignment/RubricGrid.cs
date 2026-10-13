@@ -84,7 +84,7 @@ internal sealed class RubricGridPanel : Grid
         for (var j = 0; j < plan.Cols; j++)
         {
             var h = plan.Heads[j];
-            var cell = K.H(6, new Ellipse { Width = 8, Height = 8, Fill = new SolidColorBrush(h.Tone), VerticalAlignment = VerticalAlignment.Center }, K.Text(h.Name, Ty.Caption, B.Text2).Strong());
+            var cell = K.H(6, new Ellipse { Width = 8, Height = 8, Fill = K.Brush(h.Tone), VerticalAlignment = VerticalAlignment.Center }, K.Text(h.Name, Ty.Caption, B.Text2).Strong());
             g.Children.Add(cell.Margin(0, 0, 0, 10).Row(0).Col(2 + 2 * j));
         }
         var row = 1;
@@ -110,7 +110,7 @@ internal sealed class RubricGridPanel : Grid
         var scored = showMarks && c.Score != null;
         var colour = scored ? model.Grades[c.Index] : model.Hues[c.Index];
         var name = K.Wrapped(c.Name, Ty.BodyStrong);
-        var top = K.Columns("auto, *", new Ellipse { Width = 9, Height = 9, Fill = new SolidColorBrush(colour.Color), Margin = new Thickness(0, 6, 8, 0), VerticalAlignment = VerticalAlignment.Top }.Col(0), name.Col(1));
+        var top = K.Columns("auto, *", new Ellipse { Width = 9, Height = 9, Fill = K.Brush(colour.Color), Margin = new Thickness(0, 6, 8, 0), VerticalAlignment = VerticalAlignment.Top }.Col(0), name.Col(1));
         var num = new TextBlock { Text = RubricRing.Num(scored ? c.Score ?? 0 : c.Worth), FontSize = 20, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace };
         num.Fg(B.Text);
         var unit = K.Text(scored ? $"/ {RubricRing.Num(c.Worth)}" : c.Worth == 1 ? "pt" : "pts", Ty.Body, B.Text2).Margin(3, 0, 0, 2);
@@ -142,7 +142,7 @@ internal sealed class RubricGridPanel : Grid
         var sub = head.Own ? "" : l.Text;
         var colour = model.Grades[c.Index];
         var pts = K.Text(l.Pts is { } p ? RubricRing.Num(p) : "–", Ty.BodyStrong);
-        if (mark) pts.Foreground = new SolidColorBrush(K.Darkened(colour.Color));
+        if (mark) pts.Foreground = K.Brush(K.Darkened(colour.Color));
         var v = K.V(4, K.H(3, pts, K.Text(l.Pts == 1 ? "pt" : "pts", Ty.Caption, B.Text2).Margin(0, 0, 0, 1).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom)));
         if (mark) v.Children.Add(RubricView.YourMark(colour));
         if (main.Length > 0)
@@ -155,7 +155,7 @@ internal sealed class RubricGridPanel : Grid
         var cell = new Grid { Margin = new Thickness(0, 12, 0, 12), Opacity = dim ? 0.45 : 1 };
         if (mark)
         {
-            cell.Children.Add(new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(colour.Color), HorizontalAlignment = HorizontalAlignment.Left });
+            cell.Children.Add(new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Background = K.Brush(colour.Color), HorizontalAlignment = HorizontalAlignment.Left });
             v.Margin = new Thickness(10, 0, 0, 0);
             System.Windows.Automation.AutomationProperties.SetItemStatus(cell, "Your mark");
         }

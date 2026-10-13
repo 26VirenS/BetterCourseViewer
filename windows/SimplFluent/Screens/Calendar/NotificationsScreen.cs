@@ -209,7 +209,7 @@ public sealed class NotificationsScreen : Screen
         if (!string.IsNullOrEmpty(n.Sub)) words.Children.Add(K.Wrapped(n.Sub!, Ty.Body, B.Text2, 3));
         var kind = K.Text(n.CatLabel, Ty.Caption);
         kind.FontWeight = FontWeights.SemiBold;
-        kind.Foreground = new SolidColorBrush(K.Darkened(tone));
+        kind.Foreground = K.Brush(K.Darkened(tone));
         words.Children.Add(kind);
 
         // at its end: the unread dot — or, under the pointer, Mark Read (Unread) and Clear

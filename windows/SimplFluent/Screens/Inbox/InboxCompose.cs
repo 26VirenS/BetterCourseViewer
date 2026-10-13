@@ -132,7 +132,7 @@ public sealed class ComposeSheet
 
         // ---- "Discard this message?" over the sheet ----
         confirmCard = DiscardCard();
-        var smoke = new Border { Background = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)110 : (byte)70, 0, 0, 0)) };
+        var smoke = new Border { Background = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)110 : (byte)70, 0, 0, 0)) };
         smoke.MouseLeftButtonDown += (_, e) => e.Handled = true;
         confirm.Children.Add(smoke);
         confirm.Children.Add(confirmCard);
@@ -191,7 +191,7 @@ public sealed class ComposeSheet
         var chip = new Border
         {
             Child = row, Padding = new Thickness(10, 2, 3, 2), CornerRadius = new CornerRadius(13),
-            Background = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)56 : (byte)36, accent.R, accent.G, accent.B)),
+            Background = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)56 : (byte)36, accent.R, accent.G, accent.B)),
         };
         chip.MouseRightButtonUp += (_, e) =>
         {
@@ -277,7 +277,7 @@ public sealed class ComposeSheet
         for (var i = 0; i < panelItems.Count; i++)
         {
             var on = i == highlighted;
-            if (on) panelItems[i].B.Background = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)56 : (byte)36, accent.R, accent.G, accent.B));
+            if (on) panelItems[i].B.Background = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)56 : (byte)36, accent.R, accent.G, accent.B));
             else panelItems[i].B.ClearValue(Control.BackgroundProperty);
             panelItems[i].Plus.Opacity = on ? 1 : 0.5;
         }

@@ -285,7 +285,7 @@ internal sealed class RubricView : Grid
             name.HorizontalAlignment = pts.HorizontalAlignment = h;
             if (paintedHov != hov || k == hov)
             {
-                if (k == hov && !open) name.Foreground = new SolidColorBrush(K.Darkened(tones[k].Color));
+                if (k == hov && !open) name.Foreground = K.Brush(K.Darkened(tones[k].Color));
                 else name.Fg(B.Text);
                 pts.Fg(k == hov && !open ? B.Text : B.Text2);
             }
@@ -312,7 +312,7 @@ internal sealed class RubricView : Grid
             var c = model.Criteria[hot];
             var tones = geo.Tones(clock.Marks(clock.Now));
             var shortName = K.Text(c.Short, Ty.BodyStrong).Center();
-            shortName.Foreground = new SolidColorBrush(K.Darkened(tones[hot].Color));
+            shortName.Foreground = K.Brush(K.Darkened(tones[hot].Color));
             v.Children.Add(shortName);
             v.Children.Add(Big(RubricRing.Num(c.Score ?? c.Worth)));
             string line;
@@ -578,7 +578,7 @@ internal sealed class RubricView : Grid
             Text = level.Pts is { } p ? RubricRing.Num(p) : "–", FontSize = 21, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace,
             Width = 48, VerticalAlignment = VerticalAlignment.Center,
         };
-        if (dim) pts.Fg(B.Text3); else pts.Foreground = new SolidColorBrush(K.Darkened(tone.Color));
+        if (dim) pts.Fg(B.Text3); else pts.Foreground = K.Brush(K.Darkened(tone.Color));
         var label = K.Wrapped(level.Label, Ty.BodyStrong, dim ? B.Text2 : B.Text, 2);
         var top = K.Columns("*, auto", label.Col(0), picked ? YourMark(tone).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Top).Col(1) : null);
         var words = K.V(2, top);
@@ -586,8 +586,8 @@ internal sealed class RubricView : Grid
         var box = new Border { Child = words, Padding = new Thickness(12, 9, 12, 9), CornerRadius = new CornerRadius(8), SnapsToDevicePixels = true };
         if (picked)
         {
-            box.Background = new SolidColorBrush(tone.WithAlpha(Support.Appearance.Dark ? 0.22 : 0.14));
-            box.BorderBrush = new SolidColorBrush(tone.Color);
+            box.Background = K.Brush(tone.WithAlpha(Support.Appearance.Dark ? 0.22 : 0.14));
+            box.BorderBrush = K.Brush(tone.Color);
             box.BorderThickness = new Thickness(1.5);
         }
         else box.Bg(B.Card).Stroke(B.CardStroke);
@@ -603,8 +603,8 @@ internal sealed class RubricView : Grid
     {
         var t = K.Text("Your mark", Ty.Caption);
         t.FontWeight = FontWeights.SemiBold;
-        t.Foreground = new SolidColorBrush(tone.Ink);
-        return new Border { Child = t, Background = new SolidColorBrush(tone.Color), CornerRadius = new CornerRadius(10), Padding = new Thickness(7, 1, 7, 2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        t.Foreground = K.Brush(tone.Ink);
+        return new Border { Child = t, Background = K.Brush(tone.Color), CornerRadius = new CornerRadius(10), Padding = new Thickness(7, 1, 7, 2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
     }
 
     /// <summary>Which criterion is open: its colour, which of how many and its points, its name, its description (More
@@ -612,7 +612,7 @@ internal sealed class RubricView : Grid
     private FrameworkElement Head(int k, RubricRGB tone)
     {
         var c = model.Criteria[k];
-        var square = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = new SolidColorBrush(tone.Color), VerticalAlignment = VerticalAlignment.Center };
+        var square = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = K.Brush(tone.Color), VerticalAlignment = VerticalAlignment.Center };
         var left = K.V(5,
             K.H(8, square, K.Text($"Criterion {k + 1} of {model.N} · {model.PointsLabel(c)}", Ty.Caption, B.Text2).Strong()),
             K.Wrapped(c.Name, Ty.Subtitle, B.Text, 2));
@@ -624,7 +624,7 @@ internal sealed class RubricView : Grid
             var on = other.Index == k;
             double d = on ? (n > 10 ? 11 : 14) : n > 15 ? 6 : n > 10 ? 8 : 11;
             double hit = n > 15 ? 17 : 23;
-            var colour = new SolidColorBrush(model.Colors[other.Index].Color);
+            var colour = K.Brush(model.Colors[other.Index].Color);
             var face = new Grid { Width = hit, Height = hit };
             face.Children.Add(new Ellipse { Width = d, Height = d, Fill = colour, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
             if (on) face.Children.Add(new Ellipse { Width = Math.Min(hit, d + 8), Height = Math.Min(hit, d + 8), Stroke = colour, StrokeThickness = 2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });

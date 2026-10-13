@@ -44,7 +44,7 @@ public sealed class WebWindow : FluentWindow
         {
             try
             {
-                var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Engine.Engine.BrowserArguments));
+                var env = await Engine.Engine.WebEnvironment();
                 await web.EnsureCoreWebView2Async(env);
                 web.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
                 web.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;

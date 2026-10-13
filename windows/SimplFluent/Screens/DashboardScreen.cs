@@ -72,6 +72,7 @@ public sealed partial class DashboardScreen : Screen
             selector = new SelectorBar(ViewsHere, View);
             selector.Changed += v =>
             {
+                if (v == 0 && view != 0) courseCardsShown = false;
                 view = v;
                 Prefs.Set("dashView", v);
                 Refresh();
@@ -444,7 +445,7 @@ public sealed partial class DashboardScreen : Screen
         foreach (var row in s.Rows)
         {
             var rq = row.Quiet == true;
-            var bar = new Border { Width = 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(K.WithAlpha(K.Hex(row.Color), rq ? 0.5 : 1)), Margin = new Thickness(0, 2, 12, 2) };
+            var bar = new Border { Width = 4, CornerRadius = new CornerRadius(2), Background = K.Brush(K.WithAlpha(K.Hex(row.Color), rq ? 0.5 : 1)), Margin = new Thickness(0, 2, 12, 2) };
             var words = K.V(1, K.Wrapped(row.Title, Ty.Body, rq ? B.Text2 : B.Text, 2));
             if (!string.IsNullOrEmpty(row.Sub)) words.Children.Add(K.Text(row.Sub!, Ty.Caption, B.Text2));
             var g = K.Columns("auto, *, auto", bar.Col(0), words.Col(1));

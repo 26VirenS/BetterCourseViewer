@@ -107,7 +107,7 @@ internal sealed class MacmillanPopupView
         Hold(true); // (the screenshot suite waits for the page, not only for the app's own calls)
         try
         {
-            var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Simpl.Engine.Engine.BrowserArguments));
+            var env = await Simpl.Engine.Engine.WebEnvironment();
             await web.EnsureCoreWebView2Async(env);
         }
         catch (Exception e)

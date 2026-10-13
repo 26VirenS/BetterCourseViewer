@@ -52,7 +52,7 @@ public sealed partial class AssignmentScreen
             var icon = K.Icon(SymbolRegular.CheckmarkStarburst24, 18, B.Success, filled: true);
             seal = icon;
             var word = K.Wrapped(submitted, Ty.BodyStrong);
-            word.Foreground = new SolidColorBrush(K.Darkened(K.Tone("green")));
+            word.Foreground = K.Brush(K.Darkened(K.Tone("green")));
             rows.Children.Add(K.Columns("auto, *", icon.Margin(0, 1, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), word.Col(1)).Margin(10, 8, 10, 8));
         }
         if (text.Length > 0)
@@ -164,7 +164,7 @@ public sealed partial class AssignmentScreen
     /// <summary>A part's edge in the course's colour, shown for a moment when the page has just gone to it.</summary>
     private static Border Lit(AssignmentData d, double corner) => new()
     {
-        BorderBrush = new SolidColorBrush(Tint(d)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(corner),
+        BorderBrush = K.Brush(Tint(d)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(corner),
         Opacity = 0, IsHitTestVisible = false,
     };
 
@@ -268,7 +268,7 @@ public sealed partial class AssignmentScreen
                 var t = new TextBlock
                 {
                     Text = word.Length == 0 ? g.Pct is { } p ? $"{Math.Round(p, MidpointRounding.AwayFromZero)}%" : "" : word,
-                    FontSize = 22, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = new SolidColorBrush(K.Darkened(color)),
+                    FontSize = 22, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = K.Brush(K.Darkened(color)),
                 };
                 return new Viewbox { Child = t, StretchDirection = StretchDirection.DownOnly, MaxWidth = 54, MaxHeight = 40 };
             }
@@ -289,7 +289,7 @@ public sealed partial class AssignmentScreen
         if (!string.IsNullOrEmpty(g.Late))
         {
             var late = K.Text(g.Late!, Ty.BodyStrong);
-            late.Foreground = new SolidColorBrush(K.Darkened(K.Tone("orange")));
+            late.Foreground = K.Brush(K.Darkened(K.Tone("orange")));
             facts.Children.Add(late);
         }
         facts.VerticalAlignment = VerticalAlignment.Center;

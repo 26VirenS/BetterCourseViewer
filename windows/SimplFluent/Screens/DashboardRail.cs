@@ -127,7 +127,7 @@ public sealed partial class DashboardScreen
         var street = new Border { Height = 1 }.Bg(B.Divider);
         var legend = K.H(10, K.Text("Window colour = score", Ty.Caption, B.Text2));
         foreach (var bnd in new[] { "A", "B", "C", "D", "F" })
-            legend.Children.Add(K.H(4, new Rectangle { Width = 8, Height = 8, RadiusX = 1.5, RadiusY = 1.5, Fill = new SolidColorBrush(Lit(bnd)), VerticalAlignment = VerticalAlignment.Center }, K.Text(bnd, Ty.Caption, B.Text2).Strong()));
+            legend.Children.Add(K.H(4, new Rectangle { Width = 8, Height = 8, RadiusX = 1.5, RadiusY = 1.5, Fill = K.Brush(Lit(bnd)), VerticalAlignment = VerticalAlignment.Center }, K.Text(bnd, Ty.Caption, B.Text2).Strong()));
         var card = K.Card(K.V(8, city, street, names, legend.Margin(0, 6, 0, 0)), new Thickness(18, 16, 18, 14));
         v.Children.Add(card);
         return v;
@@ -142,7 +142,7 @@ public sealed partial class DashboardScreen
         {
             body.Bg(B.Subtle);
             body.BorderThickness = new Thickness(1, 1, 1, 0);
-            body.BorderBrush = new SolidColorBrush(Color.FromArgb(120, 0x8a, 0x8a, 0x8a));
+            body.BorderBrush = K.Brush(Color.FromArgb(120, 0x8a, 0x8a, 0x8a));
         }
         else body.Background = new LinearGradientBrush(color, K.Mix(color, Colors.Black, 0.34), 90);
         g.Children.Add(body);
@@ -163,7 +163,7 @@ public sealed partial class DashboardScreen
         var canvas = new Canvas { Width = w, Height = h };
         void Put(DashSkyWindow win, double x, double y)
         {
-            var r = new Rectangle { Width = s, Height = s, RadiusX = 1.5, RadiusY = 1.5, Fill = new SolidColorBrush(WindowColor(win, ghost)) };
+            var r = new Rectangle { Width = s, Height = s, RadiusX = 1.5, RadiusY = 1.5, Fill = K.Brush(WindowColor(win, ghost)) };
             if (!string.IsNullOrEmpty(win.Title)) r.ToolTip = win.Title;
             Canvas.SetLeft(r, x);
             Canvas.SetTop(r, y);

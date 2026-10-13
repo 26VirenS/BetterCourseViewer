@@ -98,7 +98,7 @@ internal sealed class AltaGraphWindow : FluentWindow
     private void Paint()
     {
         var dark = Support.Appearance.Dark;
-        ground.Background = new SolidColorBrush(dark && !light ? Color.FromRgb(0x1c, 0x1c, 0x1c) : Colors.White);
+        ground.Background = K.Brush(dark && !light ? Color.FromRgb(0x1c, 0x1c, 0x1c) : Colors.White);
         if (!dark || session == null) { trailing.Content = null; return; }
         var s = session;
         var b = K.Button(light ? "Dark" : "Light", () => s.SetPicsLight(!light), icon: light ? SymbolRegular.WeatherMoon24 : SymbolRegular.WeatherSunny24);

@@ -251,14 +251,14 @@ public sealed partial class TodoScreen
     {
         var fore = K.Darkened(tint);
         var t = K.Text(text, Ty.Caption);
-        t.Foreground = new SolidColorBrush(fore);
+        t.Foreground = K.Brush(fore);
         t.FontWeight = FontWeights.SemiBold;
         TodoWords.Tabular(t);
         return new Border
         {
             Child = K.H(4, K.Icon(icon, 12, fore, filled: true), t),
             Padding = new Thickness(8, 2, 9, 3), CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)56 : (byte)36, tint.R, tint.G, tint.B)),
+            Background = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)56 : (byte)36, tint.R, tint.G, tint.B)),
             VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left,
         };
     }

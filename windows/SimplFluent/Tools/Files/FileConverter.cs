@@ -450,7 +450,7 @@ internal static class ConvWeb
 
     private static async Task<T> With<T>(Uri page, Window? owner, Func<CoreWebView2, CoreWebView2Environment, Task<T>> work)
     {
-        environment ??= CoreWebView2Environment.CreateAsync(null, AppPaths.WebData, new CoreWebView2EnvironmentOptions(Engine.Engine.BrowserArguments));
+        environment ??= Engine.Engine.WebEnvironment();
         var env = await environment;
         var window = owner ?? Application.Current.MainWindow ?? throw new InvalidOperationException("No window to lay the page out in.");
         var hwnd = new WindowInteropHelper(window).EnsureHandle();

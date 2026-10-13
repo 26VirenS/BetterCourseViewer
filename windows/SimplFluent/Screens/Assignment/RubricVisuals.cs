@@ -59,7 +59,7 @@ internal sealed class RubricMiniRing : FrameworkElement
                 c.PolyLineTo(new[] { P(o1, t1), P(o1 - RubricModel.Blend(th, b1), t1), P(o0 - RubricModel.Blend(th, b0), t0) }, false, false);
             }
             geo.Freeze();
-            var brush = new SolidColorBrush(cols[bm.From].Mix(cols[bm.To], bm.T).Color);
+            var brush = K.Brush(cols[bm.From].Mix(cols[bm.To], bm.T).Color);
             brush.Freeze();
             dc.DrawGeometry(brush, null, geo);
         }
@@ -200,7 +200,7 @@ internal sealed class RubricRingVisual : FrameworkElement
             var r = k == Sel || k == Hov ? 4.5 : n > 15 ? 2.5 : 3.5;
             var a = RubricRing.Span(local, 0.5, 1);
             if (a <= 0.001) continue;
-            var dot = new SolidColorBrush(tones[k].WithAlpha(a));
+            var dot = K.Brush(tones[k].WithAlpha(a));
             dot.Freeze();
             dc.DrawEllipse(dot, null, d, r, r);
         }
@@ -267,7 +267,7 @@ internal sealed class RubricRingVisual : FrameworkElement
         var a = sample(v0);
         var b = sample(v1);
         Brush brush;
-        if (Math.Abs(b.X - a.X) + Math.Abs(b.Y - a.Y) < 0.05) brush = new SolidColorBrush(colour(v0 + (v1 - v0) * 0.5).Color);
+        if (Math.Abs(b.X - a.X) + Math.Abs(b.Y - a.Y) < 0.05) brush = K.Brush(colour(v0 + (v1 - v0) * 0.5).Color);
         else
         {
             var stops = new GradientStopCollection(5);
@@ -416,8 +416,8 @@ internal sealed class RubricBarVisual : FrameworkElement
             if (a <= 0.001) continue;
             var z = 0.2 + 0.8 * a;
             var r = (p.Picked ? 8 : 5.5) * z;
-            Brush fill = p.Picked ? Brushes.White : new SolidColorBrush(dark ? Color.FromRgb(28, 28, 30) : Colors.White);
-            var stroke = new Pen(p.Picked ? new SolidColorBrush(tone.Color) : new SolidColorBrush(dark ? Color.FromArgb(209, 255, 255, 255) : Color.FromArgb(150, 60, 60, 67)), 2.5 * z);
+            Brush fill = p.Picked ? Brushes.White : K.Brush(dark ? Color.FromRgb(28, 28, 30) : Colors.White);
+            var stroke = new Pen(p.Picked ? K.Brush(tone.Color) : K.Brush(dark ? Color.FromArgb(209, 255, 255, 255) : Color.FromArgb(150, 60, 60, 67)), 2.5 * z);
             stroke.Freeze();
             dc.PushOpacity(a);
             dc.DrawEllipse(fill, stroke, new Point(RubricRing.BarX, p.Tick), r, r);
@@ -495,7 +495,7 @@ internal sealed class RubricRingBack : Button
         {
             var sweep = Math.Abs(to - from);
             if (sweep < 1e-4) return;
-            var pen = new Pen(new SolidColorBrush(color), lw);
+            var pen = new Pen(K.Brush(color), lw);
             pen.Freeze();
             if (sweep >= RubricRing.Tau - 1e-3) { dc.DrawEllipse(null, pen, c, r, r); return; }
             Point P(double a) => new(c.X + r * Math.Sin(a), c.Y - r * Math.Cos(a));

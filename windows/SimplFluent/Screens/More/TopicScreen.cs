@@ -72,6 +72,9 @@ public sealed class TopicScreen : Screen
 
     public override void Refresh() => model.Ensure(engine, "topic", Args); // (the page marks it read as it answers)
 
+    /// <summary>A reply open (being written, or posting): the screen is kept, whatever else the shell lets go.</summary>
+    public override bool Busy => replyingTo != null;
+
     /// <summary>Escape puts the reply box away (not while it is posting).</summary>
     public override bool Escape()
     {
@@ -313,7 +316,7 @@ public sealed class TopicScreen : Screen
             g.Children.Add(new Border
             {
                 Width = 2.5, CornerRadius = new CornerRadius(1.25), HorizontalAlignment = HorizontalAlignment.Left,
-                Background = new SolidColorBrush(K.WithAlpha(color, 0.35)), Margin = new Thickness((depth - 1) * Indent + 8, 0, 0, 0),
+                Background = K.Brush(K.WithAlpha(color, 0.35)), Margin = new Thickness((depth - 1) * Indent + 8, 0, 0, 0),
             });
         g.Children.Add(inner);
         var row = new Border { Child = g, Padding = new Thickness(8, 10, 8, 10), Background = Brushes.Transparent };
@@ -342,7 +345,7 @@ public sealed class TopicScreen : Screen
     {
         var box = ComposerFor(e.Id, e.Author.Length == 0 ? "Reply" : $"Reply to {e.Author}", e.Id);
         box.Margin = new Thickness(14, 4, 0, 4);
-        var bar = new Border { Width = 2.5, CornerRadius = new CornerRadius(1.25), HorizontalAlignment = HorizontalAlignment.Left, Background = new SolidColorBrush(K.WithAlpha(color, 0.6)) };
+        var bar = new Border { Width = 2.5, CornerRadius = new CornerRadius(1.25), HorizontalAlignment = HorizontalAlignment.Left, Background = K.Brush(K.WithAlpha(color, 0.6)) };
         var g = new Grid { Children = { bar, box } };
         g.Margin = new Thickness(8 + Math.Min(Math.Max(e.Depth, 0) + 1, 4) * Indent, 0, 8, 10);
         if (jump) Motion.Enter(g, 0, -12, 250);

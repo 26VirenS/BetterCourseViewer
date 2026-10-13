@@ -30,18 +30,24 @@ public sealed class NavEntry
     /// <summary>The tour's name for this row, if it lights it.</summary>
     public TourSpot? Spot;
     public Action? Hover;
+    /// <summary>Its screen got ready ahead of a click: read as a pointer rests on the row, built as it is pressed (Kit.Ahead).</summary>
+    public Action<bool>? Prepare;
 }
 
 /// <summary>
 /// The navigation pane's list, as Windows 11's Settings draws it: 36-tall rows rounded 4, a symbol at 16 and the name at
 /// 48, the row under the pointer filled softly, the chosen one filled and marked by the accent's pill at its left — the
-/// pill sliding from the row it was on to the one chosen (WinUI's NavigationView). A course's sections fold out under it.
+/// pill sliding from the row it was on to the one chosen, stretching on the way (WinUI's NavigationView), in the same
+/// motion and time as the page coming in (Motion.Out, Motion.Page), moved and stretched by its transforms alone. A
+/// course's sections fold out under it.
 /// </summary>
 public sealed class NavList : Grid
 {
     private readonly Stack items = new() { Orientation = Orientation.Vertical, Spacing = 4 };
     private readonly Canvas overlay = new() { IsHitTestVisible = false };
     private readonly Border pill = new() { Width = 3, Height = 16, CornerRadius = new CornerRadius(1.5) };
+    private readonly TranslateTransform pillMove = new();
+    private readonly ScaleTransform pillStretch = new(1, 1);
     private readonly Dictionary<string, Button> rows = new();
     private string? selected;
     private double? pillAt;
@@ -51,6 +57,9 @@ public sealed class NavList : Grid
     public NavList()
     {
         pill.SetResourceReference(Border.BackgroundProperty, B.Accent);
+        pill.RenderTransformOrigin = new Point(0.5, 0.5);
+        pill.RenderTransform = new TransformGroup { Children = { pillStretch, pillMove } };
+        Canvas.SetTop(pill, 0);
         overlay.Children.Add(pill);
         pill.Visibility = Visibility.Hidden;
         Children.Add(items);
@@ -122,6 +131,7 @@ public sealed class NavList : Grid
         rows[e.Key] = row;
         if (e.Spot is { } spot) row.Mark(spot);
         if (e.Hover is { } hover) row.MouseEnter += (_, _) => hover();
+        if (e.Prepare is { } prepare) Ahead.On(row, prepare);
         items.Children.Add(row);
         if (e.Expanded && e.Children != null)
             foreach (var c in e.Children) Add(c, depth + 1);
@@ -133,7 +143,7 @@ public sealed class NavList : Grid
         if (e.Square is { } sq)
         {
             var letter = new TextBlock { Text = e.Letter ?? "", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = K.SmallFace };
-            glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(sq), Child = letter, VerticalAlignment = VerticalAlignment.Center };
+            glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(sq), Child = letter, VerticalAlignment = VerticalAlignment.Center };
         }
         else glyph = K.Icon(e.Icon, 16, e.Tint, filled: true);
         var title = K.Text(e.Title, Ty.Body);
@@ -186,23 +196,24 @@ public sealed class NavList : Grid
         Point p;
         try { p = row.TranslatePoint(new Point(0, 0), overlay); } catch { return; }
         var y = p.Y + (row.ActualHeight - 16) / 2;
-        Canvas.SetLeft(pill, p.X);
+        if (Math.Abs(Canvas.GetLeft(pill) - p.X) > 0.1 || double.IsNaN(Canvas.GetLeft(pill))) Canvas.SetLeft(pill, p.X);
         if (pillAt is { } from && Math.Abs(from - y) < 0.5 && pill.Visibility == Visibility.Visible) return;
         pill.Visibility = Visibility.Visible;
-        if (animate && pillAt is { } start && Math.Abs(start - y) > 1)
+        if (animate && pillAt is { } start && Math.Abs(start - y) > 1 && Motion.On)
         {
-            // (WinUI's: the pill stretches toward the row chosen, then settles into it)
-            Motion.FromTo(pill, Canvas.TopProperty, start, y, Motion.Slow, Motion.Standard);
-            var stretch = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames { Duration = Motion.Ms(Motion.Slow) };
-            stretch.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(16, System.Windows.Media.Animation.KeyTime.FromPercent(0)));
-            stretch.KeyFrames.Add(new System.Windows.Media.Animation.EasingDoubleKeyFrame(Math.Min(40, 16 + Math.Abs(y - start) / 3), System.Windows.Media.Animation.KeyTime.FromPercent(0.4)) { EasingFunction = Motion.Standard });
-            stretch.KeyFrames.Add(new System.Windows.Media.Animation.EasingDoubleKeyFrame(16, System.Windows.Media.Animation.KeyTime.FromPercent(1)) { EasingFunction = Motion.Decelerate });
-            if (Motion.On) pill.BeginAnimation(HeightProperty, stretch);
+            // (WinUI's: the pill stretches toward the row chosen, then settles into it — from wherever it is, if it
+            // was on its way somewhere else)
+            Motion.To(pillMove, TranslateTransform.YProperty, y, Motion.Page, Motion.Out);
+            var stretch = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames { Duration = Motion.Ms(Motion.Page) };
+            stretch.KeyFrames.Add(new System.Windows.Media.Animation.EasingDoubleKeyFrame(Math.Min(2.5, 1 + Math.Abs(y - start) / 48), System.Windows.Media.Animation.KeyTime.FromPercent(0.35)) { EasingFunction = Motion.Out });
+            stretch.KeyFrames.Add(new System.Windows.Media.Animation.EasingDoubleKeyFrame(1, System.Windows.Media.Animation.KeyTime.FromPercent(1)) { EasingFunction = Motion.Out });
+            pillStretch.BeginAnimation(ScaleTransform.ScaleYProperty, stretch);
         }
         else
         {
-            pill.BeginAnimation(Canvas.TopProperty, null);
-            Canvas.SetTop(pill, y);
+            pillMove.BeginAnimation(TranslateTransform.YProperty, null);
+            pillStretch.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            pillMove.Y = y;
         }
         pillAt = y;
     }

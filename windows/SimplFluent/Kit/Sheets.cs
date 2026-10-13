@@ -109,7 +109,7 @@ public sealed class SheetHost : Grid
     public SheetHost()
     {
         Visibility = Visibility.Collapsed;
-        smoke.Background = new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
+        smoke.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
         smoke.MouseLeftButtonDown += (_, e) => { e.Handled = true; };
         Children.Add(smoke);
         Panel.SetZIndex(this, 1000);
@@ -127,7 +127,7 @@ public sealed class SheetHost : Grid
         focusBefore = Keyboard.FocusedElement;
         Children.Add(card);
         Visibility = Visibility.Visible;
-        smoke.Background = new SolidColorBrush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
+        smoke.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
         Motion.FadeIn(smoke, Motion.Normal);
         Motion.Pop(card);
         OpenChanged?.Invoke(true);

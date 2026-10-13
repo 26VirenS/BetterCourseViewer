@@ -21,6 +21,10 @@ internal abstract class CoursePart
     /// <summary>The width the page lays the content out in.</summary>
     internal Func<double> Width = () => 0;
     private readonly List<Action> drawn = new();
+    private readonly List<Func<bool>> loading = new();
+
+    /// <summary>A loader it watches is still reading.</summary>
+    internal bool Reading => loading.Any(l => l());
 
     protected CoursePart(Engine.Engine engine, string ctx)
     {
@@ -44,6 +48,7 @@ internal abstract class CoursePart
     {
         l.Changed += () => { if (!l.LastSame) RenderSoon(); };
         drawn.Add(l.Drawn);
+        loading.Add(() => l.Loading);
         return l;
     }
 
@@ -71,6 +76,7 @@ public abstract class CoursePartScreen : Screen
         part.HeaderChange = HeaderChange;
         part.Width = () => Width;
         WhenBuilt(part.Drawn);
+        WhenReading(() => part.Reading);
     }
 
     public override string Title => part.Title;

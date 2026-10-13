@@ -366,7 +366,7 @@ public static class WorkPreview
             var kicker = string.Join(" · ", new[] { Text(assignment?.Kind) ?? item.Kind, Text(assignment?.Context) ?? Text(page?.Context) ?? item.Course }.Where(s => !string.IsNullOrEmpty(s)));
             var kick = K.Text(kicker, Ty.Body);
             kick.FontWeight = FontWeights.SemiBold;
-            kick.Foreground = new SolidColorBrush(K.Darkened(Tint));
+            kick.Foreground = K.Brush(K.Darkened(Tint));
             var close = K.Button("Close", Close, icon: SymbolRegular.Dismiss24);
             close.MinWidth = 0;
             close.ToolTip = "Close (Esc, or click anywhere else)";
