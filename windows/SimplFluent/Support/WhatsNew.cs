@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.9", "2026-10-13",
+            ("new", "Locked with Windows Hello", "Your saved sign-in opens only with your face, fingerprint or PIN."),
+            ("improved", "Encrypted by Windows", "The rest of Simpl's data is sealed by Windows itself, with its key in this PC's TPM.")),
         R("0.2.8", "2026-10-13",
             ("new", "External Tools in the sidebar", "Every tool your courses use, one click away under Tools."),
             ("new", "Every place a tool is used", "Click Knewton Alta, or any tool in your assignments, to choose which one to open."),
