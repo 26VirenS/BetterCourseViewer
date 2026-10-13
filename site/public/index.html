@@ -84,6 +84,11 @@ svg { flex: none; }
 .btn svg { width: 19px; height: 19px; }
 .btn--blue { background: var(--blue); color: #fff; }
 .btn--soft { background: var(--soft); color: var(--soft-text); }
+/* a platform still to come (Windows): a soft button, dimmed and still — no hover, no press — its "Coming soon" beside */
+.btn--soon { background: var(--soft); color: var(--soft-sub); cursor: default; }
+.btn--soon:active { transform: none; }
+.btn--soon svg { opacity: .75; }
+.btn__soon { padding: 3px 8px; border-radius: 999px; background: var(--soft-row); color: var(--soft-sub); font: 600 11px/1.25 var(--font); letter-spacing: .01em; }
 @media (hover: hover) and (pointer: fine) { .btn--blue:hover { background: var(--blue-hover); } .btn--soft:hover { background: var(--soft-hover); } }
 .cta { position: relative; z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
 .cta > .btn, .cta > .macdl { width: 260px; }
@@ -309,6 +314,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 
 <!-- the icons, drawn once -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.4l7.1-1v7H3.5zM11.8 4.2L20.5 3v8.4h-8.7zM3.5 12.6h7.1v7l-7.1-1zM11.8 12.6h8.7V21l-8.7-1.2z" fill="currentColor"/></symbol>
   <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M4.5 16V6.8c0-.99.81-1.8 1.8-1.8h11.4c.99 0 1.8.81 1.8 1.8V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M2 17.6h20l-.6 1.2c-.23.45-.69.7-1.19.7H3.79c-.5 0-.96-.25-1.19-.7z" fill="currentColor"/></symbol>
   <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M9.5 3.8a2 2 0 0 1 4 0V5h3.3c.66 0 1.2.54 1.2 1.2v3.3h1.2a2 2 0 0 1 0 4H18v3.3c0 .66-.54 1.2-1.2 1.2h-3.3v-1.2a2 2 0 0 0-4 0V18H6.2c-.66 0-1.2-.54-1.2-1.2v-3.3H6.2a2 2 0 0 0 0-4H5V6.2C5 5.54 5.54 5 6.2 5h3.3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 16 16"><path d="M3.5 6l4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -365,6 +371,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
             </div>
           </div>
         </div>
+        <span class="btn btn--soon" role="link" aria-disabled="true" title="Simpl for Windows is coming soon"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__soon">Coming soon</span></span>
       </div>
       <p class="hero__fine">Free. No account needed.</p>
     </div>
@@ -575,8 +582,9 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
             </div>
           </div>
         </div>
+        <span class="btn btn--soon" role="link" aria-disabled="true" title="Simpl for Windows is coming soon"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__soon">Coming soon</span></span>
       </div>
-      <p class="get__req">Safari: macOS 13+ · Mac app: macOS 14+ · Chrome: any computer</p>
+      <p class="get__req">Safari: macOS 13+ · Mac app: macOS 14+ · Chrome: any computer · Windows: coming soon</p>
     </div>
   </section>
 </main>
