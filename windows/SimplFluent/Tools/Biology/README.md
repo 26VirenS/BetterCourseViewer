@@ -250,3 +250,20 @@ line for line. Add yours in `Model/<Tool>Model.cs`, in the partial method alread
 `r.Near(name, value, expected, tolerance, digits)`, `r.Same(name, value, expected)`. Names have no spaces. The unit
 test `BiologyTests.TheSelfCheckIsAllOK` (CI's Unit tests job) fails on any FAIL; `--bio-check` writes the lines to the
 log.
+
+## Cell Explorer (`cell`)
+
+The Mac's model ported draw for draw, so a seeded cell is the same picture on both. `Model/`: `CellExplorerText.cs`
+(§5.1.1–5.1.4 copied out of the specification by a script), `CellExplorerModel.cs` (the parts and their cards, the
+Compare rows, About, the quiz, the tool's state), `CellExplorerGeometry.cs` (§5.1.5's recipes), `CellExplorerBuild.cs`
+and `CellExplorerCells.cs` (each cell placed from its seed; `CEBuildCache`), `CellExplorerScene.cs` (a built cell as a
+`BioSceneContent`: hidden parts, isolate, look inside, explode; a part of more than 40 instances — ribosomes — drawn as
+one item a material, since the view draws each selected item as a model of its own), `CellMembraneModel.cs` (§4.1.1) and
+`CellExplorerChecks.cs` (its `bio-check cell.…` lines). Views: `CellExplorerTool.cs` (pages, launch state, the shared
+pieces), `CellExplorerCellPage.cs`, `CellExplorerMembranePage.cs`, `CellExplorerComparePage.cs`. Windows draws a little
+lighter than the Mac to stay near 250k triangles: tetrahedra for true scale's 20,000 ribosomes, four-sided lipid tails.
+It reads two things of `BioSceneView` through its children (`BioSceneReach`): the camera, for the scale bar, and the
+turning world, to add a layer for the membrane's osmosis animation. Launch states: `animal`, `plant`, `bacterium`,
+`membrane`, `compare`, then `whole`, `true`, `labels=off`, `explode=0.6`, `gram=positive`, `show=…`, `hide=…`,
+`select=mito`, `isolate=chloroplast`, `inside`, `quiz=find|name`; on the membrane `osmosis`, `plain`,
+`select=integral:channel`.
