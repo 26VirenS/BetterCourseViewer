@@ -134,8 +134,11 @@ struct ExternalToolsView: View {
     /// (1.3.77) The screenshot suite's `-SimplExternalToolList knewton`: the list of the first tool whose name has that
     /// word in it, opened a moment after the page is up (its card laid out in the window, for the list to come from).
     private func openAskedList() async {
-        guard let word = LaunchOpen.take("", key: "SimplExternalToolList")?.lowercased(), !word.isEmpty,
-              let t = model.data?.rows.first(where: { $0.name.lowercased().contains(word) && $0.listable }) else { return }
+        // (the flag is only taken once its tool is there: a first run of this task before the answer came, or one the
+        // engine's first data change cut short, must not use it up)
+        guard let word = UserDefaults.standard.string(forKey: "SimplExternalToolList")?.lowercased(), !word.isEmpty,
+              let t = model.data?.rows.first(where: { $0.name.lowercased().contains(word) && $0.listable }),
+              LaunchOpen.take("", key: "SimplExternalToolList") != nil else { return }
         try? await Task.sleep(nanoseconds: 600_000_000)
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
