@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// (1.3.67) What native-app.js `externalTools` gives: every external tool in the student's current courses. (1.3.77) And
 /// every place each is used: a course's assignments and module items that open it (`items`), how many in all
