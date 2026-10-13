@@ -62,11 +62,13 @@ struct BiomolMotion: Sendable {
         var delay = 0.0
         var duration = 0.6
         var pulse = false
+        /// When (s from the motion's start) it fades out, 0.2 s, after its move (the water a hydrolysis uses up).
+        var fadeOutAt: Double?
     }
 
     var groups: [Group] = []
     /// How long it runs (s).
-    var length: Double { groups.map { $0.delay + $0.duration }.max() ?? 0 }
+    var length: Double { groups.map { max($0.delay + $0.duration, ($0.fadeOutAt ?? 0) + 0.2) }.max() ?? 0 }
 }
 
 /// A cartoon over the atoms, instead of them, or none.
@@ -852,9 +854,9 @@ enum BiomolScenes {
         let site = (c1 + og) / 2 + side * 1.6
         if toSplit {
             return BiomolMotion(groups: [
-                BiomolMotion.Group(items: water(at: site, look: look, chem: chem), from: side * 4, to: BioVec(0, 0, 0), fromAlpha: 0, toAlpha: 1, delay: 0, duration: 0.4),
+                BiomolMotion.Group(items: water(at: site, look: look, chem: chem), from: side * 4, to: BioVec(0, 0, 0), fromAlpha: 0, toAlpha: 1, delay: 0,
+                                   duration: 0.4, fadeOutAt: 0.45),
                 BiomolMotion.Group(items: [glyco], fromAlpha: 0, toAlpha: 1, delay: 0.2, duration: 0.4, pulse: true),
-                BiomolMotion.Group(items: water(at: site, look: look, chem: chem), fromAlpha: 1, toAlpha: 0, delay: 0.4, duration: 0.2),
                 BiomolMotion.Group(items: r0, from: BioVec(0, 0, 0), to: d * -2, delay: 0.4, duration: 0.5),
                 BiomolMotion.Group(items: r1, from: BioVec(0, 0, 0), to: d * 2, delay: 0.4, duration: 0.5),
                 BiomolMotion.Group(items: new0, from: d * 2, to: BioVec(0, 0, 0), fromAlpha: 0, toAlpha: 1, delay: 0.4, duration: 0.5),

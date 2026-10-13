@@ -76,6 +76,11 @@ enum BiomolNodes {
                 fade.timingFunction = { Float(BiomolEase.strongOut(Double($0))) }
                 steps.append(.group([move, fade]))
             }
+            if let out = g.fadeOutAt {
+                let wait = out - (g.delay + g.duration)
+                if wait > 0 { steps.append(.wait(duration: wait)) }
+                steps.append(.fadeOpacity(to: 0, duration: 0.2))
+            }
             holder.runAction(.sequence(steps))
             return holder
         }

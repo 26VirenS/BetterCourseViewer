@@ -300,7 +300,7 @@ extension BioSelfCheck {
                        BiomolScenes.strandAdded(BiomolStrand.build("ATGC", complement: false), look: look, chem: chem).groups.count,
                        BiomolScenes.disaccharideMotion("MAL", toSplit: true, look: look, chem: chem).groups.count]
         r.check("biomol.scenes", counts.map(String.init).joined(separator: ",") + "|" + motions.map(String.init).joined(separator: ","),
-                counts.allSatisfy { $0 > 20 } && motions == [3, 3, 3, 7])
+                counts.allSatisfy { $0 > 20 } && motions == [3, 3, 3, 6])
         // (the fields' cleaning and the motion curve)
         let pin = BiomolInput.protein("mkt ay1x*b")
         let din = BiomolInput.dna("atgun")
