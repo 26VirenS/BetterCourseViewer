@@ -314,6 +314,13 @@ public static class DivisionModel
                 : "Without crossing over, the cells come in identical pairs; independent assortment still mixes the pairs.");
         else
             telIINotice.Add("Gametes labelled n+1 and n−1 have one chromosome too many or too few. An n+1 gamete with an extra chromosome 21 joining a normal one makes trisomy 21 (Down syndrome, 47 chromosomes).");
+        // (the specification's sentence is the usual case; without crossing over, or with nondisjunction, it says what is
+        //  different — the Mac's)
+        var telII = o.Nondisjunction != DivisionNondisjunction.None
+            ? $"Four cells, but nondisjunction left {(ndI ? "all four" : "two of them")} with a chromosome too many (n+1) or too few (n−1)."
+            : !o.CrossingOver
+                ? "Four haploid cells. Without crossing over they come in two identical pairs; independent assortment decided which homologs went together."
+                : e[9][1];
         return new()
         {
             Stage(DivStageKey.G1, "G1", "As in mitosis, the cell grows and makes proteins and organelles. Chromosomes are long, uncondensed threads (chromatin).", 1,
@@ -329,7 +336,7 @@ public static class DivisionModel
             Stage(DivStageKey.Prophase2, "Prophase II", "No DNA replication between meiosis I and II. " + e[6][1], 6, "No S phase before meiosis II: each cell still has 2c."),
             Stage(DivStageKey.Metaphase2, "Metaphase II", e[7][1], 7, "Single chromosomes line up, as in mitosis."),
             Stage(DivStageKey.Anaphase2, "Anaphase II", e[8][1], 8, anaIINotice.ToArray()),
-            Stage(DivStageKey.Telophase2, "Telophase II + cytokinesis", e[9][1], 9, telIINotice.ToArray()),
+            Stage(DivStageKey.Telophase2, "Telophase II + cytokinesis", telII, 9, telIINotice.ToArray()),
         };
     }
 
@@ -480,11 +487,11 @@ public static class DivisionModel
         return new DivisionCounts(chromosomes(false), chromosomes(true), chromatids(false), chromatids(true), ploidy, dna, homologs, sisters, listing);
     }
 
-    /// <summary>"2c", or "1.4c" for an aneuploid cell (a tie to the even tenth, as the Mac's printf rounds: 1.25 is "1.2c").</summary>
+    /// <summary>"2c", or "1.4c" for an aneuploid cell (rounded half-up, as every bio tool rounds: 1.25 is "1.3c").</summary>
     public static string CText(double c) =>
         Math.Abs(c - Math.Round(c, MidpointRounding.AwayFromZero)) < 1e-9
             ? $"{(int)Math.Round(c, MidpointRounding.AwayFromZero)}c"
-            : Math.Round(c, 1, MidpointRounding.ToEven).ToString("0.0", CultureInfo.InvariantCulture) + "c";
+            : BioRound.Fixed(c, 1) + "c";
 
     // ---- sequences ----
 
@@ -527,7 +534,7 @@ public static class DivisionModel
         ["cellplate"] = new("Cell plate", "In plant cells, Golgi vesicles carrying wall material gather in the middle and fuse from the middle outward into a new cell wall between the two cells.", null),
         ["membrane"] = new("Cell membrane", "The plasma membrane round the cell. In an animal cell the cleavage furrow pinches it in two.", null),
         ["wall"] = new("Cell wall", "A plant cell's rigid wall outside its membrane. It keeps the cell's shape, so a plant cell divides by building a new wall between the daughters.", null),
-        ["daughter"] = new("Daughter cells", "Mitosis gives two cells with the same chromosomes as the parent and each other: diploid (2n) and, after G1, 2c.", null),
+        ["daughter"] = new("Daughter cells", "Mitosis gives two cells with the same chromosomes as the parent and as each other: diploid (2n) and 2c, ready to start G1.", null),
         ["tetrad"] = new("Tetrad (bivalent)", "A pair of homologous chromosomes joined along their length in prophase I: 2 chromosomes, 4 chromatids.", "A tetrad is 2 chromosomes, not 4: count its centromeres."),
         ["chiasma"] = new("Chiasma", "Where two non-sister chromatids of a pair crossed over and swapped the parts beyond it, in prophase I. It holds the homologs together until anaphase I.", "Crossing over is between non-sister chromatids; sister chromatids are identical, so swapping between them would change nothing."),
         ["recombinant"] = new("Recombinant chromatid", "A chromatid that crossed over: beyond the chiasma it carries the other parent's DNA. It makes gametes genetically different.", null),
@@ -546,7 +553,7 @@ public static class DivisionModel
         new("Prophase · Prophase I", "Mitosis: each chromosome condenses on its own. Meiosis I: homologs pair as tetrads and cross over.", 3, 3, 2, new[] { 3, 4 }),
         new("Metaphase · Metaphase I", "Mitosis: single chromosomes line up. Meiosis I: homologous pairs line up.", 5, 4, 3, new[] { 5 }),
         new("Anaphase · Anaphase I", "Mitosis: sister chromatids separate. Meiosis I: homologs separate and sisters stay together.", 6, 5, 4, new[] { 6 }),
-        new("Telophase · Telophase I", "Mitosis ends with 2 identical diploid cells. Meiosis I ends with 2 haploid cells whose chromosomes still have 2 chromatids.", 8, 6, 5, new[] { 2 }),
+        new("Telophase, cytokinesis · Telophase I", "Mitosis ends with 2 identical diploid cells. Meiosis I ends with 2 haploid cells whose chromosomes still have 2 chromatids.", 8, 6, 5, new[] { 2 }),
         new("Prophase II", "Mitosis is over. Meiosis goes on to a second division, with no S phase first: a spindle forms in each cell.", 8, 7, 6, new[] { 1, 2 }),
         new("Metaphase II", "In meiosis II single chromosomes line up, as in mitosis's metaphase.", 8, 8, 6, new[] { 5 }),
         new("Anaphase II", "Now meiosis separates sister chromatids, as mitosis did in its anaphase.", 8, 9, 6, new[] { 6 }),
@@ -856,9 +863,14 @@ public static partial class BioSelfCheck
                             if (!DivPainter.Anchor(l.Anchor, kf.Frame, shapes).Visible) hidden.Add($"{p.ToString().ToLowerInvariant()}{i + 1}:{l.Part}");
                         }
                         if (kf.Labels.Count > BioLabelLayout.MaxLabels) hidden.Add($"{p.ToString().ToLowerInvariant()}{i + 1}:too-many");
+                        if (kf.Labels.Select(l => l.Id).Distinct().Count() != kf.Labels.Count) hidden.Add($"{p.ToString().ToLowerInvariant()}{i + 1}:same-label");
                     }
                 }
         r.Check("divide.labels", missing.Count == 0 && hidden.Count == 0 ? "all" : string.Join(",", missing.Concat(hidden)), missing.Count == 0 && hidden.Count == 0);
+        // (§3.6: a step's title is at most 40 characters, its text one to three sentences)
+        var titles = mit.Stages.Select(s => s.Title).Concat(mei.Stages.Select(s => s.Title)).Concat(DivisionModel.CompareSteps.Select(s => s.Title));
+        var longest = titles.Max(t => t.Length);
+        r.Check("divide.titles", $"{longest}", longest <= 40 && mit.Stages.Concat(mei.Stages).All(s => s.Text.Length > 0 && (s.Text.EndsWith('.') || s.Text.EndsWith('?'))));
         r.Check("divide.compare", $"{DivisionModel.CompareSteps.Length}/{DivisionModel.CompareTable.Length}",
             DivisionModel.CompareTable.Length == 9 && DivisionModel.CompareSteps.All(s => s.Mitosis < mit.Stages.Count && s.Meiosis < mei.Stages.Count));
     }

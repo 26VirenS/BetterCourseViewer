@@ -47,7 +47,7 @@ public static class DnaStyles
     {
         "mrna" => DnaRnaView.Mrna,
         "trna" or "cloverleaf" => DnaRnaView.Cloverleaf,
-        "trna3d" or "trna-3d" or "lshape" or "l-shape" => DnaRnaView.TrnaModel,
+        "trna3d" or "trna-3d" or "trna 3d" or "lshape" or "l-shape" or "3d" or "l" => DnaRnaView.TrnaModel,
         "ribosome" or "ribosomes" or "rrna" => DnaRnaView.Ribosomes,
         _ => null,
     };

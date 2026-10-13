@@ -71,7 +71,9 @@ public class BioLabTests
 
     [Theory]
     [InlineData(7.305, 3, false, "7.31")]
-    [InlineData(1006.2, 2, false, "1,006")]
+    [InlineData(1006.2, 2, false, "1,000")]
+    [InlineData(1006.2, 3, false, "1,010")]
+    [InlineData(1006.2, 4, false, "1,006")]
     [InlineData(6400, 2, false, "6,400")]
     [InlineData(8.0386e-5, 3, false, "8.04 × 10⁻⁵")]
     [InlineData(1.5e9, 2, false, "1.5 × 10⁹")]
@@ -230,7 +232,8 @@ public class BioLabTests
         Assert.Equal("1.07 × 10¹¹", pcr.Value);
         var rcf = Run("centrifuge", "rcf");
         Assert.Equal(1006.2, rcf.Raw, 6);
-        Assert.Equal("1,006", rcf.Value);
+        // (10 cm and 3,000 rpm have one figure each, so the answer has two: 1,006.2 is "1,000"; the spec's "1,006" is its value)
+        Assert.Equal("1,000", rcf.Value);
         Assert.Equal(3000, Run("centrifuge", "rpm", ("rcf", "1006.2")).Raw, 6);
         Assert.Equal(6400, Run("bacteria").Raw, 6);
         Assert.Equal("6,400", Run("bacteria").Value);
@@ -344,5 +347,44 @@ public class BioLabTests
             BioLabModel.Figures = 3;
         }
         finally { BioLabModel.Changed -= Heard; }
+    }
+
+    /// <summary>Cell Explorer's "Why are cells small?", in both apps' words and in the earlier ones.</summary>
+    [Fact]
+    public void CellExplorersCellArrivesInTheSurfaceAreaCalculator()
+    {
+        Dictionary<string, string> info = new();
+        string? Take(string k) => info.Remove(k, out var v) ? v : null;
+        try
+        {
+            BioLabModel.Reset("sav");
+            info = new() { ["savShape"] = "sphere", ["savSize"] = "19.2", ["savUnit"] = "µm", ["from"] = "cell" };
+            Assert.True(BioLabModel.TakeCells(Take));
+            Assert.Empty(info);
+            Assert.Equal("sphere", BioLabModel.Mode("sav"));
+            Assert.Equal("9.6", BioLabModel.Text("sav", "r"));
+            Assert.True(BioLabModel.StepsOpen("sav"));
+            Assert.Equal("sav", BioLabModel.Focus);
+            info = new() { ["savShape"] = "box", ["savSize"] = "44,26,26", ["savUnit"] = "µm" };
+            Assert.True(BioLabModel.TakeCells(Take));
+            Assert.Equal("rect", BioLabModel.Mode("sav"));
+            Assert.Equal(new[] { "44", "26", "26" }, new[] { "l", "w", "h" }.Select(f => BioLabModel.Text("sav", f)));
+            info = new() { ["savShape"] = "cylinder", ["savSize"] = "1,2" };
+            Assert.True(BioLabModel.TakeCells(Take));
+            Assert.Equal(("cylinder", "0.5", "2"), (BioLabModel.Mode("sav"), BioLabModel.Text("sav", "r"), BioLabModel.Text("sav", "h")));
+            Assert.True(BioLabModel.Result("sav").Ok);
+            // (the earlier words: calc=sav with the shape and its fields)
+            info = new() { ["calc"] = "sav", ["mode"] = "sphere", ["r"] = "3" };
+            Assert.True(BioLabModel.TakeCells(Take));
+            Assert.Equal(("sphere", "3"), (BioLabModel.Mode("sav"), BioLabModel.Text("sav", "r")));
+            // (another calculator handed over is left to the pin's hand-off)
+            info = new() { ["calc"] = "molarity" };
+            Assert.False(BioLabModel.TakeCells(Take));
+        }
+        finally
+        {
+            BioLabModel.Reset("sav");
+            BioLabModel.Focus = null;
+        }
     }
 }

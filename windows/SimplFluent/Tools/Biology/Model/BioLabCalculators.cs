@@ -284,12 +284,8 @@ public sealed class LabRun
         var u = LabResult.UnitAfter(unit);
         var plain = LabNumbers.Plain(raw);
         var shown = Format(raw);
-        var a = Math.Abs(raw);
-        // (a whole-number answer with more whole digits than figures keeps them all: "1,006", not "1,010")
-        var whole = a >= Math.Pow(10, Figures) && a < Math.Pow(10, LabNumbers.ScientificFrom);
         string how;
-        if (whole) how = "to the nearest whole number";
-        else if (Exact) how = $"{Figures} significant figures; every input is exact";
+        if (Exact) how = $"{Figures} significant figures; every input is exact";
         else
         {
             var least = measured.OrderBy(m => m.N.Figures).First();
@@ -297,7 +293,7 @@ public sealed class LabRun
                 ? $"{Figures} significant figures: {Typed(least.Id)} has {least.N.Figures}, and an answer has no more than one figure past its least precise input"
                 : $"{Figures} significant figures";
         }
-        if (plain == shown) return Exact && !whole ? $"= {shown}{u} exactly" : $"= {shown}{u} ({how})";
+        if (plain == shown) return Exact ? $"= {shown}{u} exactly" : $"= {shown}{u} ({how})";
         return $"{plain}{u} → {shown}{u} ({how})";
     }
 

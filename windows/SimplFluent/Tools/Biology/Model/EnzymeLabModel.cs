@@ -287,7 +287,8 @@ public static class EnzymeLabModel
         : PhStrain > 0.5 ? "Far from its best pH, the active site's charges change and it loses its shape: the rate drops."
         : null;
 
-    public static string F(double v, int decimals) => v.ToString("F" + decimals, CultureInfo.InvariantCulture);
+    /// <summary>A number to <paramref name="decimals"/> places, rounded half-up (BioRound).</summary>
+    public static string F(double v, int decimals) => BioRound.Fixed(v, decimals);
 }
 
 public static partial class BioSelfCheck

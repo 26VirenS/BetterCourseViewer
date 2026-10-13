@@ -115,7 +115,7 @@ public static class CEScene
         var s = $"3D model of {kind.Phrase()}";
         if (cutaway) s += ", cut open";
         s += $"; {kinds} kinds of parts";
-        if (selected != null && CEParts.Part(kind, selected) is { } p) s += $"; selected: {p.Name.ToLowerInvariant()}";
+        if (selected != null && CEParts.Part(kind, selected) is { } p) s += $"; selected: {p.NameInSentence}";
         return s;
     }
 }

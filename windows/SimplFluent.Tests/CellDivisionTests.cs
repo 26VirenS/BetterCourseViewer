@@ -165,7 +165,8 @@ public class CellDivisionTests
         var two = Meiosis(new DivisionOptions { Nondisjunction = DivisionNondisjunction.MeiosisII });
         Assert.Equal(new[] { "n+1", "n−1", "n", "n" }, two.Products.Select(p => p.Tally.Ploidy));
         Assert.Equal("Partly: one chromosome's sisters did not separate", two.Counts[9].Sisters);
-        Assert.Equal("1.2c · 0.8c · 1c · 1c", Meiosis(new DivisionOptions { Pairs = 3, Nondisjunction = DivisionNondisjunction.MeiosisII }).Counts[10].Dna);
+        // (1.25c and 0.75c, rounded half-up as every bio tool rounds)
+        Assert.Equal("1.3c · 0.8c · 1c · 1c", Meiosis(new DivisionOptions { Pairs = 3, Nondisjunction = DivisionNondisjunction.MeiosisII }).Counts[10].Dna);
     }
 
     [Fact]

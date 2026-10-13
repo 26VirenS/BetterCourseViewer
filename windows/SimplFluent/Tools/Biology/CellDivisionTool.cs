@@ -579,7 +579,7 @@ internal sealed class DivisionProcessPage : Grid
         return b;
     }
 
-    private static string ChiasmaWords(double v) => $"{Math.Round(v * 100):0}% along its long arm";
+    private static string ChiasmaWords(double v) => $"{v * 100:0}% along its long arm";
 
     private void Change(Func<DivisionOptions, DivisionOptions> change)
     {

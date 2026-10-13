@@ -227,10 +227,10 @@ internal sealed class EnzymeLabTool : Grid
         return box;
     }
 
-    private static string F(double v, int d) => LabNumbers.Minus(v.ToString("F" + d, Inv));
+    private static string F(double v, int d) => LabNumbers.Minus(BioRound.Fixed(v, d));
 
     /// <summary>A setting's number as the Mac writes it: whole numbers bare, else to a decimal or two ("2.5", "0.75").</summary>
-    private static string N(double v) => LabNumbers.Minus(Math.Round(v, 2).ToString("0.##", Inv));
+    private static string N(double v) => LabNumbers.Minus(BioRound.Upto(v, 2));
 
     private void Play() => site.Play();
 

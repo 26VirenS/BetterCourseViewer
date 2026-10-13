@@ -1,11 +1,12 @@
-# The biology toolkit on Windows: the foundation
+# The biology toolkit on Windows
 
 Ten tools under a **Biology** heading on the Tools page (spec §2): `cell` Cell Explorer, `dna` DNA & RNA, `gene` Gene
 Expression, `biomol` Biomolecule Builder, `cross` Genetics Crosses, `divide` Cell Division, `popgen` Hardy–Weinberg,
 `biolab` Bio Lab Calculator, `enzyme` Enzyme Lab, `energy` Photosynthesis & Respiration. Each is pinnable like any
-tool. This page is for the people building them: what the foundation gives you, and which files are yours. It is the
+tool. All ten are built. This page is for the people working on them: what the shared foundation gives, which files
+are each tool's, and what each tool's pages, launch words and hand-offs are (from "Cell Explorer" on). It is the
 Windows twin of the Mac's `docs/mac-biology.md`: the same design, the same data, the same algorithms (the self-check's
-110 shared lines come out identical on both, value for value), C# names in PascalCase.
+shared lines come out identical on both, value for value), C# names in PascalCase.
 
 ## Files
 
@@ -162,7 +163,8 @@ P, Phenotype, Dies, Carrier; `Phenotypes` (born); `GenotypicRatio(Text)`, `BornG
   `HardyWeinberg.Calculate(given, value)` / `Calculate(counts)` (each step as text), `.Test(counts, df)` (df 1 by
   default), `HWSimulation.Step/Run` in §5.4.3's order — replicate r, from 0, draws from SplitMix64 seed S + r, 2N
   `Uniform() < p₃` draws a generation — so a seed gives the Mac's populations; run off the UI thread by `HWRunner`.
-  `HWFormat.Fixed` writes numbers as printf does (a tie rounded to even), so the working reads as on the Mac. Hand-offs:
+  `HWFormat.Fixed` writes numbers as printf's `%.Nf` does, rounded half-up as every bio tool rounds (Numbers, below), so
+  the working reads as on the Mac. Hand-offs:
   `["given"] = "q2", ["value"] = "0.16"`, `["counts"] = "50,30,20"`.
 - **Launch states:** `--tool cross --tool-state cross:forked` (`square`, `genotypes`, `why`, `testcross`, `cross=…` or
   `--bio-cross "AaBb x AaBb"`); `probability:prob=AaBbCc x AaBbCc:target=aa,B_,Cc:children=3`; `chi:fromcross` or
@@ -244,8 +246,9 @@ chemistry builders' three columns), `BioUI.Heading`, `BioUI.Caption`, `BioUI.Car
 
 `BioSelfCheck.Run()` covers the shared data and algorithms (the genetic code, the templates' frame, chirality, bonds
 and χ angles, every molecule's formula, the B-DNA test vectors, SplitMix64, chi-square, every §5.3.2 cross, the genes,
-proteins and tRNA, the geometry, the label layout and the step-through): 111 lines, all OK, the Mac's 110 among them
-line for line. Add yours in `Model/<Tool>Model.cs`, in the partial method already there:
+proteins and tRNA, the geometry, the label layout and the step-through): the foundation's 111 lines, the Mac's 110
+among them line for line, and each tool's own (`cell.…`, `dna.…`, `gx.…`, `biomol.…`, `cross.…`, `hw.…`, `divide.…`,
+`biolab.…`, `enzyme.…`, `energy.…`): 450 lines, all OK. Add yours in `Model/<Tool>Model.cs`, in the partial method already there:
 `static partial void CellChecks(BioCheckReport r) { r.Near("cell.count", …); }` with `r.Check(name, value, ok)`,
 `r.Near(name, value, expected, tolerance, digits)`, `r.Same(name, value, expected)`. Names have no spaces. The unit
 test `BiologyTests.TheSelfCheckIsAllOK` (CI's Unit tests job) fails on any FAIL; `--bio-check` writes the lines to the
@@ -267,4 +270,124 @@ turning world, to add a layer for the membrane's water and carrier. Launch state
 `plant`, `bacterium`, `membrane`, `compare`, then `nocut`, `true`, `nolabels`, `explode=0.6`, `gram+`, `show=…`,
 `hide=…`, `select=mito`, `isolate=mito`, `inside=chloroplast`, `quiz=find|name`; on the membrane `osmosis`, `still`,
 `nolabels`, `popc`, `select=integral:channel`. Each cell's hidden parts are kept (`SimplBio.cell.hidden.animal`).
-"Why are cells small?" hands the Bio Lab Calculator `calc=sav` with its `mode` and `r`/`l`/`w`/`h`.
+"Why are cells small?" hands the Bio Lab Calculator the cell as both apps word it (`savShape` sphere, box or cylinder,
+`savSize` its sizes across, `savUnit` µm, `from`; Between the tools, below), and "See a real phospholipid" hands the
+Biomolecule Builder `molecule` = POV. A part chosen from the parts list while another is isolated is isolated in its
+place, as on the Mac. Two differences from the Mac: it draws the thousands of ribosomes, pores, actin and fimbriae in
+spatial clusters, Windows as one item a material (above) with the part's labelled instance on its own for Zoom to; and
+a wrong answer in Find shakes the question here, where the Mac wobbles the part pressed in 3D.
+
+## Gene Expression (`gene`)
+
+Pages `express` (transcribe & translate), `codons`, `frames`, `mutations`. `Model/GeneExpressionModel.cs` (the tool's
+state, the codon table and wheel), `GeneExpressionProcess.cs` (§4.3's process one nucleotide a press: transcription,
+cap, tail, splicing — the codon split across the exon junction — export, then one codon a press: the E/P/A sites,
+anticodons 3′→5′, a release factor), `GeneExpressionMutations.cs` (a typed `c.20A>T` or a pressed base, the seven
+kinds, the original and the mutant lined up base for base). Views: `GeneExpressionTool.cs` (pages, launch, the pin's
+codon lookup `GeneExpressionCompact`), `GeneExpressionExpressPage.cs`, `GeneExpressionScene.cs` and
+`GeneExpressionDraw.cs` (the four lanes), `GeneExpressionCodonsPage.cs`, `GeneExpressionFramesPage.cs` (only the visible
+part of 3,000 nt is drawn), `GeneExpressionMutationsPage.cs`. Launch: `express:step=40`, `express:prokaryote:step=45`,
+`codons:find=Lys`, `codons:wheel:find=Leu`, `frames:seq=…`, `mutations:sickle`, `mutations:mut=c.6_7insA`; the pin
+`--pin-open gene --tool-state codon=UGG`. Takes `sequence`, `codon`, `mutation` (= `sickle`) and `page`; sends a finished
+protein (`protein`, page `proteins`) or an amino acid (`molecule`, page `amino`) to the Biomolecule Builder.
+
+## Biomolecule Builder (`biomol`)
+
+Pages `amino`, `proteins`, `nucleic`, `carbs`, `lipids`. `Model/BiomoleculeBuilderModel.cs` (state, input, its
+`biomol.…` checks), `BiomolPeptide.cs` (a typed sequence built as a helix, strand, coil or the rarer shapes, side
+chains turned apart), `BiomolProteins.cs` (ubiquitin's and haemoglobin's four levels, denature and refold),
+`BiomolMolecules.cs` and `BiomolScenes.cs` (nucleotides joined into a strand, sugars and their glycosidic bonds,
+cellulose and starch, fats, phospholipids, cholesterol). Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
+layer added to the shared 3D view), `BiomolDrawings.cs`, `BiomolAminoPage.cs`, `BiomolProteinPage.cs`,
+`BiomolMoleculePages.cs`. Every page opens its molecule in the Molecule Builder (`MoleculeModel.Shared`, atom ids from
+1,000,000). Launch: `amino:aa=W:colour=part`, `proteins:hbonds:ribbon=over`, `proteins:ss=helix`, `proteins:sheet`,
+`proteins:level=tertiary:core`, `proteins:level=quaternary`, `nucleic:strand:seq=ATGCGT:complement`, `carbs:anomers`,
+`carbs:di=SUC:split`, `carbs:poly=cellulose`, `lipids:lipid=compare` (the Mac's words, a few aliases beside them).
+Takes `sequence`, `protein` and `molecule`; sends `mutation` = `sickle` (page `mutations`) to Gene Expression, `sequence`
+(page `sequence`) to DNA & RNA, and page `membrane` to Cell Explorer.
+
+## DNA & RNA (`dna`)
+
+Pages `helix`, `nucleotides`, `sequence`, `replication`, `rna`. `Model/DNAToolModel.cs` (state, styles),
+`DnaHelix.cs` (right-handed B-DNA, 10.5 bp a turn, cartoon, atoms or space-filling; ends, grooves, measures,
+H-bonds, unzip), `DnaNucleotides.cs` (the nine nucleotides, the A·T/A·U and G·C pairs drawn flat), `DnaReplication.cs`
+(the fork's nine steps, each naming its enzyme), `DnaRna.cs` (the mRNA strip, the tRNA cloverleaf and its L-shape in
+3D, ribosomes), `DnaChecks.cs`. Views: `DNATool.cs` (pages, launch, hand-off, `SimplBio.dna.<field>`), one file a
+page (`DNAHelixPage.cs` … `DNARnaPage.cs`). Launch, in the Mac's words with this app's first ones beside them:
+`helix:style=atoms|space|cartoon:grooves:measure:ends|noends:nohbonds:unzip=0.5:pair=10:seq=…`;
+`nucleotides:mol=DT` (or `nt=`), `pairs` (or `bases`), `model`, `au`, `numbers`, `compare`, `parts`/`noparts` (or
+`cpk`), `part=sugar`; `replication:step=6`; `rna:view=cloverleaf|lshape|mrna|ribosomes` (or `trna`, `trna3d`,
+`mrna`, `ribosome`), `modified`, `base=34`, `arm=anticodon`. Takes `sequence` (shown on the Sequence page, RNA letters
+written as DNA), `nucleotide` (the Nucleotides page) and `page` (Cell Division's "What happens in S phase" opens
+`replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is).
+
+## Cell Division (`divide`)
+
+Pages `mitosis`, `meiosis`, `compare`, `cycle`. `Model/CellDivisionModel.cs` (the stages and their counts, §5.2.1–2;
+the Compare table, §5.2.3; the cards), `CellDivisionGeometry.cs` and `CellDivisionKeyframes.cs` (each step's cell,
+chromosomes, spindle and labels), `CellDivisionPainter.cs` (a frame as primitives). Views: `CellDivisionTool.cs`
+(pages, the counts panel, options, the step-through across the page's foot), `CellDivisionCanvas.cs` (the 2D drawing,
+600 ms a step or a crossfade), `CellCycleView.cs` (the wheel to scale — G1 11 h, S 8 h, G2 4 h, M 1 h — G0, the three
+checkpoints, cyclins, a cancer view). The Mac's model line for line: its frames, counts, labels' anchors and badges
+compare equal for eight option sets (its plate spacing, prophase I's pairing, telophase's angles and interphase's
+G1/S/G2 split among them). Launch: `mitosis:step=6`, `mitosis:plant:step=8`, `meiosis:step=4`, `meiosis:step=11:nd=1`,
+`meiosis:step=5:pick=0`, `compare:step=3`, `cycle:gate=g1s:cancer` (`--bio-cell plant`, `--bio-step <n>` too).
+"What happens in S phase" opens DNA & RNA on page `replication`.
+
+## Bio Lab Calculator, Enzyme Lab, Photosynthesis & Respiration (`biolab`, `enzyme`, `energy`)
+
+- **Bio Lab** (`BioLabTool.cs`, the pin's `BioLabCompact`; `Model/BioLabModel.cs`, `BioLabCalculators.cs` — the 26
+  calculators, the Mac's names — `BioLabNumbers.cs`, `LabSpecText.cs`): pages `solutions`, `microscopy`, `cells`,
+  `stats`, `ecology`, `molecules`. Answers follow §5.5's significant-figure rule, as the Mac's do: the least precise
+  measured input decides (a centrifuge's 10 cm at 3,000 rpm is "1,000 × g", its value 1,006.2 shown in the working),
+  and an answer from exact inputs says so. Launch: `<page>:calc=<id>:mode=<id>:steps:sf=<n>:digits=<n>:<field>=<text>`
+  (underscores for spaces); `steps` without `calc=` opens every card's steps. Takes Cell Explorer's cell for surface
+  area to volume (`BioLabModel.TakeCells`: `savShape`, `savSize`, `savUnit`, `from`; the earlier `calc` = sav with
+  `mode` and `r`/`l`/`w`/`h` too) and the pin's `calc`.
+- **Enzyme Lab** (`EnzymeLabTool.cs`, `Model/EnzymeLabModel.cs`, `LabPlot.cs`): launch `none`, `competitive`,
+  `noncompetitive`, `denatured`, `enzyme=`, `phpreset=`, `temp=`, `ph=`, `s=` (and `preset=`, `t=`, `i=`). "Fresh
+  enzyme" while the sample is still too hot also brings the temperature to that enzyme's best, on both apps.
+- **Photosynthesis & Respiration** (`EnergyPathwaysTool.cs`, `Model/EnergyPathwaysModel.cs`): pages `map`,
+  `respiration`, `photosynthesis`, `atoms`; launch `map:stage=<id>:respire:night`,
+  `respiration:step=<n>:ferment=lactate|ethanol`, `photosynthesis:step=<n>`, `atoms:trace=carbon|oxygen:step=<n>`.
+
+## Between the tools (hand-offs)
+
+The keys are the Mac's, so a hand-off reads the same on both; a tool also reads its own earlier words.
+
+| From → to | Keys (page) |
+|---|---|
+| Cell Explorer → Bio Lab ("Why are cells small?") | `savShape` sphere, box or cylinder; `savSize` (a sphere's diameter, a box's `l,w,h`, a cylinder's `diameter,length`); `savUnit`; `from` (page `cells`) |
+| Cell Explorer → Biomolecule Builder | `molecule` = POV (shown on its Lipids page) |
+| Gene Expression → Biomolecule Builder | `protein` (page `proteins`), `molecule` (page `amino`) |
+| Biomolecule Builder → Gene Expression | `mutation` = sickle (page `mutations`) |
+| DNA & RNA ⇄ Gene Expression, Biomolecule Builder → DNA & RNA | `sequence` |
+| Cell Division → DNA & RNA | `page` = replication |
+| Cell Explorer → Flashcards | `deck` |
+| Genetics Crosses → Cell Division ("How meiosis makes them") | `focus` = assortment (not read yet on either app: Cell Division opens on its last page) |
+| a pin's quick version → its tool | Crosses `cross`, `chi`; Hardy–Weinberg `given`, `value`, `counts`; Gene Expression `codon`; Bio Lab `calc` |
+
+## Numbers (rounding)
+
+Every number a bio tool shows is rounded one way on both apps: decimal half-up (uifix/conventions.md), the number as
+it reads in decimal, so 0.125 is "0.13", 3.425 is "3.43" and 1.25c is "1.3c". `BioRound.Fixed`, `.Upto` and `.Value`
+(`Model/BioMath.cs`) do it; .NET's custom formats (`"0.00"`, `{x:0}`) round this way too, but its standard ones
+(`"F2"`, `"N2"`) and `Math.Round(x, 2)` do not, so a tool's numbers go through one of the first. The Bio Lab's
+significant figures round their decimal digits half-up likewise. No specification test vector is a tie, so every one
+still passes.
+
+## Pictures
+
+`.github/workflows/windows-fluent.yml` pictures each tool at 1366×778 (`--place tools --tool <key> --tool-state …`):
+`tools-biology` (the section, with `--bio-check`: CI fails unless the log says `bio-check summary n/n OK`), `bio-tool`,
+`pin-bio`, `bio-foundation(-dark)`; `bio-cell-animal`, `-card`, `-inside`, `-bacterium`, `-explode`, `-membrane`,
+`-compare`; `bio-gene-transcribe`, `-translate`, `-splice`, `-prokaryote`, `-codons`, `-wheel`, `-frames`, `-sickle`,
+`-frameshift`, `pin-gene`; `bio-cross-dihybrid`, `-xlinked`, `-forked`, `-why`, `-probability`, `-chi`, `-pedigree`,
+`bio-popgen-calculate`, `-test`, `-simulate`, `-lethal`, `pin-cross`, `pin-popgen`; `bio-biomol-amino(-dark)`,
+`-peptide`, `-helix-dark`, `-sheet`, `-tertiary`, `-quaternary`, `-strand`, `-anomers`, `-sucrose`, `-cellulose`,
+`-lipids`; `bio-dna-helix(-dark)`, `-grooves`, `-atoms`, `-unzip`, `-nucleotide(-dark)`, `-pairs`, `-sequence`,
+`-replication(-dark)`, `-okazaki`, `-trna(-dark)`, `-trna3d`, `-mrna`, `-ribosome`; `bio-divide-mitosis`, `-meiosis`,
+`-gametes`, `-plant`, `-pick`, `-compare`, `-cycle`, each with `-dark`; `bio-lab-dilution`, `-stats-dark`,
+`-cells-dark`, `pin-biolab`, `bio-enzyme-competitive`, `-denatured-dark`, `bio-energy-map`, `-respiration-dark`,
+`-photosynthesis`, `-atoms`. An argument with a space in it (a cross typed `AaBb x AaBb`) is put in quotes by the
+workflow's `Shot`.

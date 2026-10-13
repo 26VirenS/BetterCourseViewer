@@ -110,6 +110,47 @@ public static class BioLabModel
         Tell(id);
     }
 
+    /// <summary>
+    /// Cell Explorer's "Why are cells small?" taken (the hand-off both apps send): <c>savShape</c> sphere, box or cylinder,
+    /// <c>savSize</c> its sizes across — a sphere's diameter, a box's "l,w,h", a cylinder's "diameter,length" — in
+    /// <c>savUnit</c>, and <c>from</c> (the tool it came from). The earlier words are read too: <c>calc</c> = sav with
+    /// <c>mode</c> and the fields themselves (r, s, l, w, h). The surface-area-to-volume calculator is set up with the cell's
+    /// shape, its steps open, and brought into view; false when nothing of the kind was handed over.
+    /// </summary>
+    public static bool TakeCells(Func<string, string?> take)
+    {
+        var shape = take("savShape");
+        var size = take("savSize");
+        var unit = take("savUnit");
+        take("from");
+        var calc = shape == null ? take("calc") : null;
+        if (shape == null && calc != "sav") return false;
+        const string id = "sav";
+        if (LabCalcs.Find(id) is not { } sav) return false;
+        var mode = (shape ?? take("mode"))?.Trim().ToLowerInvariant() switch
+        {
+            "sphere" => "sphere", "cube" => "cube", "box" or "rect" or "rectangular" or "rectangular solid" => "rect", "cylinder" => "cylinder", _ => null,
+        };
+        if (mode != null) SetMode(id, mode);
+        var m = mode ?? Mode(id);
+        static string Half(string s) => BioText.Number(s.Trim()) is { } d && d > 0 ? LabNumbers.Plain(d / 2) : s.Trim();
+        if (shape != null && size != null)
+        {
+            var parts = size.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            string[] fields = m switch { "sphere" => new[] { "r" }, "cube" => new[] { "s" }, "rect" => new[] { "l", "w", "h" }, _ => new[] { "r", "h" } };
+            for (var i = 0; i < Math.Min(parts.Length, fields.Length); i++)
+                SetText(id, fields[i], fields[i] == "r" ? Half(parts[i]) : parts[i]);
+        }
+        else
+            foreach (var f in new[] { "r", "s", "l", "w", "h" })
+                if (take(f) is { Length: > 0 } t) SetText(id, f, t.Trim());
+        if (unit is { Length: > 0 } && LabUnits.Of(LabDim.Length).Any(u => u.Symbol == unit))
+            foreach (var f in sav.Fields) SetUnit(id, f.Id, unit);
+        SetSteps(id, true);
+        Focus = id;
+        return true;
+    }
+
     /// <summary>The calculator's own values back.</summary>
     public static void Reset(string id)
     {
@@ -235,7 +276,8 @@ public static partial class BioSelfCheck
         r.Check("biolab.beer-lambert", $"{Shown(beer)}={beer.Alt}", beer.Ok && Near(beer.Raw, 0.5 / 6220) && beer.Value == "8.04 × 10⁻⁵" && beer.Alt == "80.4 µM");
         Line("biolab.a260", Run("a260", "ds"), 125, "125");
         Line("biolab.pcr", Run("pcr"), 100 * Math.Pow(2, 30), "1.07 × 10¹¹");
-        Line("biolab.centrifuge", Run("centrifuge", "rcf"), 1006.2, "1,006");
+        // (§5.5's 1,006 × g is the value; 10 cm and 3,000 rpm have one significant figure each, so it shows to two)
+        Line("biolab.centrifuge", Run("centrifuge", "rcf"), 1006.2, "1,000");
         Line("biolab.bacteria", Run("bacteria"), 6400, "6,400");
         Line("biolab.pH", Run("ph", "pH"), 7.0, "7.00");
         Line("biolab.q10", Run("q10"), 2.2, "2.2");

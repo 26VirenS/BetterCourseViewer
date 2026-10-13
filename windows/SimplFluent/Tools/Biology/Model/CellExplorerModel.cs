@@ -125,6 +125,20 @@ public sealed record CEPart(string Id, CEKind Kind, string Name, string Label, s
     /// <summary>The card's structure line: "Double membrane · the nuclear envelope, with nuclear pores".</summary>
     public string StructureText => StructureLine ?? (StructureNote.Length == 0 ? Membranes.Line() : Membranes.Line() + " · " + StructureNote);
 
+    /// <summary>The name inside a sentence ("Find the Golgi apparatus", "the rough ER", "the nucleus").</summary>
+    public string NameInSentence => InSentence(Name);
+
+    public string LabelInSentence => InSentence(Label);
+
+    /// <summary>A name with its first letter lowered, unless it begins a proper name or an abbreviation (Golgi, ER, DNA) —
+    /// the Mac's CEPart.inSentence.</summary>
+    public static string InSentence(string s)
+    {
+        var first = s.Split(' ')[0];
+        if (first.StartsWith("Golgi", StringComparison.Ordinal) || first.Length > 1 && first == first.ToUpperInvariant()) return s;
+        return s.Length == 0 ? s : char.ToLowerInvariant(s[0]) + s[1..];
+    }
+
     /// <summary>"animal ✓ · plant ✓ · bacteria ✗" (§5.1.6).</summary>
     public string FoundInText => string.Join(" · ", CEKinds.All.Zip(FoundIn).Select(z => $"{z.First.FoundName()} {z.Second.Mark.Symbol()}"));
 
@@ -416,7 +430,9 @@ public sealed partial class CEModel
             (_, "chloroplast") => $"{n} lenses 5.0 × 2.4 µm, each with 14 grana (real: 40–60) of 10 thylakoids",
             (_, "amyloplast") => $"{n}, each 2 µm long, with starch grains",
             (_, "capsule") => "A layer 0.15 µm thick, translucent",
-            (_, "outer") => "A shell 0.012 µm thick, outside the thin wall",
+            (_, "outer") => Options.GramPositive
+                ? "None: a Gram-positive bacterium has no outer membrane, only its thick wall (turn off Gram-positive wall to see one)"
+                : "A shell 0.012 µm thick, outside the thin wall",
             (_, "nucleoid") => "One chromosome drawn as a tangle of 600 steps in a region 1.3 × 0.64 µm",
             (_, "plasmid") => $"{n} small loops 0.14–0.2 µm across",
             _ => n > 0 ? $"{n}" : "",
@@ -438,7 +454,8 @@ public sealed partial class CEModel
     {
         if (x == 0 || double.IsNaN(x) || double.IsInfinity(x)) return "0";
         var place = 2 - (int)Math.Floor(Math.Log10(Math.Abs(x)));
-        var rounded = place >= 0 ? Math.Round(x, Math.Min(place, 15), MidpointRounding.AwayFromZero) : Math.Round(x / Math.Pow(10, -place), MidpointRounding.AwayFromZero) * Math.Pow(10, -place);
+        // (rounded half-up, as every bio tool rounds: BioRound)
+        var rounded = place >= 0 ? BioRound.Value(x, Math.Min(place, 15)) : BioRound.Value(x / Math.Pow(10, -place), 0) * Math.Pow(10, -place);
         return rounded.ToString("#,0.###############", CultureInfo.InvariantCulture);
     }
 }
@@ -673,13 +690,21 @@ public static class CellExplorerModel
         return new CEView(Explode, s.Hidden.OrderBy(h => h, StringComparer.Ordinal).ToArray(), s.Isolated, s.Isolated != null && s.LookInside, dark);
     }
 
-    /// <summary>A part selected (its card opened), or none; one outside what is isolated shows the whole cell again.</summary>
-    public static void Select(CEKind k, string? part)
+    /// <summary>A part selected (its card opened), or none; one outside what is isolated shows the whole cell again. Chosen
+    /// from the parts list (<paramref name="follow"/>) while another part is isolated, the new part is isolated instead (seen
+    /// inside only if it can be), as on the Mac; a click in the scene keeps the view (the nucleolus inside the nucleus).</summary>
+    public static void Select(CEKind k, string? part, bool follow = false)
     {
         var s = Cell(k);
         if (s.Selected == part) return;
         s.Selected = part;
-        if (part == null || (s.Isolated != null && !InView(s, part))) { s.Isolated = null; s.LookInside = false; }
+        if (follow && part != null && s.Isolated != null && s.Isolated != part)
+        {
+            s.Isolated = part;
+            s.LookInside = s.LookInside && CEScene.CanLookInside(part);
+            s.Hidden.Remove(part);
+        }
+        else if (part == null || (s.Isolated != null && !InView(s, part))) { s.Isolated = null; s.LookInside = false; }
         Tell();
     }
 
@@ -775,6 +800,8 @@ public static partial class BioSelfCheck
         r.Same("cell.plant-golgi", CEParts.Part(CEKind.Plant, "golgi")?.Function ?? "-",
             "Modifies, sorts and packages proteins and lipids from the ER; ships them in vesicles (to the membrane, lysosomes or outside). Also makes wall polysaccharides and builds the cell plate.");
         r.Check("cell.plant-pm-mixup", CEParts.Part(CEKind.Plant, "pm")?.Mixup ?? "none", CEParts.Part(CEKind.Plant, "pm")?.Mixup == null);
+        var sentences = new[] { "golgi", "rer", "mito" }.Select(id => CEParts.Part(CEKind.Animal, id)?.LabelInSentence).OfType<string>();
+        r.Same("cell.names-in-sentences", string.Join(",", sentences), "Golgi apparatus,rough ER,mitochondria");
         r.Same("cell.nucleoid-structure", CEParts.Part(CEKind.Bacterium, "nucleoid")?.StructureText ?? "-", "No membrane · a region of the cytoplasm, not an organelle");
         var doubles = CEKinds.All.SelectMany(CEParts.All).Where(p => p.Membranes == CEMembranes.Double).Select(p => p.Id).ToHashSet();
         r.Check("cell.double-membranes", string.Join(",", doubles.OrderBy(d => d, StringComparer.Ordinal)),

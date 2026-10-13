@@ -52,8 +52,12 @@ internal sealed class BioLabTool : Grid
     public BioLabTool(ToolContext c, BioLaunchState? state)
     {
         BioLabStore.Load();
-        // (handed over by the pin's quick version: the calculator begun there)
-        if (c.TakeInfo("calc") is { } calc && LabCalcs.Find(calc) is { } hc)
+        // (handed over by Cell Explorer's "Why are cells small?": the cell's shape and size in the surface-area-to-volume
+        //  calculator, on the Cells page; or by the pin's quick version: the calculator begun there)
+        var calc = c.TakeInfo("calc");
+        if (BioLabModel.TakeCells(name => name == "calc" ? calc : c.TakeInfo(name)))
+            BioNav.Set("biolab", "cells", remember: false);
+        else if (calc != null && LabCalcs.Find(calc) is { } hc)
         {
             BioNav.Set("biolab", hc.Page, remember: false);
             BioLabModel.SetSteps(hc.Id, true);

@@ -441,3 +441,34 @@ public static class BioText
     public static int? Int(string s) =>
         s.Length > 0 && !char.IsWhiteSpace(s[0]) && !char.IsWhiteSpace(s[^1]) && int.TryParse(s, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var i) ? i : null;
 }
+
+/// <summary>
+/// Numbers shown to a student, rounded the one way every bio tool rounds on both apps (uifix/conventions.md): decimal
+/// half-up — the number as it reads in decimal (15 significant digits, so 3.425 is 3.425, not the 3.42499… a double
+/// holds), a 5 rounded up, away from zero: 3.425 → "3.43", 0.125 → "0.13", 0.575 → "0.58". .NET's custom formats
+/// ("0.00") round this way; its standard ones ("F2", "N2") and Math.Round(x, 2) do not (they round the double's exact
+/// value, or a tie to even), so a tool's numbers go through here or a custom format.
+/// </summary>
+public static class BioRound
+{
+    /// <summary>The value rounded half-up at <paramref name="decimals"/> places (0–15).</summary>
+    public static double Value(double x, int decimals) =>
+        double.IsFinite(x) ? double.Parse(Fixed(x, decimals), NumberStyles.Float, CultureInfo.InvariantCulture) : x;
+
+    /// <summary>"%.{decimals}f", rounded half-up: "0.13", "12", "-2.45"; a value that rounds to zero is "0.00", never "-0.00".</summary>
+    public static string Fixed(double x, int decimals)
+    {
+        if (double.IsNaN(x)) return "nan";
+        if (double.IsInfinity(x)) return x > 0 ? "inf" : "-inf";
+        var d = Math.Clamp(decimals, 0, 15);
+        var s = x.ToString(d > 0 ? "0." + new string('0', d) : "0", CultureInfo.InvariantCulture);
+        return s.StartsWith('-') && s.AsSpan(1).IndexOfAnyExcept("0.") < 0 ? s[1..] : s;
+    }
+
+    /// <summary>Up to <paramref name="decimals"/> places, trailing zeros dropped ("0.##"): "2.5", "3", "0.13".</summary>
+    public static string Upto(double x, int decimals)
+    {
+        var s = Fixed(x, decimals);
+        return s.Contains('.') ? s.TrimEnd('0').TrimEnd('.') : s;
+    }
+}

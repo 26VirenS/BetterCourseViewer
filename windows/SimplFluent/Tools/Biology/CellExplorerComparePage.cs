@@ -90,7 +90,7 @@ internal sealed class CellComparePage : Grid
                     CellExplorerModel.Select(o.Kind, o.Part);
                 }, new Thickness(8, 7, 8, 8));
                 b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-                b.ToolTip = $"See the {part.Name.ToLowerInvariant()} in the {o.Kind.Title().ToLowerInvariant()}";
+                b.ToolTip = $"See the {part.LabelInSentence} in the {o.Kind.Title().ToLowerInvariant()}";
                 System.Windows.Automation.AutomationProperties.SetName(b, $"{row.Structure}: animal {row.Cells[0]}, plant {row.Cells[1]}, bacterium {row.Cells[2]}");
                 v.Children.Add(b);
             }

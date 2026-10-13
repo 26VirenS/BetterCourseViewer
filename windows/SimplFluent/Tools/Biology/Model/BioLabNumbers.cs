@@ -149,9 +149,10 @@ public static class LabNumbers
     public static string Minus(string s) => s.Replace('-', '−');
 
     /// <summary>
-    /// A value to so many significant figures, as on paper: "7.31", "0.450", "5.0", "−2.45"; "8.04 × 10⁻⁵" and "1.5 × 10⁹"
-    /// from 10⁵ up and below 0.001; and a whole-number answer below that keeps its whole digits ("1,006", "6,400",
-    /// "3,000" — never "1,010"). <paramref name="trim"/>: trailing zeros dropped (an exact answer: "0.62", "8.4 × 10⁵", "400").
+    /// A value to so many significant figures, as on paper and as the Mac writes it (spec §5.5): "7.31", "0.450", "5.0",
+    /// "−2.45"; "8.04 × 10⁻⁵" and "1.5 × 10⁹" from 10⁵ up and below 0.001; a whole number past its figures ends in zeros
+    /// ("1,010" for 1,006.2 to three, "1,000" to two). <paramref name="trim"/>: trailing zeros dropped (an exact answer:
+    /// "0.62", "8.4 × 10⁵", "400").
     /// </summary>
     public static string Sig(double v, int figures, bool trim = false)
     {
@@ -179,9 +180,8 @@ public static class LabNumbers
         }
         else if (e >= figures - 1)
         {
-            // (a whole-number answer: its whole digits kept)
-            var whole = Math.Round((decimal)a, 0, MidpointRounding.AwayFromZero);
-            body = whole.ToString("N0", Inv);
+            // (a whole number: its figures, then zeros to the decimal point)
+            body = (m * Pow10(e)).ToString("N0", Inv);
         }
         else
         {

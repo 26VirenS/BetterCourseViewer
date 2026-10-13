@@ -180,7 +180,7 @@ internal sealed class CellPage : Grid
         CellExplorerModel.Tell();
     }
 
-    private static string ExplodeWords(double v) => v < 0.005 ? "Off" : $"{Math.Round(v * 100)}%";
+    private static string ExplodeWords(double v) => v < 0.005 ? "Off" : $"{v * 100:0}%";
 
     /// <summary>After the explode slider is let go: the camera framing the cell as far apart as it now is (the Mac's).</summary>
     private void Refit()
@@ -244,7 +244,7 @@ internal sealed class CellPage : Grid
         if (q is { Current: { } current })
         {
             var name = CEParts.Part(kind, current.Part)?.Name ?? current.Part;
-            var v = K.V(4, K.Text(q.Mode == CEQuizMode.Find ? $"Find the {name.ToLowerInvariant()}" : "Name the glowing part", Ty.BodyStrong).Align(HorizontalAlignment.Center, VerticalAlignment.Center));
+            var v = K.V(4, K.Text(q.Mode == CEQuizMode.Find ? $"Find the {CEPart.InSentence(name)}" : "Name the glowing part", Ty.BodyStrong).Align(HorizontalAlignment.Center, VerticalAlignment.Center));
             v.Children.Add(CellExplorerModel.QuizFeedback is { } said
                 ? Said(said)
                 : K.Text($"Question {q.Index + 1} of {q.Questions.Count}", Ty.Caption, B.Text2).Align(HorizontalAlignment.Center, VerticalAlignment.Center));
@@ -359,7 +359,7 @@ internal sealed class CellPage : Grid
             var drawn = model == null || model.PartsShown.Contains(id);
             r.Box.IsChecked = on;
             r.Box.IsEnabled = drawn && !quiz;
-            r.Box.ToolTip = on ? $"Hide the {r.Part.Label.ToLowerInvariant()}" : $"Show the {r.Part.Label.ToLowerInvariant()}";
+            r.Box.ToolTip = on ? $"Hide the {r.Part.LabelInSentence}" : $"Show the {r.Part.LabelInSentence}";
             r.Button.IsEnabled = !quiz;
             r.Name.Opacity = on && drawn ? 1 : 0.55;
             var selected = s.Selected == id;
@@ -380,13 +380,13 @@ internal sealed class CellPage : Grid
         var name = K.Text(p.Label, Ty.Body);
         name.TextTrimming = TextTrimming.CharacterEllipsis;
         var face = K.Columns("auto, *", CellUI.Swatch(p.Colour.ToColor()).Margin(0, 0, 8, 0).Col(0), name.Col(1));
-        var b = K.Subtle(face, () => Select(id), new Thickness(6, 4, 6, 5), 7);
+        var b = K.Subtle(face, () => Select(id, follow: true), new Thickness(6, 4, 6, 5), 7);
         b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         b.ToolTip = p.Name;
         // (Tab through the list opens each part's card in turn; ↑ and ↓ step to the part before or after)
         b.GotKeyboardFocus += (_, _) =>
         {
-            if (InputManager.Current.MostRecentInputDevice is KeyboardDevice && State.Selected != id && CellExplorerModel.Quiz == null) Select(id);
+            if (InputManager.Current.MostRecentInputDevice is KeyboardDevice && State.Selected != id && CellExplorerModel.Quiz == null) Select(id, follow: true);
         };
         b.PreviewKeyDown += (_, e) =>
         {
@@ -424,10 +424,12 @@ internal sealed class CellPage : Grid
         return bits.Length >= 2 && bits[0] is "organelle" or "inside" ? bits[1] : null;
     }
 
-    private void Select(string? part)
+    /// <summary>A part's card. From the parts list (<paramref name="follow"/>) while another part is isolated, the new
+    /// part is isolated instead; a click in the scene keeps the view as it is.</summary>
+    private void Select(string? part, bool follow = false)
     {
         if (part != null && CEParts.Part(kind, part) == null) return;
-        CellExplorerModel.Select(kind, part);
+        CellExplorerModel.Select(kind, part, follow);
     }
 
     /// <summary>A click in the scene (or on a label): its part's card, or the quiz's answer; on nothing, back out of
@@ -522,7 +524,7 @@ internal sealed class CellPage : Grid
         }
         var isolated = s.Isolated == p.Id && !s.LookInside;
         var inside = s.Isolated == p.Id && s.LookInside;
-        Act(isolated ? "Show all" : "Isolate", SymbolRegular.Filter20, $"Show only the {p.Label.ToLowerInvariant()}, framed and enlarged (Escape to come back)",
+        Act(isolated ? "Show all" : "Isolate", SymbolRegular.Filter20, $"Show only the {p.LabelInSentence}, framed and enlarged (Escape to come back)",
             () => CellExplorerModel.Isolate(kind, isolated ? null : p.Id), drawn || isolated, accent: isolated);
         Act("Zoom to", SymbolRegular.ZoomIn20, "Bring the camera to it (or double-click it)", () => ZoomTo(p.Id), drawn);
         if (CEScene.CanLookInside(p.Id))
@@ -586,30 +588,30 @@ internal sealed class CellPage : Grid
     }
 
     /// <summary>The Bio Lab Calculator's surface area to volume (its Cells page), with this cell as the shape the AP sheet
-    /// has for it: a sphere of the animal cell's volume, the plant cell's box, the bacterium's cylinder.</summary>
+    /// has for it: a sphere of the animal cell's volume, the plant cell's box, the bacterium's cylinder. Handed over in
+    /// both apps' words (BioLabModel.TakeCells): savShape, savSize (sizes across: the sphere's diameter, the box's l,w,h,
+    /// the cylinder's diameter and length), savUnit and from.</summary>
     private void WhySmall()
     {
-        var info = new Dictionary<string, string> { ["calc"] = "sav" };
+        var info = new Dictionary<string, string> { ["from"] = "cell", ["savUnit"] = "µm" };
         switch (kind)
         {
             case CEKind.Animal:
                 var v = CEBuildCache.Built(Options)?.Volume ?? 0;
-                var r = v > 0 ? Math.Cbrt(3 * v / (4 * Math.PI)) : 9.5;
-                info["mode"] = "sphere";
-                info["r"] = r.ToString("0.0", CultureInfo.InvariantCulture);
+                var d = v > 0 ? Math.Cbrt(6 * v / Math.PI) : 19;
+                info["savShape"] = "sphere";
+                info["savSize"] = d.ToString("0.0", CultureInfo.InvariantCulture);
                 break;
             case CEKind.Plant:
-                info["mode"] = "box";
-                info["l"] = "44";
-                info["w"] = "26";
-                info["h"] = "26";
+                info["savShape"] = "box";
+                info["savSize"] = "44,26,26";
                 break;
             default:
-                info["mode"] = "cylinder";
-                info["r"] = "0.5";
-                info["h"] = "2";
+                info["savShape"] = "cylinder";
+                info["savSize"] = "1,2";
                 break;
         }
+        BioNav.Set("biolab", "cells", remember: false);
         BioTools.Open(c, "biolab", info);
     }
 
@@ -666,7 +668,7 @@ internal sealed class CellPage : Grid
     private void AnswerFind(string part)
     {
         if (CellExplorerModel.Quiz is not { Mode: CEQuizMode.Find, Current: not null } quiz) return;
-        var name = (CEParts.Part(kind, part)?.Name ?? part).ToLowerInvariant();
+        var name = CEPart.InSentence(CEParts.Part(kind, part)?.Name ?? part);
         var right = quiz.Answer(part);
         var said = right ? $"Yes: the {name}." : $"That’s the {name}.";
         CellExplorerModel.QuizFeedback = said;
@@ -682,7 +684,7 @@ internal sealed class CellPage : Grid
         if (CellExplorerModel.Quiz is not { Mode: CEQuizMode.Name, Current: { } current } quiz) return;
         var rightName = CEParts.Part(kind, current.Part)?.Name ?? current.Part;
         var right = quiz.Answer(chosen);
-        var said = right ? $"Yes: {rightName}." : $"It’s the {rightName.ToLowerInvariant()}.";
+        var said = right ? $"Yes: {rightName}." : $"It’s the {CEPart.InSentence(rightName)}.";
         CellExplorerModel.QuizFeedback = said;
         Hold(current.Part, right ? 0.8 : 1.6, () => { if (CellExplorerModel.QuizFeedback == said) CellExplorerModel.QuizFeedback = null; });
         Say(said);
@@ -719,7 +721,7 @@ internal sealed class CellPage : Grid
                     var id = p.Id;
                     var row = K.Subtle(K.V(2, K.Text(p.Name, Ty.BodyStrong), CellUI.Rich(p.Function, Ty.Caption, B.Text2)), () => { EndQuiz(); Select(id); }, new Thickness(6, 4, 6, 5), 7);
                     row.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-                    row.ToolTip = $"Open the {p.Name.ToLowerInvariant()}'s card";
+                    row.ToolTip = $"Open the {p.NameInSentence}'s card";
                     list.Children.Add(row);
                 }
                 v.Children.Add(list);
@@ -734,7 +736,7 @@ internal sealed class CellPage : Grid
             var name = CEParts.Part(kind, current.Part)?.Name ?? current.Part;
             v.Children.Add(K.Text($"Question {q.Index + 1} of {q.Questions.Count} · {q.Score} right", Ty.Body, B.Text2));
             if (q.Mode == CEQuizMode.Find)
-                v.Children.Add(K.Wrapped($"Press the {name.ToLowerInvariant()} in the model. Turn it and zoom in if you need to; the labels are off.", Ty.Body));
+                v.Children.Add(K.Wrapped($"Press the {CEPart.InSentence(name)} in the model. Turn it and zoom in if you need to; the labels are off.", Ty.Body));
             else
             {
                 v.Children.Add(K.Text("Which part is glowing?", Ty.Body));

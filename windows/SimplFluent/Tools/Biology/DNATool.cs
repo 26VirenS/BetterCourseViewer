@@ -47,8 +47,7 @@ internal sealed class DNATool : Grid
     {
         this.c = c;
         DnaPrefs.Load();
-        // (a strand handed over by another tool: "Open in DNA & RNA" — RNA letters written as DNA)
-        if (c.TakeInfo("sequence") is { Length: > 0 } handed) DNAToolModel.Quietly(() => DNAToolModel.SetSequence(handed.ToUpperInvariant().Replace('U', 'T')));
+        TakeHandOff(c);
         if (state != null) Apply(state);
         Children.Add(host);
         Show(false);
@@ -74,35 +73,68 @@ internal sealed class DNATool : Grid
         if (animate) Motion.FadeIn(view, Motion.Medium);
     }
 
-    /// <summary>What a launch asked for (the screenshot suite's pictures): put in the model without being remembered.
-    /// helix: <c>style=atoms|space|cartoon</c>, <c>grooves</c>, <c>measure</c>, <c>noends</c>, <c>nohbonds</c>, <c>unzip=0.5</c>,
-    /// <c>pair=5</c> (selects base pair 5), <c>seq=ATGC…</c> (or --bio-seq); nucleotides: <c>nt=DT</c>, <c>pairs</c>, <c>au</c>,
-    /// <c>numbers</c>, <c>cpk</c>, <c>part=sugar</c>; replication: <c>step=6</c> (or --bio-step); rna: <c>mrna</c>, <c>trna</c>,
-    /// <c>trna3d</c>, <c>ribosome</c>, <c>modified</c>, <c>base=34</c>.</summary>
+    /// <summary>
+    /// What another tool handed over (spec §3.2; both apps' words): a strand (<c>sequence</c>, RNA letters written as DNA)
+    /// shown on the Sequence page, a nucleotide (<c>nucleotide</c>, "DT") on the Nucleotides page, or just a page
+    /// (<c>page</c>: Cell Division's "What happens in S phase" opens Replication) — <c>page</c> also says where a strand
+    /// or a nucleotide is shown.
+    /// </summary>
+    private static void TakeHandOff(ToolContext c)
+    {
+        var page = c.TakeInfo("page") is { } p && Pages.Any(x => x.Id == p) ? p : null;
+        if (c.TakeInfo("sequence") is { Length: > 0 } handed)
+        {
+            DNAToolModel.Quietly(() => DNAToolModel.SetSequence(handed.ToUpperInvariant().Replace('U', 'T')));
+            BioNav.Set("dna", page ?? "sequence");
+        }
+        else if (NucleotideCode(c.TakeInfo("nucleotide")) is { } code)
+        {
+            DNAToolModel.Quietly(() => { DNAToolModel.Nucleotide = code; DNAToolModel.ShowPairs = false; });
+            BioNav.Set("dna", page ?? "nucleotides");
+        }
+        else if (page != null) BioNav.Set("dna", page);
+    }
+
+    /// <summary>A nucleotide's code as the tool names it ("dt" → "DT"), else null.</summary>
+    private static string? NucleotideCode(string? s) =>
+        s == null ? null : DnaNucleotides.Codes.FirstOrDefault(x => string.Equals(x, s.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>What a launch asked for (the screenshot suite's pictures): put in the model without being remembered. The
+    /// Mac's words, with this app's first ones beside them. helix: <c>style=atoms|space|cartoon</c>, <c>grooves</c>,
+    /// <c>measure</c>, <c>ends</c>/<c>noends</c>, <c>nohbonds</c>, <c>unzip=0.5</c>, <c>pair=5</c> (selects base pair 5),
+    /// <c>seq=ATGC…</c> (or --bio-seq); nucleotides: <c>mol=DT</c> (or <c>nt=</c>), <c>pairs</c> (or <c>bases</c>), <c>model</c>,
+    /// <c>au</c>, <c>numbers</c>, <c>compare</c>, <c>parts</c>/<c>noparts</c> (or <c>cpk</c>), <c>part=sugar</c>; replication:
+    /// <c>step=6</c> (or --bio-step); rna: <c>view=cloverleaf|lshape|mrna|ribosomes</c> (or <c>trna</c>, <c>trna3d</c>,
+    /// <c>mrna</c>, <c>ribosome</c>), <c>modified</c>, <c>base=34</c>, <c>arm=anticodon</c>.</summary>
     private static void Apply(BioLaunchState s)
     {
         DNAToolModel.Quietly(() =>
         {
             if (s.Value("seq") is { Length: > 0 } seq) DNAToolModel.SetSequence(seq);
-            if (DnaStyles.Parse(s.Value("style")) is { } st) DNAToolModel.Style = st;
+            if (DnaStyles.Parse(s.Value("style") ?? s.Value("DNAStyle")) is { } st) DNAToolModel.Style = st;
             if (s.Has("grooves")) DNAToolModel.ShowGrooves = true;
             if (s.Has("measure")) DNAToolModel.ShowMeasure = true;
+            if (s.Has("ends")) DNAToolModel.ShowEnds = true;
             if (s.Has("noends")) DNAToolModel.ShowEnds = false;
             if (s.Has("nohbonds")) DNAToolModel.ShowHBonds = false;
-            if (double.TryParse(s.Value("unzip"), NumberStyles.Float, CultureInfo.InvariantCulture, out var u)) DNAToolModel.Unzip = u;
+            if (double.TryParse(s.Value("unzip"), NumberStyles.Float, CultureInfo.InvariantCulture, out var u)) DNAToolModel.Unzip = Math.Clamp(u, 0, 1);
             if (int.TryParse(s.Value("pair"), out var pair) && pair >= 1 && pair <= DNAToolModel.HelixSequence.Length) DNAToolModel.Selected = $"bp:{pair - 1}";
-            if (s.Value("nt") is { } nt && DnaNucleotides.Codes.FirstOrDefault(x => string.Equals(x, nt, StringComparison.OrdinalIgnoreCase)) is { } code) DNAToolModel.Nucleotide = code;
-            if (s.Has("pairs")) DNAToolModel.ShowPairs = true;
+            if (NucleotideCode(s.Value("mol") ?? s.Value("nt") ?? s.Value("Nucleotide")) is { } code) DNAToolModel.Nucleotide = code;
+            if (s.Has("pairs") || s.Has("bases")) DNAToolModel.ShowPairs = true;
+            if (s.Has("model")) DNAToolModel.ShowPairs = false;
             if (s.Has("au")) DNAToolModel.PairWithUracil = true;
             if (s.Has("numbers")) DNAToolModel.ShowNumbers = true;
-            if (s.Has("cpk")) DNAToolModel.ShowParts = false;
+            if (s.Has("compare")) DNAToolModel.ShowDifferences = true;
+            if (s.Has("parts")) DNAToolModel.ShowParts = true;
+            if (s.Has("cpk") || s.Has("noparts")) DNAToolModel.ShowParts = false;
             if (s.Value("part") is { } part) DNAToolModel.NucleotidePart = part;
             if (int.TryParse(s.Value("step"), out var step)) DNAToolModel.Replication.Go(Math.Clamp(step - 1, 0, DnaReplication.Steps.Length - 1), animated: false);
-            foreach (var v in new[] { "mrna", "trna", "trna3d", "ribosome", "ribosomes", "cloverleaf" })
+            foreach (var v in new[] { "mrna", "trna", "trna3d", "ribosome", "ribosomes", "cloverleaf", "lshape" })
                 if (s.Has(v) && DnaStyles.ParseRna(v) is { } rv) DNAToolModel.RnaView = rv;
             if (DnaStyles.ParseRna(s.Value("view")) is { } rv2) DNAToolModel.RnaView = rv2;
             if (s.Has("modified")) DNAToolModel.ShowModified = true;
             if (int.TryParse(s.Value("base"), out var b) && b is >= 1 and <= 76) DNAToolModel.TrnaSelected = b;
+            if (s.Value("arm")?.ToLowerInvariant() is { } arm && DnaTrna.Arms.Any(a => a.Key == arm)) DNAToolModel.TrnaArmSelected = "arm:" + arm;
         });
     }
 }

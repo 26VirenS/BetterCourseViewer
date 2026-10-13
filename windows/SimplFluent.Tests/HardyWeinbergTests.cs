@@ -32,10 +32,14 @@ public class HardyWeinbergTests
         Assert.Equal("0.4225", HardyWeinberg.Num(0.4225));
         Assert.Equal("2.50 × 10⁻⁵", HardyWeinberg.Num(0.000025));
         Assert.Equal("20", HardyWeinberg.Carriers(19.8));
-        // (printf rounds a tie to even; .NET's "F" would round it away from zero)
-        Assert.Equal("2", HWFormat.Fixed(2.5, 0));
-        Assert.Equal("0.12", HWFormat.Fixed(0.125, 2));
+        // (rounded half-up on the decimal digits, as every bio tool rounds on both apps: a tie goes up, and 3.425 — 3.42499…
+        //  in binary — is still 3.43; nothing rounds to "-0.00")
+        Assert.Equal("3", HWFormat.Fixed(2.5, 0));
+        Assert.Equal("0.13", HWFormat.Fixed(0.125, 2));
+        Assert.Equal("3.43", HWFormat.Fixed(3.425, 2));
         Assert.Equal("-0.50", HWFormat.Fixed(-0.5, 2));
+        Assert.Equal("0.00", HWFormat.Fixed(-0.001, 2));
+        Assert.Equal("0.123457", HWFormat.G(0.1234565));
         Assert.Equal(new[] { 42, 46, 12 }, HardyWeinberg.People(new[] { 0.4225, 0.455, 0.1225 }));
         Assert.Equal(1.0 / 2500, HWInput.Number("1/2500"));
         Assert.Equal(0.16, HWInput.Number("16%"));

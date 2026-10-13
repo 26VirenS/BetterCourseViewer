@@ -15,43 +15,23 @@ namespace Simpl.Tools;
 // ---- numbers written as the Mac writes them ----
 
 /// <summary>
-/// Numbers written exactly as C's printf writes them (Swift's String(format:)), so the working and the self-check read
-/// the same on both platforms: the double's exact value rounded half to even at the asked decimals (.NET's own "F"
-/// rounds a tie away from zero).
+/// Numbers written as the Mac writes them, rounded the toolkit's one way (BioRound: decimal half-up, so 0.125 is "0.13" and
+/// 3.425 is "3.43" on both apps), so the working and the self-check read the same on both platforms.
 /// </summary>
 public static class HWFormat
 {
-    /// <summary>printf's "%.{decimals}f".</summary>
-    public static string Fixed(double x, int decimals)
-    {
-        if (double.IsNaN(x)) return "nan";
-        if (double.IsInfinity(x)) return x > 0 ? "inf" : "-inf";
-        var bits = BitConverter.DoubleToInt64Bits(x);
-        var negative = bits < 0;
-        var exponent = (int)((bits >> 52) & 0x7FF);
-        var mantissa = bits & 0xFFFFFFFFFFFFFL;
-        if (exponent == 0) exponent = 1; else mantissa |= 1L << 52;
-        exponent -= 1075;
-        // (|x| = mantissa · 2^exponent exactly; scaled by 10^decimals and rounded half to even)
-        var num = new BigInteger(mantissa) * BigInteger.Pow(10, decimals);
-        BigInteger q;
-        if (exponent >= 0) q = num << exponent;
-        else
-        {
-            var den = BigInteger.One << -exponent;
-            q = BigInteger.DivRem(num, den, out var r);
-            var twice = r * 2;
-            if (twice > den || (twice == den && !q.IsEven)) q += 1;
-        }
-        var digits = q.ToString(CultureInfo.InvariantCulture).PadLeft(decimals + 1, '0');
-        var whole = digits[..^decimals];
-        var text = decimals > 0 ? whole + "." + digits[^decimals..] : digits;
-        return (negative ? "-" : "") + text;
-    }
+    /// <summary>printf's "%.{decimals}f", rounded half-up (BioRound.Fixed).</summary>
+    public static string Fixed(double x, int decimals) => BioRound.Fixed(x, decimals);
 
-    /// <summary>printf's "%g": six significant figures, the exponent written when it is below −4 or above 5.</summary>
+    /// <summary>printf's "%g": six significant figures (rounded half-up, as BioRound rounds), the exponent written when it
+    /// is below −4 or above 5.</summary>
     public static string G(double x)
     {
+        if (double.IsFinite(x) && x != 0 && Math.Abs(x) < 1e15)
+        {
+            var places = 5 - (int)Math.Floor(Math.Log10(Math.Abs(x)));
+            if (places is >= 0 and <= 20) x = (double)Math.Round((decimal)x, places, MidpointRounding.AwayFromZero);
+        }
         var s = x.ToString("G6", CultureInfo.InvariantCulture);
         return s.Replace("E", "e", StringComparison.Ordinal);
     }
