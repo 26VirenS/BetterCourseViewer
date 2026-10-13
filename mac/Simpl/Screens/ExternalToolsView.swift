@@ -143,6 +143,13 @@ struct ExternalToolsView: View {
         }
         guard LaunchOpen.take("", key: "SimplExternalToolList") != nil else { return }
         NSLog("[Simpl] tool list: opening %@", t.name)
+        // (a popover shows for the app in front: the suite runs several copies at once, so this one is brought forward,
+        // its window made key, before the list is asked for — as a student's own click always is)
+        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
         try? await Task.sleep(nanoseconds: 600_000_000)
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
