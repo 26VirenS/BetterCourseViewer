@@ -33,13 +33,18 @@ private struct OpenTimed: ViewModifier {
     let source: () -> String
     /// What this appearance has said so far: nothing, its content (and where it came from), its live content.
     @State private var said: String?
+    /// It is on screen (SwiftUI may say a screen appeared twice: it is timed once).
+    @State private var visible = false
 
     func body(content: Content) -> some View {
         content
             .onAppear {
+                guard !visible else { return }
+                visible = true
                 said = nil
                 if ready { report(source()) }
             }
+            .onDisappear { visible = false }
             .onChange(of: ready) { _, now in
                 if now && said == nil { report(source()) }
             }
@@ -66,7 +71,7 @@ extension View {
 
 /// (1.3.78) The screenshot suite's walk through the app (`-SimplWalk "todo,grades,dashboard,todo"`): once the first
 /// screen is up and a few seconds more have passed (`-SimplWalkWait`, 5 by default — a student reading it), each step
-/// in turn, as a student's clicks would make it, the next once the one before has shown its content (8 seconds at
+/// in turn, as a student's clicks would make it, the next once the one before has shown its content (15 seconds at
 /// most) and stood for a moment. A step is a place as `-SimplPlace` names it, `back` (the toolbar's Back) or
 /// `push:<address>` (a link to it). The console then has each screen's first open and its opens again; the picture waits
 /// for the walk's end.
@@ -82,7 +87,7 @@ enum Walk {
         let pause = d.object(forKey: "SimplWalkWait") == nil ? 5 : d.double(forKey: "SimplWalkWait")
         Shot.began() // (the picture is taken once the walk is over)
         Task { @MainActor in
-            await until(8) { OpenClock.shown > 0 }
+            await until(20) { OpenClock.shown > 0 }
             try? await Task.sleep(nanoseconds: UInt64(pause * 1_000_000_000))
             for step in steps {
                 let before = OpenClock.shown
@@ -96,8 +101,8 @@ enum Walk {
                 } else {
                     continue
                 }
-                await until(8) { OpenClock.shown > before }
-                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                await until(15) { OpenClock.shown > before }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             NSLog("[Simpl] walk: done")
             Shot.ended()
