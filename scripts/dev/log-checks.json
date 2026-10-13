@@ -1,0 +1,12 @@
+{
+  "about": "Lines in the apps' logs that look like trouble and are not, for scripts/dev/scan-logs.py: per app (mac, ios, windows; 'all' for every app), a regular expression on one line and the reason it is harmless. A line newly here needs a reason a reader would agree with; an error in the app or its pages is fixed, never listed here.",
+  "all": [],
+  "mac": [],
+  "ios": [],
+  "windows": [
+    {
+      "pattern": "vault: the TPM did not take its key \\(CryptographicException: The device that is required by this cryptographic provider is not ready for use\\.\\): Windows \\(DPAPI\\) holds it",
+      "reason": "GitHub's Windows runners have no TPM: the vault keeps its key with Windows (DPAPI) instead, as it does on a PC without one (windows/SimplFluent/Support/Vault.cs)"
+    }
+  ]
+}

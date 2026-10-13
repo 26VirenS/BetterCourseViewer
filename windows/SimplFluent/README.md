@@ -7,10 +7,19 @@ navigation pane and cards, Segoe UI Variable, Fluent System Icons, WinUI's motio
 Build (Windows, or Linux with the targeting pack): `dotnet build windows/SimplFluent/SimplFluent.csproj -c Release -p:EnableWindowsTargeting=true`.
 CI (`.github/workflows/windows-fluent.yml`) builds it once (the app, Simpl-Setup.exe and the zip, kept as `release`),
 then at the same time pictures it against the mock Canvas in eight parts, tries its installer and walks it for its
-timings (`windows-fluent-perf`); the parts come back together as `windows-fluent-shots`. A push takes about five minutes. A preview (`windows-fluent-v<run>`) is published
+timings (`windows-fluent-perf`); the parts come back together as `windows-fluent-shots`. A push takes about five
+minutes, and a newer push cancels the run before it (never a run that publishes). A preview (`windows-fluent-v<run>`) is published
 when a commit message carries `[preview]`, or by Run workflow, which publishes the green run already made for the
 commit (or the run named by `from_run`) as it is, in about a minute. Keep changes to the workflow in commits of their
 own: GitHub lets a workflow tag a commit only if the commit itself leaves the workflows alone.
+
+Beside the build, the models' unit tests (`windows/SimplFluent.Tests`, xUnit: the chemistry, the calculator, the
+vault's and the saved sign-in's seals, the bridge's JSON — `dotnet test windows/SimplFluent.Tests` on Windows; they
+build anywhere with `-p:EnableWindowsTargeting=true`) and the compiler's warnings against the ones already known
+(`scripts/dev/baselines/windows-warnings.txt`: a new one fails). After the pictures, every picture each part was to
+take is checked to be there and to show something, and every Simpl's log (with the page's own errors, which a
+picture's run writes in `page-errors.log`: `Support/PageErrors.cs`) to be free of exceptions and errors. A preview waits
+for all of it. `docs/CI.md` says how to read a failure and how to update the lists.
 
 ## Installing
 

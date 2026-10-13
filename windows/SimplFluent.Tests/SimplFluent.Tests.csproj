@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Simpl for Windows' models, tested on their own: the Lewis maker's and the elements' chemistry, the calculator's
+       sums, the saved sign-in's record and its Windows Hello seal, the vault's seal, the JSON the bridge writes. No
+       window is opened and no school is asked: each test takes milliseconds. CI runs them on every push to the Windows
+       branch (windows-fluent.yml, "Unit tests and warnings"); by hand: dotnet test windows/SimplFluent.Tests. They build
+       anywhere (EnableWindowsTargeting) and run on Windows: the app is WPF, and its models use WPF's points and colours. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12.0</LangVersion>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Simpl.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);CA1416;WPF0001</NoWarn>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SimplFluent\SimplFluent.csproj" />
+  </ItemGroup>
+
+</Project>

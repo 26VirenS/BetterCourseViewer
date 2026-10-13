@@ -1,0 +1,8 @@
+# The compiler warnings already known (scripts/dev/check-warnings.py): one a line, by file and words.
+# A build with a warning not here fails. Fixing one: after a full build, run the script with --write.
+windows/SimplFluent/Engine/AnswerCache.cs: CS8602 Dereference of a possibly null reference.
+windows/SimplFluent/Engine/Engine.cs: CS0414 The field 'Engine.openedOnKept' is assigned but its value is never used
+windows/SimplFluent/Screens/DashboardScreen.cs: CS0108 'DashboardScreen.View' hides inherited member 'Screen.View'. Use the new keyword if hiding was intended.
+windows/SimplFluent/Screens/ScreenFactory.cs: CS8603 Possible null reference return.
+windows/SimplFluent/Shell/AppShell.cs: CS8601 Possible null reference assignment.
+windows/SimplFluent/Shell/AppShell.cs: CS8604 Possible null reference argument for parameter 's' in 'string AppShell.Initial(string s)'.
