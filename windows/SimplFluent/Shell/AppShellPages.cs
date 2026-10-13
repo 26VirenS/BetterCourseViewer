@@ -356,9 +356,15 @@ public sealed partial class AppShell
             if (shownLeaf == leaf) shownLeaf = null;
             Still(leaf);
             Cache(leaf.Root, false);
-            deck.Children.Remove(leaf.Root);
-            if (leaf.Scroller != null) leaf.Scroller.Content = null;
-            leaf.Root.Children.Clear();
+            leaf.Root.Visibility = Visibility.Collapsed;
+            // (taken out of the window once nothing else is happening: taking a page's tree out walks all of it, which
+            //  is no part of bringing the next page in)
+            Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
+            {
+                deck.Children.Remove(leaf.Root);
+                if (leaf.Scroller != null) leaf.Scroller.Content = null;
+                leaf.Root.Children.Clear();
+            });
         }
         s.Hide();
         s.Release();

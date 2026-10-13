@@ -304,6 +304,14 @@ A development run also says, as each screen comes in, how long it took and how: 
 waited for the page). The walk notes the same beside each step; its `Grades (again)` comes back to a screen whose page
 was let go, so it is built from what was kept.
 
+Resources looked up (`Kit/FlatResources.cs`): WPF-UI keeps its control styles in 91 merged dictionaries, and every
+style or theme colour WPF looked up for an element searched them one after another — again for each element each time
+the part of a page it is in was added to another (pages are built from the bottom up). A trace of the walk put a fifth
+of the window's busy time there. At start they are copied into one dictionary, in WPF-UI's order; the theme's own
+dictionary stays apart (WPF-UI swaps it), and the accent is written over all of it as before. `--no-flatten` leaves
+them as they were. A screen let go is taken out of the window once nothing else is happening, not while the next page
+comes in.
+
 Memory given back (`Support/MemoryTidy.cs`): left alone ten seconds — nothing pressed or typed in the window, nothing
 asked of the page, a good deal made and thrown away since — .NET collects and hands its free memory back to Windows
 (once a minute at most). Minimized or in the notification area for twenty seconds: the same; the page (and the

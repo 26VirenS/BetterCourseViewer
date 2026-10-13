@@ -27,6 +27,7 @@ public static class Program
         Tools.FlashcardStore.SealSoon();  // (and flashcards an earlier Simpl kept in plain text, sealed)
         var app = new App();
         app.InitializeComponent();
+        Kit.FlatResources.Apply(app);     // (WPF-UI's 91 dictionaries of styles as one: every lookup a few reads, not 91)
         app.DispatcherUnhandledException += (_, e) =>
         {
             Log.Write("unhandled: " + e.Exception);
