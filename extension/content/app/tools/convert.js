@@ -538,7 +538,8 @@
     const exts = kinds.flatMap((k) => EXTS[k]).filter((e, i, all) => !want.has(e) && all.indexOf(e) === i);
     const words = kinds.map((k) => KIND_WORDS[k]);
     const verb = words.length > 1 || PLURAL.has(words[0]) ? 'are' : 'is';
-    const line = words.length ? `${andWords(words)} ${verb} converted${want.size === 1 ? ` to ${[...want][0].toUpperCase()}` : ''} for you` : '';
+    const said = words.length ? `${andWords(words)} ${verb} converted${want.size === 1 ? ` to ${[...want][0].toUpperCase()}` : ''} for you` : '';
+    const line = said.charAt(0).toUpperCase() + said.slice(1); // (2.99.33) a sentence of its own after the types it follows: "Text and pictures are…
     return { kinds, exts, line };
   }
   /** The file, converted as plan() said: a File under its new name. Throws with the engine's own reason. */

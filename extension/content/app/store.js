@@ -689,7 +689,8 @@
       if (!it.isDue || it.submitted || it.complete || it.dismissed || it.excused || !it.date) continue;
       const ms = it.date - t;
       const pts = it.points !== null && it.points !== undefined ? ` · ${it.points} pts` : '';
-      const base = { title: it.title, courseId: it.courseId, course: label(it.course) || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now' };
+      // (2.99.33) `parts`: the facts one by one, for the apps' shorter line (native-app.js notifications)
+      const base = { title: it.title, courseId: it.courseId, course: label(it.course) || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now', parts: { kind: it.kind, points: it.points ?? null, missing: !!it.missing, quiz: it.type === 'quiz' } };
       if (ms < 0 && ms > -14 * 24 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'overdue', note: `${it.missing ? 'Marked missing' : 'Nothing submitted'} · ${pastText(it.date, t)}${pts}` });
       else if (ms >= 0 && ms < 48 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'soon', note: `${it.kind}${pts} · ${it.type === 'quiz' ? 'not started' : 'no submission'}` });
     }
@@ -704,7 +705,7 @@
         const comments = Array.isArray(a.submission_comments) ? a.submission_comments.filter((x) => x && x.comment) : [];
         const name = a.assignment?.name || String(a.title || 'Submission').replace(/\s+graded\b.*$/i, '');
         const possible = a.assignment?.points_possible;
-        if (scored) out.push({ ...base, id: `stream:${a.id}`, cat: 'graded', title: `${name} graded`, note: `${a.score ?? a.grade}${possible !== undefined && possible !== null ? ` / ${possible}` : ''}${a.grade && a.score !== undefined && a.score !== null && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : ''}`, action: 'See grades' });
+        if (scored) out.push({ ...base, id: `stream:${a.id}`, cat: 'graded', title: `${name} graded`, note: `${a.score ?? a.grade}${possible !== undefined && possible !== null ? ` / ${possible}` : ''}${a.grade && a.score !== undefined && a.score !== null && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : ''}`, action: 'See grades', parts: { score: a.score ?? null, possible: possible ?? null, grade: a.grade ?? null } });
         if (comments.length) {
           const last = comments[comments.length - 1];
           out.push({ ...base, id: `stream:${a.id}:comment`, cat: 'feedback', when: U.parse(last.created_at) || when, title: `${last.author_name || 'Your instructor'} left a comment on ${name}`, note: `“${stripHtml(last.comment).slice(0, 140)}”`, action: 'Read comment' });
@@ -940,14 +941,15 @@
     await C.put(`/api/v1/conversations/${id}`, { conversation: { starred } });
     await invalidateInbox();
   }
-  async function replyTo(id, body) {
-    const r = await C.post(`/api/v1/conversations/${id}/add_message`, { body });
+  async function replyTo(id, body, attachmentIds = []) {
+    const r = await C.post(`/api/v1/conversations/${id}/add_message`, { body, ...(attachmentIds?.length ? { attachment_ids: attachmentIds.map(String) } : {}) });
     await invalidateInbox();
     return r;
   }
-  async function compose({ recipients, subject, body, contextCode }) {
+  async function compose({ recipients, subject, body, contextCode, attachmentIds = [] }) {
     const payload = { recipients, subject, body, group_conversation: recipients.length > 1 };
     if (contextCode) payload.context_code = contextCode;
+    if (attachmentIds?.length) payload.attachment_ids = attachmentIds.map(String);
     const r = await C.post('/api/v1/conversations', payload);
     await invalidateInbox();
     return r;
@@ -1252,7 +1254,16 @@
    *  POST the bytes there (progress reaches the row), then confirm when storage
    *  answers with a location instead of the file. Returns the file id. */
   async function uploadSubmissionFile(cid, aid, file, onProgress) {
-    const pre = await C.post(preflightPath(cid, aid), { name: file.name, size: file.size, content_type: file.type || undefined, on_duplicate: 'rename' });
+    return uploadFileTo(preflightPath(cid, aid), {}, file, onProgress);
+  }
+  /** (2.99.33) A file for an Inbox message or a reply: uploaded to the student's own "conversation attachments" folder,
+   *  where Canvas's own Inbox puts one, by the same three steps. Returns the file id, which the message then names. */
+  async function uploadMessageFile(file, onProgress) {
+    return uploadFileTo('/api/v1/users/self/files', { parent_folder_path: 'conversation attachments' }, file, onProgress);
+  }
+  /** The three steps of a Canvas upload, to the preflight at `path` (with `extra` beside the file's own fields). */
+  async function uploadFileTo(path, extra, file, onProgress) {
+    const pre = await C.post(path, { name: file.name, size: file.size, content_type: file.type || undefined, ...extra, on_duplicate: 'rename' });
     if (!pre?.upload_url) throw new Error(`${BCV.lms.name} did not return an upload URL`);
     const form = new FormData();
     for (const [k, v] of Object.entries(pre.upload_params || {})) form.append(k, v);
@@ -1832,6 +1843,6 @@
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
-    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
+    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, uploadMessageFile, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };
 })();
