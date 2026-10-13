@@ -84,11 +84,8 @@ svg { flex: none; }
 .btn svg { width: 19px; height: 19px; }
 .btn--blue { background: var(--blue); color: #fff; }
 .btn--soft { background: var(--soft); color: var(--soft-text); }
-/* a platform still to come (Windows): a soft button, dimmed and still — no hover, no press — its "Coming soon" beside */
-.btn--soon { background: var(--soft); color: var(--soft-sub); cursor: default; }
-.btn--soon:active { transform: none; }
-.btn--soon svg { opacity: .75; }
-.btn__soon { padding: 3px 8px; border-radius: 999px; background: var(--soft-row); color: var(--soft-sub); font: 600 11px/1.25 var(--font); letter-spacing: .01em; }
+/* a platform still in beta (Windows): a soft button like the rest, its "Beta" beside */
+.btn__tag { padding: 3px 8px; border-radius: 999px; background: var(--soft-row); color: var(--soft-sub); font: 600 11px/1.25 var(--font); letter-spacing: .01em; }
 @media (hover: hover) and (pointer: fine) { .btn--blue:hover { background: var(--blue-hover); } .btn--soft:hover { background: var(--soft-hover); } }
 .cta { position: relative; z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
 .cta > .btn, .cta > .macdl { width: 260px; }
@@ -371,7 +368,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
             </div>
           </div>
         </div>
-        <span class="btn btn--soon" role="link" aria-disabled="true" title="Simpl for Windows is coming soon"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__soon">Coming soon</span></span>
+        <a class="btn btn--soft" href="/download/windows" title="Download Simpl for Windows (beta) — Windows 10 or 11, 64-bit"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__tag">Beta</span></a>
       </div>
       <p class="hero__fine">Free. No account needed.</p>
     </div>
@@ -582,9 +579,9 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
             </div>
           </div>
         </div>
-        <span class="btn btn--soon" role="link" aria-disabled="true" title="Simpl for Windows is coming soon"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__soon">Coming soon</span></span>
+        <a class="btn btn--soft" href="/download/windows" title="Download Simpl for Windows (beta) — Windows 10 or 11, 64-bit"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__tag">Beta</span></a>
       </div>
-      <p class="get__req">Safari: macOS 13+ · Mac app: macOS 14+ · Chrome: any computer · Windows: coming soon</p>
+      <p class="get__req">Safari: macOS 13+ · Mac app: macOS 14+ · Chrome: any computer · Windows (beta): Windows 10 or 11, 64-bit</p>
     </div>
   </section>
 </main>
