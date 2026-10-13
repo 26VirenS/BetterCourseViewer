@@ -644,13 +644,15 @@
     // ---- workload ------------------------------------------------------------------
     function workloadBlock() {
       if (!planner || !favs.length) return null;
-      // on entry each row floats in and its bar wipes from the left, staggered down the list (mockup 11)
+      // on entry each row floats in and its bar wipes from the left, staggered down the list (mockup 11) — a course
+      // with nothing assigned does not: its row arrives as its disclosure opens (an empty bar has nothing to wipe)
       const row = (c, mine, i) => {
         const done = mine.filter((it) => it.submitted).length;
         const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
         const k = Math.min(i, 6);
-        const fill = h('span', { class: `bcv-work__fill ${!entered ? 'bcv-work__fill--grow' : ''}`, style: { width: `${pct}%`, background: c.color, '--bcv-delay': `${120 + k * 70}ms` } }); // (just after its row)
-        return U.el(`bcv-work__row ${!entered ? 'bcv-work__row--in' : ''}`, [
+        const arrive = !entered && mine.length > 0;
+        const fill = h('span', { class: `bcv-work__fill ${arrive ? 'bcv-work__fill--grow' : ''}`, style: { width: `${pct}%`, background: c.color, '--bcv-delay': `${120 + k * 70}ms` } }); // (just after its row)
+        return U.el(`bcv-work__row ${arrive ? 'bcv-work__row--in' : ''}`, [
           U.dot(c.color, 'bcv-dot--9'),
           U.text('bcv-work__code bcv-ellip', c.shortName || c.name, 'span'),
           h('span', { class: 'bcv-work__bar' }, fill),
@@ -662,13 +664,13 @@
         const mine = weekAll.filter((it) => it.courseId === c.id);
         (mine.length ? active : idle).push(row(c, mine, mine.length ? active.length : idle.length));
       }
-      // Courses with nothing assigned this week fold away under a disclosure.
-      const idleWrap = U.el('bcv-work__idle', idle);
-      idleWrap.hidden = true;
+      // Courses with nothing assigned this week fold away under a disclosure, sliding open under its chevron.
+      const idleWrap = idle.length ? U.collapsible(U.el('bcv-work__idle', idle), false, 'bcv-work__fold') : null;
       const toggle = idle.length ? h('button', { type: 'button', class: 'bcv-work__more', 'aria-expanded': 'false', onclick: () => {
-        idleWrap.hidden = !idleWrap.hidden;
-        toggle.setAttribute('aria-expanded', idleWrap.hidden ? 'false' : 'true');
-        toggle.classList.toggle('is-open', !idleWrap.hidden);
+        const open = !toggle.classList.contains('is-open');
+        idleWrap.setOpen(open);
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.classList.toggle('is-open', open);
       } }, [U.svg(IC.chevron, { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2, cls: 'bcv-work__more-ic' }), `${U.plural(idle.length, 'course')} with nothing assigned this week`]) : null;
       return U.card(U.el('bcv-work', [
         U.el('bcv-work__head', [U.text('bcv-label bcv-label--inline', `Week of ${U.fmtShort(weekStart)} · workload`, 'span'), U.text('bcv-work__hint', 'Submitted / assigned this week', 'span')]),

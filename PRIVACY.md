@@ -1,6 +1,6 @@
 # Simpl Courses privacy policy
 
-_Last updated: 20 September 2026_
+_Last updated: 13 October 2026_
 
 Simpl Courses is a browser extension that redraws the Canvas learning-management system in your browser. It has no servers, no accounts and no analytics. This page describes exactly what the extension touches and where that data goes.
 
@@ -17,6 +17,7 @@ Everything below lives in the extension's local storage in your browser. **Reset
 - your settings (appearance, the sites you enabled it on, preferences such as list groupings), plus a one-line copy of the look and the appearance in each Canvas site's own storage so a page never flashes stock Canvas before first paint (Reset everything clears it on every open Canvas tab);
 - your CloudConvert API key, if you connected one in the file converter — stored only locally, never included in settings exports, and sent only to CloudConvert's API; **Remove key** in the converter forgets it;
 - unsent drafts (a text-entry submission you have not sent yet);
+- the lists a Canvas page opens with — your name and photo address, your courses with their colours, cards and current totals, the tabs, front page, modules and to-do list of the courses you opened last, what is due on your planner and the tasks you added, the titles of your courses' announcements, the unread count and your groups — and, for the Dashboard's counts, your favourite courses' assignments with their due dates and scores. They are kept from one page load to the next so a page draws at once while it asks Canvas again; only for the Canvas site and the user they came from, for at most a week (two for the assignments), never a message, a submission, or a discussion's or announcement's body; and they are removed when you log out through the interface or press **Reset everything**;
 - the Grades page's optional inputs (a prior GPA, a goal, target grades) and its daily GPA snapshots, which are computed from the scores Canvas returns and never leave your browser.
 
 ## What the extension never does

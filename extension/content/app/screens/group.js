@@ -113,8 +113,9 @@
       default: el = T.native(ctx, shell);
     }
     if (!ctx.alive()) return out;
-    content.classList.remove('is-loading');
-    content.replaceChildren(el);
+    // within a kept shell the new column moves in as a screen would (app.js swap), the header and the rail holding still
+    const put = () => { content.classList.remove('is-loading'); content.replaceChildren(el); };
+    if (kept && ctx.swap) await ctx.swap(put, content); else put();
     // the column was built off-DOM, so a course that landed while it was building could not reach
     // its About card; now that it is in place, anything still missing is filled in
     adopt();

@@ -37,6 +37,7 @@ html[data-bcv-theme] {
   /* motion: one easing and three lengths — the exits are the fast one, an entrance the middle, a sheet's rise the slow */
   --bcv-ease: cubic-bezier(.32,.72,0,1); --bcv-t-fast: .18s; --bcv-t: .28s; --bcv-t-slow: .34s;
   --bcv-ease-out: cubic-bezier(.23,1,.32,1); --bcv-ease-in-out: cubic-bezier(.77,0,.175,1); /* (arrivals, exits and presses start fast; a thing moving across the screen eases both ends) */
+  --bcv-t-arrive: .22s; --bcv-t-leave: .16s; --bcv-arrive-x: 32px; --bcv-leave-x: 12px; /* (2.99.33) a move between screens: the one language the Mac and Windows apps move in too */
   /* the springs (content/app/motion.js writes each preset's exact curve and settle time over these as a linear() easing; docs/MOTION.md) */
   --bcv-spring-snappy: cubic-bezier(.34,1.15,.42,1); --bcv-t-snappy: .29s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .46s;
   --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s; --bcv-spring-island: cubic-bezier(.32,.72,0,1); --bcv-t-island: .5s; --bcv-spring-pin: cubic-bezier(.32,.72,0,1); --bcv-t-pin: .37s;
@@ -93,18 +94,44 @@ html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-app > :is(#bcv-main, #bcv-side)
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
 @keyframes bcv-fade-out { to { opacity: 0; } }
 @keyframes bcv-line-draw { from { -webkit-clip-path: inset(-10px 100% -10px -5px); clip-path: inset(-10px 100% -10px -5px); } to { -webkit-clip-path: inset(-10px -5px -10px -5px); clip-path: inset(-10px -5px -10px -5px); } } /* (a clip sliding open, in the line's own units: a dash the line's length stayed a dash pattern in Safari) */
-/* screens rise in; sheets grow over a blurring scrim; popovers pop */
-.bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-up var(--bcv-t-gentle) var(--bcv-spring-gentle) both; }
-/* the way a screen arrives says which way you went (app.render): forward rises from below, back settles down from above; on the phone a pushed screen slides in from the right and a popped one from the left, a tab change only fades */
+/* screens arrive the way you went (app.render, 2.99.33): deeper slides in from the right as it fades in, Back from the
+   left, a section (a sidebar row, a course's own tabs) crossfades; 220ms on the ease-out, transform and opacity only.
+   Where the browser has view transitions this is played by the transition below, and the screen's own entrance stands
+   down (bcv-screen--vt). On the phone a pushed screen slides in from the right and a popped one from the left, a tab
+   change only fades, on the phone's spring (phone.js). */
+@keyframes bcv-arrive-fwd { from { opacity: 0; transform: translateX(var(--bcv-arrive-x)); } to { opacity: 1; transform: none; } }
+@keyframes bcv-arrive-back { from { opacity: 0; transform: translateX(calc(-1 * var(--bcv-arrive-x))); } to { opacity: 1; transform: none; } }
+.bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-in var(--bcv-t-arrive) var(--bcv-ease-out) both; }
+.bcv-main > [data-bcv-arrive="fwd"] { animation-name: bcv-arrive-fwd; }
+.bcv-main > [data-bcv-arrive="back"] { animation-name: bcv-arrive-back; }
+.bcv-main > .bcv-screen--vt { animation: none; }
+html.bcv-phone .bcv-main > .bcv-screen, html.bcv-phone .bcv-main > .bcv-qz, html.bcv-phone .bcv-main > .bcv-sb { animation: bcv-fade-up var(--bcv-t-gentle) var(--bcv-spring-gentle) both; }
 @keyframes bcv-fade-down { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @keyframes bcv-push-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes bcv-pop-in { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
-.bcv-main > .bcv-screen--back { animation-name: bcv-fade-down; }
+html.bcv-phone .bcv-main > .bcv-screen--back { animation-name: bcv-fade-down; }
 html.bcv-phone .bcv-main > .bcv-screen--fwd { animation: bcv-push-in var(--bcv-t-phone) var(--bcv-spring-phone) both; }
 html.bcv-phone .bcv-main > .bcv-screen--back { animation: bcv-pop-in var(--bcv-t-phone) var(--bcv-spring-phone) both; }
 html.bcv-phone .bcv-main > .bcv-screen--tab { animation: bcv-fade-in var(--bcv-t-scrim) var(--bcv-spring-scrim) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
 .bcv-main > .bcv-screen--still { animation: none; } /* a screen drawn again in place (ui.still): it is already here, so it does not arrive */
+/* The move as a view transition (app.js swap): the screen's column (#bcv-main, or a course's own column within its kept
+   header and rail) is the one thing that moves; the rest of the page is its own picture and holds still. The screen left
+   behind gives way a short distance the other way as it fades, quicker than the new one arrives, so the two never sit
+   on top of each other for long; their light adds while they cross (plus-lighter), so a crossfade never dips. */
+@keyframes bcv-vt-in-fwd { from { opacity: 0; transform: translateX(var(--bcv-arrive-x)); } }
+@keyframes bcv-vt-in-back { from { opacity: 0; transform: translateX(calc(-1 * var(--bcv-arrive-x))); } }
+@keyframes bcv-vt-out-fwd { to { opacity: 0; transform: translateX(calc(-1 * var(--bcv-leave-x))); } }
+@keyframes bcv-vt-out-back { to { opacity: 0; transform: translateX(var(--bcv-leave-x)); } }
+html[data-bcv-vt]::view-transition-old(root), html[data-bcv-vt]::view-transition-new(root) { animation: none; }
+html[data-bcv-vt]::view-transition-group(bcv-screen) { animation: none; }
+html[data-bcv-vt]::view-transition-image-pair(bcv-screen) { isolation: isolate; }
+html[data-bcv-vt]::view-transition-old(bcv-screen) { animation: bcv-fade-out var(--bcv-t-leave) var(--bcv-ease-out) both; mix-blend-mode: plus-lighter; }
+html[data-bcv-vt]::view-transition-new(bcv-screen) { animation: bcv-fade-in var(--bcv-t-arrive) var(--bcv-ease-out) both; mix-blend-mode: plus-lighter; }
+html[data-bcv-vt="fwd"]::view-transition-old(bcv-screen) { animation-name: bcv-vt-out-fwd; }
+html[data-bcv-vt="fwd"]::view-transition-new(bcv-screen) { animation-name: bcv-vt-in-fwd; }
+html[data-bcv-vt="back"]::view-transition-old(bcv-screen) { animation-name: bcv-vt-out-back; }
+html[data-bcv-vt="back"]::view-transition-new(bcv-screen) { animation-name: bcv-vt-in-back; }
 /* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter).
    The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
 .bcv-enter { animation: bcv-fade-up var(--bcv-dur, var(--bcv-t-settle)) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }
@@ -122,10 +149,10 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet var(--bcv-t-phone) var(--bcv-sp
 .bcv-sheet-ov.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; }
 .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-shrink var(--bcv-t-fast) ease both; }
 html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down .22s var(--bcv-ease) both; }
-.bcv-menu.is-closing, .bcv-quicknav.is-closing { animation: bcv-leave-pop .14s ease both; pointer-events: none; }
+.bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-picker__list.is-closing { animation: bcv-leave-pop .14s ease both; pointer-events: none; } /* (2.99.32: a dropdown's list too — it went in a frame) */
 .bcv-toast.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; } /* (2.99.7: without the springs a toast had no exit and went in a frame) */
 @media (prefers-reduced-motion: reduce) { /* (they still fade — 150ms of opacity, no shrinking or sliding — and the sheet goes with its scrim, not on its own) */
-  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-toast.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
+  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-picker__list.is-closing, .bcv-toast.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
   .bcv-sheet-ov.is-closing > .bcv-sheet, html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: none; }
 }
 /* A press is felt: a row or an item dips while the pointer is down, a card darkens a touch. */
@@ -1025,7 +1052,8 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-work__more:hover { color: var(--bcv-ink); }
 .bcv-work__more-ic { transition: transform .3s var(--bcv-ease); }
 .bcv-work__more.is-open .bcv-work__more-ic { transform: rotate(90deg); }
-.bcv-work__idle { display: flex; flex-direction: column; gap: 14px; }
+.bcv-work__fold { margin-top: -14px; } /* (the card's gap goes inside it, so shut it takes no room: ui.collapsible) */
+.bcv-work__idle { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
 .bcv-group__head--reorder { align-items: center; }
 .bcv-reorder { display: inline-flex; gap: 4px; }
 .bcv-reorder__up svg { transform: rotate(-90deg); }
@@ -1757,6 +1785,20 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-module__items { min-height: 0; overflow: hidden; }
 .bcv-module--open > .bcv-module__wrap > .bcv-module__items { border-top: 1px solid var(--bcv-sep); }
 @media (prefers-reduced-motion: reduce) { .bcv-module__wrap { transition: none; } }
+/* (2.99.32) the same slide for the other disclosures (ui.collapsible: the Dashboard's courses with nothing assigned,
+   every option on a quiz's feedback, a course's grading scale), what it opens fading in over 200ms and out over 150ms;
+   transitions, so a second press turns it round where it is. Shut, it is hidden as [hidden] had it — from find, from
+   the page's text, from screen readers — once its fade is over (visibility turns at the end of the way out, at the
+   start of the way in). Its sides bleed 4px, so a focus ring at an edge is not cut off. Reduced motion: no slide — it
+   takes its size at once — and the 150ms fade both ways. */
+.bcv-collapsible { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s var(--bcv-ease); }
+.bcv-collapsible.is-open { grid-template-rows: 1fr; }
+.bcv-collapsible__in { min-height: 0; overflow: hidden; margin: 0 -4px; padding: 0 4px; opacity: 0; visibility: hidden; transition: opacity .15s var(--bcv-ease-out), visibility .15s; }
+.bcv-collapsible.is-open > .bcv-collapsible__in { opacity: 1; visibility: visible; transition-duration: .2s; }
+@media (prefers-reduced-motion: reduce) {
+  .bcv-collapsible { transition: none; }
+  .bcv-collapsible.is-open > .bcv-collapsible__in { transition-duration: .15s; }
+}
 .bcv-module__bar { display: flex; align-items: center; gap: 10px; padding: 0 2px 2px; }
 /* what the module next wants, on the head, so the list can be read without opening anything */
 .bcv-module__due { flex: none; font: 600 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); padding: 3px 9px; border-radius: 9px; background: var(--bcv-fill); }
@@ -2020,7 +2062,8 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail__note { margin: 0; font: 400 11.5px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
 /* (2.99.27) a course's grading scale, as its instructor set it: a cutoff per letter */
 .bcv-scale__toggle { margin-left: 8px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--bcv-chip, rgba(127,127,127,.14)); color: var(--bcv-ink1); font: 600 11.5px/1.2 var(--bcv-font); cursor: pointer; }
-.bcv-scale__editor { display: grid; gap: 10px; margin-top: 8px; }
+.bcv-scale__fold { margin-top: -8px; } /* (the section's gap goes inside it, so shut it takes no room: ui.collapsible) */
+.bcv-scale__editor { display: grid; gap: 10px; margin-top: 16px; padding-bottom: 3px; } /* (3px under Save: its focus ring inside the fold's clip) */
 .bcv-scale__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
 .bcv-scale__cell { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 10px; background: var(--bcv-chip, rgba(127,127,127,.1)); }
 .bcv-scale__letter { min-width: 22px; font: 700 12.5px/1 var(--bcv-font); color: var(--bcv-ink1); }
@@ -2425,7 +2468,8 @@ html[data-bcv-theme="dark"] .bcv-fb__chip--right { color: #5ddb7d; }
 .bcv-fb__more:hover { background: var(--bcv-fill2); }
 .bcv-fb__morechev { transform: rotate(90deg); transition: transform .2s var(--bcv-ease); color: var(--bcv-ink3); }
 .bcv-fb__more.is-open .bcv-fb__morechev { transform: rotate(-90deg); }
-.bcv-fb__opts { align-self: stretch; display: flex; flex-direction: column; gap: 5px; }
+.bcv-fb__fold { align-self: stretch; margin-top: -8px; transition-duration: .2s; } /* (in step with its .2s chevron; the gap inside it, so shut it takes no room) */
+.bcv-fb__opts { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .bcv-fb__opt { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 11px; background: var(--bcv-fill2); border: 1px solid transparent; font: 400 13px/1.4 var(--bcv-font); }
 .bcv-fb__opt.is-mine { border-color: var(--bcv-blue); }
 .bcv-fb__opt.is-right { background: rgba(52,199,89,.14); }
@@ -4288,6 +4332,11 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-tool-ov.is-closing { animation: bcv-tool-ovout .18s ease both; }
 .bcv-tool-ov.is-closing .bcv-sheet { animation: bcv-tool-out .18s ease both; }
 .bcv-pin.is-new { animation: bcv-pin-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
+/* (2.99.32) an unpinned pin leaves the way it landed, quicker: back to .9 as it fades, out of the row where it stood while
+   the pins beside it slide into its place (tools.js paintPins). The timer's live pin keeps its own exit (bcv-live-out). */
+.bcv-pin.is-out:not(.is-live) { animation: bcv-pin-out var(--bcv-t-fast) var(--bcv-ease-out) both; }
+/* (2.99.32) a set deleted fades where it stood, settling back to .97, and the sets below slide up into the gap (cards.js) */
+.bcv-fc__deck.is-out { animation: bcv-leave-shrink var(--bcv-t-fast) var(--bcv-ease-out) both; pointer-events: none; }
 .bcv-conv__drop.is-drag { animation: bcv-drop-pulse 1s ease-in-out infinite; }
 .bcv-conv__run.is-busy { background: linear-gradient(90deg, var(--bcv-blue) 0%, #5aa0ff 50%, var(--bcv-blue) 100%) !important; background-size: 200% 100% !important; color: #fff !important; opacity: 1; animation: bcv-busy-wash 1.2s linear infinite; }
 .bcv-conv__delta, .bcv-conv__outlabel { animation: bcv-conv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
@@ -4305,6 +4354,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 @keyframes bcv-tool-ovout { to { opacity: 0; } }
 @keyframes bcv-tool-out { to { opacity: 0; transform: scale(.97); } }
 @keyframes bcv-pin-pop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bcv-pin-out { to { transform: scale(.9); opacity: 0; } } /* (bcv-pin-pop, mirrored) */
 @keyframes bcv-drop-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--bcv-blue-soft); } 50% { box-shadow: 0 0 0 6px var(--bcv-blue-soft); } }
 @keyframes bcv-busy-wash { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @keyframes bcv-conv-pop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } } /* (its own name: it once shared the menus' bcv-pop and, coming later, made every menu open from .6) */
@@ -4313,6 +4363,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
   .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-fc__flipper, .bcv-pomo__marker, .bcv-pomo__strip, .bcv-pomo__tick, .bcv-pomo__label, .bcv-pin.bcv-island, .bcv-island__face, .bcv-island .bcv-pin__btn, .bcv-island .bcv-pin__ic, .bcv-island__glyph, .bcv-island__body, .bcv-island__set, .bcv-island__arc, .bcv-island__hand, .bcv-pin.bcv-quick, .bcv-quick__face, .bcv-quick .bcv-pin__btn, .bcv-quick__body, .bcv-pin.bcv-island::before, .bcv-pin.bcv-quick::before { transition: none; }
   .bcv-tool-card:hover { transform: none; }
   .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-fc__tilecard.is-wrong, .bcv-pin.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
+  .bcv-pin.is-out:not(.is-live), .bcv-fc__deck.is-out { animation: bcv-fade-out .15s var(--bcv-ease-out) both; } /* (an unpinned pin and a deleted set still fade, nothing scaling) */
   .bcv-pin.bcv-island.is-open::before, .bcv-pin.bcv-quick.is-open::before { animation: none; opacity: 1; }
 }
 

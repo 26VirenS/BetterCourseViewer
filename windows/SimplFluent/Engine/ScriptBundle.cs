@@ -92,6 +92,9 @@ public static class ScriptBundle
         var guardJs = $"if(window.top!==window||location.hostname.toLowerCase()!=={hostLit})return;";
         var scripts = new List<string> { NativeChannel };
         var seen = new HashSet<string>();
+        // (with it bridge.js sets BCVBridge.native, which is how the extension knows it is inside an app, as in the Mac's
+        // and the iPhone's web views: none of its own reading ahead, kept answers or view transitions — the app has its
+        // own; README: Pages)
         const string webkitLocal = "var webkit={messageHandlers:{bcv:window.__simplNative.handler('bcv'),bcvLogin:window.__simplNative.handler('bcvLogin')}};";
 
         string AtEnd(string body) =>

@@ -66,54 +66,89 @@
   // And a warm-up the new screen turns out to want (Groups pressed while its list is still queued
   // behind the calendar's month) is moved up to the new screen's place in the queue rather than
   // left waiting its turn as a warm-up.
+  //
+  // (2.99.33) What the app reads ahead of a press — at idle, or under a pointer resting on a link — is
+  // a warm-up of its own kind (`pre`): never more than MAX_WARM of those out at once, asked for at the
+  // browser's low priority, and the app stands them down when Canvas says its bucket is running low
+  // (budget(), from the X-Rate-Limit-Remaining header every answer carries). A navigation lifts the
+  // cap off any still queued: they wait behind the new screen's own requests, as any warm-up does.
   const MAX_INFLIGHT = 10;
+  const MAX_WARM = 2;
   let navigation = 0; // the app counts its navigations here
   let drawing = true; // until the screen settles, what is asked for is what the user is waiting on
+  let warmingNow = false; // the app is reading ahead (warming()): what is asked for now is a `pre` warm-up
   let open = 0;
+  let warmOpen = 0; // of those, the `pre` warm-ups
   let order = 0; // the order requests went out in
-  const waiting = []; // slots asked for while every slot was held: { nav, key, bg, resolve }, in the order asked
-  const running = new Set(); // the slots held: { nav, key, bg, ac, at, yielded }
+  const waiting = []; // slots asked for while every slot was held: { nav, key, bg, pre, resolve }, in the order asked
+  const running = new Set(); // the slots held: { nav, key, bg, pre, ac, at, yielded }
   let loadingKey = null; // the memo key whose loader is being called, so its requests can be found in the queue again
-  const navigated = () => { navigation++; drawing = true; };
+  let budget = { remaining: null, at: 0 }; // Canvas's own count of what is left in the bucket, as of its last answer
+  const navigated = () => {
+    navigation++;
+    drawing = true;
+    warmingNow = false;
+    for (const s of waiting) s.pre = false; // (still queued from the screen before: behind this one's, with no cap of their own)
+    pump();
+  };
   const settled = () => { drawing = false; };
+  /** The app reading ahead (true), or done or interrupted (false): see `pre` above. */
+  const warming = (on) => { warmingNow = !!on; };
+  const startable = (s) => !s.pre || warmOpen < MAX_WARM;
+  function begin(s) {
+    open++;
+    s.held = true;
+    s.heldPre = !!s.pre;
+    if (s.heldPre) warmOpen++;
+    running.add(s);
+  }
+  function free(s) {
+    running.delete(s);
+    if (!s.held) return;
+    s.held = false;
+    open--;
+    if (s.heldPre) warmOpen--;
+  }
   function admit(slot) {
-    if (open < MAX_INFLIGHT) {
-      open++;
-      running.add(slot);
+    if (open < MAX_INFLIGHT && startable(slot)) {
+      begin(slot);
       return Promise.resolve();
     }
-    if (!slot.bg) {
+    if (!slot.bg && open >= MAX_INFLIGHT) {
       // every slot is held: a warm-up in flight for an older screen gives its slot up to the screen
       // being drawn — the oldest screen's, and of those the one that went out last (the least done)
       let v = null;
       for (const s of running) if (s.bg && s.nav < slot.nav && s.ac && (!v || s.nav < v.nav || (s.nav === v.nav && s.at > v.at))) v = s;
       if (v) {
         v.yielded = true;
-        running.delete(v);
+        free(v);
         v.ac.abort();
-        open++;
-        running.add(slot);
+        begin(slot);
         return Promise.resolve();
       }
     }
     return new Promise((resolve) => { slot.resolve = resolve; waiting.push(slot); });
   }
-  function release(slot) {
-    running.delete(slot);
-    if (slot.yielded || !waiting.length) { // (a slot given up was taken over already: nothing to pass on)
-      open--;
-      return;
+  /** Hands free slots on: to the newest navigation's first request that may start (a `pre` one only while fewer than MAX_WARM are out). */
+  function pump() {
+    while (open < MAX_INFLIGHT && waiting.length) {
+      let next = -1;
+      for (let i = 0; i < waiting.length; i++) if (startable(waiting[i]) && (next < 0 || waiting[i].nav > waiting[next].nav)) next = i;
+      if (next < 0) return;
+      const s = waiting.splice(next, 1)[0];
+      begin(s);
+      s.resolve();
     }
-    let next = 0; // the newest navigation's first request; the slot passes straight to it
-    for (let i = 1; i < waiting.length; i++) if (waiting[i].nav > waiting[next].nav) next = i;
-    const s = waiting.splice(next, 1)[0];
-    running.add(s);
-    s.resolve();
+  }
+  function release(slot) {
+    free(slot); // (a slot given up was freed when it was taken over: nothing more to give back)
+    pump();
   }
   /** The requests behind a memo key are now what the screen being drawn is waiting on. */
   function promote(key) {
-    for (const s of waiting) if (s.key === key) { s.nav = navigation; s.bg = false; }
-    for (const s of running) if (s.key === key) { s.nav = navigation; s.bg = false; }
+    for (const s of waiting) if (s.key === key) { s.nav = navigation; s.bg = false; s.pre = false; }
+    for (const s of running) if (s.key === key) { s.nav = navigation; s.bg = false; s.pre = false; }
+    pump();
   }
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -145,7 +180,8 @@
   // long it is given up, a GET is asked once more, and then it fails like any other request (the
   // screen shows its error, or gives way, rather than waiting forever).
   let REQUEST_TIMEOUT = 20000;
-  const tune = ({ requestTimeout } = {}) => { if (Number.isFinite(requestTimeout)) REQUEST_TIMEOUT = requestTimeout; };
+  let ttlScale = 1; // (a test makes the memo's answers lapse sooner: fluid-test.mjs)
+  const tune = ({ requestTimeout, lifetimes } = {}) => { if (Number.isFinite(requestTimeout)) REQUEST_TIMEOUT = requestTimeout; if (Number.isFinite(lifetimes) && lifetimes > 0) ttlScale = lifetimes; };
 
   async function request(method, path, { params, body, all = false, maxPages = 10 } = {}) {
     // (a Brightspace page: the same request, answered by Brightspace in Canvas's shapes — lib/d2l-api.js)
@@ -158,7 +194,7 @@
     let pages = 0;
     let throttled = 0;
     let timedOut = 0;
-    const slot = { nav: navigation, key: loadingKey, bg: !drawing, ac: null, at: 0, yielded: false }; // one slot, page by page
+    const slot = { nav: navigation, key: loadingKey, bg: !drawing, pre: warmingNow && !drawing, ac: null, at: 0, yielded: false }; // one slot, page by page
     while (url && pages < maxPages) {
       if (sessionLost) throw new CanvasError('Signed out of Canvas', 401);
       if (method === 'GET') {
@@ -176,8 +212,9 @@
         // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
         // Never the browser's HTTP cache, and nothing in between is to answer from its own: a
         // score read from a cached body is a score days old (a grade a tool posted, never seen
-        // until a look switch happened to reload the page) — the per-page memo above is the only
-        // cache these answers live in.
+        // until a look switch happened to reload the page) — the per-page memo below is the only
+        // cache these answers live in (and what the store keeps between page loads, which is
+        // always asked for again the moment it is used: below).
         res = await fetch(url, {
           method,
           credentials: 'same-origin',
@@ -192,7 +229,10 @@
           },
           body: body ? JSON.stringify(body) : undefined,
           signal: ac ? ac.signal : undefined,
+          ...(slot.pre ? { priority: 'low' } : {}), // (a read ahead: the browser's own queue puts it behind what is on screen)
         });
+        const left = res.headers?.get?.('x-rate-limit-remaining');
+        if (left !== null && left !== undefined && left !== '' && Number.isFinite(Number(left))) budget = { remaining: Number(left), at: Date.now() };
         text = await res.text();
       } catch (e) {
         if (!(ac && ac.signal.aborted)) { self.BCV?.errors?.failed?.('NET'); throw e; } // (no answer at all: offline, or the connection dropped)
@@ -281,7 +321,7 @@
   // Every page load (or reload) starts with an empty memo and asks Canvas afresh. Within one page
   // a key is requested once and shared by every component that wants it (callers that arrive
   // while it runs share the request); the interface then navigates in place, so an answer lives
-  // for its TTL and is fetched again after that. Nothing is kept between pages.
+  // for its TTL and is fetched again after that. (What a page opens with is kept between pages: below.)
   // A write invalidates a key; a request for that key that was already running when the write
   // happened answers its caller but never lands in the memo (it would put the stale list back).
   // A caller that must not draw from an old answer (a score: a tool may have posted a grade since)
@@ -302,17 +342,8 @@
     const oldest = [...memory.entries()].sort((a, b) => (a[1].at || 0) - (b[1].at || 0)).slice(0, memory.size - MEMO_MAX);
     for (const [k] of oldest) memory.delete(k);
   }
-  async function cached(key, ttlMs, loader, { force = false, refresh = false, maxAge = 0 } = {}) {
-    const k = cacheKey(key);
-    if (!force && !refresh) {
-      const hit = memory.get(k);
-      const fresh = hit && (!hit.until || hit.until > Date.now()) && !(maxAge > 0 && Date.now() - (hit.at || 0) > maxAge);
-      if (fresh) return hit.value;
-      if (inflight.has(k)) {
-        if (drawing) promote(k); // a warm-up still queued that the screen being drawn wants: it goes up to the screen's place
-        return inflight.get(k);
-      }
-    }
+  /** Calls the loader for a key, its answer landing in the memo (unless a write forgot the key meanwhile). */
+  function start(k, key, ttlMs, loader) {
     const gen = generation.get(k) || 0;
     // the loader's own requests (the ones it makes before its first await, which is all of them for
     // nearly every loader) are made while the key is set, so they can be found in the queue again
@@ -322,19 +353,93 @@
     try {
       run = (async () => {
         const value = await loader();
-        if ((generation.get(k) || 0) === gen) { memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs : 0 }); trim(); }
+        if ((generation.get(k) || 0) === gen) {
+          memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs * ttlScale : 0 });
+          trim();
+          try { onAnswer?.(key, value); } catch { /* not kept: the next page asks Canvas, as before */ }
+        }
         return value;
       })();
     } finally {
       loadingKey = was;
     }
     inflight.set(k, run);
-    try {
-      return await run;
-    } finally {
-      if (inflight.get(k) === run) inflight.delete(k);
+    const done = () => { if (inflight.get(k) === run) inflight.delete(k); };
+    run.then(done, done);
+    return run;
+  }
+  async function cached(key, ttlMs, loader, { force = false, refresh = false, maxAge = 0 } = {}) {
+    const k = cacheKey(key);
+    if (!force && !refresh) {
+      const hit = memory.get(k);
+      const old = (x) => maxAge > 0 && Date.now() - (x.at || 0) > maxAge;
+      const fresh = hit && !hit.kept && (!hit.until || hit.until > Date.now()) && !old(hit);
+      if (fresh) return hit.value;
+      if (hit && !old(hit) && (hit.kept || lapsed(key, hit))) return serveKept(k, key, ttlMs, loader, hit);
+      if (inflight.has(k)) {
+        if (drawing) promote(k); // a warm-up still queued that the screen being drawn wants: it goes up to the screen's place
+        return inflight.get(k);
+      }
+    }
+    return start(k, key, ttlMs, loader);
+  }
+
+  // ---- kept between page loads (2.99.33) ---------------------------------------------------------
+  // The memo above starts empty on every page load, and a page loaded afresh used to wait on Canvas
+  // for every list before it drew a thing. The store keeps the answers a screen opens with (store.js
+  // says which, in what form, for which user and for how long) and seeds the memo with them as the
+  // page loads, marked kept. A kept answer is handed to whoever asks for it, and Canvas is asked for
+  // the key again in the same breath: the screen lands from what was kept, Canvas's answer replaces
+  // it in the memo, and the app hears whether the two differed (revalidated()) so it can draw the
+  // screen again in place. A caller that must not draw from an old answer (maxAge: a score) never
+  // gets a kept one; a write forgets it like any other answer.
+  //
+  // The same goes for one of those lists whose lifetime in the memo has run out (lapsed): the
+  // Dashboard opened again after five minutes in a course draws from the answer it had, and asks
+  // again, rather than waiting on Canvas for every list it shows.
+  let keptForm = null; // (key, value) → the form a kept answer takes (store.js)
+  let onAnswer = null; // (key, value): an answer from Canvas landed in the memo (the store keeps the ones it keeps)
+  let onDropped = null; // (which): a write invalidated these keys — what was kept of them is out of date too (the store drops it)
+  let keptServed = 0; // kept answers handed out so far: the app compares the count before and after a draw
+  const revalidations = new Set(); // one promise per key asked for again: whether Canvas's answer differed
+  function keepWith({ form = null, answered = null, dropped = null } = {}) { keptForm = form; onAnswer = answered; onDropped = dropped; }
+  /** The kept answers, into the memo: { key: { value, at } }, `at` when Canvas gave it. */
+  function seed(entries) {
+    for (const [key, e] of Object.entries(entries || {})) {
+      const k = cacheKey(key);
+      if (!e || e.value === undefined || memory.has(k) || inflight.has(k)) continue;
+      memory.set(k, { value: e.value, at: Number(e.at) || 0, until: 1, kept: true }); // (until 1: never fresh, and the first to go under the cap)
     }
   }
+  /** An answer whose lifetime has run out, of a kind that is kept: handed out as a kept one would be (its form, to compare with what comes next). */
+  function lapsed(key, hit) {
+    if (!keptForm || (hit.until && hit.until > Date.now()) || !hit.until) return false;
+    try {
+      const form = keptForm(key, hit.value);
+      if (form === undefined) return false;
+      hit.kept = true;
+      hit.was = JSON.stringify(form);
+      return true;
+    } catch { return false; }
+  }
+  const asking = new Map(); // memo key → the promise of whether Canvas's answer differs from the one handed out
+  function serveKept(k, key, ttlMs, loader, hit) {
+    keptServed += 1;
+    if (!asking.has(k)) {
+      const was = hit.was ?? JSON.stringify(hit.value);
+      const differs = (inflight.get(k) || start(k, key, ttlMs, loader)).then(
+        (value) => { try { return JSON.stringify(keptForm ? keptForm(key, value) : value) !== was; } catch { return true; } },
+        () => { if (memory.get(k) === hit) memory.delete(k); return false; }, // (Canvas did not answer: the next caller asks it, as before; what is drawn stays)
+      );
+      asking.set(k, differs);
+      revalidations.add(differs);
+      differs.finally(() => { revalidations.delete(differs); if (asking.get(k) === differs) asking.delete(k); });
+    }
+    return hit.value;
+  }
+  /** Whether any kept answer handed out so far turned out to differ from Canvas's, once every one asked for again has answered. */
+  const revalidated = () => Promise.all([...revalidations]).then((r) => r.some(Boolean));
+  const keptCount = () => keptServed;
   /** What is already in the memo for this key, or undefined — never a request. For the parts of a
    *  screen that are worth drawing with if the answer happens to be here, and not worth waiting for
    *  if it is not (a course's name beside a group, say). */
@@ -349,11 +454,13 @@
   };
   async function invalidate(key) {
     forget(cacheKey(key));
+    try { onDropped?.((k) => k === key); } catch { /* (kept or not, the next draw asks Canvas) */ }
   }
   /** Forget every memoised (or still loading) key that starts with the prefix (after a write). */
   async function invalidatePrefix(prefix) {
     const p = cacheKey(prefix);
     for (const k of new Set([...memory.keys(), ...inflight.keys()])) if (k.startsWith(p)) forget(k);
+    try { onDropped?.((k) => k.startsWith(prefix)); } catch { /* (kept or not, the next draw asks Canvas) */ }
   }
   /** Forget everything (a page brought back from the back/forward cache, a re-tap of the current
    *  tab): the next draw asks Canvas afresh, exactly as a fresh page load does. */
@@ -364,6 +471,7 @@
 
   BCV.canvas = {
     get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, settled, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
+    warming, budget: () => budget, keepWith, seed, revalidated, keptCount, // (2.99.33: reading ahead, and what is kept between page loads)
     /** The session has ended (lib/d2l-api.js says so for Brightspace, whose answers do not come through here). */
     signedOut: loseSession,
   };

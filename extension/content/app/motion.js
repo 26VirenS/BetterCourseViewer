@@ -196,7 +196,7 @@
   // the stylesheet's arrivals: each ends on the element's own look (a `to` of opacity 1 and no
   // transform, or no `to` at all). Exits, loops and the ones that end on a look of their own are not
   // here, and are never touched.
-  const ARRIVALS = new Set(['bcv-fade-up', 'bcv-fade-in', 'bcv-fade-down', 'bcv-pop', 'bcv-sheet', 'bcv-load', 'bcv-grow', 'bcv-morph', 'bcv-ring-fill', 'bcv-push-in', 'bcv-pop-in', 'bcv-toast-in', 'bcv-welcome-in', 'bcv-welcome-fade', 'bcv-qn-in', 'bcv-pv-in', 'bcv-sheet-up', 'bcv-pin-pop', 'bcv-mark-pop', 'bcv-pdfx-pop', 'bcv-omni-wiki-in', 'bcv-omni-in']);
+  const ARRIVALS = new Set(['bcv-fade-up', 'bcv-fade-in', 'bcv-fade-down', 'bcv-arrive-fwd', 'bcv-arrive-back', 'bcv-pop', 'bcv-sheet', 'bcv-load', 'bcv-grow', 'bcv-morph', 'bcv-ring-fill', 'bcv-push-in', 'bcv-pop-in', 'bcv-toast-in', 'bcv-welcome-in', 'bcv-welcome-fade', 'bcv-qn-in', 'bcv-pv-in', 'bcv-sheet-up', 'bcv-pin-pop', 'bcv-mark-pop', 'bcv-pdfx-pop', 'bcv-omni-wiki-in', 'bcv-omni-in']);
   // each, as it ends (the event reaches here from the page's own DOM)
   self.document?.addEventListener('animationend', (e) => {
     if (!ARRIVALS.has(e.animationName)) return;

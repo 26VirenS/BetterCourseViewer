@@ -298,22 +298,27 @@
     };
 
     function onAway(e) { if (!list?.contains(e.target) && !btn.contains(e.target)) close(); }
-    function close() {
+    /** The list goes back into its button the way it grew out of it (dismiss: a menu's pop, from
+     *  wherever its entrance had got to, nothing in it pressable on the way); shut from the keyboard
+     *  (Escape, Tab, a pick by key) it is simply gone. The next press opens a fresh one at once. */
+    function close(keyed = false) {
       if (!list) return;
-      list.remove();
+      if (keyed) list.remove();
+      else { list.inert = true; dismiss(list, { reduced: true }); } // (reduced motion: its 150ms fade, waited for)
       list = null;
       btn.setAttribute('aria-expanded', 'false');
       document.removeEventListener('pointerdown', onAway, true);
       document.removeEventListener('keydown', listKeys, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll, true);
     }
     // the page moving under it takes it away — but the list scrolling inside itself does not
     function onScroll(e) { if (!list?.contains(e.target)) close(); }
-    const pick = (v) => {
+    function onResize() { close(); }
+    const pick = (v, keyed = false) => {
       cur = known(v);
       drawFace();
-      close();
+      close(keyed);
       btn.focus();
       onChange(cur);
     };
@@ -332,7 +337,7 @@
       list = el('bcv-picker__list', options.map((o) => h('button', {
         type: 'button', class: `bcv-picker__opt ${o.cls || ''} ${String(o.value) === cur ? 'is-on' : ''}`, role: 'option',
         'aria-selected': String(o.value) === cur ? 'true' : 'false', dataset: { value: String(o.value) },
-        onclick: () => pick(o.value),
+        onclick: (e) => pick(o.value, e.detail === 0), // (e.detail 0: Enter or Space)
       }, [
         String(o.html || '').trim() && !String(o.text || '').trim()
           ? BCV.screens.course.prose(o.html, { cls: 'bcv-picker__rich' })
@@ -348,7 +353,7 @@
       requestAnimationFrame(() => {
         if (!list) return;
         document.addEventListener('pointerdown', onAway, true);
-        window.addEventListener('resize', close);
+        window.addEventListener('resize', onResize);
         window.addEventListener('scroll', onScroll, true);
       });
     }
@@ -370,15 +375,15 @@
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
-    btn.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    btn.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(true); });
     // the list's own keys: the buttons in it have focus while it is open
     function listKeys(e) {
       if (!list || !list.contains(e.target)) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); move(e.target, 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(e.target, -1); }
       else if (e.key === 'Home') { e.preventDefault(); move(null, 0); }
-      else if (e.key === 'Escape') { e.preventDefault(); close(); btn.focus(); }
-      else if (e.key === 'Tab') close();
+      else if (e.key === 'Escape') { e.preventDefault(); close(true); btn.focus(); }
+      else if (e.key === 'Tab') close(true);
       else if (e.key.length === 1) jump(e.key);
     }
     drawFace();
@@ -435,10 +440,12 @@
 
   /** Resolves when the element's (and its direct children's) running animations and transitions
    *  have ended — their own timing, read from the page — capped so a stuck one never holds a caller;
-   *  at once under reduced motion. Call it right after setting the class that starts the motion. */
-  function afterMotion(el, cap = 450) {
+   *  at once under reduced motion, unless `reduced` says the exit keeps its short fade there (the
+   *  stylesheet's reduce rules), which is then waited for too. Call it right after setting the class
+   *  that starts the motion. */
+  function afterMotion(el, cap = 450, { reduced = false } = {}) {
     return new Promise((resolve) => {
-      if (!el || reducedMotion()) { resolve(); return; }
+      if (!el || (reducedMotion() && !reduced)) { resolve(); return; }
       const t = setTimeout(resolve, cap);
       const done = () => { clearTimeout(t); resolve(); };
       let list = [];
@@ -567,13 +574,13 @@
   /** Closes an overlay, a menu or a sheet with its exit: is-closing starts the CSS's animation, and
    *  the element goes when that has ended (at once under reduced motion). */
   /** Which spring an element leaves on (docs/MOTION.md): a scrim fades while its sheet shrinks (a
-   *  phone sheet slides down), a menu or a toast pops out, anything else fades. */
+   *  phone sheet slides down), a menu, a dropdown's list or a toast pops out, anything else fades. */
   function exitKindOf(ov) {
     const c = ov.classList;
     if (c.contains('bcv-sheet-ov')) return document.documentElement.classList.contains('bcv-phone') ? 'down' : 'shrink';
     if (c.contains('bcv-toast')) return 'toast';
     if (c.contains('bcv-quicknav')) return 'left';
-    if (c.contains('bcv-menu')) return 'pop';
+    if (c.contains('bcv-menu') || c.contains('bcv-picker__list')) return 'pop'; // (back toward the edge it grew from: ui.anchor's origin)
     return 'fade';
   }
   const EXIT_CAP = 700; // ms: the longest exit spring settles well inside this, and an element has left by then whatever its animations do
@@ -584,8 +591,10 @@
    *  runs. Without the springs, or under reduced motion, is-closing starts the stylesheet's exit and
    *  afterMotion sees it end. Either way the element is removed by EXIT_CAP: a promise that waits on
    *  an animation is raced against the clock, so nothing that never finishes leaves a scrim on the
-   *  page (docs/SAFARI.md §4), and a spring that throws hands over to the stylesheet's exit. */
-  function dismiss(ov) {
+   *  page (docs/SAFARI.md §4), and a spring that throws hands over to the stylesheet's exit. `reduced`:
+   *  under reduced motion its 150ms fade (app.css) is waited for before it goes (ui.afterMotion), rather
+   *  than its going at once. */
+  function dismiss(ov, { reduced = false } = {}) {
     if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return Promise.resolve();
     const exit = (ov._bcvExit = { recalled: false }); // (recall() below can still bring it back, until it is gone)
     const gone = () => { if (exit.recalled) return; try { ov.remove(); } catch { /* already gone */ } };
@@ -602,7 +611,7 @@
       } catch { ov.classList.remove('is-closing', 'bcv-sprung'); } // (the stylesheet's exit instead)
     }
     ov.classList.add('is-closing');
-    return Promise.race([afterMotion(ov), cap]).then(gone, gone);
+    return Promise.race([afterMotion(ov, 450, { reduced }), cap]).then(gone, gone);
   }
   /** Bring back something on its way out (dismiss above), from wherever its exit has got to — the pointer back over
    *  what opened it, say — rather than letting it go and opening a second one beside it. False when it is not leaving. */
@@ -912,6 +921,19 @@
     for (const p of el.querySelectorAll('path')) p.setAttribute('pathLength', '1');
     el.classList.add('bcv-check--draw');
     return el;
+  }
+
+  /** What a disclosure opens, sliding open and shut rather than jumping: the course modules' collapsing
+   *  grid row (0fr → 1fr takes the content's own height, nothing measured), the content fading in as it
+   *  opens and out as it shuts (app.css .bcv-collapsible). Transitions, so a second press turns it round
+   *  from wherever it has got to. Shut, the content is inert: out of the tab order and the accessibility
+   *  tree, as [hidden] had it. Returns the wrapper; wrapper.setOpen(on) opens or shuts it. */
+  function collapsible(content, open = false, cls = '') {
+    const inner = el('bcv-collapsible__in', content);
+    const wrap = el(`bcv-collapsible ${cls} ${open ? 'is-open' : ''}`, inner);
+    inner.inert = !open;
+    wrap.setOpen = (on) => { wrap.classList.toggle('is-open', on); inner.inert = !on; };
+    return wrap;
   }
 
   /** Screen pixels per CSS pixel (a zoom, a scaled display), for a canvas drawn to be crisp: capped
@@ -1573,7 +1595,7 @@
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, dpr, onDprChange, dismiss, recall,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, collapsible, dpr, onDprChange, dismiss, recall,
     afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold, cardBox,
   };
 })();

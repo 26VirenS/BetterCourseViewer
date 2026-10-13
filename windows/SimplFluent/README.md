@@ -422,6 +422,15 @@ whenever the student's own screens are asking: the school is asked at the pace o
 at once. A pointer resting 90 ms on a pane's row, a course's card or a row of work has its screen read; pressed, the
 screen is built and laid out too, unseen (`Kit/Ahead.cs`), so the click only has to bring it in. `--no-prefetch` (any
 run) reads nothing ahead.
+
+These, and the kept answers above, are the app's own. The extension in the engine's page does none of its own: since
+2.99.33 it reads ahead (at idle, under a resting pointer, Chrome's speculation rules), keeps the answers a page opens
+with between page loads, and moves between its screens with view transitions only where no app is around it — which it
+knows by `BCVBridge.native`. `bridge.js` sets that because `Engine/ScriptBundle.cs` hands it a stand-in for WebKit's
+message handler (the local `webkit`), exactly as the Mac's and the iPhone's web views have the real one; so nothing is
+read twice over (the app's reading ahead and the page's), the page keeps no more of the school's answers in the
+extension's storage than it did before (the courses' assignments, for the Dashboard's counts), and the web screens
+change as they did before.
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
 

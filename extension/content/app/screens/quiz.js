@@ -1587,19 +1587,19 @@
           right ? U.text('bcv-fb__opttag bcv-fb__opttag--right', 'Correct', 'span') : null,
         ]);
       }));
-      list.hidden = true;
+      const fold = U.collapsible(list, false, 'bcv-fb__fold'); // (sliding open and shut with the chevron's turn)
       const label = U.text('bcv-fb__morelbl', `Show all ${U.plural(opts.length, 'option')}`, 'span');
       const btn = h('button', {
         type: 'button', class: 'bcv-fb__more', 'aria-expanded': 'false',
         onclick: () => {
-          const open = list.hidden;
-          list.hidden = !open;
+          const open = !btn.classList.contains('is-open');
+          fold.setOpen(open);
           btn.setAttribute('aria-expanded', open ? 'true' : 'false');
           btn.classList.toggle('is-open', open);
           label.textContent = open ? 'Hide the options' : `Show all ${U.plural(opts.length, 'option')}`;
         },
       }, [label, U.svg(IC.chevron, { size: 12, width: 2.2, cls: 'bcv-fb__morechev' })]);
-      return U.el('bcv-fb__optwrap', [btn, list]);
+      return U.el('bcv-fb__optwrap', [btn, fold]);
     }
 
     /* ---- the feedback screen (2.98.27) ----------------------------------------------
