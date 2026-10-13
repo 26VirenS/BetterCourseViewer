@@ -364,6 +364,10 @@ jobs:
           Shot 'assignment-feedback' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1008', '--open', 'feedback'))
           Shot 'assignment-held' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1006'))
           Shot 'hand-in' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4002', '--open', 'handin'))
+          # Send from Phone: its panel and code, light and dark, and as the first time (Windows will ask)
+          Shot 'hand-in-phone' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1012', '--open', 'handin', '--phone'))
+          Shot 'hand-in-phone-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1012', '--open', 'handin', '--phone'))
+          Shot 'hand-in-phone-first' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1012', '--open', 'handin', '--phone', 'first'))
           Shot 'assignment-rubric' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4001'))
           Shot 'rubric' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'course:104', '--push', '/courses/104/assignments/4001', '--open', 'rubric'))
           Shot 'rubric-grid' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4001', '--open', 'rubric:grid'))
@@ -403,12 +407,67 @@ jobs:
           Shot 'update-waiting-quiz' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--open', 'quiz:101:9011'))
           Shot 'update-critical-quiz' '1366x778' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-critical', '--open', 'quiz:101:9011'))
           Shot 'update-restarting' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed'))
+          # Send from Phone, tried as a phone would (one part each): Simpl's hand-in panel with --phone-test says its
+          # server's address in simpl.log (on 127.0.0.1 too); the page is opened, a wrong key tried, then each file posted
+          # as the phone's page posts it (X-File-Name, its type, its length) with Invoke-WebRequest; what came back goes
+          # in shots/phone-test.txt, and the log must then say each file is in the hand-in (checked below)
+          function PhoneTest($name, $part, $extra, $sends) {
+            if ($shard -ne $part) { return }
+            $script:mine += $name
+            while (@($script:running | Where-Object { -not $_.HasExited }).Count -ge 3) { Start-Sleep -Milliseconds 400 }
+            $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
+            $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', '90', '--profile', $prof, '--window-size', '1024x681') + $mock + $extra + @('--phone', '--phone-test')
+            $script:running += Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            $log = Join-Path $prof 'simpl.log'
+            $url = $null
+            for ($i = 0; $i -lt 480 -and -not $url; $i++) {
+              Start-Sleep -Milliseconds 250
+              if (Test-Path $log) { $m = Select-String -Path $log -Pattern 'phone hand-in: test address (\S+)' | Select-Object -First 1; if ($m) { $url = $m.Matches[0].Groups[1].Value } }
+            }
+            if (-not $url) { "${name}: no address in the log" | Add-Content shots/phone-test.txt; return }
+            $base = $url -replace '[^/]+/$', ''
+            $page = (Invoke-WebRequest -Uri $url -SkipHttpErrorCheck -TimeoutSec 15).StatusCode
+            $wrong = (Invoke-WebRequest -Uri "${base}AAAAAAAAAAAAAAAAAAAAAA/" -SkipHttpErrorCheck -TimeoutSec 15).StatusCode
+            Start-Sleep -Seconds 1
+            $codes = @()
+            foreach ($f in $sends) {
+              $codes += (Invoke-WebRequest -Uri "${url}upload" -Method Post -InFile $f.Path -ContentType $f.Type -Headers @{ 'X-File-Name' = [uri]::EscapeDataString($f.Name) } -SkipHttpErrorCheck -TimeoutSec 30).StatusCode
+              Start-Sleep -Milliseconds 600
+            }
+            "${name}: page $page, wrong key $wrong, uploads $($codes -join ' ')" | Add-Content shots/phone-test.txt
+          }
+          'Notes from class, sent from a phone.' | Set-Content -NoNewline "$env:RUNNER_TEMP/phone-notes.txt"
+          'ID3 not really music' | Set-Content -NoNewline "$env:RUNNER_TEMP/phone-song.mp3"
+          $photo = (Resolve-Path scripts/dev/fixtures/photo.jpg).Path
+          PhoneTest 'hand-in-phone-connected' 6 @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1012', '--open', 'handin') @(
+            @{ Path = $photo; Type = 'image/jpeg'; Name = 'Photo from phone.jpg' }, @{ Path = "$env:RUNNER_TEMP/phone-notes.txt"; Type = 'text/plain'; Name = 'Notes.txt' })
+          # (an assignment narrowed to PDFs for this part's mock: its photos made one PDF, an mp3 refused)
+          if ($shard -eq 7) { Invoke-WebRequest -Uri http://localhost:8800/__mock/config -Method Post -ContentType 'application/json' -Body '{"ext":{"1013":["pdf"]}}' | Out-Null }
+          PhoneTest 'hand-in-phone-photos' 7 @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1013', '--open', 'handin') @(
+            @{ Path = $photo; Type = 'image/jpeg'; Name = 'IMG_0001.jpg' }, @{ Path = $photo; Type = 'image/jpeg'; Name = 'IMG_0002.jpg' }, @{ Path = "$env:RUNNER_TEMP/phone-song.mp3"; Type = 'audio/mpeg'; Name = 'Song.mp3' })
           foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
           Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
             $log = Join-Path $_.FullName 'simpl.log'
             if (Test-Path $log) { Copy-Item $log "shots/$($_.Name).log"; Write-Host "--- $($_.Name)"; Get-Content $log -Tail 25 }
           }
+          # Send from Phone took the files: the server's answers, and the log saying each file is in the hand-in
+          $phoneBad = @()
+          function PhoneLog($name) { $l = "shots/profile-$name.log"; if (Test-Path $l) { Get-Content $l -Raw } else { '' } }
+          if ($script:mine -contains 'hand-in-phone-connected') {
+            $t = if (Test-Path shots/phone-test.txt) { Get-Content shots/phone-test.txt -Raw } else { '' }
+            $l = PhoneLog 'hand-in-phone-connected'
+            if ($t -notmatch 'hand-in-phone-connected: page 200, wrong key 404, uploads 200 200') { $phoneBad += "the server's answers: $t" }
+            foreach ($want in @('phone hand-in: opened', 'hand-in: added Photo from phone.jpg', 'hand-in: added Notes.txt')) { if (-not $l.Contains($want)) { $phoneBad += "hand-in-phone-connected's log lacks: $want" } }
+          }
+          if ($script:mine -contains 'hand-in-phone-photos') {
+            $t = if (Test-Path shots/phone-test.txt) { Get-Content shots/phone-test.txt -Raw } else { '' }
+            $l = PhoneLog 'hand-in-phone-photos'
+            if ($t -notmatch 'hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415') { $phoneBad += "the server's answers: $t" }
+            if (([regex]::Matches($l, 'hand-in: added project01\.pdf \(1 files\)')).Count -lt 2) { $phoneBad += "hand-in-phone-photos: the two photos did not become one PDF in the hand-in" }
+          }
+          if ($phoneBad.Count -gt 0) { $phoneBad | ForEach-Object { Write-Host "::error::Send from Phone: $_" }; exit 1 }
+          if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
           # printed whole, with the bridge's own error, so its cause can be read here)
           if ($script:mine -contains 'setup-saved') {
