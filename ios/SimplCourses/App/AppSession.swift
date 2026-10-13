@@ -123,18 +123,24 @@ final class AppSession: ObservableObject {
     func changeSchool() {
         Task { await Reminders.shared.clear() } // (another school's work: none of these reminders are its)
         Task { await Activity.shared.reset() }
+        #if os(iOS)
+        TestSchool.signOut() // (the test school, picked again, asks for its sign-in again)
+        #endif
         UserDefaults.standard.removeObject(forKey: AppSession.hostKey)
         host = nil
         lms = nil
     }
 
     /// Clears the Canvas session (cookies and site data), like signing out of a browser, and forgets the
-    /// saved sign-in (or the app would sign straight back in).
+    /// saved sign-in (or the app would sign straight back in). The test school's sign-in, kept by the app, goes too.
     func signOut(completion: @escaping () -> Void = {}) {
         Task { await Reminders.shared.clear() } // (the next account's work is not this one's)
         Task { await Activity.shared.reset() }
         CookieJar.shared.clear()
         LoginVault.clear()
+        #if os(iOS)
+        TestSchool.signOut()
+        #endif
         WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {
             completion()
             NotificationCenter.default.post(name: .simplSignedOut, object: nil)

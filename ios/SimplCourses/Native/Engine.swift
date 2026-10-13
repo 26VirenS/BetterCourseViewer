@@ -383,6 +383,7 @@ final class Engine: ObservableObject, ShellListener {
 
     private func isCanvasHost(_ u: URL) -> Bool {
         let s = u.scheme?.lowercased() ?? ""
+        if TestSchool.owns(u) { return TestSchool.owns(web.baseURL) } // (the test school's own scheme: its addresses are its)
         return (s == "http" || s == "https") && u.host?.lowercased() == web.baseURL.host?.lowercased()
     }
 

@@ -27,10 +27,15 @@ targets:
           - "Info.plist"
           - "Web/bridge.js"
           - "Web/login.js"
+          - "Resources/TestSchool"
+          - "Resources/TestSchool/**"
       - path: SimplCourses/Web/bridge.js
         buildPhase: resources # copied into the bundle as-is; ScriptBundle reads it at run time
       - path: SimplCourses/Web/login.js
         buildPhase: resources # the sign-in reader (LoginAssist), read the same way
+      - path: SimplCourses/Resources/TestSchool
+        type: folder
+        buildPhase: resources # the test school's mock Canvas and its page, as a folder (Web/TestSchool.swift; scripts/dev/make-test-school.mjs writes it)
       - path: ../extension
         type: folder
         buildPhase: resources

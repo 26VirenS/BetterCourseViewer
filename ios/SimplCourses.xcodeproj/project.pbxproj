@@ -54,6 +54,8 @@
 		5E1D0A7B3C9F4E2A8B6D1C03 /* Activity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D0A7B3C9F4E2A8B6D1C04 /* Activity.swift */; };
 		3438780C1CEBCF932B4D526C /* ToolSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA39D269F874824A865B8166 /* ToolSheet.swift */; };
 		9058FF99027A13078E174731 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */; };
+		458DF6144E5763DFEACDF228 /* TestSchool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0885763A074B3A79969D1CE1 /* TestSchool.swift */; };
+		37F013F0F3FFD99CBD797D87 /* TestSchool in Resources */ = {isa = PBXBuildFile; fileRef = 2D8B496502628DA2297412A1 /* TestSchool */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -105,6 +107,8 @@
 		5E1D0A7B3C9F4E2A8B6D1C04 /* Activity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Activity.swift; sourceTree = "<group>"; };
 		FA39D269F874824A865B8166 /* ToolSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolSheet.swift; sourceTree = "<group>"; };
 		AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		0885763A074B3A79969D1CE1 /* TestSchool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSchool.swift; sourceTree = "<group>"; };
+		2D8B496502628DA2297412A1 /* TestSchool */ = {isa = PBXFileReference; lastKnownFileType = folder; path = TestSchool; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -171,6 +175,7 @@
 				CB97C35721F98A64BF310C10 /* ContentRules.swift */,
 				11F8ABC65325789350307D00 /* CookieJar.swift */,
 				2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */,
+				0885763A074B3A79969D1CE1 /* TestSchool.swift */,
 				7A29721466E551DA05644A62 /* WebController.swift */,
 			);
 			path = Web;
@@ -180,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				641EF96E2EE0228604CB7D48 /* Assets.xcassets */,
+				2D8B496502628DA2297412A1 /* TestSchool */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -282,6 +288,7 @@
 				A8A43C5820C0DD477310B3D3 /* Assets.xcassets in Resources */,
 				35E709E2F61A88D2152FAE2B /* bridge.js in Resources */,
 				F71DC0F6D3D792DB868CE252 /* extension in Resources */,
+				37F013F0F3FFD99CBD797D87 /* TestSchool in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -332,6 +339,7 @@
 				1C925D881554BE71A9B14321 /* CookieJar.swift in Sources */,
 				E87481CD4B0A70BF5422DBB7 /* SchoolPickerView.swift in Sources */,
 				CE782850F95C710FAC0E113F /* ScriptBundle.swift in Sources */,
+				458DF6144E5763DFEACDF228 /* TestSchool.swift in Sources */,
 				BB26A260BED650E07132CA16 /* SettingsSheet.swift in Sources */,
 				5B59F23116F3AF8F361D0845 /* SimplCoursesApp.swift in Sources */,
 				2C9206E01EDAD1D07FC3380C /* WebController.swift in Sources */,

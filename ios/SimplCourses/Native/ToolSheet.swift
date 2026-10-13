@@ -74,7 +74,7 @@ struct ToolSheet: View {
                         .accessibilityLabel("Back")
                     Menu {
                         Button { browser.reload() } label: { Label("Reload", systemImage: "arrow.clockwise") }
-                        if let u = browser.current ?? url {
+                        if let u = browser.current ?? url, !TestSchool.owns(u) { // (the test school's pages are the app's own: Safari has none of them)
                             Button { engine.web.openExternally(u) } label: { Label("Open in Safari", systemImage: "safari") }
                             ShareLink(item: u) { Label("Share", systemImage: "square.and.arrow.up") }
                         }
@@ -147,6 +147,7 @@ struct ToolWebView: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.defaultWebpagePreferences.preferredContentMode = .mobile
+        TestSchool.register(on: config) // (the test school's tools and pages, at its own scheme: Web/TestSchool.swift)
         let v = WKWebView(frame: .zero, configuration: config)
         v.allowsBackForwardNavigationGestures = true
         v.navigationDelegate = context.coordinator
@@ -174,7 +175,7 @@ struct ToolWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             let scheme = navigationAction.request.url?.scheme?.lowercased() ?? ""
-            if ["http", "https", "about", "blob", "data"].contains(scheme) || scheme.isEmpty {
+            if ["http", "https", "about", "blob", "data"].contains(scheme) || scheme.isEmpty || TestSchool.owns(navigationAction.request.url) {
                 decisionHandler(.allow)
             } else {
                 if let u = navigationAction.request.url { UIApplication.shared.open(u) } // (mailto:, tel:, an app's link)

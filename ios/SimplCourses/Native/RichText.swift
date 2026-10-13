@@ -36,6 +36,7 @@ struct HTMLBlock: UIViewRepresentable {
         ucc.add(WeakHandler(context.coordinator), name: "size")
         ucc.addUserScript(WKUserScript(source: HTMLBlock.sizer, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         config.userContentController = ucc
+        TestSchool.register(on: config) // (the test school's pictures and frames, at its own scheme: Web/TestSchool.swift)
         let v = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 24), configuration: config)
         v.isOpaque = false
         v.backgroundColor = .clear

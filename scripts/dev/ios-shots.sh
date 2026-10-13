@@ -2,7 +2,8 @@
 # The iPhone app's screens on the iOS Simulator, against the mock Canvas: each tab, a counter's sheet,
 # Notifications, a course and an assignment pushed from the native screens, a course's grades sheet,
 # Hand In, a discussion, modules, files, Groups and the Inbox, a quiz and a tool — in light and in dark; then against
-# the mock Brightspace (2.99.22): Today, a course, an assignment, its grades, a discussion, its content, in light.
+# the mock Brightspace (2.99.22): Today, a course, an assignment, its grades, a discussion, its content, in light; then
+# the app's own test school (test.simpl.com): its sign-in page, and Today signed in.
 # Run by .github/workflows/ios-shots.yml after the app is built and installed on a booted simulator and
 # the mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860
 # (node scripts/dev/mock-brightspace.mjs 8860 --open). Pictures in ./shots.
@@ -15,13 +16,17 @@ xcrun simctl status_bar booted override --time 9:41 --batteryState charged --bat
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
 
 # launch <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it:
-# -SimplDemo), then a picture after <wait> seconds
+# -SimplDemo), then a picture after <wait> seconds. The mock is the one at BASE (http://localhost:8800 unless set) — or,
+# with BASE=test-school, the app's own test school: test.simpl.com picked as a student picks it, no address given, its
+# Canvas answered inside the app (ios/SimplCourses/Web/TestSchool.swift), no server
 launch() {
   local name="$1" wait="$2"
   shift 2
+  local school=(-SimplBaseURL "${BASE:-http://localhost:8800}")
+  [ "${BASE:-}" = "test-school" ] && school=(-canvasHost test.simpl.com)
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   sleep 1
-  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL "${BASE:-http://localhost:8800}" -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
+  xcrun simctl launch --console-pty booted "$BID" "${school[@]}" -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
   sleep "$wait"
   xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
 }
@@ -88,6 +93,12 @@ launch d2l-03-assignment 20 -SimplTab todo -SimplPush /courses/31001/assignments
 launch d2l-04-grades-sheet 18 -SimplTab grades -SimplOpen grades:31001
 launch d2l-05-discussion 20 -SimplTab courses -SimplPush /courses/31001/discussion_topics/2000000902
 launch d2l-06-modules 18 -SimplTab courses -SimplPush /courses/31001/modules
+# the test school (test.simpl.com), in light: its sign-in page as App Review first sees it (the app's own sign-in form over
+# Canvas's page), then Today once signed in — by -SimplTestSchoolSignedIn, the suite's own sign-in (a debug build with
+# -SimplDemo only), so CI never needs the password
+export BASE=test-school
+launch test-01-sign-in 20
+launch test-02-today 28 -SimplTestSchoolSignedIn YES
 unset BASE
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 collect end

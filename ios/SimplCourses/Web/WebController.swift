@@ -60,6 +60,12 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
             ucc.add(login, contentWorld: LoginAssist.world, name: LoginAssist.handlerName)
         }
         config.userContentController = ucc
+        #if os(iOS)
+        // the test school's scheme (Web/TestSchool.swift), whatever the school: WebKit takes a scheme's handler only before
+        // the web view is made. Only the test school's own pages are at it; for the test school, its hidden page starts now.
+        TestSchool.register(on: config)
+        if case .canvas(let host) = mode, TestSchool.isHost(host) { TestSchool.warmUp() }
+        #endif
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
         webView.navigationDelegate = self
@@ -110,14 +116,27 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     var currentURL: URL? { webView.url }
 
     /// The school's Canvas: https on its host — or, for the simulator suite, the address given at launch
-    /// (-SimplBaseURL http://localhost:8800), the mock Canvas.
+    /// (-SimplBaseURL http://localhost:8800), the mock Canvas; or, for the test school (test.simpl.com), the app's own
+    /// simpltest://test.simpl.com/, answered on the phone itself (Web/TestSchool.swift).
     var baseURL: URL {
         if case .canvas(let host) = mode {
             if let dev = AppSession.devBaseURL, dev.host?.lowercased() == host.lowercased() { return dev }
+            #if os(iOS)
+            if TestSchool.isHost(host) { return TestSchool.baseURL }
+            #endif
             return URL(string: "https://\(host)/") ?? URL(fileURLWithPath: "/")
         }
         return ScriptBundle.extensionDir
     }
+
+    #if os(iOS)
+    /// This is the test school's web view (test.simpl.com).
+    var isTestSchool: Bool {
+        if case .canvas(let host) = mode { return TestSchool.isHost(host) }
+        return false
+    }
+    #endif
+
     private var loadStarted = false
 
     /// The first load, once. SwiftUI can call onAppear more than once for the same view, and a second
@@ -134,7 +153,12 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
             // the first launch lands on the guided setup (after Canvas's sign-in, which returns to it): the web
             // interface's own, when the app's chrome is off — with it on, the app shows its own setup over the Dashboard
             let firstLaunch = !UserDefaults.standard.bool(forKey: "setupOpened") && UserDefaults.standard.bool(forKey: "nativeShellOff")
-            guard let url = URL(string: firstLaunch ? "/?bcv=setup" : "/", relativeTo: baseURL)?.absoluteURL else { return }
+            var start = firstLaunch ? "/?bcv=setup" : "/"
+            #if os(iOS)
+            // (the test school signed out: its sign-in page straight away, rather than by way of Canvas sending it there)
+            if TestSchool.isHost(host), !TestSchool.signedIn { start = TestSchool.signInPath }
+            #endif
+            guard let url = URL(string: start, relativeTo: baseURL)?.absoluteURL else { return }
             prepare(host: host) { [weak self] in
                 self?.webView.load(URLRequest(url: url))
                 UserDefaults.standard.set(true, forKey: "setupOpened")
@@ -171,7 +195,13 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
         let scheme = url.scheme?.lowercased() ?? ""
-        if !["http", "https", "file", "about", "blob", "data"].contains(scheme) {
+        #if os(iOS)
+        // (the test school's pages are at a scheme of the app's own: in its own web view, and nowhere else)
+        let ownScheme = isTestSchool && TestSchool.owns(url)
+        #else
+        let ownScheme = false
+        #endif
+        if !ownScheme && !["http", "https", "file", "about", "blob", "data"].contains(scheme) {
             WebController.openSystem(url) // mailto:, tel:, another app
             decisionHandler(.cancel)
             return
@@ -197,6 +227,14 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         if navigationResponse.isForMainFrame, !navigationResponse.canShowMIMEType {
+            #if os(iOS)
+            // (a file of the test school's: asked of the school itself, as WebKit's downloads go to the network)
+            if isTestSchool, let url = navigationResponse.response.url, TestSchool.owns(url) {
+                decisionHandler(.cancel)
+                FilePreview.shared.open(url, name: navigationResponse.response.suggestedFilename ?? url.lastPathComponent, in: webView)
+                return
+            }
+            #endif
             decisionHandler(.download) // a file: fetched with this view's session and opened in the phone's own viewer (FilePreview)
             return
         }

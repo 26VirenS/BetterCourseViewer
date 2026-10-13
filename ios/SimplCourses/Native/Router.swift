@@ -201,6 +201,10 @@ extension Engine {
 
     private func isCanvas(_ url: URL) -> Bool {
         let scheme = url.scheme?.lowercased() ?? ""
+        #if os(iOS)
+        // (the test school's addresses are at the app's own scheme: one of them is the school's, as https is another's)
+        if TestSchool.owns(url) { return TestSchool.owns(web.baseURL) }
+        #endif
         return (scheme == "http" || scheme == "https") && url.host?.lowercased() == web.baseURL.host?.lowercased()
     }
 

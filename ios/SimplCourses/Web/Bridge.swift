@@ -192,8 +192,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             }
             Bridge.run(source, in: view, frame: message.frameInfo, world: message.world) { ok in replyHandler(["ok": ok], nil) }
         case "previewFile":
-            // a file in the phone's own viewer, fetched with the page's own session
-            guard let address = body["url"] as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let view = message.webView else {
+            // a file in the phone's own viewer, fetched with the page's own session (or, the test school's, from the school)
+            #if os(iOS)
+            let ownSchool = { (u: URL) in TestSchool.owns(u) }
+            #else
+            let ownSchool = { (_: URL) in false }
+            #endif
+            guard let address = body["url"] as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased() ?? "") || ownSchool(url), let view = message.webView else {
                 replyHandler(["ok": false], nil)
                 return
             }

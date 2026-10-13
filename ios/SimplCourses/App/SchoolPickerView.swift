@@ -153,6 +153,15 @@ final class SchoolSearch: ObservableObject {
             scored.append((score, e.school))
         }
         results = Array(scored.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1.name.localizedCaseInsensitiveCompare($1.1.name) == .orderedAscending }.prefix(60).map(\.1))
+        #if os(iOS)
+        // the app's own test school (Web/TestSchool.swift), first, for "simpl test" or "test.simpl" — and then nothing is
+        // asked of the network: no school out there is the one being looked for
+        if TestSchool.matches(raw) {
+            results.insert(School(name: TestSchool.name, domain: TestSchool.host), at: 0)
+            asking = false
+            return
+        }
+        #endif
         // after a pause in the typing: (1.7) a Brightspace of that name, asked of the name itself, and with few carried,
         // Instructure's own lookup too (a school added since the list was made)
         guard raw.trimmingCharacters(in: .whitespaces).count >= 3, SchoolSearch.addressLike(raw) == nil else { asking = false; return }

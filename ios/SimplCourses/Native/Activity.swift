@@ -377,6 +377,11 @@ final class Activity: ObservableObject {
     private static func baseURL() -> URL? {
         if let dev = AppSession.devBaseURL { return dev }
         guard let host = UserDefaults.standard.string(forKey: "canvasHost"), !host.isEmpty else { return nil }
+        #if os(iOS)
+        // (the test school is answered by the app's own page, which is not up while the app is closed: nothing to read, and
+        // test.simpl.com is no server to ask)
+        if TestSchool.isHost(host) { return nil }
+        #endif
         return URL(string: "https://\(host)/")
     }
 

@@ -1,5 +1,6 @@
 import QuickLook
 import UIKit
+import UniformTypeIdentifiers
 import WebKit
 
 /// A file from Canvas in the phone's own viewer (Quick Look), in a sheet of its own: pinch, page,
@@ -18,6 +19,8 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
     /// will not hand over): its own page for it, once this sheet is down. And the error it answered with, once it has.
     private var instead: (() -> Void)?
     private var refusedCode: Int?
+    /// The test school's file being asked for (one at a time: a file asked for since, or the sheet closed, drops it).
+    private var schoolFetch: UUID?
 
     private var folder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("SimplFiles", isDirectory: true) }
 
@@ -25,8 +28,50 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
     func open(_ url: URL, name: String, in webView: WKWebView, instead: (() -> Void)? = nil) {
         present(name: name)
         self.instead = instead
+        if TestSchool.owns(url) {
+            fromTestSchool(url)
+            return
+        }
         webView.startDownload(using: URLRequest(url: url)) { [weak self] download in
             self?.adopt(download)
+        }
+    }
+
+    /// The test school's file (Web/TestSchool.swift): asked of the school itself, which answers on the phone — a web view's
+    /// download goes to the network, where test.simpl.com is not — and kept in the same folder, under its own name.
+    private func fromTestSchool(_ url: URL) {
+        let asked = UUID()
+        schoolFetch = asked
+        TestSchool.fetch(url) { [weak self] answer in
+            guard let self, self.schoolFetch == asked else { return } // (another file asked for since, or the sheet closed)
+            self.schoolFetch = nil
+            guard let answer else {
+                self.sheet?.fail("The test school could not be reached.")
+                return
+            }
+            if answer.status >= 400 {
+                self.refusedCode = answer.status
+                self.refused(answer.status)
+                return
+            }
+            var fileName = self.name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            if (fileName as NSString).pathExtension.isEmpty,
+               let type = answer.header("Content-Type")?.split(separator: ";").first.map({ $0.trimmingCharacters(in: .whitespaces) }),
+               let ext = UTType(mimeType: type)?.preferredFilenameExtension {
+                fileName += ".\(ext)"
+            }
+            let fm = FileManager.default
+            try? fm.createDirectory(at: self.folder, withIntermediateDirectories: true)
+            let dest = self.folder.appendingPathComponent(fileName)
+            try? fm.removeItem(at: dest)
+            guard (try? answer.body.write(to: dest)) != nil else {
+                self.sheet?.fail("It could not be saved on this iPhone.")
+                return
+            }
+            self.file = dest
+            let ql = QLPreviewController()
+            ql.dataSource = self
+            self.sheet?.show(ql)
         }
     }
 
@@ -48,6 +93,7 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
         file = nil
         instead = nil
         refusedCode = nil
+        schoolFetch = nil
         self.name = name
         try? FileManager.default.removeItem(at: folder)
         let vc = FileSheetController(name: name)
@@ -64,6 +110,7 @@ final class FilePreview: NSObject, QLPreviewControllerDataSource, WKDownloadDele
     private func closed() {
         download?.cancel { _ in }
         download = nil
+        schoolFetch = nil
         file = nil
         try? FileManager.default.removeItem(at: folder)
     }

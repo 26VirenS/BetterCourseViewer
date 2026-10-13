@@ -164,8 +164,14 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         // the page's own address, as WebKit knows it — not what the script says it is
         let origin = message.frameInfo.securityOrigin
         let host = origin.host.lowercased()
-        // (this machine itself — the mock, in development — is as good as https: nothing leaves it)
-        let secure = origin.protocol == "https" || host == "localhost" || host == "127.0.0.1"
+        // (this machine itself — the mock, in development — is as good as https: nothing leaves it; and so is the test
+        // school's sign-in page, answered on the phone itself at the app's own scheme — that school's web view and host only)
+        #if os(iOS)
+        let ownSchool = origin.protocol.lowercased() == TestSchool.scheme && TestSchool.isHost(host) && TestSchool.isHost(canvasHost)
+        #else
+        let ownSchool = false
+        #endif
+        let secure = origin.protocol == "https" || host == "localhost" || host == "127.0.0.1" || ownSchool
         let error = (body["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         if (body["stale"] as? Bool) == true, host != canvasHost {
             staleSeen()
