@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.2.8", "2026-10-13",
+            ("new", "External Tools in the sidebar", "Every tool your courses use, one click away under Tools."),
+            ("new", "Every place a tool is used", "Click Knewton Alta, or any tool in your assignments, to choose which one to open."),
+            ("improved", "External Tools, tidied", "Cards sit side by side without gaps, and long course names fit.")),
         R("0.2.7", "2026-10-13",
             ("new", "Your data, encrypted", "Your sign-in, settings, saved pages and flashcards are encrypted, with the key held by this PC's security chip."),
             ("improved", "Pinned tools in colour", "Each pinned tool shows in its own colour on the title bar, easy to spot in light or dark.")),
