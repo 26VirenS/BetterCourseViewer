@@ -412,6 +412,15 @@ jobs:
           Shot 'pin-bio' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'gene,cell', '--pin-open', 'cell'))
           Shot 'bio-foundation' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--bio-demo'))
           Shot 'bio-foundation-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--bio-demo'))
+          # Cell Explorer: the animal cell cut open and labelled, a part's card, a chloroplast looked inside, the bacterium,
+          # the animal cell exploded in true scale, the membrane with osmosis, and the three cells compared
+          Shot 'bio-cell-animal' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'cell', '--tool-state', 'animal'))
+          Shot 'bio-cell-card' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'cell', '--tool-state', 'animal:select=mito'))
+          Shot 'bio-cell-inside' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'cell', '--tool-state', 'plant:isolate=chloroplast:inside'))
+          Shot 'bio-cell-bacterium' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'cell', '--tool-state', 'bacterium'))
+          Shot 'bio-cell-explode' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'cell', '--tool-state', 'animal:true:explode=0.6'))
+          Shot 'bio-cell-membrane' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'cell', '--tool-state', 'membrane:osmosis'))
+          Shot 'bio-cell-compare' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'cell', '--tool-state', 'compare'))
           Shot 'topic' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/discussion_topics/7003'))
           # (tall enough for the replies: one is a file and nothing else, shown with its file)
           Shot 'topic-replies' '1366x1050' 45 ($mock + @('--appearance', 'dark', '--push', '/courses/101/discussion_topics/7003'))
