@@ -1,0 +1,26 @@
+{
+  "about": "Pictures meant to be plain, for scripts/dev/check-shots.py: per app (mac, ios, windows; 'all' for every app), a picture's name (a glob, without .png) and the floor it is held to instead of the usual one (min_spread, max_dominant, min_colours), with the reason it is plain. A picture newly here needs a reason a reader would agree with; never one to make a broken screen pass.",
+  "all": {},
+  "mac": {
+    "warmup*": {
+      "missing": true,
+      "reason": "mac-shots.sh's first launch in each worker's home, to warm WebKit and the mock: its picture is never kept"
+    }
+  },
+  "ios": {
+    "warmup": {
+      "missing": true,
+      "reason": "ios-shots.sh's first launch, to warm the simulator: its picture is never kept"
+    },
+    "*-settle": {
+      "missing": true,
+      "reason": "ios-shots.sh's launch after the appearance changes (it can come up behind the home screen): its picture is never kept"
+    }
+  },
+  "windows": {
+    "sign-in-working": {
+      "max_dominant": 0.995,
+      "reason": "\"Logging you in\": a spinner, a line and two buttons in the middle of an empty window, as it is meant to be while the school's page signs in behind it"
+    }
+  }
+}

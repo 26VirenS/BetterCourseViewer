@@ -16,19 +16,34 @@ xcrun simctl status_bar booted override --time 9:41 --batteryState charged --bat
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
 
 # launch <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it:
-# -SimplDemo), then a picture after <wait> seconds. The mock is the one at BASE (http://localhost:8800 unless set) — or,
-# with BASE=test-school, the app's own test school: test.simpl.com picked as a student picks it, no address given, its
-# Canvas answered inside the app (ios/SimplCourses/Web/TestSchool.swift), no server
+# -SimplDemo), then a picture once the app says it has settled — "[Simpl Courses] shot: settled" on its console
+# (Native/Engine.swift, watchForSettled: its screens up, the page's answers in, nothing asked for a moment) — <wait>
+# seconds at most. A picture of what the app's answers do not say (a tool's page loading in its sheet, the school's
+# sign-in page, a launch only to settle the simulator) waits the whole <wait> (SETTLE=no). The mock is the one at BASE
+# (http://localhost:8800 unless set) — or, with BASE=test-school, the app's own test school: test.simpl.com picked as a
+# student picks it, no address given, its Canvas answered inside the app (ios/SimplCourses/Web/TestSchool.swift), no
+# server
 launch() {
   local name="$1" wait="$2"
   shift 2
   local school=(-SimplBaseURL "${BASE:-http://localhost:8800}")
   [ "${BASE:-}" = "test-school" ] && school=(-canvasHost test.simpl.com)
+  local settle="${SETTLE:-yes}"
+  case "$name $*" in *warmup*|*-settle*|*" tool:"*|test-01-sign-in*) settle=no ;; esac
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
-  sleep 1
-  xcrun simctl launch --console-pty booted "$BID" "${school[@]}" -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
-  sleep "$wait"
-  xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
+  sleep 0.5
+  xcrun simctl launch --console-pty booted "$BID" "${school[@]}" -setupOpened YES -SimplDemo YES -SimplShotSettle YES "$@" > "$OUT/console-$name.txt" 2>&1 &
+  local t0=$SECONDS i=0
+  while [ $i -lt $((wait * 4)) ]; do
+    [ "$settle" = yes ] && grep -q "shot: settled" "$OUT/console-$name.txt" 2>/dev/null && break
+    sleep 0.25
+    i=$((i + 1))
+  done
+  [ "$settle" = yes ] && sleep 0.5 # (the frame after the last change drawn)
+  local how="after ${wait}s"
+  [ $i -lt $((wait * 4)) ] && how="settled"
+  xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name ($((SECONDS - t0))s, $how)" || echo "no shot $name"
+  echo "$name $((SECONDS - t0))s $how" >> "$OUT/shot-times.txt"
 }
 
 # the app's crash reports and its own log lines, kept with the pictures (a picture of the home screen is an app
