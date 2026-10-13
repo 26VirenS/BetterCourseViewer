@@ -10,6 +10,8 @@ extension Notification.Name {
 /// The school sign-in the student chose to keep ("Stay logged in?"): the username and password, for
 /// the one sign-in page they were given on. In the iPhone's Keychain, this device only, readable only
 /// while it is unlocked; never synced, never backed up, and only ever typed into that page's own form.
+/// (Mac 1.3.76) On a Mac, inside Simpl instead: Application Support ▸ Simpl ▸ login.bin, sealed by its vault
+/// (mac/Simpl/Support/Vault.swift); one kept in the login Keychain before is moved there.
 struct SavedLogin: Codable, Equatable {
     var host: String
     var user: String
@@ -26,17 +28,27 @@ enum LoginVault {
     }
 
     static func load() -> SavedLogin? {
+        #if os(macOS)
+        _ = moved
+        guard let saved = Vault.read(from: file, purpose: "login"), !saved.legacy else { return nil }
+        return try? JSONDecoder().decode(SavedLogin.self, from: saved.data)
+        #else
         var q = query()
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
         guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
         return try? JSONDecoder().decode(SavedLogin.self, from: data)
+        #endif
     }
 
     @discardableResult
     static func save(_ login: SavedLogin) -> Bool {
         guard let data = try? JSONEncoder().encode(login) else { return false }
+        #if os(macOS)
+        _ = moved
+        let ok = Vault.write(data, to: file, purpose: "login")
+        #else
         SecItemDelete(query() as CFDictionary)
         var q = query()
         q[kSecValueData as String] = data
@@ -44,14 +56,36 @@ enum LoginVault {
         q[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         #endif
         let ok = SecItemAdd(q as CFDictionary, nil) == errSecSuccess
+        #endif
         NotificationCenter.default.post(name: .simplLoginChanged, object: nil)
         return ok
     }
 
     static func clear() {
-        SecItemDelete(query() as CFDictionary)
+        #if os(macOS)
+        try? FileManager.default.removeItem(at: file)
+        #endif
+        SecItemDelete(query() as CFDictionary) // (on a Mac too: a sign-in kept in its Keychain before 1.3.76)
         NotificationCenter.default.post(name: .simplLoginChanged, object: nil)
     }
+
+    #if os(macOS)
+    /// (Mac 1.3.76) Where a Mac keeps it: a file of Simpl's own, sealed by its vault.
+    private static var file: URL { Vault.folder.appendingPathComponent("login.bin") }
+
+    /// A sign-in a Mac kept in its login Keychain before 1.3.76, moved into the vault once a launch at most: written
+    /// there (unless the vault holds one already), then deleted from the Keychain — kept there if it could not be written.
+    private static let moved: Void = {
+        var q = LoginVault.query()
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return }
+        let file = LoginVault.file
+        if !FileManager.default.fileExists(atPath: file.path), !Vault.write(data, to: file, purpose: "login") { return }
+        SecItemDelete(LoginVault.query() as CFDictionary)
+    }()
+    #endif
 }
 
 /// The app's side of signing in. Web/login.js (in a world of its own on every page) says what a page

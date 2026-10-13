@@ -509,7 +509,7 @@ private struct GeneralPane: View {
             } header: {
                 Text("Sign-In")
             } footer: {
-                Text("Kept in this Mac’s Keychain only: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too.")
+                Text(GeneralPane.keptNote)
                     .foregroundStyle(.secondary)
             }
             if settings.live {
@@ -540,6 +540,12 @@ private struct GeneralPane: View {
         } message: {
             Text("Simpl will ask for your username and password the next time your school does.")
         }
+    }
+
+    /// (1.3.76) Where the saved sign-in is: inside Simpl, encrypted, its key held as Support/Vault.swift says.
+    private static var keptNote: String {
+        let key = Vault.keyHolder.map { ", encrypted with a key \($0)" } ?? ""
+        return "Kept inside Simpl on this Mac only\(key): never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too."
     }
 }
 
@@ -763,6 +769,16 @@ private struct DataPane: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            // (1.3.76) what Simpl keeps here, encrypted, and where its key is (Support/Vault.swift)
+            Section {
+                LabeledContent {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.secondary)
+                } label: {
+                    Text("Encryption")
+                    Text(DataPane.encryptionNote)
+                }
+            }
             // (1.2.4) always here, signed in or not: the way out of anything
             Section {
                 LabeledContent {
@@ -782,6 +798,12 @@ private struct DataPane: View {
         } message: {
             Text("Your settings, grade history, goals, saved pages, reminders and \(session.lmsName) sign-in are erased from this Mac. Simpl then restarts as if it were new. This can’t be undone.")
         }
+    }
+
+    /// (1.3.76) The Encryption row's line: what is encrypted, and where its key is (Support/Vault.swift).
+    private static var encryptionNote: String {
+        let key = Vault.keyHolder.map { "Its key is \($0)." } ?? "Its key is kept in a file beside it: neither a Secure Enclave nor the Keychain would take it."
+        return "Simpl’s data on this Mac is encrypted (AES-256). " + key
     }
 }
 

@@ -13,6 +13,10 @@ struct SimplApp: App {
     @StateObject private var session = AppSession()
     @StateObject private var model = AppModel.shared
 
+    init() {
+        Vault.prepare() // (1.3.76: what Simpl keeps is sealed; its vault opened off the main thread before the first read)
+    }
+
     var body: some Scene {
         Window("Simpl", id: "main") {
             ContentView()

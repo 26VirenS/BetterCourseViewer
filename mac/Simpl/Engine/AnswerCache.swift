@@ -3,7 +3,9 @@ import Foundation
 
 /// What the screens were last told, kept on disk for the school signed in to (1.2): a screen opens on what it showed
 /// last time at once, and the live answer replaces it when it is in. Only reads are kept (never an action's answer, a
-/// quiz, a search); a count is never shown from here (`liveCount()`); signing out clears it all.
+/// quiz, a search); a count is never shown from here (`liveCount()`); signing out clears it all. (1.3.76) Each answer is
+/// sealed by the vault (Support/Vault.swift), under a name of the vault's that says nothing of what it holds; the ones
+/// kept in plain JSON before are let go (it is only a cache).
 @MainActor
 final class AnswerCache {
     /// The reads a screen may open on, by their call's name (BCVNative.call).
@@ -26,11 +28,13 @@ final class AnswerCache {
         let dir = self.dir
         disk.async {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            AnswerCache.dropPlain(dir)
             AnswerCache.prune(dir)
         }
     }
 
-    /// The file a read is kept in: its name and its arguments, in a stable order.
+    /// The read's own name: its name and its arguments, in a stable order (what it is held by in memory, and what the
+    /// vault names and seals its file by, as "answers:" and this).
     static func file(_ name: String, _ args: [String: Any]) -> String? {
         guard reads.contains(name), JSONSerialization.isValidJSONObject(args),
               let a = try? JSONSerialization.data(withJSONObject: args, options: [.sortedKeys]) else { return nil }
@@ -42,7 +46,9 @@ final class AnswerCache {
     func data(_ name: String, _ args: [String: Any]) -> Data? {
         guard let f = AnswerCache.file(name, args) else { return nil }
         if let d = memory[f] { return d }
-        guard let d = try? Data(contentsOf: dir.appendingPathComponent(f)) else { return nil }
+        let purpose = "answers:" + f
+        guard let sealed = try? Data(contentsOf: dir.appendingPathComponent(Vault.fileName(purpose))),
+              let d = Vault.open(sealed, purpose: purpose) else { return nil }
         remember(f, d)
         return d
     }
@@ -57,11 +63,12 @@ final class AnswerCache {
     func keep(_ data: Data, _ name: String, _ args: [String: Any]) {
         guard !stopped, let f = AnswerCache.file(name, args) else { return }
         remember(f, data)
-        let url = dir.appendingPathComponent(f)
+        let purpose = "answers:" + f
+        let url = dir.appendingPathComponent(Vault.fileName(purpose))
         let dir = self.dir
         disk.async {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try? data.write(to: url, options: .atomic)
+            Vault.write(data, to: url, purpose: purpose)
         }
     }
 
@@ -83,12 +90,12 @@ final class AnswerCache {
     }
 
     /// (1.2.4) Every school's kept answers, gone from disk at once (Reset Everything): only the files this cache writes
-    /// (a SHA-256 name, .json) and the folders they leave empty.
+    /// (the vault's 32 hex digits; before 1.3.76 a SHA-256 name, .json) and the folders they leave empty.
     static func eraseAll() {
         let fm = FileManager.default
         guard let base = fm.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("Answers", isDirectory: true),
               let schools = try? fm.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) else { return }
-        let ours = try? NSRegularExpression(pattern: "^[0-9a-f]{64}\\.json$")
+        let ours = try? NSRegularExpression(pattern: "^([0-9a-f]{32}|[0-9a-f]{64}\\.json)$")
         for school in schools {
             for f in (try? fm.contentsOfDirectory(at: school, includingPropertiesForKeys: nil)) ?? [] {
                 let name = f.lastPathComponent
@@ -97,6 +104,16 @@ final class AnswerCache {
             if (try? fm.contentsOfDirectory(atPath: school.path))?.isEmpty == true { try? fm.removeItem(at: school) }
         }
         if (try? fm.contentsOfDirectory(atPath: base.path))?.isEmpty == true { try? fm.removeItem(at: base) }
+    }
+
+    /// (1.3.76) The answers kept in plain JSON before they were sealed (a SHA-256 name, .json), let go.
+    private nonisolated static func dropPlain(_ dir: URL) {
+        let fm = FileManager.default
+        let plain = try? NSRegularExpression(pattern: "^[0-9a-f]{64}\\.json$")
+        for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] {
+            let name = f.lastPathComponent
+            if plain?.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil { try? fm.removeItem(at: f) }
+        }
     }
 
     /// What has not been read in a month, let go (a course long finished, an assignment looked at once).

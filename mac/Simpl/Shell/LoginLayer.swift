@@ -36,8 +36,14 @@ struct LoginLayer: View {
             Button("Not Now", role: .cancel) { assist.stay(false) }
             Button("Stay Logged In") { assist.stay(true) }
         } message: {
-            Text("Simpl keeps your username and password on this Mac only, locked in your Keychain, and signs you in when your school asks again. Two-step codes still come to you.")
+            Text(LoginLayer.stayNote)
         }
+    }
+
+    /// (1.3.76) Where the username and password go: inside Simpl, encrypted, its key held as Support/Vault.swift says.
+    private static var stayNote: String {
+        let kept = Vault.keyHolder.map { "encrypted inside Simpl with a key \($0)" } ?? "inside Simpl"
+        return "Simpl keeps your username and password on this Mac only, \(kept), and signs you in when your school asks again. Two-step codes still come to you."
     }
 }
 

@@ -4,8 +4,8 @@ import WebKit
 
 /// Reset Everything (1.2.4): all Simpl keeps on this Mac erased — the extension's storage (settings, grade history,
 /// goals, every flag), the pages kept for a fast start, the sign-in (the school's cookies and site data, the saved
-/// login), the reminders and alerts, every preference of the app's own — and Simpl opened again, as on its first run.
-/// Only what Simpl itself wrote is touched.
+/// login), the reminders and alerts, every preference of the app's own, (1.3.76) the vault's key — and Simpl opened
+/// again, as on its first run. Only what Simpl itself wrote is touched.
 @MainActor
 enum EraseAll {
     static func run(_ engine: Engine?) async {
@@ -21,7 +21,7 @@ enum EraseAll {
         centre.removeAllPendingNotificationRequests()
         centre.removeAllDeliveredNotifications()
 
-        // the sign-in: the cookies kept in the keychain, the saved login, and every bit of the school's site data
+        // the sign-in: the cookies kept for the next launch, the saved login, and every bit of the school's site data
         CookieJar.shared.clear()
         LoginVault.clear()
         await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
@@ -31,6 +31,12 @@ enum EraseAll {
         // what is kept on disk: the extension's storage and the answers kept for a fast start
         Bridge.shared.eraseStorage()
         AnswerCache.eraseAll()
+
+        // (1.3.76) the vault's key, gone (Support/Vault.swift): nothing it sealed can be read again. The flashcards stay,
+        // as they always have: read under the old key, sealed again under a new one
+        let cards = FlashcardStore.shared
+        Vault.erase()
+        cards.write()
 
         // every preference of the app's own (the window, the views chosen, the tour, what was asked already)
         let id = Bundle.main.bundleIdentifier ?? "com.simplcourses.mac"

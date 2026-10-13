@@ -3,6 +3,8 @@ import Foundation
 /// The extension's `storage.local`: one JSON file in Application Support, mirrored in memory.
 /// Values are whatever the scripts store (settings, per-user preferences, cached Canvas responses).
 /// Called on the main thread by the bridge; the file write is coalesced and done off it.
+/// (Mac 1.3.76) On a Mac the file is sealed by Simpl's vault (mac/Simpl/Support/Vault.swift); one written before,
+/// in plain JSON, is read as it is and written again sealed. The iPhone's stays as it was (the app's own sandbox).
 final class BridgeStore {
     private var data: [String: Any] = [:]
     private let fileURL: URL
@@ -14,9 +16,16 @@ final class BridgeStore {
         let dir = support.appendingPathComponent("SimplCourses", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("storage.json")
+        #if os(macOS)
+        if let saved = Vault.read(from: fileURL, purpose: "storage"), let object = try? JSONSerialization.jsonObject(with: saved.data) as? [String: Any] {
+            data = object
+            if saved.legacy { scheduleSave() }
+        }
+        #else
         if let saved = try? Data(contentsOf: fileURL), let object = try? JSONSerialization.jsonObject(with: saved) as? [String: Any] {
             data = object
         }
+        #endif
     }
 
     /// Chrome's shapes: nothing/null = everything, a key, a list of keys, or {key: default}.
@@ -87,7 +96,11 @@ final class BridgeStore {
         let url = fileURL
         let work = DispatchWorkItem {
             guard JSONSerialization.isValidJSONObject(snapshot), let bytes = try? JSONSerialization.data(withJSONObject: snapshot) else { return }
+            #if os(macOS)
+            Vault.write(bytes, to: url, purpose: "storage")
+            #else
             try? bytes.write(to: url, options: .atomic)
+            #endif
         }
         pendingSave = work
         queue.asyncAfter(deadline: .now() + 0.3, execute: work)

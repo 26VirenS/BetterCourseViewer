@@ -75,7 +75,8 @@ struct FCDeck: Codable, Identifiable, Hashable {
 }
 
 /// The sets, kept in a file of the app's own in Application Support; a change is written at once, except typing in the
-/// editor, which is written once a pause comes.
+/// editor, which is written once a pause comes. (1.3.76) The file is sealed by the vault (Support/Vault.swift); one kept
+/// before, in plain JSON, is read as it is and written again sealed. A set exported goes where the student puts it, plain.
 @MainActor
 final class FlashcardStore: ObservableObject {
     static let shared = FlashcardStore()
@@ -91,8 +92,9 @@ final class FlashcardStore: ObservableObject {
     }
 
     init() {
-        if let file, let data = try? Data(contentsOf: file), let list = try? JSONDecoder().decode([FCDeck].self, from: data) {
+        if let file, let saved = Vault.read(from: file, purpose: "flashcards"), let list = try? JSONDecoder().decode([FCDeck].self, from: saved.data) {
             decks = list
+            if saved.legacy { write() }
         }
     }
 
@@ -137,7 +139,7 @@ final class FlashcardStore: ObservableObject {
         pending?.cancel()
         pending = nil
         guard let file, let data = try? JSONEncoder().encode(decks) else { return }
-        try? data.write(to: file, options: .atomic)
+        Vault.write(data, to: file, purpose: "flashcards")
     }
 }
 
