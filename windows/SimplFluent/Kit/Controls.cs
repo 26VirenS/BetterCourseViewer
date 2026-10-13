@@ -43,6 +43,9 @@ public sealed class SelectorBar : Grid
         Children.Add(overlay);
         Paint();
         LayoutUpdated += (_, _) => Place(false);
+        // (the last layout can come before the choices are loaded — a bar opened with the rest of a sheet: placed once
+        //  they are, not left at the corner)
+        Loaded += (_, _) => Dispatcher.BeginInvoke(() => Place(false), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     public int Selected => selected;
