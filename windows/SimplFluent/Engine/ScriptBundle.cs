@@ -97,11 +97,19 @@ public static class ScriptBundle
         string AtEnd(string body) =>
             $"(function(){{{guardJs}var go=function(){{{body}\n}};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go,{{once:true}});else go();}})();";
 
-        void Add(string path, bool atStart)
+        // A script WebView2 runs as a document is created runs before the document has its root (<html>), where a
+        // browser runs an extension's document_start script with the root there: one that touches the page is run as
+        // soon as the root is there (at once when it already is), before anything of the page's own — or its first
+        // touch of document.documentElement fails (the screenshot suite's page-errors.log said so, every start).
+        string AtRoot(string body) =>
+            $"(function(){{{guardJs}var go=function(){{{body}\n}};if(document.documentElement)go();else{{var o=new MutationObserver(function(){{if(document.documentElement){{o.disconnect();go();}}}});o.observe(document,{{childList:true}});}}}})();";
+
+        void Add(string path, bool atStart, bool page = false)
         {
             if (!seen.Add(path)) return;
             var body = $"try{{\n{File(path)}\n}}catch(e){{console.error('[Simpl Courses] {path} failed',e)}}";
-            scripts.Add(atStart ? $"(function(){{{guardJs}{body}\n}})();\n//# sourceURL=simpl-courses/{path}" : AtEnd(body) + $"\n//# sourceURL=simpl-courses/{path}");
+            var wrapped = !atStart ? AtEnd(body) : page ? AtRoot(body) : $"(function(){{{guardJs}{body}\n}})();";
+            scripts.Add(wrapped + $"\n//# sourceURL=simpl-courses/{path}");
         }
 
         // 1. the bridge that stands in for the browser-extension APIs, with the manifest baked in
@@ -126,17 +134,17 @@ public static class ScriptBundle
             var js = (entry["js"] as JsonArray)?.Select(n => n?.ToString() ?? "").ToList() ?? new List<string>();
             if (js.Contains("content/sniff.js")) continue; // (the browsers' finder of a school's Canvas: the school is chosen in the app)
             var atStart = entry["run_at"]?.ToString() == "document_start";
-            foreach (var path in js) Add(path, atStart);
+            foreach (var path in js) Add(path, atStart, page: true);
             foreach (var path in (entry["css"] as JsonArray)?.Select(n => n?.ToString() ?? "") ?? Enumerable.Empty<string>()) css.Add(File(path));
         }
         var early = new List<string>
         {
-            $"(function(){{{guardJs}var m=document.querySelector('meta[name=viewport]');if(!m){{m=document.createElement('meta');m.name='viewport';(document.head||document.documentElement).appendChild(m);}}m.content={vpLit};}})();",
+            AtRoot($"var m=document.querySelector('meta[name=viewport]');if(!m){{m=document.createElement('meta');m.name='viewport';(document.head||document.documentElement).appendChild(m);}}m.content={vpLit};"),
         };
         if (css.Count > 0)
         {
             // before first paint, then moved to the end of <body> so it wins ties with Canvas's own stylesheets
-            early.Add($"(function(){{{guardJs}var s=document.createElement('style');s.id='bcv-css';s.textContent={Json.Str(string.Join("\n", css))};(document.head||document.documentElement).appendChild(s);}})();");
+            early.Add(AtRoot($"var s=document.createElement('style');s.id='bcv-css';s.textContent={Json.Str(string.Join("\n", css))};(document.head||document.documentElement).appendChild(s);"));
             scripts.Add(AtEnd("var s=document.getElementById('bcv-css');if(s&&document.body)document.body.appendChild(s);"));
         }
         scripts.InsertRange(2, early);
