@@ -151,7 +151,7 @@ struct ExternalToolsView: View {
             NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        try? await Task.sleep(nanoseconds: UserDefaults.standard.string(forKey: "SimplShotFile") != nil ? 1_500_000_000 : 600_000_000)
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
     }
@@ -311,6 +311,9 @@ private struct ToolCard: View {
     /// When its list last closed: a press that closed it (a transient popover closes as the mouse goes down outside it)
     /// must not open it again as the mouse comes up.
     @State private var closedAt = Date.distantPast
+    /// Whether this card's list is showing — the card's own, as a pinned tool keeps its popover's, kept in step with the
+    /// page's `listed` (which card's list is open) both ways.
+    @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color { Color(hex: tool.courses.first?.color ?? "#8e8e93") }
@@ -352,13 +355,12 @@ private struct ToolCard: View {
         .animation(.easeOut(duration: 0.1), value: pressed)
         .animation(Motion.hover, value: hover || listed)
         .onHover { hover = $0 }
-        .onChange(of: listed) { _, on in if !on { closedAt = Date() } }
-        .popover(isPresented: $listed, arrowEdge: .trailing) {
-            ToolPlacesList(tool: tool, tint: tint, choose: choose, close: { listed = false })
-                // (the screenshot suite's console: when a list shows and goes)
-                .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) } }
-                .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) } }
+        .onChange(of: listed) { _, on in
+            if !on { closedAt = Date() }
+            if shown != on { shown = on }
         }
+        .onChange(of: shown) { _, on in if listed != on { listed = on } }
+        .onAppear { if listed && !shown { shown = true } }
     }
 
     /// The card's own button, the whole card under what it says: it tells the card when it is held, for the card to give.
@@ -368,7 +370,7 @@ private struct ToolCard: View {
         var next = ""
         if let n = tool.nextShown { next = "Next: \(n.title), \(n.line)" }
         return Button {
-            if Date().timeIntervalSince(closedAt) > 0.3 { listed = true }
+            if Date().timeIntervalSince(closedAt) > 0.3 { shown = true }
         } label: {
             shape.fill(Color.clear).contentShape(shape)
         }
@@ -377,6 +379,14 @@ private struct ToolCard: View {
         .accessibilityLabel(label)
         .accessibilityValue(next)
         .accessibilityHint(tool.chooseHelp)
+        // (the list hangs from this button — the whole card, under its words — not from the card's glass surface over
+        // it, from which a popover did not show)
+        .popover(isPresented: $shown, arrowEdge: .trailing) {
+            ToolPlacesList(tool: tool, tint: tint, choose: choose, close: { shown = false })
+                // (the screenshot suite's console: when a list shows and goes)
+                .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) } }
+                .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) } }
+        }
     }
 
     private var header: some View {
