@@ -148,6 +148,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01-dashboard 12
   shoot light-01d-dashboard-counter 14 -SimplSheet next
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
+  # (1.3.78) the row of six: the first tile's panel from its left edge, the last one's from its right; and the row with
+  # the sidebar folded away, each symbol beside its name
+  shoot light-01e-counter-first 14 -SimplSheet today
+  shoot light-01f-counter-last 14 -SimplSheet graded
+  shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
   shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
   shoot light-21f-alta-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable" # (1.3.73: the toolbar's pins on the popup's own bar)
