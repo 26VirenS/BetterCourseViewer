@@ -82,8 +82,10 @@ internal sealed class CellExplorerTool : Grid
     }
 }
 
-/// <summary>The options Cell Explorer remembers (spec §3.2: Prefs SimplBio.cell.&lt;field&gt;) — the cutaway, the labels
-/// and the scale — read once a run; and what a launch asks of it (spec §9: the pictures' states).</summary>
+/// <summary>The options Cell Explorer remembers (spec §3.2: Prefs SimplBio.cell.&lt;field&gt;, the Mac's names) — the
+/// cutaway, the labels, the scale, the bacterium's wall, each cell's hidden parts and the membrane page's switches — read
+/// once a run; and what a
+/// launch asks of it (spec §9: the pictures' states).</summary>
 internal static class CellExplorerSettings
 {
     private static bool loaded;
@@ -95,45 +97,85 @@ internal static class CellExplorerSettings
         CellExplorerModel.Cutaway = BioPrefs.Bool("cell", "cutaway", true);
         CellExplorerModel.Labels = BioPrefs.Bool("cell", "labels", true);
         CellExplorerModel.TrueScale = BioPrefs.Bool("cell", "trueScale", false);
+        CellExplorerModel.GramPositive = BioPrefs.Bool("cell", "gramPositive", false);
+        CellExplorerModel.MembraneLabels = BioPrefs.Bool("cell", "membrane.labels", true);
+        CellExplorerModel.MembraneCholesterol = BioPrefs.Bool("cell", "membrane.cholesterol", true);
+        CellExplorerModel.MembraneSugars = BioPrefs.Bool("cell", "membrane.sugars", true);
+        CellExplorerModel.MembraneTransport = BioPrefs.Bool("cell", "membrane.transport", true);
+        CellExplorerModel.MembraneOsmosis = BioPrefs.Bool("cell", "membrane.osmosis", false);
+        // (each cell's parts hidden, as last left; never set: the "(Nice)" parts that start off)
+        foreach (var k in Enum.GetValues<CEKind>())
+        {
+            string? saved;
+            try { saved = BioPrefs.String("cell", "hidden." + k.Id()); }
+            catch (InvalidOperationException) { saved = null; }
+            if (saved == null) continue;
+            var s = CellExplorerModel.Cell(k);
+            s.Hidden.Clear();
+            foreach (var p in saved.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                if (CEParts.Part(k, p) != null) s.Hidden.Add(p);
+        }
     }
 
-    /// <summary>An option the student changed, kept for next time.</summary>
+    /// <summary>A cell's hidden parts, kept for next time (the Mac's "hidden.animal").</summary>
+    public static void SaveHidden(CEKind k) =>
+        BioPrefs.Set("cell", "hidden." + k.Id(), string.Join(",", CellExplorerModel.Cell(k).Hidden.OrderBy(h => h, StringComparer.Ordinal)));
+
+    /// <summary>The options the student changed, kept for next time.</summary>
     public static void Save()
     {
         BioPrefs.Set("cell", "cutaway", CellExplorerModel.Cutaway);
         BioPrefs.Set("cell", "labels", CellExplorerModel.Labels);
         BioPrefs.Set("cell", "trueScale", CellExplorerModel.TrueScale);
+        BioPrefs.Set("cell", "gramPositive", CellExplorerModel.GramPositive);
+        BioPrefs.Set("cell", "membrane.labels", CellExplorerModel.MembraneLabels);
+        BioPrefs.Set("cell", "membrane.cholesterol", CellExplorerModel.MembraneCholesterol);
+        BioPrefs.Set("cell", "membrane.sugars", CellExplorerModel.MembraneSugars);
+        BioPrefs.Set("cell", "membrane.transport", CellExplorerModel.MembraneTransport);
+        BioPrefs.Set("cell", "membrane.osmosis", CellExplorerModel.MembraneOsmosis);
     }
 
     /// <summary>
-    /// A launch's state (never remembered): the page first (animal, plant, bacterium, membrane, compare, or --bio-cell), then
-    /// any of <c>whole</c> (no cutaway), <c>true</c> (true scale), <c>labels=off</c>, <c>explode=0.6</c>, <c>gram=positive</c>,
-    /// <c>show=flagellum</c>, <c>hide=capsule</c>, <c>select=mito</c>, <c>isolate=mito</c>, <c>inside</c> (look inside the
-    /// isolated part), <c>quiz=find|name</c>; on the membrane page <c>osmosis</c>, <c>plain</c> (no cholesterol, sugars or
-    /// other proteins) and <c>select=integral:channel</c>.
+    /// A launch's state (never remembered), in the Mac's words: the page first (animal, plant, bacterium, membrane, compare,
+    /// or --bio-cell), then any of <c>nocut</c> (or <c>whole</c>), <c>cutaway</c>, <c>true</c>, <c>teaching</c>,
+    /// <c>nolabels</c> (or <c>labels=off</c>), <c>explode=0.6</c>, <c>gram+</c> (or <c>gram=positive</c>), <c>show=flagellum</c>,
+    /// <c>hide=capsule</c>, <c>select=mito</c>, <c>isolate=mito</c>, <c>inside=chloroplast</c> (or <c>isolate=…:inside</c>),
+    /// <c>quiz=find|name</c>; on the membrane page <c>osmosis</c>, <c>still</c> (the carrier not at work), <c>nolabels</c>,
+    /// <c>popc</c> and <c>select=integral:channel</c>.
     /// </summary>
     public static void Apply(BioLaunchState s)
     {
         if (s.Page == null && CEKinds.FromId(s.Value("cell")) is { } asked) BioNav.Set("cell", asked.Id(), remember: false);
         var page = BioNav.Page("cell");
-        if (s.Has("whole") || s.Value("cutaway") == "off") CellExplorerModel.Cutaway = false;
-        if (s.Has("cut") || s.Value("cutaway") == "on") CellExplorerModel.Cutaway = true;
+        if (s.Has("whole") || s.Has("nocut") || s.Value("cutaway") == "off") CellExplorerModel.Cutaway = false;
+        if (s.Has("cut") || s.Has("cutaway") || s.Value("cutaway") == "on") CellExplorerModel.Cutaway = true;
         if (s.Has("true") || s.Value("scale") == "true") CellExplorerModel.TrueScale = true;
         if (s.Has("teaching") || s.Value("scale") == "teaching") CellExplorerModel.TrueScale = false;
         if (s.Value("labels") is { } labels) CellExplorerModel.Labels = labels != "off";
+        if (s.Has("nolabels")) CellExplorerModel.Labels = false;
         if (double.TryParse(s.Value("explode"), NumberStyles.Float, CultureInfo.InvariantCulture, out var e)) CellExplorerModel.Explode = Math.Clamp(e, 0, 1);
-        if (s.Value("gram") == "positive" || s.Has("gram-positive")) CellExplorerModel.GramPositive = true;
+        if (s.Value("gram") == "positive" || s.Has("gram+") || s.Has("gram-positive")) CellExplorerModel.GramPositive = true;
         if (page == "membrane")
         {
             if (s.Has("osmosis")) CellExplorerModel.MembraneOsmosis = true;
-            if (s.Has("plain")) CellExplorerModel.MembraneCholesterol = CellExplorerModel.MembraneSugars = CellExplorerModel.MembraneProteins = false;
-            if (s.Value("select") is { } part && CEMembrane.Part(part) != null) CellExplorerModel.MembraneSelected = part;
+            if (s.Has("still")) CellExplorerModel.MembraneTransport = false;
+            if (s.Has("nolabels")) CellExplorerModel.MembraneLabels = false;
+            if (s.Has("popc")) CellExplorerModel.MembranePopc = true;
+            // ("select=integral:channel" arrives split at its colon: the part after "select=" rejoined)
+            var i = s.Parts.ToList().FindIndex(p => p.StartsWith("select=", StringComparison.OrdinalIgnoreCase));
+            if (i >= 0)
+            {
+                var id = s.Parts[i]["select=".Length..];
+                if (i + 1 < s.Parts.Count && CEMembrane.Part(id + ":" + s.Parts[i + 1]) != null) id += ":" + s.Parts[i + 1];
+                if (CEMembrane.Part(id) != null) CellExplorerModel.MembraneSelected = id;
+            }
             return;
         }
         if (CEKinds.FromId(page) is not { } kind) return;
         foreach (var p in (s.Value("show") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)) CellExplorerModel.Cell(kind).Hidden.Remove(p);
         foreach (var p in (s.Value("hide") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)) CellExplorerModel.Cell(kind).Hidden.Add(p);
-        if (s.Value("isolate") is { } iso && CEParts.Part(kind, iso) != null) CellExplorerModel.Isolate(kind, iso, s.Has("inside"));
+        if (s.Value("inside") is { } ins && CEScene.CanLookInside(ins) && CEParts.Part(kind, ins) != null) CellExplorerModel.Isolate(kind, ins, lookInside: true);
+        else if (s.Value("isolate") is { } iso && CEParts.Part(kind, iso) != null) CellExplorerModel.Isolate(kind, iso, s.Has("inside"));
         else if (s.Value("select") is { } sel && CEParts.Part(kind, sel) != null) CellExplorerModel.Select(kind, sel);
         if (s.Value("quiz") is { } quiz)
         {
@@ -269,9 +311,9 @@ internal static class BioSceneReach
 }
 
 /// <summary>
-/// A scale bar at the bottom left of a 3D view (spec §4.1 item 7): 1, 2 or 5 of a power of ten of the scene's unit,
-/// whichever comes out 60–160 long at the current zoom (the cells' 1, 5 or 10 µm; the bacterium's 0.5 µm; the membrane's
-/// nanometres), always shown, following the camera; with a "Not to scale" badge beside it in teaching scale.
+/// A scale bar at the bottom left of a 3D view (spec §4.1 item 7): the first of 1, 5 or 10 µm that comes out 60–160 long
+/// at the current zoom, else the nearest other length that does (a bacterium seen close needs 500 nm; the membrane is in
+/// nm), always shown, following the camera; with a "Not to scale" badge beside it in teaching scale.
 /// </summary>
 internal sealed class CellScaleBar : Grid
 {
@@ -280,13 +322,16 @@ internal sealed class CellScaleBar : Grid
     private readonly Path bar = new() { StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Flat, StrokeEndLineCap = PenLineCap.Flat, SnapsToDevicePixels = true };
     private readonly TextBlock words = K.Text("", Ty.Caption);
     private readonly ContentControl badge = new() { Focusable = false, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+    private readonly double[] preferred, others;
     private PerspectiveCamera? camera;
     private string? notToScale;
 
+    /// <summary>A bar in µm (1, 5 or 10 first) or, for the membrane, nm (5, 10 or 20 first).</summary>
     public CellScaleBar(BioSceneView scene, string unit)
     {
         this.scene = scene;
         this.unit = unit;
+        (preferred, others) = unit == "nm" ? (new[] { 5.0, 10, 20 }, new[] { 1.0, 2, 50 }) : (new[] { 1.0, 5, 10 }, new[] { 0.1, 0.2, 0.5, 2, 20, 50, 100 });
         IsHitTestVisible = false;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Bottom;
@@ -295,7 +340,11 @@ internal sealed class CellScaleBar : Grid
         words.FontWeight = FontWeights.SemiBold;
         words.Margin = new Thickness(0, 0, 0, 3);
         var stack = K.V(0, words, bar);
-        Children.Add(K.H(0, stack, badge));
+        stack.VerticalAlignment = VerticalAlignment.Bottom;
+        badge.VerticalAlignment = VerticalAlignment.Bottom;
+        var plate = K.Card(K.H(0, stack, badge), new Thickness(10, 6, 10, 7), 9);
+        plate.Opacity = 0.94;
+        Children.Add(plate);
         Loaded += (_, _) => Watch();
         Unloaded += (_, _) => { if (camera != null) camera.Changed -= OnCamera; camera = null; };
         scene.SizeChanged += (_, _) => Update();
@@ -327,21 +376,29 @@ internal sealed class CellScaleBar : Grid
         var ppu = BioSceneReach.PixelsPerUnit(scene);
         if (ppu <= 0) { Visibility = Visibility.Hidden; return; }
         Visibility = Visibility.Visible;
-        // (1, 2 or 5 × 10ⁿ, the one nearest 100 long within 60–160)
-        var best = 0.0;
-        var bestScore = double.MaxValue;
-        for (var e = -3; e <= 3; e++)
-            foreach (var m in new[] { 1.0, 2.0, 5.0 })
-            {
-                var len = m * Math.Pow(10, e);
-                var px = len * ppu;
-                var score = Math.Abs(Math.Log(px / 100)) + (px is >= 60 and <= 160 ? 0 : 10);
-                if (score < bestScore) { bestScore = score; best = len; }
-            }
-        var w = best * ppu;
+        var best = Length(ppu, preferred, others);
+        var w = Math.Clamp(best * ppu, 8, 400);
         bar.Data = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M0,0 L0,6 M0,3 L{w:0.##},3 M{w:0.##},0 L{w:0.##},6"));
-        var shown = best.ToString(best < 1 ? "0.###" : "0", CultureInfo.InvariantCulture);
-        words.Text = $"{shown} {unit}";
-        System.Windows.Automation.AutomationProperties.SetName(this, $"Scale bar: {shown} {unit}");
+        var shown = Words(best, unit);
+        words.Text = shown;
+        System.Windows.Automation.AutomationProperties.SetName(this, $"Scale bar: {shown}" + (notToScale == null ? "" : $", {notToScale.ToLowerInvariant()}"));
+    }
+
+    /// <summary>The bar's length (the Mac's choice): the first preferred length that comes out 60–160 long at this zoom, else
+    /// the shortest of all that does, else the one nearest 110 long.</summary>
+    public static double Length(double ppu, double[] preferred, double[] others)
+    {
+        static bool Fits(double px) => px is >= 60 and <= 160;
+        foreach (var l in preferred) if (Fits(l * ppu)) return l;
+        var all = preferred.Concat(others).OrderBy(l => l).ToArray();
+        foreach (var l in all) if (Fits(l * ppu)) return l;
+        return all.MinBy(l => Math.Abs(l * ppu - 110));
+    }
+
+    /// <summary>"5 µm", "500 nm" (under a micrometre in nanometres), "10 nm".</summary>
+    public static string Words(double l, string unit)
+    {
+        if (unit == "µm" && l < 1) return $"{Math.Round(l * 1000)} nm";
+        return (l == Math.Round(l) ? ((int)l).ToString(CultureInfo.InvariantCulture) : l.ToString("G", CultureInfo.InvariantCulture)) + " " + unit;
     }
 }

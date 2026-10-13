@@ -263,7 +263,8 @@ one item a material, since the view draws each selected item as a model of its o
 pieces), `CellExplorerCellPage.cs`, `CellExplorerMembranePage.cs`, `CellExplorerComparePage.cs`. Windows draws a little
 lighter than the Mac to stay near 250k triangles: tetrahedra for true scale's 20,000 ribosomes, four-sided lipid tails.
 It reads two things of `BioSceneView` through its children (`BioSceneReach`): the camera, for the scale bar, and the
-turning world, to add a layer for the membrane's osmosis animation. Launch states: `animal`, `plant`, `bacterium`,
-`membrane`, `compare`, then `whole`, `true`, `labels=off`, `explode=0.6`, `gram=positive`, `show=…`, `hide=…`,
-`select=mito`, `isolate=chloroplast`, `inside`, `quiz=find|name`; on the membrane `osmosis`, `plain`,
-`select=integral:channel`.
+turning world, to add a layer for the membrane's water and carrier. Launch states, in the Mac's words: `animal`,
+`plant`, `bacterium`, `membrane`, `compare`, then `nocut`, `true`, `nolabels`, `explode=0.6`, `gram+`, `show=…`,
+`hide=…`, `select=mito`, `isolate=mito`, `inside=chloroplast`, `quiz=find|name`; on the membrane `osmosis`, `still`,
+`nolabels`, `popc`, `select=integral:channel`. Each cell's hidden parts are kept (`SimplBio.cell.hidden.animal`).
+"Why are cells small?" hands the Bio Lab Calculator `calc=sav` with its `mode` and `r`/`l`/`w`/`h`.

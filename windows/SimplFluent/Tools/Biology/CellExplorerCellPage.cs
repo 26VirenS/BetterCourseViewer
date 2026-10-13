@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -13,13 +14,14 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Tools;
 
 /// <summary>
-/// A cell in 3D (spec §4.1), the chemistry builders' three columns (BioUI.Work): at the left the parts list — every part in
-/// its group with its colour and a box to hide it, a press opening its card — then Cutaway, Labels, Scale and Explode (and
-/// the bacterium's Gram-positive wall); in the middle the cell in its card, its name and scale badge above it, the scale
-/// bar over its corner, a banner while one part is isolated; at the right the part's card (its function, structure, size,
-/// where it is found, its common mix-up; Isolate, Zoom to, Look inside), the quiz, or "About this cell". Click a part (or
-/// its label, or its row) for its card, double-click to zoom to it, Escape to let go (or show all again), Tab through the
-/// parts list to open each card in turn.
+/// A cell in 3D (spec §4.1), the chemistry builders' three columns (BioUI.Work), laid out as the Mac's: at the left the
+/// parts list — every part in its group with its colour and a box to hide it, a press opening its card — then View
+/// (Cutaway, Labels, the bacterium's Gram-positive wall, Scale, Explode) and Learn (the two quizzes, flashcards, why cells
+/// are small); in the middle the cell in its card, its name, scale badge and "Only: …" above it, the scale bar over its
+/// corner, the hovered part's name or the quiz's question over its top; at the right the part's card (its function,
+/// structure, size, what the model draws, where it is found, its common mix-up; Isolate, Zoom to, Look inside, Done), the
+/// quiz, or "About this cell". Click a part (or its label, or its row) for its card, double-click to zoom to it, click
+/// nothing or press Escape to let go (or show all again); Tab and the arrow keys step through the parts list.
 /// </summary>
 internal sealed class CellPage : Grid
 {
@@ -29,25 +31,33 @@ internal sealed class CellPage : Grid
     private readonly Stack left = K.V(14);
     private readonly Stack right = K.V(14);
     private readonly ContentControl barTitle = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
-    private readonly ContentControl banner = new() { Focusable = false, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 10, 0, 0) };
+    private readonly ContentControl overTop = new() { Focusable = false, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 8, 0, 0), IsHitTestVisible = false };
     private readonly CellScaleBar scaleBar;
-    private readonly Border sceneCard;
 
     // (the left column's controls, made once and kept, so a slider being dragged or a row with the focus is not made again)
     private readonly ToggleSwitch cutaway = new(), labels = new(), gram = new();
-    private readonly SelectorBar scale = new(new[] { "Teaching scale", "True scale" }, 0);
+    private readonly SelectorBar scale = new(new[] { "Teaching", "True" }, 0);
+    private readonly TextBlock scaleNote = K.Wrapped("", Ty.Caption, B.Text2);
     private readonly Slider explode = new() { Minimum = 0, Maximum = 1, SmallChange = 0.05, LargeChange = 0.2, Value = 0 };
-    private readonly TextBlock explodeValue = K.Text("0%", Ty.Caption, B.Text2);
-    private readonly Stack partsList = K.V(2);
+    private readonly TextBlock explodeValue = K.Text("Off", Ty.Caption, B.Text2);
+    private readonly Stack partsList = K.V(1);
     private readonly Dictionary<string, PartRow> rows = new();
+    private readonly List<string> rowOrder = new();
     private readonly FrameworkElement gramRow;
+    private readonly Wpf.Ui.Controls.Button findQuiz, nameQuiz;
+    private readonly TextBlock madeNote = K.Wrapped("", Ty.Caption, B.Text2);
     private CEKind? rowsKind;
     private bool syncing;
 
     private readonly DispatcherTimer explodeLater = new() { Interval = TimeSpan.FromMilliseconds(45) };
-    private readonly DispatcherTimer wrongLater = new() { Interval = TimeSpan.FromMilliseconds(900) };
+    private double framedExplode;
+    /// <summary>A quiz answer shown a moment (the part it names glowing) before the quiz goes on.</summary>
+    private readonly DispatcherTimer holdLater = new();
+    private Action? afterHold;
     private string? flash;
+    private string? hovered;
     private string rightSignature = "";
+    private string overSignature = "";
 
     public CellPage(ToolContext c)
     {
@@ -60,48 +70,75 @@ internal sealed class CellPage : Grid
         var sceneHost = new Grid { ClipToBounds = true };
         sceneHost.Children.Add(scene);
         sceneHost.Children.Add(scaleBar);
-        sceneHost.Children.Add(banner);
+        sceneHost.Children.Add(overTop);
         var bar = K.Columns("*, auto", barTitle.Col(0), BioSceneCard.Buttons(scene).Col(1));
-        sceneCard = CellUI.SceneCard(bar, sceneHost);
+        var sceneCard = CellUI.SceneCard(bar, sceneHost);
 
         // (the controls)
         cutaway.Checked += (_, _) => SetOption(() => CellExplorerModel.Cutaway = true);
         cutaway.Unchecked += (_, _) => SetOption(() => CellExplorerModel.Cutaway = false);
         labels.Checked += (_, _) => SetOption(() => CellExplorerModel.Labels = true);
         labels.Unchecked += (_, _) => SetOption(() => CellExplorerModel.Labels = false);
-        gram.Checked += (_, _) => SetOption(() => CellExplorerModel.GramPositive = true, save: false);
-        gram.Unchecked += (_, _) => SetOption(() => CellExplorerModel.GramPositive = false, save: false);
+        gram.Checked += (_, _) => SetOption(() => CellExplorerModel.GramPositive = true);
+        gram.Unchecked += (_, _) => SetOption(() => CellExplorerModel.GramPositive = false);
         scale.Changed += i => SetOption(() => CellExplorerModel.TrueScale = i == 1);
         explode.ValueChanged += (_, e) =>
         {
             if (syncing) return;
             CellExplorerModel.Explode = e.NewValue;
-            explodeValue.Text = $"{Math.Round(e.NewValue * 100)}%";
+            explodeValue.Text = ExplodeWords(e.NewValue);
             explodeLater.Stop();
             explodeLater.Start();
         };
-        explodeLater.Tick += (_, _) => { explodeLater.Stop(); ShowScene(); };
-        wrongLater.Tick += (_, _) => { wrongLater.Stop(); flash = null; ApplySelection(); };
-        explode.ToolTip = "Pull the organelles apart from the cell's centre";
+        explodeLater.Tick += (_, _) =>
+        {
+            explodeLater.Stop();
+            if (Mouse.LeftButton == MouseButtonState.Released) Refit();
+            ShowScene();
+        };
+        explode.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) => { Refit(); ShowScene(); }));
+        holdLater.Tick += (_, _) =>
+        {
+            holdLater.Stop();
+            var then = afterHold;
+            afterHold = null;
+            flash = null;
+            then?.Invoke();
+            CellExplorerModel.Tell();
+        };
+        explode.ToolTip = "Move every part outward from the centre; the membrane fades";
         System.Windows.Automation.AutomationProperties.SetName(explode, "Explode");
-        scale.ToolTip = "Teaching scale enlarges the tiny parts and shows fewer of them; true scale draws them at their real sizes";
-        gramRow = CellUI.Toggle("Gram-positive wall", gram, "A thick peptidoglycan wall and no outer membrane, in place of the Gram-negative envelope");
+        scale.ToolTip = "Teaching scale draws tiny parts larger and fewer of them; true scale draws everything at its real size";
+        System.Windows.Automation.AutomationProperties.SetName(scale, "Scale");
+        gramRow = CellUI.Toggle("Gram-positive wall", gram, "A thick peptidoglycan wall and no outer membrane, instead of E. coli's thin wall and outer membrane");
+
+        // (Learn: the quizzes, flashcards, why cells are small)
+        findQuiz = ChemKit.Wide("Find the…", () => StartQuiz(CEQuizMode.Find), icon: SymbolRegular.Search20);
+        findQuiz.ToolTip = "A quiz: press the part named, ten questions";
+        nameQuiz = ChemKit.Wide("Name it", () => StartQuiz(CEQuizMode.Name), icon: SymbolRegular.QuestionCircle20);
+        nameQuiz.ToolTip = "A quiz: one part glows; choose its name from four, ten questions";
+        var cards = ChemKit.Wide("Make flashcards", MakeFlashcards, icon: SymbolRegular.Library20);
+        cards.ToolTip = "A Flashcards set of this cell's parts and what each does";
+        var why = ChemKit.Wide("Why are cells small?", WhySmall, icon: SymbolRegular.Cube20);
+        why.ToolTip = "Surface area to volume, in the Bio Lab Calculator, with this cell's size";
+        madeNote.Visibility = Visibility.Collapsed;
 
         left.Children.Add(BioUI.Heading("Parts"));
-        left.Children.Add(BioUI.Caption("Press a part to learn about it. Untick it to hide it."));
         left.Children.Add(partsList);
         left.Children.Add(BioUI.Heading("View").Margin(0, 6, 0, 0));
-        left.Children.Add(CellUI.Toggle("Cutaway", cutaway, "Cut the front of the cell away to see inside"));
-        left.Children.Add(CellUI.Toggle("Labels", labels, "Name the parts, with lines to them"));
+        left.Children.Add(CellUI.Toggle("Cutaway", cutaway, "Cut away the front upper-right eighth of the membrane, nuclear envelope and wall, showing how thick each is"));
+        left.Children.Add(CellUI.Toggle("Labels", labels, "Name the parts at the sides, with lines to them"));
         left.Children.Add(gramRow);
-        left.Children.Add(scale);
+        left.Children.Add(K.V(6, K.Text("Scale", Ty.Body), scale, scaleNote));
         left.Children.Add(K.V(4, K.Columns("*, auto", K.Text("Explode", Ty.Body).Col(0), explodeValue.Col(1)), explode));
+        left.Children.Add(BioUI.Heading("Learn").Margin(0, 6, 0, 0));
+        left.Children.Add(K.V(8, K.Columns("*, 8, *", findQuiz.Col(0), nameQuiz.Col(2)), cards, madeNote, why));
 
         Children.Add(BioUI.Work(left, sceneCard, right));
 
         CellUI.Escape(this, LetGo);
         void Changed() => Refresh();
-        void Look() { rowsKind = null; rightSignature = ""; Refresh(); }
+        void Look() { rowsKind = null; rightSignature = ""; overSignature = ""; Refresh(); }
         Loaded += (_, _) =>
         {
             CellExplorerModel.Changed -= Changed;
@@ -126,6 +163,8 @@ internal sealed class CellPage : Grid
         {
             if (kind == value && rowsKind != null) return;
             kind = value;
+            framedExplode = CellExplorerModel.Explode;
+            madeNote.Visibility = Visibility.Collapsed;
             if (CellExplorerModel.Quiz is { } q && q.Kind != value) CellExplorerModel.EndQuiz();
             Refresh();
         }
@@ -133,12 +172,21 @@ internal sealed class CellPage : Grid
 
     private CECellState State => CellExplorerModel.Cell(kind);
 
-    private void SetOption(Action set, bool save = true)
+    private void SetOption(Action set)
     {
         if (syncing) return;
         set();
-        if (save) CellExplorerSettings.Save();
+        CellExplorerSettings.Save();
         CellExplorerModel.Tell();
+    }
+
+    private static string ExplodeWords(double v) => v < 0.005 ? "Off" : $"{Math.Round(v * 100)}%";
+
+    /// <summary>After the explode slider is let go: the camera framing the cell as far apart as it now is (the Mac's).</summary>
+    private void Refit()
+    {
+        if (Math.Abs(CellExplorerModel.Explode - framedExplode) <= 0.2) return;
+        framedExplode = CellExplorerModel.Explode;
     }
 
     // ---- drawing ----
@@ -159,7 +207,8 @@ internal sealed class CellPage : Grid
         var dark = Appearance.Dark;
         var v = CellExplorerModel.View(kind, dark) with { Explode = Math.Round(CellExplorerModel.Explode * 50) / 50 };
         var key = string.Join("|", kind.Id(), o.TrueScale ? "true" : "teaching", o.Cutaway ? "cut" : "whole", o.GramPositive ? "gram+" : "gram-", v.Key);
-        scene.Show(key, () => CEScene.Content(CEBuildCache.Model(o), v), frameKey: $"{kind.Id()}|{v.Isolate}|{v.LookInside}");
+        var framed = Math.Round(framedExplode * 50) / 50;
+        scene.Show(key, () => CEScene.Content(CEBuildCache.Model(o), v), frameKey: $"{kind.Id()}|{v.Isolate}|{v.LookInside}|{framed.ToString(CultureInfo.InvariantCulture)}");
         // (when the cell is built, what the parts list and the card say of it)
         if (CEBuildCache.Built(o) == null)
             Task.Run(() => CEBuildCache.Model(o)).ContinueWith(_ => Dispatcher.BeginInvoke(() => { if (Options == o) { rightSignature = ""; Controls(); Right(); } }), TaskScheduler.Default);
@@ -169,10 +218,10 @@ internal sealed class CellPage : Grid
         var model = CEBuildCache.Built(o);
         scene.Accessibility = CEScene.Accessibility(model, kind, o.Cutaway && v.Isolate == null, State.Hidden, State.Selected);
         scaleBar.NotToScale = o.TrueScale ? null : "Not to scale";
-        Banner();
+        OverTop();
     }
 
-    /// <summary>What glows: the selected part (all of it), the quiz's part in "Name it", a wrong answer's part for a moment;
+    /// <summary>What glows: the selected part (all of it), the quiz's part in "Name it", an answer's part for a moment;
     /// nothing while the isolated part is the selected one (there is nothing else to dim), but a pore or the nucleolus
     /// picked inside the nucleus cut open.</summary>
     private void ApplySelection()
@@ -184,20 +233,44 @@ internal sealed class CellPage : Grid
         scene.Selection = sel == null ? null : "organelle:" + sel;
     }
 
-    private void Banner()
+    /// <summary>Over the scene's top: the quiz's question and what was said, else the name of the part under the pointer.</summary>
+    private void OverTop()
     {
-        var s = State;
-        if (s.Isolated is not { } iso || CEParts.Part(kind, iso) is not { } p) { banner.Content = null; return; }
-        var words = K.Text(s.LookInside ? $"Inside: {p.Name}" : $"Only: {p.Name}", Ty.BodyStrong);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var all = K.Button("Show all", () => CellExplorerModel.Isolate(kind, null), icon: SymbolRegular.ArrowExpand20);
-        all.MinWidth = 0;
-        all.ToolTip = "Show the whole cell again (Escape)";
-        var row = K.H(12, CellUI.Swatch(p.Colour.ToColor(), 14), words, all);
-        var card = K.Card(row, new Thickness(14, 8, 8, 8), 20);
-        card.Opacity = 0.96;
-        banner.Content = card;
+        var q = CellExplorerModel.Quiz;
+        var hoveredPart = hovered != null && q == null ? CEParts.Part(kind, hovered) : null;
+        var sig = string.Join("|", kind, q == null ? "-" : $"{q.Mode}{q.Index}{q.Done}", CellExplorerModel.QuizFeedback, hoveredPart?.Id, Appearance.Dark);
+        if (sig == overSignature) return;
+        overSignature = sig;
+        if (q is { Current: { } current })
+        {
+            var name = CEParts.Part(kind, current.Part)?.Name ?? current.Part;
+            var v = K.V(4, K.Text(q.Mode == CEQuizMode.Find ? $"Find the {name.ToLowerInvariant()}" : "Name the glowing part", Ty.BodyStrong).Align(HorizontalAlignment.Center, VerticalAlignment.Center));
+            v.Children.Add(CellExplorerModel.QuizFeedback is { } said
+                ? Said(said)
+                : K.Text($"Question {q.Index + 1} of {q.Questions.Count}", Ty.Caption, B.Text2).Align(HorizontalAlignment.Center, VerticalAlignment.Center));
+            var card = K.Card(v, new Thickness(16, 9, 16, 9), 14);
+            card.Opacity = 0.96;
+            overTop.Content = card;
+        }
+        else if (hoveredPart != null)
+        {
+            var words = K.Text(hoveredPart.Label, Ty.Caption);
+            words.FontWeight = FontWeights.SemiBold;
+            var pill = K.Card(words, new Thickness(10, 4, 10, 5), 12);
+            pill.Opacity = 0.94;
+            overTop.Content = pill;
+        }
+        else overTop.Content = null;
     }
+
+    /// <summary>A quiz answer's words, green with a tick when right, orange with a cross when not.</summary>
+    private static FrameworkElement Said(string said)
+    {
+        var good = Good(said);
+        return ChemKit.Line(good ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.DismissCircle20, said, good ? K.Tone("green") : K.Tone("orange"));
+    }
+
+    private static bool Good(string said) => said.StartsWith("Yes", StringComparison.Ordinal);
 
     private void Controls()
     {
@@ -209,30 +282,50 @@ internal sealed class CellPage : Grid
             gram.IsChecked = CellExplorerModel.GramPositive;
             gramRow.Visibility = kind == CEKind.Bacterium ? Visibility.Visible : Visibility.Collapsed;
             scale.Select(CellExplorerModel.TrueScale ? 1 : 0, false);
+            scaleNote.Text = CellExplorerModel.TrueScale
+                ? "Every part at its real size, with 20,000 ribosomes."
+                : "Ribosomes, vesicles and filaments drawn larger, and fewer of them, so you can see them.";
             if (Math.Abs(explode.Value - CellExplorerModel.Explode) > 1e-9) explode.Value = CellExplorerModel.Explode;
-            explodeValue.Text = $"{Math.Round(CellExplorerModel.Explode * 100)}%";
+            explodeValue.Text = ExplodeWords(CellExplorerModel.Explode);
             var isolated = State.Isolated != null;
             explode.IsEnabled = !isolated;
             explode.Opacity = isolated ? 0.5 : 1;
+            var quiz = CellExplorerModel.Quiz != null;
+            findQuiz.IsEnabled = !quiz;
+            nameQuiz.IsEnabled = !quiz;
         }
         finally { syncing = false; }
         Bar();
         Parts();
     }
 
+    /// <summary>The scene card's top bar: the cell's name, its scale badge, and while one part is isolated "Only: …" (or
+    /// "Inside: …"), which shows the whole cell again.</summary>
     private void Bar()
     {
         var o = Options;
-        var badge = o.TrueScale ? K.Chip("True scale", K.Tone("green"), strong: true) : K.Chip("Not to scale", K.Tone("orange"), strong: true);
-        badge.ToolTip = o.TrueScale ? "Every part at its real size" : "Tiny parts are drawn larger, and fewer of the many, so you can see them";
-        barTitle.Content = K.H(10, K.Text(kind.Title(), Ty.Subtitle), badge);
+        var badge = o.TrueScale ? K.Chip("True scale", K.Tone("green"), strong: true) : K.Chip("Teaching scale", K.Tone("orange"), strong: true);
+        badge.ToolTip = o.TrueScale ? "Every part at its real size" : "Small parts drawn larger than they are, and fewer of them";
+        var title = K.Text(kind.Title(), Ty.Subtitle);
+        title.VerticalAlignment = VerticalAlignment.Center;
+        var h = K.H(10, title, badge);
+        var s = State;
+        if (s.Isolated is { } iso && CEParts.Part(kind, iso) is { } p)
+        {
+            var only = K.Button(s.LookInside ? $"Inside: {p.Label}" : $"Only: {p.Label}", () => CellExplorerModel.Isolate(kind, null), accent: true, icon: SymbolRegular.DismissCircle20);
+            only.MinWidth = 0;
+            only.ToolTip = "Show the whole cell again (Escape)";
+            h.Children.Add(only);
+        }
+        barTitle.Content = h;
     }
 
     // ---- the parts list ----
 
-    /// <summary>A row of the parts list: its box (shown or hidden), and its button (its swatch and name; a press opens its card).</summary>
+    /// <summary>A row of the parts list: its box (shown or hidden), and its button (its swatch and label; a press opens its card).</summary>
     private sealed class PartRow
     {
+        public required CEPart Part { get; init; }
         public required CheckBox Box { get; init; }
         public required Button Button { get; init; }
         public required Border Wash { get; init; }
@@ -245,30 +338,35 @@ internal sealed class CellPage : Grid
         {
             rowsKind = kind;
             rows.Clear();
+            rowOrder.Clear();
             partsList.Children.Clear();
             var parts = CEParts.All(kind);
             foreach (var g in CEGroups.All)
             {
                 var inGroup = parts.Where(p => p.Group == g).ToList();
                 if (inGroup.Count == 0) continue;
-                partsList.Children.Add(K.Text(g.Title(), Ty.Caption, B.Text2).Strong().Margin(2, partsList.Children.Count == 0 ? 0 : 10, 0, 2));
+                partsList.Children.Add(K.Text(g.Title(), Ty.Caption, B.Text2).Strong().Margin(2, partsList.Children.Count == 0 ? 0 : 11, 0, 3));
                 foreach (var p in inGroup) partsList.Children.Add(Row(p));
             }
+            System.Windows.Automation.AutomationProperties.SetName(partsList, $"Parts of the {kind.Title().ToLowerInvariant()}");
         }
         var model = CEBuildCache.Built(Options);
         var s = State;
         var quiz = CellExplorerModel.Quiz != null;
         foreach (var (id, r) in rows)
         {
+            var on = !s.Hidden.Contains(id);
             var drawn = model == null || model.PartsShown.Contains(id);
-            r.Box.IsChecked = !s.Hidden.Contains(id);
+            r.Box.IsChecked = on;
             r.Box.IsEnabled = drawn && !quiz;
+            r.Box.ToolTip = on ? $"Hide the {r.Part.Label.ToLowerInvariant()}" : $"Show the {r.Part.Label.ToLowerInvariant()}";
             r.Button.IsEnabled = !quiz;
-            r.Name.Opacity = drawn ? 1 : 0.55;
-            var on = s.Selected == id;
-            r.Wash.Opacity = on ? 0.16 : 0;
-            r.Name.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
-            System.Windows.Automation.AutomationProperties.SetName(r.Button, on ? $"{r.Name.Text}, selected" : r.Name.Text);
+            r.Name.Opacity = on && drawn ? 1 : 0.55;
+            var selected = s.Selected == id;
+            r.Wash.Opacity = selected ? 0.16 : 0;
+            r.Name.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+            System.Windows.Automation.AutomationProperties.SetName(r.Button, selected ? $"{r.Part.Name}, selected" : r.Part.Name);
+            System.Windows.Automation.AutomationProperties.SetHelpText(r.Button, on ? "Shows its card" : "Hidden in the model; shows its card");
         }
     }
 
@@ -276,29 +374,44 @@ internal sealed class CellPage : Grid
     {
         var id = p.Id;
         var box = new CheckBox { IsChecked = true, MinWidth = 0, Padding = new Thickness(0), Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
-        box.ToolTip = $"Show or hide the {p.Name.ToLowerInvariant()}";
         System.Windows.Automation.AutomationProperties.SetName(box, $"Show {p.Name}");
-        box.Checked += (_, _) => { if (!syncing) CellExplorerModel.SetVisible(kind, id, true); };
-        box.Unchecked += (_, _) => { if (!syncing) CellExplorerModel.SetVisible(kind, id, false); };
-        var name = K.Text(p.Name, Ty.Body);
+        box.Checked += (_, _) => { if (!syncing) SetVisible(id, true); };
+        box.Unchecked += (_, _) => { if (!syncing) SetVisible(id, false); };
+        var name = K.Text(p.Label, Ty.Body);
         name.TextTrimming = TextTrimming.CharacterEllipsis;
-        var face = K.Columns("auto, *", CellUI.Swatch(p.Colour.ToColor()).Margin(0, 0, 10, 0).Col(0), name.Col(1));
-        var b = K.Subtle(face, () => Select(id), new Thickness(8, 5, 8, 6), 4);
+        var face = K.Columns("auto, *", CellUI.Swatch(p.Colour.ToColor()).Margin(0, 0, 8, 0).Col(0), name.Col(1));
+        var b = K.Subtle(face, () => Select(id), new Thickness(6, 4, 6, 5), 7);
         b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-        b.ToolTip = CellUI.Plain(p.Function);
-        // (Tab through the list opens each part's card in turn: keyboard access to every card)
+        b.ToolTip = p.Name;
+        // (Tab through the list opens each part's card in turn; ↑ and ↓ step to the part before or after)
         b.GotKeyboardFocus += (_, _) =>
         {
             if (InputManager.Current.MostRecentInputDevice is KeyboardDevice && State.Selected != id && CellExplorerModel.Quiz == null) Select(id);
         };
-        var wash = new Border { CornerRadius = new CornerRadius(4), Opacity = 0, IsHitTestVisible = false };
+        b.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key is not (Key.Up or Key.Down) || CellExplorerModel.Quiz != null) return;
+            var order = rowOrder.Where(o => !State.Hidden.Contains(o)).ToList();
+            var i = order.IndexOf(id);
+            var next = i < 0 ? 0 : Math.Clamp(i + (e.Key == Key.Up ? -1 : 1), 0, order.Count - 1);
+            if (order.Count > 0 && rows.TryGetValue(order[next], out var r)) r.Button.Focus();
+            e.Handled = true;
+        };
+        var wash = new Border { CornerRadius = new CornerRadius(7), Opacity = 0, IsHitTestVisible = false };
         wash.SetResourceReference(Border.BackgroundProperty, B.Accent);
         var holder = new Grid { Children = { wash, b } };
-        rows[id] = new PartRow { Box = box, Button = b, Wash = wash, Name = name };
+        rows[id] = new PartRow { Part = p, Box = box, Button = b, Wash = wash, Name = name };
+        rowOrder.Add(id);
         syncing = true;
         try { box.IsChecked = !State.Hidden.Contains(id); }
         finally { syncing = false; }
         return K.Columns("auto, *", box.Col(0), holder.Col(1));
+    }
+
+    private void SetVisible(string id, bool visible)
+    {
+        CellExplorerModel.SetVisible(kind, id, visible);
+        CellExplorerSettings.SaveHidden(kind);
     }
 
     // ---- choosing ----
@@ -317,31 +430,36 @@ internal sealed class CellPage : Grid
         CellExplorerModel.Select(kind, part);
     }
 
+    /// <summary>A click in the scene (or on a label): its part's card, or the quiz's answer; on nothing, back out of
+    /// isolation, or let the card go.</summary>
     private void OnPicked(string? id)
     {
         var part = PartOf(id);
-        if (CellExplorerModel.Quiz is { } q && !q.Done)
+        if (CellExplorerModel.Quiz is { } q)
         {
-            if (q.Mode != CEQuizMode.Find || part == null) return;
-            Answer(part);
+            if (!q.Done && q.Mode == CEQuizMode.Find && part != null && afterHold == null) AnswerFind(part);
             return;
         }
-        if (part == null && State.Isolated != null) return;
-        Select(part);
+        if (id == null)
+        {
+            if (State.Isolated != null) CellExplorerModel.Isolate(kind, null);
+            else Select(null);
+            return;
+        }
+        if (part != null) Select(part);
     }
 
     private void OnHover(string? id)
     {
-        // (the hovered part's name as a tooltip, for when its label is hidden; never while a quiz would give it away)
-        var part = PartOf(id) is { } p ? CEParts.Part(kind, p) : null;
-        scene.ToolTip = part != null && CellExplorerModel.Quiz == null ? part.Name : null;
+        hovered = PartOf(id);
+        OverTop();
     }
 
     /// <summary>Escape: the quiz ended, else Isolate left, else the card closed (false: nothing to let go, the sheet closes).</summary>
     private bool LetGo()
     {
         var s = State;
-        if (CellExplorerModel.Quiz != null) CellExplorerModel.EndQuiz();
+        if (CellExplorerModel.Quiz != null) EndQuiz();
         else if (s.Isolated != null) CellExplorerModel.Isolate(kind, null);
         else if (s.Selected != null) CellExplorerModel.Select(kind, null);
         else return false;
@@ -355,7 +473,7 @@ internal sealed class CellPage : Grid
         var s = State;
         var q = CellExplorerModel.Quiz;
         var sig = string.Join("|", kind, s.Selected, s.Isolated, s.LookInside, CellExplorerModel.TrueScale, Appearance.Dark, CEBuildCache.Built(Options) != null,
-            q == null ? "-" : $"{q.Mode}{q.Index}{q.Score}{q.MissedThis}{CellExplorerModel.QuizFeedback}", string.Join(",", s.Hidden));
+            q == null ? "-" : $"{q.Mode}{q.Index}{q.Score}{q.MissedThis}{CellExplorerModel.QuizFeedback}{afterHold != null}", string.Join(",", s.Hidden));
         if (sig == rightSignature) return;
         rightSignature = sig;
         right.Children.Clear();
@@ -364,8 +482,8 @@ internal sealed class CellPage : Grid
         else About();
     }
 
-    /// <summary>A part's card (spec §4.1 item 3, §5.1.6): its function word for word, its membranes, its real size and what
-    /// the model draws, where it is found, its common mix-up; Isolate, Zoom to, Look inside.</summary>
+    /// <summary>A part's card (spec §4.1 item 3, §5.1.6): its function word for word, its structure, its real size, what the
+    /// model draws, where it is found, its common mix-up; Isolate, Zoom to, Look inside, Done.</summary>
     private void Card(CEPart p)
     {
         var s = State;
@@ -375,37 +493,50 @@ internal sealed class CellPage : Grid
         {
             CellUI.Fact("Function", p.Function),
             CellUI.Fact("Structure", p.StructureText),
-            CellUI.Fact("Size", p.Size),
-            // (what the model has of it, at this scale; §5.1's Model column until the cell is built)
-            CellUI.Fact("In this model", model?.ModelLine(p) is { Length: > 0 } line ? line : CEParts.InThisModel(p, trueScale)),
         };
-        var found = p.FoundInText + (p.FoundInNotes.Count > 0 ? "\n" + string.Join("\n", p.FoundInNotes) : "");
-        rows.Add(CellUI.Fact("Found in", found));
+        if (p.Size != "—") rows.Add(CellUI.Fact("Size", p.Size));
+        // (what the model has of it, at this scale; §5.1's Model column until the cell is built)
+        var line = model != null ? model.ModelLine(p) : CEParts.InThisModel(p, trueScale);
+        if (line.Length > 0) rows.Add(CellUI.Fact("In this model", line));
+        var found = K.V(3, K.Text("Found in", Ty.Caption, B.Text2).Strong(), K.Wrapped(p.FoundInText, Ty.Body));
+        foreach (var n in p.FoundInNotes) found.Children.Add(K.Wrapped(n, Ty.Caption, B.Text2));
+        System.Windows.Automation.AutomationProperties.SetName(found, "Found in: " + string.Join(" ", new[] { p.FoundInText }.Concat(p.FoundInNotes)));
+        rows.Add(found);
         if (p.Mixup is { } mix) rows.Add(MixUp(mix));
-        // (the actions)
-        var actions = new WrapPanel { Orientation = Orientation.Horizontal };
-        void Act(string text, SymbolRegular icon, string tip, Action a, bool enabled = true, bool accent = false)
+        if (s.Hidden.Contains(p.Id))
         {
-            var b = K.Button(text, a, accent, icon);
-            b.MinWidth = 0;
-            b.Margin = new Thickness(0, 0, 8, 8);
+            var show = K.Button("Show it in the model", () => SetVisible(p.Id, true), icon: SymbolRegular.Eye20);
+            show.HorizontalAlignment = HorizontalAlignment.Left;
+            rows.Add(show);
+        }
+        // (the actions, two to a row)
+        var drawn = (model == null || model.PartsShown.Contains(p.Id)) && !s.Hidden.Contains(p.Id);
+        var buttons = new List<FrameworkElement>();
+        Wpf.Ui.Controls.Button Act(string text, SymbolRegular icon, string tip, Action a, bool enabled = true, bool accent = false)
+        {
+            var b = ChemKit.Wide(text, a, accent, icon);
             b.ToolTip = tip;
             b.IsEnabled = enabled;
-            actions.Children.Add(b);
+            buttons.Add(b);
+            return b;
         }
-        var drawn = model == null || model.PartsShown.Contains(p.Id);
-        if (s.Isolated == p.Id) Act("Show all", SymbolRegular.ArrowExpand20, "Show the whole cell again (Escape)", () => CellExplorerModel.Isolate(kind, null), accent: true);
-        else Act("Isolate", SymbolRegular.Filter20, "Show only this part, framed and enlarged", () => CellExplorerModel.Isolate(kind, p.Id), drawn);
-        if (p.LookInside && !(s.Isolated == p.Id && s.LookInside))
-            Act("Look inside", SymbolRegular.ZoomIn20, p.Id == "nucleus" ? "The nucleus cut open: its pores, nucleolus and chromatin" : "Cut lengthwise, to see inside",
-                () => CellExplorerModel.Isolate(kind, p.Id, lookInside: true), drawn);
-        Act("Zoom to", SymbolRegular.CenterVertical20, "Bring the camera to it (or double-click it)", () => ZoomTo(p.Id), drawn && !(s.Isolated == p.Id && s.LookInside));
-        rows.Add(actions);
-        var close = K.Link("Close card", () => CellExplorerModel.Select(kind, null), Ty.Caption);
-        close.HorizontalAlignment = HorizontalAlignment.Left;
-        close.ToolTip = "Escape";
-        rows.Add(close);
-        var card = BioUI.Card(p.Name, p.Colour.ToColor(), kind.Title(), rows.ToArray());
+        var isolated = s.Isolated == p.Id && !s.LookInside;
+        var inside = s.Isolated == p.Id && s.LookInside;
+        Act(isolated ? "Show all" : "Isolate", SymbolRegular.Filter20, $"Show only the {p.Label.ToLowerInvariant()}, framed and enlarged (Escape to come back)",
+            () => CellExplorerModel.Isolate(kind, isolated ? null : p.Id), drawn || isolated, accent: isolated);
+        Act("Zoom to", SymbolRegular.ZoomIn20, "Bring the camera to it (or double-click it)", () => ZoomTo(p.Id), drawn);
+        if (CEScene.CanLookInside(p.Id))
+            Act(inside ? "Whole cell" : "Look inside", SymbolRegular.Cut20, p.Id == "nucleus" ? "The nucleus cut open: envelope, pores, nucleolus and chromatin" : "One cut lengthwise, to see inside",
+                () => { if (inside) CellExplorerModel.Isolate(kind, null); else CellExplorerModel.Isolate(kind, p.Id, lookInside: true); }, drawn || inside, accent: inside);
+        Act("Done", SymbolRegular.Checkmark20, "Close the card (Escape)", () => CellExplorerModel.Select(kind, null));
+        var grid = new UniformGrid { Columns = 2 };
+        foreach (var b in buttons)
+        {
+            b.Margin = new Thickness(0, 0, 4, 8);
+            grid.Children.Add(b);
+        }
+        rows.Add(grid);
+        var card = BioUI.Card(p.Name, p.Colour.ToColor(), p.Group.Title(), rows.ToArray());
         right.Children.Add(card);
         if (Motion.On) Motion.FadeIn(card, 180);
     }
@@ -423,67 +554,52 @@ internal sealed class CellPage : Grid
         return b;
     }
 
+    /// <summary>The camera brought to the part's instance its label points to (the part as a whole when looked inside).</summary>
     private void ZoomTo(string part)
     {
-        if (CEBuildCache.Built(Options) is not { } m) return;
-        if (m.Anchors.TryGetValue(part, out var a)) scene.ZoomTo(m.Instances[a.Instance].Id);
+        var s = State;
+        if (CEBuildCache.Built(Options) is { } m && m.Anchors.TryGetValue(part, out var a) && !(s.LookInside && s.Isolated == part)) scene.ZoomTo(m.Instances[a.Instance].Id);
         else scene.ZoomTo("organelle:" + part);
         scene.Focus();
     }
 
-    /// <summary>"About this cell" (spec §4.1 UI layout): its size, what makes it distinctive, three things to try; why cells
-    /// are small (its SA:V, and the Bio Lab Calculator's); the quiz; flashcards of its parts.</summary>
+    /// <summary>"About this cell" (spec §4.1 UI layout): its size, what makes it distinctive, its surface for its volume,
+    /// three things to try, and how to reach the cards.</summary>
     private void About()
     {
         var about = CEAbout.Of(kind);
         var model = CEBuildCache.Built(Options);
-        var tries = K.V(6);
+        var rows = new List<UIElement> { CellUI.Fact("Size", about.Size), CellUI.Fact("What makes it distinctive", about.Distinctive) };
+        if (model != null)
+            rows.Add(CellUI.Fact("Surface and volume", model.SurfaceLine + ". " + (kind == CEKind.Bacterium
+                ? "A small cell has far more surface for its volume, so materials reach every part quickly."
+                : "The bigger a cell, the less surface it has for each µm³ of inside to feed.")));
+        var tries = K.V(6, K.Text("Try this", Ty.Caption, B.Text2).Strong());
         foreach (var t in about.TryThis)
         {
-            var dot = K.Text("•", Ty.Body, B.Text2).Margin(0, 0, 8, 0);
+            var dot = K.Text("•", Ty.Body, B.Text2).Margin(0, 0, 6, 0);
             tries.Children.Add(K.Columns("auto, *", dot.Col(0), K.Wrapped(t, Ty.Body).Col(1)));
         }
-        right.Children.Add(BioUI.Card($"About this {kind.Title().ToLowerInvariant()}", BioColors.Tool("cell"), null,
-            CellUI.Fact("Size", about.Size), CellUI.Fact("What makes it distinctive", about.Distinctive), K.V(6, K.Text("Things to try", Ty.Caption, B.Text2).Strong(), tries)));
-        // (why cells are small: this cell's surface area for its volume)
-        if (model != null && model.Volume > 0)
-        {
-            var sav = model.Area / model.Volume;
-            var facts = BioUI.Facts(new (string, string, Color?)[]
-            {
-                ("Surface area", $"about {CellUI.Number(model.Area)} µm²", null),
-                ("Volume", $"about {CellUI.Number(model.Volume)} µm³", null),
-                ("SA:V", $"{sav.ToString(sav < 1 ? "0.00" : "0.0", CultureInfo.InvariantCulture)} µm⁻¹", null),
-            });
-            var why = K.Link("Why are cells small?", SurfaceToVolume);
-            why.HorizontalAlignment = HorizontalAlignment.Left;
-            why.ToolTip = "Work out surface area to volume in the Bio Lab Calculator, with this cell's size";
-            right.Children.Add(K.V(6, facts, BioUI.Caption("A smaller cell has more membrane for each unit of volume it must supply. Compare the bacterium's SA:V with this."), why));
-        }
-        // (the quiz and the flashcards)
-        var find = ChemKit.Wide("Find the …", () => StartQuiz(CEQuizMode.Find), icon: SymbolRegular.Search20);
-        find.ToolTip = "Ten questions: press the part named";
-        var name = ChemKit.Wide("Name it", () => StartQuiz(CEQuizMode.Name), icon: SymbolRegular.QuestionCircle20);
-        name.ToolTip = "Ten questions: one part glows, choose its name";
-        var cards = ChemKit.Wide("Make flashcards", MakeFlashcards, icon: SymbolRegular.Library20);
-        cards.ToolTip = $"A Flashcards set of this cell's parts and what they do";
-        right.Children.Add(ChemKit.Card(K.V(10, K.Text("Test yourself", Ty.BodyStrong), BioUI.Caption("Labels hide while you answer. Nothing is kept after the session."),
-            K.Columns("*, 8, *", find.Col(0), name.Col(2)), cards)));
+        rows.Add(tries);
+        rows.Add(BioUI.Caption("Click any part, its label or its row on the left for its card. Tab and the arrow keys step through the parts."));
+        right.Children.Add(BioUI.Card("About this cell", BioColors.Tool("cell"), kind.Title(), rows.ToArray()));
     }
 
-    /// <summary>The Bio Lab Calculator's surface area and volume, with this cell's size as the AP sheet's nearest shape (the
-    /// animal cell a sphere of its volume, the plant cell a box, the bacterium a cylinder).</summary>
-    private void SurfaceToVolume()
+    /// <summary>The Bio Lab Calculator's surface area to volume (its Cells page), with this cell as the shape the AP sheet
+    /// has for it: a sphere of the animal cell's volume, the plant cell's box, the bacterium's cylinder.</summary>
+    private void WhySmall()
     {
         var info = new Dictionary<string, string> { ["calc"] = "sav" };
         switch (kind)
         {
             case CEKind.Animal:
+                var v = CEBuildCache.Built(Options)?.Volume ?? 0;
+                var r = v > 0 ? Math.Cbrt(3 * v / (4 * Math.PI)) : 9.5;
                 info["mode"] = "sphere";
-                info["r"] = Math.Pow(11 * 8 * 9.5, 1.0 / 3).ToString("0.0", CultureInfo.InvariantCulture);
+                info["r"] = r.ToString("0.0", CultureInfo.InvariantCulture);
                 break;
             case CEKind.Plant:
-                info["mode"] = "rect";
+                info["mode"] = "box";
                 info["l"] = "44";
                 info["w"] = "26";
                 info["h"] = "26";
@@ -497,8 +613,8 @@ internal sealed class CellPage : Grid
         BioTools.Open(c, "biolab", info);
     }
 
-    /// <summary>A Flashcards set "Organelles (animal)": each part's name and its function (spec §4.1 Nice). One already made
-    /// is opened rather than made again.</summary>
+    /// <summary>A Flashcards set "Organelles (animal)": each part's name and its function (spec §4.1 Nice), said under the
+    /// button and opened. One already made is opened rather than made again.</summary>
     private void MakeFlashcards()
     {
         var title = $"Organelles ({kind.Id()})";
@@ -509,6 +625,8 @@ internal sealed class CellPage : Grid
             Desc = $"The parts of {kind.Phrase()} and what they do, from Cell Explorer.",
             Cards = CEParts.All(kind).Select(p => new FCCard(p.Name, CellUI.Plain(p.Function))).ToList(),
         });
+        madeNote.Text = $"Made “{title}” in Flashcards.";
+        madeNote.Visibility = Visibility.Visible;
         BioTools.Open(c, "fc", new Dictionary<string, string> { ["deck"] = id });
     }
 
@@ -516,88 +634,126 @@ internal sealed class CellPage : Grid
 
     private void StartQuiz(CEQuizMode mode)
     {
+        holdLater.Stop();
+        afterHold = null;
+        flash = null;
         var model = CEBuildCache.Built(Options);
         var s = State;
-        var drawn = (model?.PartsShown ?? CEParts.All(kind).Select(p => p.Id).ToHashSet()).Where(p => !s.Hidden.Contains(p)).ToList();
+        var drawn = (model?.PartsShown ?? CEParts.All(kind).Where(p => p.DefaultVisible).Select(p => p.Id).ToHashSet()).Where(p => !s.Hidden.Contains(p)).ToList();
         CellExplorerModel.StartQuiz(kind, mode, drawn);
         scene.Focus();
     }
 
-    private void Answer(string given)
+    private void EndQuiz()
     {
-        if (CellExplorerModel.Quiz is not { Current: { } q } quiz) return;
-        var right = quiz.Answer(given);
-        // (what is named back: the part pressed in "Find", the right one in "Name it")
-        var shown = CEParts.Part(kind, quiz.Mode == CEQuizMode.Find ? given : q.Part)?.Name ?? given;
-        if (quiz.Mode == CEQuizMode.Find)
-        {
-            CellExplorerModel.QuizFeedback = right ? $"Right: that is the {shown.ToLowerInvariant()}." : $"That is the {shown.ToLowerInvariant()}. Try again.";
-            if (!right)
-            {
-                // (a wrong press: the part pressed glows a moment, the view shakes, and its name is said)
-                flash = given;
-                wrongLater.Stop();
-                wrongLater.Start();
-                if (Motion.On) Motion.Shake(sceneCard);
-            }
-        }
-        else CellExplorerModel.QuizFeedback = right ? $"Right: the {shown.ToLowerInvariant()}." : $"It was the {shown.ToLowerInvariant()}.";
-        Say(CellExplorerModel.QuizFeedback);
+        holdLater.Stop();
+        afterHold = null;
+        flash = null;
+        CellExplorerModel.EndQuiz();
+    }
+
+    /// <summary>The answer glowing a moment, then <paramref name="then"/>.</summary>
+    private void Hold(string part, double seconds, Action then)
+    {
+        flash = part;
+        afterHold = then;
+        holdLater.Stop();
+        holdLater.Interval = TimeSpan.FromSeconds(seconds);
+        holdLater.Start();
+    }
+
+    /// <summary>"Find the …": the part pressed. Right: on to the next. Wrong: its name, and the question wobbles.</summary>
+    private void AnswerFind(string part)
+    {
+        if (CellExplorerModel.Quiz is not { Mode: CEQuizMode.Find, Current: not null } quiz) return;
+        var name = (CEParts.Part(kind, part)?.Name ?? part).ToLowerInvariant();
+        var right = quiz.Answer(part);
+        var said = right ? $"Yes: the {name}." : $"That’s the {name}.";
+        CellExplorerModel.QuizFeedback = said;
+        Hold(part, right ? 0.7 : 1.1, () => { if (right && CellExplorerModel.QuizFeedback == said) CellExplorerModel.QuizFeedback = null; });
+        Say(said);
+        CellExplorerModel.Tell();
+        if (!right && Motion.On && overTop.Content is UIElement prompt) Motion.Shake(prompt);
+    }
+
+    /// <summary>"Name it": a name chosen; the answer shown a moment, then the next part glows.</summary>
+    private void AnswerName(string chosen)
+    {
+        if (CellExplorerModel.Quiz is not { Mode: CEQuizMode.Name, Current: { } current } quiz) return;
+        var rightName = CEParts.Part(kind, current.Part)?.Name ?? current.Part;
+        var right = quiz.Answer(chosen);
+        var said = right ? $"Yes: {rightName}." : $"It’s the {rightName.ToLowerInvariant()}.";
+        CellExplorerModel.QuizFeedback = said;
+        Hold(current.Part, right ? 0.8 : 1.6, () => { if (CellExplorerModel.QuizFeedback == said) CellExplorerModel.QuizFeedback = null; });
+        Say(said);
         CellExplorerModel.Tell();
     }
 
+    private void Skip(CEQuiz q)
+    {
+        holdLater.Stop();
+        afterHold = null;
+        flash = null;
+        q.Skip();
+        CellExplorerModel.QuizFeedback = null;
+        CellExplorerModel.Tell();
+    }
+
+    /// <summary>The quiz in the right column: the question's choices ("Name it") or how to answer ("Find the …"), then the
+    /// score and the parts missed.</summary>
     private void Quiz(CEQuiz q)
     {
         var v = K.V(12);
+        var holding = afterHold != null;
         if (q.Done)
         {
-            v.Children.Add(K.Text($"{q.Score} of {q.Questions.Count}", Ty.Title));
-            v.Children.Add(K.Wrapped(q.Score == q.Questions.Count ? "Every one right." : "The ones to look at again:", Ty.Body, B.Text2));
-            foreach (var miss in q.Misses.Distinct())
+            var score = K.Text($"{q.Score} of {q.Questions.Count}", Ty.Display);
+            v.Children.Add(score);
+            v.Children.Add(K.Wrapped(q.Score == q.Questions.Count ? "Every one right first time." : "Right first time. The parts below are worth a second look.", Ty.Body, B.Text2));
+            var misses = q.Misses.Distinct().OrderBy(m => m, StringComparer.Ordinal).Select(m => CEParts.Part(kind, m)).OfType<CEPart>().ToList();
+            if (misses.Count > 0)
             {
-                if (CEParts.Part(kind, miss) is not { } p) continue;
-                var row = K.Subtle(K.H(10, CellUI.Swatch(p.Colour.ToColor()), K.Text(p.Name, Ty.Body)), () => { CellExplorerModel.EndQuiz(); Select(miss); }, new Thickness(8, 5, 8, 6));
-                row.HorizontalContentAlignment = HorizontalAlignment.Left;
-                row.ToolTip = $"Open the {p.Name.ToLowerInvariant()}'s card";
-                v.Children.Add(row);
+                var list = K.V(6, K.Text("To look at again", Ty.Caption, B.Text2).Strong());
+                foreach (var p in misses)
+                {
+                    var id = p.Id;
+                    var row = K.Subtle(K.V(2, K.Text(p.Name, Ty.BodyStrong), CellUI.Rich(p.Function, Ty.Caption, B.Text2)), () => { EndQuiz(); Select(id); }, new Thickness(6, 4, 6, 5), 7);
+                    row.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+                    row.ToolTip = $"Open the {p.Name.ToLowerInvariant()}'s card";
+                    list.Children.Add(row);
+                }
+                v.Children.Add(list);
             }
-            var again = K.Button("Try again", () => StartQuiz(q.Mode), accent: true, icon: SymbolRegular.ArrowRepeatAll20);
-            var done = K.Button("Done", CellExplorerModel.EndQuiz);
-            v.Children.Add(K.H(8, again, done));
-            right.Children.Add(BioUI.Card(q.Mode == CEQuizMode.Find ? "Find the part: done" : "Name it: done", BioColors.Tool("cell"), null, v));
-            return;
-        }
-        var current = q.Current!;
-        var part = CEParts.Part(kind, current.Part);
-        v.Children.Add(K.Text($"Question {q.Index + 1} of {q.Questions.Count} · {q.Score} right", Ty.Caption, B.Text2));
-        if (q.Mode == CEQuizMode.Find)
-        {
-            v.Children.Add(K.Wrapped($"Find the {part?.Name.ToLowerInvariant() ?? current.Part}.", Ty.BodyLarge).Strong());
-            v.Children.Add(BioUI.Caption("Press it in the cell. Turn and zoom to look for it."));
+            var again = ChemKit.Wide("Try again", () => StartQuiz(q.Mode), accent: true);
+            var done = ChemKit.Wide("Done", EndQuiz);
+            v.Children.Add(K.Columns("*, 8, *", again.Col(0), done.Col(2)));
         }
         else
         {
-            v.Children.Add(K.Wrapped("What is the part that glows?", Ty.BodyLarge).Strong());
-            var choices = K.V(6);
-            foreach (var choice in current.Choices)
+            var current = q.Current!;
+            var name = CEParts.Part(kind, current.Part)?.Name ?? current.Part;
+            v.Children.Add(K.Text($"Question {q.Index + 1} of {q.Questions.Count} · {q.Score} right", Ty.Body, B.Text2));
+            if (q.Mode == CEQuizMode.Find)
+                v.Children.Add(K.Wrapped($"Press the {name.ToLowerInvariant()} in the model. Turn it and zoom in if you need to; the labels are off.", Ty.Body));
+            else
             {
-                var name = choice;
-                var b = ChemKit.Wide(choice, () => Answer(name));
-                choices.Children.Add(b);
+                v.Children.Add(K.Text("Which part is glowing?", Ty.Body));
+                var choices = K.V(8);
+                foreach (var choice in current.Choices)
+                {
+                    var chosen = choice;
+                    var b = ChemKit.Wide(choice, () => AnswerName(chosen));
+                    b.IsEnabled = !holding && CellExplorerModel.QuizFeedback == null;
+                    choices.Children.Add(b);
+                }
+                v.Children.Add(choices);
             }
-            v.Children.Add(choices);
+            if (CellExplorerModel.QuizFeedback is { } said) v.Children.Add(Said(said));
+            var skip = ChemKit.Wide("Skip", () => Skip(q));
+            var end = ChemKit.Wide("End quiz", EndQuiz);
+            end.ToolTip = "Escape";
+            v.Children.Add(K.Columns("*, 8, *", skip.Col(0), end.Col(2)));
         }
-        if (CellExplorerModel.QuizFeedback is { } said)
-        {
-            var good = said.StartsWith("Right", StringComparison.Ordinal);
-            v.Children.Add(ChemKit.Line(good ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Info20, said, good ? K.Tone("green") : K.Tone("orange")));
-        }
-        var skip = K.Button("Skip", () => { q.Skip(); CellExplorerModel.QuizFeedback = null; CellExplorerModel.Tell(); });
-        skip.MinWidth = 0;
-        var end = K.Button("End quiz", CellExplorerModel.EndQuiz);
-        end.MinWidth = 0;
-        end.ToolTip = "Escape";
-        v.Children.Add(K.H(8, skip, end));
         right.Children.Add(BioUI.Card(q.Mode == CEQuizMode.Find ? "Find the part" : "Name it", BioColors.Tool("cell"), kind.Title(), v));
     }
 

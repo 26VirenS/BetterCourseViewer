@@ -349,7 +349,7 @@ public static class CEMembrane
         out_.Arrow = (d.Apply(new BioVec(ch.X, 5.5, Half + 1.2)), d.Apply(new BioVec(ch.X, -5.5, Half + 1.2)));
         out_.Up = d.ApplyVector(new BioVec(0, 1, 0));
         out_.Triangles = items.Sum(i => i.Mesh.TriangleCount);
-        out_.Content = new BioSceneContent { Items = items, Labels = Labels(), Frame = new BioSphere(BioVec.Zero, 26) };
+        out_.Content = new BioSceneContent { Items = items, Labels = Labels(), Frame = new BioSphere(BioVec.Zero, 29) };
         return out_;
     }
 

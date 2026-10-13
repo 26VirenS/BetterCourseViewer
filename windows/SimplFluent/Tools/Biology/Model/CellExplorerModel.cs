@@ -428,6 +428,19 @@ public sealed partial class CEModel
 
     /// <summary>A count with its thousands grouped ("1,500").</summary>
     public static string Count(int x) => x.ToString("#,0", CultureInfo.InvariantCulture);
+
+    /// <summary>The cell's surface area, volume and their ratio, to three significant figures ("Surface area 2,410 µm² ·
+    /// volume 3,540 µm³ · SA:V 0.681 per µm").</summary>
+    public string SurfaceLine => $"Surface area {Sig3(Area)} µm² · volume {Sig3(Volume)} µm³ · SA:V {Sig3(Volume > 0 ? Area / Volume : 0)} per µm";
+
+    /// <summary>A number to three significant figures, its thousands grouped ("2,410", "0.33").</summary>
+    public static string Sig3(double x)
+    {
+        if (x == 0 || double.IsNaN(x) || double.IsInfinity(x)) return "0";
+        var place = 2 - (int)Math.Floor(Math.Log10(Math.Abs(x)));
+        var rounded = place >= 0 ? Math.Round(x, Math.Min(place, 15), MidpointRounding.AwayFromZero) : Math.Round(x / Math.Pow(10, -place), MidpointRounding.AwayFromZero) * Math.Pow(10, -place);
+        return rounded.ToString("#,0.###############", CultureInfo.InvariantCulture);
+    }
 }
 
 // ---- the Compare page (§4.1 item 8, §5.1.4) ----
@@ -727,11 +740,15 @@ public static class CellExplorerModel
 
     /// <summary>The membrane part selected (its card open), if any.</summary>
     public static string? MembraneSelected { get; set; }
+    public static bool MembraneLabels { get; set; } = true;
     public static bool MembraneCholesterol { get; set; } = true;
     public static bool MembraneSugars { get; set; } = true;
-    public static bool MembraneProteins { get; set; } = true;
-    /// <summary>The osmosis animation: water through the aquaporin, the carrier rocking open (§4.1 Nice).</summary>
+    /// <summary>The channel and the carrier at work: the carrier rocking open to one side, then the other (§4.1 Nice).</summary>
+    public static bool MembraneTransport { get; set; } = true;
+    /// <summary>Osmosis: water filing down the aquaporin beside an arrow (§4.1 Nice).</summary>
     public static bool MembraneOsmosis { get; set; }
+    /// <summary>POPC asked for over the membrane page (a launch's "popc"), taken when the page shows.</summary>
+    public static bool MembranePopc { get; set; }
 }
 
 public static partial class BioSelfCheck

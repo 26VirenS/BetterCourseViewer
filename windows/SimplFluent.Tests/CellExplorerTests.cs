@@ -183,4 +183,22 @@ public class CellExplorerTests
         // (the water goes in from the outside: the channel's way runs against the membrane's up)
         Assert.True(BioV.Dot(moving.ChannelPath.Out - moving.ChannelPath.In, moving.Up) < 0);
     }
+
+    // ---- the scale bar (§4.1 item 7) ----
+
+    [Fact]
+    public void TheScaleBarPicksAPreferredLength()
+    {
+        double[] cells = { 1, 5, 10 }, more = { 0.1, 0.2, 0.5, 2, 20, 50, 100 };
+        Assert.Equal(1, CellScaleBar.Length(100, cells, more));
+        Assert.Equal(5, CellScaleBar.Length(20, cells, more));
+        Assert.Equal(10, CellScaleBar.Length(8, cells, more));
+        // (a bacterium close up: half a micrometre, said in nanometres)
+        Assert.Equal(0.5, CellScaleBar.Length(200, cells, more));
+        Assert.Equal("500 nm", CellScaleBar.Words(0.5, "µm"));
+        Assert.Equal("5 µm", CellScaleBar.Words(5, "µm"));
+        Assert.Equal("10 nm", CellScaleBar.Words(10, "nm"));
+        // (nothing fits: the one nearest 110 long)
+        Assert.Equal(100, CellScaleBar.Length(0.5, cells, more));
+    }
 }
