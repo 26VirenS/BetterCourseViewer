@@ -89,7 +89,8 @@ function asTheAppSeesIt(a) {
   const type = a.headers['content-type'] || '';
   const location = a.headers.location ? swap(a.headers.location) : undefined;
   if (!TEXTY.test(type)) return { ...a, text: null, location };
-  let text = swap(a.bytes.toString('utf8'));
+  // (the words of the real university the mock was first drawn from are the test school's own in the app: make-test-school.mjs)
+  let text = swap(a.bytes.toString('utf8')).replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');
   if (/^text\/html/i.test(type) && text.includes('ENV = ')) text = text.replace(/<head>/i, `<head><meta name="csrf-token" content="${CSRF}">`);
   return { ...a, text, location };
 }

@@ -45,6 +45,10 @@ let src = readFileSync(join(root, 'scripts', 'dev', 'mock-canvas.mjs'), 'utf8').
 const IMPORT = "import http from 'node:http';";
 if (!src.includes(IMPORT)) fail(`the mock no longer starts with ${IMPORT} — look at what it imports now`);
 src = src.replace(/^#!.*\n/, '').replace(IMPORT, '// (node:http: stood in for above)');
+// (the test school is no real school: the mock's few words of the university it was first drawn from — an address, a
+// notice's title, a mascot's greeting — are made the test school's own, here only; CI's mock keeps them)
+src = src.replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');
+for (const word of ['merced', 'bobcat']) if (src.toLowerCase().includes(word)) throw new Error(`the test school still names a real school: "${word}"`);
 if (/^\s*(import|export)\b/m.test(src)) fail('the mock imports or exports something more than node:http: stand it in for here');
 const uses = (re) => [...new Set([...src.matchAll(re)].map((m) => m[1]))].sort();
 const only = (what, found, allowed) => {
