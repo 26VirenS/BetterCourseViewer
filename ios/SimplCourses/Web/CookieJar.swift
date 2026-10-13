@@ -11,9 +11,9 @@ import WebKit
 /// session cookie is one) in memory only, so a launch after the app had been killed came back at the
 /// login page. The jar mirrors the web view's cookies into the Keychain whenever they change and when
 /// the app leaves the foreground, and puts them back into the cookie store before the first page loads.
-/// Signing out empties it. (Mac 1.3.76) On a Mac the jar is not the Keychain but a file of Simpl's own,
-/// Application Support ▸ Simpl ▸ cookies.bin, sealed by its vault (mac/Simpl/Support/Vault.swift); a jar kept
-/// in the login Keychain before is moved there.
+/// Signing out empties it. On a Mac, the login Keychain's, the same way. (Mac) An early 1.3.76 build kept the jar
+/// inside Simpl instead (Application Support ▸ Simpl ▸ cookies.bin, sealed by its vault,
+/// mac/Simpl/Support/Vault.swift): found there, it is put back into the Keychain once and the file deleted.
 final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
     static let shared = CookieJar()
     private let service = "com.simplcourses.ios.cookies"
@@ -109,9 +109,9 @@ final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
     func clear() {
         pending?.cancel()
         #if os(macOS)
-        try? FileManager.default.removeItem(at: CookieJar.file)
+        try? FileManager.default.removeItem(at: CookieJar.oldFile) // (one not yet put back: emptied too, never put back)
         #endif
-        SecItemDelete(query() as CFDictionary) // (on a Mac too: a jar kept in its Keychain before 1.3.76)
+        SecItemDelete(query() as CFDictionary)
     }
 
     // MARK: - Keychain
@@ -122,9 +122,8 @@ final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
 
     private func write(_ data: Data) {
         #if os(macOS)
-        _ = CookieJar.moved
-        Vault.write(data, to: CookieJar.file, purpose: "cookies")
-        #else
+        _ = CookieJar.movedBack
+        #endif
         var q = query()
         SecItemDelete(q as CFDictionary)
         q[kSecValueData as String] = data
@@ -132,39 +131,34 @@ final class CookieJar: NSObject, WKHTTPCookieStoreObserver {
         q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         #endif
         SecItemAdd(q as CFDictionary, nil)
-        #endif
     }
 
     private func read() -> Data? {
         #if os(macOS)
-        _ = CookieJar.moved
-        guard let saved = Vault.read(from: CookieJar.file, purpose: "cookies"), !saved.legacy else { return nil }
-        return saved.data
-        #else
+        _ = CookieJar.movedBack
+        #endif
         var q = query()
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
         guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess else { return nil }
         return item as? Data
-        #endif
     }
 
     #if os(macOS)
-    /// (Mac 1.3.76) Where a Mac keeps the jar: a file of Simpl's own, sealed by its vault.
-    private static var file: URL { Vault.folder.appendingPathComponent("cookies.bin") }
+    /// (Mac) Where an early 1.3.76 build kept the jar instead of the Keychain: a file of Simpl's own, sealed by its
+    /// vault.
+    private static var oldFile: URL { Vault.folder.appendingPathComponent("cookies.bin") }
 
-    /// A jar a Mac kept in its login Keychain before 1.3.76, moved into the vault once a launch at most: written there
-    /// (unless the vault holds one already), then deleted from the Keychain — kept there if it could not be written.
-    private static let moved: Void = {
-        var q = CookieJar.shared.query()
-        q[kSecReturnData as String] = true
-        q[kSecMatchLimit as String] = kSecMatchLimitOne
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return }
-        let file = CookieJar.file
-        if !FileManager.default.fileExists(atPath: file.path), !Vault.write(data, to: file, purpose: "cookies") { return }
-        SecItemDelete(CookieJar.shared.query() as CFDictionary)
+    /// (Mac) That file's jar put back into the Keychain, once a launch at most, and the file deleted (Vault.moveBack).
+    /// One kept in the Keychain already is the one kept.
+    private static let movedBack: Void = {
+        Vault.moveBack(from: CookieJar.oldFile, purpose: "cookies") { data in
+            var q = CookieJar.shared.query()
+            q[kSecValueData as String] = data
+            let status = SecItemAdd(q as CFDictionary, nil)
+            return status == errSecSuccess || status == errSecDuplicateItem
+        }
     }()
     #endif
 }

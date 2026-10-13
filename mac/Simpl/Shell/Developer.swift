@@ -76,7 +76,7 @@ final class DevMode: ObservableObject {
             "macOS \(os), \(ProcessInfo.processInfo.processorCount) cores, \(ByteCountFormatter.string(fromByteCount: Int64(ProcessInfo.processInfo.physicalMemory), countStyle: .memory))",
             "App: \(AppPlacement.runningURL.path)\(AppPlacement.isTranslocated ? " (translocated from \(AppPlacement.originalURL.path))" : "")",
             "Development run: \(Updater.isDevelopmentRun)",
-            "Data: encrypted (AES-256), its key in \(Vault.protection.rawValue)", // (1.3.76, Support/Vault.swift)
+            "Data: encrypted (AES-256), its key \(Vault.protection == .keychain ? "in the login Keychain" : "in vault.key itself (the Keychain would not take it)"); sign-in and cookies in the login Keychain", // (1.3.76, Support/Vault.swift)
             "Updates: feed \(u.feedURL.absoluteString), beta \(u.beta), automatic \(u.automatic), paused \(u.paused), state \(Self.describe(u.state)), last check \(u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")",
         ]
         if let e {

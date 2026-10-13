@@ -14,7 +14,7 @@ enum MacWhatsNew {
             ReleaseNote(kind: "improved", title: "External Tools, tidied", body: "No gaps between cards, and long course names fit."),
         ]),
         Release(version: "1.3.76", date: "2026-10-12", notes: [
-            ReleaseNote(kind: "new", title: "Your data, encrypted", body: "Your sign-in, flashcards and saved pages are encrypted."),
+            ReleaseNote(kind: "new", title: "Your data, encrypted", body: "Cards and pages are encrypted; the key is in your Keychain."),
             ReleaseNote(kind: "new", title: "Electron cloud model", body: "A Cloud view: dots show where electrons are likely to be."),
             ReleaseNote(kind: "new", title: "One subshell at a time", body: "Pick a subshell such as 3d; the rest of the atom goes grey."),
             ReleaseNote(kind: "improved", title: "Smoother moments", body: "Errors, signing in and finishing a set or the tour glide."),

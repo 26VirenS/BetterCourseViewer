@@ -36,7 +36,7 @@ mac/
     Support/Platform.swift      the theme, the house springs, what the shared code expects of the app
     Support/Shot.swift          the screenshot suite's camera (does nothing without its launch argument)
     Support/Updater.swift       updates: the feed, the download and its checks, the swap and relaunch, earlier versions
-    Support/Vault.swift         what Simpl keeps, encrypted, its key held by the Secure Enclave (Data and encryption)
+    Support/Vault.swift         what Simpl keeps, encrypted, its key in the login Keychain (Data and encryption)
 ```
 
 The web layer (`ios/SimplCourses/Web/`), the models the page's answers decode into, the router, the quiz's run, the
@@ -335,34 +335,54 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 
 ## Data and encryption
 
-(1.3.76) What Simpl keeps on a Mac is encrypted by Simpl itself, with no prompt (`Support/Vault.swift`): the
-extension's storage (`Application Support/SimplCourses/storage.json`: settings, grade history, goals), the answers kept
-for a fast start (`Caches/Answers/<school>/`, each file named by an HMAC, so a name says nothing of what it holds), the
-flashcards (`Application Support/com.simplcourses.mac/flashcards.json`), the saved sign-in and the school's cookies
-(`Application Support/Simpl/login.bin` and `cookies.bin`: out of the login Keychain, where they were before). Each is
-AES-256-GCM under one 256-bit key made on first use, with what the file is authenticated alongside (a file cannot pass
-for another). The key is held by the Mac's **Secure Enclave**: `Application Support/Simpl/vault.key` keeps a Secure
-Enclave key's blob, which that Mac's Enclave alone can use (no Touch ID or password asked), and the data key sealed to
-it (an ephemeral P-256 key agreed with the Enclave's, HKDF-SHA256, AES-GCM). A Mac with no Enclave (an older Intel Mac, a
-virtual machine — CI's) keeps the key as a generic password in the login **Keychain** (*Simpl Courses vault*); where
-that fails too, in `vault.key` itself (readable by its owner only, which locks nothing; the console says so). Settings ▸
-Data says which.
+(1.3.76) Simpl for Mac keeps what it holds secret in the Mac's own **Keychain**, which macOS encrypts under the
+student's login password (`Support/Vault.swift`):
+
+- **The saved sign-in and the school's cookies** are generic-password items of their own in the login Keychain
+  (services *com.simplcourses.ios.login* and *com.simplcourses.ios.cookies*), as on the iPhone and as before 1.3.76
+  (`LoginVault` in `Web/LoginAssist.swift`, `Web/CookieJar.swift`).
+- **The rest of what Simpl keeps** — the extension's storage (`Application Support/SimplCourses/storage.json`:
+  settings, grade history, goals), the answers kept for a fast start (`Caches/Answers/<school>/`, each file named by an
+  HMAC, so a name says nothing of what it holds) and the flashcards
+  (`Application Support/com.simplcourses.mac/flashcards.json`) — is sealed by Simpl: AES-256-GCM under one 256-bit key
+  made on first use, with what the file is authenticated alongside (a file cannot pass for another). That key is one
+  more generic password in the login Keychain (*Simpl Courses vault*, account `master-<id>`);
+  `Application Support/Simpl/vault.key` only names the item.
+
+The items carry macOS's own access list: the app that made them reads them without a prompt, and any other app that asks
+for one makes macOS ask the student first. Released builds are signed with the team's Developer ID (Releasing, below),
+so every new version is that same app to the Keychain and an update reads the items with no prompt. Only a development
+or CI build, signed just to run locally, is a different app each time it is built: macOS may ask once whether it may
+use each item ("Simpl wants to use your confidential information stored in … in your keychain": *Always Allow*). There
+is no Touch ID or password prompt of Simpl's own: that needs the data-protection keychain, and with it a provisioning
+profile and keychain entitlements Simpl's builds do not carry. Settings ▸ Data ▸ Encryption says where the key is.
+
+Only where the Keychain will not take the key (a CI runner) is it kept in `vault.key` itself, readable by its owner
+only, which locks nothing: the console says so every launch, and Settings ▸ Data says the key is in a file.
 
 A file written before 1.3.76 is read once as it was and written back sealed (the kept answers are dropped instead: they
-are only a cache). A vault that cannot be opened — a `vault.key` from another Mac, its Keychain item gone — is set aside
-with what it sealed in `Application Support/Simpl/Unreadable-<date>/` (never deleted) and a new one made, with a line on
-the console and no alert. **Reset Everything** deletes the key and its Keychain item, so nothing it sealed can be read
-again; the flashcards, which Reset has never erased, are sealed again under the new key.
+are only a cache). A Mac that ran an early 1.3.76 build — which kept the sign-in and the cookies inside Simpl, sealed,
+as `Application Support/Simpl/login.bin` and `cookies.bin`, and held the vault's key with the Secure Enclave — has the
+two files put back into the Keychain once and deleted (one already in the Keychain wins), and its key opened by the
+Enclave one last time, put into the Keychain, and `vault.key` written again without the Enclave key's blob. A vault that
+cannot be opened — a `vault.key` from another Mac, its Keychain item gone — is set aside with what it sealed in
+`Application Support/Simpl/Unreadable-<date>/` (never deleted) and a new one made, with a line on the console and no
+alert; a Keychain that will not give the key this launch (access refused) leaves everything as it is until the next.
+Signing out deletes the sign-in and cookie items. **Reset Everything** deletes them and the vault's key item, so nothing
+it sealed can be read again; the flashcards, which Reset has never erased, are sealed again under the new key.
 
 Plain on purpose: the preferences (UserDefaults: the theme, the layout, what was seen), the console, the theme's photos
 (`Application Support/Simpl/Photos`), the screenshot suite's pictures, files the student exports or saves elsewhere, and
 WebKit's own website data.
 
-**What it protects, and what it does not.** It protects data at rest: files copied off the Mac, backups and Time
-Machine, another account or an administrator browsing the disk, a lost or stolen disk. It does not stop a program
-running as the same macOS user, which can ask the Secure Enclave (or the Keychain) to unwrap the key just as Simpl does.
-Only an unlock prompt (Touch ID or the password, which Simpl does not ask for) or Developer ID signing with a keychain
-access group closes that.
+**What it protects, and what it does not.** It protects data at rest from anyone without the student's login password:
+files copied off the Mac, another account or an administrator browsing the disk, a lost or stolen disk. The login
+Keychain is itself a file in the same home folder, locked with the login password, so a backup or Time Machine copy of
+the home folder holds the sealed files and their key together, and whoever also has the login password can open both,
+as they could every other password in that Keychain. While the student is logged in the Keychain is unlocked: another
+program running as them cannot take the key without macOS asking first (for a Developer ID build), but the student can
+let it, and it can read what Simpl does not seal, WebKit's website data (the school's session among it) included. A key
+kept in `vault.key`, the last resort, locks nothing.
 
 ## Building and running
 
@@ -438,5 +458,7 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
 `.github/workflows/mac.yml` builds the app with Xcode 26 on every change to `mac/` or the shared files, runs it against
 the mock Canvas, and pictures every screen in light and dark (`scripts/dev/mac-shots.sh`). The pictures, the build's
 errors and warnings and the built app go to the `mac-shots` branch. Nothing is signed for distribution or published.
-(1.3.76) After the pictures, every storage, flashcards, sign-in, cookie and kept-answer file the app wrote must start
-with the vault's `SIMPLENC` mark (Data and encryption, above), or the run fails.
+(1.3.76) After the pictures, every storage, flashcards and kept-answer file the app wrote must start with the vault's
+`SIMPLENC` mark, and no `login.bin` or `cookies.bin` may be found (the sign-in and the cookies are Keychain items: Data
+and encryption, above), or the run fails. Where each worker's vault keeps its key (`vault.key`'s mode) is printed:
+`keychain`, or `file` when the runner's Keychain would not take it.

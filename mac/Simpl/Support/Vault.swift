@@ -2,14 +2,24 @@ import CryptoKit
 import Foundation
 import Security
 
-/// (1.3.76) What Simpl keeps on this Mac, encrypted by Simpl itself and never with a prompt: the extension's storage
-/// (settings, grade history, goals), the answers kept for a fast start, the flashcards, the saved sign-in and the
-/// school's cookies. One 256-bit key, made the first time it is needed, seals each of them (AES-256-GCM), and that key
-/// is held by this Mac's Secure Enclave: what Application Support ▸ Simpl ▸ vault.key keeps is the Enclave key's blob,
-/// which only this Mac's Enclave can use, and the data key sealed to it (an ephemeral P-256 key agreed with the
-/// Enclave's, HKDF-SHA256, AES-GCM). A Mac with no Enclave (an older Intel Mac, a virtual machine — CI's), or one
-/// whose Enclave refuses, keeps the key in the login Keychain instead; where that fails too, in vault.key itself,
-/// readable by this user only, and the console says so.
+/// (1.3.76) What Simpl keeps on this Mac, encrypted, with its key in the Mac's own Keychain: the extension's storage
+/// (settings, grade history, goals), the answers kept for a fast start, and the flashcards. One 256-bit key, made the
+/// first time it is needed, seals each of them (AES-256-GCM), and that key is a generic password of its own in the
+/// student's login Keychain (service "Simpl Courses vault", account "master-" and the vault's id): macOS keeps it
+/// encrypted under their login password and hands it, without asking, only to the app that put it there — any other app
+/// that asks for it is asked about first. Application Support ▸ Simpl ▸ vault.key says which item it is. Where the
+/// Keychain will not take the key (a CI runner), and only there, it is kept in vault.key itself, readable by this user
+/// only, which locks nothing: the console says so, plainly, every launch.
+///
+/// The saved sign-in and the school's cookies are not sealed here: they are Keychain items of their own, as on the
+/// iPhone (LoginVault, CookieJar). An early 1.3.76 build sealed them here instead, as login.bin and cookies.bin:
+/// `moveBack` puts them back into the Keychain, once, and deletes the files. Those builds held the key with this Mac's
+/// Secure Enclave (vault.key keeping the Enclave key's blob): such a vault is opened with the Enclave one last time,
+/// its key put into the Keychain, and vault.key written again without the blob.
+///
+/// Released builds are signed with the team's Developer ID, so each new version is the same app to the Keychain and
+/// reads these items with no prompt. A development or CI build, signed only to run locally, is another app each time it
+/// is built: macOS may ask once whether it may use them ("Always Allow").
 ///
 /// A sealed file is "SIMPLENC", a version byte (1) and AES-GCM's combined box (nonce, ciphertext, tag), what it is
 /// (its purpose: "storage", "flashcards" …) authenticated with it, so one file cannot be passed off as another. A file
@@ -25,18 +35,16 @@ import Security
 enum Vault {
     /// What holds the key.
     enum Protection: String {
-        case secureEnclave = "Secure Enclave"
         case keychain = "Keychain"
         case file = "file"
     }
 
     static var protection: Protection { current().protection }
 
-    /// Where the key is, in the words Settings and the sign-in card use ("Its key is …"); nil when it is in a file
-    /// beside the data (the last resort, which locks nothing).
+    /// Where the key is, in the words Settings uses ("Its key is …"); nil when it is in a file beside the data (the
+    /// last resort, which locks nothing).
     static var keyHolder: String? {
         switch protection {
-        case .secureEnclave: return "held by this Mac’s Secure Enclave"
         case .keychain: return "kept in your Keychain"
         case .file: return nil
         }
@@ -108,6 +116,27 @@ enum Vault {
         return nil
     }
 
+    /// What an early 1.3.76 build kept inside Simpl rather than in the Keychain — the saved sign-in and the cookies,
+    /// sealed, in Application Support ▸ Simpl (login.bin, cookies.bin) — opened and handed to `putBack`, which puts it
+    /// back into the Keychain where it was before (true once it is there, or one is there already); then the file is
+    /// deleted. Nothing when there is no file. A file the vault cannot open this launch (the Keychain would not give
+    /// its key) is left for the next launch, as it is when `putBack` fails; one it cannot open at all is set aside, as
+    /// `read` does with any; one without the mark, which no build wrote, is deleted unused. Called once a launch at
+    /// most, by LoginVault and CookieJar.
+    static func moveBack(from url: URL, purpose: String, into putBack: (Data) -> Bool) {
+        guard FileManager.default.fileExists(atPath: url.path), let saved = read(from: url, purpose: purpose) else { return }
+        let name = url.lastPathComponent
+        if saved.legacy {
+            note("\(name) was not sealed by Simpl; deleted unused")
+        } else if putBack(saved.data) {
+            note("\(name) put back into the login Keychain; the file deleted")
+        } else {
+            note("\(name) could not be put back into the login Keychain; it is kept as it is until Simpl is opened again")
+            return
+        }
+        try? FileManager.default.removeItem(at: url)
+    }
+
     /// Reset Everything: vault.key and its Keychain item deleted and the key forgotten — whatever it sealed can no
     /// longer be read by anyone. The next seal makes a new vault.
     static func erase() {
@@ -151,10 +180,11 @@ enum Vault {
     /// vault.key: what holds the key, and what it takes to get it back.
     private struct KeyFile: Codable {
         var version = 1
-        /// "se", "keychain" or "file".
+        /// "keychain" or "file"; "se" only in an early 1.3.76 build's, which is read once and written again
+        /// (`outOfEnclave`).
         var mode: String
-        /// "se": the Enclave key's blob (only this Mac's Enclave can use it), the ephemeral public key (raw), the HKDF
-        /// salt, and the data key sealed (AES-GCM, combined).
+        /// "se": the Enclave key's blob (only that Mac's Enclave can use it), the ephemeral public key (raw), the HKDF
+        /// salt, and the data key sealed (AES-GCM, combined). Never written now.
         var enclaveKey: Data?
         var ephemeral: Data?
         var salt: Data?
@@ -183,8 +213,12 @@ enum Vault {
         if FileManager.default.fileExists(atPath: keyURL.path) {
             switch unlock() {
             case .key(let master, let protection):
-                if protection == .file { note("its key is kept in vault.key itself (readable by this user only, not locked)") }
+                if protection == .file {
+                    note("its key is kept in vault.key itself, readable by this user only — NOT protected by the Keychain, which would not take it when the vault was made")
+                }
                 return Opened(protection, master: master)
+            case .enclave(let master):
+                return Opened(outOfEnclave(master), master: master)
             case .later(let why):
                 note("\(why); nothing is kept encrypted until Simpl is opened again")
                 return Opened(.keychain, master: nil)
@@ -198,6 +232,8 @@ enum Vault {
 
     private enum Unlock {
         case key(Data, Protection)
+        /// (an early 1.3.76 build's) The key, opened by this Mac's Secure Enclave: to go into the Keychain.
+        case enclave(Data)
         /// The key is there but not to be had this launch.
         case later(String)
         /// The key is gone for good.
@@ -209,13 +245,6 @@ enum Vault {
             return .lost("vault.key cannot be read")
         }
         switch file.mode {
-        case "se":
-            do {
-                let master = try enclaveOpen(file)
-                return .key(master, .secureEnclave)
-            } catch {
-                return .lost("the Secure Enclave will not open it: \(error)")
-            }
         case "keychain":
             guard let id = file.id else { return .lost("vault.key names no Keychain item") }
             var q = keychainQuery(id)
@@ -229,21 +258,28 @@ enum Vault {
         case "file":
             guard let master = file.key, master.count == 32 else { return .lost("vault.key holds no key") }
             return .key(master, .file)
+        case "se":
+            do {
+                let master = try enclaveOpen(file)
+                guard master.count == 32 else { return .lost("the Secure Enclave gave back no key") }
+                return .enclave(master)
+            } catch {
+                return .lost("the Secure Enclave will not open it: \(error)")
+            }
         default:
             return .lost("vault.key's mode \(file.mode) is not known")
         }
     }
 
-    /// A new key, kept where it can be, and vault.key written.
+    /// A new key, kept in the login Keychain (or, where it will not take it, in vault.key), and vault.key written.
     private static func make() -> Opened {
         let master = random(32)
         let (file, protection) = keep(master)
         switch commit(file) {
         case .written:
             switch protection {
-            case .secureEnclave: note("made; its key is held by this Mac's Secure Enclave")
-            case .keychain: note("made; its key is kept in the login Keychain")
-            case .file: note("made; its key is kept in vault.key itself (no Secure Enclave or Keychain would take it): readable by this user only, not locked")
+            case .keychain: note("made; its key is kept in the login Keychain (\(service))")
+            case .file: note("made; its key is kept in vault.key itself, readable by this user only — NOT protected by the Keychain, which would not take it")
             }
             return Opened(protection, master: master)
         case .taken:
@@ -259,23 +295,32 @@ enum Vault {
         }
     }
 
-    /// The Secure Enclave if it will (and gives the key back), else the Keychain, else vault.key itself.
+    /// The key put into the login Keychain, an item of its own; where the Keychain will not take it (a CI runner), into
+    /// vault.key itself, the last resort.
     private static func keep(_ master: Data) -> (KeyFile, Protection) {
-        if SecureEnclave.isAvailable {
-            do {
-                let file = try enclaveSeal(master)
-                // (opened again before it is trusted: a blob this Mac's Enclave would not take back is no use)
-                if try enclaveOpen(file) == master { return (file, .secureEnclave) }
-                note("the Secure Enclave gave back another key; the Keychain will hold it")
-            } catch {
-                note("the Secure Enclave could not hold its key (\(error)); the Keychain will")
-            }
-        }
         let id = random(8).map { String(format: "%02x", $0) }.joined()
         let status = keychainAdd(master, id: id)
         if status == errSecSuccess { return (KeyFile(mode: "keychain", id: id), .keychain) }
-        note("the Keychain could not hold its key either (\(status))")
+        note("the login Keychain would not take its key (\(status)); vault.key itself will hold it")
         return (KeyFile(mode: "file", key: master), .file)
+    }
+
+    /// (an early 1.3.76 build's vault, its key held by the Secure Enclave) The key, opened by the Enclave this once,
+    /// put where a new one goes (`keep`), and vault.key written again in its place without the Enclave key's blob —
+    /// that key was kept nowhere else, so it goes with it. If vault.key cannot be written again, the new item is let go
+    /// and the Enclave opens the vault next launch as it did this one. Where the key is now.
+    private static func outOfEnclave(_ master: Data) -> Protection {
+        let (file, protection) = keep(master)
+        guard replace(file) else {
+            if let id = file.id { keychainDelete(id) }
+            note("its key, held by the Secure Enclave, could not be moved (vault.key could not be written again); tried again when Simpl is next opened")
+            return protection
+        }
+        switch protection {
+        case .keychain: note("its key moved from the Secure Enclave into the login Keychain (\(service)); vault.key no longer holds the Enclave's")
+        case .file: note("its key moved from the Secure Enclave into vault.key itself, readable by this user only — NOT protected by the Keychain, which would not take it")
+        }
+        return protection
     }
 
     private enum Commit {
@@ -297,30 +342,27 @@ enum Vault {
         return e == EEXIST ? .taken : .failed(String(cString: strerror(e)))
     }
 
-    // MARK: - The Secure Enclave
+    /// vault.key written again whole (0600), in place of the one there: a file beside it, renamed over it in one step.
+    private static func replace(_ file: KeyFile) -> Bool {
+        guard let data = try? JSONEncoder().encode(file) else { return false }
+        let temp = folder.appendingPathComponent(".vault-\(UUID().uuidString).key")
+        guard FileManager.default.createFile(atPath: temp.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return false }
+        if rename(temp.path, keyURL.path) == 0 { return true }
+        unlink(temp.path)
+        return false
+    }
+
+    // MARK: - The Secure Enclave (an early 1.3.76 build's vault, opened once)
 
     private enum VaultError: Error {
-        case noAccessControl, noBox, incomplete
+        case incomplete
     }
 
     private static let sharedInfo = Data("Simpl vault v1".utf8)
 
-    /// The key sealed to a new Secure Enclave key (not kept in any keychain: its blob is kept in vault.key): an ephemeral
-    /// P-256 key agreed with it, HKDF-SHA256 over the shared secret with a random salt, AES-GCM. Usable whenever this
-    /// Mac's user is logged in (after the first unlock since it started, this Mac only), with no prompt.
-    private static func enclaveSeal(_ master: Data) throws -> KeyFile {
-        guard let access = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly, .privateKeyUsage, nil) else {
-            throw VaultError.noAccessControl
-        }
-        let enclave = try SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl: access)
-        let ephemeral = P256.KeyAgreement.PrivateKey()
-        let salt = random(32)
-        let wrap = try ephemeral.sharedSecretFromKeyAgreement(with: enclave.publicKey)
-            .hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: sharedInfo, outputByteCount: 32)
-        guard let box = try AES.GCM.seal(master, using: wrap).combined else { throw VaultError.noBox }
-        return KeyFile(mode: "se", enclaveKey: enclave.dataRepresentation, ephemeral: ephemeral.publicKey.rawRepresentation, salt: salt, box: box)
-    }
-
+    /// The key an early 1.3.76 build sealed to a Secure Enclave key whose blob it kept in vault.key: an ephemeral P-256
+    /// key agreed with it, HKDF-SHA256 over the shared secret with a random salt, AES-GCM. Only ever opened now, once,
+    /// on the Mac whose Enclave made it.
     private static func enclaveOpen(_ file: KeyFile) throws -> Data {
         guard let blob = file.enclaveKey, let ephemeral = file.ephemeral, let salt = file.salt, let box = file.box else {
             throw VaultError.incomplete
@@ -331,7 +373,7 @@ enum Vault {
         return try AES.GCM.open(AES.GCM.SealedBox(combined: box), using: wrap)
     }
 
-    // MARK: - The Keychain (the fallback)
+    // MARK: - The Keychain
 
     private static let service = "Simpl Courses vault"
 
@@ -339,7 +381,8 @@ enum Vault {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: "master-" + id]
     }
 
-    /// (the login Keychain, a file keychain: its items have no accessibility class, so none is given)
+    /// (the login Keychain, a file keychain: its items have no accessibility class, so none is given; nor an access
+    /// list — macOS's own, the app that made the item, is the one wanted)
     private static func keychainAdd(_ master: Data, id: String) -> OSStatus {
         var q = keychainQuery(id)
         q[kSecValueData as String] = master
