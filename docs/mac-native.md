@@ -535,4 +535,8 @@ session's answer in memory; `kept`, an answer kept from before, its counts held 
 `fetched`, asked of the page while the screen waited; `alive`, a screen never put away) — and both picture sets take
 `light-01w-walk`: the app walks through its places as a student's clicks would (`-SimplWalk`, Support/OpenClock.swift),
 each root place, a course and an assignment and then each again, so its console has the time of every first visit and
-every visit again.
+every visit again. `light-01v-walk-plain` walks the same way beside it, last and by themselves (the copies picturing
+the rest would slow them, and unevenly), with the screens loading as they did before 1.3.78 (`-SimplPlain`: nothing
+held or read ahead, the Dashboard not kept), so the two consoles compare like for like. In the screenshot suite and in
+developer mode the console also times each call (`call grades: 820 ms`, `read ahead home: 40 ms`) and when each screen
+appeared (`appear Grades: 12 ms`).

@@ -24,6 +24,13 @@ enum OpenClock {
     static var verbose: Bool { shooting || DevMode.shared.unlocked }
     private static let shooting = UserDefaults.standard.string(forKey: "SimplShotFile") != nil
 
+    /// The screen is on screen, its content or not (in the screenshot suite and developer mode: how much of an open is
+    /// the window making the screen, and how much its content).
+    static func appeared(_ screen: String) {
+        guard verbose else { return }
+        NSLog("[Simpl] appear %@: %d ms", screen, Int(((CACurrentMediaTime() - mark) * 1000).rounded()))
+    }
+
     static func report(_ screen: String, _ source: String) {
         let ms = Int(((CACurrentMediaTime() - mark) * 1000).rounded())
         NSLog("[Simpl] open %@: %d ms (%@)", screen, ms, source)
@@ -49,6 +56,7 @@ private struct OpenTimed: ViewModifier {
             .onAppear {
                 guard !visible else { return }
                 visible = true
+                OpenClock.appeared(screen)
                 said = nil
                 if ready { report(seen ? "alive" : source()) }
                 seen = true

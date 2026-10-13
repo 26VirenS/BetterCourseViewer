@@ -182,17 +182,22 @@ final class ReadAhead {
 }
 
 extension Engine {
+    /// (1.3.78) The screenshot suite's comparison (`-SimplPlain YES`): the screens load as they did before 1.3.78 —
+    /// nothing answered from what this session holds, nothing read ahead, the Dashboard not kept — so the walk's times
+    /// (Support/OpenClock.swift) can be set beside the same walk's as it is.
+    static let plain = UserDefaults.standard.bool(forKey: "SimplPlain")
+
     /// (1.3.78) This session's answer to a read, if it has one (decoded, in memory), and whether it is still fresh.
     func recent<T>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) -> (value: T, fresh: Bool)? {
         if let primary { return primary.recent(name, args, as: type) }
-        guard let key = AnswerMemo.key(name, args) else { return nil }
+        guard !Engine.plain, let key = AnswerMemo.key(name, args) else { return nil }
         return memo.value(key, as: type)
     }
 
     /// (1.3.78) What a place opens on, read ahead (the pointer resting on its row).
     func readAhead(_ place: Place) {
         if let primary { primary.readAhead(place); return }
-        guard phase == .native else { return }
+        guard phase == .native, !Engine.plain else { return }
         ahead.add(Engine.reads(for: place, engine: self), first: true, engine: self)
     }
 
@@ -200,7 +205,7 @@ extension Engine {
     /// a tool, a quiz, a file or a page of another site.
     func readAhead(url: String?) {
         if let primary { primary.readAhead(url: url); return }
-        guard phase == .native, let url, !url.isEmpty,
+        guard phase == .native, !Engine.plain, let url, !url.isEmpty,
               toolLaunch(for: url, title: "") == nil, quizLaunch(for: url, title: "") == nil, fileDownload(for: url) == nil else { return }
         if let route = nativeRoute(for: url, title: "") {
             ahead.add(Engine.reads(for: route, engine: self), first: true, engine: self)
@@ -212,7 +217,11 @@ extension Engine {
     /// (1.3.78) Once the window is up and quiet: the root places and every course's home, so the first visit to each is
     /// whole at once too.
     func readAheadAfterLaunch() {
-        if primary != nil { return }
+        if primary != nil || Engine.plain { return }
+        // (the screenshot suite's pictures are each of one screen: only its walks read ahead — five copies of the app
+        // reading every place at once only slowed the runner)
+        let d = UserDefaults.standard
+        if d.string(forKey: "SimplShotFile") != nil && d.string(forKey: "SimplWalk") == nil { return }
         ahead.afterLaunch(self) { [weak self] in
             guard let self else { return [] }
             var places: [Place] = [.dashboard, .todo, .calendar, .grades, .notifications]

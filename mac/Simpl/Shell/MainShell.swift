@@ -147,7 +147,14 @@ struct DetailStack: View {
         let path = engine.nav.current.path
         let dashboardUp = place == .dashboard && path.isEmpty
         ZStack {
-            NavigationStack(path: Binding(get: { engine.nav.current.path }, set: { engine.nav.setPath($0) })) {
+            // (1.3.78) the stack's path is its own place's: a stack on its way out, as another place's comes in, keeps
+            // the path it had — it never takes up the new place's (a screen opened in another course's place would be
+            // pushed on the page leaving, and that page's stack, going, would set the path back)
+            NavigationStack(path: Binding(get: {
+                engine.nav.current.place.identity == place.identity ? engine.nav.current.path : path
+            }, set: { p in
+                if engine.nav.current.place.identity == place.identity { engine.nav.setPath(p) }
+            })) {
                 PlaceScreen(place: place)
                     .background(PageGround().ignoresSafeArea())
                     .modifier(PageArrival(move: engine.move, top: path.isEmpty && place != .dashboard))
@@ -173,8 +180,8 @@ struct DetailStack: View {
                     .accessibilityHidden(!dashboardUp)
             }
         }
-        .onAppear { if dashboardUp { dashboardKept = true } }
-        .onChange(of: dashboardUp) { _, up in if up { dashboardKept = true } }
+        .onAppear { if dashboardUp && !Engine.plain { dashboardKept = true } }
+        .onChange(of: dashboardUp) { _, up in if up && !Engine.plain { dashboardKept = true } }
     }
 }
 
