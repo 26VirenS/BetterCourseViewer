@@ -57,6 +57,20 @@ export function shortenTimers(extDir) {
   return { done, missing };
 }
 
+/** The copy drawing nothing from an answer kept between page loads or lapsed in the memo (the store never hands
+ *  lib/canvas-api.js its keeping: every screen waits for Canvas, as it did before 2.99.33), for a suite whose checks read
+ *  a screen the moment it is drawn while changing Canvas's data as they go: there a screen drawn from the last answer,
+ *  then put right in place when Canvas answers, would race them. The fluid suite (fluid-test.mjs) checks the kept
+ *  answers themselves. Returns whether the shipped text was found, exactly once. */
+export function keptOff(extDir) {
+  const path = join(extDir, 'content', 'app', 'store.js');
+  const from = '  C.keepWith({ form: keptFormOf, answered: keepAnswer, dropped: dropAnswers });';
+  const src = readFileSync(path, 'utf8');
+  if (src.split(from).length !== 2) return false;
+  writeFileSync(path, src.replace(from, '  /* (harness.mjs keptOff: nothing kept) */'));
+  return true;
+}
+
 /** A step's duration, for the log: `(+4.2s)`. */
 export const secs = (ms) => `${(ms / 1000).toFixed(1)}s`;
 

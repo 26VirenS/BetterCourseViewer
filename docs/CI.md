@@ -20,7 +20,8 @@ In Tests, Mac app, iOS build, iOS screenshots and the Windows app's push runs, a
 (only the newest is worth waiting for: it holds every commit before it). A run that publishes is never cancelled: the
 Windows app's Run workflow and a push asking for a `[preview]` keep groups of their own, and Package, Site and the
 Mac's release have no cancelling at all. A push that changes only `docs/` runs nothing. The Windows branch runs its
-own Tests workflow on its own copy of the extension and suites.
+own Tests workflow on its own copy of the extension and suites (every suite but `test-school`: the iPhone's test school
+is not on that branch).
 
 ## The checks that fail a run
 

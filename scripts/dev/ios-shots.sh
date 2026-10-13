@@ -2,7 +2,8 @@
 # The iPhone app's screens on the iOS Simulator, against the mock Canvas: each tab, a counter's sheet,
 # Notifications, a course and an assignment pushed from the native screens, a course's grades sheet,
 # Hand In, a discussion, modules, files, Groups and the Inbox, a quiz and a tool — in light and in dark; then against
-# the mock Brightspace (2.99.22): Today, a course, an assignment, its grades, a discussion, its content, in light.
+# the mock Brightspace (2.99.22): Today, a course, an assignment, its grades, a discussion, its content, in light; then
+# the app's own test school (test.simpl.com): its sign-in page, and Today signed in.
 # Run by .github/workflows/ios-shots.yml after the app is built and installed on a booted simulator and
 # the mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860
 # (node scripts/dev/mock-brightspace.mjs 8860 --open). Pictures in ./shots.
@@ -15,15 +16,37 @@ xcrun simctl status_bar booted override --time 9:41 --batteryState charged --bat
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
 
 # launch <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it:
-# -SimplDemo), then a picture after <wait> seconds
+# -SimplDemo), then a picture once the app says it has settled — "[Simpl Courses] shot: settled" on its console
+# (Native/Engine.swift, watchForSettled: its screens up, the page's answers in, nothing asked for a moment) — <wait>
+# seconds at most. A picture of what the app's answers do not say (a tool's page loading in its sheet, the school's
+# sign-in page, a launch only to settle the simulator) waits the whole <wait> (SETTLE=no). The mock is the one at BASE
+# (http://localhost:8800 unless set) — or, with BASE=test-school, the app's own test school: test.simpl.com picked as a
+# student picks it, no address given, its Canvas answered inside the app (ios/SimplCourses/Web/TestSchool.swift), no
+# server
 launch() {
   local name="$1" wait="$2"
   shift 2
+  local school=(-SimplBaseURL "${BASE:-http://localhost:8800}")
+  [ "${BASE:-}" = "test-school" ] && school=(-canvasHost test.simpl.com)
+  local settle="${SETTLE:-yes}"
+  case "$name $*" in *-settle*|*" tool:"*|test-01-sign-in*) settle=no ;; esac
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
-  sleep 1
-  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL "${BASE:-http://localhost:8800}" -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
-  sleep "$wait"
-  xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
+  sleep 0.5
+  xcrun simctl launch --console-pty booted "$BID" "${school[@]}" -setupOpened YES -SimplDemo YES -SimplShotSettle YES "$@" > "$OUT/console-$name.txt" 2>&1 &
+  # (timed by the clock, not by counting naps: with the simulator busy a nap of a quarter second took twice that, and
+  #  a count of them stretched a 40-second wait to 83)
+  local t0=$SECONDS how="after ${wait}s"
+  if [ "$settle" = yes ]; then
+    while [ $((SECONDS - t0)) -lt "$wait" ]; do
+      if grep -q "shot: settled" "$OUT/console-$name.txt" 2>/dev/null; then how="settled"; break; fi
+      sleep 0.3
+    done
+    sleep 0.5 # (the frame after the last change drawn)
+  else
+    sleep "$wait"
+  fi
+  xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name ($((SECONDS - t0))s, $how)" || echo "no shot $name"
+  echo "$name $((SECONDS - t0))s $how" >> "$OUT/shot-times.txt"
 }
 
 # the app's crash reports and its own log lines, kept with the pictures (a picture of the home screen is an app
@@ -88,6 +111,12 @@ launch d2l-03-assignment 20 -SimplTab todo -SimplPush /courses/31001/assignments
 launch d2l-04-grades-sheet 18 -SimplTab grades -SimplOpen grades:31001
 launch d2l-05-discussion 20 -SimplTab courses -SimplPush /courses/31001/discussion_topics/2000000902
 launch d2l-06-modules 18 -SimplTab courses -SimplPush /courses/31001/modules
+# the test school (test.simpl.com), in light: its sign-in page as App Review first sees it (the app's own sign-in form over
+# Canvas's page), then Today once signed in — by -SimplTestSchoolSignedIn, the suite's own sign-in (a debug build with
+# -SimplDemo only), so CI never needs the password
+export BASE=test-school
+launch test-01-sign-in 20
+launch test-02-today 28 -SimplTestSchoolSignedIn YES
 unset BASE
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 collect end

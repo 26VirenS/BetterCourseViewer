@@ -8,7 +8,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { TIMERS, shortenTimers, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension } from './harness.mjs';
+import { TIMERS, shortenTimers, keptOff, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension } from './harness.mjs';
 import { SMOKE_SHARDS, SMOKE_PARTS } from './smoke-shards.mjs';
 
 const require = createRequire(import.meta.url);
@@ -38,7 +38,7 @@ const on = (name) => { const yes = !SECTIONS || SECTIONS.includes(name); if (yes
 const sectionStarts = []; // (when each section of sectionsRun began: the log ends with where the time went)
 // ports: a shard's four in a row from 8900; a whole run (or a half) the old ones
 const SLOT = SHARD ? Object.keys(SMOKE_SHARDS).indexOf(SHARD) : -1;
-const PORT = SLOT >= 0 ? 8900 + SLOT * 4 : PART === 2 ? 8788 : 8787;
+const PORT = SLOT >= 0 ? (Number(process.env.BCV_PORT_BASE) || 8900) + SLOT * 4 : PART === 2 ? 8788 : 8787; // (BCV_PORT_BASE: another run of the suite already holds these, on a shared machine)
 const BASE = `http://localhost:${PORT}`;
 // A tool is somebody else's site, on an origin of its own. One is served here so the tab a tool
 // opens into is a real cross-origin page — which is what decides whether the bar and the tray have
@@ -67,6 +67,7 @@ manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`, `${FAR}/*`); // (a shipp
 for (const cs of manifest.content_scripts) if ((cs.js || []).includes('content/toolbar.js')) cs.matches = ['*://*.instructure.com/*', `${BASE}/*`, `${SIM}/*`];
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const timers = shortenTimers(extDir); // the product's longest waits run short in this copy (harness.mjs); the shipped values are checked below
+const noKept = keptOff(extDir); // (every page load asks Canvas first, as the checks below expect: the kept answers are fluid-test.mjs's)
 
 // 2. mock server
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT), String(SIM_PORT)], { stdio: 'inherit' });
@@ -118,6 +119,7 @@ const shot = async (page, name) => { if (process.env.BCV_NO_SHOTS) return; await
 // has to be there, exactly, or a timer changed under the suite without the table in harness.mjs
 {
   console.log('\nharness');
+  check(noKept, "the copy draws every screen from Canvas's answer, nothing kept from the last visit or lapsed (the store's keeping found, as harness.mjs expects it)");
   check(timers.missing.length === 0 && timers.done.length === 12, `the copy runs the welcome's wait, the word-marks, the screen patience, the Away Refresh count, its hold and its off-stay, the island, the counter roll and the grade poll short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
   // every section the suite has is in exactly one shard (smoke-shards.mjs), so the shards together are the whole suite
   const declared = [...readFileSync(fileURLToPath(import.meta.url), 'utf8').matchAll(/^ {2}if \(on\((['"])(.+?)\1\)\) \{/gm)].map((m) => m[2]).concat(['bundles', "what's new notes"]);
@@ -830,8 +832,8 @@ try {
       label: cols[0].querySelector('.bcv-sky__tower').getAttribute('aria-label'),
     };
   });
-  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'AB*D*A*F*A*F*' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && sky.label === 'F26-MATH 021 20: 92%, 1 graded, 4 to come, 12 not counted. Open its grades.'
-    && sky.grey.up === 5 && sky.grey.down === 12 && !sky.grey.mixed && sky.grey.filter && sky.grey.pane && sky.grey.below && sky.grey.street === 7,
+  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'AB*D*A*F*A*F*' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && sky.label === 'F26-MATH 021 20: 92%, 1 graded, 4 to come, 13 not counted. Open its grades.'
+    && sky.grey.up === 5 && sky.grey.down === 13 && !sky.grey.mixed && sky.grey.filter && sky.grey.pane && sky.grey.below && sky.grey.street === 7,
     `the grades skyline stands at the workload's left — towers as tall as the scores (the lab, unscored, an outline), windows lit in their grades' colours from the top, and what does not count toward the total (MATH's 0%-weight groups, its omitted check) in grey at the street: ${JSON.stringify(sky)}`);
   await shot(page, '01a-dashboard-skyline');
   await page.click('.bcv-sky__col[data-course="101"] .bcv-sky__tower');
@@ -1605,7 +1607,7 @@ try {
   const gpaStats = await texts('.bcv-gpa__stat');
   check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');
-  check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
+  check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 517 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
   // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
   const pfCourse = await page.$eval('.bcv-gpa__card', (e) => e.dataset.course);
   const gpaBefore = (await texts('.bcv-gpa__value'))[0];
@@ -1649,7 +1651,7 @@ try {
   await page.click('.bcv-gpa__card .bcv-gpa__details');
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   const detail = (await texts('.bcv-gpa-detail'))[0];
-  check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ Open the course’s Grades page by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 17 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
+  check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ Open the course’s Grades page by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 18 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
   // one steady size, the breakdown on the left and the assignments on the right, each side scrolling on its own
   await page.waitForTimeout(500); // (the sheet's morph out of the Details button settles before it is measured)
   const detailBox = await page.$eval('.bcv-gpa-detail', (e) => { const cols = e.querySelector('.bcv-gpa-detail__cols'); const right = e.querySelector('.bcv-gpa-detail__col--right'); const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), cols: getComputedStyle(cols).gridTemplateColumns.split(' ').length, rightScrolls: right.scrollHeight > right.clientHeight + 2, sheetScrolls: e.scrollHeight > e.clientHeight + 2, go: e.querySelector('.bcv-gpa-detail__go')?.textContent.trim(), goTag: e.querySelector('.bcv-gpa-detail__go')?.tagName, goByX: !!e.querySelector('.bcv-sheet__head .bcv-gpa-detail__go + .bcv-sheet__close'), link: !!e.querySelector('.bcv-gpa-detail__link') }; });
@@ -1659,14 +1661,14 @@ try {
   const sheetPick = await page.evaluate(() => ({ has: !!document.querySelector('.bcv-gpa-detail.has-pick'), rows: [...document.querySelectorAll('.bcv-gpa-detail__arow.is-picked .bcv-gpa-detail__agroup')].map((e) => e.textContent.split(' · ')[0]), dim: document.querySelectorAll('.bcv-gpa-detail__arow.is-dim').length, rings: document.querySelectorAll('.bcv-gpa-detail__ring circle.is-picked').length, note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
   await page.keyboard.press('Escape');
   const sheetEsc = await page.evaluate(() => ({ open: !!document.querySelector('.bcv-gpa-detail'), has: !!document.querySelector('.bcv-gpa-detail.has-pick'), note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
-  check(sheetPick.has && sheetPick.rows.length === 8 && sheetPick.rows.every((g) => g === 'Effort') && sheetPick.dim === 9 && sheetPick.rings === 2 && sheetPick.note === 'Effort · 8 assignmentsShow all' && sheetEsc.open && !sheetEsc.has && sheetEsc.note === 'Blue dot means graded', `the details sheet: a group pressed picks out its ring and assignments, Escape lets it go and leaves the sheet open: ${JSON.stringify({ sheetPick, sheetEsc })}`);
+  check(sheetPick.has && sheetPick.rows.length === 8 && sheetPick.rows.every((g) => g === 'Effort') && sheetPick.dim === 10 && sheetPick.rings === 2 && sheetPick.note === 'Effort · 8 assignmentsShow all' && sheetEsc.open && !sheetEsc.has && sheetEsc.note === 'Blue dot means graded', `the details sheet: a group pressed picks out its ring and assignments, Escape lets it go and leaves the sheet open: ${JSON.stringify({ sheetPick, sheetEsc })}`);
   // By letter in the sheet too (2.98.35)
   const sheetStops = await page.$$eval('.bcv-gpa-detail .bcv-bands__stop', (els) => Object.fromEntries(els.map((e) => [e.dataset.band, Number(e.querySelector('.bcv-bands__n').textContent)])));
   await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="A"]');
   const sheetA = await page.$$eval('.bcv-gpa-detail__arow', (els) => els.map((r) => r.querySelector('.bcv-bandchip')?.textContent));
   await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="all"]');
   const sheetAll = (await page.$$('.bcv-gpa-detail__arow')).length;
-  check(sheetStops.A >= 1 && sheetA.length === sheetStops.A && sheetA.every((c) => c === 'A') && sheetAll === 17, `the details sheet's By letter lists one letter's work alone: ${JSON.stringify({ sheetStops, sheetA, sheetAll })}`);
+  check(sheetStops.A >= 1 && sheetA.length === sheetStops.A && sheetA.every((c) => c === 'A') && sheetAll === 18, `the details sheet's By letter lists one letter's work alone: ${JSON.stringify({ sheetStops, sheetA, sheetAll })}`);
   // the Grades page lists the same assignments, and they open the same way the course page's do
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
@@ -1679,13 +1681,13 @@ try {
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   await page.click('.bcv-gpa-detail__step:last-child');
   await waitText('.bcv-gpa-detail__tval', /^A · 93%$/);
-  check(/Needs 9\d% of the remaining 507 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
+  check(/Needs 9\d% of the remaining 517 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
   // what-if scores in the sheet: the button loads the real scores into bigger, tinted fields; a change
   // moves the total at the top (red, marked what-if) and nothing behind the sheet moves
   await page.click('.bcv-gpa-detail .bcv-whatif-btn');
   await page.waitForSelector('.bcv-gpa-detail .bcv-whatif__input', { timeout: 5000 });
   const wfFields = await page.$$eval('.bcv-gpa-detail .bcv-whatif__input', (els) => ({ n: els.length, h: Math.round(els[0].getBoundingClientRect().height), w: Math.round(els[0].getBoundingClientRect().width), bg: getComputedStyle(els[0]).backgroundColor, hyp: els.filter((e) => e.classList.contains('is-hyp')).length, first: els[0].value, bannerH: Math.round(document.querySelector('.bcv-gpa-detail .bcv-banner--sm')?.getBoundingClientRect().height || 0) }));
-  check(wfFields.n === 17 && wfFields.h >= 34 && wfFields.w >= 68 && wfFields.bg !== 'rgba(0, 0, 0, 0)' && !/^rgb\(255, 255, 255\)$/.test(wfFields.bg) && wfFields.hyp === 0 && wfFields.bannerH > 0 && wfFields.bannerH < 120 && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Exit what-if mode' && (await page.$eval('.bcv-gpa-detail__pct', (e) => e.classList.contains('is-hyp'))), `Try what-if scores: a bigger tinted field per assignment with the real score in it, the banner up: ${JSON.stringify(wfFields)}`);
+  check(wfFields.n === 18 && wfFields.h >= 34 && wfFields.w >= 68 && wfFields.bg !== 'rgba(0, 0, 0, 0)' && !/^rgb\(255, 255, 255\)$/.test(wfFields.bg) && wfFields.hyp === 0 && wfFields.bannerH > 0 && wfFields.bannerH < 120 && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Exit what-if mode' && (await page.$eval('.bcv-gpa-detail__pct', (e) => e.classList.contains('is-hyp'))), `Try what-if scores: a bigger tinted field per assignment with the real score in it, the banner up: ${JSON.stringify(wfFields)}`);
   const pctBefore = (await texts('.bcv-gpa-detail__pct'))[0];
   // every graded assignment zeroed (one alone could sit in a group that carries no weight): the total has to move
   const gradedWf = await page.$$eval('.bcv-gpa-detail__arow', (rows) => rows.filter((r) => r.querySelector('.bcv-whatif__input') && r.querySelector('.bcv-gpa__catdot')?.style.background === 'rgb(10, 132, 255)' && r.querySelector('.bcv-whatif__input').value !== '0').map((r) => r.querySelector('.bcv-whatif__input').dataset.wf)); // (a real 0 set to 0 is no change)
@@ -1710,7 +1712,7 @@ try {
   check((await texts('.bcv-gpa-detail__pct'))[0] === pctBefore && !(await page.$('.bcv-gpa-detail .bcv-wfadd__rm')), 'Clear all puts the real scores back, and takes the made-up assignment away');
   await page.click('.bcv-gpa-detail .bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input'), null, { timeout: 5000 });
-  check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 17 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
+  check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 18 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
   // the button on the left is the way through to the course's own Grades page, and it takes the sheet with it
   await page.click('.bcv-gpa-detail__go');
   await page.waitForFunction(() => /\/courses\/\d+\/grades$/.test(location.pathname) && !document.querySelector('.bcv-sheet-ov'), null, { timeout: 10000 });
@@ -2705,7 +2707,7 @@ try {
   await shot(page, '12-course-announcements');
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 2, 'announcement opens as a thread');
+  check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 3 && (await texts('.bcv-entry .bcv-chip')).includes('W8 Discussion Worksheet - More Newton’s Laws.pdf'), 'announcement opens as a thread (a reply that is a file alone shows its file)');
 
   // assignments
   await tab('assignments');
@@ -2789,7 +2791,7 @@ try {
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
-  check((await page.$$('.bcv-entry')).length === 2 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
+  check((await page.$$('.bcv-entry')).length === 3 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
   await page.fill('.bcv-reply textarea', 'My question is about removable discontinuities.');
   await page.click('.bcv-reply .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 3, null, { timeout: 10000 });
@@ -2815,7 +2817,7 @@ try {
   check((await page.$$('.bcv-wbar__seg')).length === 3 && (await page.$$('.bcv-wbar__seg--ungraded')).length === 2 && wbar.join(' | ') === 'Discussion Quizzes 18% of grade 100% | Midterms 57% of grade ungraded | Final 25% of grade ungraded' && (await texts('.bcv-gr__hsub'))[0] === '100% of final grade', `weight bar: ${wbar.join(' | ')}`);
   check((await texts('.bcv-gr__wnote'))[0] === 'Effort, Collaboration and Coursework (Knewton Alta) carry 0% weight — they show as rings but never move the total.', `0%-weight note: ${(await texts('.bcv-gr__wnote'))[0]}`);
   const gradeRows = await texts('.bcv-grades__main .bcv-row');
-  check(gradeRows.length === 17 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
+  check(gradeRows.length === 18 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
   check(gradeRows.some((t) => /Skills_Check.*Not counted toward final grade/.test(t)) && gradeRows.some((t) => /Transformation.*Late/.test(t)), 'late / not-counted badges');
   check(!(await page.$('.bcv-grades__side')) && !(await texts('.bcv-label')).some((t) => /assignment group weights/i.test(t)), 'no separate group-weights card: the weights live in the grade card');
   await shot(page, '16-course-grades');
@@ -2834,7 +2836,7 @@ try {
   }));
   await page.locator('.bcv-legend__row[data-pick]', { hasText: 'Effort' }).click();
   const pickEffort = await pickState();
-  check(pickEffort.rows.length === 8 && pickEffort.rows.every((g) => g === 'Effort') && pickEffort.dim === 9 && pickEffort.rings === 2 && pickEffort.ringsDim === 6 && pickEffort.legend === 'Effort' && pickEffort.pressed === 'true' && pickEffort.note === 'Effort · 8 assignmentsShow all', `pressing a group picks out its ring and its assignments; the rest steps back: ${JSON.stringify(pickEffort)}`);
+  check(pickEffort.rows.length === 8 && pickEffort.rows.every((g) => g === 'Effort') && pickEffort.dim === 10 && pickEffort.rings === 2 && pickEffort.ringsDim === 6 && pickEffort.legend === 'Effort' && pickEffort.pressed === 'true' && pickEffort.note === 'Effort · 8 assignmentsShow all', `pressing a group picks out its ring and its assignments; the rest steps back: ${JSON.stringify(pickEffort)}`);
   await shot(page, '16b-course-grades-group');
   await page.locator('.bcv-wbar__row[data-pick]', { hasText: 'Midterms' }).click();
   const pickMid = await pickState();
@@ -2888,7 +2890,7 @@ try {
   await page.waitForSelector('.bcv-banner', { timeout: 5000 });
   check((await texts('.bcv-banner__title'))[0] === 'This is not your actual score.', 'what-if banner');
   const inputs = await page.$$('.bcv-whatif__input');
-  check(inputs.length === 17, 'what-if inputs for every row');
+  check(inputs.length === 18, 'what-if inputs for every row');
   const midterm = (await page.$$('.bcv-grades__main .bcv-row')).find(async () => true);
   void midterm;
   const rows = await page.$$('.bcv-grades__main .bcv-row');
@@ -3654,7 +3656,7 @@ try {
   check(/em$/.test(eqFit.set) && eqFit.w === 'auto' && !eqFit.attrs && eqFit.h < eqFit.natural && eqFit.h > eqFit.fs && eqFit.h <= eqFit.fs * 4 && eqFit.va === 'middle' && eqFit.display === 'inline-block', `a formula is sized to the text it sits in and reads on the line: ${JSON.stringify(eqFit)}`);
   // every option the question offered, for checking the rest — folded away until asked for
   const optsBtn = await page.$$('.bcv-qfb__q .bcv-fb__more');
-  check(optsBtn.length === 3 && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.hidden)), 'each choice question offers its full list of options, folded away');
+  check(optsBtn.length === 3 && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.parentElement.inert && !e.closest('.bcv-collapsible').classList.contains('is-open'))), 'each choice question offers its full list of options, folded away');
   await optsBtn[0].click();
   const shownOpts = await page.$$eval('.bcv-qfb__q[data-k="0"] .bcv-fb__opt', (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')));
   check(shownOpts.length === 5 && shownOpts[0] === 'A-3.15 m/sYour answerCorrect' && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Hide the options', `the options open with your pick marked, the right one from Canvas's results page: ${shownOpts.join(' | ')}`);
@@ -3663,7 +3665,7 @@ try {
   const wrongOpts = await page.$$eval('.bcv-qfb__q[data-k="1"] .bcv-fb__opt', (els) => els.map((e) => `${e.textContent.trim().replace(/\s+/g, ' ')}${e.classList.contains('is-right') ? ' [right]' : ''}${e.classList.contains('is-mine') ? ' [mine]' : ''}`));
   check(wrongOpts.length === 5 && wrongOpts.filter((t) => t.includes('[right]')).length === 1 && wrongOpts.filter((t) => t.includes('[mine]')).length === 1 && wrongOpts.some((t) => /Correct.*\[right\]/.test(t)), `a wrong question marks both your pick and the right one: ${wrongOpts.join(' | ')}`);
   await (await page.$$('.bcv-qfb__q .bcv-fb__more'))[0].click();
-  check(await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.hidden), 'pressing it again folds the options away');
+  check(await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.parentElement.inert && !e.closest('.bcv-collapsible').classList.contains('is-open')), 'pressing it again folds the options away');
   const eqText = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
@@ -4600,7 +4602,9 @@ try {
   const knewTitle = await gtitle();
   const [knewTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await knewTab.waitForLoadState('domcontentloaded').catch(() => {});
-  check(knewTitle === 'Open a tool' && knewRows.length === 2 && knewRows[0].t === 'Knewton Alta' && knewRows[0].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows[0].acts.join() === 'Open tool,Assignment' && knewRows[1].t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(knewRows[1].s) && knewTab.url() === `${BASE}/courses/104/external_tools/retrieve?assignment_id=4003&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by Canvas's own launch route: “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
+  // (Knewton Alta is in two courses: a row for the tool in each, each through that course's assignment nearest its due — SPRK's
+  // through Unit 2, not Unit 1 handed in nor Units 3 and 4 further off — then the assignments that are the tool)
+  check(knewTitle === 'Open a tool' && knewRows.length === 7 && knewRows.slice(0, 2).every((r) => r.t === 'Knewton Alta' && r.acts.join() === 'Open tool,Assignment') && knewRows[0].s === 'MATH-021-20 · Tool · via Knewton Alta: Limits Practice' && knewRows[1].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows.some((r) => r.t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(r.s)) && knewTab.url() === `${BASE}/courses/101/external_tools/retrieve?assignment_id=1090&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by Canvas's own launch route: “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
   await knewTab.close().catch(() => {});
   const modRows = await findRows('/open mastering');
   const [modTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
@@ -4966,10 +4970,10 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 5000 });
   const motion = await page.evaluate(() => ({
-    screen: getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName,
+    screen: `${getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName}@${getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationDuration}`,
     noBar: !document.getElementById('bcv-progress') && !document.querySelector('.bcv-load'),
   }));
-  check(motion.screen === 'bcv-fade-up' && motion.noBar, `screens rise in by keyframe; no page-top bar, and no row wash once the screen is drawn: ${JSON.stringify(motion)}`);
+  check(motion.screen === 'bcv-fade-in@0.22s' && motion.noBar, `a page's first screen fades in by keyframe, 220ms (2.99.33: deeper moves slide, sections crossfade — fluid-test.mjs); no page-top bar, and no row wash once the screen is drawn: ${JSON.stringify(motion)}`);
   // mockup 14: the pressed control is the progress bar. A sidebar row that starts a load fills left to
   // right with a flat wash in its own icon colour, under its label; a second press is a no-op.
   const slowCal = /\/calendar(\?.*)?$/; // the next page's own document is held back, so the pressed row's wash can be watched
@@ -6273,7 +6277,9 @@ try {
   check((await texts('.bcv-sheet--ask .bcv-sheet__title'))[0] === 'Remove Probe?', 'the bin asks first');
   await page.click('.bcv-sheet--ask .bcv-ask__ok');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
-  check((await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]', 'removed: the card, the pin and its store all go');
+  // (the Tools page draws its thirteen cards as soon as the list is kept; the widget's own store, its pin and the pin's
+  //  record go a moment after — widgets.js remove() — so they are waited for, not caught half way)
+  check(await eventually(async () => (await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]'), 'removed: the card, the pin and its store all go');
   await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { for (const w of await self.BCV.widgets.all()) await self.BCV.widgets.remove(w.id); self.BCV.app.render(); } }); }, BASE);
   await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 11, null, { timeout: 8000 });
   check((await widgetsKept()).length === 0, 'the others removed too: the eleven built-in tools again');
@@ -6664,7 +6670,7 @@ try {
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowLeft');
   await page.waitForSelector('.bcv-fc__keep', { timeout: 3000 });
-  check((await texts('.bcv-fc__donetitle'))[0] === 'Nice work!' && (await texts('.bcv-fc__countn')).join(',') === '3,2' && (await texts('.bcv-fc__keep'))[0] === 'Keep reviewing 2 terms', 'the end of the round: the counts, and Keep reviewing for the two still being learned');
+  check((await texts('.bcv-fc__donetitle'))[0] === 'Nice work!' && (await texts('.bcv-fc__countn')).join(',') === '3,2' && (await texts('.bcv-fc__keep'))[0] === 'Keep reviewing 2 terms' && (await page.$eval('.bcv-fc__donetick', (e) => e.classList.contains('bcv-check--draw'))), 'the end of the round: the counts, Keep reviewing for the two still being learned, and its tick drawn in (2.99.32), the last mark a key');
   await shot(page, '40b-tools-flashcards-round');
   await page.click('.bcv-fc__keep');
   await page.waitForSelector('.bcv-fc__mark--know', { timeout: 3000 });
@@ -6755,8 +6761,26 @@ try {
   for (const id of ids) { await page.click(`.bcv-fc__tilecard[data-tile="${termOf(id).i}"]`); await page.click(`.bcv-fc__tilecard[data-tile="${defOf(id).i}"]`); }
   await page.waitForSelector('.bcv-fc__again', { timeout: 3000 });
   const matchDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
-  check(/^Matched in \d+\.\d s$/.test((await texts('.bcv-fc__donetitle'))[0]) && (await texts('.bcv-fc__donetext'))[0] === 'A new best time!' && matchDecks[0].best > 0, `every pair matched: the time, and a best kept on the set (${(await texts('.bcv-fc__donetitle'))[0]})`);
+  check(/^Matched in \d+\.\d s$/.test((await texts('.bcv-fc__donetitle'))[0]) && (await texts('.bcv-fc__donetext'))[0] === 'A new best time!' && matchDecks[0].best > 0 && (await page.$eval('.bcv-fc__donetick', (e) => e.classList.contains('bcv-check--draw'))), `every pair matched: the time, a best kept on the set, and the tick drawn in (${(await texts('.bcv-fc__donetitle'))[0]})`);
   await shot(page, '40e-tools-flashcards-match');
+  // (2.99.32) a set deleted leaves where it stood, fading as it settles back, and is written at once; what was below it closes up
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__deck', { timeout: 3000 });
+  await page.setInputFiles('.bcv-fc input[type=file]', [{ name: 'spare.csv', mimeType: 'text/csv', buffer: Buffer.from('Term,Definition\nLimit,what f(x) nears\n') }]);
+  await page.waitForSelector('.bcv-fc__editrow', { timeout: 5000 });
+  await page.click('.bcv-tool__back');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__deck').length === 2, null, { timeout: 3000 });
+  const spare = (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks'])).find((d) => d.name === 'spare');
+  const deleting = await realMotion(page, async () => {
+    await page.click(`.bcv-fc__deck[data-deck="${spare?.id}"] .bcv-fc__delete`);
+    const mid = await page.evaluate(() => { const r = document.querySelector('.bcv-fc__deck.is-out'); return { out: !!r, inert: !!r?.inert, name: getComputedStyle(r || document.body).animationName }; });
+    await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__deck').length === 1, null, { timeout: 3000 });
+    return mid;
+  });
+  const keptDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  check(!!spare && deleting.out && deleting.inert && deleting.name === 'bcv-leave-shrink' && keptDecks.length === 1 && keptDecks[0].id === decks[0].id && (await page.$(`.bcv-fc__deck[data-deck="${spare.id}"]`)) === null && (await toolSub()) === '1 set', `the X deletes the set: it fades where it stood (pressed no more) and is gone from the list and the store, the other kept (${JSON.stringify(deleting)})`);
   await closeTool();
   // a card dragged to the top becomes a pin beside the switch, on every page
   const cardBox = await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 60, y: r.top + 30 }; });
@@ -6901,7 +6925,9 @@ try {
     check((await texts('.bcv-need__big'))[0] === '95%' && (await texts('.bcv-need__line'))[0] === 'on Midterm 2 to finish with an A (93%).' && (await texts('.bcv-need__grid .bcv-tool__hint'))[1] === "Midterms is 57% of the grade; this is 100 points of the group's 200." && (await texts('.bcv-need__row')).join(' | ') === 'A+ out of reach | A 95% | A− 84% | B+ 74% | B 60% | B− 49% | C+ 39% | C 25% | C− 14% | D already there', `the answer: 95% on Midterm 2 for an A, the piece's share explained, and every letter's price under it (${(await texts('.bcv-need__row')).join(' | ')})`);
     await shot(page, '41-grade-needed');
     await ntPicks[1].$eval('.bcv-picker', (e) => e.click());
-    const ntOpts = await texts('.bcv-picker__list .bcv-picker__opt');
+    // (the open list's alone: the course list picked from a moment ago is still on its way out — its exit plays, under
+    //  load for a while — and its rows were read with these)
+    const ntOpts = await texts('.bcv-picker__list:not(.is-closing) .bcv-picker__opt');
     check(ntOpts.slice(0, 4).join(' | ') === 'Midterm 2 · 28.5% | Midterm 1 · 28.5% | Final Exam · 25% | Qz01 · 9%' && ntOpts[ntOpts.length - 1] === 'Something else…' && !ntOpts.some((o) => /Lec01|Qz00|Skills_Check/.test(o)), `the pieces are the ungraded work, heaviest first, graded and omitted work left out, Something else last (${ntOpts.join(' | ')})`);
     await page.click('.bcv-picker__list .bcv-picker__opt[data-value="1017"]');
     await page.waitForTimeout(200);
@@ -7859,7 +7885,7 @@ try {
   // (a named action run in the page's content-script world: the worker's CSP allows no built function)
   const runInApp = (name) => sw.evaluate(async ([base, n]) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (what) => { if (what === 'toast') self.BCV.ui.toast('Springs'); else if (what === 'stuck') { const ov = document.querySelector('.bcv-sheet-ov'); self.BCV.ui.dismiss(ov); for (const a of ov.getAnimations({ subtree: true })) a.pause(); } }, args: [n] }); }, [BASE, name]);
   const springs = await page.evaluate(() => { const cs = getComputedStyle(document.documentElement); const screen = getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')); return { cls: document.documentElement.classList.contains('bcv-springs'), gentle: cs.getPropertyValue('--bcv-spring-gentle').trim().slice(0, 9), t: cs.getPropertyValue('--bcv-t-gentle').trim(), screenEase: screen.animationTimingFunction.slice(0, 7), screenDur: screen.animationDuration, stops: cs.getPropertyValue('--bcv-spring-gentle').split(',').length, qn: getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-snappy').trim().slice(0, 7) }; });
-  check(springs.cls && springs.gentle === 'linear(0,' && /^\d{3}ms$/.test(springs.t) && springs.screenEase === 'linear(' && Math.round(parseFloat(springs.screenDur) * 1000) === parseInt(springs.t, 10) && springs.stops >= 12, `the springs are the stylesheet's easings: the root carries each preset as a linear() curve with its own settle time, and a screen's rise runs on it: ${JSON.stringify(springs)}`);
+  check(springs.cls && springs.gentle === 'linear(0,' && /^\d{3}ms$/.test(springs.t) && springs.screenEase === 'cubic-b' && springs.screenDur === '0.22s' && springs.stops >= 12, `the springs are the stylesheet's easings: the root carries each preset as a linear() curve with its own settle time — and a screen's arrival is the one move every Simpl app makes (2.99.33), 220ms on the house ease-out: ${JSON.stringify(springs)}`);
   // (2.99.20) in Safari each spring is its bezier: Core Animation cannot play linear(), and a rule eased by one would run on
   // the main thread at the page's rate. Asked as Safari (its user agent in every world, the content script's too)
   const sfPage = await context.newPage();

@@ -1,0 +1,2 @@
+# The compiler warnings already known (scripts/dev/check-warnings.py): one a line, by file and words.
+# A build with a warning not here fails. Fixing one: after a full build, run the script with --write.

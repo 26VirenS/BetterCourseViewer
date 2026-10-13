@@ -66,6 +66,50 @@ shoot() {
   ) &
 }
 
+# (1.3.78) Send from Phone, tried as a phone would: phone_send <name> <file>… waits for the picture <name>'s app to say
+# its server's address on the console (-SimplPhoneTest), opens the page there, asks for a wrong key's, then posts each
+# file as the phone's page does (X-File-Name, its type, its length); what it got back goes in phone-test.txt. The app
+# holds its picture until a file has come, so the picture shows them arriving; phone_check reads the consoles after.
+phone_send() {
+  local name="$1"
+  shift
+  (
+    local console="$OUT_ABS/console-$name.txt" url="" i=0 codes=""
+    while [ -z "$url" ] && [ $i -lt 360 ]; do
+      url="$(grep -o 'SimplPhone ready http://[^ ]*' "$console" 2>/dev/null | head -1 | cut -d' ' -f3)"
+      if [ -z "$url" ]; then sleep 0.25; i=$((i + 1)); fi
+    done
+    if [ -z "$url" ]; then echo "$name: no address on the console" >> "$OUT_ABS/phone-test.txt"; exit 0; fi
+    local base="${url%/*/}"
+    local page wrong
+    page="$(curl -s -m 10 -o "$OUT_ABS/phone-page-$name.html" -w '%{http_code}' "$url")"
+    wrong="$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$base/AAAAAAAAAAAAAAAAAAAAAA/")"
+    sleep 1
+    for f in "$@"; do
+      local as="${f##*=}" path="${f%%=*}"
+      codes="$codes $(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST -H 'Expect:' -H "X-File-Name: ${as// /%20}" \
+        -H "Content-Type: $(file -b --mime-type "$path")" --data-binary @"$path" "${url}upload")"
+      sleep 0.6
+    done
+    echo "$name: page $page, wrong key $wrong, uploads$codes" >> "$OUT_ABS/phone-test.txt"
+  ) &
+}
+
+# phone_check: what the server answered and what the app's consoles say came into the hand-in, as phone-check.txt
+phone_check() {
+  local out="$OUT_ABS/phone-check.txt" t="$OUT_ABS/phone-test.txt"
+  : > "$out"
+  ok() { if eval "$2"; then echo "ok   $1" >> "$out"; else echo "FAIL $1" >> "$out"; fi; }
+  ok "the page opened (200) and a wrong key did not (404): $(grep 12d "$t" 2>/dev/null)" "grep -q '12d-hand-in-phone-connected: page 200, wrong key 404, uploads 200 200' '$t'"
+  ok "the page has the assignment's name in it" "grep -q 'Composition of Functions' '$OUT_ABS/phone-page-light-12d-hand-in-phone-connected.html'"
+  ok "the phone was seen to connect" "grep -q 'SimplPhone opened' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
+  ok "the photo is in the hand-in" "grep -q 'SimplHandIn added Photo from phone.jpg' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
+  ok "the notes are in the hand-in" "grep -q 'SimplHandIn added Notes.txt' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
+  ok "a PDF-only assignment's photos were taken and an mp3 refused (415): $(grep 12e "$t" 2>/dev/null)" "grep -q '12e-hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415' '$t'"
+  ok "its two photos became one PDF in the hand-in" "[ \"\$(grep -c 'SimplHandIn added project01.pdf (1 files)' '$OUT_ABS/console-dark-12e-hand-in-phone-photos.txt')\" -ge 2 ]"
+  cat "$out"
+}
+
 # a first launch in each worker's home to warm WebKit and the mock (the first start is slow), not pictured
 for i in $(seq 1 "$JOBS"); do MODE=light shoot "warmup$i" 20; done
 wait
@@ -79,6 +123,24 @@ keep_crashes() {
   done
 }
 
+# (1.3.78) a walk through the app as a student's clicks would make it (Support/OpenClock.swift): each root place, a
+# course and an assignment, then each again — the console's "[Simpl] open <screen>: <ms> (<where from>)" lines are the
+# time of each first visit and each visit again. The walks run last, by themselves (the copies picturing the rest slow
+# them, and unevenly): the app as it is, and as it loaded before 1.3.78 (-SimplPlain: nothing held or read ahead, the
+# Dashboard not kept), side by side, so the two are timed alike — against a Canvas a quarter of a second away, as a
+# school's is (its assignment lists 0.6 s: the web's fluid suite's), not the mock's instant answers. Last, the
+# assignment opened from the Dashboard — its course's place, made with the assignment on it — and Back: the console
+# says "open Assignment" there, not the course's list.
+WALK="todo,grades,calendar,notifications,inbox,course:101,externaltools,dashboard,todo,grades,calendar,notifications,inbox,course:101,push:/courses/101/assignments/1001,back,externaltools,dashboard,push:/courses/101/assignments/1001,back"
+walks() {
+  MODE=light
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":{"/assignments$":600,"":250}}' http://localhost:8800/__mock/config || true
+  shoot light-01w-walk 200 -SimplWalk "$WALK"
+  shoot light-01v-walk-plain 200 -SimplWalk "$WALK" -SimplPlain YES
+  wait
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":null}' http://localhost:8800/__mock/config || true
+}
+
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
 # SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
 if [ "${SHOTS:-full}" = quick ]; then
@@ -88,10 +150,13 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
   shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
+  shoot light-21f-alta-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable" # (1.3.73: the toolbar's pins on the popup's own bar)
+  shoot light-21g-alta-float 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc # (1.3.73: a quick panel pulled out, floating over the popup)
   shoot light-21d-macmillan 20 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
+  shoot light-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
@@ -115,6 +180,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-35-tools 10 -SimplPlace tools
   shoot light-26-school 8 -SimplPicker merced
   shoot light-26b-school-confirm 18 -SimplPicker catcourses -SimplPickerConfirm YES
+  # (1.3.73) the sign-in: Simpl's own card over the school's sign-in page (the mock run with --login, on :8802)
+  BASE=http://localhost:8802 shoot light-60-sign-in 10
   shoot light-27-tour 12 -SimplOpen tour
   # (1.3) themes, To Do's fixed side column, a narrow window, the setup's nicknames
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
@@ -123,8 +190,19 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
   shoot light-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot light-03-todo 12 -SimplPlace todo
+  # (1.3.78) the main screens in both looks, so a change to how screens load and move is seen to leave them as they were
+  shoot light-05-calendar 12 -SimplPlace calendar
+  shoot light-08-course 14 -SimplPlace course:101
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
+  # (1.3.78) Send from Phone: its panel with the code; the phone connected and two files in (posted by phone_send); a
+  # PDF-only assignment's photos made into one PDF, and a kind it does not take refused
+  shoot light-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  printf 'Notes from class, sent from a phone.\n' > "$HOMES/phone-notes.txt"
+  printf 'ID3 not really music\n' > "$HOMES/phone-song.mp3"
+  shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
+  phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
   shoot light-22-setup 14 -SimplOpen setup
   shoot light-53-whats-new 12 -SimplOpen whatsnew
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
@@ -132,10 +210,15 @@ if [ "${SHOTS:-full}" = quick ]; then
   # maker; the 3D molecule builder
   SIZE=1440x920 shoot light-55-ptable-trends 14 -SimplPlace tools -SimplTool ptable -SimplPTColour electronegativity
   SIZE=1440x920 shoot light-55b-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6
+  # (1.3.76) the element page's Cloud view: carbon's whole atom, and the cloud model's test vectors on its console
+  SIZE=1440x920 shoot light-55k-ptable-cloud 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6 -SimplPTModel cloud -SimplCloudCheck YES
   SIZE=1440x920 shoot light-55c-ptable-lewis 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NO₃⁻"
   SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset Benzene
   SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NaNO₃"
   SIZE=1440x920 shoot light-55d-ptable-molecule 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Ethanol
+  # (1.3.74) shapes laid out by VSEPR: carbon dioxide straight, water bent
+  SIZE=1440x920 shoot light-55k-molecule-co2 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule "Carbon dioxide"
+  SIZE=1440x920 shoot light-55l-molecule-water 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Water
   # (1.3.59) the tour, at its Draw your own step; (1.3.61) and at its first, the table's carbon lit
   SIZE=1440x920 shoot light-55h-ptable-tour 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 4
   SIZE=1440x920 shoot light-55i-ptable-tour-start 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 0
@@ -144,13 +227,27 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   SIZE=1440x920 shoot dark-55e-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
+  # (1.3.76) iron's cloud in dark, its 3d chosen: the rest of the atom grey
+  SIZE=1440x920 shoot dark-55l-ptable-cloud 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26 -SimplPTModel cloud -SimplPTSubshell 3d
   shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
+  shoot dark-03-todo 12 -SimplPlace todo
+  shoot dark-04-grades 12 -SimplPlace grades
+  shoot dark-05-calendar 12 -SimplPlace calendar
+  shoot dark-08-course 14 -SimplPlace course:101
+  shoot dark-36-external-tools 16 -SimplPlace externaltools
+  shoot dark-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
+  BASE=http://localhost:8802 shoot dark-60-sign-in 10
+  shoot dark-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
+  phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
   wait
+  walks
+  phone_check
   keep_crashes
   exit 0
 fi
@@ -168,6 +265,7 @@ for MODE in light dark; do
   shoot "$MODE-10-assignment" 14 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
   shoot "$MODE-11-course-grades" 14 -SimplPlace section:courses/101:grades
   shoot "$MODE-12-hand-in" 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+  shoot "$MODE-12c-hand-in-phone" 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot "$MODE-13-discussion" 14 -SimplPlace course:101 -SimplPush /courses/101/discussion_topics/7003
   shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
   shoot "$MODE-15-files" 12 -SimplPlace section:courses/101:files
@@ -179,12 +277,15 @@ for MODE in light dark; do
   shoot "$MODE-21-tool" 16 -SimplOpen tool:101:9
   shoot "$MODE-21a-alta" 20 -SimplOpen alta:104:4003
   shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
+  shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
+  shoot "$MODE-21g-alta-float" 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc
   shoot "$MODE-22-setup" 14 -SimplOpen setup
   shoot "$MODE-23-settings" 12 -SimplOpen settings
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
   shoot "$MODE-26-school" 8 -SimplPicker merced
   shoot "$MODE-26b-school-confirm" 18 -SimplPicker catcourses -SimplPickerConfirm YES
+  BASE=http://localhost:8802 shoot "$MODE-60-sign-in" 10 # (1.3.73) Simpl's own sign-in card over the school's page
   # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
@@ -227,6 +328,7 @@ shoot d2l-07-discussion 14 -SimplPlace course:31001 -SimplPush /courses/31001/di
 shoot d2l-08-todo 12 -SimplPlace todo
 unset BASE
 wait # (the rest alone: a running focus timer is kept)
+walks
 # (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
 shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
 shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
