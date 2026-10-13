@@ -692,8 +692,8 @@ final class Engine: ObservableObject, ShellListener {
     /// arrives (PageArrival). A move within a place swaps its screen at once — the stack keeps the one under it as it
     /// was — and the screen on top arrives by itself, so a push and a Back move as the places do. So does a move to
     /// another place with a screen already on it (an assignment opened from Grades, To Do or the Dashboard, or Back to
-    /// one): its stack is made alone, the old one gone at once, and the screen on top arrives by itself — a stack made
-    /// beside another still fading out showed its own place's list, not the screen it was made with.
+    /// one), as the push it is: the old page goes at once and the screen on top arrives by itself, its place's own page
+    /// never shown under it (DetailStack).
     private func moving(_ kind: PageMove.Kind, animated: Bool = true, _ change: (inout Navigator) -> Void) {
         var next = nav
         change(&next)

@@ -143,6 +143,10 @@ struct DetailStack: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: drawn again as the window moves)
     @State private var dashboardKept = false
+    /// (1.3.78) The place whose stack is up. A stack is made with nothing pushed on it and given its place's screens once
+    /// it is there, as a push: made with screens already on it (an assignment opened from Grades, To Do or the
+    /// Dashboard; Back or Forward to one), it set them away itself as it appeared, and showed its place's list.
+    @State private var standing: Place?
 
     var body: some View {
         let place = engine.nav.current.place
@@ -150,12 +154,12 @@ struct DetailStack: View {
         let dashboardUp = place == .dashboard && path.isEmpty
         ZStack {
             // (1.3.78) the stack's path is its own place's: a stack on its way out, as another place's comes in, keeps
-            // the path it had — it never takes up the new place's (a screen opened in another course's place would be
-            // pushed on the page leaving, and that page's stack, going, would set the path back)
+            // the path it had — it never takes up the new place's — and one coming in has none until it is up
             NavigationStack(path: Binding(get: {
-                engine.nav.current.place.identity == place.identity ? engine.nav.current.path : path
+                guard engine.nav.current.place.identity == place.identity else { return path }
+                return standing == place.identity ? engine.nav.current.path : []
             }, set: { p in
-                guard engine.nav.current.place.identity == place.identity else { return }
+                guard engine.nav.current.place.identity == place.identity, standing == place.identity else { return }
                 // (in the screenshot suite and developer mode the console says so: only the stack's own Back does this)
                 if OpenClock.verbose, p != engine.nav.current.path {
                     NSLog("[Simpl] stack: %@ set its own path, %d screens to %d", Engine.name(of: place), engine.nav.current.path.count, p.count)
@@ -164,6 +168,7 @@ struct DetailStack: View {
             })) {
                 PlaceScreen(place: place)
                     .background(PageGround().ignoresSafeArea())
+                    .modifier(RootUnseen(top: path.isEmpty))
                     .modifier(PageArrival(move: engine.move, top: path.isEmpty && place != .dashboard))
                     .navigationDestination(for: Route.self) { route in
                         RouteScreen(route: route)
@@ -172,6 +177,16 @@ struct DetailStack: View {
                             .background(PageGround().ignoresSafeArea())
                             .modifier(PageArrival(move: engine.move, top: engine.nav.current.path.last == route))
                     }
+            }
+            .onAppear {
+                // (each place's stack, as it is made: up on the run loop's next turn, its screens put on it at once —
+                // the one on top arrives by itself)
+                let id = place.identity
+                DispatchQueue.main.async {
+                    var t = Transaction()
+                    t.disablesAnimations = true
+                    withTransaction(t) { standing = id }
+                }
             }
             .id(place.identity)
             .transition(.page)
@@ -189,6 +204,25 @@ struct DetailStack: View {
         }
         .onAppear { if dashboardUp && !Engine.plain { dashboardKept = true } }
         .onChange(of: dashboardUp) { _, up in if up && !Engine.plain { dashboardKept = true } }
+    }
+}
+
+/// (1.3.78) A place's own page in a stack made with screens due on it: not shown until it is the one on top (Back to
+/// it), so it never shows between the page left and the screen arriving over it. One that has been on top stays under
+/// the screens pushed on it, as it was.
+private struct RootUnseen: ViewModifier {
+    let top: Bool
+    @State private var seen: Bool
+
+    init(top: Bool) {
+        self.top = top
+        _seen = State(initialValue: top)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(seen ? 1 : 0)
+            .onChange(of: top) { _, now in if now { seen = true } }
     }
 }
 

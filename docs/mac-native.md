@@ -404,8 +404,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     swaps the stack's screen at once (the screen under it kept as it was) and the new top arrives by itself; one to
     another place fades the old page out the way the move goes (`PageExit`) while the new one arrives (`PageArrival`),
     unless the place comes with a screen already on it (an assignment opened from Grades, To Do or the Dashboard; Back
-    or Forward to one): then, as with a push, the old page goes at once and the screen on top arrives, its place's
-    stack made alone — a stack made beside another still fading out showed its place's list, not the screen on it.
+    or Forward to one): then, as with a push, the old page goes at once and the screen on top arrives, the place's
+    own page never shown under it (`RootUnseen`). A place's stack is made with nothing on it and given its screens on
+    the run loop's next turn, once it is up: a `NavigationStack` made with screens already on it set them away itself
+    as it appeared (the console said `stack: … set its own path, 1 screens to 0`) and showed its place's list.
     Under Reduce Motion every move is a cross-fade. No element is morphed from one screen into the next: the card and
     the course's heading are drawn by different screens, and a morph between them could not be kept clean.
 
