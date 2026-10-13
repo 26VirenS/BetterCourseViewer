@@ -353,7 +353,16 @@ try {
   }, [BASE, op]);
   // the page: one row at the bottom of the nav, five cards
   const raw = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim())); // (textContent: the small labels are drawn in capitals by CSS)
-  const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
+  // (a popup that stays after its Escape says where the keyboard was and what was open, before and after: now and
+  //  then in CI the graphing tool's did, and only its state can say why)
+  const keyState = () => page.evaluate(() => ({ active: document.activeElement ? `${document.activeElement.tagName.toLowerCase()}.${String(document.activeElement.className).trim().replace(/\s+/g, '.')}` : null, focused: document.hasFocus(), visible: document.visibilityState, overlays: [...document.querySelectorAll('.bcv-sheet-ov')].map((o) => o.className) })).catch((e) => String(e));
+  const closeTool = async () => {
+    const before = await keyState();
+    await page.keyboard.press('Escape');
+    try { await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); } catch (e) {
+      throw new Error(`the tool's popup stayed after Escape: before ${JSON.stringify(before)}, after ${JSON.stringify(await keyState())} (${e.message.split('\n')[0]})`);
+    }
+  };
   const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
   const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
   // and back
