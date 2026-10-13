@@ -63,6 +63,11 @@ struct BioSceneView: View {
     /// A click on an object or its label (nil: on nothing); by default it sets the selection.
     var onPick: ((String?) -> Void)? = nil
     var onDoubleClick: ((String?) -> Void)? = nil
+    /// The object under the pointer (or its label) changed: its id, or nil — for a tool's tooltip.
+    var onHover: ((String?) -> Void)? = nil
+    /// Points on the screen per scene unit at the framed ball's centre, told when the camera's zoom changes it — for a
+    /// scale bar.
+    var onScale: ((Double) -> Void)? = nil
 
     @StateObject private var live = BioSceneLive()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -71,7 +76,7 @@ struct BioSceneView: View {
         ZStack(alignment: .topLeading) {
             BioSceneRepresentable(key: key, build: build, extras: extras, selection: selection, showLabels: showLabels,
                                   turning: turning && !reduceMotion, frameKey: frameKey, reset: reset, zoom: zoom, dimOthers: dimOthers,
-                                  reduceMotion: reduceMotion, live: live, pick: pick, doubleClick: doubleClick)
+                                  reduceMotion: reduceMotion, live: live, pick: pick, doubleClick: doubleClick, hover: onHover, scale: onScale)
             if showLabels {
                 BioLabelsOverlay(live: live, reduceMotion: reduceMotion, pick: pick)
             }
@@ -260,6 +265,8 @@ struct BioSceneRepresentable: NSViewRepresentable {
     let live: BioSceneLive
     let pick: (String?) -> Void
     let doubleClick: (String?) -> Void
+    var hover: ((String?) -> Void)? = nil
+    var scale: ((Double) -> Void)? = nil
 
     func makeCoordinator() -> BioSceneCoordinator { BioSceneCoordinator(live: live) }
 
@@ -352,13 +359,17 @@ final class BioSceneCoordinator: NSObject {
     private var resume: Task<Void, Never>?
     private var lastHover = Date.distantPast
     private var hoverSink: AnyCancellable?
+    private var lastScale = 0.0
 
     init(live: BioSceneLive) {
         self.live = live
         super.init()
         // (whatever is hovered — an object in the scene, or its label over it — outlined)
         hoverSink = live.$hovered.removeDuplicates().sink { [weak self] id in
-            MainActor.assumeIsolated { self?.outline(id) }
+            MainActor.assumeIsolated {
+                self?.outline(id)
+                self?.config?.hover?(id)
+            }
         }
     }
 
@@ -382,9 +393,9 @@ final class BioSceneCoordinator: NSObject {
             }
         }
         applyTurning(c.turning)
-        if c.showLabels {
-            startLabels()
-        } else if !live.labels.isEmpty || live.more != 0 {
+        // (the labels' timer also measures the scale, for a tool that asks)
+        if c.showLabels || c.scale != nil { startLabels() }
+        if !c.showLabels && (!live.labels.isEmpty || live.more != 0) {
             // (not while SwiftUI is updating the view: after it)
             Task { [weak self] in
                 self?.live.labels = []
@@ -653,10 +664,27 @@ final class BioSceneCoordinator: NSObject {
     private func startLabels() {
         guard timer == nil else { return }
         let t = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tickLabels() }
+            MainActor.assumeIsolated {
+                self?.tickScale()
+                self?.tickLabels()
+            }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+    }
+
+    /// For a tool's scale bar: how many points one scene unit spans at the framed ball's centre (a ruler one unit long
+    /// along the camera's right, projected), told when it changes by more than half a percent.
+    private func tickScale() {
+        guard let report = config?.scale, content != nil, let v = view, let cam = v.pointOfView, let turn = node("turn") else { return }
+        let c3 = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(framing.centre.x), Float(framing.centre.y), Float(framing.centre.z)), to: nil)
+        let e3 = c3 + cam.presentation.simdWorldRight
+        let pc = v.projectPoint(SCNVector3(CGFloat(c3.x), CGFloat(c3.y), CGFloat(c3.z)))
+        let pe = v.projectPoint(SCNVector3(CGFloat(e3.x), CGFloat(e3.y), CGFloat(e3.z)))
+        let s = hypot(Double(pe.x - pc.x), Double(pe.y - pc.y))
+        guard s.isFinite, s > 0, abs(s - lastScale) > lastScale * 0.005 else { return }
+        lastScale = s
+        report(s)
     }
 
     func stop() {

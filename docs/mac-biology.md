@@ -167,7 +167,9 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   `BioMoleculeScene.items(model, style:, hydrogens:, color:)` draws atoms (CPK, chemistry radii, UV spheres ≤ 300
   atoms, icospheres above) and bonds; `BioMoleculeScene.symbolNodes` the atom letters (as `extras`).
 - **The view:** `BioSceneView(key:, build: BioSceneBuild { … }, extras:, selection: $sel, showLabels:, turning:,
-  frameKey:, reset:, zoom: BioZoomRequest?, dimOthers:, accessibility:, onPick:, onDoubleClick:)`. The build closure
+  frameKey:, reset:, zoom: BioZoomRequest?, dimOthers:, accessibility:, onPick:, onDoubleClick:, onHover:, onScale:)`
+  (`onHover` tells the id under the pointer, for a tooltip; `onScale` the points one scene unit spans at the framed
+  ball's centre whenever the zoom changes it, for a scale bar). The build closure
   runs off the main thread — capture copies, not your ObservableObject; it runs again only when `key` changes (put
   page, options and light/dark in it). The camera frames the content (40°, 1.15·R/sin 20°) on the first scene and when
   `frameKey` changes; `reset += 1` puts it back; `zoom` frames an object. Click picks (opaque first, through
@@ -203,3 +205,29 @@ proteins and tRNA, the geometry and label layout). Add yours in `Model/<Tool>Mod
 `extension BioSelfCheck { static func cellChecks(_ r: inout BioCheckReport) { r.near("cell.count", …) } }` with
 `r.check(name, value, ok)`, `r.near(name, value, expected, tolerance)`, `r.same(name, value, expected)`. Names have no
 spaces. CI's Models job fails on any FAIL.
+
+## Cell Explorer (`cell`)
+
+`CellExplorerTool.swift` (the pages; a cell's page `CECellPage`), `CellExplorerViews.swift` (card rows, the scale bar
+and chip, the quiz), `CellExplorerPages.swift` (Compare, Membrane, the POPC sheet, the membrane's moving nodes). Model
+(Foundation only): `CellExplorerText.swift` (§5.1.1–5.1.4 copied by a script — never edited by hand), `CellExplorerModel.swift`
+(`CEParts`: each part's card from those words; `CECompare`; `CEAbout`; `CEQuiz`; `CEModel.modelLine`),
+`CellExplorerGeometry.swift` (`CERecipes`: §5.1.5's organelles in their own frames; `CEGeo`), `CellExplorerBuild.swift` and
+`CellExplorerCells.swift` (`CEBuild.build(CEBuildOptions)`: the placement, each cell's recipe in its draw order, the
+labels' anchors, Look inside; `CEBuildCache`), `CellExplorerScene.swift` (`CEScene.content(model, CEView)`: explode,
+fade, isolate, labels; the Compare page's three cells), `CellMembraneModel.swift` (`CEMembrane`: the 60 × 60 nm patch)
+and `CellExplorerChecks.swift` (the `cell.…` self-check lines: counts, the 250k-triangle budget, inside the membrane,
+the empty cutaway wedge, the same twice, explode and fade, chloroplasts, the dented vacuole, left-handed flagella, true
+scale, labels, SA:V, the membrane).
+
+Scene ids: `organelle:<part>:<n>` (a click selects the part: every `organelle:<part>:…` glows), `inside:<part>:…` (Look
+inside's labels), `cell:<kind>` (Compare), `part:<id>…` and `side:outside|inside` (Membrane). Remembered:
+`SimplBio.cell.cutaway|labels|trueScale|gramPositive|hidden.<kind>|membrane.*`. The cells are turned 32° and tilted
+22° in the scene (a three-quarter view into the cut); the membrane 30° and 26°.
+
+Launch states: `animal|plant|bacterium[:nocut][:nolabels][:true][:gram+][:explode=0.6][:show=flagellum,amyloplast]`
+`[:select=<part>|:isolate=<part>|:inside=mito|chloroplast|nucleus][:quiz=find|name]`; `membrane[:select=<id>][:osmosis]`
+`[:still][:nolabels][:popc]`; `compare`; `-SimplBioCell animal|plant|bacterium` picks the cell. "Why are cells small?"
+opens the Bio Lab Calculator's `cells` page with `["from": "cell", "savShape": "sphere"|"rectangular"|"cylinder",
+"savSize": "18.9" | "44,26,26" | "1,2", "savUnit": "µm"]`; "Make flashcards" adds a Flashcards set and opens it
+(`["deck": id]`).
