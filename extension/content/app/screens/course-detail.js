@@ -781,11 +781,15 @@
     } });
     const entryEl = (e, depth) => {
       const author = people.get(String(e.user_id));
+      // (a reply's own files: the view gives one as `attachment`, newer Canvas as `attachments` — a reply may be a file alone)
+      const seen = new Set();
+      const files = e.deleted ? [] : [...(Array.isArray(e.attachments) ? e.attachments : []), ...(e.attachment ? [e.attachment] : [])].filter((x) => x?.url && !seen.has(x.url) && seen.add(x.url));
       return U.el(`bcv-entry ${depth === 1 ? 'bcv-entry--reply' : depth >= 2 ? 'bcv-entry--reply2' : ''}`, [
         U.avatar(author?.avatar_image_url, author?.display_name, 38),
         U.el('bcv-entry__body', [
           U.el('bcv-entry__head', [U.text('bcv-entry__author', author?.display_name || 'Deleted user', 'span'), U.text('bcv-entry__date', U.fmtAtUpper(e.created_at), 'span'), e.deleted ? U.badge('Deleted', '', 'bcv-badge--xs') : null]),
-          e.deleted ? null : CS().prose(e.message || '', { cls: 'bcv-prose--14 bcv-entry__msg' }),
+          e.deleted || (!e.message && files.length) ? null : CS().prose(e.message || '', { cls: 'bcv-prose--14 bcv-entry__msg' }),
+          files.length ? U.el('bcv-chips', files.map((att) => h('a', { class: 'bcv-chip', href: att.url, target: '_blank', rel: 'noopener', text: att.display_name || att.filename || 'Attachment' }))) : null,
           t.locked || e.deleted ? null : U.el('bcv-entry__actions', h('button', { type: 'button', class: 'bcv-entry__action', text: 'Reply', onclick: () => { replyTo = { id: e.id, name: author?.display_name || 'this post' }; replyTitle.textContent = `Reply to ${replyTo.name}`; cancelReply.hidden = false; replyBox.focus(); } })),
         ]),
       ]);

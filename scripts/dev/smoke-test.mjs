@@ -821,8 +821,8 @@ try {
       label: cols[0].querySelector('.bcv-sky__tower').getAttribute('aria-label'),
     };
   });
-  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'AB*D*A*F*A*F*' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && sky.label === 'F26-MATH 021 20: 92%, 1 graded, 4 to come, 12 not counted. Open its grades.'
-    && sky.grey.up === 5 && sky.grey.down === 12 && !sky.grey.mixed && sky.grey.filter && sky.grey.pane && sky.grey.below && sky.grey.street === 7,
+  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'AB*D*A*F*A*F*' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && sky.label === 'F26-MATH 021 20: 92%, 1 graded, 4 to come, 13 not counted. Open its grades.'
+    && sky.grey.up === 5 && sky.grey.down === 13 && !sky.grey.mixed && sky.grey.filter && sky.grey.pane && sky.grey.below && sky.grey.street === 7,
     `the grades skyline stands at the workload's left — towers as tall as the scores (the lab, unscored, an outline), windows lit in their grades' colours from the top, and what does not count toward the total (MATH's 0%-weight groups, its omitted check) in grey at the street: ${JSON.stringify(sky)}`);
   await shot(page, '01a-dashboard-skyline');
   await page.click('.bcv-sky__col[data-course="101"] .bcv-sky__tower');
@@ -1596,7 +1596,7 @@ try {
   const gpaStats = await texts('.bcv-gpa__stat');
   check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');
-  check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
+  check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 517 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
   // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
   const pfCourse = await page.$eval('.bcv-gpa__card', (e) => e.dataset.course);
   const gpaBefore = (await texts('.bcv-gpa__value'))[0];
@@ -1640,7 +1640,7 @@ try {
   await page.click('.bcv-gpa__card .bcv-gpa__details');
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   const detail = (await texts('.bcv-gpa-detail'))[0];
-  check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ Open the course’s Grades page by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 17 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
+  check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ Open the course’s Grades page by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 18 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
   // one steady size, the breakdown on the left and the assignments on the right, each side scrolling on its own
   await page.waitForTimeout(500); // (the sheet's morph out of the Details button settles before it is measured)
   const detailBox = await page.$eval('.bcv-gpa-detail', (e) => { const cols = e.querySelector('.bcv-gpa-detail__cols'); const right = e.querySelector('.bcv-gpa-detail__col--right'); const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), cols: getComputedStyle(cols).gridTemplateColumns.split(' ').length, rightScrolls: right.scrollHeight > right.clientHeight + 2, sheetScrolls: e.scrollHeight > e.clientHeight + 2, go: e.querySelector('.bcv-gpa-detail__go')?.textContent.trim(), goTag: e.querySelector('.bcv-gpa-detail__go')?.tagName, goByX: !!e.querySelector('.bcv-sheet__head .bcv-gpa-detail__go + .bcv-sheet__close'), link: !!e.querySelector('.bcv-gpa-detail__link') }; });
@@ -1650,14 +1650,14 @@ try {
   const sheetPick = await page.evaluate(() => ({ has: !!document.querySelector('.bcv-gpa-detail.has-pick'), rows: [...document.querySelectorAll('.bcv-gpa-detail__arow.is-picked .bcv-gpa-detail__agroup')].map((e) => e.textContent.split(' · ')[0]), dim: document.querySelectorAll('.bcv-gpa-detail__arow.is-dim').length, rings: document.querySelectorAll('.bcv-gpa-detail__ring circle.is-picked').length, note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
   await page.keyboard.press('Escape');
   const sheetEsc = await page.evaluate(() => ({ open: !!document.querySelector('.bcv-gpa-detail'), has: !!document.querySelector('.bcv-gpa-detail.has-pick'), note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
-  check(sheetPick.has && sheetPick.rows.length === 8 && sheetPick.rows.every((g) => g === 'Effort') && sheetPick.dim === 9 && sheetPick.rings === 2 && sheetPick.note === 'Effort · 8 assignmentsShow all' && sheetEsc.open && !sheetEsc.has && sheetEsc.note === 'Blue dot means graded', `the details sheet: a group pressed picks out its ring and assignments, Escape lets it go and leaves the sheet open: ${JSON.stringify({ sheetPick, sheetEsc })}`);
+  check(sheetPick.has && sheetPick.rows.length === 8 && sheetPick.rows.every((g) => g === 'Effort') && sheetPick.dim === 10 && sheetPick.rings === 2 && sheetPick.note === 'Effort · 8 assignmentsShow all' && sheetEsc.open && !sheetEsc.has && sheetEsc.note === 'Blue dot means graded', `the details sheet: a group pressed picks out its ring and assignments, Escape lets it go and leaves the sheet open: ${JSON.stringify({ sheetPick, sheetEsc })}`);
   // By letter in the sheet too (2.98.35)
   const sheetStops = await page.$$eval('.bcv-gpa-detail .bcv-bands__stop', (els) => Object.fromEntries(els.map((e) => [e.dataset.band, Number(e.querySelector('.bcv-bands__n').textContent)])));
   await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="A"]');
   const sheetA = await page.$$eval('.bcv-gpa-detail__arow', (els) => els.map((r) => r.querySelector('.bcv-bandchip')?.textContent));
   await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="all"]');
   const sheetAll = (await page.$$('.bcv-gpa-detail__arow')).length;
-  check(sheetStops.A >= 1 && sheetA.length === sheetStops.A && sheetA.every((c) => c === 'A') && sheetAll === 17, `the details sheet's By letter lists one letter's work alone: ${JSON.stringify({ sheetStops, sheetA, sheetAll })}`);
+  check(sheetStops.A >= 1 && sheetA.length === sheetStops.A && sheetA.every((c) => c === 'A') && sheetAll === 18, `the details sheet's By letter lists one letter's work alone: ${JSON.stringify({ sheetStops, sheetA, sheetAll })}`);
   // the Grades page lists the same assignments, and they open the same way the course page's do
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
@@ -1670,13 +1670,13 @@ try {
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   await page.click('.bcv-gpa-detail__step:last-child');
   await waitText('.bcv-gpa-detail__tval', /^A · 93%$/);
-  check(/Needs 9\d% of the remaining 507 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
+  check(/Needs 9\d% of the remaining 517 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
   // what-if scores in the sheet: the button loads the real scores into bigger, tinted fields; a change
   // moves the total at the top (red, marked what-if) and nothing behind the sheet moves
   await page.click('.bcv-gpa-detail .bcv-whatif-btn');
   await page.waitForSelector('.bcv-gpa-detail .bcv-whatif__input', { timeout: 5000 });
   const wfFields = await page.$$eval('.bcv-gpa-detail .bcv-whatif__input', (els) => ({ n: els.length, h: Math.round(els[0].getBoundingClientRect().height), w: Math.round(els[0].getBoundingClientRect().width), bg: getComputedStyle(els[0]).backgroundColor, hyp: els.filter((e) => e.classList.contains('is-hyp')).length, first: els[0].value, bannerH: Math.round(document.querySelector('.bcv-gpa-detail .bcv-banner--sm')?.getBoundingClientRect().height || 0) }));
-  check(wfFields.n === 17 && wfFields.h >= 34 && wfFields.w >= 68 && wfFields.bg !== 'rgba(0, 0, 0, 0)' && !/^rgb\(255, 255, 255\)$/.test(wfFields.bg) && wfFields.hyp === 0 && wfFields.bannerH > 0 && wfFields.bannerH < 120 && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Exit what-if mode' && (await page.$eval('.bcv-gpa-detail__pct', (e) => e.classList.contains('is-hyp'))), `Try what-if scores: a bigger tinted field per assignment with the real score in it, the banner up: ${JSON.stringify(wfFields)}`);
+  check(wfFields.n === 18 && wfFields.h >= 34 && wfFields.w >= 68 && wfFields.bg !== 'rgba(0, 0, 0, 0)' && !/^rgb\(255, 255, 255\)$/.test(wfFields.bg) && wfFields.hyp === 0 && wfFields.bannerH > 0 && wfFields.bannerH < 120 && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Exit what-if mode' && (await page.$eval('.bcv-gpa-detail__pct', (e) => e.classList.contains('is-hyp'))), `Try what-if scores: a bigger tinted field per assignment with the real score in it, the banner up: ${JSON.stringify(wfFields)}`);
   const pctBefore = (await texts('.bcv-gpa-detail__pct'))[0];
   // every graded assignment zeroed (one alone could sit in a group that carries no weight): the total has to move
   const gradedWf = await page.$$eval('.bcv-gpa-detail__arow', (rows) => rows.filter((r) => r.querySelector('.bcv-whatif__input') && r.querySelector('.bcv-gpa__catdot')?.style.background === 'rgb(10, 132, 255)' && r.querySelector('.bcv-whatif__input').value !== '0').map((r) => r.querySelector('.bcv-whatif__input').dataset.wf)); // (a real 0 set to 0 is no change)
@@ -1701,7 +1701,7 @@ try {
   check((await texts('.bcv-gpa-detail__pct'))[0] === pctBefore && !(await page.$('.bcv-gpa-detail .bcv-wfadd__rm')), 'Clear all puts the real scores back, and takes the made-up assignment away');
   await page.click('.bcv-gpa-detail .bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input'), null, { timeout: 5000 });
-  check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 17 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
+  check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 18 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
   // the button on the left is the way through to the course's own Grades page, and it takes the sheet with it
   await page.click('.bcv-gpa-detail__go');
   await page.waitForFunction(() => /\/courses\/\d+\/grades$/.test(location.pathname) && !document.querySelector('.bcv-sheet-ov'), null, { timeout: 10000 });
@@ -2696,7 +2696,7 @@ try {
   await shot(page, '12-course-announcements');
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 2, 'announcement opens as a thread');
+  check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 3 && (await texts('.bcv-entry .bcv-chip')).includes('W8 Discussion Worksheet - More Newton’s Laws.pdf'), 'announcement opens as a thread (a reply that is a file alone shows its file)');
 
   // assignments
   await tab('assignments');
@@ -2780,7 +2780,7 @@ try {
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
-  check((await page.$$('.bcv-entry')).length === 2 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
+  check((await page.$$('.bcv-entry')).length === 3 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
   await page.fill('.bcv-reply textarea', 'My question is about removable discontinuities.');
   await page.click('.bcv-reply .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 3, null, { timeout: 10000 });
@@ -2806,7 +2806,7 @@ try {
   check((await page.$$('.bcv-wbar__seg')).length === 3 && (await page.$$('.bcv-wbar__seg--ungraded')).length === 2 && wbar.join(' | ') === 'Discussion Quizzes 18% of grade 100% | Midterms 57% of grade ungraded | Final 25% of grade ungraded' && (await texts('.bcv-gr__hsub'))[0] === '100% of final grade', `weight bar: ${wbar.join(' | ')}`);
   check((await texts('.bcv-gr__wnote'))[0] === 'Effort, Collaboration and Coursework (Knewton Alta) carry 0% weight — they show as rings but never move the total.', `0%-weight note: ${(await texts('.bcv-gr__wnote'))[0]}`);
   const gradeRows = await texts('.bcv-grades__main .bcv-row');
-  check(gradeRows.length === 17 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
+  check(gradeRows.length === 18 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
   check(gradeRows.some((t) => /Skills_Check.*Not counted toward final grade/.test(t)) && gradeRows.some((t) => /Transformation.*Late/.test(t)), 'late / not-counted badges');
   check(!(await page.$('.bcv-grades__side')) && !(await texts('.bcv-label')).some((t) => /assignment group weights/i.test(t)), 'no separate group-weights card: the weights live in the grade card');
   await shot(page, '16-course-grades');
@@ -2825,7 +2825,7 @@ try {
   }));
   await page.locator('.bcv-legend__row[data-pick]', { hasText: 'Effort' }).click();
   const pickEffort = await pickState();
-  check(pickEffort.rows.length === 8 && pickEffort.rows.every((g) => g === 'Effort') && pickEffort.dim === 9 && pickEffort.rings === 2 && pickEffort.ringsDim === 6 && pickEffort.legend === 'Effort' && pickEffort.pressed === 'true' && pickEffort.note === 'Effort · 8 assignmentsShow all', `pressing a group picks out its ring and its assignments; the rest steps back: ${JSON.stringify(pickEffort)}`);
+  check(pickEffort.rows.length === 8 && pickEffort.rows.every((g) => g === 'Effort') && pickEffort.dim === 10 && pickEffort.rings === 2 && pickEffort.ringsDim === 6 && pickEffort.legend === 'Effort' && pickEffort.pressed === 'true' && pickEffort.note === 'Effort · 8 assignmentsShow all', `pressing a group picks out its ring and its assignments; the rest steps back: ${JSON.stringify(pickEffort)}`);
   await shot(page, '16b-course-grades-group');
   await page.locator('.bcv-wbar__row[data-pick]', { hasText: 'Midterms' }).click();
   const pickMid = await pickState();
@@ -2879,7 +2879,7 @@ try {
   await page.waitForSelector('.bcv-banner', { timeout: 5000 });
   check((await texts('.bcv-banner__title'))[0] === 'This is not your actual score.', 'what-if banner');
   const inputs = await page.$$('.bcv-whatif__input');
-  check(inputs.length === 17, 'what-if inputs for every row');
+  check(inputs.length === 18, 'what-if inputs for every row');
   const midterm = (await page.$$('.bcv-grades__main .bcv-row')).find(async () => true);
   void midterm;
   const rows = await page.$$('.bcv-grades__main .bcv-row');
@@ -4591,7 +4591,9 @@ try {
   const knewTitle = await gtitle();
   const [knewTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await knewTab.waitForLoadState('domcontentloaded').catch(() => {});
-  check(knewTitle === 'Open a tool' && knewRows.length === 2 && knewRows[0].t === 'Knewton Alta' && knewRows[0].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows[0].acts.join() === 'Open tool,Assignment' && knewRows[1].t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(knewRows[1].s) && knewTab.url() === `${BASE}/courses/104/external_tools/retrieve?assignment_id=4003&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by Canvas's own launch route: “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
+  // (Knewton Alta is in two courses: a row for the tool in each, each through that course's assignment nearest its due — SPRK's
+  // through Unit 2, not Unit 1 handed in nor Units 3 and 4 further off — then the assignments that are the tool)
+  check(knewTitle === 'Open a tool' && knewRows.length === 7 && knewRows.slice(0, 2).every((r) => r.t === 'Knewton Alta' && r.acts.join() === 'Open tool,Assignment') && knewRows[0].s === 'MATH-021-20 · Tool · via Knewton Alta: Limits Practice' && knewRows[1].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows.some((r) => r.t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(r.s)) && knewTab.url() === `${BASE}/courses/101/external_tools/retrieve?assignment_id=1090&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by Canvas's own launch route: “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
   await knewTab.close().catch(() => {});
   const modRows = await findRows('/open mastering');
   const [modTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);

@@ -29,6 +29,7 @@
       { kind: 'improved', title: 'Smoother exits', body: 'Sets, pins, dropdowns and widgets leave, not vanish.', icon: P.arrows },
       { kind: 'improved', title: 'Sections slide open', body: 'Idle courses, quiz options and scales slide, not jump.', icon: P.layers },
       { kind: 'improved', title: 'Flashcards tick', body: 'A finished round draws its tick, as a quiz does.', icon: P.check },
+      { kind: 'fixed', title: 'Files in replies', body: 'A reply that is a file shows the file.', icon: P.clip },
     ] },
     { version: '2.99.31', date: '2026-10-10', notes: [
       { kind: 'fixed', title: 'Finished quizzes', body: 'A Brightspace quiz you finished shows as done.', icon: P.check },
