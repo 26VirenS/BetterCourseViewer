@@ -321,7 +321,7 @@ slower number never fails a run, and nothing waits for it but the pictures' merg
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
 | `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
-| `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
+| `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder). |
 
 ## A screen
@@ -403,6 +403,45 @@ A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grow
 `WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
 Calendar's `CalendarPeek`). The card reads the work's details as it opens, Mark done ticks it, a double-click or a
 Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row.
+
+## Send from Phone
+
+Hand In's *Send from Phone…* (beside Choose Files…, for an assignment that takes files) opens a panel over the form
+with a QR code (`Screens/Assignment/PhoneHandIn.cs`). The phone's own camera opens it: a page this PC serves itself
+(`Assets/PhoneHandIn.html`, an embedded resource — the same file as the Mac app's), with the assignment, its course and
+the kinds of file it takes, *Take Photo* and *Choose Files*, each file's progress and Retry, then "Sent to your PC —
+finish handing in there." Each file comes into the hand-in as if chosen with Choose Files… (its type checked, converted
+where it must be); the student looks it over and presses Submit on the PC — nothing is handed in by itself.
+
+- **No server anywhere.** `Support/PhoneServer.cs` is a small web server on plain sockets (`TcpListener`, not
+  `HttpListener`, which needs an address an administrator reserves) on this PC's private Wi-Fi or Ethernet address
+  (`PhoneLan.Best()`: never a VPN's, a virtual switch's or Bluetooth's) and a port Windows picks. It is up only while the
+  panel is open: it stops when the panel closes, when the hand-in is sent or cancelled, and after 15 minutes with nothing
+  from the phone. The address holds a 128-bit one-time key, compared in constant time; every other path is 404; only
+  private addresses may connect; a file is at most 50 MB (Hand In's own limit) and a session 500 MB; names are made safe
+  (no folders, nothing Windows forbids, not CON or NUL); what came waits in `%TEMP%\SimplPhone-…`, deleted with the
+  hand-in. The page is served with a strict Content-Security-Policy and asks for nothing but its uploads.
+- **Reachability.** The panel says where this PC is ("This PC is on Wi-Fi at 192.168.1.23") and that the phone must be
+  on the same Wi-Fi — some school networks keep devices apart; a phone's hotspot works. With no such address: "Connect
+  this computer to Wi-Fi to use your phone." The first time, before it listens, the panel says Windows will ask whether
+  Simpl may use the network (choose Allow) — `phoneAsked` in prefs.json remembers it was said.
+- **Photos into one PDF.** For an assignment that takes PDFs and not pictures, *Combine photos into one PDF*: each photo
+  turned upright (`WinImage.Read`, its EXIF orientation), no larger than 2200 pixels, a JPEG page each in the order they
+  came, on Letter (or A4 where the region is metric), landscape for a wide photo (`PhotoPdf`, PDFsharp), as one PDF named
+  for the assignment, replaced in the hand-in as each photo comes.
+- **The code** is QRCoder's (MIT, correction M) module matrix drawn by `PhoneQrView` in one `OnRender` on one clock
+  (`CompositionTarget.Rendering`, only while it arrives): softly rounded modules, dark on white even in dark mode, four
+  modules of quiet space. The panel grows from the button (96% to full, fading in, 240 ms, cubic-bezier(0.23, 1, 0.32,
+  1)); the finder squares settle first (from 85%), then the data ripples out from the centre (each module from 60% over
+  120 ms, all in place within 420 ms, never from nothing); with Windows' animation effects off, a 150 ms fade. "Waiting for
+  your phone…" has a breathing dot, never the code. When the phone opens the page the code flies into the corner as
+  "Phone connected" and the files arrive in a list with their pictures and progress.
+- **CI**: `windows-fluent.yml` pictures the panel (`hand-in-phone`, `-dark`, `-first`), and two parts run
+  `--phone-test` (the server on 127.0.0.1 too, its address in simpl.log): PowerShell opens the page, tries a wrong key,
+  posts files with `Invoke-WebRequest` as the phone's page does, and the log must say each is in the hand-in
+  (`hand-in-phone-connected`; `hand-in-phone-photos`: a PDF-only assignment's two photos made one PDF, an mp3 refused).
+
+The Chrome and Safari extensions and the iPhone app do not have it: an extension cannot take a connection.
 
 ## A tool
 

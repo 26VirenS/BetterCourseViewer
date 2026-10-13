@@ -39,6 +39,8 @@
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <!-- PDFs written by the file tools (merge, split, pages turned, marks saved in the file, pictures and text to PDF) -->
     <PackageReference Include="PDFsharp" Version="6.2.4" />
+    <!-- Send from Phone's QR code: its modules (MIT); the app draws them itself -->
+    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
   <!-- (Windows' own APIs as .NET sees them, 25 MB that the file tools alone use: not precompiled, or it more than doubles) -->
@@ -51,6 +53,8 @@
     <Resource Include="Assets\Simpl-256.png" />
     <!-- the themes' drawn scenes (the Mac's asset catalogue's): masks, inked in the accent where they show -->
     <Resource Include="Assets\Themes\*.png" />
+    <!-- the page Send from Phone serves to the phone (the Mac app carries the same file) -->
+    <EmbeddedResource Include="Assets\PhoneHandIn.html" LogicalName="PhoneHandIn.html" />
   </ItemGroup>
 
   <!-- The extension the engine runs (the same files the Mac and iPhone apps carry), and the bridge and sign-in reader

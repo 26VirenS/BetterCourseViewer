@@ -22,7 +22,8 @@ namespace Simpl.Screens;
 /// Submit. A file of a kind the assignment does not take is converted to one it does where the web's converter can; the
 /// assignment's own file types are checked before anything is sent. A file chosen is looked at in a pane at the dialog's
 /// right, the dialog widening for it (the Mac's HandInPreview). While it goes, the dialog says so, and says why if it
-/// could not.
+/// could not. Send from Phone… (beside Choose Files…) opens a panel over the form whose QR code a phone's camera opens;
+/// what the phone sends comes into the hand-in as a file chosen here would (PhoneHandIn.cs).
 /// </summary>
 internal sealed class HandInSheet
 {
@@ -82,6 +83,11 @@ internal sealed class HandInSheet
     private readonly List<WebView2> owned = new();
     private double formWidth = FormWidth, paneWidth = 540;
 
+    // Send from Phone: its panel over the form, its button, and the photos' PDF it gave the hand-in
+    private readonly PhoneHandIn phone;
+    private FrameworkElement? phoneButton;
+    private Guid? phonePdf;
+
     public static void Show(Engine.Engine engine, AssignmentData a, IReadOnlyList<string> dropped, string? link, Action done)
     {
         if (Open) return;
@@ -95,6 +101,18 @@ internal sealed class HandInSheet
             var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
             t.Tick += (_, _) => { t.Stop(); s.AddPath(path); };
             t.Start();
+        }
+        // (the screenshot suite: --phone opens Send from Phone a moment after the dialog is up — "--phone first" as the
+        // first time, saying Windows will ask — the picture waiting for its code)
+        if (Launch.Get("phone") != null && a.Types.Contains("online_upload"))
+        {
+            Shot.Began();
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            t.Tick += (_, _) => { t.Stop(); s.OpenPhone(null); };
+            t.Start();
+            var u = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2400) };
+            u.Tick += (_, _) => { u.Stop(); Shot.Ended(); };
+            u.Start();
         }
     }
 
@@ -130,6 +148,9 @@ internal sealed class HandInSheet
         errorRow.Visibility = Visibility.Collapsed;
         hint = K.Text("", Ty.Caption, B.Text3);
         filesFoot = K.Wrapped("", Ty.Caption, B.Text2);
+        phone = new PhoneHandIn(Accent);
+        phone.Arrived += FromPhone;
+        phone.Closed += Paint;
         filesSection = FilesSection();
 
         sheet = new Sheet { Bare = true, Width = FormWidth, Body = body };
@@ -187,6 +208,12 @@ internal sealed class HandInSheet
         status.Margin = new Thickness(24, 0, 24, 14);
         var left = K.Rows("auto, *, auto", head.Row(0), scroll.Row(1), status.Row(2));
         body.Children.Add(left.Col(0));
+        body.Children.Add(phone.View.Col(0)); // (Send from Phone's panel, over the form when it is open)
+        // (while it is open, Escape puts it away — the dialog is held open meanwhile — and Return is not Submit's)
+        body.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape && phone.IsOpen) { e.Handled = true; phone.Close(); }
+        };
         var line = new Border { Width = 1 }.Bg(B.Divider);
         body.Children.Add(line.Col(1));
         body.Children.Add(pane.Col(2));
@@ -273,7 +300,13 @@ internal sealed class HandInSheet
         var choose = K.Button("Choose Files…", ChooseFiles, icon: SymbolRegular.Folder24);
         var pictures = K.Button("Choose Pictures…", ChoosePictures, icon: SymbolRegular.ImageMultiple24);
         pictures.ToolTip = "Pictures and videos from your Pictures folder";
-        return K.V(8, K.Text("Files", Ty.BodyStrong), filesList, K.H(10, choose, pictures).Margin(0, 4, 0, 0), filesFoot);
+        // (Send from Phone beside them, onto a line of its own when the three will not fit)
+        var fromPhone = K.Button("Send from Phone…", () => OpenPhone(phoneButton), icon: SymbolRegular.Phone24);
+        fromPhone.ToolTip = "Scan a code with your phone to send photos and files to this hand-in";
+        phoneButton = fromPhone;
+        var buttons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, -8) };
+        foreach (var b in new FrameworkElement[] { choose, pictures, fromPhone }) buttons.Children.Add(b.Margin(0, 0, 10, 8));
+        return K.V(8, K.Text("Files", Ty.BodyStrong), filesList, buttons, filesFoot);
     }
 
     /// <summary>What the dialog says now: the files, the line under them, whether Submit can be pressed, the error, the
@@ -287,9 +320,9 @@ internal sealed class HandInSheet
         var allowed = a.Allowed ?? new List<string>();
         filesFoot.Text = allowed.Count > 0 ? $"This assignment takes {AllowedList} files." + (convertible.Line.Length == 0 ? "" : $" {convertible.Line}.") : "";
         filesFoot.Visibility = allowed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        submit.Enabled = Ready && !sending;
+        submit.Enabled = Ready && !sending && !phone.IsOpen;
         cancel.Enabled = !sending;
-        sheet.Modal = sending;
+        sheet.Modal = sending || phone.IsOpen;
         foreach (var e in new UIElement[] { text, url, note, filesSection }) e.IsEnabled = !sending;
         if (kinds != null) kinds.IsEnabled = !sending;
         busy.Visibility = sending ? Visibility.Visible : Visibility.Collapsed;
@@ -407,20 +440,23 @@ internal sealed class HandInSheet
         catch { Fail($"{name} could not be read."); }
     }
 
-    private void Add(Picked f)
+    private void Add(Picked f, bool preview = true)
     {
         if (f.Data.LongLength > Limit) { Fail($"{f.Name} is larger than 50 MB. Hand it in on {engine.LmsName}’s own page."); return; }
-        if (!AllowedName(f.Name)) { Convert(f); return; }
+        if (!AllowedName(f.Name)) { Convert(f, preview); return; }
         Fail(null);
         if (files.Any(x => x.Name == f.Name && x.Data.LongLength == f.Data.LongLength)) return; // (dropped twice)
         files.Add(f);
+        if (Shot.Asked) Log.Write($"hand-in: added {f.Name} ({files.Count} files)");
         Paint();
-        OpenPreview(f); // (a file added is looked at straight away — the last one added, where several come at once)
+        // (a file added is looked at straight away — the last one added, where several come at once; one from the phone
+        // is shown in Send from Phone's own panel instead)
+        if (preview) OpenPreview(f);
     }
 
     /// <summary>A file of a type the assignment doesn't take: converted to one it does, as the web hand-in does (Word,
     /// text and pictures to PDF, and so on); said plainly when it can't be.</summary>
-    private async void Convert(Picked f)
+    private async void Convert(Picked f, bool preview = true)
     {
         if (a.Allowed is not { } allowed || converting.Contains(f.Name)) return;
         Fail(null);
@@ -431,7 +467,7 @@ internal sealed class HandInSheet
             var r = await engine.Call<ConvertedFile>("convertFile", new { name = f.Name, type = f.Type, data = System.Convert.ToBase64String(f.Data), allowed });
             converting.Remove(f.Name);
             if (!r.IsConverted || r.Name == null || r.Data == null) Fail($"{f.Name} can’t be turned into {AllowedList} here. This assignment takes {AllowedList} files.");
-            else Add(new Picked(Guid.NewGuid(), r.Name, r.Type ?? "application/octet-stream", System.Convert.FromBase64String(r.Data)));
+            else Add(new Picked(Guid.NewGuid(), r.Name, r.Type ?? "application/octet-stream", System.Convert.FromBase64String(r.Data)), preview);
         }
         catch (Exception e)
         {
@@ -444,6 +480,7 @@ internal sealed class HandInSheet
     private void Remove(Picked f)
     {
         if (showing == f.Id) ClosePreview();
+        if (phonePdf == f.Id) { phonePdf = null; phone.PhotosRemoved(); }
         files.RemoveAll(x => x.Id == f.Id);
         Paint();
     }
@@ -592,7 +629,7 @@ internal sealed class HandInSheet
 
     private async void Submit()
     {
-        if (!Ready || sending) return;
+        if (!Ready || sending || phone.IsOpen) return;
         sending = true;
         Fail(null);
         Paint();
@@ -620,5 +657,36 @@ internal sealed class HandInSheet
         Open = false;
         showing = null;
         Release();
+        phone.End(); // (the hand-in sent or cancelled: Send from Phone's server stopped, what the phone sent thrown away)
+    }
+
+    // ---- Send from Phone ----
+
+    /// <summary>Send from Phone's panel opened over the form, grown from the button that opened it.</summary>
+    private void OpenPhone(FrameworkElement? from)
+    {
+        if (phone.IsOpen || sending) return;
+        Point? at = null;
+        if (from is { IsLoaded: true }) { try { at = from.TranslatePoint(new Point(from.ActualWidth / 2, from.ActualHeight / 2), body); } catch { } }
+        phone.Open(new PhoneSetup(a.Title, a.Context ?? "", a.Color, a.Allowed ?? new List<string>(), convertible.Exts, Limit), at);
+        Paint();
+    }
+
+    /// <summary>What the phone sent, into the hand-in as a file chosen here would be — its type checked, converted where it
+    /// must be — but not opened in the preview (the panel shows it); the photos' PDF in place of the one before it.</summary>
+    private void FromPhone(string name, string type, byte[] data, bool photos)
+    {
+        var f = new Picked(Guid.NewGuid(), name, type, data);
+        if (photos && phonePdf is { } old && files.FindIndex(x => x.Id == old) is var i and >= 0)
+        {
+            if (showing == old) ClosePreview();
+            files[i] = f;
+            phonePdf = f.Id;
+            if (Shot.Asked) Log.Write($"hand-in: added {f.Name} ({files.Count} files)");
+            Paint();
+            return;
+        }
+        if (photos) phonePdf = f.Id;
+        Add(f, preview: false);
     }
 }
