@@ -2204,7 +2204,7 @@
         const item = {
           kind: 'assignment', id: String(a.id), title: a.name || 'Untitled', due: a.due_at || null,
           sub: [a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date', ptsOf(a.points_possible)].filter(Boolean).join(' · '),
-          status: statusOf(store.workStatus(a)), upcoming: !!(d && d >= now && !submittedA(a)),
+          status: statusOf(store.workStatus(a)), upcoming: !!(d && d >= now && !submittedA(a) && !a.submission?.excused),
         };
         if (name) note(name, host, c, { assignment: String(a.id) }, 'Assignments', item);
       }
