@@ -197,15 +197,26 @@ final class BioNav: ObservableObject {
     }
 }
 
-/// A biology tool's remembered settings (spec §3.2): UserDefaults `SimplBio.<key>.<field>`, on this Mac only.
+/// A biology tool's remembered settings (spec §3.2): UserDefaults `SimplBio.<key>.<field>`, on this Mac only. A
+/// picture's launch (-SimplShotFile, the screenshot suite) keeps them for itself in a suite of its own that starts
+/// empty, so one picture's choices (a plant cell, a cross typed, 2n = 6) never carry into the next picture taken in the
+/// same home: each shows its tool as its launch asks and nothing more.
 enum BioPrefs {
+    private static let store: UserDefaults = {
+        guard UserDefaults.standard.string(forKey: "SimplShotFile") != nil else { return .standard }
+        let name = "SimplBioPicture"
+        guard let d = UserDefaults(suiteName: name) else { return .standard }
+        d.removePersistentDomain(forName: name)
+        return d
+    }()
+
     static func key(_ k: ToolKind, _ field: String) -> String { "SimplBio.\(k.rawValue).\(field)" }
-    static func string(_ k: ToolKind, _ field: String) -> String? { UserDefaults.standard.string(forKey: key(k, field)) }
-    static func set(_ k: ToolKind, _ field: String, _ value: String?) { UserDefaults.standard.set(value, forKey: key(k, field)) }
+    static func string(_ k: ToolKind, _ field: String) -> String? { store.string(forKey: key(k, field)) }
+    static func set(_ k: ToolKind, _ field: String, _ value: String?) { store.set(value, forKey: key(k, field)) }
     static func bool(_ k: ToolKind, _ field: String, default d: Bool) -> Bool {
-        UserDefaults.standard.object(forKey: key(k, field)) == nil ? d : UserDefaults.standard.bool(forKey: key(k, field))
+        store.object(forKey: key(k, field)) == nil ? d : store.bool(forKey: key(k, field))
     }
-    static func set(_ k: ToolKind, _ field: String, _ value: Bool) { UserDefaults.standard.set(value, forKey: key(k, field)) }
+    static func set(_ k: ToolKind, _ field: String, _ value: Bool) { store.set(value, forKey: key(k, field)) }
 }
 
 /// A biology tool's pages in its header, left of its pin (the Periodic Table's PTHeaderControls): their names where
