@@ -173,6 +173,7 @@ internal static class HWRunner
 
     private static void Schedule()
     {
+        Shot.Moved();
         running?.Cancel();
         running = null;
         if (wait == null)

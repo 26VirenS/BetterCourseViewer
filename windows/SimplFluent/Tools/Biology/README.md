@@ -148,6 +148,29 @@ P, Phenotype, Dies, Carrier; `Phenotypes` (born); `GenotypicRatio(Text)`, `BornG
 (HomDominant "AA", Heterozygous "Aa", HomRecessive "aa", Dominant "A_", Any). Exact `BioFrac` throughout (`Text` "3/32",
 `PercentText` "9.4%"); `BioRatio.Reduce/Whole/Text`.
 
+### The Genetics Crosses and Hardy–Weinberg tools (built)
+
+- **Crosses** (`CrossesTool.cs`, `CrossesPages.cs`, `CrossesParts.cs`; `Model/CrossesModel.cs`, `Model/PedigreeModel.cs`,
+  the Mac's models line for line): `CrossSetup` is the Cross page's cross (one to three genes, one X-linked at most;
+  `Genotypes(k, parent)` lists only what a parent can be — never a lethal homozygote; `SetPattern`, `SetLetter`,
+  `ApplyExample` (§5.3.1's `CrossExamples`), `TestCross`, `Parse`, `Encoded` for `SimplBio.cross.setup`).
+  `CrossPunnett`, `CrossForkedLine`, `CrossProbability` (chips, the product and sum rules, at least one / exactly k of
+  n), `ChiSquareWork` (the null hypothesis, AP's conclusion), `Pedigree` and `PedigreeChecker` (four modes, the people
+  who rule each out). `CrossesModel` keeps the pages' state. Hand-offs it takes: `["cross"] = "AaBb × aaBb"`, and
+  `["chi"] = "round:3:5474;wrinkled:1:1850"` (name:ratio:observed) for the Chi-square page.
+- **Hardy–Weinberg** (`HardyWeinbergTool.cs`, `HardyWeinbergPages.cs`; `Model/HardyWeinbergModel.cs`):
+  `HardyWeinberg.Calculate(given, value)` / `Calculate(counts)` (each step as text), `.Test(counts, df)` (df 1 by
+  default), `HWSimulation.Step/Run` in §5.4.3's order — replicate r, from 0, draws from SplitMix64 seed S + r, 2N
+  `Uniform() < p₃` draws a generation — so a seed gives the Mac's populations; run off the UI thread by `HWRunner`.
+  `HWFormat.Fixed` writes numbers as printf does (a tie rounded to even), so the working reads as on the Mac. Hand-offs:
+  `["given"] = "q2", ["value"] = "0.16"`, `["counts"] = "50,30,20"`.
+- **Launch states:** `--tool cross --tool-state cross:forked` (`square`, `genotypes`, `why`, `testcross`, `cross=…` or
+  `--bio-cross "AaBb x AaBb"`); `probability:prob=AaBbCc x AaBbCc:target=aa,B_,Cc:children=3`; `chi:fromcross` or
+  `chi:obs=315,108,101,32`; `pedigree:example=xr:mode=xd:select=2`. `--tool popgen --tool-state calculate:q2=0.16`
+  (any `HWGiven` key, or `counts=50,30,20`); `test:counts=50,30,20:df=2`;
+  `simulate:n=10:p0=0.5:seed=7:reps=5:gens=100:preset=recessiveLethal:F=0.25:u=…:v=…:m=…:pm=…:hover=40` (`infinite`
+  for no drift). The pins: `--pin-open cross --tool-state "cross=Aa x aa"`, `--pin-open popgen --tool-state q2=0.16`.
+
 ## Chi-square and randomness (§5.3.4, §5.6.3–4)
 
 `BioChiSquare.Test(observed, expected, df:)` → `Chi2`, `Terms`, `Df`, `Critical` (p = 0.05), `P`, `Reject`,
