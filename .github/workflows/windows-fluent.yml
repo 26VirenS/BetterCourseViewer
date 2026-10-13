@@ -382,6 +382,11 @@ jobs:
           # (General's foot, below the fold: This PC's Uninstall Simpl, and the question it asks)
           Shot 'settings-general-end' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000'))
           Shot 'settings-uninstall' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000', '--settings-sheet', 'uninstall'))
+          # (the saved sign-in as a PC with Windows Hello shows it — locked with it — and as one without; a runner has no
+          #  Windows Hello, so --hello-state, a development run's alone, says which: windows/SimplFluent/Support/Hello.cs)
+          Shot 'settings-signin-hello' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--hello-state', 'locked'))
+          Shot 'settings-signin-nohello' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--hello-state', 'none'))
+          Shot 'settings-data-hello' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'data', '--hello-state', 'locked'))
           foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
           Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
