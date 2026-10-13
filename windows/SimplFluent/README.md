@@ -309,7 +309,8 @@ style or theme colour WPF looked up for an element searched them one after anoth
 the part of a page it is in was added to another (pages are built from the bottom up). A trace of the walk put a fifth
 of the window's busy time there (half the walk's busy time went once they were one). They are copied into one
 dictionary, in WPF-UI's order, a few milliseconds at a time while the window is idle at start (making every style
-took 170 ms in one go, and the window waited for it), and the copy put in WPF-UI's place once whole; the theme's own
+took 170 ms in one go, and the window waited for it), and the copy put in WPF-UI's place once whole — or, on a first
+start, finished at once just before the app's pages are made on the page's answers; the theme's own
 dictionary stays apart (WPF-UI swaps it), and the accent is written over all of it as before. `--no-flatten` leaves
 them as they were. A screen let go is taken out of the window once nothing else is happening, not while the next page
 comes in.

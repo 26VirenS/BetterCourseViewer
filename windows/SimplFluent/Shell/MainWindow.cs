@@ -283,6 +283,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
             working = null;
             if (shell == null)
             {
+                // (made on the page's answers, late in the start: WPF-UI's styles finished as one dictionary first, so its
+                //  pages are made with it — not on what was kept, which comes before the window has had a moment)
+                if (engine.CountsLive) Kit.FlatResources.Finish();
                 shell = new AppShell(engine, this);
                 Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
