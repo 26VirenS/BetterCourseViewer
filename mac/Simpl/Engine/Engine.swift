@@ -57,7 +57,12 @@ final class Engine: ObservableObject, ShellListener {
     let hostView = EngineView()
 
     @Published private(set) var phase: Phase = .starting
-    @Published var nav = Navigator()
+    /// (1.3.78) Where the window is and how it last moved, observed on their own (Whereabouts, Engine/Navigator.swift).
+    let whereabouts = Whereabouts()
+    var nav: Navigator {
+        get { whereabouts.nav }
+        set { whereabouts.nav = newValue }
+    }
     @Published private(set) var snapshot: Snapshot?
     /// The school's site as the page says it: "canvas" or "d2l" (Brightspace); nil until it has (Router.swift onBrightspace).
     @Published private(set) var lms: String?
@@ -256,6 +261,9 @@ final class Engine: ObservableObject, ShellListener {
     private func setPhase(_ p: Phase) {
         idlePage(p == .native)
         guard phase != p else { return }
+        // (1.3.78: in the screenshot suite and developer mode, when the window goes from the school's page to the app's
+        // screens and back, and why — a picture taken as it changes is explained by it)
+        if OpenClock.verbose { NSLog("[Simpl] window: %@ (%@)", p == .native ? "the app's screens" : p == .web ? "the school's page" : "starting", web.webView.url?.path ?? "no page") }
         withAnimation(.easeInOut(duration: 0.35)) { phase = p }
         if p == .native {
             // (the page underneath lets go of the keyboard: what is typed goes to the app's own screens, never to it)
@@ -677,7 +685,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     /// (1.3.78) How the window last moved (PageMove): each screen arrives by it, and the one leaving goes by it.
-    @Published private(set) var move = PageMove()
+    var move: PageMove { whereabouts.move }
 
     /// (1.3.78) A move of the window's, timed (OpenClock) and told to the screens (`move`). A move to another place is
     /// animated on the page spring: the page leaving goes the way the move goes as it fades (PageExit) while the new one
@@ -693,7 +701,7 @@ final class Engine: ObservableObject, ShellListener {
         var t = Transaction(animation: animated && across ? Motion.page : nil)
         t.disablesAnimations = !(animated && across)
         withTransaction(t) {
-            move = PageMove(kind: animated ? kind : .none, serial: move.serial + 1)
+            whereabouts.move = PageMove(kind: animated ? kind : .none, serial: move.serial + 1)
             nav = next
         }
     }

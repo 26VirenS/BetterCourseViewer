@@ -59,12 +59,7 @@ struct SimplCommands: Commands {
         }
 
         CommandMenu("Go") {
-            Button("Back") { engine?.goBack() }
-                .keyboardShortcut("[")
-                .disabled(!(engine?.nav.canGoBack ?? false))
-            Button("Forward") { engine?.goForward() }
-                .keyboardShortcut("]")
-                .disabled(!(engine?.nav.canGoForward ?? false))
+            GoBackForward(whereabouts: engine?.whereabouts ?? Whereabouts.nowhere, engine: engine)
             Divider()
             place("Dashboard", .dashboard, key: "1")
             place("To Do", .todo, key: "2")
@@ -153,5 +148,21 @@ private struct CheckForUpdatesButton: View {
             updater.revealPane = true
             openSettings()
         }
+    }
+}
+
+/// (1.3.78) The Go menu's Back and Forward, enabled as the window in front can go back or forward — its whereabouts
+/// watched on their own (Engine/Navigator.swift), as the engine no longer says when the window moves.
+private struct GoBackForward: View {
+    @ObservedObject var whereabouts: Whereabouts
+    let engine: Engine?
+
+    var body: some View {
+        Button("Back") { engine?.goBack() }
+            .keyboardShortcut("[")
+            .disabled(engine == nil || !whereabouts.nav.canGoBack)
+        Button("Forward") { engine?.goForward() }
+            .keyboardShortcut("]")
+            .disabled(engine == nil || !whereabouts.nav.canGoForward)
     }
 }

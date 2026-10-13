@@ -243,19 +243,13 @@ struct CalendarView: View {
 
     // MARK: Month
 
-    /// The month's grid with the day picked beside it on a wide window, under it on a narrow one.
+    /// The month's grid with the day picked beside it on a wide window, under it on a narrow one. (1.3.78) Chosen by the
+    /// page's width (MonthLayout), not by building both and measuring them: the grid is the heaviest thing drawn.
     private func monthView(_ byDay: [String: [CalEvent]]) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 22) {
-                monthGrid(byDay)
-                    .frame(minWidth: 540, idealWidth: 640, maxWidth: .infinity)
-                dayPanel(selected, events: byDay[key(selected)] ?? [])
-                    .frame(width: 340)
-            }
-            VStack(alignment: .leading, spacing: 22) {
-                monthGrid(byDay)
-                dayPanel(selected, events: byDay[key(selected)] ?? [])
-            }
+        MonthLayout {
+            monthGrid(byDay)
+        } day: {
+            dayPanel(selected, events: byDay[key(selected)] ?? [])
         }
     }
 
@@ -743,6 +737,31 @@ struct CalendarView: View {
 }
 
 // MARK: - Pieces
+
+/// (1.3.78) The month's grid with the day picked beside it when the page has room for both at their ideal widths (the
+/// grid's 640 and the day's 340, 22 apart: as a ViewThatFits of the two chose), else the day under the grid — only the
+/// one shown is built.
+private struct MonthLayout<Grid: View, Day: View>: View {
+    @ViewBuilder var grid: () -> Grid
+    @ViewBuilder var day: () -> Day
+    @Environment(\.pageWidth) private var width
+
+    var body: some View {
+        if (width ?? 0) >= 640 + 22 + 340 {
+            HStack(alignment: .top, spacing: 22) {
+                grid()
+                    .frame(minWidth: 540, idealWidth: 640, maxWidth: .infinity)
+                day()
+                    .frame(width: 340)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 22) {
+                grid()
+                day()
+            }
+        }
+    }
+}
 
 private extension PreviewItem {
     /// (1.2.3) A piece of work or an event of the calendar, for its preview: its line under the title is "course · kind ·

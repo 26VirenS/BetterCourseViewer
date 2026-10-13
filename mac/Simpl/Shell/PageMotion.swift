@@ -4,7 +4,8 @@ import SwiftUI
 /// (1.3.78) How the window last moved — one motion language with Simpl on the web and on Windows. Going deeper (a
 /// link, a row, Forward) the new page comes in from the trailing edge a short way as it fades in, and the page left
 /// behind drifts a little the other way as it fades out; Back is the same in reverse; another place picked in the
-/// sidebar cross-fades, the new page rising a touch. All on `Motion.page`, critically damped: a move made mid-way
+/// sidebar cross-fades. The distances are the web's (32 points in from the side). All on `Motion.page`, critically
+/// damped: a move made mid-way
 /// starts from wherever things are, and nothing waits in line. Under Reduce Motion, every move is a cross-fade.
 struct PageMove: Equatable {
     enum Kind: Equatable {
@@ -25,10 +26,8 @@ extension Motion {
 @MainActor
 enum PageMotion {
     /// How far a page comes in from the side it comes from, and how far the one it covers drifts the other way.
-    static let travel: CGFloat = 28
+    static let travel: CGFloat = 32
     static let drift: CGFloat = 12
-    /// A new place's page rises this much as it fades in.
-    static let rise: CGFloat = 8
 
     /// Where a page leaving goes for the move under way (its x offset, fully gone): read by the page as it leaves, each
     /// frame, so it goes the way of the move that took it away.
@@ -51,8 +50,7 @@ enum PageMotion {
         switch kind {
         case .deeper: return CGSize(width: travel, height: 0)
         case .back: return CGSize(width: -drift, height: 0)
-        case .across: return CGSize(width: 0, height: rise)
-        case .none: return .zero
+        case .across, .none: return .zero
         }
     }
 }

@@ -59,7 +59,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   it opens to its sections.
 - **Motion.** Springs only, critically damped (`Motion.snappy`, `gentle`, `hover`, `fill`, `page`): they start from what
   is on screen, so anything can be interrupted and turned around. Cards lift under the pointer and give under a click; a
-  place cross-fades in, rising a touch; a page opened deeper comes in from the trailing edge a short way and Back
+  place cross-fades in; a page opened deeper comes in from the trailing edge a short way and Back
   reverses it (1.3.78, below); a tick shows before its row moves. Under Reduce Motion, moves become cross-fades.
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
@@ -389,10 +389,14 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     meanwhile, each card changing in place. Its title and toolbar stay in the stack (`DashboardChrome`).
   - *Waiting*: a screen's spinner shows only after a third of a second, so a quick answer replaces an empty page rather
     than a spinner that flashes.
+  - *A move draws little*: where the window is and how it last moved (`Whereabouts`, Engine/Navigator.swift) are
+    observed apart from the engine, so a move draws again only what shows it — the sidebar, the toolbar's Back and
+    Forward, the stack, the preview over the window, the Go menu — and not every screen and row that reads the engine
+    (the Dashboard kept under the stack among them).
   - *Motion* (Shell/PageMotion.swift, one language with the web and Windows): going deeper — a link, a row, a card,
-    Forward, a course's home to a section — the new page comes in from the trailing edge 28 points as it fades in, and
-    a place left drifts 12 points the other way as it fades out; Back is the same in reverse; another place picked in
-    the sidebar cross-fades, the new page rising 8 points. All on `Motion.page` (critically damped, response 0.34):
+    Forward, a course's home to a section — the new page comes in from the trailing edge 32 points (the web's) as it
+    fades in, and a place left drifts 12 points the other way as it fades out; Back is the same in reverse; another
+    place picked in the sidebar cross-fades. All on `Motion.page` (critically damped, response 0.34):
     a move made mid-way starts from where things are and nothing waits in line. A page that arrives waits until its
     content is there (a third of a second at most), so it never slides in empty and then fills. A move within a place
     swaps the stack's screen at once (the screen under it kept as it was) and the new top arrives by itself; one to

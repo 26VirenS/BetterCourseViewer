@@ -35,6 +35,7 @@ struct RootView: View {
         .tint(appearance.accentColor) // (1.3) one accent throughout: the theme's, or the Mac's own
         .overlay(alignment: .bottom) { FileToast(files: files) }
         .environmentObject(engine)
+        .environmentObject(engine.whereabouts) // (1.3.78: where the window is, observed on its own)
         .focusedSceneObject(engine)
         .modifier(EngineSheets(engine: engine))
         .onChange(of: session.showSettings) { _, show in

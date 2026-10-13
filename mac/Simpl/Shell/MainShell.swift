@@ -6,6 +6,7 @@ import SwiftUI
 /// buttons, and Search (whose suggestions run commands, 1.2). The tour, the first time, goes over all of it.
 struct MainShell: View {
     @EnvironmentObject private var engine: Engine
+    @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: Back and Forward follow the window's moves)
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
     @State private var columns: NavigationSplitViewVisibility = .all
@@ -140,6 +141,7 @@ extension MainShell {
 /// its answers refreshed in place; its title and toolbar stay in the stack where every screen's are (DashboardChrome).
 struct DetailStack: View {
     @EnvironmentObject private var engine: Engine
+    @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: drawn again as the window moves)
     @State private var dashboardKept = false
 
     var body: some View {
@@ -253,6 +255,7 @@ struct WebFallback: View {
 
 struct Sidebar: View {
     @EnvironmentObject private var engine: Engine
+    @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: its selection follows the window's moves)
     @Environment(\.openWindow) private var openWindow
     @State private var open: Set<String> = []
 

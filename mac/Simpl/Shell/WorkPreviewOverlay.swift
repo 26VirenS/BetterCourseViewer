@@ -10,6 +10,7 @@ import SwiftUI
 
 struct WorkPreviewOverlay: View {
     @EnvironmentObject private var engine: Engine
+    @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: a move takes the card with it)
     @ObservedObject private var preview = WorkPreview.shared
     @ObservedObject private var tour = MacTour.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -32,7 +33,7 @@ struct WorkPreviewOverlay: View {
         }
         .allowsHitTesting(preview.item != nil && preview.shown)
         // (the window gone somewhere else — a place picked, Back — takes the card with it)
-        .onChange(of: engine.nav.current) { _, _ in preview.dismiss() }
+        .onChange(of: whereabouts.nav.current) { _, _ in preview.dismiss() }
     }
 
     // MARK: - Where it goes

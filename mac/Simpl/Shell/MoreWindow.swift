@@ -71,6 +71,7 @@ private struct MoreWindowBody: View {
         .tint(appearance.accentColor)
         .overlay(alignment: .bottom) { FileToast(files: files) }
         .environmentObject(engine)
+        .environmentObject(engine.whereabouts) // (1.3.78: where the window is, observed on its own)
         .focusedSceneObject(engine)
         .modifier(EngineSheets(engine: engine))
     }

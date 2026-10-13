@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// A place in the sidebar: a root of the app (Dashboard, To Do …), a course's or a group's home, or one of its sections.
@@ -116,4 +117,16 @@ struct Navigator: Equatable {
         if back.count > 120 { back.removeFirst(back.count - 120) }
         forward.removeAll()
     }
+}
+
+/// (1.3.78) Where the window is (`nav`) and how it last moved (`move`, Shell/PageMotion.swift), observed apart from the
+/// engine: a move draws again only what shows it — the sidebar, the toolbar's Back and Forward, the stack, the preview
+/// over the window — and not every screen and row that reads the engine (the Dashboard kept under the stack among them).
+@MainActor
+final class Whereabouts: ObservableObject {
+    @Published var nav = Navigator()
+    @Published var move = PageMove()
+
+    /// No window's (the Go menu with no window in front: Back and Forward greyed out).
+    static let nowhere = Whereabouts()
 }
