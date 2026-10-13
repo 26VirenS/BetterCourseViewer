@@ -266,6 +266,20 @@ public static class Perf
         }
     }
 
+    /// <summary>Once nothing has been asked of the page for <paramref name="quietMs"/> (counted from now at the earliest):
+    /// true; false if that has not happened by <paramref name="limitMs"/>.</summary>
+    internal static async Task<bool> Quiet(double quietMs, double limitMs)
+    {
+        var from = Ticks();
+        while (Ms(from, Ticks()) < limitMs)
+        {
+            lock (Gate)
+                if (inFlight == 0 && Ms(Math.Max(lastActivity, from), Ticks()) >= quietMs) return true;
+            await Task.Delay(100);
+        }
+        return false;
+    }
+
     /// <summary>When the window is next idle: everything asked of it so far done (built, laid out), input included —
     /// the moment taken there, not where it is awaited (an answer arriving meanwhile would come first).</summary>
     internal static Task<long> Idle() => (Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher).InvokeAsync(Ticks, DispatcherPriority.ContextIdle).Task;
@@ -546,46 +560,18 @@ public static class Perf
         lock (Gate) return new JsonObject { ["over200"] = stallCount, ["longest"] = Math.Round(stallLongest) };
     }
 
-    /// <summary>Memory now: .NET's (and its collections), the process's, and the web view's own processes'.</summary>
-    private sealed record Memory(double Managed, int Gc0, int Gc1, int Gc2, double Private, double WorkingSet, double? Web, int WebProcesses);
+    /// <summary>Memory now: Simpl's process and WebView2's (PerfMemory), and .NET's collections so far.</summary>
+    internal static PerfMemory.Reading Memory() => PerfMemory.Read(webEnv);
 
-    private static Memory ReadMemory()
-    {
-        using var p = Process.GetCurrentProcess();
-        double? web = null;
-        var count = 0;
-        try
-        {
-            if (webEnv != null)
-            {
-                double sum = 0;
-                foreach (var info in webEnv.GetProcessInfos())
-                {
-                    try { using var wp = Process.GetProcessById(info.ProcessId); sum += wp.WorkingSet64; count++; } catch { }
-                }
-                web = sum / MB;
-            }
-        }
-        catch { /* (the web view gone, at exit) */ }
-        return new Memory(GC.GetTotalMemory(false) / MB, GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2), p.PrivateMemorySize64 / MB, p.WorkingSet64 / MB, web, count);
-    }
+    internal static string MemoryText() => MemoryText(Memory());
 
-    internal static string MemoryText()
-    {
-        var m = ReadMemory();
-        return Fmt($"managed {m.Managed:0} MB · gc {m.Gc0}/{m.Gc1}/{m.Gc2} · private {m.Private:0} MB · working set {m.WorkingSet:0} MB · web view ") +
-               (m.Web is { } w ? Fmt($"{w:0} MB in {m.WebProcesses} processes") : "—");
-    }
+    internal static string MemoryText(PerfMemory.Reading m) => PerfMemory.Text(m) + Fmt($" · gc {GC.CollectionCount(0)}/{GC.CollectionCount(1)}/{GC.CollectionCount(2)}");
 
-    internal static JsonObject MemoryJson()
+    internal static JsonObject MemoryJson(PerfMemory.Reading m)
     {
-        var m = ReadMemory();
-        return new JsonObject
-        {
-            ["managedMB"] = Math.Round(m.Managed, 1), ["gc0"] = m.Gc0, ["gc1"] = m.Gc1, ["gc2"] = m.Gc2,
-            ["privateMB"] = Math.Round(m.Private, 1), ["workingSetMB"] = Math.Round(m.WorkingSet, 1),
-            ["webViewMB"] = m.Web is { } w ? Math.Round(w, 1) : null, ["webViewProcesses"] = m.WebProcesses,
-        };
+        var o = PerfMemory.Json(m);
+        o["gc"] = new JsonArray(GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2));
+        return o;
     }
 
     // ---- pieces ----

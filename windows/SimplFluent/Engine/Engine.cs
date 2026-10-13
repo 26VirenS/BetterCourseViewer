@@ -111,8 +111,30 @@ public sealed partial class Engine : Observable, IShellListener
     // MARK: - Starting
 
     /// <summary>The web views' browser, as Simpl runs it: media may play without a press; a page out of sight (the
-    /// engine's, under the app's screens) keeps its timers and its pace.</summary>
-    public const string BrowserArguments = "--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion";
+    /// engine's, under the app's screens) keeps its timers and its pace. A development run may add more
+    /// (--browser-args, ';' between them), their features merged with these.</summary>
+    public static string BrowserArguments { get; } = MergeArguments(
+        "--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion",
+        Launch.IsDevelopment ? Launch.Get("browser-args")?.Replace(';', ' ') : null);
+
+    /// <summary>Two sets of browser arguments as one: Chromium takes only the last --enable-features and the last
+    /// --disable-features, so each is made one list.</summary>
+    internal static string MergeArguments(string first, string? more)
+    {
+        if (string.IsNullOrWhiteSpace(more)) return first;
+        var plain = new List<string>();
+        var enable = new List<string>();
+        var disable = new List<string>();
+        foreach (var a in (first + " " + more).Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (a.StartsWith("--enable-features=", StringComparison.Ordinal)) enable.AddRange(a["--enable-features=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries));
+            else if (a.StartsWith("--disable-features=", StringComparison.Ordinal)) disable.AddRange(a["--disable-features=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries));
+            else if (!plain.Contains(a)) plain.Add(a);
+        }
+        if (enable.Count > 0) plain.Add("--enable-features=" + string.Join(',', enable.Distinct()));
+        if (disable.Count > 0) plain.Add("--disable-features=" + string.Join(',', disable.Distinct()));
+        return string.Join(' ', plain);
+    }
 
     public async void Start()
     {
@@ -139,6 +161,8 @@ public sealed partial class Engine : Observable, IShellListener
             return;
         }
         var core = Web.CoreWebView2;
+        // (a development run may ask the page to keep to little memory throughout: --web-memory low)
+        if (Launch.IsDevelopment && Launch.Get("web-memory") == "low") core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Low;
         core.Settings.AreDevToolsEnabled = true;
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsZoomControlEnabled = false;

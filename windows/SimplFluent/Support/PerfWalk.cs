@@ -16,10 +16,12 @@ namespace Simpl.Support;
 /// --perf-walk &lt;folder&gt;: once the app's own screens are up and their first answers in, one fixed walk through
 /// it — the Dashboard, To Do, the Calendar, Grades, the Inbox, a course, an assignment, Notifications, New task,
 /// Settings, Tools, a search typed, the window dragged and resized, the Dashboard again — each step timed with Perf's
-/// numbers, written to perf[-name].json and perf[-name].txt in the folder and to simpl.log, and then Simpl quits. It
-/// only looks: New task and Settings are opened and closed with nothing saved. --perf-name (the files' suffix),
-/// --perf-course and --perf-assignment (what is opened; else the first course, and the first assignment To Do
-/// lists), --perf-timeout (150 s from the start: what was walked by then is written).
+/// numbers; memory read once the start has settled, after the walk, and after the window has been minimized a while
+/// (then brought back, timed); all written to perf[-name].json and perf[-name].txt in the folder and to simpl.log,
+/// and then Simpl quits. It only looks: New task and Settings are opened and closed with nothing saved. --perf-name
+/// (the files' suffix), --perf-course and --perf-assignment (what is opened; else the first course, and the first
+/// assignment To Do lists), --perf-minimized (how long the window stays minimized, 30 s; 0: not), --perf-timeout
+/// (240 s from the start: what was walked by then is written).
 /// </summary>
 public static class PerfWalk
 {
@@ -38,7 +40,7 @@ public static class PerfWalk
     {
         if (w is not Shell.MainWindow m) return;
         main = m;
-        var limit = Launch.Number("perf-timeout", 150);
+        var limit = Launch.Number("perf-timeout", 240);
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(1000, limit * 1000 - Perf.Now)) };
         timer.Tick += (_, _) =>
         {
@@ -79,6 +81,11 @@ public static class PerfWalk
                 await Until(() => m.Sheets.Current != s, 3000);
             }
             await Task.Delay(500);
+            // memory once the start has settled: nothing asked of the page for two seconds (twenty at most)
+            stage = "the start settling";
+            await Perf.Quiet(2000, 20_000);
+            if (finished) return;
+            Remember("settled");
             Perf.Fast(true);
 
             await Go("To Do", () => e.Go(Place.Todo));
@@ -98,6 +105,12 @@ public static class PerfWalk
             await Drag(m);
             await Resize(m);
             await Go("Dashboard (again)", () => e.Go(Place.Dashboard));
+            // memory after the walk, settled as the start was; then after a while minimized, and the window back
+            stage = "the walk settling";
+            await Perf.Quiet(2000, 20_000);
+            if (finished) return;
+            Remember("walked");
+            await Minimized(m);
             Finish(null);
         }
         catch (Exception x)
@@ -251,6 +264,50 @@ public static class PerfWalk
         await Task.Delay(250);
     }
 
+    /// <summary>
+    /// The window minimized for --perf-minimized seconds (30; 0: not at all) and memory read then, as a student leaves
+    /// Simpl down on the taskbar; then brought back as the taskbar does, and timed: drawn again (ui), its frames.
+    /// </summary>
+    private static async Task Minimized(Shell.MainWindow m)
+    {
+        var seconds = Launch.Number("perf-minimized", 30);
+        if (finished || seconds <= 0) return;
+        stage = "minimized";
+        m.WindowState = WindowState.Minimized;
+        var from = Perf.Ticks();
+        while (!finished && Perf.Ms(from, Perf.Ticks()) < seconds * 1000) await Task.Delay(250);
+        if (finished) return;
+        Remember("minimized");
+        stage = "Restore";
+        var k = new Mark();
+        long? frame = null;
+        void First(object? s, EventArgs a) => frame ??= Perf.Ticks();
+        CompositionTarget.Rendering += First;
+        m.WindowState = WindowState.Normal;
+        m.Activate();
+        var shown = await Perf.Idle();
+        await Until(() => frame != null, 3000);
+        CompositionTarget.Rendering -= First;
+        await k.FramesFor(700);
+        var drawn = Math.Max(shown, frame ?? shown);
+        rows.Add(k.Row("Restore", Perf.Ms(k.T0, drawn), null, Perf.Fmt($"after {seconds:0} s minimized: ui is its first frame drawn, the window idle again")));
+        await Task.Delay(250);
+    }
+
+    /// <summary>Memory now, by the name of the moment (settled, walked, minimized): written with the steps.</summary>
+    private static void Remember(string when)
+    {
+        try
+        {
+            var m = Perf.Memory();
+            memory.Add((when, m));
+            Log.Write($"perf walk: memory {when} {Perf.MemoryText(m)}");
+        }
+        catch (Exception x) { Log.Write($"perf walk: memory {when} not read: {x.Message}"); }
+    }
+
+    private static readonly List<(string When, PerfMemory.Reading Reading)> memory = new();
+
     private const string Late = "answers not all in after 15 s";
 
     private static void Skip(string name, string why) => rows.Add(new Row(name, null, null, 0, 0, 0, 0, 0, null, null, 0, "skipped: " + why) { Skipped = true });
@@ -369,11 +426,16 @@ public static class PerfWalk
                 ["calls"] = r.Calls, ["callMs"] = Math.Round(r.CallMs), ["stall"] = Math.Round(r.Stall), ["frames"] = r.Frames,
                 ["worstFrame"] = R(r.WorstFrame), ["mb"] = Math.Round(r.Mb, 1), ["skipped"] = r.Skipped, ["note"] = r.Note,
             });
+        var mem = new JsonObject();
+        foreach (var (when, m) in memory) mem[when] = Perf.MemoryJson(m);
+        mem["end"] = Perf.MemoryJson(Perf.Memory());
         var json = new JsonObject
         {
             ["name"] = name, ["version"] = WhatsNew.Current, ["when"] = DateTime.Now.ToString("s"), ["complete"] = note == null, ["note"] = note,
             ["env"] = Perf.MachineJson(), ["start"] = Perf.StartJson(), ["steps"] = steps, ["calls"] = Perf.CallsJson(), ["builds"] = Perf.BuildsJson(),
-            ["switches"] = Perf.SwitchesJson(), ["memory"] = Perf.MemoryJson(), ["stalls"] = Perf.StallsJson(),
+            ["switches"] = Perf.SwitchesJson(), ["memory"] = mem, ["stalls"] = Perf.StallsJson(),
+            ["args"] = Launch.Get("browser-args") != null ? Engine.Engine.BrowserArguments : null,
+            ["webMemory"] = Launch.Get("web-memory"),
         };
         File.WriteAllText(Path.Combine(dir, $"perf{suffix}.json"), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
         var text = Text(name, note);
@@ -406,7 +468,9 @@ public static class PerfWalk
         foreach (var c in Perf.BuildLines()) b.Append("  ").Append(c).Append('\n');
         b.Append("switches (n · drawn p50 · max · answered p50 · max ms)\n");
         foreach (var c in Perf.SwitchLines()) b.Append("  ").Append(c).Append('\n');
-        b.Append("memory  ").Append(Perf.MemoryText()).Append('\n');
+        b.Append("memory, MB (private · working set · private working set)\n");
+        foreach (var (when, m) in memory) b.Append("  ").Append(Perf.Fmt($"{when,-10} ")).Append(Perf.MemoryText(m)).Append('\n');
+        b.Append("  ").Append(Perf.Fmt($"{"end",-10} ")).Append(Perf.MemoryText()).Append('\n');
         b.Append("stalls  ").Append(Perf.StallText()).Append('\n');
         return b.ToString();
     }
