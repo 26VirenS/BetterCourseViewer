@@ -56,6 +56,7 @@ const fullCourse = (c) => ({
 // [id, name, group, possible, earned, dueOffsetDays, dueHour, submittedOffset|null, extra]
 const A = {
   101: [
+    ['1090', 'Knewton Alta: Limits Practice', 'Coursework (Knewton Alta)', 10, null, 9, 23.98, null, { tool: 'https://tool.example.com/launch' }],
     ['1001', 'Lec01-PreQuiz', 'Effort', 16, 13, -13, 10.5, -14, { quiz: true }],
     ['1002', 'Lec02-PreQuiz', 'Effort', 17, 11, -10, 10.5, -12, { quiz: true }],
     ['1003', 'Dis00', 'Collaboration', 10, 10, -7, 23.98, null, {}],
@@ -93,6 +94,11 @@ const A = {
     // the mockup's example: file or text or link, four file types, open for a week, unlimited attempts
     ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format. See the <a class="instructure_file_link" title="Course Syllabus.pdf" href="/courses/101/files/f1?wrap=1">citation guide</a> before you start.</p><p><span style="color: #2d3b45;">Bring the printed rubric to lab — the TA marks it in person.</span></p>' }],
     ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
+    // (Mac 1.3.77, Windows 0.2.8) more of Alta's units, for External Tools' list of every place a tool is used (outside
+    // the next seven days, so the Dashboard's counts stay as they were)
+    ['4010', 'Knewton Alta: Unit 1', 'Assignments', 20, 18, -9, 23.98, -9, { tool: 'https://tool.example.com/launch' }],
+    ['4011', 'Knewton Alta: Unit 3', 'Assignments', 20, null, 12, 23.98, null, { tool: 'https://tool.example.com/launch' }],
+    ['4012', 'Knewton Alta: Unit 4', 'Assignments', 20, null, 19, 23.98, null, { tool: 'https://tool.example.com/launch' }],
   ],
   105: [
     ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, { gradingType: 'pass_fail' }], // (marked complete/incomplete: the grade is the word, not the points)
@@ -1221,7 +1227,7 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   const q = url.searchParams;
   const what = q.get('assignment_id') ? `assignment ${q.get('assignment_id')}` : q.get('module_item_id') ? `module item ${q.get('module_item_id')}` : q.get('id') ? `tool ${q.get('id')}` : 'a launch URL';
   // (Mac 1.3.17) Knewton Alta: Unit 2 launches the stand-in for Alta's assignment player
-  if (q.get('assignment_id') === '4003') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1` };
+  if (['4003', '4010', '4011', '4012', '1090'].includes(q.get('assignment_id'))) return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1` };
   // (Mac 1.3.66) a Macmillan Learning assignment, for its popup
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
