@@ -1,9 +1,9 @@
 # The iPhone app built with Xcode 26 (its tab bar, navigation bars and sheets in Liquid Glass) and run on
 # the iOS Simulator against the mock Canvas: every native screen pictured in light and dark
 # (scripts/dev/ios-shots.sh), the pictures and the build log pushed to the ios-shots branch to be looked at.
-# The simulator boots while the app builds (the last build's intermediates kept: only what changed is compiled again),
-# each picture is taken as soon as the app says it has settled, and the pictures, the app's consoles and the build's
-# warnings are checked before they are pushed (docs/CI.md).
+# The last build's intermediates are kept (only what changed is compiled again), each picture is taken as soon as the
+# app says it has settled, and the pictures, the app's consoles and the build's warnings are checked before they are
+# pushed (docs/CI.md).
 name: iOS screenshots
 
 on:
@@ -34,13 +34,6 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      # (the simulator boots meanwhile — two minutes and more on a fresh runner — beside the build, not after it)
-      - name: Boot the simulator
-        run: |
-          DEV=$(xcrun simctl list devices available | grep -E "iPhone 17 Pro \(" | head -1 | grep -oE "[0-9A-F-]{36}")
-          echo "device $DEV"
-          echo "DEV=$DEV" >> "$GITHUB_ENV"
-          nohup xcrun simctl boot "$DEV" > boot.log 2>&1 &
       # (the last build's intermediates, every file not changed since dated as it was then: only what changed is
       #  compiled again — scripts/dev/mtime-cache.py, as the Mac app's workflow does; the iOS build workflow's too)
       - name: The last build
@@ -78,12 +71,16 @@ jobs:
         with:
           path: build
           key: ios-sim-debug-${{ github.sha }}
+      # (the simulator booted once the build is done, not beside it: its first boot takes the runner's three cores for
+      #  minutes, and a build beside it took four times as long)
       - name: Simulator and mock Canvas
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
           node scripts/dev/mock-brightspace.mjs 8860 --open > mock-d2l.log 2>&1 &
+          DEV=$(xcrun simctl list devices available | grep -E "iPhone 17 Pro \(" | head -1 | grep -oE "[0-9A-F-]{36}")
+          echo "device $DEV"
+          xcrun simctl boot "$DEV"
           xcrun simctl bootstatus "$DEV" -b
-          cat boot.log
           xcrun simctl install booted "build/Build/Products/Debug-iphonesimulator/Simpl Courses.app"
           # (up when they answer, not after a set time)
           for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8860/d2l/home && break; sleep 0.5; done

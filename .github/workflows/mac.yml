@@ -29,6 +29,7 @@ on:
       - 'scripts/dev/check-warnings.py'
       - 'scripts/dev/*-checks.json'
       - 'scripts/dev/baselines/mac-*'
+      - 'scripts/dev/swift-checks/**'
       - '.github/workflows/mac.yml'
   workflow_dispatch:
     inputs:
@@ -50,6 +51,24 @@ concurrency:
   cancel-in-progress: true # (a newer push cancels the run before it: only the newest is worth waiting for)
 
 jobs:
+  # (the models that need no window, checked on their own beside the build — the elements' data and VSEPR's shapes:
+  #  scripts/dev/swift-checks/main.swift compiled with the files it checks and run, in about a minute)
+  models:
+    name: Models
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            mac/Simpl/Tools
+            scripts/dev/swift-checks
+      - name: The models' checks
+        run: |
+          swiftc -O -o "$RUNNER_TEMP/model-checks" mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
+            mac/Simpl/Tools/MoleculeShape.swift scripts/dev/swift-checks/main.swift
+          "$RUNNER_TEMP/model-checks"
+
   mac:
     runs-on: macos-26
     timeout-minutes: 50
