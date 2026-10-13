@@ -368,8 +368,12 @@ enum DNANucleotides {
         r.check("dna.2D.GC", gcd.map { String(format: "%.2f", $0) }.joined(separator: ","),
                 gcd.count == 3 && abs(gcd[0] - 2.87) < 0.01 && abs(gcd[1] - 2.79) < 0.01 && abs(gcd[2] - 3.00) < 0.01)
         // (A·U: no methyl, an H5 1.08 Å from C5; the same two H-bonds)
-        let h5 = au.index("U", "H5").map { au.atoms[$0] }, c5 = au.index("U", "C5").map { au.atoms[$0] }
-        let h5d = h5.flatMap { h in c5.map { c in ((h.x - c.x) * (h.x - c.x) + (h.y - c.y) * (h.y - c.y)).squareRoot() } } ?? 0
+        var h5d = 0.0
+        if let h = au.index("U", "H5"), let c = au.index("U", "C5") {
+            let dx: Double = au.atoms[h].x - au.atoms[c].x
+            let dy: Double = au.atoms[h].y - au.atoms[c].y
+            h5d = (dx * dx + dy * dy).squareRoot()
+        }
         r.check("dna.2D.AU", String(format: "H5-C5=%.3f", h5d), abs(h5d - 1.08) < 1e-6 && au.index("U", "C7") == nil
                 && au.hBonds.count == 2 && au.atoms.count == at.atoms.count - 3)
         // (each H-bond drawn from the donor's H nearest the acceptor, which is bonded to the donor)
