@@ -132,8 +132,8 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   (1: 80 triangles), `cylinder(from:to:)`, `capsule`, `spheroid`, `superellipsoid`, `roundedBox`, `lens`, `torus`,
   `shellPatch` (RER sheets), and `radial(rings:segments:cut:inner:radius:)` for any star-shaped solid or shell —
   `cut: .octant` (x, y, z > 0 removed) or `.half` (z > 0) with capped cut faces showing the wall; radius functions
-  `BioShapes.ellipsoid`, `capsuleRadius`, `roundedBoxRadius`, `lensRadius`, `superellipsoid`, `byDistance(sdf)`,
-  `blob(base, BioBlob(seed:amplitude:terms:))`. `BioPath.catmullRom`, `frames` (rotation-minimising),
+  `BioShapes.sphere(r)`, `ellipsoid`, `capsuleRadius`, `roundedBoxRadius`, `lensRadius`, `superellipsoidRadius`,
+  `byDistance(sdf)`, `blob(base, BioBlob(seed:amplitude:terms:))`. `BioPath.catmullRom`, `frames` (rotation-minimising),
   `tube(points, radius:, radii:, sides:, closed:)`, `ribbon(points, guides:, width:, thickness:, arrow:, elliptical:)`.
   `BioFrame` places a mesh (`along(dir, at:)`, `rotation(axis:degrees:)`); `mesh.transformed/translated/scaled/
   flipped`. `BioMoleculeMeshes.dashes` for H-bonds.

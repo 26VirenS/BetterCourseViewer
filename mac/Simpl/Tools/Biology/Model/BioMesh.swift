@@ -262,7 +262,7 @@ enum BioShapes {
 
     /// A superellipsoid's: semi-axes a, b, c; e1 shapes it north–south, e2 east–west (1 and 1 is an ellipsoid; near 0
     /// a box).
-    static func superellipsoid(_ a: Double, _ b: Double, _ c: Double, e1: Double, e2: Double) -> (BioVec) -> Double {
+    static func superellipsoidRadius(_ a: Double, _ b: Double, _ c: Double, e1: Double, e2: Double) -> (BioVec) -> Double {
         { d in
             let xz = pow(pow(abs(d.x / a), 2 / e2) + pow(abs(d.z / c), 2 / e2), e2 / e1)
             let f = xz + pow(abs(d.y / b), 2 / e1)
@@ -330,7 +330,7 @@ enum BioShapes {
     }
 
     static func superellipsoid(_ a: Double, _ b: Double, _ c: Double, e1: Double, e2: Double, rings: Int = 20, segments: Int = 40) -> BioMesh {
-        radial(rings: rings, segments: segments, radius: superellipsoid(a, b, c, e1: e1, e2: e2))
+        radial(rings: rings, segments: segments, radius: superellipsoidRadius(a, b, c, e1: e1, e2: e2))
     }
 
     /// An icosphere: an icosahedron's faces split `subdivisions` times (1: 80 triangles; 2: 320), for the many small
