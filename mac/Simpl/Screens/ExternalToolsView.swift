@@ -136,9 +136,13 @@ struct ExternalToolsView: View {
     private func openAskedList() async {
         // (the flag is only taken once its tool is there: a first run of this task before the answer came, or one the
         // engine's first data change cut short, must not use it up)
-        guard let word = UserDefaults.standard.string(forKey: "SimplExternalToolList")?.lowercased(), !word.isEmpty,
-              let t = model.data?.rows.first(where: { $0.name.lowercased().contains(word) && $0.listable }),
-              LaunchOpen.take("", key: "SimplExternalToolList") != nil else { return }
+        guard let word = UserDefaults.standard.string(forKey: "SimplExternalToolList")?.lowercased(), !word.isEmpty else { return }
+        guard let t = model.data?.rows.first(where: { $0.name.lowercased().contains(word) && $0.listable }) else {
+            NSLog("[Simpl] tool list: %@ not there yet (%d tools)", word, model.data?.rows.count ?? -1)
+            return
+        }
+        guard LaunchOpen.take("", key: "SimplExternalToolList") != nil else { return }
+        NSLog("[Simpl] tool list: opening %@", t.name)
         try? await Task.sleep(nanoseconds: 600_000_000)
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
@@ -343,6 +347,9 @@ private struct ToolCard: View {
         .onChange(of: listed) { _, on in if !on { closedAt = Date() } }
         .popover(isPresented: $listed, arrowEdge: .trailing) {
             ToolPlacesList(tool: tool, tint: tint, choose: choose, close: { listed = false })
+                // (the screenshot suite's console: when a list shows and goes)
+                .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) } }
+                .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) } }
         }
     }
 
