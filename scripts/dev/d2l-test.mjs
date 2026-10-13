@@ -23,7 +23,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import vm from 'node:vm';
-import { launchExtension, shortenTimers, afterMigration } from './harness.mjs';
+import { launchExtension, shortenTimers, keptOff, afterMigration } from './harness.mjs';
 import { appBundle } from './app-bundle.mjs';
 
 const require = createRequire(import.meta.url);
@@ -297,6 +297,7 @@ for (const cs of manifest.content_scripts) if (!cs.matches.includes('https://laz
 manifest.host_permissions.push(`${BASE}/*`);
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 shortenTimers(extDir);
+keptOff(extDir); // (each page load drawn from Brightspace's answers, as the checks below read them: harness.mjs)
 const userDataDir = join(tmpdir(), `bcv-d2l-profile-${process.pid}`);
 let context;
 try {

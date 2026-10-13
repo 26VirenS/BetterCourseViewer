@@ -8,7 +8,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { TIMERS, shortenTimers, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension } from './harness.mjs';
+import { TIMERS, shortenTimers, keptOff, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension } from './harness.mjs';
 import { SMOKE_SHARDS, SMOKE_PARTS } from './smoke-shards.mjs';
 
 const require = createRequire(import.meta.url);
@@ -38,7 +38,7 @@ const on = (name) => { const yes = !SECTIONS || SECTIONS.includes(name); if (yes
 const sectionStarts = []; // (when each section of sectionsRun began: the log ends with where the time went)
 // ports: a shard's four in a row from 8900; a whole run (or a half) the old ones
 const SLOT = SHARD ? Object.keys(SMOKE_SHARDS).indexOf(SHARD) : -1;
-const PORT = SLOT >= 0 ? 8900 + SLOT * 4 : PART === 2 ? 8788 : 8787;
+const PORT = SLOT >= 0 ? (Number(process.env.BCV_PORT_BASE) || 8900) + SLOT * 4 : PART === 2 ? 8788 : 8787; // (BCV_PORT_BASE: another run of the suite already holds these, on a shared machine)
 const BASE = `http://localhost:${PORT}`;
 // A tool is somebody else's site, on an origin of its own. One is served here so the tab a tool
 // opens into is a real cross-origin page — which is what decides whether the bar and the tray have
@@ -67,6 +67,7 @@ manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`, `${FAR}/*`); // (a shipp
 for (const cs of manifest.content_scripts) if ((cs.js || []).includes('content/toolbar.js')) cs.matches = ['*://*.instructure.com/*', `${BASE}/*`, `${SIM}/*`];
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const timers = shortenTimers(extDir); // the product's longest waits run short in this copy (harness.mjs); the shipped values are checked below
+const noKept = keptOff(extDir); // (every page load asks Canvas first, as the checks below expect: the kept answers are fluid-test.mjs's)
 
 // 2. mock server
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT), String(SIM_PORT)], { stdio: 'inherit' });
@@ -118,6 +119,7 @@ const shot = async (page, name) => { if (process.env.BCV_NO_SHOTS) return; await
 // has to be there, exactly, or a timer changed under the suite without the table in harness.mjs
 {
   console.log('\nharness');
+  check(noKept, "the copy draws every screen from Canvas's answer, nothing kept from the last visit or lapsed (the store's keeping found, as harness.mjs expects it)");
   check(timers.missing.length === 0 && timers.done.length === 12, `the copy runs the welcome's wait, the word-marks, the screen patience, the Away Refresh count, its hold and its off-stay, the island, the counter roll and the grade poll short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
   // every section the suite has is in exactly one shard (smoke-shards.mjs), so the shards together are the whole suite
   const declared = [...readFileSync(fileURLToPath(import.meta.url), 'utf8').matchAll(/^ {2}if \(on\((['"])(.+?)\1\)\) \{/gm)].map((m) => m[2]).concat(['bundles', "what's new notes"]);
@@ -4959,10 +4961,10 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 5000 });
   const motion = await page.evaluate(() => ({
-    screen: getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName,
+    screen: `${getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName}@${getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationDuration}`,
     noBar: !document.getElementById('bcv-progress') && !document.querySelector('.bcv-load'),
   }));
-  check(motion.screen === 'bcv-fade-up' && motion.noBar, `screens rise in by keyframe; no page-top bar, and no row wash once the screen is drawn: ${JSON.stringify(motion)}`);
+  check(motion.screen === 'bcv-fade-in@0.22s' && motion.noBar, `a page's first screen fades in by keyframe, 220ms (2.99.33: deeper moves slide, sections crossfade — fluid-test.mjs); no page-top bar, and no row wash once the screen is drawn: ${JSON.stringify(motion)}`);
   // mockup 14: the pressed control is the progress bar. A sidebar row that starts a load fills left to
   // right with a flat wash in its own icon colour, under its label; a second press is a no-op.
   const slowCal = /\/calendar(\?.*)?$/; // the next page's own document is held back, so the pressed row's wash can be watched
@@ -7872,7 +7874,7 @@ try {
   // (a named action run in the page's content-script world: the worker's CSP allows no built function)
   const runInApp = (name) => sw.evaluate(async ([base, n]) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (what) => { if (what === 'toast') self.BCV.ui.toast('Springs'); else if (what === 'stuck') { const ov = document.querySelector('.bcv-sheet-ov'); self.BCV.ui.dismiss(ov); for (const a of ov.getAnimations({ subtree: true })) a.pause(); } }, args: [n] }); }, [BASE, name]);
   const springs = await page.evaluate(() => { const cs = getComputedStyle(document.documentElement); const screen = getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')); return { cls: document.documentElement.classList.contains('bcv-springs'), gentle: cs.getPropertyValue('--bcv-spring-gentle').trim().slice(0, 9), t: cs.getPropertyValue('--bcv-t-gentle').trim(), screenEase: screen.animationTimingFunction.slice(0, 7), screenDur: screen.animationDuration, stops: cs.getPropertyValue('--bcv-spring-gentle').split(',').length, qn: getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-snappy').trim().slice(0, 7) }; });
-  check(springs.cls && springs.gentle === 'linear(0,' && /^\d{3}ms$/.test(springs.t) && springs.screenEase === 'linear(' && Math.round(parseFloat(springs.screenDur) * 1000) === parseInt(springs.t, 10) && springs.stops >= 12, `the springs are the stylesheet's easings: the root carries each preset as a linear() curve with its own settle time, and a screen's rise runs on it: ${JSON.stringify(springs)}`);
+  check(springs.cls && springs.gentle === 'linear(0,' && /^\d{3}ms$/.test(springs.t) && springs.screenEase === 'cubic-b' && springs.screenDur === '0.22s' && springs.stops >= 12, `the springs are the stylesheet's easings: the root carries each preset as a linear() curve with its own settle time — and a screen's arrival is the one move every Simpl app makes (2.99.33), 220ms on the house ease-out: ${JSON.stringify(springs)}`);
   // (2.99.20) in Safari each spring is its bezier: Core Animation cannot play linear(), and a rule eased by one would run on
   // the main thread at the page's rate. Asked as Safari (its user agent in every world, the content script's too)
   const sfPage = await context.newPage();
