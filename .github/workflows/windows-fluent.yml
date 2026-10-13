@@ -671,6 +671,15 @@ jobs:
           $walks += ,@('cold', 'dist/Simpl/Simpl.exe', $prof, @())
           if ($hasBase) { $walks += ,@('base-warm', 'base/Simpl/Simpl.exe', $baseProf, @()) }
           $walks += ,@('warm', 'dist/Simpl/Simpl.exe', $prof, @())
+          # (each build opened once first and left to quit, with a profile of no use after: the runner's disk has both
+          #  builds, .NET and WebView2 read once, so the first walk is not the only one to pay for reading them)
+          foreach ($exe in @('base/Simpl/Simpl.exe', 'dist/Simpl/Simpl.exe')) {
+            if (-not (Test-Path $exe)) { continue }
+            $warmup = Join-Path $env:RUNNER_TEMP ('profile-warmup-' + [guid]::NewGuid())
+            $p = Start-Process -FilePath $exe -ArgumentList ($mock + @('--profile', $warmup, '--perf-walk', (Join-Path $env:RUNNER_TEMP 'warmup'), '--perf-timeout', '8')) -PassThru
+            if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+            Start-Sleep -Seconds 2
+          }
           foreach ($w in $walks) {
             $run = $w[0]
             $argList = $mock + @('--profile', $w[2], '--perf-walk', "$PWD/shots", '--perf-name', $run, '--perf-course', '101', '--perf-assignment', '1001', '--perf-timeout', '240') + $w[3]
