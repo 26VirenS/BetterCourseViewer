@@ -33,6 +33,8 @@ struct DashboardView: View {
     @State private var panelHeight: CGFloat = 0
     @State private var sheetAsked = false
     @State private var width: CGFloat = 0
+    /// (1.3.78) The window is at least `rowOfSix` wide (nil until the window has said how wide it is).
+    @State private var wideWindow: Bool?
     @State private var courses: DashCoursesData?
     @State private var progress: [String: CourseProgress] = [:]
     @State private var progressRead = false
@@ -57,6 +59,11 @@ struct DashboardView: View {
 
     // MARK: - Widths
 
+    /// (1.3.78) The narrowest window whose counters stand in one row of six — with the sidebar out or not; a narrower one
+    /// keeps them three across (two on a very narrow page). The window's width, not the page's: the row never goes back
+    /// to two rows because the sidebar is shown, or because the side column comes in beside the view.
+    static let rowOfSix: CGFloat = 1024
+
     /// The side column's width on a wide window.
     private var railWidth: CGFloat { min(440, max(340, (width * 0.3).rounded())) }
     /// Wide enough for the view and the side column side by side.
@@ -72,6 +79,13 @@ struct DashboardView: View {
             }
         }
         // (1.3.78: its title and toolbar are DashboardChrome's, in the window's stack)
+        .background {
+            // (1.3.78) how wide the window is, for the counters' row of six
+            WindowWidthProbe { w in
+                let wide = w >= Self.rowOfSix
+                if wide != wideWindow { wideWindow = wide }
+            }
+        }
         .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .task(id: version) {
             if active { await load() } else { behind = true }
@@ -137,19 +151,26 @@ struct DashboardView: View {
 
     // MARK: - Counters
 
-    /// The counters in rows (six across where they fit, else three or two). (1.2.8) A counter opened grows out of its own
-    /// tile into a panel that floats over the page — as wide as a panel needs, not the page — over its tile, placed by
-    /// where the tile is (1.3.16): the left-most tile's panel from its left edge, the right-most's from its right, one in
-    /// the middle centred on it; nothing under it moves.
+    /// The counters in rows: (1.3.78) one row of six compact tiles on a window `rowOfSix` wide or wider, else tall tiles
+    /// three across, or two on a very narrow page. (1.2.8) A counter opened grows out of its own tile into a panel that
+    /// floats over the page — as wide as a panel needs, not the page — over its tile, placed by where the tile is
+    /// (1.3.16): the left-most tile's panel from its left edge, the right-most's from its right, one in the middle centred
+    /// on it, each kept on the page; nothing under it moves.
     private func counters(_ d: Today) -> some View {
-        let cols = width >= 900 ? 6 : (width >= 520 ? 3 : 2)
+        // (until the window has said how wide it is: six where the page alone has room for them, as before 1.3.78)
+        let six = wideWindow ?? (width >= 900)
+        let cols = six ? 6 : (width >= 520 ? 3 : 2)
         let list = DashboardView.ordered(d.counters)
         let rows: [[Counter]] = stride(from: 0, to: list.count, by: cols).map { start in
             Array(list[start..<min(start + cols, list.count)])
         }
-        return VStack(alignment: .leading, spacing: 14) {
+        let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
+        let style: DashCounterTile.Style = six
+            ? .row(symbolBeside: DashCounterTile.symbolsFit(list.map(\.label), tileWidth: tile))
+            : .tall
+        return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                counterRow(row, cols: cols)
+                counterRow(row, cols: cols, style: style)
             }
         }
         .overlayPreferenceValue(DashTileAnchors.self) { anchors in
@@ -192,10 +213,13 @@ struct DashboardView: View {
         .onDisappear { watchClicks(false) }
     }
 
-    private func counterRow(_ row: [Counter], cols: Int) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+    /// The room between two tiles, across and down.
+    static let counterSpacing: CGFloat = 14
+
+    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style) -> some View {
+        HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c).frame(maxWidth: .infinity, maxHeight: .infinity)
+                counterSlot(c, style: style).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -207,14 +231,14 @@ struct DashboardView: View {
     /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
     /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
     @ViewBuilder
-    private func counterSlot(_ c: Counter) -> some View {
+    private func counterSlot(_ c: Counter, style: DashCounterTile.Style) -> some View {
         Group {
             if open == c.key && !reduceMotion {
-                DashCounterTile(counter: c, value: value(c), note: note(c)) {}
+                DashCounterTile(counter: c, value: value(c), note: note(c), style: style) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
-                DashCounterTile(counter: c, value: value(c), note: note(c)) { setOpen(open == c.key ? nil : c.key) }
+                DashCounterTile(counter: c, value: value(c), note: note(c), style: style) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: !reduceMotion)
                     .transition(.opacity)
@@ -686,4 +710,42 @@ extension DashView {
     static func offered(brightspace: Bool) -> [DashView] {
         brightspace ? [.cards, .list] : allCases
     }
+}
+
+/// (1.3.78) The width of the window a view is in — said once it is in a window, and again each time the window is
+/// resized — for a layout that follows the window itself rather than the room its column happens to have beside the
+/// sidebar. An unseen view (it takes no presses).
+struct WindowWidthProbe: NSViewRepresentable {
+    let onWidth: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> WindowWidthProbeView {
+        let v = WindowWidthProbeView()
+        v.onWidth = onWidth
+        return v
+    }
+
+    func updateNSView(_ v: WindowWidthProbeView, context: Context) { v.onWidth = onWidth }
+}
+
+final class WindowWidthProbeView: NSView {
+    var onWidth: (CGFloat) -> Void = { _ in }
+    private var watch: NSObjectProtocol?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let watch { NotificationCenter.default.removeObserver(watch) }
+        watch = nil
+        guard let window else { return }
+        // (said on the run loop's next turn: this is called while SwiftUI is putting the view in place)
+        let width = window.frame.width
+        DispatchQueue.main.async { [weak self] in self?.onWidth(width) }
+        watch = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] n in
+            MainActor.assumeIsolated {
+                guard let w = n.object as? NSWindow else { return }
+                self?.onWidth(w.frame.width)
+            }
+        }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

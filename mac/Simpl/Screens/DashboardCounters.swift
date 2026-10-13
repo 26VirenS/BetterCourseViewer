@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
 // The Dashboard's six counters (1.2): each a glass tile with its symbol, its number and the line under it. Pressed, a
 // tile grows where it stands into a panel floating over the page (1.2.8: a panel's width, from the tile's corner)
 // listing what it counted, and folds back into its tile when closed (its ✕, Escape, a click round it, or the tile).
+// (1.3.78) On a window 1024 points wide or wider they stand in one row of six, each a compact tile two lines tall.
 
 /// A counter's look, as the web Dashboard's: its symbol and colour, and its name in full for the panel it opens.
 enum DashCounterLook {
@@ -78,49 +80,45 @@ struct DashCount: View {
     }
 }
 
-/// A counter's tile: its symbol and name, its number, the line under it.
+/// A counter's tile: its symbol and name, its number, the line under it. (1.3.78) In the row of six, a compact tile: its
+/// name over its number, the line beside the number — cut short, or left out where there is no room to say it.
 struct DashCounterTile: View {
+    /// How a tile is laid out: tall, three across (or two); or compact, in the row of six — its symbol beside its name
+    /// where every name in the row has room for one, else in the tile's corner beside its number.
+    enum Style: Equatable {
+        case tall
+        case row(symbolBeside: Bool)
+    }
+
     let counter: Counter
     let value: Int?
     let note: String?
+    var style: Style = .tall
     let action: () -> Void
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
 
     private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
+    private var radius: CGFloat { style == .tall ? 18 : 16 }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 7) {
-                    Image(systemName: DashCounterLook.symbol(counter.key))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DashCounterLook.color(counter.key))
-                    Text(counter.label)
-                        .font(.sCallout.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+            Group {
+                switch style {
+                case .tall: tall
+                case .row(let symbolBeside): compact(symbolBeside: symbolBeside)
                 }
-                DashCount(value: value, alert: alert)
-                Text(note?.isEmpty == false ? note! : " ")
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 // (1.3.1) its photo, frosted under its words (Settings ▸ Appearance, or its context menu)
                 if let slot = PhotoSlot.card(counter.key) {
                     SlotPhotoView(slot: slot)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 }
             }
         }
-        .buttonStyle(CardButtonStyle(radius: 18, tint: alert ? .red : nil))
+        .buttonStyle(CardButtonStyle(radius: radius, tint: alert ? .red : nil))
         .contextMenu {
             if PhotoSlot.card(counter.key) != nil {
                 Button("Card Photo…") { editing = true }
@@ -134,6 +132,103 @@ struct DashCounterTile: View {
         .animation(Motion.snappy, value: value)
         .help("Show \(DashCounterLook.fullName(counter.key, counter.label).lowercased())")
         .accessibilityLabel("\(DashCounterLook.fullName(counter.key, counter.label)): \(value.map(String.init) ?? "counting")")
+    }
+
+    private func symbol(size: CGFloat) -> some View {
+        Image(systemName: DashCounterLook.symbol(counter.key))
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(DashCounterLook.color(counter.key))
+    }
+
+    /// Three lines: its symbol and name, its number, and the line under it.
+    private var tall: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                symbol(size: 14)
+                Text(counter.label)
+                    .font(.sCallout.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            DashCount(value: value, alert: alert)
+            Text(note?.isEmpty == false ? note! : " ")
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - In the row of six
+
+    /// (1.3.78) A compact tile's name, as it is drawn (the row measures every name with it), and what is beside it.
+    static let rowLabelSize: CGFloat = 13
+    static let rowSymbolWidth: CGFloat = 16
+    static let rowSymbolGap: CGFloat = 6
+    static let rowPadding: CGFloat = 12
+
+    /// (1.3.78) Whether every name has room beside its symbol on a tile `tileWidth` across — measured as the tile draws
+    /// them, so the row decides once for all six and no name is ever cut short.
+    static func symbolsFit(_ labels: [String], tileWidth: CGFloat) -> Bool {
+        let font = NSFont.systemFont(ofSize: rowLabelSize, weight: .medium)
+        let widest = labels.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return rowPadding * 2 + rowSymbolWidth + rowSymbolGap + widest.rounded(.up) + 2 <= tileWidth
+    }
+
+    /// Two lines: its name (its symbol beside it, where the row has room), then its number with the line beside it —
+    /// in full where it fits, cut short where a few words of it still say something, else left out; its symbol in the
+    /// corner where it is not beside the name. Never a third line.
+    private func compact(symbolBeside: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: Self.rowSymbolGap) {
+                if symbolBeside {
+                    symbol(size: 12.5).frame(width: Self.rowSymbolWidth)
+                }
+                Text(counter.label)
+                    .font(.system(size: Self.rowLabelSize, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8) // (a sidebar dragged wide on the narrowest window: smaller, never cut short)
+            }
+            HStack(alignment: .center, spacing: 6) {
+                ViewThatFits(in: .horizontal) {
+                    numberLine(note: note)
+                    numberLine(note: note, cut: true)
+                    numberLine(note: nil)
+                }
+                .layoutPriority(1)
+                if !symbolBeside {
+                    Spacer(minLength: 0)
+                    symbol(size: 13)
+                }
+            }
+        }
+        .padding(.horizontal, symbolBeside ? Self.rowPadding : 10)
+        .padding(.vertical, 11)
+    }
+
+    /// The number, and the line beside it on its baseline: whole, or (`cut`) in whatever room is left once there is
+    /// room for a few words of it, ending in an ellipsis.
+    private func numberLine(note: String?, cut: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            DashCount(value: value, alert: alert, size: 26)
+                .fixedSize()
+            if let note, !note.isEmpty {
+                let line = Text(note)
+                    .font(.sCaption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if cut {
+                    line.frame(minWidth: 0, idealWidth: 64, maxWidth: .infinity, alignment: .leading)
+                } else {
+                    line
+                }
+            }
+        }
     }
 }
 

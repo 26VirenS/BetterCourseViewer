@@ -9,7 +9,8 @@ struct MainShell: View {
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: Back and Forward follow the window's moves)
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
-    @State private var columns: NavigationSplitViewVisibility = .all
+    // (the screenshot suite: -SimplSidebar hidden opens the window with the sidebar folded away)
+    @State private var columns: NavigationSplitViewVisibility = UserDefaults.standard.string(forKey: "SimplSidebar") == "hidden" ? .detailOnly : .all
     /// (1.3) The window was last wide enough for the sidebar beside the screen: crossing below folds it away, crossing
     /// back brings it out again (a sidebar opened by hand on a narrow window stays until the window narrows again).
     @State private var wasWide: Bool?

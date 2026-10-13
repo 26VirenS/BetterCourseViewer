@@ -63,6 +63,15 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   reverses it (1.3.78, below); a tick shows before its row moves. Under Reduce Motion, moves become cross-fades.
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
+- **The Dashboard's counters (1.3.78).** On a window 1024 points wide or wider — the sidebar out or not — the six
+  counters stand in one row of six, each a compact tile about 72 points tall: its name, then its number with its line
+  beside it (whole where it fits, ending in an ellipsis where a few words of it still fit, else left out — never a
+  third line). Each symbol is beside its name where every name in the row has room for one (measured as the tile draws
+  it), else in the tile's corner beside its number; a name is never cut short. A narrower window keeps tall tiles,
+  three across (two on a page under 520 points). The rule reads the window's own width (`DashboardView.rowOfSix`,
+  `WindowWidthProbe`), not the page's, so showing the sidebar or the side column coming in never sends the row back to
+  two. A tile's panel still opens over the page from its tile: the first from its left edge, the last from its right,
+  one between them in step, each kept on the page.
 
 - **Knewton Alta (1.3.17, Mac only; cut back in 1.3.45).** Open Tool on a Knewton Alta assignment (the engine's
   `alta`: its launch address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): Close and
@@ -479,7 +488,8 @@ Simpl.app/Contents/MacOS/Simpl -SimplBaseURL http://localhost:8800 -SimplDemo YE
 Launch arguments (each read once): `-SimplPlace dashboard|courses|todo|calendar|grades|notifications|inbox|groups|
 search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas address>`, `-SimplOpen quiz:<course>:<quiz>
 [:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin`,
-`-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab Settings opens on).
+`-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab Settings opens on),
+`-SimplSidebar hidden` (the window opens with its sidebar folded away).
 
 ## Releasing
 
