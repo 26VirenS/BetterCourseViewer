@@ -126,6 +126,15 @@ json.dump(feed, open("build/site-sync/public/app/mac-beta.json", "w"), indent=2)
 print("/app/mac-beta.json → " + version + (" (beta)" if feed["beta"] else ""))
 ' "$REPO" "$CRITICAL" || echo "no Simpl for Mac beta feed written"
   fi
+  # Simpl for Windows (a beta: the landing page's Windows button), /download/windows: the newest windows-fluent-v*
+  # release's installer, Simpl-Setup.exe (every one of them is a pre-release, the app's previews)
+  WIN_EXE="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | test("^windows-fluent-v[0-9]+$")) and any(.assets[]; .name == "Simpl-Setup.exe"))] | sort_by(.tag_name | ltrimstr("windows-fluent-v") | tonumber) | last | (.assets // [] | map(select(.name == "Simpl-Setup.exe")) | first | .browser_download_url) // ""' 2>/dev/null || true)"
+  if [ -n "$WIN_EXE" ]; then
+    REDIRECTS=build/site-sync/public/_redirects
+    { grep -v '^/download/windows ' "$REDIRECTS" 2>/dev/null || true; echo "/download/windows $WIN_EXE 302"; } > "$REDIRECTS.new"
+    mv "$REDIRECTS.new" "$REDIRECTS"
+    echo "/download/windows → $WIN_EXE"
+  fi
 fi
 (
   cd build/site-sync
