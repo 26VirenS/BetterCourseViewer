@@ -298,6 +298,12 @@ jobs:
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'light', '--dash-view', 'activity'))
           Shot 'dashboard-counter' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next'))
           Shot 'dashboard-counter-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--sheet', 'unread'))
+          # (the counters one row of six from a window 1024 wide: the first tile's panel and the last one's, each on the
+          #  page; the window Simpl first opens at; a theme's pictures in the narrowest one-row tiles)
+          Shot 'dashboard-counter-first' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'today'))
+          Shot 'dashboard-counter-last' '1024x681' 45 ($mock + @('--appearance', 'dark', '--sheet', 'graded'))
+          Shot 'dashboard-1280' '1280x820' 45 ($mock + @('--appearance', 'light'))
+          Shot 'theme-dusk-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'Dusk'))
           Shot 'dashboard-1080p' '1920x1050' 45 ($mock + @('--appearance', 'dark'))
           Shot 'grades-1080p' '1920x1050' 45 ($mock + @('--appearance', 'light', '--place', 'grades'))
           Shot 'dashboard-narrow' '780x683' 45 ($mock + @('--appearance', 'light'))
