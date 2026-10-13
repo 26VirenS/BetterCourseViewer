@@ -372,7 +372,11 @@ public sealed class TodoScreen : Screen
 
 - The shell gives the page its title (a breadcrumb when something is pushed), the commands at the title's right, a
   scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
-  `LayoutChanges` to be built again when a width threshold is crossed.
+  `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
+  and the page together), for a layout told by the window rather than by the page left beside the pane, with
+  `WindowLayoutChanges` for its thresholds: the Dashboard's six counters sit in one row on a window 1024 wide or wider
+  (compact tiles, about 72 tall: the name over the number and its line), and three to a row (two on the narrowest page)
+  on a narrower one.
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
   light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`).
 - Type follows Windows 11's ramp (`Ty.Caption` 12, `Ty.Body` 14, `Ty.BodyStrong`, `Ty.Subtitle` 20, `Ty.Title` 28).

@@ -113,11 +113,10 @@ public sealed partial class DashboardScreen : Screen
     private readonly Dictionary<string, Button> tiles = new();
     private string? lastTitle;
 
-    protected override bool LayoutChanges(double before, double now)
-    {
-        static int Cols(double w) => w >= 900 ? 6 : w >= 520 ? 3 : 2;
-        return Cols(before) != Cols(now) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760) || CardCols(before) != CardCols(now);
-    }
+    protected override bool LayoutChanges(double before, double now) =>
+        CounterLayout(before, WindowWidth) != CounterLayout(now, WindowWidth) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760) || CardCols(before) != CardCols(now);
+
+    protected override bool WindowLayoutChanges(double before, double now) => CounterLayout(Width, before) != CounterLayout(Width, now);
 
     protected override FrameworkElement Build()
     {
@@ -127,8 +126,8 @@ public sealed partial class DashboardScreen : Screen
         var width = Math.Max(320, Width);
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         var look = (Appearance.Dark, Appearance.Accent, Appearance.ThemeName);
-        var cols = width >= 900 ? 6 : width >= 520 ? 3 : 2;
-        page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, overdueAdjust, openKey, cols, look }, () => Counters(d, width)));
+        var layout = CounterLayout(width, WindowWidth);
+        page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, overdueAdjust, openKey, layout, look }, () => Counters(d, layout)));
         var two = width >= 900;
         var railW = Math.Clamp(Math.Round(width * 0.3), 340, 440);
         var mainW = two ? width - railW - 28 : width;
@@ -202,9 +201,47 @@ public sealed partial class DashboardScreen : Screen
         "tomorrow" => "Due tomorrow", "graded" => "Graded this week", _ => label,
     };
 
-    private FrameworkElement Counters(Today d, double width)
+    /// <summary>A window this wide or wider shows the six counters in one row, however wide the page beside the
+    /// navigation pane is (1024 is the pictures' usual window, the page beside the pane 640 of it).</summary>
+    private const double OneRowFrom = 1024;
+
+    /// <summary>A one-row tile's padding at its sides, its symbol's size and the room between the symbol and its words.</summary>
+    private const double RowPad = 12, RowSymbol = 22, RowGap = 8;
+
+    /// <summary>
+    /// How the counters are laid out for a page and a window this wide: on a window 1024 wide or wider, one row of six —
+    /// told by the window, so a page that narrows as the pane or the rail takes room never puts them back in two rows —
+    /// and whether each of those tiles has room for its symbol beside its name (else the symbol goes beside its number);
+    /// on a narrower window, three to a row, or two on the narrowest page.
+    /// </summary>
+    private (int Cols, bool Roomy) CounterLayout(double page, double window)
     {
-        var cols = width >= 900 ? 6 : width >= 520 ? 3 : 2;
+        if (window < OneRowFrom) return (page >= 520 ? 3 : 2, false);
+        var words = (Math.Max(320, page) - 5 * 12) / 6 - 2 - 2 * RowPad;
+        return (6, words >= RowSymbol + RowGap + WidestLabel() + 2);
+    }
+
+    /// <summary>The widest of the counters' names in the tiles' type, measured once for each set of names.</summary>
+    private double WidestLabel()
+    {
+        var labels = string.Join("\u001f", today.Data?.Counters.Select(c => c.Label) ?? Enumerable.Empty<string>());
+        if (widest.Labels != labels) widest = (labels, today.Data?.Counters.Select(c => WordsWidth(c.Label, Ty.Body)).DefaultIfEmpty(0).Max() ?? 0);
+        return widest.Width;
+    }
+
+    private (string? Labels, double Width) widest;
+
+    /// <summary>How wide a line of words is in a step of Windows' type ramp, as a TextBlock lays it out.</summary>
+    private static double WordsWidth(string s, Ty ty)
+    {
+        var (size, weight, face, _) = K.Ramp(ty);
+        return new FormattedText(s, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(face, FontStyles.Normal, weight, FontStretches.Normal), size, Brushes.Black, 1).WidthIncludingTrailingWhitespace;
+    }
+
+    private FrameworkElement Counters(Today d, (int Cols, bool Roomy) layout)
+    {
+        var cols = layout.Cols;
         var items = d.Counters.OrderBy(c => Array.IndexOf(Order, c.Key) is var i && i < 0 ? 99 : i).ToList();
         var grid = new Grid();
         for (var c = 0; c < cols; c++)
@@ -222,7 +259,7 @@ public sealed partial class DashboardScreen : Screen
         for (var k = 0; k < items.Count; k++)
         {
             var c = items[k];
-            var tile = Tile(c);
+            var tile = cols == 6 ? RowTile(c, layout.Roomy) : Tile(c);
             Grid.SetColumn(tile, (k % cols) * 2);
             Grid.SetRow(tile, (k / cols) * 2);
             grid.Children.Add(tile);
@@ -233,6 +270,7 @@ public sealed partial class DashboardScreen : Screen
         return grid;
     }
 
+    /// <summary>A counter's tile three to a row (two on the narrowest page): its symbol and name, its number, the line under it.</summary>
     private Button Tile(Counter c)
     {
         var (value, note) = Count(c);
@@ -244,6 +282,60 @@ public sealed partial class DashboardScreen : Screen
         var noteT = K.Text(note ?? " ", Ty.Caption, B.Text2);
         var content = K.V(0, head, count, noteT);
         content.Margin = new Thickness(14, 14, 14, 12);
+        return TileButton(c, content, value, alert, color);
+    }
+
+    /// <summary>
+    /// A counter's tile in one row of six, made for it — two lines, about 72 tall, so the work under the counters stays
+    /// in view: its name (never cut short) over its number, the symbol beside the name where both fit; where they do
+    /// not (the narrowest tiles, on a window not much over 1024), beside the number instead. The line about the count
+    /// follows the number, cut short at its end, and is left out where too little of it would show.
+    /// </summary>
+    private Button RowTile(Counter c, bool roomy)
+    {
+        var (value, note) = Count(c);
+        var alert = c.Tone == "red" && (value ?? 0) > 0;
+        var color = CounterColor(c.Key);
+        var symbol = K.IconTile(Glyph.Counter(c.Key), color, RowSymbol);
+        var label = K.Text(c.Label, Ty.Body, B.Text2);
+        label.TextTrimming = TextTrimming.None;
+        // (a name wider than its room, were there ever one, shrunk to fit rather than cut; a number likewise)
+        var name = new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        var head = roomy ? K.Columns("auto, *", symbol.Col(0), name.Margin(RowGap, 0, 0, 0).Col(1)) : K.Columns("*", name);
+        head.Height = RowSymbol;
+        var count = K.Text(value?.ToString() ?? "–", Ty.Count, value == null ? B.Text3 : alert ? B.Critical : B.Text);
+        count.FontSize = 28;
+        count.LineHeight = 32;
+        count.TextTrimming = TextTrimming.None;
+        Grid line;
+        if (roomy)
+        {
+            line = K.Columns("auto, *", count.Col(0));
+            if (!string.IsNullOrEmpty(note))
+            {
+                var noteT = K.Text(note!, Ty.Caption, B.Text2).Margin(RowGap, 0, 0, 5).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1);
+                // (shown when all of it fits, or enough to say something — about nine letters)
+                var enough = Math.Min(WordsWidth(note!, Ty.Caption), 56);
+                noteT.SizeChanged += (_, e) => noteT.Visibility = e.NewSize.Width + 0.5 >= enough ? Visibility.Visible : Visibility.Hidden;
+                line.Children.Add(noteT);
+            }
+        }
+        else
+        {
+            // (no line about the count: beside the symbol and the number, too little of it would ever show)
+            var number = new Viewbox { Child = count, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(RowGap, 0, 0, 0) };
+            line = K.Columns("auto, *", symbol.Col(0), number.Col(1));
+        }
+        line.Height = 32;
+        var content = K.V(0, head, line);
+        content.Margin = new Thickness(RowPad, 8, RowPad, 8);
+        return TileButton(c, content, value, alert, color);
+    }
+
+    /// <summary>A counter's tile round its words: its colour washed across it (or its theme's picture, or the alert's red),
+    /// opening its panel when pressed, its full name its tooltip and what a screen reader says with its count.</summary>
+    private Button TileButton(Counter c, FrameworkElement content, int? value, bool alert, Color color)
+    {
         // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
         var face = new Grid();
         if (Scenes.Backdrop(c.Key) is { } scene) face.Children.Add(scene);

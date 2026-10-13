@@ -24,7 +24,7 @@ public abstract class Screen
     /// <summary>The loaders it watches: whether one is still reading, for the shell's prefetch.</summary>
     private readonly List<Func<bool>> reading = new();
     private bool built, pending, gone = true, stale;
-    private double width;
+    private double width, window;
     /// <summary>When it was last built (Environment.TickCount64), and the build waiting for the answers coming close behind.</summary>
     private long builtAt;
     private DispatcherTimer? soon;
@@ -65,6 +65,10 @@ public abstract class Screen
 
     /// <summary>The width the page lays the content out in.</summary>
     public double Width => width;
+
+    /// <summary>The window's width, the navigation pane's and the page's together (0 until the shell gives it): for a
+    /// layout that follows the window rather than the page left beside the pane — the Dashboard's counters.</summary>
+    public double WindowWidth => window;
 
     /// <summary>Built at least once, and not waiting to be built again.</summary>
     public bool Ready => built && !stale && !pending;
@@ -126,12 +130,17 @@ public abstract class Screen
     /// <summary>The page's width changed: a screen whose layout follows the width says whether it must be built again.</summary>
     protected virtual bool LayoutChanges(double before, double now) => false;
 
-    public void SetWidth(double w)
+    /// <summary>The window's width changed: a screen whose layout follows the window says whether it must be built again.</summary>
+    protected virtual bool WindowLayoutChanges(double before, double now) => false;
+
+    /// <summary>The page's width <paramref name="w"/> and the window's <paramref name="win"/>, as the shell lays them out now.</summary>
+    public void SetWidth(double w, double win)
     {
-        if (Math.Abs(w - width) < 0.5) return;
-        var before = width;
+        if (Math.Abs(w - width) < 0.5 && Math.Abs(win - window) < 0.5) return;
+        var (before, windowBefore) = (width, window);
         width = w;
-        if (!built || !LayoutChanges(before, w)) return;
+        window = win;
+        if (!built || !(LayoutChanges(before, w) || WindowLayoutChanges(windowBefore, win))) return;
         if (gone) stale = true; else Render();
     }
 

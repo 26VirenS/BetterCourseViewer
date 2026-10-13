@@ -95,7 +95,7 @@ public sealed partial class AppShell
             current = next;
             current.HeaderChanged += Header;
             var stamp = Perf.Ticks();
-            current.SetWidth(ContentWidth);
+            current.SetWidth(ContentWidth, WindowActualWidth);
             var kept = current.Ready;
             // (built at once, so the page comes in with what it shows — unless the page area has not been laid out yet,
             //  the shell just made: then once it has, at its width, as before)
@@ -105,7 +105,7 @@ public sealed partial class AppShell
         }
         else
         {
-            current.SetWidth(ContentWidth);
+            current.SetWidth(ContentWidth, WindowActualWidth);
             current.Show();
             // (the same screen with something else in it — a search typed further: from its top)
             if (leaves.TryGetValue(current, out var same)) same.Scroller?.ScrollToTop();
@@ -176,7 +176,7 @@ public sealed partial class AppShell
     private void PageWidths()
     {
         if (current is { Scrolls: true, MaxContentWidth: { } mw }) current.View.Width = Math.Min(mw, ContentWidth);
-        current?.SetWidth(ContentWidth);
+        current?.SetWidth(ContentWidth, WindowActualWidth);
         if (current != null && leaves.TryGetValue(current, out var leaf) && leaf.Scroller != null)
         {
             leaf.Scroller.Padding = SidePadding;
@@ -397,7 +397,7 @@ public sealed partial class AppShell
                 return;
             }
             if (s == current) return;
-            s.SetWidth(ContentWidth);
+            s.SetWidth(ContentWidth, WindowActualWidth);
             if (!s.Ready) s.Prefetch();
             if (build) Dispatcher.BeginInvoke(DispatcherPriority.Background, () => BuildAhead(s));
         }

@@ -21,11 +21,11 @@ internal sealed class Prefetcher
 
     private readonly Engine.Engine engine;
     private readonly Func<Location, bool> kept;
-    private readonly Func<double> width;
+    private readonly Func<(double Page, double Window)> width;
     private bool started, stopped;
     private int busy;
 
-    public Prefetcher(Engine.Engine engine, Func<Location, bool> kept, Func<double> width)
+    public Prefetcher(Engine.Engine engine, Func<Location, bool> kept, Func<(double Page, double Window)> width)
     {
         this.engine = engine;
         this.kept = kept;
@@ -84,7 +84,8 @@ internal sealed class Prefetcher
         try
         {
             s = route != null ? ScreenFactory.For(engine, route) : ScreenFactory.For(engine, place);
-            s.SetWidth(width());
+            var (page, window) = width();
+            s.SetWidth(page, window);
             s.Prefetch();
             var from = Environment.TickCount64;
             while (s.Reading && Environment.TickCount64 - from < 15_000) await Task.Delay(50);

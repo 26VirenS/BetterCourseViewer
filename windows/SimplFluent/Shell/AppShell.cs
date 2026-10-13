@@ -138,7 +138,7 @@ public sealed partial class AppShell : Grid, IDisposable
 
         engine.PropertyChanged += OnEngine;
         engine.PrepareRequested += OnPrepare;
-        prefetch = new Prefetcher(engine, loc => ScreenAt(loc, make: false) != null, () => ContentWidth);
+        prefetch = new Prefetcher(engine, loc => ScreenAt(loc, make: false) != null, () => (ContentWidth, WindowActualWidth));
         Updates();
         Navigate();
         paneScene.Content = Scenes.Backdrop("side");
@@ -430,6 +430,9 @@ public sealed partial class AppShell : Grid, IDisposable
     }
 
     private double ContentWidth => Math.Max(200, page.ActualWidth - 80);
+
+    /// <summary>The window's width, the pane's and the page's together: what the Dashboard's counters follow.</summary>
+    private double WindowActualWidth => window.ActualWidth;
 
     private void Widths()
     {
