@@ -147,7 +147,7 @@ private struct EnzymeControls: View {
                 Button("Fresh enzyme") { lab.c.freshEnzyme() }
                     .glassButton(prominent: c.denatured)
                     .disabled(!c.denatured)
-                    .help("A new sample of the enzyme, never heated")
+                    .help("A new sample of the enzyme, never heated (put at its best temperature if the sample is too hot)")
                 Button("Reset") { lab.c = EnzymeConditions() }
                     .glassButton()
                     .help("Every setting back to where it started")

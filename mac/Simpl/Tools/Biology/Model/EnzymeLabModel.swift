@@ -219,9 +219,11 @@ struct EnzymeConditions: Codable, Equatable {
         denatured = temperature > tempPreset.denatureAt
     }
 
-    /// A fresh sample of the enzyme (and, if it is still too hot, it unfolds again at once).
+    /// A fresh sample of the enzyme (the denatured one thrown away), at its optimum (to the nearest degree) if the sample
+    /// was still too hot — so it is not unfolded again at once, and its curve shows it at its best (as on Windows).
     mutating func freshEnzyme() {
-        denatured = temperature > tempPreset.denatureAt
+        denatured = false
+        if temperature > tempPreset.denatureAt { temperature = tempPreset.peak.rounded() }
     }
 
     var apparent: (vmax: Double, km: Double) {
@@ -332,8 +334,13 @@ extension BioSelfCheck {
         let before = c.rate
         c.setTemperature(47)
         c.setTemperature(37)
+        // (and a fresh enzyme while the sample is still too hot is put at its optimum, 37 °C, folded)
+        var hot = EnzymeConditions()
+        hot.setTemperature(60)
+        hot.freshEnzyme()
         r.check("enzyme.denaturation", String(format: "at=%.0f,kept=%.3f", human.denatureAt, c.rate / before),
-                human.denatureAt == 46 && c.denatured && abs(c.rate / before - EnzymeModel.cooledFraction) < 1e-9 && c.site == .denatured)
+                human.denatureAt == 46 && c.denatured && abs(c.rate / before - EnzymeModel.cooledFraction) < 1e-9 && c.site == .denatured
+                    && !hot.denatured && hot.temperature == 37)
         // (pH: 1 at the optimum, e⁻¹ at 1.5 either side; the presets' optima)
         r.check("enzyme.pH", String(format: "%.4f,%.4f", EnzymeModel.phFactor(2, optimum: 2), EnzymeModel.phFactor(9.5, optimum: 8)),
                 EnzymeModel.phFactor(2, optimum: 2) == 1 && abs(EnzymeModel.phFactor(9.5, optimum: 8) - exp(-1)) < 1e-12
