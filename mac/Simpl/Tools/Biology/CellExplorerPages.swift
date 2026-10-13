@@ -74,7 +74,7 @@ struct CEComparePage: View {
                 .buttonStyle(.plain)
                 .disabled(r.open == nil)
                 .onHover { inside in hoveredRow = inside ? r.id : (hoveredRow == r.id ? nil : hoveredRow) }
-                .help(r.open.map { "Open the \(CEParts.part($0.kind, $0.part)?.label.lowercased() ?? r.structure.lowercased()) in the \($0.kind.title.lowercased())" } ?? r.structure)
+                .help(r.open.map { "Open the \(CEParts.part($0.kind, $0.part)?.labelInSentence ?? CEPart.inSentence(r.structure)) in the \($0.kind.title.lowercased())" } ?? r.structure)
                 .accessibilityLabel("\(r.structure): animal \(r.cells[0]); plant \(r.cells[1]); bacterium \(r.cells[2])")
             }
         }
@@ -230,7 +230,7 @@ struct CEMembranePage: View {
                              frameKey: "membrane",
                              reset: reset,
                              accessibility: "3D model of a patch of plasma membrane, 60 by 60 nanometres, cut on two sides to show the phospholipid bilayer"
-                                 + (selectedPart.map { "; selected: \($0.name.lowercased())" } ?? ""),
+                                 + (selectedPart.map { "; selected: \(CEPart.inSentence($0.name))" } ?? ""),
                              onPick: { id in withAnimation(anim) { selection = id.flatMap { CEMembranePage.partID($0) }.map { $0.hasPrefix("side:") ? $0 : "part:" + $0 } } },
                              onHover: { hovered = $0 },
                              onScale: { scale = $0 })
@@ -393,6 +393,31 @@ enum CEMembraneNodes {
                 arrow.runAction(.repeatForever(.sequence([.fadeOpacity(to: 0.45, duration: 0.8), .fadeOpacity(to: 1, duration: 0.8)])))
             }
             out.append(arrow)
+        }
+        return out
+    }
+}
+
+/// The quiz's wrong answer (§4.1 Nice: "wrong presses wobble the object"): the part pressed drawn on its own, glowing,
+/// each instance shaking side to side about its own centre for half a second (the batched part is left out meanwhile).
+enum CEWobble {
+    static func nodes(_ m: CEModel, part: String, explode: Double, dark: Bool) -> [SCNNode] {
+        var out: [SCNNode] = []
+        for inst in m.instances where inst.part == part && !inst.pieces.isEmpty {
+            let d = CEScene.displacement(inst, explode: explode, cellRadius: m.cellRadius)
+            let c = inst.centre + d
+            let holder = SCNNode()
+            holder.position = SCNVector3(CGFloat(c.x), CGFloat(c.y), CGFloat(c.z))
+            for p in inst.pieces {
+                let mesh = CEGeo.moved(p.mesh, d - c)
+                let n = BioSceneKit.node(mesh, BioMaterial(p.colour.hex(dark: dark), alpha: p.alpha, roughness: p.roughness, emission: 0.35), order: p.order)
+                holder.addChildNode(n)
+            }
+            let step = CGFloat(max(0.04, min(inst.radius * 0.3, 0.6)))
+            holder.runAction(.sequence([.moveBy(x: step, y: 0, z: 0, duration: 0.06), .moveBy(x: -2 * step, y: 0, z: 0, duration: 0.12),
+                                        .moveBy(x: 2 * step, y: 0, z: 0, duration: 0.12), .moveBy(x: -2 * step, y: 0, z: 0, duration: 0.12),
+                                        .moveBy(x: step, y: 0, z: 0, duration: 0.06)]))
+            out.append(holder)
         }
         return out
     }

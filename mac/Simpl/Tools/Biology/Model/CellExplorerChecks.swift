@@ -159,7 +159,7 @@ extension BioSelfCheck {
         // (the bilayer's thickness: head centres 3.9 nm apart, about 4.8 nm across the heads)
         r.near("cell.membrane.thickness", 2 * CEMembrane.headY + 0.9, 4.8, 1e-9, digits: 2)
         // (the quaternion of a frame turns as the frame does)
-        let q = quaternion(CEMembrane.display)
+        let q = CEQuat.of(CEMembrane.display)
         let v = BioVec(0.3, -0.5, 0.8)
         r.near("cell.membrane.turn", BioV.distance(q.rotate(v), CEMembrane.display.applyVector(v)), 0, 1e-12, digits: 3)
     }

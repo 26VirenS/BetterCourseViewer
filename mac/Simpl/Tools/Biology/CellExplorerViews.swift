@@ -118,7 +118,7 @@ struct CEQuizPrompt: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(quiz.mode == .find ? "Find the \((CEParts.part(quiz.kind, question.part)?.name ?? question.part).lowercased())" : "Name the glowing part")
+            Text(quiz.mode == .find ? "Find the \(CEPart.inSentence(CEParts.part(quiz.kind, question.part)?.name ?? question.part))" : "Name the glowing part")
                 .font(.sHeadline)
             if let f = feedback {
                 Label(f.text, systemImage: f.right ? "checkmark.circle.fill" : "xmark.circle.fill")
@@ -177,7 +177,7 @@ struct CEQuizPanel: View {
             } else if let q = quiz.current {
                 Text("Question \(quiz.index + 1) of \(quiz.questions.count) · \(quiz.score) right").font(.sCallout).foregroundStyle(.secondary)
                 if quiz.mode == .find {
-                    Text("Press the \((CEParts.part(kind, q.part)?.name ?? q.part).lowercased()) in the model. Turn it and zoom in if you need to; the labels are off.")
+                    Text("Press the \(CEPart.inSentence(CEParts.part(kind, q.part)?.name ?? q.part)) in the model. Turn it and zoom in if you need to; the labels are off.")
                         .font(.sCallout)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {

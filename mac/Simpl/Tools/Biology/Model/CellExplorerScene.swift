@@ -74,7 +74,7 @@ enum CEScene {
         var s = "3D model of \(kind == .animal ? "an animal cell" : (kind == .plant ? "a plant cell" : "a bacterial cell"))"
         if cutaway { s += ", cut open" }
         s += "; \(kinds) kinds of parts"
-        if let selected, let p = CEParts.part(kind, selected) { s += "; selected: \(p.name.lowercased())" }
+        if let selected, let p = CEParts.part(kind, selected) { s += "; selected: \(p.nameInSentence)" }
         return s
     }
 }

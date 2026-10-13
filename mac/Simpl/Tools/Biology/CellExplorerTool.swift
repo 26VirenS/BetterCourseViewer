@@ -1,4 +1,5 @@
 import AppKit
+import SceneKit
 import SwiftUI
 
 // Cell Explorer (spec §4.1): animal, plant and bacterial cells in 3D, built from §5.1's recipes at fixed seeds
@@ -88,6 +89,9 @@ struct CECellPage: View {
     @State private var quizGlow: String?
     @State private var feedback: (right: Bool, text: String)?
     @State private var shake = 0.0
+    /// A wrong "Find" answer's part, wobbling for a moment (drawn as extras, left out of the batched scene).
+    @State private var wobble: String?
+    @State private var wobbleSerial = 0
     @State private var madeSet: String?
     @FocusState private var listFocused: Bool
 
@@ -109,10 +113,19 @@ struct CECellPage: View {
     /// The explode slider in steps of 0.02 (each a scene to make).
     private var explodeStep: Double { (explode * 50).rounded() / 50 }
     /// What the scene shows of the built cell.
-    private var look: CEView { CEView(explode: explodeStep, hidden: hidden, isolate: isolate, lookInside: lookInside, dark: dark) }
+    private var look: CEView {
+        CEView(explode: explodeStep, hidden: hidden.union(wobble.map { [$0] } ?? []), isolate: isolate, lookInside: lookInside, dark: dark)
+    }
     private var optionsKey: String { "\(kind.rawValue)|\(trueScale)|\(cutaway)|\(options.gramPositive)" }
     private var sceneKey: String {
-        [optionsKey, String(explodeStep), hidden.sorted().joined(separator: ","), isolate ?? "-", String(lookInside), String(dark)].joined(separator: "|")
+        [optionsKey, String(explodeStep), hidden.sorted().joined(separator: ","), isolate ?? "-", String(lookInside), String(dark),
+         wobble.map { "\($0)\(wobbleSerial)" } ?? "-"].joined(separator: "|")
+    }
+    /// The wobbling part's nodes, while there is one.
+    private var wobbleNodes: (() -> [SCNNode])? {
+        guard let w = wobble else { return nil }
+        let o = options, e = explodeStep, d = dark
+        return { CEWobble.nodes(CEBuildCache.shared.model(o), part: w, explode: e, dark: d) }
     }
     private var selectedID: String? { selection.flatMap { CECellPage.partID($0) } }
     private var selectedPart: CEPart? { selectedID.flatMap { CEParts.part(kind, $0) } }
@@ -230,8 +243,8 @@ struct CECellPage: View {
             Toggle(p.label, isOn: Binding(get: { on }, set: { v in setVisible(p.id, v) }))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
-                .help(on ? "Hide the \(p.label.lowercased())" : "Show the \(p.label.lowercased())")
-            Button { select(p.id) } label: {
+                .help(on ? "Hide the \(p.labelInSentence)" : "Show the \(p.labelInSentence)")
+            Button { select(p.id, follow: true) } label: {
                 HStack(spacing: 8) {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(p.colour.color)
@@ -303,6 +316,7 @@ struct CECellPage: View {
             ZStack(alignment: .bottomLeading) {
                 BioSceneView(key: sceneKey,
                              build: BioSceneBuild { [o = options, v = look] in CEScene.content(CEBuildCache.shared.model(o), v) },
+                             extras: wobbleNodes,
                              selection: Binding(get: { isolate == nil ? (quizGlow ?? selection) : nil }, set: { selection = $0 }),
                              showLabels: labels && quiz == nil,
                              turning: turning,
@@ -386,7 +400,7 @@ struct CECellPage: View {
                     Label(isolate == p.id && !lookInside ? "Show all" : "Isolate", systemImage: "circle.dashed.inset.filled").frame(maxWidth: .infinity)
                 }
                 .glassButton(prominent: isolate == p.id && !lookInside)
-                .help("Show only the \(p.label.lowercased()), framed and enlarged (Escape to come back)")
+                .help("Show only the \(p.labelInSentence), framed and enlarged (Escape to come back)")
                 Button { zoomTo(p.id) } label: { Label("Zoom to", systemImage: "plus.magnifyingglass").frame(maxWidth: .infinity) }
                     .glassButton()
                     .help("Bring the camera to it (or double-click it)")
@@ -433,8 +447,18 @@ struct CECellPage: View {
 
     // MARK: Actions
 
-    private func select(_ part: String) {
-        withAnimation(anim) { selection = "organelle:\(part)" }
+    /// A part's card. Chosen from the parts list (`follow`) while another part is isolated, the new part is isolated
+    /// instead (seen inside only if it can be); a click in the scene keeps the view as it is (the nucleolus inside the
+    /// nucleus opened).
+    private func select(_ part: String, follow: Bool = false) {
+        withAnimation(anim) {
+            selection = "organelle:\(part)"
+            if follow, let iso = isolate, iso != part {
+                isolate = part
+                if lookInside && !CEScene.canLookInside(part) { lookInside = false }
+                if hidden.contains(part) { setVisible(part, true) }
+            }
+        }
     }
 
     private func setVisible(_ part: String, _ v: Bool) {
@@ -471,12 +495,14 @@ struct CECellPage: View {
     }
 
     private func toggleIsolate(_ part: String) {
+        if hidden.contains(part) { setVisible(part, true) }
         withAnimation(anim) {
             if isolate == part && !lookInside { isolate = nil } else { isolate = part; lookInside = false }
         }
     }
 
     private func toggleInside(_ part: String) {
+        if hidden.contains(part) { setVisible(part, true) }
         withAnimation(anim) {
             if isolate == part && lookInside { isolate = nil; lookInside = false } else { isolate = part; lookInside = true }
         }
@@ -499,7 +525,7 @@ struct CECellPage: View {
         if let s = selectedID, let i = order.firstIndex(of: s) { next = i + (back ? -1 : 1) } else { next = back ? order.count - 1 : 0 }
         if press.key == .tab && (next < 0 || next >= order.count) { return .ignored }
         next = min(max(next, 0), order.count - 1)
-        select(order[next])
+        select(order[next], follow: true)
         return .handled
     }
 
@@ -567,10 +593,20 @@ struct CECellPage: View {
         let right = q.answer(part)
         quiz = q
         withAnimation(anim) {
-            feedback = right ? (true, "Yes: the \(name.lowercased()).") : (false, "That’s the \(name.lowercased()).")
+            feedback = right ? (right: true, text: "Yes: the \(CEPart.inSentence(name)).") : (right: false, text: "That’s the \(CEPart.inSentence(name)).")
             quizGlow = "organelle:\(part)"
         }
-        if !right && !reduceMotion { withAnimation(.linear(duration: 0.4)) { shake += 1 } }
+        if !right && !reduceMotion {
+            withAnimation(.linear(duration: 0.4)) { shake += 1 }
+            // (the part pressed wobbles, then goes back into the scene)
+            wobbleSerial += 1
+            wobble = part
+            let serial = wobbleSerial
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                if wobbleSerial == serial { wobble = nil }
+            }
+        }
         let shownFeedback = feedback?.text
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: right ? 700_000_000 : 1_100_000_000)
@@ -588,7 +624,7 @@ struct CECellPage: View {
         let rightName = CEParts.part(kind, current.part)?.name ?? current.part
         let right = q.answer(name)
         quiz = q
-        withAnimation(anim) { feedback = right ? (true, "Yes: \(rightName).") : (false, "It’s the \(rightName.lowercased()).") }
+        withAnimation(anim) { feedback = right ? (right: true, text: "Yes: \(rightName).") : (right: false, text: "It’s the \(CEPart.inSentence(rightName)).") }
         let shown = feedback?.text
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: right ? 800_000_000 : 1_600_000_000)

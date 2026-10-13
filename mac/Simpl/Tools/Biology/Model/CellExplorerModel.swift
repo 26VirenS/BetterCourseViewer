@@ -135,6 +135,17 @@ struct CEPart: Sendable, Identifiable {
     /// "Look inside": a mitochondrion or chloroplast cut lengthwise, the nucleus cut open.
     let lookInside: Bool
 
+    /// The name inside a sentence ("Find the golgi…" no: "Find the Golgi apparatus", "the rough ER", "the nucleus").
+    var nameInSentence: String { CEPart.inSentence(name) }
+    var labelInSentence: String { CEPart.inSentence(label) }
+
+    /// A name with its first letter lowered, unless it begins a proper name or an abbreviation (Golgi, ER, DNA).
+    static func inSentence(_ s: String) -> String {
+        let first = s.split(separator: " ").first.map(String.init) ?? s
+        if first.hasPrefix("Golgi") || first.count > 1 && first == first.uppercased() { return s }
+        return s.prefix(1).lowercased() + s.dropFirst()
+    }
+
     /// The card's structure line: "Double membrane · the nuclear envelope, with nuclear pores".
     var structureText: String {
         if let structureLine { return structureLine }
@@ -658,6 +669,8 @@ extension BioSelfCheck {
         r.same("cell.plant-golgi", CEParts.part(.plant, "golgi")?.function ?? "-",
                "Modifies, sorts and packages proteins and lipids from the ER; ships them in vesicles (to the membrane, lysosomes or outside). Also makes wall polysaccharides and builds the cell plate.")
         r.check("cell.plant-pm-mixup", CEParts.part(.plant, "pm")?.mixup ?? "none", CEParts.part(.plant, "pm")?.mixup == nil)
+        let sentences = ["golgi", "rer", "mito"].compactMap { CEParts.part(.animal, $0)?.labelInSentence }
+        r.same("cell.names-in-sentences", sentences.joined(separator: ","), "Golgi apparatus,rough ER,mitochondria")
         r.same("cell.nucleoid-structure", CEParts.part(.bacterium, "nucleoid")?.structureText ?? "-", "No membrane · a region of the cytoplasm, not an organelle")
         let doubles = CEKind.allCases.flatMap { CEParts.all($0) }.filter { $0.membranes == .double }.map(\.id)
         r.check("cell.double-membranes", Set(doubles).sorted().joined(separator: ","), Set(doubles) == ["nucleus", "mito", "chloroplast", "amyloplast"])
@@ -670,7 +683,7 @@ extension BioSelfCheck {
         r.check("cell.compare-opens", "\(opens)", opens == 22 && CECompare.rows.first { $0.structure == "Chloroplasts" }?.open?.kind == .plant
                 && CECompare.rows.first { $0.structure == "Capsule" }?.open?.kind == .bacterium)
         // (the quiz: ten questions, four choices each, the right one among them)
-        var g = BioQuizRandom(seed: 7)
+        var g = CEQuizRandom(seed: 7)
         var quiz = CEQuiz(mode: .name, kind: .animal, parts: animal.map(\.id), using: &g)
         let fair = quiz.questions.count == 10 && quiz.questions.allSatisfy { q in q.choices.count == 4 && q.choices.contains(CEParts.part(.animal, q.part)?.name ?? "?") }
         quiz.answer(CEParts.part(.animal, quiz.questions[0].part)?.name ?? "")
@@ -682,7 +695,7 @@ extension BioSelfCheck {
 }
 
 /// The self-check's own generator for the quiz (SplitMix64 behind RandomNumberGenerator).
-struct BioQuizRandom: RandomNumberGenerator {
+struct CEQuizRandom: RandomNumberGenerator {
     var rng: BioRandom
     init(seed: UInt64) { rng = BioRandom(seed: seed) }
     mutating func next() -> UInt64 { rng.next() }

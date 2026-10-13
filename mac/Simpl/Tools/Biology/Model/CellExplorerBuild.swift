@@ -175,6 +175,10 @@ enum CEBuild {
         case .plant: b.buildPlant()
         case .bacterium: b.buildBacterium()
         }
+        #if DEBUG
+        // (§4.1: a placement that ran out of tries leaves the count lower — said in debug builds)
+        if !b.model.gaveUp.isEmpty { print("cell-explorer \(o.kind.rawValue): gave up placing \(b.model.gaveUp.sorted { $0.key < $1.key })") }
+        #endif
         return b.finish()
     }
 }

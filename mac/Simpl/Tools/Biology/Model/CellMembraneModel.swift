@@ -299,7 +299,7 @@ enum CEMembrane {
 
     /// The axis–angle of the patch's turn after a helix's tilt (for the carrier's animation).
     static func turn(axis: BioVec, degrees: Double) -> (axis: BioVec, angle: Double) {
-        let q = quaternion(display).times(BioQuat(axis: axis, degrees: degrees))
+        let q = CEQuat.of(display).times(CEQuat(axis: axis, degrees: degrees))
         return q.axisAngle
     }
 
@@ -378,7 +378,7 @@ enum CEMembrane {
 // MARK: - Quaternions (the carrier's turns, as SceneKit takes them)
 
 /// A unit quaternion (w, x, y, z).
-struct BioQuat: Sendable {
+struct CEQuat: Sendable {
     var w, x, y, z: Double
 
     init(w: Double, x: Double, y: Double, z: Double) {
@@ -393,11 +393,11 @@ struct BioQuat: Sendable {
         self.init(w: cos(h), x: u.x * sin(h), y: u.y * sin(h), z: u.z * sin(h))
     }
 
-    func times(_ q: BioQuat) -> BioQuat {
-        BioQuat(w: w * q.w - x * q.x - y * q.y - z * q.z,
-                x: w * q.x + x * q.w + y * q.z - z * q.y,
-                y: w * q.y - x * q.z + y * q.w + z * q.x,
-                z: w * q.z + x * q.y - y * q.x + z * q.w)
+    func times(_ q: CEQuat) -> CEQuat {
+        CEQuat(w: w * q.w - x * q.x - y * q.y - z * q.z,
+               x: w * q.x + x * q.w + y * q.z - z * q.y,
+               y: w * q.y - x * q.z + y * q.w + z * q.x,
+               z: w * q.z + x * q.y - y * q.x + z * q.w)
     }
 
     func rotate(_ v: BioVec) -> BioVec {
@@ -415,22 +415,24 @@ struct BioQuat: Sendable {
     }
 }
 
-/// A rotation frame's quaternion (its axes the turned x, y, z).
-func quaternion(_ f: BioFrame) -> BioQuat {
-    let m00 = f.x.x, m11 = f.y.y, m22 = f.z.z
-    let m01 = f.y.x, m02 = f.z.x, m10 = f.x.y, m12 = f.z.y, m20 = f.x.z, m21 = f.y.z
-    let tr = m00 + m11 + m22
-    if tr > 0 {
-        let s = (tr + 1).squareRoot() * 2
-        return BioQuat(w: s / 4, x: (m21 - m12) / s, y: (m02 - m20) / s, z: (m10 - m01) / s)
-    } else if m00 > m11 && m00 > m22 {
-        let s = (1 + m00 - m11 - m22).squareRoot() * 2
-        return BioQuat(w: (m21 - m12) / s, x: s / 4, y: (m01 + m10) / s, z: (m02 + m20) / s)
-    } else if m11 > m22 {
-        let s = (1 + m11 - m00 - m22).squareRoot() * 2
-        return BioQuat(w: (m02 - m20) / s, x: (m01 + m10) / s, y: s / 4, z: (m12 + m21) / s)
-    } else {
-        let s = (1 + m22 - m00 - m11).squareRoot() * 2
-        return BioQuat(w: (m10 - m01) / s, x: (m02 + m20) / s, y: (m12 + m21) / s, z: s / 4)
+extension CEQuat {
+    /// A rotation frame's quaternion (its axes the turned x, y, z).
+    static func of(_ f: BioFrame) -> CEQuat {
+        let m00 = f.x.x, m11 = f.y.y, m22 = f.z.z
+        let m01 = f.y.x, m02 = f.z.x, m10 = f.x.y, m12 = f.z.y, m20 = f.x.z, m21 = f.y.z
+        let tr = m00 + m11 + m22
+        if tr > 0 {
+            let s = (tr + 1).squareRoot() * 2
+            return CEQuat(w: s / 4, x: (m21 - m12) / s, y: (m02 - m20) / s, z: (m10 - m01) / s)
+        } else if m00 > m11 && m00 > m22 {
+            let s = (1 + m00 - m11 - m22).squareRoot() * 2
+            return CEQuat(w: (m21 - m12) / s, x: s / 4, y: (m01 + m10) / s, z: (m02 + m20) / s)
+        } else if m11 > m22 {
+            let s = (1 + m11 - m00 - m22).squareRoot() * 2
+            return CEQuat(w: (m02 - m20) / s, x: (m01 + m10) / s, y: s / 4, z: (m12 + m21) / s)
+        } else {
+            let s = (1 + m22 - m00 - m11).squareRoot() * 2
+            return CEQuat(w: (m10 - m01) / s, x: (m02 + m20) / s, y: (m12 + m21) / s, z: s / 4)
+        }
     }
 }
