@@ -14,7 +14,7 @@ namespace Simpl.Support;
 /// little memory (WebView2 hands its own back) and Windows takes the pages Simpl is not using out of RAM (its working
 /// set) — never sooner, so a window brought straight back has everything where it was; brought back later, the few
 /// pages it draws with come back from Windows' own standby memory, not the disk. Back in view, the page is asked for its
-/// pace again at once.
+/// pace again at once. The web view's other processes (its browser, its GPU process) are trimmed the same way.
 /// </summary>
 public static class MemoryTidy
 {
@@ -31,6 +31,8 @@ public static class MemoryTidy
 
     [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
     [DllImport("kernel32.dll")] private static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr min, IntPtr max);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+    [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
 
     /// <summary>The main window, watched from its making (and the engine it shows, once there is one).</summary>
     public static void Watch(Window w, Func<Engine.Engine?> e)
@@ -75,7 +77,8 @@ public static class MemoryTidy
                 Lean(true);
                 Collect(full: true);
                 SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
-                Log.Write($"memory: given back after {(now - awaySince) / 1000} s away");
+                var web = TrimStarted();
+                Log.Write($"memory: given back after {(now - awaySince) / 1000} s away (and by {web} of the web view's processes)");
                 return;
             }
             var e = engine?.Invoke();
@@ -85,6 +88,25 @@ public static class MemoryTidy
             Collect(full: false);
         }
         catch (Exception x) { Log.Write("memory: " + x.Message); }
+    }
+
+    /// <summary>
+    /// The web view's own processes (its browser, GPU process and utilities; its page's renderer has given its memory back
+    /// already, asked to keep to little) out of RAM too, as Simpl's own: what they need again comes back from Windows'
+    /// standby memory as they touch it. How many could be asked.
+    /// </summary>
+    private static int TrimStarted()
+    {
+        const uint SetQuota = 0x0100, QueryLimited = 0x1000;
+        var n = 0;
+        foreach (var pid in PerfMemory.Descendants())
+        {
+            var h = OpenProcess(SetQuota | QueryLimited, false, pid);
+            if (h == IntPtr.Zero) continue;
+            try { if (SetProcessWorkingSetSize(h, -1, -1)) n++; }
+            finally { CloseHandle(h); }
+        }
+        return n;
     }
 
     /// <summary>.NET's free memory handed back to Windows: a compacting collection that gives back all it can (and,

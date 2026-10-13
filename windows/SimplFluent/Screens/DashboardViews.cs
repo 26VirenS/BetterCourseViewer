@@ -274,7 +274,7 @@ public sealed partial class DashboardScreen
     /// <summary>An activity item opened: its dot goes (here and on the web Dashboard), and it opens.</summary>
     private void OpenActivity(DashActivityRow row)
     {
-        if (row.Unread == true && seen.Add(row.Id)) { _ = engine.Act("dashSeen", new { id = row.Id }); Render(); }
+        if (row.Unread == true && seen.Add(row.Id)) { seenTurn++; _ = engine.Act("dashSeen", new { id = row.Id }); Render(); }
         if (!string.IsNullOrEmpty(row.Url)) engine.OpenWeb(row.Url!, row.Title);
     }
 }

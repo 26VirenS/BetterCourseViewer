@@ -316,10 +316,13 @@ browser (`Engine.WebEnvironment`) serves every web view, with its network servic
 CI's Performance walk, beside the pictures, does the same against the mock twice with one profile — `cold`, then
 `warm` (the answers kept) — prints both tables in its log and the run's summary, keeps them as `windows-fluent-perf`
 and with the pictures, and compares each with the last green run's (before, after, the change: the timings, all the
-calls' time, and memory at each of its moments — all of it, then Simpl's and WebView2's). For now it also walks the
-warm profile with `--no-prefetch`, against the warm walk, and once under dotnet-trace (`windows-fluent-trace`, kept a
-week: the sampled stacks, as speedscope reads them). It only reports: a
-slower number never fails a run, and nothing waits for it but the pictures' merge.
+calls' time, and memory at each of its moments — all of it, then Simpl's and WebView2's). Runners differ more than
+most changes do (their processors, their caches: .NET keeps far more memory on one with a very large cache), so that
+run's build is walked here too, on the same runner, cold then warm, each just before this build's walk — the first
+comparison, then the one against that run's own numbers. A commit message with `[perf-base <run id>]` names the run to
+compare with instead (its build is kept 30 days). For now it also walks once under dotnet-trace
+(`windows-fluent-trace`, kept a week: the sampled stacks, as speedscope reads them). It only reports: a slower number
+never fails a run, and nothing waits for it but the pictures' merge.
 
 ## Layout of the code
 

@@ -126,19 +126,26 @@ public sealed partial class DashboardScreen : Screen
         if (d == null) return K.LoadState(today.Error, () => today.Reload(engine, "today"));
         var width = Math.Max(320, Width);
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
-        page.Children.Add(Counters(d, width));
+        var look = (Appearance.Dark, Appearance.Accent, Appearance.ThemeName);
+        var cols = width >= 900 ? 6 : width >= 520 ? 3 : 2;
+        page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, overdueAdjust, openKey, cols, look }, () => Counters(d, width)));
         var two = width >= 900;
         var railW = Math.Clamp(Math.Round(width * 0.3), 340, 440);
+        var mainW = two ? width - railW - 28 : width;
+        // (the view: what it shows, at its width; the cards are the courses' and their progress, the list the planner's,
+        //  the activity the school's — not today's, so a new count leaves them as they are)
+        var main = Part("main", new object?[] { View, Math.Round(mainW), courses.Data, progress.Data, courses.Error, list.Data, list.Error, activity.Data, activity.Error, ticks, seenTurn, courseCardsShown, look }, () => Main(d, mainW));
         if (two)
         {
-            var g = K.Columns($"*, 28, {railW.ToString(System.Globalization.CultureInfo.InvariantCulture)}", Main(d, width - railW - 28).Col(0), Rail(d, railW, false).Col(2));
+            var rail = Part("rail", new object?[] { d, skyFresh.Data, skyKept.Data, View, railW, false, ticks, look }, () => Rail(d, railW, false));
+            var g = K.Columns($"*, 28, {railW.ToString(System.Globalization.CultureInfo.InvariantCulture)}", main.Col(0), rail.Col(2));
             page.Children.Add(g);
         }
         else
         {
-            if (View != 1) page.Children.Add(TodaySection(d, true));
-            page.Children.Add(Main(d, width));
-            page.Children.Add(Rail(d, width, true));
+            if (View != 1) page.Children.Add(Part("today", new object?[] { d, ticks, look }, () => TodaySection(d, true)));
+            page.Children.Add(main);
+            page.Children.Add(Part("rail", new object?[] { d, skyFresh.Data, skyKept.Data, View, Math.Round(width), true, ticks, look }, () => Rail(d, width, true)));
         }
         root = new Grid();
         overlay = new Canvas { ClipToBounds = false };
@@ -146,6 +153,36 @@ public sealed partial class DashboardScreen : Screen
         root.Children.Add(overlay);
         if (openKey != null) root.Loaded += (_, _) => ShowPanel(animate: !sheetAsked);
         return root;
+    }
+
+    // ---- parts kept from build to build ----
+
+    /// <summary>Each part of the page as it was built last, with what it was built from.</summary>
+    private readonly Dictionary<string, (object?[] Inputs, FrameworkElement Part)> parts = new();
+    /// <summary>Bumped as a tick is shown, or an activity seen: the parts that draw them are built again.</summary>
+    private int ticks, seenTurn;
+
+    /// <summary>
+    /// A part of the page (the counters, the view, the rail): the one built last time when what it shows has not changed —
+    /// the same answers, the same width and view, the same ticks and look — taken from the page before and put in this
+    /// one. A new count leaves the courses' cards exactly as they were (not built again, not redrawn), so the Dashboard's
+    /// answers read again in the background change only what they change, in place.
+    /// </summary>
+    private FrameworkElement Part(string key, object?[] inputs, Func<FrameworkElement> make)
+    {
+        if (parts.TryGetValue(key, out var was) && was.Inputs.Length == inputs.Length && was.Inputs.Zip(inputs).All(p => Equals(p.First, p.Second)))
+        {
+            switch (was.Part.Parent)
+            {
+                case Panel panel: panel.Children.Remove(was.Part); break;
+                case Decorator dec: dec.Child = null; break;
+                case ContentControl cc: cc.Content = null; break;
+            }
+            return was.Part;
+        }
+        var e = make();
+        parts[key] = (inputs, e);
+        return e;
     }
 
     // ---- the counters (the Mac's DashCounterTile, as Windows 11 cards) ----
@@ -503,10 +540,12 @@ public sealed partial class DashboardScreen : Screen
     private async void Tick(string id, bool done)
     {
         ticked[id] = done;
+        ticks++;
         var ok = await engine.Act("complete", new { id, done });
-        if (!ok) { ticked[id] = !done; Render(); return; }
+        if (!ok) { ticked[id] = !done; ticks++; Render(); return; }
         await Task.Delay(450);
         ticked.Remove(id);
+        ticks++;
         list.Again();
         today.Again();
         engine.DataChanged();

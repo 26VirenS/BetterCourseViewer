@@ -32,6 +32,33 @@ internal static class PerfMemory
         public double PrivateWs => Simpl.PrivateWs + WebPrivateWs;
     }
 
+    /// <summary>Every process Simpl started, and the ones they started (WebView2's), by id.</summary>
+    public static IReadOnlyList<int> Descendants()
+    {
+        var me = Environment.ProcessId;
+        var all = Snapshot();
+        return Under(me, all).Where(p => p != me).ToList();
+    }
+
+    /// <summary>The process and every process whose parent, or its parent's parent…, it is (a parent's id reused by a
+    /// later process is not taken for it: a child is never older than its parent).</summary>
+    private static HashSet<int> Under(int me, Dictionary<int, Raw> all)
+    {
+        var under = new HashSet<int> { me };
+        bool grew;
+        do
+        {
+            grew = false;
+            foreach (var p in all.Values)
+                if (!under.Contains(p.Pid) && under.Contains(p.Parent) && p.Created >= (all.TryGetValue(p.Parent, out var parent) ? parent.Created : 0))
+                {
+                    under.Add(p.Pid);
+                    grew = true;
+                }
+        } while (grew);
+        return under;
+    }
+
     /// <summary>Now: Simpl, and every process under it (WebView2's kinds named by <paramref name="env"/> where it knows them).</summary>
     public static Reading Read(CoreWebView2Environment? env)
     {
@@ -53,18 +80,7 @@ internal static class PerfMemory
         }
         catch { /* (the web view gone, at exit) */ }
         // (every process whose parent, or its parent's parent…, is Simpl: WebView2's browser is Simpl's child, the rest are its)
-        var under = new HashSet<int> { me };
-        bool grew;
-        do
-        {
-            grew = false;
-            foreach (var p in all.Values)
-                if (!under.Contains(p.Pid) && under.Contains(p.Parent) && p.Created >= (all.TryGetValue(p.Parent, out var parent) ? parent.Created : 0))
-                {
-                    under.Add(p.Pid);
-                    grew = true;
-                }
-        } while (grew);
+        var under = Under(me, all);
         Proc Of(Raw r, string kind) => new(r.Pid, kind, r.Private / MB, r.WorkingSet / MB, r.PrivateWs / MB);
         var simpl = all.TryGetValue(me, out var self) ? Of(self, "simpl") : Fallback();
         var web = all.Values.Where(p => p.Pid != me && under.Contains(p.Pid))
