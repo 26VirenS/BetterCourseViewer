@@ -458,6 +458,10 @@ jobs:
           Shot 'update-waiting-quiz' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--open', 'quiz:101:9011'))
           Shot 'update-critical-quiz' '1366x778' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-critical', '--open', 'quiz:101:9011'))
           Shot 'update-restarting' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed'))
+          # (two more themes' pictures in the narrowest one-row counters, a 1024 window's: City's skyline and Forest's
+          #  trees, the busiest, behind the numbers — last in the list, so every picture above keeps its part)
+          Shot 'theme-city-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'City'))
+          Shot 'theme-forest-1024' '1024x681' 45 ($mock + @('--appearance', 'dark', '--theme', 'Forest'))
           # Send from Phone, tried as a phone would (one part each): Simpl's hand-in panel with --phone-test says its
           # server's address in simpl.log (on 127.0.0.1 too); the page is opened, a wrong key tried, then each file posted
           # as the phone's page posts it (X-File-Name, its type, its length) with Invoke-WebRequest; what came back goes
