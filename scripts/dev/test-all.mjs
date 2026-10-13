@@ -25,7 +25,7 @@
 //   node scripts/dev/test-all.mjs --skip chrome-setup
 //   BCV_NO_SHOTS=1 node scripts/dev/test-all.mjs     # the smoke shards take no screenshots (a quick pass while working)
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, openSync, closeSync, readFileSync, writeFileSync, statSync, rmSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, openSync, closeSync, readFileSync, writeFileSync, statSync, rmSync, readdirSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cpus, tmpdir } from 'node:os';
@@ -111,7 +111,9 @@ function run(name) {
       const passed = (text.match(/^\s*✓/gm) || []).length;
       const failed = (text.match(/^\s*✗/gm) || []).length;
       const tail = text.match(/\d+ check\(s\) failed:\n([\s\S]*?)(?:\n\(\d+\.\ds\)|\n*$)/);
-      const failures = tail ? tail[1].split('\n').filter((l) => l.startsWith(' - ')).map((l) => l.slice(3)) : [];
+      // (a suite without that summary at its end — alta, api… — has its ✗ lines read instead)
+      const failures = tail ? tail[1].split('\n').filter((l) => l.startsWith(' - ')).map((l) => l.slice(3))
+        : (text.match(/^\s*✗ .*$/gm) || []).map((l) => l.trim().slice(2));
       const crash = text.match(/(?:crashed|failed to start)[^\n]*/)?.[0] || null;
       resolve({ name, code: hung ? 1 : (code ?? 1), passed, failed, ms: Date.now() - t, failures, crash, hung, log });
     });
@@ -150,6 +152,8 @@ const failedFirst = results.filter((r) => !okOf(r));
 if (retry && failedFirst.length) {
   console.log(`\n${failedFirst.length} failed: run again, alone`);
   for (const first of failedFirst) {
+    // (the first time's log kept beside the second's, <suite>.first.log: what failed under load is read there)
+    try { copyFileSync(first.log, first.log.replace(/\.log$/, '.first.log')); } catch { /* gone */ }
     const again = await run(first.name);
     report(again, first);
     if (okOf(again)) { flaky.push(first.name); results[results.indexOf(first)] = again; }
