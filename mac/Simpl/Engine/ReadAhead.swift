@@ -47,8 +47,8 @@ final class AnswerMemo {
         return callKey(name, plain)
     }
 
-    /// The read sets a preference as it reads (or asks for a fresh read): it is always asked, never answered from what
-    /// is held.
+    /// The read sets a preference as it reads: it is always asked, never answered from what is held. (A course's grades
+    /// asked for afresh are the one exception: the screen always asks so, and a fresh enough answer is that.)
     static func sets(_ name: String, _ args: [String: Any]) -> Bool {
         guard let keys = settings[name] else { return false }
         return args.keys.contains { keys.contains($0) && !(name == "courseGrades" && $0 == "fresh") }

@@ -545,4 +545,5 @@ held or read ahead, the Dashboard not kept), so the two consoles compare like fo
 quarter of a second away, as a school's is (its assignment lists 0.6 s; the mock's `apiDelay`, as the web's fluid suite
 has it), not the mock's instant answers. In the screenshot suite and in
 developer mode the console also times each call (`call grades: 820 ms`, `read ahead home: 40 ms`) and when each screen
-appeared (`appear Grades: 12 ms`).
+appeared (`appear Grades: 12 ms`). Each picture is taken with its window brought to the front 0.7 s before (Shot.swift):
+a copy another had covered drew nothing new, so an animation under way in it was pictured where it had stopped.

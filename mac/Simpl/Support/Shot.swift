@@ -84,6 +84,17 @@ enum Shot {
     private static func take(_ file: String) {
         guard !taken else { return }
         taken = true
+        // (1.3.78) the window brought to the front first, and pictured a moment later: the suite's copies of the app share
+        // the screen, and a copy another has covered draws nothing new — an animation under way in it (its screens
+        // fading in as it opens) stopped where it was and was pictured so, faint or blank. In front, it finishes.
+        if let w = target() {
+            NSApp.activate(ignoringOtherApps: true)
+            w.orderFrontRegardless()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { capture(file) }
+    }
+
+    private static func capture(_ file: String) {
         guard let w = target(), let primary = NSScreen.screens.first else { return }
         // (the window, then what belongs to it over it: its sheets, its child windows, a popover open on it)
         var parts = [w] + w.sheets + (w.attachedSheet.map { [$0] } ?? []) + (w.childWindows ?? []).filter(\.isVisible)
