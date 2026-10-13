@@ -14,6 +14,7 @@ using Simpl.Screens;
 using Simpl.Shell;
 using Simpl.Support;
 using Wpf.Ui.Controls;
+using Wpf.Ui.Extensions;
 using Button = System.Windows.Controls.Button;
 using TextBlock = System.Windows.Controls.TextBlock;
 using TextBox = Wpf.Ui.Controls.TextBox;
@@ -606,9 +607,9 @@ public sealed class PinBar : StackPanel
 
     private Button Pin(ToolsScreen.Kind kind)
     {
-        var b = K.Subtle(new Grid(), () => OpenFlyout(kind.Key), new Thickness(10, 0, 10, 0), 4);
+        var b = K.Subtle(new Grid(), () => OpenFlyout(kind.Key), new Thickness(6, 0, 6, 0), 4);
         b.Height = 32;
-        b.MinWidth = 40;
+        b.MinWidth = 36;
         b.VerticalAlignment = VerticalAlignment.Center;
         b.HorizontalContentAlignment = HorizontalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(b, kind.Name);
@@ -632,15 +633,48 @@ public sealed class PinBar : StackPanel
             clock.Foreground = new SolidColorBrush(c);
             clock.FontFeatures();
             var row = K.H(6, ring, clock);
-            if (timer.Paused) row.Children.Add(K.Icon(SymbolRegular.Pause24, 10, B.Text2, filled: true));
+            if (timer.Paused)
+            {
+                var pause = Glyph(SymbolRegular.Pause24, 10);
+                pause.SetResourceReference(TextBlock.ForegroundProperty, B.Text2);
+                row.Children.Add(pause);
+            }
             b.Content = row;
             b.ToolTip = $"Focus timer: {timer.PhaseName.ToLowerInvariant()}{(timer.Paused ? ", paused" : "")}";
         }
         else
         {
-            b.Content = K.Icon(kind.Symbol, 16, kind.Color);
+            b.Content = Face(kind);
             b.ToolTip = kind.Name;
         }
+    }
+
+    /// <summary>
+    /// A tool's pin: its symbol, white, on a rounded square of its colour (its tile on the Tools page, solid), so each
+    /// stands out on the title bar, light or dark. The symbol is drawn as words in the symbol font: an icon element's
+    /// own colour is lost in the title bar (it came out black), a TextBlock's is kept.
+    /// </summary>
+    private static FrameworkElement Face(ToolsScreen.Kind kind)
+    {
+        var glyph = Glyph(kind.Symbol, 14);
+        glyph.Foreground = Brushes.White;
+        return new Border
+        {
+            Width = 24, Height = 24, CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(kind.Color),
+            Child = glyph, VerticalAlignment = VerticalAlignment.Center, SnapsToDevicePixels = true,
+        };
+    }
+
+    /// <summary>A filled symbol as words in the symbol font, for the title bar (see <see cref="Face"/>).</summary>
+    private static TextBlock Glyph(SymbolRegular symbol, double size)
+    {
+        var t = new TextBlock
+        {
+            Text = symbol.Swap().GetString(), FontSize = size,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center,
+        };
+        t.SetResourceReference(TextBlock.FontFamilyProperty, "FluentSystemIconsFilled");
+        return t;
     }
 
     private ContextMenu Menu(ToolsScreen.Kind kind)
