@@ -53,6 +53,21 @@ final class AnswerCache {
         return d
     }
 
+    /// (1.3.78) `data`, with the file read and opened off the main thread: a screen opening on what was kept never waits
+    /// on the disk or the vault in the middle of drawing.
+    func dataOffMain(_ name: String, _ args: [String: Any]) async -> Data? {
+        guard let f = AnswerCache.file(name, args) else { return nil }
+        if let d = memory[f] { return d }
+        let dir = self.dir
+        let found = await Task.detached(priority: .userInitiated) { () -> Data? in
+            let purpose = "answers:" + f
+            guard let sealed = try? Data(contentsOf: dir.appendingPathComponent(Vault.fileName(purpose))) else { return nil }
+            return Vault.open(sealed, purpose: purpose)
+        }.value
+        if let found { remember(f, found) }
+        return found
+    }
+
     /// (1.2.14) What is held in memory as well as on disk, capped: past 48 answers the oldest go (the disk keeps them all).
     private var order: [String] = []
     private func remember(_ f: String, _ d: Data) {

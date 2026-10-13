@@ -6,10 +6,16 @@ import SwiftUI
 /// cards: score, what is due, unread announcements, how much is handed in, quick links), List (every course on one
 /// line, then everything coming up day by day, ticked off where it is done) and Activity (Canvas's recent activity).
 /// Beside the view on a wide window, and under it on a narrow one: the day's work, the grades skyline and the week's
-/// load per course.
+/// load per course. (1.3.78) Kept once opened (DetailStack): `active` while it is the screen showing; put away, it keeps
+/// everything it shows, and reads again — quietly, each card changing in place — when it is shown again and what it
+/// holds has gone stale, or something was done meanwhile.
 struct DashboardView: View {
+    /// (1.3.78) It is the screen showing (not put away under another).
+    let active: Bool
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<Today>()
+    /// (1.3.78) Something was done while it was put away (`dataVersion` moved on): it reads again when it is shown.
+    @State private var behind = false
     /// The view chosen (Cards, List, Activity), kept on this Mac. (The screenshot suite: -SimplDashView list.)
     @AppStorage("SimplDashView") private var chosen: DashView = .list // (1.2.1: List unless another is picked)
     @State private var counts: TodayCounts?
@@ -32,8 +38,13 @@ struct DashboardView: View {
     @Namespace private var morph
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // (written out: `active` has no default, and the state above is private)
+    init(active: Bool) {
+        self.active = active
+    }
+
     /// Brightspace has no activity stream: there the Activity view is not offered.
-    private var views: [DashView] { engine.onBrightspace ? [.cards, .list] : DashView.allCases }
+    private var views: [DashView] { DashView.offered(engine) }
     private var view: DashView { views.contains(chosen) ? chosen : .list }
 
     // MARK: - Widths
@@ -52,29 +63,40 @@ struct DashboardView: View {
                 LoadState(error: model.error) { Task { await load() } }
             }
         }
-        .navigationTitle("Dashboard")
-        .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
-        .toolbar { toolbarItems }
-        .task(id: engine.dataVersion) { await load() }
+        // (1.3.78: its title and toolbar are DashboardChrome's, in the window's stack)
+        .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
+        .task(id: engine.dataVersion) {
+            if active { await load() } else { behind = true }
+        }
+        .onChange(of: active) { _, now in
+            if now {
+                // (shown again as it was: timed as such, and read again only if what it holds has gone stale)
+                if model.data != nil { DispatchQueue.main.async { OpenClock.report("Dashboard", "alive") } }
+                if behind || engine.recent("today", as: Today.self)?.fresh != true {
+                    behind = false
+                    Task { await load() }
+                }
+            } else if open != nil {
+                setOpen(nil) // (a counter left open folds back as the Dashboard is put away)
+            }
+        }
         .onChange(of: chosen) { _, _ in Task { await loadView() } }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Picker("View", selection: $chosen.animation(Motion.gentle)) {
-                ForEach(views) { v in
-                    Text(v.title).tag(v)
-                }
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .help("Cards, a list by day, or recent activity")
+    /// (1.3.78) What the Dashboard opens on, as it asks for it (read ahead when it is not the first screen).
+    static func reads(_ engine: Engine) -> [ReadAhead.Ask?] {
+        let chosen = DashView(rawValue: UserDefaults.standard.string(forKey: "SimplDashView") ?? "") ?? .list
+        var asks: [ReadAhead.Ask?] = [
+            .read("today", Today.self), .read("todayCounts", ["kept": false], TodayCounts.self),
+            .read("dashSkyline", ["kept": false], DashSkylineData.self),
+            .read("dashCourses", DashCoursesData.self), .read("coursesProgress", [String: CourseProgress].self),
+        ]
+        switch DashView.offered(engine).contains(chosen) ? chosen : .list {
+        case .cards: break
+        case .list: asks.append(.read("dashList", DashListData.self))
+        case .activity: asks.append(.read("dashActivity", DashActivityData.self))
         }
-        ToolbarItem(placement: .primaryAction) {
-            Button { engine.newTask = true } label: { Label("New Task", systemImage: "plus") }
-                .help("New Task (⌘N)")
-        }
+        return asks
     }
 
     // MARK: - The page
@@ -467,20 +489,30 @@ struct DashboardView: View {
 
     /// The cards, the List, the activity and the skyline as they were last time (AnswerCache), until the live answers
     /// are in. Their counts wait for the live answer, as every count does: a card's due today and unread, a new dot.
+    /// (1.3.78) This session's answers first, whole (read ahead, or from a visit before): nothing held back.
     private func showKept() {
         var t = Transaction()
         t.disablesAnimations = true
         withTransaction(t) {
-            if courses == nil, var c = engine.kept("dashCourses", as: DashCoursesData.self) {
+            if courses == nil, let c = engine.recent("dashCourses", as: DashCoursesData.self)?.value {
+                courses = c
+                if let p = engine.recent("coursesProgress", as: [String: CourseProgress].self)?.value {
+                    progress = p
+                    progressRead = true
+                }
+            } else if courses == nil, var c = engine.kept("dashCourses", as: DashCoursesData.self) {
                 for i in c.rows.indices {
                     c.rows[i].unread = nil
                     c.rows[i].dueToday = nil
                 }
                 courses = c
             }
-            if sky == nil, let s = engine.kept("dashSkyline", ["kept": false], as: DashSkylineData.self) { sky = s }
-            if list == nil, let l = engine.kept("dashList", as: DashListData.self) { list = l }
-            if activity == nil, var a = engine.kept("dashActivity", as: DashActivityData.self) {
+            if counts == nil, let c = engine.recent("todayCounts", ["kept": false], as: TodayCounts.self)?.value { counts = c }
+            if sky == nil, let s = engine.recent("dashSkyline", ["kept": false], as: DashSkylineData.self)?.value ?? engine.kept("dashSkyline", ["kept": false], as: DashSkylineData.self) { sky = s }
+            if list == nil, let l = engine.recent("dashList", as: DashListData.self)?.value ?? engine.kept("dashList", as: DashListData.self) { list = l }
+            if activity == nil, let a = engine.recent("dashActivity", as: DashActivityData.self)?.value {
+                activity = a
+            } else if activity == nil, var a = engine.kept("dashActivity", as: DashActivityData.self) {
                 for i in a.rows.indices { a.rows[i].unread = nil }
                 activity = a
             }
@@ -490,8 +522,8 @@ struct DashboardView: View {
     private func loadCounts() async {
         // (1.2.12) Overdue and Graded at once, as the web Dashboard has them: counted from the assignments the page keeps
         // (read on the last visit), then from Canvas's answer now — reading every course again took a while
-        async let quick = try? engine.call("todayCounts", ["kept": true], as: TodayCounts.self)
-        async let fresh = try? engine.call("todayCounts", ["kept": false], as: TodayCounts.self)
+        async let quick = try? engine.read("todayCounts", ["kept": true], as: TodayCounts.self)
+        async let fresh = try? engine.read("todayCounts", ["kept": false], as: TodayCounts.self)
         if let k = await quick, k.overdue != nil, counts == nil {
             withAnimation(Motion.snappy) { counts = k }
         }
@@ -501,12 +533,12 @@ struct DashboardView: View {
     }
 
     private func loadCourses() async {
-        if let c = try? await engine.call("dashCourses", as: DashCoursesData.self) {
+        if let c = try? await engine.read("dashCourses", as: DashCoursesData.self) {
             withAnimation(courses == nil ? nil : Motion.gentle) { courses = c }
         } else if courses == nil {
             courses = DashCoursesData(rows: [], empty: "Your courses could not be loaded.")
         }
-        if let p = try? await engine.call("coursesProgress", as: [String: CourseProgress].self) {
+        if let p = try? await engine.read("coursesProgress", as: [String: CourseProgress].self) {
             withAnimation(Motion.gentle) {
                 progress = p
                 progressRead = true
@@ -516,10 +548,10 @@ struct DashboardView: View {
 
     /// The skyline from the copy kept from the last visit first (at once), then from what Canvas says now.
     private func loadSkyline() async {
-        if sky == nil, let kept = try? await engine.call("dashSkyline", ["kept": true], as: DashSkylineData.self), sky == nil {
+        if sky == nil, let kept = try? await engine.read("dashSkyline", ["kept": true], as: DashSkylineData.self), sky == nil {
             sky = kept
         }
-        if let fresh = try? await engine.call("dashSkyline", ["kept": false], as: DashSkylineData.self) {
+        if let fresh = try? await engine.read("dashSkyline", ["kept": false], as: DashSkylineData.self) {
             withAnimation(Motion.gentle) { sky = fresh }
         }
     }
@@ -536,7 +568,7 @@ struct DashboardView: View {
         var args: [String: Any] = [:]
         if let hideDone { args["hideDone"] = hideDone }
         do {
-            let l = try await engine.call("dashList", args, as: DashListData.self)
+            let l = try await engine.read("dashList", args, as: DashListData.self)
             withAnimation(animated || hideDone != nil ? Motion.gentle : nil) {
                 list = l
                 listError = nil
@@ -548,7 +580,7 @@ struct DashboardView: View {
 
     private func loadActivity() async {
         do {
-            let a = try await engine.call("dashActivity", as: DashActivityData.self)
+            let a = try await engine.read("dashActivity", as: DashActivityData.self)
             activity = a
             activityError = nil
         } catch {
@@ -609,5 +641,42 @@ struct DashboardView: View {
         }
         Task { _ = await engine.act("dashSeen", ["id": row.id]) }
         if let url = row.url { engine.openWeb(url, title: row.title) }
+    }
+}
+
+/// (1.3.78) The Dashboard's title and toolbar — its view (Cards, List, Activity) and New Task — in the window's stack,
+/// where every screen's are; the Dashboard itself is kept over the stack (DetailStack), so going back to it never draws
+/// it again.
+struct DashboardChrome: View {
+    @EnvironmentObject private var engine: Engine
+    @AppStorage("SimplDashView") private var chosen: DashView = .list
+
+    var body: some View {
+        Color.clear
+            .navigationTitle("Dashboard")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Picker("View", selection: $chosen.animation(Motion.gentle)) {
+                        ForEach(DashView.offered(engine)) { v in
+                            Text(v.title).tag(v)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    .help("Cards, a list by day, or recent activity")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { engine.newTask = true } label: { Label("New Task", systemImage: "plus") }
+                        .help("New Task (⌘N)")
+                }
+            }
+    }
+}
+
+extension DashView {
+    /// The views offered: Brightspace has no activity stream, so no Activity there.
+    @MainActor
+    static func offered(_ engine: Engine) -> [DashView] {
+        engine.onBrightspace ? [.cards, .list] : allCases
     }
 }

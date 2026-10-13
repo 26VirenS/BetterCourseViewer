@@ -116,7 +116,7 @@ struct ExternalToolsView: View {
             }
         }
         .navigationTitle("External Tools")
-        .openTimed("External Tools", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed("External Tools", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .task(id: engine.dataVersion) {
             await load()
             await openAskedList()

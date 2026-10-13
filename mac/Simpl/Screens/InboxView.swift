@@ -440,8 +440,8 @@ struct InboxView: View {
     private func load(animated: Bool = false) async {
         store.bind(engine)
         let wanted = scope
-        if model.data == nil, let kept = store.lists[wanted] {
-            shownFrom = "cached"
+        if model.data == nil, let kept = store.lists[wanted] ?? engine.recent("inbox", ["scope": wanted], as: InboxData.self)?.value {
+            shownFrom = "cached" // (1.3.78: or read ahead)
             model.data = kept
         }
         do {
@@ -788,7 +788,7 @@ struct GroupsView: View {
             }
         }
         .navigationTitle("Groups")
-        .openTimed("Groups", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed("Groups", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: "/groups", title: "Groups")

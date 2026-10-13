@@ -32,7 +32,7 @@ struct TopicView: View {
         }
         .navigationTitle(model.data?.title ?? "Discussion")
         .navigationSubtitle(model.data.map { kindLine($0) } ?? "")
-        .openTimed("Discussion", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed("Discussion", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if let d = model.data {

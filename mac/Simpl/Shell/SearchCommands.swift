@@ -615,14 +615,14 @@ final class SearchPalette: ObservableObject {
 
     private func todo(_ engine: Engine) async -> TodoData? {
         if let c = todoCache, Date().timeIntervalSince(c.at) < 90 { return c.data }
-        guard let d = try? await engine.call("todo", as: TodoData.self) else { return nil }
+        guard let d = try? await engine.read("todo", as: TodoData.self) else { return nil } // (1.3.78: as read ahead, if it is fresh)
         todoCache = (at: Date(), data: d)
         return d
     }
 
     private func grades(_ engine: Engine) async -> GradesData? {
         if let c = gradesCache, Date().timeIntervalSince(c.at) < 120 { return c.data }
-        guard let d = try? await engine.call("grades", as: GradesData.self) else { return nil }
+        guard let d = try? await engine.read("grades", as: GradesData.self) else { return nil } // (1.3.78: as read ahead, if it is fresh)
         gradesCache = (at: Date(), data: d)
         return d
     }

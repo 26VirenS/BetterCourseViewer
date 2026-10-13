@@ -28,7 +28,7 @@ struct NotificationsView: View {
             }
         }
         .navigationTitle("Notifications")
-        .openTimed("Notifications", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed("Notifications", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { mark("all", read: true) } label: { Label("Mark All Read", systemImage: "envelope.open") }

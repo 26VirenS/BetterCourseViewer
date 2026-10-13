@@ -19,6 +19,11 @@ enum OpenClock {
         mark = CACurrentMediaTime()
     }
 
+    /// The calls' own times on the console too (a screen's call, a read ahead): in the screenshot suite and in developer
+    /// mode.
+    static var verbose: Bool { shooting || DevMode.shared.unlocked }
+    private static let shooting = UserDefaults.standard.string(forKey: "SimplShotFile") != nil
+
     static func report(_ screen: String, _ source: String) {
         let ms = Int(((CACurrentMediaTime() - mark) * 1000).rounded())
         NSLog("[Simpl] open %@: %d ms (%@)", screen, ms, source)
@@ -35,14 +40,18 @@ private struct OpenTimed: ViewModifier {
     @State private var said: String?
     /// It is on screen (SwiftUI may say a screen appeared twice: it is timed once).
     @State private var visible = false
+    /// It has appeared before: shown again, it was never put away (a screen uncovered by Back).
+    @State private var seen = false
 
     func body(content: Content) -> some View {
         content
+            .preference(key: PageReadyKey.self, value: ready) // (a page arriving waits for its content: PageArrival)
             .onAppear {
                 guard !visible else { return }
                 visible = true
                 said = nil
-                if ready { report(source()) }
+                if ready { report(seen ? "alive" : source()) }
+                seen = true
             }
             .onDisappear { visible = false }
             .onChange(of: ready) { _, now in
@@ -101,7 +110,8 @@ enum Walk {
                 } else {
                     continue
                 }
-                await until(15) { OpenClock.shown > before }
+                // (Back within a place uncovers a screen that was never put away: it may say nothing of its open)
+                await until(step == "back" ? 3 : 15) { OpenClock.shown > before }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             NSLog("[Simpl] walk: done")

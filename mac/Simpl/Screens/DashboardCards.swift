@@ -162,6 +162,7 @@ struct DashCourseCard: View {
                     .padding(.bottom, 8)
             }
             .contextMenu { DashCourseMenu(course: course, engine: engine) }
+            .readsAhead { engine.readAhead(url: course.url) } // (1.3.78: its home, read ahead)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(course.code), \(course.scoreText ?? "")")
     }

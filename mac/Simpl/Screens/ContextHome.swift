@@ -21,7 +21,7 @@ struct ContextHome: View {
         }
         .navigationTitle(model.data?.title ?? "")
         .navigationSubtitle(model.data?.sub ?? "")
-        .openTimed(ctx.hasPrefix("groups/") ? "Group home" : "Course home", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed(ctx.hasPrefix("groups/") ? "Group home" : "Course home", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: "/\(ctx)", title: model.data?.title ?? "")
@@ -134,6 +134,7 @@ struct ContextHome: View {
                     .canvasRowMenu(s.label, url: engine.canvasURL(for: .section(ctx, s.kind))?.absoluteString, engine: engine) {
                         engine.go(.section(ctx, s.kind))
                     }
+                    .readsAhead { engine.readAhead(.section(ctx, s.kind)) } // (1.3.78: the section, read ahead)
                 }
             }
         }

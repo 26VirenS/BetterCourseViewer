@@ -347,6 +347,8 @@ struct PreviewLink<Label: View>: View {
                     .onChange(of: p.size.width) { _, w in rowWidth = w }
             }
         }
+        // (1.3.78) what it opens, read ahead while the pointer rests on it: its preview and its screen are whole at once
+        .readsAhead { AppModel.shared.engine?.readAhead(url: item.url) }
         .onAppear(perform: shot)
     }
 

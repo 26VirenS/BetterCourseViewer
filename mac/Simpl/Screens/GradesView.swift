@@ -20,6 +20,8 @@ struct GradesView: View {
     @State private var split = true
     /// The course shown beside the list (the first until another is picked).
     @State private var picked: String?
+    /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
+    @State private var source = "fetched"
 
     var body: some View {
         Group {
@@ -40,7 +42,8 @@ struct GradesView: View {
         }
         .navigationTitle("Grades")
         .navigationSubtitle(data?.term ?? "")
-        .openTimed("Grades", ready: data != nil, source: "fetched")
+        .openTimed("Grades", ready: data != nil, source: source)
+        .onAppear(perform: seed)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: engine.canvasURL(for: .grades)?.absoluteString, title: "Grades")
@@ -305,9 +308,23 @@ struct GradesView: View {
 
     // MARK: - Reading and saving
 
+    /// (1.3.78) This session's answer at once (read ahead, or from a visit before): the screen is whole on its first
+    /// frame, and asked again only once that answer is stale.
+    private func seed() {
+        guard data == nil, let held = engine.recent("grades", as: GradesData.self) else { return }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            goal = held.value.goal
+            data = held.value
+        }
+        source = "cached"
+    }
+
     private func load() async {
+        seed()
         do {
-            let d = try await engine.call("grades", as: GradesData.self)
+            let d = try await engine.read("grades", as: GradesData.self)
             var t = Transaction()
             // a redraw is not an arrival — but a term GPA that really changed rolls to its new value, as the rings beside it do
             if let old = data, old.gpa != d.gpa { t.animation = Motion.snappy } else { t.disablesAnimations = true }
@@ -1053,6 +1070,8 @@ struct CourseGradesView: View {
     @State private var wide = true
     /// (1.2) Room for the groups in two columns.
     @State private var twoColumns = false
+    /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
+    @State private var source = "fetched"
     @FocusState private var focused: String?
 
     // (written out: the state above is of this file's own types, which would keep a synthesized one in this file)
@@ -1081,7 +1100,8 @@ struct CourseGradesView: View {
         }
         .navigationTitle(sectionTitle)
         .navigationSubtitle(data?.code ?? "")
-        .openTimed("Course grades", ready: data != nil, source: "fetched")
+        .openTimed("Course grades", ready: data != nil, source: source)
+        .onAppear(perform: seed)
         .toolbar { toolbarItems }
         .task(id: engine.dataVersion) { await load(fresh: true, animated: false) }
         .sheet(item: $addingTo) { g in
@@ -1667,8 +1687,24 @@ struct CourseGradesView: View {
         }
     }
 
+    /// (1.3.78) The read a course's grades open on (nothing tried, nothing added, What-If off), as reading ahead asks it.
+    static func firstRead(_ courseId: String) -> [String: Any] {
+        ["id": courseId, "tried": [String: Any](), "added": [[String: Any]](), "on": false, "fresh": true]
+    }
+
+    /// (1.3.78) This session's answer at once (read ahead, or from a visit before), while nothing is tried.
+    private func seed() {
+        guard data == nil, drafts.isEmpty, added.isEmpty, !whatIf,
+              let held = engine.recent("courseGrades", Self.firstRead(courseId), as: CourseGradesData.self) else { return }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) { data = held.value }
+        source = "cached"
+    }
+
     /// The course's grades with the scores tried and the assignments added. `animated`: the answer to something just done
-    /// (rings move, numbers roll); a first read or a reload is a redraw. Only the latest read is shown.
+    /// (rings move, numbers roll); a first read or a reload is a redraw. Only the latest read is shown. (1.3.78) A first
+    /// read or a reload is answered by this session's answer while it is fresh.
     private func load(fresh: Bool = false, animated: Bool = true) async {
         reads += 1
         let read = reads
@@ -1677,8 +1713,12 @@ struct CourseGradesView: View {
             tried[k] = v.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)
         }
         let extra: [[String: Any]] = added.map { ["id": $0.id, "groupId": $0.groupId, "name": $0.name, "possible": $0.possible] }
+        let args: [String: Any] = ["id": courseId, "tried": tried, "added": extra, "on": whatIf, "fresh": fresh]
+        if !animated { seed() }
         do {
-            let d = try await engine.call("courseGrades", ["id": courseId, "tried": tried, "added": extra, "on": whatIf, "fresh": fresh], as: CourseGradesData.self)
+            let d = try await (animated
+                ? engine.call("courseGrades", args, as: CourseGradesData.self)
+                : engine.read("courseGrades", args, as: CourseGradesData.self))
             guard read == reads else { return }
             if animated && data != nil {
                 withAnimation(Motion.snappy) {

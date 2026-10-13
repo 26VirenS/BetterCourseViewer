@@ -22,6 +22,8 @@ mac/
     Engine/Engine.swift         the web view as the engine: calls, where the window is, opening any Canvas address
     Engine/Navigator.swift      places in the sidebar and a browser's Back/Forward history across them
     Engine/FilePreview.swift    a Canvas file fetched with the session, shown in Quick Look
+    Engine/AnswerCache.swift    each read's last answer, sealed on disk, for a fast start
+    Engine/ReadAhead.swift      this session's answers in memory (AnswerMemo) and reading ahead of the student
     Shell/RootView.swift        the engine underneath, the window over it, sign-in, sheets, Quick Look
     Shell/MainShell.swift       the split view: the sidebar (places, courses and their sections, groups, the account)
     Shell/Commands.swift        the menu bar: New Task / New Message, Reload, the Go menu, Change School, What's New
@@ -30,11 +32,13 @@ mac/
     Shell/SettingsView.swift    Simpl ▸ Settings: General, Notifications, Grades, Data, Updates, About
     Shell/ToolWindow.swift      an external tool (or a page Simpl does not draw) in a window of its own
     Shell/WhatsNewSheet.swift   what changed, after an update
+    Shell/PageMotion.swift      how a screen arrives and leaves as the window moves (push, Back, a place picked)
     Screens/                    the native screens (Dashboard, Courses, To Do, Calendar, Grades, Notifications, Inbox,
                                 Groups, Search, a course's home and sections, an assignment, a discussion, a quiz, setup)
     Components/                 cards, rows, rings, chips, the loader, Canvas's rich text
     Support/Platform.swift      the theme, the house springs, what the shared code expects of the app
     Support/Shot.swift          the screenshot suite's camera (does nothing without its launch argument)
+    Support/OpenClock.swift     every screen's open timed on the console, and the screenshot suite's walk
     Support/Updater.swift       updates: the feed, the download and its checks, the swap and relaunch, earlier versions
     Support/Vault.swift         what Simpl keeps, encrypted, its key in the login Keychain (Data and encryption)
     Support/PhoneServer.swift   Send from Phone's server on this Mac's Wi-Fi, up only while its panel is open
@@ -53,10 +57,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   headings, the course colours, grade rings that fill once — drawn with native buttons, toggles, pickers, menus, steppers,
   date pickers, popovers, sheets and context menus. The sidebar is the Mac's (vibrancy, selection, badges); each course in
   it opens to its sections.
-- **Motion.** Springs only, critically damped (`Motion.snappy`, `gentle`, `hover`, `fill`): they start from what is on
-  screen, so anything can be interrupted and turned around. Cards lift under the pointer and give under a click; a place
-  cross-fades in; a push slides as Apple's stacks do; a tick shows before its row moves. Under Reduce Motion, moves become
-  cross-fades.
+- **Motion.** Springs only, critically damped (`Motion.snappy`, `gentle`, `hover`, `fill`, `page`): they start from what
+  is on screen, so anything can be interrupted and turned around. Cards lift under the pointer and give under a click; a
+  place cross-fades in, rising a touch; a page opened deeper comes in from the trailing edge a short way and Back
+  reverses it (1.3.78, below); a tick shows before its row moves. Under Reduce Motion, moves become cross-fades.
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
 
@@ -360,6 +364,41 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool window). Its chips stay for the courses where it is also a tab. `-SimplExternalToolList knewton` opens the list of
   the first tool whose name has that word (the screenshot suite's `light-36b-external-tools-list` and
   `dark-36b-external-tools-list`).
+
+- **Fast and fluid (1.3.78).** A screen shows its whole content at once whenever this session has already read what
+  it shows, and the window moves the same way however it is moved:
+  - *Held answers* (`AnswerMemo`, Engine/ReadAhead.swift): every read's answer is held in memory, decoded, by its call
+    and arguments (the arguments that only set a preference — To Do's grouping, Hide Completed, the calendar's view —
+    left out of the name it is held by, and such a read is always asked). A screen opens on it at once (`Loader`,
+    `Engine.recent`) and asks again only once it is stale: after a minute, or once any call that is not a read has
+    succeeded (a tick, a hand-in, a post, a setting: `Engine.fetch` makes everything held stale; `changed()` does too,
+    unless an action did a moment ago). A stale answer is still shown at once and replaced quietly, what changed moving
+    into place. The same read asked twice while it is on its way is asked once. Answers are decoded off the main thread,
+    and the answers kept on disk (AnswerCache, sealed by the vault) are read and opened off it too. Signing out lets go
+    of all of it.
+  - *Reading ahead* (`ReadAhead`): once the window has been quiet a moment after it opens, the Dashboard (when it is
+    not the first screen), To Do, the Calendar (its view and the span round today), Grades, Notifications, the Inbox,
+    All Courses and every course's home are read, two at a time at most, never while a screen is waiting for a read of
+    its own, a breath between them. A sidebar row, a course's card, a section's pill or a row of work the pointer rests
+    on for 80 ms has what it opens read ahead, first in line (on a Mac every press comes after the pointer arrives, so
+    this is also what a press would ask). Nothing that marks something read (a discussion, a conversation) is read
+    ahead. These reads are quiet: the screenshot suite's pictures never wait for them.
+  - *The Dashboard kept* (`DetailStack`): opened once, it stays — over the stack, out of sight and out of reach of the
+    pointer while another screen shows — so its cards, their pictures and where it was scrolled are as they were when
+    the window comes back to it. It reads again only when it is shown and what it holds is stale or something was done
+    meanwhile, each card changing in place. Its title and toolbar stay in the stack (`DashboardChrome`).
+  - *Waiting*: a screen's spinner shows only after a third of a second, so a quick answer replaces an empty page rather
+    than a spinner that flashes.
+  - *Motion* (Shell/PageMotion.swift, one language with the web and Windows): going deeper — a link, a row, a card,
+    Forward, a course's home to a section — the new page comes in from the trailing edge 28 points as it fades in, and
+    a place left drifts 12 points the other way as it fades out; Back is the same in reverse; another place picked in
+    the sidebar cross-fades, the new page rising 8 points. All on `Motion.page` (critically damped, response 0.34):
+    a move made mid-way starts from where things are and nothing waits in line. A page that arrives waits until its
+    content is there (a third of a second at most), so it never slides in empty and then fills. A move within a place
+    swaps the stack's screen at once (the screen under it kept as it was) and the new top arrives by itself; one to
+    another place fades the old page out the way the move goes (`PageExit`) while the new one arrives (`PageArrival`).
+    Under Reduce Motion every move is a cross-fade. No element is morphed from one screen into the next: the card and
+    the course's heading are drawn by different screens, and a morph between them could not be kept clean.
 
 ## Data and encryption
 

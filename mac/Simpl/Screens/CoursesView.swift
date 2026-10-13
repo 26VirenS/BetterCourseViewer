@@ -25,7 +25,7 @@ struct CoursesView: View {
             }
         }
         .navigationTitle("Courses")
-        .openTimed("Courses", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed("Courses", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Picker("Show", selection: $filter.animation(Motion.gentle)) {
@@ -93,8 +93,12 @@ struct CoursesView: View {
     }
 
     private func load(animated: Bool = false) async {
+        // (1.3.78: how much is handed in, as this session last read it, with the cards — then asked again if stale)
+        if progress.isEmpty, let held = engine.recent("coursesProgress", ["all": true], as: [String: CourseProgress].self) {
+            progress = held.value
+        }
         await model.load(engine, "allCourses", animated: animated)
-        if let p = try? await engine.call("coursesProgress", ["all": true], as: [String: CourseProgress].self) {
+        if let p = try? await engine.read("coursesProgress", ["all": true], as: [String: CourseProgress].self) {
             withAnimation(Motion.gentle) { progress = p }
         }
     }
@@ -162,6 +166,7 @@ private struct CourseCard: View {
         .scaleEffect(reduceMotion ? 1 : (hover ? 1.006 : 1))
         .animation(Motion.hover, value: hover)
         .onHover { hover = $0 }
+        .readsAhead { engine.readAhead(.home(ctx)) } // (1.3.78: its home, read ahead)
         .contextMenu { menu }
     }
 

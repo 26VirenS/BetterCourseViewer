@@ -134,25 +134,47 @@ extension MainShell {
 }
 
 /// The screen chosen in the sidebar, with what is pushed on it (an assignment, a discussion, a page, a folder, a
-/// conversation). Another place cross-fades in; a push slides as Apple's own stacks do.
+/// conversation). (1.3.78) Each screen arrives the way the window moved (PageArrival), and a place left goes the same
+/// way (PageExit): one motion language for a push, Back and a place picked. The Dashboard, once opened, is kept over the
+/// stack — its cards, its pictures, where it was scrolled — shown again as it was when the window comes back to it,
+/// its answers refreshed in place; its title and toolbar stay in the stack where every screen's are (DashboardChrome).
 struct DetailStack: View {
     @EnvironmentObject private var engine: Engine
+    @State private var dashboardKept = false
 
     var body: some View {
         let place = engine.nav.current.place
-        NavigationStack(path: Binding(get: { engine.nav.current.path }, set: { engine.nav.setPath($0) })) {
-            PlaceScreen(place: place)
-                .background(PageGround().ignoresSafeArea())
-                .navigationDestination(for: Route.self) { route in
-                    RouteScreen(route: route)
-                        .navigationBarBackButtonHidden(true) // (the toolbar's own Back and Forward walk the history)
-                        // (1.2.3) its own ground, up under the toolbar: the screen it was opened from never shows through
-                        .background(PageGround().ignoresSafeArea())
-                }
+        let path = engine.nav.current.path
+        let dashboardUp = place == .dashboard && path.isEmpty
+        ZStack {
+            NavigationStack(path: Binding(get: { engine.nav.current.path }, set: { engine.nav.setPath($0) })) {
+                PlaceScreen(place: place)
+                    .background(PageGround().ignoresSafeArea())
+                    .modifier(PageArrival(move: engine.move, top: path.isEmpty && place != .dashboard))
+                    .navigationDestination(for: Route.self) { route in
+                        RouteScreen(route: route)
+                            .navigationBarBackButtonHidden(true) // (the toolbar's own Back and Forward walk the history)
+                            // (1.2.3) its own ground, up under the toolbar: the screen it was opened from never shows through
+                            .background(PageGround().ignoresSafeArea())
+                            .modifier(PageArrival(move: engine.move, top: engine.nav.current.path.last == route))
+                    }
+            }
+            .id(place.identity)
+            .transition(.page)
+            .background(PageGround().ignoresSafeArea())
+            if dashboardKept || dashboardUp {
+                DashboardView(active: dashboardUp)
+                    .background(PageGround().ignoresSafeArea())
+                    .modifier(PageArrival(move: engine.move, top: dashboardUp))
+                    .modifier(PageExit(gone: dashboardUp ? 0 : 1))
+                    // (coming back, it arrives by itself: only its going is on the move's spring)
+                    .transaction(value: dashboardUp) { t in if dashboardUp { t.animation = nil } }
+                    .allowsHitTesting(dashboardUp)
+                    .accessibilityHidden(!dashboardUp)
+            }
         }
-        .id(place.identity)
-        .transition(.opacity)
-        .background(PageGround().ignoresSafeArea())
+        .onAppear { if dashboardUp { dashboardKept = true } }
+        .onChange(of: dashboardUp) { _, up in if up { dashboardKept = true } }
     }
 }
 
@@ -162,7 +184,7 @@ struct PlaceScreen: View {
 
     var body: some View {
         switch place {
-        case .dashboard: DashboardView()
+        case .dashboard: DashboardChrome() // (1.3.78: the Dashboard itself is kept over the stack, DetailStack)
         case .courses: CoursesView()
         case .todo: TodoView()
         case .calendar: CalendarView()
@@ -394,6 +416,7 @@ struct Sidebar: View {
         }
         .tourSpot(c.id == engine.courses.first?.id ? .firstCourse : nil)
         .onHover { on in if on { MacTour.shared.did(.courseHover) } } // (the tour's "Hover over a course")
+        .readsAhead { engine.readAhead(.home(ctx)) } // (1.3.78: its home, read ahead)
         .tag(Place.home(ctx))
         .contextMenu {
             Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: .home(ctx))) } // (1.3.69)
@@ -412,15 +435,19 @@ struct Sidebar: View {
     }
 }
 
-/// (1.3.69) A sidebar row's menu: its place in a window of its own.
+/// (1.3.69) A sidebar row's menu: its place in a window of its own. (1.3.78) And what the row opens, read ahead while
+/// the pointer rests on it.
 private struct WindowMenu: ViewModifier {
     let place: Place
+    @EnvironmentObject private var engine: Engine
     @Environment(\.openWindow) private var openWindow
 
     func body(content: Content) -> some View {
-        content.contextMenu {
-            Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: place)) }
-        }
+        content
+            .contextMenu {
+                Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: place)) }
+            }
+            .readsAhead { engine.readAhead(place) }
     }
 }
 

@@ -43,7 +43,7 @@ struct FilesBrowser: View {
         }
         .navigationTitle(name)
         .navigationSubtitle(model.data?.context ?? "")
-        .openTimed("Files", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.kept ? "kept" : "fetched")
+        .openTimed("Files", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 CanvasMenu(url: "/\(ctx)/files", title: name)

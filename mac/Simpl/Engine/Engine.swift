@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import QuartzCore
 import SwiftUI
 import WebKit
 
@@ -111,6 +112,10 @@ final class Engine: ObservableObject, ShellListener {
     private var launchPlaceTaken = false
     /// What the screens were last told, for this school (AnswerCache).
     let answers: AnswerCache
+    /// (1.3.78) This session's answers, decoded, by their read (a window more uses the main window's).
+    let memo = AnswerMemo()
+    /// (1.3.78) What is read ahead of the student (ReadAhead.swift).
+    let ahead = ReadAhead()
     private var queuedPopups: [Popup] = []
     private var popupCheck: DispatchWorkItem?
     private var loginWatch: AnyCancellable?
@@ -191,6 +196,12 @@ final class Engine: ObservableObject, ShellListener {
     func kept<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) -> T? {
         guard let d = answers.data(name, args) else { return nil }
         return try? JSONDecoder().decode(T.self, from: d)
+    }
+
+    /// (1.3.78) `kept`, read, opened and decoded off the main thread (a screen's first open after a launch).
+    func keptAnswer<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async -> T? {
+        guard let d = await answers.dataOffMain(name, args) else { return nil }
+        return try? await Engine.decoded(d, as: T.self)
     }
 
     // MARK: - What the page says
@@ -274,6 +285,7 @@ final class Engine: ObservableObject, ShellListener {
     func signedOut() {
         if let primary { nav.replace(.dashboard); primary.signedOut(); return }
         answers.clear()
+        memo.clear()
         ready = false
         openedOnKept = false
         shownNative = false
@@ -333,6 +345,7 @@ final class Engine: ObservableObject, ShellListener {
         }
         await refreshSnapshot()
         await loadSidebar()
+        readAheadAfterLaunch() // (1.3.78: once the window is quiet, the places most opened next, read ahead)
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) }
         // (the screenshot suite: -SimplActivityProbe YES — one read of the school as the new-activity check makes it, on the console)
@@ -475,6 +488,7 @@ final class Engine: ObservableObject, ShellListener {
     /// Something changed under the screens (a tick, a hand-in): they read again, and so do the counts and reminders.
     func changed() {
         if let primary { primary.changed(); return } // (every window reads again)
+        memo.changed() // (1.3.78: what is held is stale, unless the action that changed it already said so)
         dataVersion += 1
         Task { await refreshSnapshot() }
         Task { await Reminders.shared.reschedule(self) }
@@ -504,33 +518,102 @@ final class Engine: ObservableObject, ShellListener {
     // MARK: - Calls
 
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready (a page load
-    /// under way), and tries once more if the page went away mid-call.
+    /// under way), and tries once more if the page went away mid-call. (1.3.78) A read's answer is held for the session
+    /// (`memo`), and any other call that succeeds makes what is held stale (it may have changed what the screens show).
     func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async throws -> T {
-        if let primary { return try await primary.call(name, args, as: type) } // (a window more: the main window's page answers)
-        Shot.began() // (the screenshot suite's picture waits for the page's answers: Support/Shot.swift)
-        defer { Shot.ended() }
+        try await fetch(name, args, as: type, quiet: false)
+    }
+
+    /// (1.3.78) A screen's read: this session's answer while it is fresh (nothing is asked), else the page's (`call`).
+    func read<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type, quiet: Bool = false) async throws -> T {
+        if let primary { return try await primary.read(name, args, as: type, quiet: quiet) }
+        if !AnswerMemo.sets(name, args), let held = recent(name, args, as: type), held.fresh { return held.value }
+        return try await fetch(name, args, as: type, quiet: quiet)
+    }
+
+    /// (1.3.78) A call, `quiet` when it is read ahead: the screenshot suite's picture does not wait for it, and a read
+    /// ahead lets a screen's own read go first (`waiting`).
+    func fetch<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type, quiet: Bool) async throws -> T {
+        if let primary { return try await primary.fetch(name, args, as: type, quiet: quiet) } // (a window more: the main window's page answers)
+        if !quiet {
+            Shot.began() // (the screenshot suite's picture waits for the page's answers: Support/Shot.swift)
+            waiting += 1
+        }
+        defer {
+            if !quiet {
+                Shot.ended()
+                waiting -= 1
+            }
+        }
+        let held = AnswerMemo.held.contains(name)
+        let generation = memo.generation
+        let started = CACurrentMediaTime()
+        let data = try await answer(name, args, shared: held)
+        let decoded: T
+        do {
+            decoded = try await Engine.decoded(data, as: T.self) // (off the main thread: a long answer never holds up the window)
+        } catch let e as DecodingError {
+            print("[Simpl] \(name) answer not understood:", e)
+            throw EngineError.unreadable
+        }
+        if held {
+            answers.keep(data, name, args) // (a read: kept for next time, AnswerCache)
+            if let key = AnswerMemo.key(name, args) { memo.put(key, decoded, generation: generation) }
+        } else if !AnswerMemo.neutral.contains(name) {
+            memo.invalidate() // (something was done: what the screens hold is asked for again as each opens)
+        }
+        if OpenClock.verbose {
+            NSLog("[Simpl] %@ %@: %d ms", quiet ? "read ahead" : "call", name, Int(((CACurrentMediaTime() - started) * 1000).rounded()))
+        }
+        return decoded
+    }
+
+    /// (1.3.78) The page's answer to a call, as JSON data (its error thrown) — a read asked again while it is on its way
+    /// is not asked twice: whoever asks waits for the same answer.
+    private func answer(_ name: String, _ args: [String: Any], shared: Bool) async throws -> Data {
+        guard shared, let key = AnswerMemo.callKey(name, args) else { return try await ask(name, args) }
+        if let running = inflight[key] { return try await running.value }
+        let task = Task { try await self.ask(name, args) }
+        inflight[key] = task
+        defer { inflight[key] = nil }
+        return try await task.value
+    }
+
+    private var inflight: [String: Task<Data, Error>] = [:]
+    /// (1.3.78) Reads a screen is waiting for, now: reading ahead waits until there are none.
+    private(set) var waiting = 0
+
+    private func ask(_ name: String, _ args: [String: Any]) async throws -> Data {
         var lastError: Error = EngineError.notReady(lmsName)
         for attempt in 0..<3 {
             await whenReady()
             guard ready else { throw EngineError.notReady(lmsName) }
             do {
                 let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
-                guard let text = raw as? String, let data = text.data(using: .utf8) else { throw EngineError.unreadable }
-                if let box = try? JSONDecoder().decode(ErrorBox.self, from: data), let message = box.error { throw EngineError.page(message) }
-                let answer = try JSONDecoder().decode(T.self, from: data)
-                answers.keep(data, name, args) // (a read: kept for next time, AnswerCache)
-                return answer
+                guard let text = raw as? String else { throw EngineError.unreadable }
+                return try await Engine.checked(text)
             } catch let e as EngineError {
                 throw e
-            } catch let e as DecodingError {
-                print("[Simpl] \(name) answer not understood:", e)
-                throw EngineError.unreadable
             } catch {
                 lastError = error
                 if attempt < 2 { try? await Task.sleep(nanoseconds: 400_000_000) }
             }
         }
         throw lastError
+    }
+
+    /// (1.3.78) The page's JSON text as data, or the error it says — off the main thread, as is the decoding.
+    private nonisolated static func checked(_ text: String) async throws -> Data {
+        guard let data = text.data(using: .utf8) else { throw EngineError.unreadable }
+        // (only an answer that starts as an object can be the page's { error })
+        if data.first == UInt8(ascii: "{"), let box = try? JSONDecoder().decode(ErrorBox.self, from: data), let message = box.error {
+            throw EngineError.page(message)
+        }
+        return data
+    }
+
+    private nonisolated static func decoded<V: Decodable>(_ data: Data, as type: V.Type) async throws -> V {
+        try JSONDecoder().decode(V.self, from: data)
     }
 
     /// (1.3.72) The Developer window's console: a call's answer as the page gives it, as JSON text.
@@ -562,50 +645,74 @@ final class Engine: ObservableObject, ShellListener {
 
     // MARK: - Where the window is
 
-    /// A place picked: shown at its root, the change cross-faded.
-    func go(_ place: Place, animated: Bool = true) {
-        OpenClock.navigated()
-        if animated {
-            withAnimation(.easeInOut(duration: 0.2)) { nav.go(place) }
+    /// A place picked: shown at its root. (1.3.78) A place in the same course deeper in it (its home to a section) is a
+    /// move deeper, and back to its home a move back; any other a move across (`moving`). `kind` says otherwise: a link
+    /// to a course is a move deeper.
+    func go(_ place: Place, animated: Bool = true, kind: PageMove.Kind? = nil) {
+        let here = nav.current.place
+        let way: PageMove.Kind
+        if let kind {
+            way = kind
+        } else if let ctx = place.ctx, ctx == here.ctx, place != here {
+            way = place.kind == "home" ? .back : (here.kind == "home" ? .deeper : .across)
         } else {
-            nav.go(place)
+            way = .across
         }
+        moving(way, animated: animated) { $0.go(place) }
         if case .home(let ctx) = place { Task { await loadSections(ctx) } }
         if case .section(let ctx, _) = place { Task { await loadSections(ctx) } }
     }
 
-    /// A screen pushed on the place showing (on the same short curve as Back and Forward).
+    /// A screen pushed on the place showing.
     func push(_ route: Route) {
-        OpenClock.navigated()
-        withAnimation(.easeInOut(duration: 0.2)) { nav.push(route) }
+        moving(.deeper) { $0.push(route) }
     }
 
     func goBack() {
-        OpenClock.navigated()
-        withAnimation(.easeInOut(duration: 0.2)) { nav.goBack() }
+        moving(.back) { $0.goBack() }
     }
 
     func goForward() {
+        moving(.deeper) { $0.goForward() }
+    }
+
+    /// (1.3.78) How the window last moved (PageMove): each screen arrives by it, and the one leaving goes by it.
+    @Published private(set) var move = PageMove()
+
+    /// (1.3.78) A move of the window's, timed (OpenClock) and told to the screens (`move`). A move to another place is
+    /// animated on the page spring: the page leaving goes the way the move goes as it fades (PageExit) while the new one
+    /// arrives (PageArrival). A move within a place swaps its screen at once — the stack keeps the one under it as it
+    /// was — and the screen on top arrives by itself, so a push and a Back move as the places do.
+    private func moving(_ kind: PageMove.Kind, animated: Bool = true, _ change: (inout Navigator) -> Void) {
+        var next = nav
+        change(&next)
+        guard next != nav else { return } // (the place showing, picked again)
         OpenClock.navigated()
-        withAnimation(.easeInOut(duration: 0.2)) { nav.goForward() }
+        let across = next.current.place.identity != nav.current.place.identity
+        PageMotion.leaving(kind)
+        var t = Transaction(animation: animated && across ? Motion.page : nil)
+        t.disablesAnimations = !(animated && across)
+        withTransaction(t) {
+            move = PageMove(kind: animated ? kind : .none, serial: move.serial + 1)
+            nav = next
+        }
     }
 
     /// A native screen by its route: a course, a group, a section, the Inbox and the roots are places in the sidebar;
     /// an assignment, a discussion, a page, a folder, a conversation are pushed on the place showing.
     func open(_ route: Route) {
         switch route {
-        case .course(let id): go(.home("courses/\(id)"))
-        case .group(let id): go(.home("groups/\(id)"))
+        case .course(let id): go(.home("courses/\(id)"), kind: .deeper)
+        case .group(let id): go(.home("groups/\(id)"), kind: .deeper)
         case .groups: go(.groups)
         case .inbox: go(.inbox)
         case .notifications: go(.notifications)
         case .calendar: go(.calendar)
-        case .section(let ctx, let kind): go(.section(ctx, kind))
+        case .section(let ctx, let kind): go(.section(ctx, kind), kind: .deeper)
         default:
             // (1.2.10) a course's screen opens in its course: the course chosen in the sidebar, the screen on it
             if let place = Engine.place(of: route), nav.current.place.ctx != place.ctx {
-                OpenClock.navigated()
-                withAnimation(.easeInOut(duration: 0.2)) { nav.push(route, in: place) }
+                moving(.deeper) { $0.push(route, in: place) }
                 if let ctx = place.ctx { Task { await loadSections(ctx) } }
             } else {
                 push(route)

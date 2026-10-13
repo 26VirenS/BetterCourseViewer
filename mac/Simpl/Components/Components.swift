@@ -495,10 +495,13 @@ enum Glyph {
 
 // MARK: - Loading
 
-/// A screen's state while its first answer is on the way, or when it could not be read.
+/// A screen's state while its first answer is on the way, or when it could not be read. (1.3.78) The spinner shows only
+/// once the wait is long enough to notice (a third of a second): an answer that comes sooner replaces an empty page, not
+/// a spinner that flashes.
 struct LoadState: View {
     let error: String?
     let retry: () -> Void
+    @State private var long = false
 
     var body: some View {
         if let error = error {
@@ -512,7 +515,13 @@ struct LoadState: View {
         } else {
             ProgressView()
                 .controlSize(.regular)
+                .opacity(long ? 1 : 0)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .task {
+                    try? await Task.sleep(nanoseconds: 330_000_000)
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.2)) { long = true }
+                }
         }
     }
 }
@@ -520,43 +529,63 @@ struct LoadState: View {
 /// A screen's data, read through the engine: its answer, its error, and a reload that keeps what is shown until the new
 /// answer is in (a redraw is not an arrival; an answer to something just done arrives on the house spring). (1.2) A
 /// screen opens on what it was told last time (AnswerCache) while the live answer is on its way: `kept` says so, and
-/// its counts wait for the live one (`liveCount()`).
+/// its counts wait for the live one (`liveCount()`). (1.3.78) Before that, on this session's own answer (AnswerMemo):
+/// a screen opened again, or read ahead, is whole at once — its page waits that moment before it arrives
+/// (PageArrival) — and is asked again only once that answer has gone stale: quietly, what changed moving into place.
 @MainActor
 final class Loader<T: Decodable>: ObservableObject {
     @Published var data: T?
     @Published var error: String?
     /// What is shown is what was kept from last time; the live answer is still on its way.
     @Published private(set) var kept = false
+    /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
+    private(set) var source = "fetched"
+    /// (1.3.78) What is shown is this screen's own answer (or a fresh one): a reload is a redraw, not an arrival.
+    private var settled = false
 
     func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
-        if data == nil, let k = engine.kept(name, args, as: T.self) {
-            var t = Transaction()
-            t.disablesAnimations = true
-            withTransaction(t) {
-                data = k
-                kept = true
+        if data == nil {
+            if let held = engine.recent(name, args, as: T.self) {
+                quietly {
+                    data = held.value
+                    source = "cached"
+                    settled = held.fresh
+                }
+            } else if let k = await engine.keptAnswer(name, args, as: T.self), data == nil {
+                quietly {
+                    data = k
+                    kept = true
+                    source = "kept"
+                }
             }
         }
+        // (answered moments ago, and nothing done since: nothing to ask)
+        if !animated, settled, data != nil, !AnswerMemo.sets(name, args), engine.recent(name, args, as: T.self)?.fresh == true { return }
         do {
-            let d = try await engine.call(name, args, as: T.self)
-            if animated || kept {
-                // (the live answer over the kept one: what changed moves to where it is now)
+            let d = try await engine.read(name, args, as: T.self)
+            if animated || (!settled && data != nil) {
+                // (the live answer over the kept one, or this session's earlier one: what changed moves to where it is now)
                 withAnimation(Motion.gentle) {
                     data = d
                     error = nil
                     kept = false
                 }
-                return
+            } else {
+                quietly {
+                    data = d
+                    error = nil
+                }
             }
-            var t = Transaction()
-            t.disablesAnimations = true
-            withTransaction(t) {
-                data = d
-                error = nil
-            }
+            settled = true
         } catch {
             if data == nil { self.error = error.localizedDescription }
         }
+    }
+
+    private func quietly(_ change: () -> Void) {
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t, change)
     }
 }
 

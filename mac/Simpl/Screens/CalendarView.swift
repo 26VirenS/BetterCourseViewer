@@ -22,6 +22,8 @@ struct CalendarView: View {
     @State private var asked = ""
     @State private var modeRead = false
     @State private var choosing = false
+    /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
+    @State private var source = "fetched"
     /// The way the last move went (the month slides in from that side): set a frame before the move itself, so the
     /// month leaving reads it as it leaves.
     @State private var dir = 1
@@ -76,12 +78,13 @@ struct CalendarView: View {
         }
         .navigationTitle("Calendar")
         .navigationSubtitle(periodTitle)
-        .openTimed("Calendar", ready: data != nil, source: "fetched")
+        .openTimed("Calendar", ready: data != nil, source: source)
         .toolbar { toolbarItems }
+        .onAppear(perform: seed)
         .task(id: engine.dataVersion) {
             if !modeRead {
                 modeRead = true
-                if let v = try? await engine.call("calView", as: OK.self).view, Self.modes.contains(v) { mode = v }
+                if let v = try? await engine.read("calView", as: OK.self).view, Self.modes.contains(v) { mode = v }
             }
             await load(animated: false)
         }
@@ -657,6 +660,11 @@ struct CalendarView: View {
 
     /// The span shown: six weeks round the month, the week, or three weeks from today.
     private var range: (Date, Date) {
+        Self.span(mode, anchor: anchor, weekStart: weekStart)
+    }
+
+    private static func span(_ mode: String, anchor: Date, weekStart: Date) -> (Date, Date) {
+        let cal = Calendar.current
         switch mode {
         case "week":
             return (weekStart, cal.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart)
@@ -669,14 +677,43 @@ struct CalendarView: View {
         }
     }
 
+    /// The calendar's read for a span, as the page takes it.
+    private static func args(_ span: (Date, Date)) -> [String: Any] {
+        let iso = ISO8601DateFormatter()
+        return ["from": iso.string(from: span.0), "to": iso.string(from: span.1)]
+    }
+
+    /// (1.3.78) What the Calendar opens on — its view as last chosen, the span round today — read ahead.
+    static func readAhead() -> ReadAhead.Ask? {
+        ReadAhead.Ask(key: "calendar|now") { engine in
+            let v = (try? await engine.read("calView", as: OK.self, quiet: true))?.view ?? "month"
+            let shown = Self.span(Self.modes.contains(v) ? v : "month", anchor: Self.monthStart(Date()), weekStart: Self.firstOfWeek(Date()))
+            _ = try? await engine.read("calendar", Self.args(shown), as: CalendarData.self, quiet: true)
+        }
+    }
+
+    /// (1.3.78) This session's answers at once (read ahead, or from a visit before): its view, and the span round today
+    /// in it — whole on its first frame, asked again only once stale.
+    private func seed() {
+        guard data == nil else { return }
+        if !modeRead, let v = engine.recent("calView", as: OK.self)?.value.view, Self.modes.contains(v) {
+            mode = v
+            modeRead = true
+        }
+        guard let held = engine.recent("calendar", Self.args(range), as: CalendarData.self) else { return }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) { data = held.value }
+        source = "cached"
+    }
+
     private func load(animated: Bool) async {
         let (s, e) = range
         let ask = "\(mode)|\(Int(s.timeIntervalSince1970))|\(Int(e.timeIntervalSince1970))"
         asked = ask
         loading = true
-        let iso = ISO8601DateFormatter()
         do {
-            let d = try await engine.call("calendar", ["from": iso.string(from: s), "to": iso.string(from: e)], as: CalendarData.self)
+            let d = try await engine.read("calendar", Self.args((s, e)), as: CalendarData.self)
             guard asked == ask else { return } // (a later move asked for another span)
             if data == nil || !animated {
                 var t = Transaction()
