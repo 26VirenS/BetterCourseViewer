@@ -1,2 +1,4 @@
 # The compiler warnings already known (scripts/dev/check-warnings.py): one a line, by file and words.
 # A build with a warning not here fails. Fixing one: after a full build, run the script with --write.
+mac/Simpl/Support/PhoneServer.swift: 'interfaceNames()' was deprecated in macOS 13.0: Use -[CWWiFiClient interfaceNames] instead
+mac/Simpl/Tools/Flashcards.swift: value 'finished' was defined but never used; consider replacing with boolean test
