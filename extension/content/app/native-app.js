@@ -2153,6 +2153,9 @@
   // (its navigation's tabs) and the ones found only in its assignments and module items — one row a tool, named as the
   // web's search names it (hub.js toolNameOf: the publisher by its address, else the words before the assignment
   // name's colon), with each course it is in and how to open it there (its tab, else an assignment, else a module item).
+  // (Mac 1.3.77, Windows 0.2.8) Each course also lists every place the tool is used there (`items`: its assignments,
+  // with their due dates and where the work stands, then its module items), for the app to offer the one to open; and
+  // each tool its count (`instances`) and the next of them still to do (`next`).
   async function externalTools() {
     const all = await store.courses().catch(() => null);
     if (!all) return { error: 'Your courses could not be loaded.' };
@@ -2161,48 +2164,69 @@
     const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const hostOf = (u) => { try { return new URL(u, location.origin).hostname.replace(/^www\./, ''); } catch { return ''; } };
     const nameOf = (url, title) => BCV.hub?.toolNameOf?.({ external_tool_tag_attributes: { url }, name: title }) || null;
+    const now = new Date();
     const tools = new Map();
-    const note = (name, host, c, open, kind) => {
+    const note = (name, host, c, open, kind, item) => {
       const key = norm(name);
       if (!key) return;
       const t = tools.get(key) || { id: key, name, host: '', kinds: [], courses: new Map(), assignments: 0 };
       if (!t.host && host && host !== location.hostname) t.host = host;
       if (!t.kinds.includes(kind)) t.kinds.push(kind);
       if (kind === 'Assignments') t.assignments += 1;
-      const had = t.courses.get(String(c.id));
-      // (a course's own tab opens it best; else the first assignment or module item found)
-      if (!had || (open.tool && !had.open.tool)) {
-        t.courses.set(String(c.id), { id: String(c.id), name: c.nickname || c.shortName || c.name || 'Course', color: c.color || GRAY, open: { course: String(c.id), ...open } });
+      let had = t.courses.get(String(c.id));
+      if (!had) {
+        had = { id: String(c.id), name: c.nickname || c.shortName || c.name || 'Course', color: c.color || GRAY, open: { course: String(c.id), ...open }, items: [] };
+        t.courses.set(String(c.id), had);
+      } else if (open.tool && !had.open.tool) {
+        // (a course's own tab opens it best; else the first assignment or module item found)
+        had.open = { course: String(c.id), ...open };
       }
+      if (item) had.items.push(item);
       tools.set(key, t);
     };
+    // (an assignment's place in the list: what is still to do, soonest first; then what has no date; then the rest,
+    // the latest first)
+    const rank = (a) => { const d = U.parse(a.due_at); const done = submittedA(a) || !!a.submission?.excused; return !done && d && d >= now ? [0, d.getTime()] : !d ? [1, 0] : [2, -d.getTime()]; };
     await Promise.all(cs.map(async (c) => {
       const [tabs, list, mods] = await Promise.all([store.tabs(c.id).catch(() => []), store.assignments(c.id).catch(() => []), store.modules(c.id).catch(() => [])]);
       for (const t of tabs || []) {
         if (t.hidden || !(t.type === 'external' || String(t.id || '').startsWith('context_external_tool'))) continue;
         const id = String(t.id || '').replace(/^context_external_tool_/, '');
-        if (/^\d+$/.test(id)) note(t.label || 'Tool', hostOf(t.html_url || ''), c, { tool: id }, 'Course navigation');
+        if (/^\d+$/.test(id)) note(t.label || 'Tool', hostOf(t.html_url || ''), c, { tool: id }, 'Course navigation', null);
       }
-      for (const a of list || []) {
-        if (!(a.submission_types || []).includes('external_tool')) continue;
+      const tooled = (list || []).filter((a) => a.published !== false && (a.submission_types || []).includes('external_tool'));
+      tooled.sort((x, y) => { const [a1, b1] = rank(x), [a2, b2] = rank(y); return a1 - a2 || b1 - b2; });
+      for (const a of tooled) {
         const url = a.external_tool_tag_attributes?.url || '';
         const host = hostOf(url);
         const name = nameOf(url, a.name) || host;
-        if (name) note(name, host, c, { assignment: String(a.id) }, 'Assignments');
+        const d = U.parse(a.due_at);
+        const item = {
+          kind: 'assignment', id: String(a.id), title: a.name || 'Untitled', due: a.due_at || null,
+          sub: [a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date', ptsOf(a.points_possible)].filter(Boolean).join(' · '),
+          status: statusOf(store.workStatus(a)), upcoming: !!(d && d >= now && !submittedA(a)),
+        };
+        if (name) note(name, host, c, { assignment: String(a.id) }, 'Assignments', item);
       }
       for (const m of mods || []) {
         for (const it of m.items || []) {
           if (it.type !== 'ExternalTool') continue;
           const host = hostOf(it.external_url || '');
           const name = nameOf(it.external_url || '', it.title) || host;
-          if (name) note(name, host, c, { moduleItem: String(it.id) }, 'Modules');
+          const item = { kind: 'moduleItem', id: String(it.id), title: it.title || 'Untitled', due: null, sub: m.name ? `In ${m.name}` : 'In Modules', status: null, upcoming: false };
+          if (name) note(name, host, c, { moduleItem: String(it.id) }, 'Modules', item);
         }
       }
     }));
-    const rows = [...tools.values()].map((t) => ({
-      id: t.id, name: t.name, host: t.host, kinds: t.kinds, assignments: t.assignments,
-      courses: [...t.courses.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    const rows = [...tools.values()].map((t) => {
+      const courses = [...t.courses.values()].sort((a, b) => a.name.localeCompare(b.name));
+      const items = courses.flatMap((c) => c.items.map((i) => ({ ...i, course: c.name })));
+      const next = items.filter((i) => i.upcoming).sort((a, b) => U.parse(a.due) - U.parse(b.due))[0] || null;
+      return {
+        id: t.id, name: t.name, host: t.host === t.name ? '' : t.host, kinds: t.kinds, assignments: t.assignments,
+        instances: items.length, next: next ? { title: next.title, sub: next.sub, course: next.course } : null, courses,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
     return { rows, sub: `${U.plural(rows.length, 'tool')} across ${U.plural(cs.length, 'course')}`, empty: 'None of your courses has an external tool.' };
   }
 

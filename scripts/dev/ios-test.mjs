@@ -452,9 +452,13 @@ try {
   // tool found only in an assignment (Knewton Alta, named from its title), each with the courses it is in and how to open it
   const et = await nc('externalTools');
   const rp = et.rows?.find((t) => t.name === 'Resources & Policy'), ka = et.rows?.find((t) => t.name === 'Knewton Alta');
+  const kaSprk = ka?.courses.find((c) => c.id === '104');
   check(!et.error && !!rp && rp.courses.length >= 2 && rp.courses.every((c) => c.open.tool === '9' && c.open.course === c.id) && rp.kinds.includes('Course navigation')
-    && !!ka && ka.courses.length === 1 && ka.courses[0].open.assignment === '4003' && ka.assignments >= 1 && ka.kinds.includes('Assignments'),
-    `external tools: a course's own and one found only in an assignment, with where to open each (${JSON.stringify(et.rows?.map((t) => [t.name, t.courses.length, t.kinds.join('+')]))})`);
+    && !!ka && ka.courses.length === 2 && kaSprk?.open.assignment === '4003' && ka.assignments === 5 && ka.kinds.includes('Assignments')
+    // (Mac 1.3.77, Windows 0.2.8) every place it is used, to choose from: still to do soonest first, then what is done
+    && ka.instances === 5 && kaSprk.items.map((i) => i.id).join() === '4003,4011,4012,4010' && kaSprk.items.every((i) => i.kind === 'assignment' && i.title && i.sub)
+    && ka.next?.title === 'Knewton Alta: Unit 2' && rp.instances === 0 && rp.courses.every((c) => c.items.length === 0),
+    `external tools: a course's own and one found only in assignments, with where to open each and every place it is used (${JSON.stringify(et.rows?.map((t) => [t.name, t.courses.length, t.kinds.join('+'), t.instances, t.next?.title]))}, ${JSON.stringify(kaSprk?.items?.map((i) => i.id))})`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });
