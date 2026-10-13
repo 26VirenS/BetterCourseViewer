@@ -12,7 +12,7 @@ struct BiomolLipidPage: View {
     @Environment(\.colorScheme) private var scheme
 
     private static let choices: [(id: String, title: String, colour: Color?)] =
-        BiomolLipid.codes.map { (id: $0, title: BiomolLipid.shortName($0), colour: Color?.none) } + [(id: "STE+OLA", title: "Saturated vs unsaturated", colour: Color?.none)]
+        BiomolLipid.codes.map { (id: $0, title: BiomolLipid.shortName($0), colour: Color?.none) } + [(id: "STE+OLA", title: "Stearic vs oleic", colour: Color?.none)]
 
     private var codes: [String] { s.lipid == "STE+OLA" ? ["STE", "OLA"] : [s.lipid] }
 
@@ -126,8 +126,27 @@ struct BiomolLipidPage: View {
                     BioFactRow(label: "Trans fats", text: "A trans double bond leaves the chain straight despite the double bond, so trans fats pack like saturated ones.")
                 }
             }
+            BiomolPartsList(items: parts)
             BiomolColourLegend(items: legend)
         }
+    }
+
+    /// The lipid's parts for the list (stearic and oleic acids: each molecule and the cis bond).
+    private var parts: [(id: String, title: String)] {
+        if codes.count == 2 {
+            return [(id: "mol:0", title: "Stearic acid"), (id: "mol:1", title: "Oleic acid"), (id: "mol:1:cis", title: "cis double bond")]
+        }
+        guard let m = BioData.molecule(codes[0]) else { return [] }
+        var out: [(id: String, title: String)] = []
+        var seen = Set<String>()
+        for a in m.atoms {
+            let d = BiomolLipid.detail(a.name, in: m)
+            guard !d.isEmpty, seen.insert(d).inserted else { continue }
+            out.append((id: "part:" + d.lowercased().replacingOccurrences(of: " ", with: "-"), title: d))
+        }
+        if !BiomolLipid.esterBonds(m.code).isEmpty { out.append((id: "ester", title: "Ester bonds (\(BiomolLipid.esterBonds(m.code).count))")) }
+        if !BiomolLipid.cisBonds(m.code).isEmpty { out.append((id: "cis", title: "cis double bond")) }
+        return out
     }
 
     private func notes(_ code: String) -> [(String, String)] {

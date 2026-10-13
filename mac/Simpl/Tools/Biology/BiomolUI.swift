@@ -244,6 +244,43 @@ struct BiomolAtomCard: View {
     }
 }
 
+/// What the 3D view shows, as a list (§9 Accessibility): pressing a part selects it there, as a click or its label does,
+/// and its card shows — so the parts are reachable from the keyboard and by VoiceOver.
+struct BiomolPartsList: View {
+    let items: [(id: String, title: String)]
+    @ObservedObject private var s = BiomolState.shared
+
+    var body: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                BioHeading("Parts")
+                    .padding(.bottom, 4)
+                ForEach(items.indices, id: \.self) { i in
+                    let it = items[i]
+                    let on = s.selection == it.id
+                    Button {
+                        withAnimation(Motion.snappy) { s.selection = on ? nil : it.id }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(it.title).font(.sCallout).lineLimit(1)
+                            Spacer(minLength: 4)
+                            if on { Image(systemName: "checkmark").font(.sCaption.weight(.semibold)).foregroundStyle(Theme.accent) }
+                        }
+                        .padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(on ? "Let go of it in the 3D view (Escape)" : "Select it in the 3D view")
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card(radius: 14)
+        }
+    }
+}
+
 /// A short note under a column's controls.
 struct BiomolNote: View {
     let text: String

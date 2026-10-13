@@ -126,6 +126,9 @@ struct BiomolNucleicPage: View {
                     BioFactRow(label: "Energy", text: "Its two outer phosphate bonds hold energy the cell spends: ATP → ADP + phosphate.")
                 }
             }
+            BiomolPartsList(items: [(id: "part:phosphate", title: code == "ATP" ? "Phosphates" : "Phosphate"),
+                                    (id: "part:sugar", title: deoxy ? "Deoxyribose" : "Ribose"),
+                                    (id: "part:base", title: "Base: \(BiomolNucleotide.baseName(letter).lowercased())")])
             BiomolColourLegend(items: legend(letter))
         }
     }
@@ -275,8 +278,19 @@ struct BiomolNucleicPage: View {
                     BioFactRow(label: "Antiparallel", text: "Strand 2 pairs base for base (A·T, G·C) but runs 3′→5′ beside it. Written 5′→3′ it is \(BioSeq.reverseComplement(seq)) (the reverse complement).")
                 }
             }
+            if n > 0 { BiomolPartsList(items: strandParts(n)) }
             BiomolColourLegend(items: legend())
         }
+    }
+
+    private func strandParts(_ n: Int) -> [(id: String, title: String)] {
+        var out: [(id: String, title: String)] = [(id: "nt:1:0", title: "5′ end (phosphate)"), (id: "nt:1:\(n - 1)", title: "3′ end (–OH)")]
+        if n > 1 { out.append((id: "pdiester", title: "Phosphodiester bonds (\(n - 1))")) }
+        if s.complement {
+            out.append((id: "nt:2", title: "Complementary strand"))
+            out.append((id: "bp", title: "Base-pair H-bonds"))
+        }
+        return out
     }
 
     private func legend() -> [(color: Color, text: String)] {

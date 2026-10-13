@@ -20,8 +20,10 @@ struct BiomolCarbPage: View {
     var body: some View {
         PTWorkLayout {
             VStack(alignment: .leading, spacing: 14) {
-                BiomolModePicker(items: [(BiomolState.CarbMode.mono, "Monosaccharides"), (.di, "Disaccharides"), (.poly, "Polysaccharides")],
-                                 selection: $s.carbMode)
+                let modes: [(id: BiomolState.CarbMode, title: String, colour: Color?)] = [
+                    (id: .mono, title: "Monosaccharides", colour: nil), (id: .di, title: "Disaccharides", colour: nil), (id: .poly, title: "Polysaccharides", colour: nil),
+                ]
+                BiomolChoices(items: modes, selected: s.carbMode, columns: 1) { s.carbMode = $0 }
                 switch s.carbMode {
                 case .mono: monoControls
                 case .di: diControls
@@ -133,6 +135,9 @@ struct BiomolCarbPage: View {
                     if code == "FRU" { BioFactRow(label: "Fructose", text: "A five-membered ring: its C=O was at C2. With glucose it makes sucrose.") }
                 }
             }
+            BiomolPartsList(items: s.compareAnomers ? [(id: "alpha", title: "α-glucose"), (id: "beta", title: "β-glucose")]
+                            : [(id: "part:ring", title: "Ring"), (id: "part:anomeric", title: "Anomeric –OH"),
+                               (id: "part:ch2oh", title: "CH₂OH"), (id: "part:oh", title: "Other –OH groups")])
             BiomolColourLegend(items: s.colourBy == .element ? BiomolColourLegend.elements(["C", "H", "O"])
                                : BiomolColourLegend.parts([BiomolScenes.ringPart, BiomolScenes.anomericPart, BiomolScenes.referencePart, BiomolScenes.hydroxylPart]))
         }
@@ -231,6 +236,8 @@ struct BiomolCarbPage: View {
                         .font(.sCallout).fixedSize(horizontal: false, vertical: true)
                 }
             }
+            BiomolPartsList(items: [(id: "res:0", title: names.first), (id: "res:1", title: names.second)]
+                            + (s.split ? [] : [(id: "glyco", title: "Glycosidic bond")]))
             BiomolColourLegend(items: s.colourBy == .element ? BiomolColourLegend.elements(["C", "H", "O"])
                                : [(BiomolSugar.residueColours[0].color, names.first), (BiomolSugar.residueColours[1].color, names.second),
                                   (BiomolParts.bondHighlight.color, s.split ? "Atoms from water" : "Glycosidic bond")])

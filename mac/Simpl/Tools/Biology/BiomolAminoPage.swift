@@ -160,6 +160,8 @@ struct BiomolAminoPage: View {
                     }
                 }
             }
+            BiomolPartsList(items: [(id: "part:amino", title: "Amino group"), (id: "part:alpha", title: "α-carbon"),
+                                    (id: "part:carboxyl", title: "Carboxyl group"), (id: "part:r", title: "R group (side chain)")])
             BiomolColourLegend(items: legend(aa, model: model, look: look))
         }
     }

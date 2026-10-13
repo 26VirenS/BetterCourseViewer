@@ -74,17 +74,18 @@ struct BiomolProteinPage: View {
                 BioHeading("Secondary structure")
                 HStack(spacing: 6) {
                     ForEach([BiomolSS.coil, .helix, .strand], id: \.self) { ss in brushButton(ss) }
-                    Menu {
-                        ForEach([BiomolSS.parallel, .helix310, .leftHelix], id: \.self) { ss in
-                            Button(ss.label) { s.brush = ss }
-                        }
-                    } label: {
-                        Text([BiomolSS.parallel, .helix310, .leftHelix].contains(s.brush) ? s.brush.label : "More")
-                    }
-                    .menuStyle(.button)
-                    .fixedSize()
-                    .help("Rarer structures: parallel β-strand, 3₁₀ helix, left-handed α-helix")
                 }
+                Menu {
+                    ForEach([BiomolSS.parallel, .helix310, .leftHelix], id: \.self) { ss in
+                        Button(ss.label) { s.brush = ss }
+                    }
+                } label: {
+                    Text([BiomolSS.parallel, .helix310, .leftHelix].contains(s.brush) ? "Painting: \(s.brush.label)" : "Other structures")
+                        .font(.sCallout)
+                }
+                .menuStyle(.button)
+                .fixedSize()
+                .help("Rarer structures: parallel β-strand, 3₁₀ helix, left-handed α-helix")
                 chips
                 BiomolNote(text: "Pick a structure, then press or drag across residues to give it to them.")
                 HStack(spacing: 6) {
@@ -149,8 +150,9 @@ struct BiomolProteinPage: View {
         Button { s.brush = ss } label: {
             HStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 2).fill(BioPalette.secondary(ss.cartoon).color).frame(width: 10, height: 10)
-                Text(ss.label).font(.sCallout.weight(.medium)).lineLimit(1)
+                Text(ss.label).font(.sCallout.weight(.medium)).lineLimit(1).minimumScaleFactor(0.8)
             }
+            .frame(maxWidth: .infinity)
         }
         .glassButton(prominent: s.brush == ss)
         .help("Paint residues as \(ss.label.lowercased()) (φ \(Int(ss.angles.phi))°, ψ \(Int(ss.angles.psi))°)")
@@ -277,6 +279,8 @@ struct BiomolProteinPage: View {
                 BioFactRow(label: "What holds it", text: "H-bonds between the backbone N–H of one strand and the C=O of the next — not the side chains, which point above and below the sheet.")
                 BioFactRow(label: "In real proteins", text: "Strands of a sheet come from different parts of one chain, joined by turns and loops.")
             }
+            BiomolPartsList(items: [(id: "sheet:0", title: "Strand 1"), (id: "sheet:1", title: "Strand 2"), (id: "sheet:2", title: "Strand 3"),
+                                    (id: "sheet:hbond", title: "H-bonds between strands")])
         }
     }
 
@@ -340,8 +344,20 @@ struct BiomolProteinPage: View {
                     BioFactRow(label: "Proline in a strand", text: "Proline's ring holds its φ near −65°, so in a strand it is built with the coil's φ.")
                 }
             }
+            BiomolPartsList(items: peptideParts(p))
             BiomolColourLegend(items: peptideLegend(p))
         }
+    }
+
+    /// The peptide's parts for the list: its helices and strands, its H-bonds, its peptide bonds (coloured by part).
+    private func peptideParts(_ p: BiomolPeptide) -> [(id: String, title: String)] {
+        var out: [(id: String, title: String)] = []
+        for (k, sg) in BiomolScenes.segmentOf(p).segments.enumerated() where sg.kind != "C" {
+            out.append((id: "ss:\(k)", title: "\(BiomolCartoon.name(sg.kind)), residues \(sg.first + 1)–\(sg.last + 1)"))
+        }
+        if s.hBonds && !p.hBonds.isEmpty { out.append((id: "hbond", title: "Backbone H-bonds (\(p.hBonds.count))")) }
+        if s.colourBy == .part && s.ribbon != .only && p.count > 1 { out.append((id: "pbond", title: "Peptide bonds (\(p.count - 1))")) }
+        return out
     }
 
     private func peptideSelection(_ id: String, _ p: BiomolPeptide) -> some View {
@@ -379,6 +395,15 @@ struct BiomolProteinPage: View {
         let parts = id.split(separator: ":")
         guard parts.count >= 2, parts[0] == "ss" else { return nil }
         return Int(parts[1])
+    }
+
+    /// Ubiquitin's helix and strands, for the parts list.
+    private var ubiquitinParts: [(id: String, title: String)] {
+        var out: [(id: String, title: String)] = [(id: "res:1", title: "N-terminus (Met1)"), (id: "res:76", title: "C-terminus (Gly76)")]
+        for (k, sg) in BiomolCartoon.segments(BiomolProteins.ubiquitinSS).enumerated() where sg.kind != "C" {
+            out.append((id: "ss:\(k)", title: "\(BiomolCartoon.name(sg.kind)), residues \(sg.first + 1)–\(sg.last + 1)"))
+        }
+        return out
     }
 
     private var quaternaryLegend: [(color: Color, text: String)] {
@@ -542,6 +567,8 @@ struct BiomolProteinPage: View {
                 Text("Extended strands side by side, H-bonded backbone to backbone. Side chains point above and below the sheet.")
                     .font(.sCallout).fixedSize(horizontal: false, vertical: true)
             }
+            BiomolPartsList(items: [(id: "helix:ss", title: "α-helix"), (id: "helix:hbond", title: "The helix's H-bonds"),
+                                    (id: "sheet:0", title: "β-sheet, strand 1"), (id: "sheet:hbond", title: "The sheet's H-bonds")])
             BiomolColourLegend(items: BiomolColourLegend.elements(["C", "H", "N", "O"]) + [(BioPalette.hBond.color, "H-bond (dashed)")])
         }
     }
@@ -585,6 +612,7 @@ struct BiomolProteinPage: View {
             }
             .padding(14)
             .card(radius: 14)
+            if !s.denatured && !s.renaturing { BiomolPartsList(items: ubiquitinParts) }
             BiomolColourLegend(items: [(BioPalette.helix.color, "α-helix"), (BioPalette.strand.color, "β-strand"), (BioPalette.coil.color, "Loop")])
         }
     }
@@ -617,6 +645,8 @@ struct BiomolProteinPage: View {
                 BioFactRow(label: "Sickle cell", text: "β6 Glu → Val (Glu6Val in the mature chain; codon 7 counting the first Met, p.Glu7Val). Valine is nonpolar, so deoxy haemoglobin S sticks together in fibres.")
                 BioFactRow(label: "The gene", text: "The β chains' sequence here is the HBB gene's protein without its first Met.")
             }
+            BiomolPartsList(items: [(id: "chain:A", title: "α₁ chain"), (id: "chain:B", title: "β₁ chain"), (id: "chain:C", title: "α₂ chain"),
+                                    (id: "chain:D", title: "β₂ chain"), (id: "heme", title: "The four hemes"), (id: "glu6", title: "β6 Glu (both β chains)")])
             BiomolColourLegend(items: quaternaryLegend)
         }
     }

@@ -212,29 +212,57 @@ final class BiomolState: ObservableObject {
         buildSerial += 1
         let serial = buildSerial
         let seq = sequence, ss = structure, form = ph7
-        let old = peptide
+        let old = rawPeptide
         Task.detached(priority: .userInitiated) {
             let p = BiomolPeptideBuilder.build(seq, ss: ss, ph7: form)
             await MainActor.run {
                 let me = BiomolState.shared
                 guard me.buildSerial == serial else { return }
-                me.peptide = p
-                me.peptideVersion += 1
+                me.rawPeptide = p
                 me.reframePeptide(p)
+                me.peptide = me.laidOut(p)
+                me.peptideVersion += 1
                 if let change, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-                    me.play(BiomolMotionState(kind: change, serial: 0, oldPeptide: old))
+                    me.play(BiomolMotionState(kind: change, serial: 0, oldPeptide: old.map { me.laidOut($0) }))
+                } else if me.motion(.init([.peptideAdded, .peptideRemoved])) != nil {
+                    // (built again for another reason while a residue was still sliding: the motion is over)
+                    me.motion = nil
                 }
             }
         }
     }
 
-    /// The camera frames the peptide afresh when it has grown out of the ball last framed, or shrunk well inside it.
+    /// The peptide as the builder made it (N at the origin), before it is laid out for the view.
+    private var rawPeptide: BiomolPeptide?
+    /// How the peptide is laid out: its long axis along x (N-terminus left, so it grows to the right), centred; a turn
+    /// (rows) and the centre it turns about, chosen again only when the camera frames afresh (so a residue added or
+    /// taken off does not move the rest).
+    private var layout: (rows: [[Double]], centre: BioVec) = ([[1, 0, 0], [0, 1, 0], [0, 0, 1]], BioVec(0, 0, 0))
+
+    private func laidOut(_ p: BiomolPeptide) -> BiomolPeptide { p.moved(by: -layout.centre).transformed(layout.rows, BioVec(0, 0, 0)) }
+
+    /// The camera frames the peptide afresh when it has grown out of the ball last framed, or shrunk well inside it; the
+    /// layout is chosen again then (the CA trace's principal axes: the longest along x, pointing N → C, the next along y).
     private func reframePeptide(_ p: BiomolPeptide) {
-        let b = BioV.boundingSphere(p.caTrace)
+        let ca = p.caTrace
+        let b = BioV.boundingSphere(ca)
         let r = b.radius + 6
         if let f = framed, BioV.distance(b.centre, f.centre) + r <= f.radius * 1.1, r >= f.radius * 0.55 { return }
         framed = (b.centre, r)
         peptideFrame += 1
+        guard ca.count >= 3 else { layout = ([[1, 0, 0], [0, 1, 0], [0, 0, 1]], BiomolMath.centroid(ca)); return }
+        let c = BiomolMath.centroid(ca)
+        var cov = [[Double]](repeating: [0, 0, 0], count: 3)
+        for q in ca {
+            let d = [q.x - c.x, q.y - c.y, q.z - c.z]
+            for i in 0..<3 { for j in 0..<3 { cov[i][j] += d[i] * d[j] } }
+        }
+        let axes = BiomolMath.eigenSymmetric3(cov).vectors
+        var x = axes[0], y = axes[1]
+        if BioV.dot(x, ca[ca.count - 1] - ca[0]) < 0 { x = -x }
+        if y.y < 0 { y = -y }
+        let z = BioV.cross(x, y)
+        layout = ([[x.x, x.y, x.z], [y.x, y.y, y.z], [z.x, z.y, z.z]], c)
     }
 
     // MARK: The strand
