@@ -390,6 +390,11 @@ internal sealed class PhoneHandIn
         async Task Run()
         {
             try { await before; } catch { }
+            try { await Make(); }
+            catch (Exception e) { Log.Write("phone hand-in: photos: " + e.Message); }
+        }
+        async Task Make()
+        {
             var page = await PhotoPdf.Make(data);
             if (page == null) { it.State = "unreadable"; Repaint(it); return; }
             pages.Add(page);
@@ -574,7 +579,9 @@ internal sealed class PhoneHandIn
     {
         var i = items.IndexOf(it);
         if (i < 0 || i >= list.Children.Count) return;
-        list.Children[i] = Row(it);
+        // (a panel's child is taken out before another goes in its place: WPF will not set one over another)
+        list.Children.RemoveAt(i);
+        list.Children.Insert(i, Row(it));
     }
 
     /// <summary>A file from the phone: its picture, its name, and where it is — coming (with its progress), in the hand-in,
