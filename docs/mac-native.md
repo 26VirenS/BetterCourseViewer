@@ -207,6 +207,15 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `scripts/dev/mac-shots.sh` pictures the table coloured by electronegativity with its trends, carbon's and iron's pages,
   the Lewis maker and the builder (`-SimplPTColour`, `-SimplPTTrends`, `-SimplPTElement`, `-SimplPTPage`,
   `-SimplPTMolecule`).
+- **The biology toolkit (1.3.78).** Ten tools under a *Biology* heading on the Tools page (Cell Explorer, DNA & RNA,
+  Gene Expression, Biomolecule Builder, Genetics Crosses, Cell Division, Hardy–Weinberg, Bio Lab Calculator, Enzyme
+  Lab, Photosynthesis & Respiration), each pinnable, each in a file of its own in `Tools/Biology/`, on a shared
+  foundation: the specification's datasets copied in by a script and parsed on first use, the sequence model, B-DNA
+  atom by atom, exact crosses, chi-square, SplitMix64, procedural meshes with a cutaway made in geometry, a SceneKit
+  view with picking, hover, selection and labels with leader lines, a step-through with its keys, and §3.8's colours
+  (`Tools/Biology/Model` is Foundation only and checked by CI's Models job, with the toolkit's self-check). A launch
+  opens a tool in a state for pictures: `-SimplTool cell -SimplToolState plant:cutaway`; `-SimplBioCheck YES` prints
+  the self-check. The foundation's API, for the tools' builders: `docs/mac-biology.md`.
   (1.3.55) The Lewis and 3D builders' presets are one grouped dropdown each (`PresetMenu`; `LewisPresets.sections`,
   `MoleculeModel.presetSections`) instead of rows of chips, and an element (the central atom, or the one to draw) is a
   card — symbol, name, valence electrons, most it holds — with a Change menu of the main-group elements by group

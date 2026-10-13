@@ -4,15 +4,18 @@ import UniformTypeIdentifiers
 
 // Tools (1.2): the things Simpl does on its own, as the web's Tools page has them — a citation generator, a focus timer,
 // a calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge & split PDFs, a PDF
-// annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them. One row
-// in the sidebar opens a page of tiles; a tile opens its
-// tool in the window. Any tool can be pinned: it then sits in the toolbar on every screen and opens a compact version of
-// itself in a popover (PinnedTools.swift). Everything a tool keeps stays on this Mac; nothing is sent to Canvas.
+// annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them, and
+// (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift). One row in the sidebar opens
+// a page of tiles; a tile opens its tool in the window. Any tool can be pinned: it then sits in the toolbar on every
+// screen and opens a compact version of itself in a popover (PinnedTools.swift). Everything a tool keeps stays on this
+// Mac; nothing is sent to Canvas.
 
 /// A tool: its key (the web's own, so a pin means the same thing on both), its name, the line under it, its symbol and
 /// its colour (used for its tile and its pin, nothing else).
 enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     case cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc
+    // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
+    case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
 
     var id: String { rawValue }
 
@@ -30,6 +33,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "PDF annotator"
         case .ocr: return "Image to text"
         case .fc: return "Flashcards"
+        default: return BioTools.info(self).name
         }
     }
 
@@ -48,6 +52,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "Mark up"
         case .ocr: return "Image to text"
         case .fc: return "Flashcards"
+        default: return BioTools.info(self).shortName
         }
     }
 
@@ -65,6 +70,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "Highlight and add notes, saved in the file."
         case .ocr: return "Read the words off a picture or a scan."
         case .fc: return "Make a set. Flip, learn, test, match."
+        default: return BioTools.info(self).note
         }
     }
 
@@ -82,6 +88,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "highlighter"
         case .ocr: return "text.viewfinder"
         case .fc: return "rectangle.on.rectangle.angled"
+        default: return BioTools.symbol(self)
         }
     }
 
@@ -99,6 +106,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "#e5a500"
         case .ocr: return "#00b3a4"
         case .fc: return "#0a84ff"
+        default: return BioTools.info(self).hex
         }
     }
 
@@ -111,6 +119,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .cite: return 400
         case .graph: return 360
         case .fc: return 340
+        case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: return BioTools.popoverWidth(self)
         default: return 330
         }
     }
@@ -274,22 +283,32 @@ struct ToolsView: View {
     }
 }
 
-/// The page of tiles: every tool, a press opening it, its pin at its corner.
+/// The page of tiles: every tool, a press opening it, its pin at its corner — (1.3.78) the biology toolkit's under a
+/// heading of their own, after the rest.
 struct ToolsGrid: View {
     @ObservedObject private var tools = ToolsCenter.shared
 
     var body: some View {
-        Page {
-            ScreenHeading(title: "Tools", sub: "Handy things, right here. Pin one and it sits in the toolbar on every screen.")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                ForEach(ToolKind.allCases) { k in
-                    ToolTile(kind: k)
+        ScrollViewReader { proxy in
+            Page {
+                ScreenHeading(title: "Tools", sub: "Handy things, right here. Pin one and it sits in the toolbar on every screen.")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                    ForEach(ToolKind.allCases.filter { !$0.isBiology }) { k in
+                        ToolTile(kind: k)
+                    }
+                }
+                BioToolsSection()
+                if tools.pinned.isEmpty {
+                    Label("Press a tile’s pin to keep that tool in the toolbar. Its button there opens a quick version of it.", systemImage: "pin")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
                 }
             }
-            if tools.pinned.isEmpty {
-                Label("Press a tile’s pin to keep that tool in the toolbar. Its button there opens a quick version of it.", systemImage: "pin")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
+            .task {
+                // (the screenshot suite: -SimplToolsScroll biology, the page scrolled to the Biology section)
+                guard UserDefaults.standard.string(forKey: "SimplToolsScroll") == "biology" else { return }
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                proxy.scrollTo("biology", anchor: .top)
             }
         }
     }
@@ -394,6 +413,7 @@ struct ToolScreen: View {
         case .mark: PDFAnnotatorTool()
         case .ocr: ImageToTextTool()
         case .fc: FlashcardsTool()
+        case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: BioToolScreen(kind: kind)
         }
     }
 }
@@ -439,8 +459,9 @@ struct ToolHeader: View {
                 }
             }
             Spacer(minLength: 12)
-            // (1.3.54) the Periodic Table's search, left of its pin
+            // (1.3.54) the Periodic Table's search, left of its pin; (1.3.78) a biology tool's pages
             if kind == .ptable { PTHeaderControls() }
+            if kind.isBiology { BioHeaderControls(kind: kind) }
             Button {
                 tools.togglePin(kind)
             } label: {

@@ -249,6 +249,10 @@ if [ "${SHOTS:-full}" = quick ]; then
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
   shoot dark-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
+  # (1.3.78) the Tools page's Biology section, with the toolkit's self-check on its console; a biology tool on the page
+  # its launch asked for (-SimplTool <key> -SimplToolState <page>[:…])
+  SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES
+  SIZE=1440x920 shoot light-56-bio-tool 12 -SimplPlace tools -SimplTool dna -SimplToolState sequence
   phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
   wait
   walks
@@ -298,6 +302,7 @@ for MODE in light dark; do
   shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
+  SIZE=1440x920 shoot "$MODE-56-bio-tool" 12 -SimplPlace tools -SimplTool dna -SimplToolState sequence # (1.3.78)
 done
 # (1.2) in light only: more of the redesign, and the narrow window's layouts
 MODE=light
@@ -315,6 +320,7 @@ shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptab
 shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
 shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
 shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
+SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
 SIZE=940x820 shoot light-40-narrow-dashboard 14
 SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
 SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox

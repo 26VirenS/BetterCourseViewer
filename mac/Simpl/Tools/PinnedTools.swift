@@ -200,6 +200,9 @@ struct PinnedToolQuick: View {
             fileDrop(title: "Click to add a PDF", sub: "Highlight, underline and add notes; saved in the PDF.", multiple: false)
         case .ocr:
             fileDrop(title: "Click to add a picture", sub: "The words in a picture or a scan, as text you can copy.", multiple: false)
+        case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy:
+            // (1.3.78) the biology tools': Biology/BioTools.swift
+            BioQuick(kind: kind) { openFull($0, []) }
         }
     }
 
