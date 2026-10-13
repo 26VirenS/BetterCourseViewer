@@ -1,8 +1,9 @@
 # Simpl for Windows, made again in Windows 11's look (windows/SimplFluent: WPF with WPF-UI — Mica, the Settings app's
 # navigation and cards, Fluent icons): built on a Windows runner, made into an installer (Simpl-Setup.exe, Inno Setup:
-# windows/SimplFluent/Installer/Simpl.iss) that is tried — installed, opened, pictured, updated over an open Simpl as
-# Restart to Update runs it, an update that cannot finish, uninstalled with Simpl open, installed again and uninstalled
-# from Simpl's own Settings — pictured against
+# windows/SimplFluent/Installer/Simpl.iss) that is tried — installed, opened, pictured, an update that comes by itself
+# (held by a quiz, put in once it closes, Simpl opened again where it was), updated over an open Simpl as Restart to
+# Update runs it, an update that cannot finish, uninstalled with Simpl open, installed again and uninstalled from
+# Simpl's own Settings — pictured against
 # the mock Canvas, and — when a commit asks for it with "[preview]" in its message, or by hand (Run workflow) —
 # published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
 # real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
@@ -32,6 +33,10 @@ on:
         description: Or publish this green run (its id), whatever its commit
         type: string
         default: ''
+      critical:
+        description: A Critical Update (every installed Simpl puts it in at its next check, whatever its update settings)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -387,6 +392,17 @@ jobs:
           Shot 'settings-signin-hello' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--hello-state', 'locked'))
           Shot 'settings-signin-nohello' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--hello-state', 'none'))
           Shot 'settings-data-hello' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'data', '--hello-state', 'locked'))
+          # Updates, an update played through against a local file (--update-test, windows/SimplFluent/Support/Updates.cs:
+          # the build's own Simpl.exe as the next version's installer, never run in a picture): downloaded and waiting for
+          # a quiz, as an installed copy has it, in Settings > Updates light and dark; what a copy run from its zip says;
+          # the notice over a quiz an update waits for, a Critical Update's, and an update going in
+          $next = @('--update-test', (Join-Path $PWD 'dist\Simpl\Simpl.exe'))
+          Shot 'settings-updates-waiting' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-hold', 'quiz', '--open', 'settings', '--settings-tab', 'updates'))
+          Shot 'settings-updates-waiting-dark' '1024x681' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-hold', 'quiz', '--open', 'settings', '--settings-tab', 'updates'))
+          Shot 'settings-updates-zip' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'updates'))
+          Shot 'update-waiting-quiz' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--open', 'quiz:101:9011'))
+          Shot 'update-critical-quiz' '1366x778' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-critical', '--open', 'quiz:101:9011'))
+          Shot 'update-restarting' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed'))
           foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
           Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
@@ -763,7 +779,7 @@ jobs:
           for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8802/login/canvas && break; sleep 0.5; done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
           curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
-      - name: Installer, tried (installed, opened, updated over a running Simpl, a failed update, uninstalled, uninstalled from Simpl)
+      - name: Installer, tried (installed, opened, an update by itself, updated over a running Simpl, a failed update, uninstalled, uninstalled from Simpl)
         shell: pwsh
         run: |
           $setupLog = Join-Path $env:RUNNER_TEMP 'installer-setup.log'
@@ -860,6 +876,61 @@ jobs:
           if (-not (Test-Path $shot) -or (Get-Item $shot).Length -lt 10000) { Fail "the installed Simpl made no picture of the Dashboard" }
           if (-not (Test-Path $log) -or -not (Select-String -Path $log -Pattern 'starting \(installed\)' -Quiet)) { Fail "the installed Simpl does not know it was installed" }
           Start-Sleep -Seconds 2   # (its web view's helper processes end a moment after it)
+
+          # 2b. an update that comes by itself, as an installed Simpl meets one (--update-test, Support/Updates.cs: the
+          #     installer just made, played as the next version): found and downloaded at once, and checked; held while
+          #     Simpl opens and while a quiz is open -- its window closed to the notification area meanwhile, as its close
+          #     button does; the quiz closed, it notes where it was, quits, and the installer puts the version in place and
+          #     opens Simpl again. Opened again on that profile, Simpl comes back where it was: the Grades, out of sight in
+          #     the notification area as it was left, its engine running all the same
+          $prof3 = Join-Path $env:RUNNER_TEMP 'profile-update'
+          $simplLogs['profile-update'] = $prof3
+          $ulog = Join-Path $prof3 'simpl.log'
+          # (what a log says from a line on: one profile's log holds both of its runs)
+          function Says($file, $from, $pattern) { (Test-Path $file) -and (@(Get-Content $file | Select-Object -Skip $from | Select-String -Pattern $pattern).Count -gt 0) }
+          $nextSetup = Join-Path $env:RUNNER_TEMP 'Simpl-Setup-next.exe'
+          Copy-Item dist\Simpl-Setup.exe $nextSetup
+          $updating = Start-Process -FilePath $exe -ArgumentList @('--profile', $prof3, '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light', '--place', 'grades', '--open', 'quiz:101:9011', '--update-test', $nextSetup, '--update-test-tray', '--update-test-close', '40') -PassThru
+          $null = $updating.Handle
+          if (-not $updating.WaitForExit(150000)) { Stop-Process -Id $updating.Id -Force -ErrorAction SilentlyContinue; Fail "Simpl, with an update waiting, had not put it in after two and a half minutes" }
+          if (Test-Path $ulog) { Write-Host "--- the updating Simpl's log, its updates"; Select-String -Path $ulog -Pattern 'update' | ForEach-Object { $_.Line } }
+          # (each step, in its order: found; downloaded and checked; held by the quiz; the quiz closed and the hold let go;
+          #  where it was kept; the installer run)
+          $at = 0
+          foreach ($s in @('update: v\d+ found', "update: v\d+'s installer downloaded and checked", 'update: held \(quiz\)', 'update test: closing what is open over the window',
+                           'update: no longer held \(by quiz\)', 'update: where it was: grades, the window hidden', 'update: installing .* and quitting')) {
+            $hit = if (Test-Path $ulog) { Select-String -Path $ulog -Pattern $s | Select-Object -First 1 } else { $null }
+            if (-not $hit) { Fail "the update played through never logged '$s'" }
+            if ($hit.LineNumber -lt $at) { Fail "the update played through logged '$s' out of its order" }
+            $at = $hit.LineNumber
+          }
+          # the installer it ran: the version put in place, and Simpl opened again by /LAUNCH (with no arguments: the
+          # default profile)
+          $until = (Get-Date).AddSeconds(120)
+          while (-not (Get-InstalledSimpl) -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 500 }
+          $reopened = @(Get-InstalledSimpl)
+          $byItself = Get-ChildItem (Join-Path $prof3 'Update') -Recurse -Filter 'Setup.log' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($byItself) { Copy-Item $byItself.FullName shots\installer-update-by-itself.log }
+          if ($reopened.Count -eq 0) { Fail "the update Simpl put in by itself did not open Simpl again" }
+          if ($byItself -and (Has $byItself.FullName 'The update did not finish')) { Fail "the update Simpl put in by itself did not finish" }
+          Write-Host "an update that came by itself: held by the quiz, put in once it was closed, and Simpl opened again (pid $($reopened[0].Id))"
+          $reopened | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3   # (its web view's helper processes end a moment after it)
+          $from = @(Get-Content $ulog).Count
+          $back = Start-Process -FilePath $exe -ArgumentList @('--profile', $prof3, '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light') -PassThru
+          $null = $back.Handle
+          $until = (Get-Date).AddSeconds(90)
+          while (-not (Says $ulog $from 'perf: start') -and -not $back.HasExited -and ((Get-Date) -lt $until)) { Start-Sleep -Milliseconds 500 }
+          $back.Refresh()
+          $shown = if ($back.HasExited) { "none (it exited with $($back.ExitCode))" } else { "$($back.MainWindowHandle)" }
+          Stop-Process -Id $back.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          if (Test-Path $ulog) { Write-Host "--- opened again"; Get-Content $ulog | Select-Object -Skip $from | Select-String -Pattern 'update|perf: start|phase' | ForEach-Object { $_.Line } }
+          foreach ($s in @('update: back after updating to v\d+', 'update: opened again in the notification area', 'update: opened again at grades', 'perf: start .*engine ready \d')) {
+            if (-not (Says $ulog $from $s)) { Fail "Simpl, opened again after the update, never logged '$s'" }
+          }
+          if ($shown -ne '0') { Fail "Simpl, opened again after the update, showed a window ($shown), though it was left in the notification area" }
+          Write-Host "opened again after the update: at the Grades, in the notification area as it was left, its engine running"
 
           # 3. an update over a Simpl left open, exactly as Restart to Update runs it: Setup asks Simpl to quit (the quit
           #    event), Simpl takes it and goes, Setup sees it gone, puts the new version in place, and /LAUNCH opens it again
@@ -1026,7 +1097,16 @@ jobs:
           tag="windows-fluent-v$n"
           # (the installer first, the portable zip beside it; Simpl's own Updates finds Simpl-Setup.exe by its name)
           test -f release/Simpl-Setup.exe
+          # (a Critical Update, asked for by Run workflow: its notes say so and carry the mark Simpl's Updates looks for,
+          #  windows/SimplFluent/Support/Updates.cs -- every installed Simpl older than it puts it in at its next check,
+          #  whatever its update settings, as the Mac's do; RELEASE_NOTES.md itself is left as it is)
+          notes=windows/SimplFluent/RELEASE_NOTES.md
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.critical }}" = "true" ]; then
+            notes="$RUNNER_TEMP/notes.md"
+            { cat windows/SimplFluent/RELEASE_NOTES.md; printf '\n\n**This is a Critical Update.** Every Simpl for Windows installed with Simpl-Setup.exe installs it at its next update check, whatever its update settings.\n<!-- simpl-critical -->\n'; } > "$notes"
+            echo "published as a Critical Update"
+          fi
           gh release create "$tag" release/Simpl-Setup.exe release/Simpl-Windows-x64.zip --target "${{ needs.prior.outputs.sha || github.sha }}" --prerelease \
             --title "Simpl for Windows — Windows 11 look, preview (v$n)" \
-            --notes-file windows/SimplFluent/RELEASE_NOTES.md
+            --notes-file "$notes"
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"
