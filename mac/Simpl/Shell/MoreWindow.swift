@@ -72,6 +72,7 @@ private struct MoreWindowBody: View {
         .overlay(alignment: .bottom) { FileToast(files: files) }
         .environmentObject(engine)
         .environmentObject(engine.whereabouts) // (1.3.78: where the window is, observed on its own)
+        .environment(\.engineLink, EngineLink(engine: engine)) // (1.3.78: and the engine to act through, unobserved)
         .focusedSceneObject(engine)
         .modifier(EngineSheets(engine: engine))
     }

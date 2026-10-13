@@ -85,7 +85,9 @@ struct DashWorkLine: View {
     /// The day it is under ("Today", "Saturday"), for its preview's due line.
     var day: String? = nil
     let toggle: (Bool) -> Void
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
 
     var body: some View {
         PreviewLink(item: .dash(row, day: day, engine: engine, toggle: toggle)) {
@@ -129,7 +131,9 @@ struct DashWorkLine: View {
 struct DashTodayLine: View {
     let row: WorkRow
     let toggle: (Bool) -> Void
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
 
     var body: some View {
         PreviewLink(item: .work(row, engine: engine, toggle: toggle)) {
@@ -173,7 +177,9 @@ struct DashTodayLine: View {
 struct DashActivityList: View {
     let data: DashActivityData
     let open: (DashActivityRow) -> Void
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
 
     var body: some View {
         if data.rows.isEmpty {

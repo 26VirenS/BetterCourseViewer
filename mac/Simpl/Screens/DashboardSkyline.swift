@@ -10,7 +10,9 @@ import SwiftUI
 struct DashSkyline: View {
     let courses: [DashSkyCourse]
     var height: CGFloat = 150
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The towers have risen once this launch: later visits show them standing.
     private static var risenOnce = false
@@ -281,7 +283,9 @@ private struct DashWindows: View {
 struct DashWeekLoad: View {
     let load: [LoadRow]
     let idle: Int?
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

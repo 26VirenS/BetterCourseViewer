@@ -386,7 +386,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   - *The Dashboard kept* (`DetailStack`): opened once, it stays — over the stack, out of sight and out of reach of the
     pointer while another screen shows — so its cards, their pictures and where it was scrolled are as they were when
     the window comes back to it. It reads again only when it is shown and what it holds is stale or something was done
-    meanwhile, each card changing in place. Its title and toolbar stay in the stack (`DashboardChrome`).
+    meanwhile, each card changing in place. Its title and toolbar stay in the stack (`DashboardChrome`). It and its
+    parts act through the engine held as a plain value of the environment (`EngineLink`) rather than observe it, so,
+    put away, the Dashboard is not drawn again each time the engine changes (a search typed, a count read).
   - *Waiting*: a screen's spinner shows only after a third of a second, so a quick answer replaces an empty page rather
     than a spinner that flashes.
   - *A move draws little*: where the window is and how it last moved (`Whereabouts`, Engine/Navigator.swift) are
@@ -546,4 +548,5 @@ quarter of a second away, as a school's is (its assignment lists 0.6 s; the mock
 has it), not the mock's instant answers. In the screenshot suite and in
 developer mode the console also times each call (`call grades: 820 ms`, `read ahead home: 40 ms`) and when each screen
 appeared (`appear Grades: 12 ms`). Each picture is taken with its window brought to the front 0.7 s before (Shot.swift):
-a copy another had covered drew nothing new, so an animation under way in it was pictured where it had stopped.
+a copy another had covered drew nothing new, so an animation under way in it was pictured where it had stopped. A
+window the window server gives back empty is asked for again, half a second apart, four times at most.

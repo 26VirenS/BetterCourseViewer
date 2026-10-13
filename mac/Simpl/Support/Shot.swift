@@ -94,7 +94,7 @@ enum Shot {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { capture(file) }
     }
 
-    private static func capture(_ file: String) {
+    private static func capture(_ file: String, attempt: Int = 0) {
         guard let w = target(), let primary = NSScreen.screens.first else { return }
         // (the window, then what belongs to it over it: its sheets, its child windows, a popover open on it)
         var parts = [w] + w.sheets + (w.attachedSheet.map { [$0] } ?? []) + (w.childWindows ?? []).filter(\.isVisible)
@@ -108,13 +108,33 @@ enum Shot {
         let top = primary.frame.maxY - rect.maxY
         let spec = "\(Int(rect.minX.rounded())),\(Int(top.rounded())),\(Int(rect.width.rounded())),\(Int(rect.height.rounded()))"
         let base = file.hasSuffix(".png") ? String(file.dropLast(4)) : file
-        if let image = composite(parts, rect, scale: w.backingScaleFactor) {
+        let image = composite(parts, rect, scale: w.backingScaleFactor)
+        // (1.3.78) the window server now and then gives a window back empty — nothing at all of it drawn: asked again,
+        // half a second later, four times at most, before an empty picture is kept
+        if attempt < 4, image.map(empty) ?? true {
+            NSLog("[Simpl] shot: the window came back empty; asked again (%d)", attempt + 1)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { capture(file, attempt: attempt + 1) }
+            return
+        }
+        if let image {
             let rep = NSBitmapImageRep(cgImage: image)
             if let png = rep.representation(using: .png, properties: [:]) {
                 try? png.write(to: URL(fileURLWithPath: base + "-app.png"))
             }
         }
         try? spec.write(toFile: base + ".rect", atomically: true, encoding: .utf8)
+    }
+
+    /// Nothing drawn in a picture: every pixel of it, seen small, transparent.
+    private static func empty(_ image: CGImage) -> Bool {
+        let side = 24
+        guard let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = ctx.data else { return false }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        let bytes = data.bindMemory(to: UInt8.self, capacity: side * side * 4)
+        for i in 0..<(side * side) where bytes[i * 4 + 3] > 8 { return false }
+        return true
     }
 
     /// The window and its own over it, in `rect` (AppKit's coordinates), each pictured on its own and laid in order — so

@@ -114,7 +114,9 @@ struct DashScoreRing: View {
 /// A course's quick links (its first sections, as Canvas's card has them): each opens that section.
 struct DashQuickLinks: View {
     let course: DashCourse
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
 
     static func count(_ course: DashCourse) -> Int { min(course.links?.count ?? 0, 4) }
 
@@ -148,7 +150,9 @@ struct DashQuickLinks: View {
 struct DashCourseCard: View {
     let course: DashCourse
     let progress: CourseProgress?
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
 
     private var color: Color { Color(hex: course.color) }
 

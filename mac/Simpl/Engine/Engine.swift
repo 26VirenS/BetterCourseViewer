@@ -932,3 +932,32 @@ struct EngineHost: NSViewRepresentable {
     func makeNSView(context: Context) -> EngineView { engine.hostView }
     func updateNSView(_ nsView: EngineView, context: Context) {}
 }
+
+/// (1.3.78) The window's engine as a plain value of the environment, for views that only act through it — open, go,
+/// call — and draw nothing it publishes: unlike a view holding it as an environment object, such a view is not drawn
+/// again each time the engine changes (a search typed, a count read, a course's sections). The Dashboard's parts hold
+/// it so: the Dashboard is kept under the stack while another screen shows, and drew itself again, unseen, at each.
+struct EngineLink: Equatable {
+    weak var engine: Engine?
+
+    static func == (a: EngineLink, b: EngineLink) -> Bool { a.engine === b.engine }
+}
+
+private struct EngineLinkKey: EnvironmentKey {
+    static let defaultValue = EngineLink()
+}
+
+extension EnvironmentValues {
+    var engineLink: EngineLink {
+        get { self[EngineLinkKey.self] }
+        set { self[EngineLinkKey.self] = newValue }
+    }
+}
+
+extension EngineLink {
+    /// The engine linked (else the main window's: a view always has one to act through).
+    @MainActor
+    var acting: Engine {
+        engine ?? AppModel.shared.engine!
+    }
+}

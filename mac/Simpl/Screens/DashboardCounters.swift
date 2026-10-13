@@ -156,7 +156,9 @@ struct DashCounterPanel: View {
     /// (1.2.18) A row dismissed (the page's Overdue number drops with it), then Canvas's word on it.
     enum Cleared { case pressed, done(TodayCounts), failed }
     var onCleared: (Cleared) -> Void = { _ in }
-    @EnvironmentObject private var engine: Engine
+    // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
     @ObservedObject private var preview = WorkPreview.shared
     @State private var data: ItemsSheetData?
 

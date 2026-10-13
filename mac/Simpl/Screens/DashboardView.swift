@@ -12,7 +12,13 @@ import SwiftUI
 struct DashboardView: View {
     /// (1.3.78) It is the screen showing (not put away under another).
     let active: Bool
-    @EnvironmentObject private var engine: Engine
+    /// (1.3.78) The engine's `dataVersion` and whether the school is on Brightspace, handed in by the stack: the
+    /// Dashboard holds the engine as a plain value (EngineLink), so it is drawn again only when these change — not, put
+    /// away, at every change of the engine.
+    let version: Int
+    let brightspace: Bool
+    @Environment(\.engineLink) private var link
+    private var engine: Engine { link.acting }
     @StateObject private var model = Loader<Today>()
     /// (1.3.78) Something was done while it was put away (`dataVersion` moved on): it reads again when it is shown.
     @State private var behind = false
@@ -38,13 +44,15 @@ struct DashboardView: View {
     @Namespace private var morph
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // (written out: `active` has no default, and the state above is private)
-    init(active: Bool) {
+    // (written out: the state above is private)
+    init(active: Bool, version: Int, brightspace: Bool) {
         self.active = active
+        self.version = version
+        self.brightspace = brightspace
     }
 
     /// Brightspace has no activity stream: there the Activity view is not offered.
-    private var views: [DashView] { DashView.offered(engine) }
+    private var views: [DashView] { DashView.offered(brightspace: brightspace) }
     private var view: DashView { views.contains(chosen) ? chosen : .list }
 
     // MARK: - Widths
@@ -65,7 +73,7 @@ struct DashboardView: View {
         }
         // (1.3.78: its title and toolbar are DashboardChrome's, in the window's stack)
         .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
-        .task(id: engine.dataVersion) {
+        .task(id: version) {
             if active { await load() } else { behind = true }
         }
         .onChange(of: active) { _, now in
@@ -91,7 +99,7 @@ struct DashboardView: View {
             .read("dashSkyline", ["kept": false], DashSkylineData.self),
             .read("dashCourses", DashCoursesData.self), .read("coursesProgress", [String: CourseProgress].self),
         ]
-        switch DashView.offered(engine).contains(chosen) ? chosen : .list {
+        switch DashView.offered(brightspace: engine.onBrightspace).contains(chosen) ? chosen : .list {
         case .cards: break
         case .list: asks.append(.read("dashList", DashListData.self))
         case .activity: asks.append(.read("dashActivity", DashActivityData.self))
@@ -657,7 +665,7 @@ struct DashboardChrome: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Picker("View", selection: $chosen.animation(Motion.gentle)) {
-                        ForEach(DashView.offered(engine)) { v in
+                        ForEach(DashView.offered(brightspace: engine.onBrightspace)) { v in
                             Text(v.title).tag(v)
                         }
                     }
@@ -675,8 +683,7 @@ struct DashboardChrome: View {
 
 extension DashView {
     /// The views offered: Brightspace has no activity stream, so no Activity there.
-    @MainActor
-    static func offered(_ engine: Engine) -> [DashView] {
-        engine.onBrightspace ? [.cards, .list] : allCases
+    static func offered(brightspace: Bool) -> [DashView] {
+        brightspace ? [.cards, .list] : allCases
     }
 }

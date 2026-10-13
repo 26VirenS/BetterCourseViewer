@@ -172,7 +172,7 @@ struct DetailStack: View {
             .transition(.page)
             .background(PageGround().ignoresSafeArea())
             if dashboardKept || dashboardUp {
-                DashboardView(active: dashboardUp)
+                DashboardView(active: dashboardUp, version: engine.dataVersion, brightspace: engine.onBrightspace)
                     .background(PageGround().ignoresSafeArea())
                     .modifier(PageArrival(move: engine.move, top: dashboardUp))
                     .modifier(PageExit(gone: dashboardUp ? 0 : 1))
