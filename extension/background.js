@@ -794,7 +794,8 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   /** Which setup flow this build carries. A build that changes the flow bumps it, and the flags
    *  from the older flow ("offered", "done") are cleared once, so the new flow is seen once. */
   const SETUP_FLOW = 3;
-  /** Older builds kept Canvas answers in storage; nothing is kept between pages now. */
+  /** Older builds kept every Canvas answer in storage (cache:…), drawn from as it was; those are dropped. (What a page
+   *  opens with is kept now under kept:…, and always asked for again as it is drawn: content/app/store.js.) */
   async function dropStoredCache() {
     try {
       const all = await api.storage.local.get(null);

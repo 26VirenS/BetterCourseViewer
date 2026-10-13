@@ -75,6 +75,14 @@ The rules for bringing the features back:
    when it is drawn; nothing watches the whole tree.
 5. **The lint is green, the suites are green, and the change is read against §4 before it ships.**
 
+(2.99.33) The move between screens is a same-document view transition where `startViewTransition`
+exists — Safari 18 has it — and the screen's own keyframe entrance otherwise (docs/MOTION.md §3d). It
+is progressive in the sense of rule 1: nothing is painted differently while it is not playing, the
+call is guarded (and reaches Safari only on the desktop layout, never the phone's or the app's), a
+transition that fails to start simply puts the screen in, and every press during one ends it. The
+cross-document crossfade and the documents fetched ahead are Chrome's alone (`navigator.userAgentData`,
+`HTMLScriptElement.supports('speculationrules')`): Safari loads those pages as before.
+
 ## 5. After an update: Safari keeps the files it has
 
 The Mac app's updater swaps the app on disk and relaunches itself; Safari is not told, and keeps

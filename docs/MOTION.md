@@ -51,9 +51,9 @@ The engine has no view of the page beyond two things it is asked for:
 
 ## 3. Context, in CSS
 
-- Screens arrive the way you went: `app.render` marks the root `bcv-screen--fwd` or `--back` from
-  the navigation kind — forward rises from below, back settles down from above; on the phone a
-  pushed screen slides in from the right, a popped one from the left, a tab change only fades.
+- Screens arrive the way you went (§3d): going deeper slides in from the right, Back from the left,
+  a section crossfades; on the phone a pushed screen slides in from the right, a popped one from the
+  left, a tab change only fades (`bcv-screen--fwd`, `--back`, `--tab`, on the phone's spring).
 - Menus and pickers scale from the edge they hang from: `ui.anchor` sets `transform-origin` to the
   side it chose; the account and appearance menus grow up out of their row.
 - Toasts rise from the bottom on the snappy spring and sit centred (`translate: -50% 0` keeps the
@@ -140,13 +140,45 @@ Exits that mirrored nothing, and a few rare moments left flat — each with its 
   out under reduced motion rather than going in a frame. Two Flashcards sets deleted close together
   are redrawn once, when the last has left, so neither's fade is cut short.
 
+## 3d. What 2.99.33 added: one move between screens
+
+The move between screens is the one the Mac and Windows apps make too. `app.render` works out which
+way a screen arrives (`motionFor`): a sidebar row or a favourite course is a section, and crossfades;
+Back (the browser's, or the interface's own — `markBack`) comes in from the left; otherwise the
+depth decides (`depthOf`: a root screen 0, a course's home and its lists 1, an item 2, an item's mark
+3) — deeper slides in from the right, shallower from the left, side by side (a course's own tabs)
+crossfades, and one item to the next goes on to the right. 220 ms on `--bcv-ease-out`
+(`cubic-bezier(.23,1,.32,1)`), `--bcv-arrive-x` 32 px, transform and opacity only.
+
+- **As a view transition** (`swap` in app.js): where `document.startViewTransition` is (Chrome; Safari
+  18) and the page is drawn with graphics acceleration. The column that changes is named
+  `bcv-screen` for the length of it — `#bcv-main`, or a course's own `.bcv-cmain` when its header and
+  rail are kept (`ctx.swap`) — and is the one thing that moves: the root's pictures are held still
+  (`animation: none`), so the sidebar, the bar and the header stay put. The screen left behind gives
+  way 12 px the other way over 160 ms as it fades, the new one arrives over 220 ms, their light added
+  while they cross (`plus-lighter`). The new screen's root carries `bcv-screen--vt` and has no
+  entrance of its own on top; the rows' own staggers inside it play as they always have. It starts
+  only when the new screen is built — a screen landing over its skeleton simply lands — and a second
+  move skips the first to its end. A press while one plays (it lands on the root: the pictures are
+  not the page) finishes it and is handed to what is under it now.
+- **Without one** (Firefox, an older Safari, Chrome drawing in software — `html.bcv-noblur`, where
+  taking the old screen's picture costs a tenth of a second every time): the new screen's root plays
+  the same move as a keyframe (`data-bcv-arrive` → `bcv-arrive-fwd`, `-back`, or `bcv-fade-in`).
+- **A real page load** (to or from a page Canvas draws) crossfades in Chrome (`content/early.js`):
+  both pages opt into a cross-document view transition; the page left behind stays on top, whole,
+  for 150 ms while the new one draws its shell under it, then fades over 190 ms. Skipped by either
+  page when it is not the interface's (the look off), on the phone, in the apps, in software drawing.
+- **Reduced motion**: no transition of either kind; a screen fades in over 150 ms (§4.7).
+- The phone keeps its own push and pop on the phone spring; the iPhone app's stack is its own.
+
 ## 4. The rules
 
 1. **CSS first, script adds.** Nothing on the page depends on `BCV.motion` being present.
 2. **Every scripted removal has a watchdog.** A promise that waits on motion is raced against a
    timer; the element leaves either way.
 3. Only `transform` and `opacity` move; a size change is measured first and played as a transform.
-4. Duration follows distance and size: a menu ~290 ms, a sheet or a screen ~460 ms, a row ~350 ms.
+4. Duration follows distance and size: a menu ~290 ms, a sheet ~460 ms, a row ~350 ms; the move
+   between screens is 220 ms, the one every Simpl app makes (§3d).
 5. Overshoot only on small, playful things; never on a pane that carries text.
 6. Scrims fade; they never move. A parent and its child never animate the same property at once.
 7. A redraw is not an arrival (`ui.still`). Focus moves after the motion. Reduced motion is honoured

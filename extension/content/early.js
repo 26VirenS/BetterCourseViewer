@@ -269,7 +269,40 @@
     /* ignore */
   }
 
+  // ---- a real page load, crossfaded (2.99.33) ----------------------------------------------------------
+  // Most moves between screens never leave the page (app.js). The ones that do — to a page Canvas draws, a tool, back
+  // from one — are a real load, and the new page draws its shell a moment after its first frame, so the page used to
+  // blink to its bare ground in between. In Chrome both pages take part in a cross-document view transition: the page
+  // left behind stays on top, whole, while the new one draws under it, then fades out over it (340 ms, the last 190 of
+  // them fading, on the house ease-out), so the sidebar and the bar never blink. Only between pages the interface draws,
+  // and not on the phone or in the apps (their own moves), under reduced motion, or without graphics acceleration
+  // (html.bcv-noblur: there the old page's picture costs a tenth of a second to take). A press while it plays ends it
+  // (app.js hands the press on).
+  let xvt = null;
+  (function crossFade() {
+    try {
+      if (!self.navigator?.userAgentData || !('PageRevealEvent' in self) || typeof CSSStyleSheet !== 'function' || self.BCVBridge?.native) return;
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(`@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }
+html.bcv-xvt::view-transition-old(root) { animation: bcv-xvt-hold .34s linear both; }
+html.bcv-xvt::view-transition-new(root) { animation: none; }
+@keyframes bcv-xvt-hold { 0%, 44% { opacity: 1; animation-timing-function: cubic-bezier(.23, 1, .32, 1); } to { opacity: 0; } }`);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      const ours = () => html.classList.contains('bcv-on') && !html.classList.contains('bcv-phone') && !html.classList.contains('bcv-noblur');
+      addEventListener('pageswap', (e) => { if (e.viewTransition && !ours()) e.viewTransition.skipTransition(); });
+      addEventListener('pagereveal', (e) => {
+        const t = e.viewTransition;
+        if (!t) return;
+        if (!ours()) { t.skipTransition(); return; }
+        html.classList.add('bcv-xvt');
+        xvt = t;
+        t.finished.catch(() => {}).finally(() => { html.classList.remove('bcv-xvt'); if (xvt === t) xvt = null; });
+      });
+    } catch { /* a plain page load */ }
+  })();
+
   BCV.early = {
+    xvt: () => xvt, // (the crossfade this page arrived on, while it plays)
     ready,
     sync,
     systemDark,

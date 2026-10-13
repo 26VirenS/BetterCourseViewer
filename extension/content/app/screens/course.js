@@ -482,22 +482,29 @@
   }
 
   // ---- the tabs' first requests, made early ----------------------------------------------------
-  // What each tab asks for first. It is started on hover of the tab's rail row, alongside the shell
-  // when it is the tab being opened (so the column and the rail arrive together rather than one
-  // after the other), and on idle for every other tab once a course has landed. Nothing is kept
-  // between pages: this is the per-page memo the tab would fill on its own, filled a moment sooner.
+  // What each tab asks for first. It is started under a pointer resting on the tab's rail row (or on
+  // any link to it), alongside the shell when it is the tab being opened (so the column and the rail
+  // arrive together rather than one after the other), and at idle for every other tab once a course
+  // has landed, and for each favourite course's home (app.js warmAround). This is the per-page memo the
+  // tab would fill on its own, filled a moment sooner. `front: false` leaves a home's front page out:
+  // a page read can count in Canvas as the student viewing it, so it is read ahead only for the course
+  // on show, or under the pointer (app.js).
+  const homeWarm = (id, kind, view, front) => {
+    const main = view === 'modules' ? [store.modules(id)]
+      : view === 'assignments' ? [store.assignments(id), store.assignmentGroups(id)]
+        : view === 'syllabus' ? [store.syllabus(id)]
+          : view === 'feed' ? [store.courseStream(id, { kind })]
+            : front ? [store.frontPage(id, { kind })] : [];
+    return [...main, store.courseTodo(id)];
+  };
   const TAB_WARM = {
     // a group's home is its front page and stream; a course's is whatever its instructor chose as
-    // the home view, read off the course list when it is here already (the front page otherwise)
-    home: (id, kind) => {
-      if (kind === 'groups') return [store.frontPage(id, { kind }), store.courseStream(id, { kind })];
-      const view = (BCV.canvas.ready('courses:all') || []).find((c) => String(c.id) === id)?.default_view || 'wiki';
-      const main = view === 'modules' ? [store.modules(id)]
-        : view === 'assignments' ? [store.assignments(id), store.assignmentGroups(id)]
-          : view === 'syllabus' ? [store.syllabus(id)]
-            : view === 'feed' ? [store.courseStream(id, { kind })]
-              : [store.frontPage(id, { kind })];
-      return [...main, store.courseTodo(id)];
+    // the home view, read off the course list (the course's own record, until the list is here)
+    home: (id, kind, { front = true } = {}) => {
+      if (kind === 'groups') return [front ? store.frontPage(id, { kind }) : null, store.courseStream(id, { kind })];
+      const view = (BCV.canvas.ready('courses:all') || []).find((c) => String(c.id) === id)?.default_view;
+      if (view) return homeWarm(id, kind, view, front);
+      return [store.course(id).then((c) => Promise.all(homeWarm(id, kind, c?.defaultView || 'wiki', front)))];
     },
     stream: (id, kind) => [store.courseStream(id, { kind })],
     announcements: (id, kind) => [store.announcements(id, { kind })],
@@ -512,25 +519,18 @@
     syllabus: (id) => [store.syllabus(id)],
   };
   const GROUP_TABS = ['home', 'stream', 'announcements', 'discussions', 'people', 'pages', 'files'];
-  function warmTab(kind, id, tab) {
+  /** Starts a tab's first requests; resolves when they have answered (never rejects). */
+  function warmTab(kind, id, tab, opts = {}) {
     const f = TAB_WARM[tab];
-    if (!f || !id || (kind === 'groups' && !GROUP_TABS.includes(tab))) return;
+    if (!f || !id || (kind === 'groups' && !GROUP_TABS.includes(tab))) return Promise.resolve();
     try {
-      for (const p of f(String(id), kind)) if (p) Promise.resolve(p).catch(() => {});
+      return Promise.all(f(String(id), kind, opts).map((p) => (p ? Promise.resolve(p).catch(() => {}) : null)));
     } catch {
-      /* nothing to warm */
+      return Promise.resolve(); // nothing to warm
     }
   }
-  /** Every other tab of the course (or group) on screen, once it has landed and the page is idle —
-   *  one tab per idle moment, in the rail's order, and only while `still()` says the screen is the
-   *  one on show (a hop to another course stops the warming of the one left behind). */
-  function warmTabs(r, still = () => true) {
-    const kind = r.screen === 'group' ? 'groups' : 'courses';
-    const queue = (kind === 'groups' ? GROUP_TABS : Object.keys(TAB_WARM)).filter((tab) => tab !== r.tab);
-    const later = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 400));
-    const next = () => { if (!still()) return; const tab = queue.shift(); if (!tab) return; warmTab(kind, r.courseId, tab); later(next); };
-    next();
-  }
+  /** The tabs a course (or a group) can have read ahead, in the rail's order (app.js warmAround runs them one per idle moment). */
+  const warmTabIds = (kind) => (kind === 'groups' ? GROUP_TABS : Object.keys(TAB_WARM));
 
   /** Header (back link, colour, title, pills) plus the
    *  grouped rail of the context's tabs, for courses and groups. */
@@ -598,11 +598,9 @@
       return h('button', {
         type: 'button',
         class: `bcv-rail__item ${active ? 'is-active' : ''}`,
-        dataset: { tab: t.id },
+        dataset: { tab: t.id, href: t.href }, // (the pointer resting on it, or the press, starts the tab's data loading: app.js wireIntent)
         title: t.label,
         onclick: () => { if (shell.railLoad === t.id) return; shell.markRail(t.id); app.go(t.href); }, // the pressed row fills until its column lands; a repeat press is a no-op
-        onpointerenter: () => warmTab(shell.kind, c.id, t.id), // the pointer arrives before the press: the tab's data starts loading now
-        onfocus: () => warmTab(shell.kind, c.id, t.id),
       }, [
         h('span', { class: 'bcv-rail__tile' }, U.svg(t.icon, { size: 20, width: 1.8 })), // the glyph in the course colour (mockup 11)
         h('span', { class: 'bcv-rail__label', text: t.label }),
@@ -776,8 +774,9 @@
       default: el = B.native(ctx, shell);
     }
     if (!ctx.alive()) return out;
-    content.classList.remove('is-loading');
-    content.replaceChildren(el);
+    // within a kept shell the new column moves in as a screen would (app.js swap), the header and the rail holding still
+    const put = () => { content.classList.remove('is-loading'); content.replaceChildren(el); };
+    if (kept && ctx.swap) await ctx.swap(put, content); else put();
     shell.markRail?.(null);
     document.title = `${course.name} · ${app.siteName()}`;
     return out;
@@ -1436,6 +1435,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricMorph, linksFrom, typeIcon, ptsLabel, statusBadge, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricMorph, linksFrom, typeIcon, ptsLabel, statusBadge, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabIds };
   BCV.screens.courseTabs = T;
 })();

@@ -37,6 +37,7 @@ html[data-bcv-theme] {
   /* motion: one easing and three lengths — the exits are the fast one, an entrance the middle, a sheet's rise the slow */
   --bcv-ease: cubic-bezier(.32,.72,0,1); --bcv-t-fast: .18s; --bcv-t: .28s; --bcv-t-slow: .34s;
   --bcv-ease-out: cubic-bezier(.23,1,.32,1); --bcv-ease-in-out: cubic-bezier(.77,0,.175,1); /* (arrivals, exits and presses start fast; a thing moving across the screen eases both ends) */
+  --bcv-t-arrive: .22s; --bcv-t-leave: .16s; --bcv-arrive-x: 32px; --bcv-leave-x: 12px; /* (2.99.33) a move between screens: the one language the Mac and Windows apps move in too */
   /* the springs (content/app/motion.js writes each preset's exact curve and settle time over these as a linear() easing; docs/MOTION.md) */
   --bcv-spring-snappy: cubic-bezier(.34,1.15,.42,1); --bcv-t-snappy: .29s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .46s;
   --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s; --bcv-spring-island: cubic-bezier(.32,.72,0,1); --bcv-t-island: .5s; --bcv-spring-pin: cubic-bezier(.32,.72,0,1); --bcv-t-pin: .37s;
@@ -93,18 +94,44 @@ html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-app > :is(#bcv-main, #bcv-side)
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
 @keyframes bcv-fade-out { to { opacity: 0; } }
 @keyframes bcv-line-draw { from { -webkit-clip-path: inset(-10px 100% -10px -5px); clip-path: inset(-10px 100% -10px -5px); } to { -webkit-clip-path: inset(-10px -5px -10px -5px); clip-path: inset(-10px -5px -10px -5px); } } /* (a clip sliding open, in the line's own units: a dash the line's length stayed a dash pattern in Safari) */
-/* screens rise in; sheets grow over a blurring scrim; popovers pop */
-.bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-up var(--bcv-t-gentle) var(--bcv-spring-gentle) both; }
-/* the way a screen arrives says which way you went (app.render): forward rises from below, back settles down from above; on the phone a pushed screen slides in from the right and a popped one from the left, a tab change only fades */
+/* screens arrive the way you went (app.render, 2.99.33): deeper slides in from the right as it fades in, Back from the
+   left, a section (a sidebar row, a course's own tabs) crossfades; 220ms on the ease-out, transform and opacity only.
+   Where the browser has view transitions this is played by the transition below, and the screen's own entrance stands
+   down (bcv-screen--vt). On the phone a pushed screen slides in from the right and a popped one from the left, a tab
+   change only fades, on the phone's spring (phone.js). */
+@keyframes bcv-arrive-fwd { from { opacity: 0; transform: translateX(var(--bcv-arrive-x)); } to { opacity: 1; transform: none; } }
+@keyframes bcv-arrive-back { from { opacity: 0; transform: translateX(calc(-1 * var(--bcv-arrive-x))); } to { opacity: 1; transform: none; } }
+.bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-in var(--bcv-t-arrive) var(--bcv-ease-out) both; }
+.bcv-main > [data-bcv-arrive="fwd"] { animation-name: bcv-arrive-fwd; }
+.bcv-main > [data-bcv-arrive="back"] { animation-name: bcv-arrive-back; }
+.bcv-main > .bcv-screen--vt { animation: none; }
+html.bcv-phone .bcv-main > .bcv-screen, html.bcv-phone .bcv-main > .bcv-qz, html.bcv-phone .bcv-main > .bcv-sb { animation: bcv-fade-up var(--bcv-t-gentle) var(--bcv-spring-gentle) both; }
 @keyframes bcv-fade-down { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @keyframes bcv-push-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes bcv-pop-in { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
-.bcv-main > .bcv-screen--back { animation-name: bcv-fade-down; }
+html.bcv-phone .bcv-main > .bcv-screen--back { animation-name: bcv-fade-down; }
 html.bcv-phone .bcv-main > .bcv-screen--fwd { animation: bcv-push-in var(--bcv-t-phone) var(--bcv-spring-phone) both; }
 html.bcv-phone .bcv-main > .bcv-screen--back { animation: bcv-pop-in var(--bcv-t-phone) var(--bcv-spring-phone) both; }
 html.bcv-phone .bcv-main > .bcv-screen--tab { animation: bcv-fade-in var(--bcv-t-scrim) var(--bcv-spring-scrim) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
 .bcv-main > .bcv-screen--still { animation: none; } /* a screen drawn again in place (ui.still): it is already here, so it does not arrive */
+/* The move as a view transition (app.js swap): the screen's column (#bcv-main, or a course's own column within its kept
+   header and rail) is the one thing that moves; the rest of the page is its own picture and holds still. The screen left
+   behind gives way a short distance the other way as it fades, quicker than the new one arrives, so the two never sit
+   on top of each other for long; their light adds while they cross (plus-lighter), so a crossfade never dips. */
+@keyframes bcv-vt-in-fwd { from { opacity: 0; transform: translateX(var(--bcv-arrive-x)); } }
+@keyframes bcv-vt-in-back { from { opacity: 0; transform: translateX(calc(-1 * var(--bcv-arrive-x))); } }
+@keyframes bcv-vt-out-fwd { to { opacity: 0; transform: translateX(calc(-1 * var(--bcv-leave-x))); } }
+@keyframes bcv-vt-out-back { to { opacity: 0; transform: translateX(var(--bcv-leave-x)); } }
+html[data-bcv-vt]::view-transition-old(root), html[data-bcv-vt]::view-transition-new(root) { animation: none; }
+html[data-bcv-vt]::view-transition-group(bcv-screen) { animation: none; }
+html[data-bcv-vt]::view-transition-image-pair(bcv-screen) { isolation: isolate; }
+html[data-bcv-vt]::view-transition-old(bcv-screen) { animation: bcv-fade-out var(--bcv-t-leave) var(--bcv-ease-out) both; mix-blend-mode: plus-lighter; }
+html[data-bcv-vt]::view-transition-new(bcv-screen) { animation: bcv-fade-in var(--bcv-t-arrive) var(--bcv-ease-out) both; mix-blend-mode: plus-lighter; }
+html[data-bcv-vt="fwd"]::view-transition-old(bcv-screen) { animation-name: bcv-vt-out-fwd; }
+html[data-bcv-vt="fwd"]::view-transition-new(bcv-screen) { animation-name: bcv-vt-in-fwd; }
+html[data-bcv-vt="back"]::view-transition-old(bcv-screen) { animation-name: bcv-vt-out-back; }
+html[data-bcv-vt="back"]::view-transition-new(bcv-screen) { animation-name: bcv-vt-in-back; }
 /* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter).
    The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
 .bcv-enter { animation: bcv-fade-up var(--bcv-dur, var(--bcv-t-settle)) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }

@@ -281,7 +281,7 @@
    *  load of Canvas's own page for that address. Turning the skin off reveals the page you are
    *  on (a reload, when the address moved in place).
    *  `confirmed`: the quiz screen already asked (or is leaving on purpose). */
-  function go(href, { replace = false, confirmed = false, label = '', fromNative = false } = {}) {
+  function go(href, { replace = false, confirmed = false, label = '', fromNative = false, motion = null } = {}) {
     let url;
     try {
       url = new URL(href, location.href);
@@ -313,6 +313,7 @@
     state.submitOpen = false;
     const samePage = url.pathname === location.pathname && url.search === location.search;
     state.navKind = replace ? 'replace' : (state.backPress && Date.now() - state.backPress < 1500 ? 'pop' : 'push');
+    state.navMotion = motion; // (a section from the sidebar crossfades, whatever its depth: render's motionFor)
     state.backPress = 0;
     if (samePage && (url.hash || location.hash)) {
       // a fragment move: pushed as any other in-place hop (setting location.hash would fire
@@ -343,6 +344,7 @@
 
   window.addEventListener('popstate', () => {
     state.navKind = 'pop';
+    state.navMotion = null;
     if (state.nativePath !== location.pathname + location.search && !inPlaceHop(new URL(location.href))) {
       location.reload();
       return;
@@ -374,6 +376,7 @@
       root.append(side, main);
     }
     document.body.prepend(root);
+    wireIntent(root); // (a pointer resting on a link reads its screen ahead: see the background, above)
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
     });
@@ -393,35 +396,174 @@
     });
   }
 
-  /** A screen that can start its own reading before it is asked for (the calendar's is several
-   *  requests deep) warms it when the pointer reaches its row. Once per page per screen, and
-   *  quietly: a failure here is nothing to report, the screen itself will say so. */
   // ---- the background: what the next press will want ---------------------------------------------
-  // Once a screen has settled and the page is idle, the other screens' first requests are made now
-  // rather than on the press, so a hop lands from the memo. Nothing is kept between pages — this is
-  // the same per-page memo every screen already shares — and the screen on show always goes first:
-  // this waits for it to settle, then for an idle moment, and stands down if the user has moved on.
+  // Once a screen has settled and the page is idle, what the next press is likely to want is read now
+  // rather than on the press, so the hop lands from the memo: on a course, its other tabs; then the
+  // other root screens' first requests; then each favourite course's home. The screen on show always
+  // goes first — this waits for it to settle, then for an idle moment — and it is one task at a time,
+  // each in an idle moment of its own. (2.99.33) Its requests are warm-ups (lib/canvas-api.js): never
+  // more than two out at once, at the browser's low priority. It pauses while the student is doing
+  // something (a press, a key), stops when they move on, and stands down when Canvas says its request
+  // bucket is running low, the tab is hidden, or the browser is saving data.
+  //
+  // A pointer resting on something that goes somewhere — a link, a sidebar row, a card, a course's
+  // tab (70 ms: a pass on the way elsewhere reads nothing, and leaving before then cancels it) — reads
+  // that screen's data the same way, and a press reads it at once, before the click has even landed.
+  //
+  // Only lists are read ahead — a root screen, a course's home and its tabs — never an item, and at
+  // idle never a course's front page: Canvas can count an item read as the student having viewed it
+  // (a module's "view" requirement, the course's access report). Those are read when they are opened,
+  // or under a pointer resting on them, as the course rail always has.
   const ROOT_WARM = ['dashboard', 'todo', 'calendar', 'inbox', 'gpa', 'groups', 'courses', 'notifications'];
+  const LIST_TABS = new Set(['home', 'stream', 'announcements', 'assignments', 'discussions', 'grades', 'people', 'pages', 'files', 'quizzes', 'modules', 'syllabus']);
+  const WARM_AGAIN = 60 * 1000; // (a task run this recently is not run again: the memo has its answers)
+  const INTENT_MS = 70; // (the pointer at rest this long is aiming at what is under it)
+  const warmedAt = new Map(); // task key → when it last ran
+  let warmQueue = [];
+  let warmFor = 0; // the render the idle queue is for
+  let warmBusy = false;
+  let warmTasks = 0; // tasks reading ahead right now (their requests are warm-ups)
+  let warmHeld = 0; // the student is doing something: the queue waits until then
+  const idle = (fn, ms = 1200) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: ms }) : setTimeout(fn, 300));
+  const budgetLow = () => { const b = BCV.canvas.budget?.(); return !!b && b.remaining !== null && b.remaining < 250 && Date.now() - b.at < 10000; };
+  const warmable = () => !phone() && !self.BCVBridge?.native && document.visibilityState === 'visible' && !navigator.connection?.saveData && !budgetLow();
+  /** Runs a read-ahead task, its requests marked as warm-ups for as long as it runs. Never throws. */
+  async function runWarm(key, fn) {
+    warmedAt.set(key, Date.now());
+    warmTasks += 1;
+    BCV.canvas.warming?.(true);
+    try { await fn(); } catch { /* nothing to report: the screen itself says so when it is opened */ } finally {
+      warmTasks -= 1;
+      BCV.canvas.warming?.(warmTasks > 0 && Date.now() >= warmHeld);
+    }
+  }
+  /** A course's (or group's) tab, as a read-ahead task: its shell (the course, its tabs) and its list. */
+  function tabTask(kind, id, tab, { front = true } = {}) {
+    const C = BCV.screens.course;
+    if (!C?.warmTab || !id || !LIST_TABS.has(tab)) return null;
+    return { key: `tab:${kind}:${id}:${tab}${front ? '' : ':nofront'}`, fn: () => Promise.all([kind === 'groups' ? store.group(id) : store.course(id), store.tabs(id, { kind }), C.warmTab(kind, id, tab, { front })]) };
+  }
+  /** The read-ahead for an address: a root screen's first requests, or a course's tab; nothing for an item, a quiz, a tool or a page of Canvas's own. */
+  function taskFor(r, opts) {
+    if (r.params.get('bcv') || r.screen === 'native') return null;
+    if (r.screen === 'course' || r.screen === 'group') return tabTask(r.screen === 'group' ? 'groups' : 'courses', r.courseId, r.tab || 'home', opts);
+    const screen = screens[r.screen];
+    return screen?.prefetch ? { key: `screen:${r.screen}`, fn: () => screen.prefetch() } : null;
+  }
   function warmAround(r) {
-    if (BCV.phone?.active()) return;
-    const id = state.renderId;
-    const later = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1200 }) : setTimeout(fn, 500));
-    later(() => {
-      if (id !== state.renderId) return;
-      if (r.screen === 'course' || r.screen === 'group') { BCV.screens.course.warmTabs?.(r, () => id === state.renderId); return; }
-      // one screen per idle moment, not all seven at once: the page stays responsive between them
-      const queue = ROOT_WARM.filter((key) => key !== r.screen && !warmed.has(key));
-      const next = () => { if (id !== state.renderId) return; const key = queue.shift(); if (!key) return; warm(key); later(next); };
-      next();
+    warmFor = state.renderId;
+    warmQueue = [];
+    if (!warmable()) return;
+    const kind = r.screen === 'group' ? 'groups' : 'courses';
+    const tabs = r.screen === 'course' || r.screen === 'group' ? (BCV.screens.course.warmTabIds?.(kind) || []).filter((t) => t !== r.tab) : [];
+    warmQueue = [
+      ...tabs.map((t) => tabTask(kind, r.courseId, t)), // (on a course, its own home's front page too, as ever: the student is in that course)
+      ...ROOT_WARM.filter((key) => key !== r.screen && screens[key]?.prefetch).map((key) => ({ key: `screen:${key}`, fn: () => screens[key].prefetch() })),
+      // (the favourites from the memo, once they are there: the sidebar's may still be on their way)
+      { expand: async () => (await store.favorites().catch(() => [])).filter((c) => String(c.id) !== String(r.courseId)).map((c) => tabTask('courses', c.id, 'home', { front: false })) },
+    ].filter(Boolean);
+    pumpWarm();
+  }
+  function pumpWarm() {
+    if (warmBusy || !warmQueue.length) return;
+    const forRender = warmFor;
+    idle(async () => {
+      if (forRender !== state.renderId || warmBusy || !warmable()) return;
+      if (Date.now() < warmHeld) { setTimeout(pumpWarm, warmHeld - Date.now() + 50); return; }
+      const task = warmQueue.shift();
+      if (!task) return;
+      if (task.expand) { // (a task that is the tasks it finds)
+        const more = await task.expand();
+        if (forRender === state.renderId) warmQueue.push(...more.filter(Boolean));
+      } else if (Date.now() - (warmedAt.get(task.key) || 0) >= WARM_AGAIN) {
+        warmBusy = true;
+        await runWarm(task.key, task.fn);
+        warmBusy = false;
+      }
+      pumpWarm();
     });
   }
-  const warmed = new Set();
-  function warm(key) {
-    if (warmed.has(key)) return;
-    const screen = screens[key];
-    if (!screen?.prefetch) return;
-    warmed.add(key);
-    try { Promise.resolve(screen.prefetch()).catch(() => {}); } catch { /* nothing to do */ }
+  // the student doing something: what reads ahead waits a moment (what the press asks for is the press's own, never a warm-up)
+  const holdWarm = () => { warmHeld = Date.now() + 1500; BCV.canvas.warming?.(false); };
+  document.addEventListener('keydown', holdWarm, true);
+  document.addEventListener('pointerdown', holdWarm, true);
+  /** Reads ahead for what a link, a row or a card goes to: after INTENT_MS at rest, or at once on a press. */
+  let intent = null; // { el, timer }
+  const goesTo = (el) => el?.closest?.('a[href], [data-href]');
+  function warmTarget(el, { press = false } = {}) {
+    const href = el.dataset?.href || el.getAttribute('href');
+    if (!href || href.startsWith('#') || el.target === '_blank') return;
+    let url;
+    try { url = new URL(href, location.href); } catch { return; }
+    if (url.origin !== location.origin || !warmable()) return;
+    if (!inPlaceHop(url)) { if (!press) fetchAhead(url, parseRoute(url.href)); return; } // (a real page load: its document, below)
+    if (!press && !html.classList.contains('bcv-settled')) return; // (the screen on show is still being drawn: its requests first)
+    const task = taskFor(parseRoute(url.href));
+    if (!task || Date.now() - (warmedAt.get(task.key) || 0) < (press ? 3000 : WARM_AGAIN)) return;
+    if (!press) { runWarm(task.key, task.fn); return; }
+    warmedAt.set(task.key, Date.now()); // (a press: at the press's own priority, not as a warm-up)
+    try { Promise.resolve(task.fn()).catch(() => {}); } catch { /* the screen asks for itself */ }
+  }
+  // ---- a real page load, sooner (2.99.33) -----------------------------------------------------------
+  // From a page Canvas draws (a tool, a page of its own) a move back to one of the interface's screens is a real page
+  // load. Under a pointer resting on a sidebar row or a favourite there, Chrome is asked to fetch that page ahead (a
+  // speculation rule: a prefetch, never a prerender — nothing of Canvas's or the interface's runs for a page that is not
+  // opened), so the press lands on a document already here. Only the interface's lists, never an item; at most a dozen a
+  // page. Where the school's content security policy refuses an inline rule, a <link rel=prefetch> instead (Safari has
+  // neither, and simply loads the page).
+  const SPEC = (() => { try { return HTMLScriptElement.supports?.('speculationrules') === true; } catch { return false; } })();
+  let specRefused = false;
+  const fetchedAhead = new Set();
+  function fetchAhead(url, r) {
+    if (state.route && drawnRoute(state.route)) return; // (on a screen of ours a move to another stays on the page: nothing to fetch)
+    if (!document.getElementById('bcv-app') || !drawnRoute(r) || depthOf(r) > 1 || r.params.get('bcv') || !document.head) return;
+    const href = url.pathname + url.search;
+    if (fetchedAhead.has(href) || fetchedAhead.size >= 12) return;
+    fetchedAhead.add(href);
+    if (!SPEC || specRefused) { linkAhead(href); return; }
+    const s = document.createElement('script');
+    s.type = 'speculationrules';
+    s.dataset.bcv = href;
+    s.textContent = JSON.stringify({ prefetch: [{ source: 'list', urls: [href] }] });
+    document.head.append(s);
+  }
+  function linkAhead(href) {
+    const l = document.createElement('link');
+    if (!l.relList?.supports?.('prefetch')) return;
+    l.rel = 'prefetch';
+    l.href = href;
+    l.dataset.bcv = href;
+    document.head.append(l);
+  }
+  document.addEventListener('securitypolicyviolation', (e) => {
+    if (specRefused || !SPEC || e.blockedURI !== 'inline' || !/^script-src/.test(e.violatedDirective || '') || !document.querySelector('script[type="speculationrules"][data-bcv]')) return;
+    specRefused = true; // (refused: the links from here on, and for the ones already asked for)
+    for (const s of document.querySelectorAll('script[type="speculationrules"][data-bcv]')) { linkAhead(s.dataset.bcv); s.remove(); }
+  });
+  function wireIntent(rootEl) {
+    rootEl.addEventListener('pointerover', (e) => {
+      if (e.pointerType === 'touch') return;
+      const el = goesTo(e.target);
+      if (!el || !rootEl.contains(el) || intent?.el === el) return;
+      clearTimeout(intent?.timer);
+      intent = { el, timer: setTimeout(() => { if (intent?.el === el) { intent = null; warmTarget(el); } }, INTENT_MS) };
+    }, { passive: true });
+    rootEl.addEventListener('pointerout', (e) => {
+      if (!intent || (e.relatedTarget && intent.el.contains(e.relatedTarget))) return;
+      if (goesTo(e.target) !== intent.el) return;
+      clearTimeout(intent.timer); // (left before it rested: nothing is read)
+      intent = null;
+    }, { passive: true });
+    rootEl.addEventListener('pointerdown', (e) => {
+      const el = goesTo(e.target);
+      if (el && rootEl.contains(el) && e.button === 0) { clearTimeout(intent?.timer); intent = null; warmTarget(el, { press: true }); }
+    }, true);
+    rootEl.addEventListener('focusin', (e) => {
+      const el = goesTo(e.target);
+      if (!el || intent?.el === el) return;
+      clearTimeout(intent?.timer);
+      intent = { el, timer: setTimeout(() => { if (intent?.el === el) { intent = null; warmTarget(el); } }, INTENT_MS) };
+    });
   }
 
   /** The rows' shades under the theme in force, memoised per accent, mode and count. */
@@ -531,7 +673,7 @@
     return h('button', {
       type: 'button',
       class: `${cls} ${state.route?.courseId === c.id && state.route?.screen === 'course' ? 'is-active' : ''}`,
-      dataset: { load: `fav:${c.id}`, loadColor: c.color },
+      dataset: { load: `fav:${c.id}`, loadColor: c.color, href: c.url }, // (href: the pointer resting on it reads the course's home ahead, wireIntent)
       // the wash marks what was pressed, and in hover mode the row pressed is no longer on the
       // sidebar — the Courses row it came out of carries it instead
       onclick: () => {
@@ -540,7 +682,7 @@
         const wash = hoverCourses() ? 'courses' : key;
         closeQuickNav();
         progress(true, wash);
-        go(c.url);
+        go(c.url, { motion: 'fade' }); // (a place of its own in the sidebar: a section, crossfaded)
       },
       title: c.name,
     }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })]);
@@ -591,7 +733,7 @@
       ...state.favs.map((c) => favRow(c, 'bcv-fav bcv-fav--qn')),
       state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
       U.el('bcv-quicknav__sep'),
-      h('button', { type: 'button', class: 'bcv-quicknav__all', onclick: () => { closeQuickNav(); progress(true, 'courses'); go('/courses'); } }, [
+      h('button', { type: 'button', class: 'bcv-quicknav__all', onclick: () => { closeQuickNav(); progress(true, 'courses'); go('/courses', { motion: 'fade' }); } }, [
         U.svg(IC.book, { size: 14, stroke: '#ff9500', width: 1.9 }), h('span', { text: 'All courses' }),
       ]),
     ]);
@@ -670,19 +812,18 @@
       h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count], i, all) => h('button', {
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
-        dataset: { nav: key, load: key, loadColor: glyphColor },
+        dataset: { nav: key, load: key, loadColor: glyphColor, href }, // (href: the pointer resting on the row reads its screen's data ahead, wireIntent)
         style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
         ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
-        onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op, until that load is plainly stuck
-        onpointerenter: (e) => { // the pointer arrives before the press: the screen's own data starts loading now
-          warm(key);
+        onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href, { motion: 'fade' }); }, // a second press on the loading row is a no-op, until that load is plainly stuck; a section crossfades
+        onpointerenter: (e) => {
           const a = e.currentTarget;
           clearTimeout(quickNavIntent);
           if (quickNav?.key === key || quickNavGoing?.key === key) quickNavHover(key, a); // (open, or still leaving: at once)
           else quickNavIntent = setTimeout(() => quickNavHover(key, a), 70); // (a moment's rest first, as the pins ask: a pass on the way elsewhere opens nothing)
         },
         onpointerleave: () => { clearTimeout(quickNavIntent); quickNavRelease(key); quickNavLeave(key); },
-        onfocus: (e) => { warm(key); quickNavHover(key, e.currentTarget); },
+        onfocus: (e) => quickNavHover(key, e.currentTarget),
         onblur: () => { quickNavRelease(key); quickNavLeave(key); },
         onkeydown: (e) => quickNavKey(e, key, e.currentTarget),
       }, [
@@ -720,6 +861,7 @@
    *  with the session's token, exactly what its own menu submits). Canvas keeps that token in the
    *  _csrf_token cookie, not in a meta tag; an empty token lands on its "Page Error". */
   function logout() {
+    store.forgetKept?.().catch(() => {}); // (what was kept between page loads is this user's: it goes with the session)
     if (self.BCVBridge?.native?.signOut) { self.BCVBridge.native.signOut(); return; }
     if (BCV.lms?.d2l) { go('/logout'); return; } // (Brightspace's own sign-out, /d2l/logout: lib/lms.js)
     const token = BCV.canvas.csrfToken();
@@ -1149,6 +1291,96 @@
     e.stopPropagation();
   }, true);
 
+  // ---- the move between screens (2.99.33) ------------------------------------------------------------
+  // One motion language with the Mac and Windows apps: going deeper slides the new screen in from the
+  // right, a short way, as it fades in; Back comes in from the left; a section — a sidebar row, a
+  // favourite course, a course's own tabs — crossfades. 220 ms on the house ease-out, transform and
+  // opacity only. Where the browser has view transitions (Chrome; Safari 18) the screen left behind
+  // moves with it, the sidebar, the bar and a course's header and rail holding still (they are the
+  // page's own picture, not part of the move); elsewhere the new screen's own entrance plays the same
+  // move (app.css). The move starts when the new screen is built — never over a skeleton, and never
+  // for a screen drawn again in place — and anything pressed while it plays finishes it at once.
+  // Reduced motion: no transition at all, the 150 ms fade app.css gives every arrival.
+  /** How deep an address sits: a root screen 0, a course's home and its lists 1, an item in one 2, an item's mark 3. */
+  function depthOf(r) {
+    if (r.screen !== 'course' && r.screen !== 'group') return 0;
+    if (!r.tab || LIST_TABS.has(r.tab) || r.tab === 'native' || r.tab === 'tool') return 1;
+    return r.params.get('bcv') === 'feedback' ? 3 : 2;
+  }
+  /** 'fwd', 'back' or 'fade': which way a screen arrives, from the move that brought it. */
+  function motionFor(prev, r, nav, hint) {
+    if (!prev) return 'fade'; // (the page's first screen: it simply arrives)
+    if (hint) return hint;
+    if (nav === 'pop') return 'back';
+    if (nav === 'replace') return 'fade';
+    const a = depthOf(prev), b = depthOf(r);
+    if (b !== a) return b > a ? 'fwd' : 'back';
+    return b >= 2 && prev.url !== r.url ? 'fwd' : 'fade'; // (one item to the next goes on; tabs and sections are side by side)
+  }
+  const VT_OK = typeof document.startViewTransition === 'function';
+  // (a browser drawing without graphics acceleration — html.bcv-noblur, content/early.js — takes a tenth of a second to
+  // take the picture a view transition starts from, every time: there the screen's own entrance plays the move instead)
+  const vtHere = () => VT_OK && !phone() && !U.reducedMotion() && !html.classList.contains('bcv-noblur');
+  let vt = null; // { t, scope }: the transition playing
+  /** Runs `update` (the DOM change that puts the new screen in) as a view transition of `scope` — the
+   *  main column, or a course's own column within its kept shell — moving `kind`'s way. Without view
+   *  transitions, under reduced motion, on the phone (its own push and pop), with the tab hidden or the
+   *  welcome over the page, it simply runs. Resolves once the change is in the page. */
+  function swap(update, kind, scope) {
+    if (!vtHere() || !kind || !scope?.isConnected || document.visibilityState !== 'visible' || BCV.welcome?.active?.() || html.classList.contains('bcv-punch')) {
+      update();
+      return Promise.resolve(false);
+    }
+    if (vt) { // (interrupted: the one playing jumps to its end, its name off its scope before the next is taken)
+      vt.t.skipTransition();
+      vt.scope.style.removeProperty('view-transition-name');
+      vt = null;
+    }
+    html.dataset.bcvVt = kind;
+    scope.style.setProperty('view-transition-name', 'bcv-screen');
+    let t;
+    try {
+      t = typeof document.startViewTransition === 'function' ? document.startViewTransition(() => { update(); }) : null; // (Safari 18 and Chrome have it; vtHere asked)
+      if (!t) throw new Error('no view transitions');
+    } catch {
+      scope.style.removeProperty('view-transition-name');
+      delete html.dataset.bcvVt;
+      update();
+      return Promise.resolve(false);
+    }
+    const mine = { t, scope };
+    vt = mine;
+    t.finished.catch(() => {}).finally(() => {
+      if (vt !== mine) return;
+      vt = null;
+      scope.style.removeProperty('view-transition-name');
+      delete html.dataset.bcvVt;
+    });
+    t.ready.catch(() => {}); // (skipped: the change is in all the same)
+    return t.updateCallbackDone.then(() => true, () => true);
+  }
+  // A press while a transition plays lands on the page's root (the transition's pictures are not the
+  // page): the transition is finished at once, and the press handed to what is under it now.
+  let vtPress = null;
+  document.addEventListener('pointerdown', (e) => {
+    vtPress = null;
+    const playing = vt?.t || BCV.early?.xvt?.(); // (this page's own move, or the crossfade a page load arrived on: content/early.js)
+    if (!playing || e.target !== html || e.button !== 0) return;
+    playing.skipTransition();
+    vtPress = { x: e.clientX, y: e.clientY, at: Date.now() };
+  }, true);
+  document.addEventListener('click', (e) => {
+    const p = vtPress;
+    vtPress = null;
+    if (!p || e.target !== html || Date.now() - p.at > 800 || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) return;
+    const el = document.elementFromPoint(p.x, p.y)?.closest?.('a[href], button, [role="link"], [role="button"], [role="tab"], summary, label, input, select, textarea');
+    if (!el || el.disabled || !document.getElementById('bcv-app')?.contains(el)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (el.matches('input, select, textarea')) el.focus();
+    else el.click();
+  }, true);
+
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
   /** A Canvas-drawn page or a tool's page: work marked there (an LTI plugin posting a grade) lands
@@ -1160,7 +1392,10 @@
     const r = parseRoute();
     state.route = r;
     if (toolish(prev) && !toolish(r)) store.invalidateGrades();
-    const nav = state.navKind || 'push'; // (which way the screen arrives from: forward rises, back settles down; the phone slides)
+    const nav = state.navKind || 'push'; // (which way the screen arrives from: the phone slides it; motionFor below for the rest)
+    const kind = quiet ? null : motionFor(prev, r, nav, state.navMotion);
+    state.navMotion = null;
+    const kept0 = BCV.canvas.keptCount?.() ?? 0; // (what was kept between page loads, handed out from here on: this draw's)
     noteArrival(r); // the trail, and state.from: what every Back on this screen names
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
@@ -1182,7 +1417,8 @@
     for (const ov of document.querySelectorAll('.bcv-sheet-ov, .bcv-viewer-ov')) ov.remove();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     BCV.search?.dock?.(BCV.app, r); // the search box at the left of the top bar on every screen but the Dashboard, whose header has it (kept as it is when it is already there)
-    const ctx = { app: BCV.app, route: r, alive, dark: state.dark };
+    // ctx.swap: a screen that keeps its shell (a course's tabs) puts its new column in through it, so the column moves as a screen would
+    const ctx = { app: BCV.app, route: r, alive, dark: state.dark, swap: (update, scope) => (alive() ? swap(update, kind, scope) : Promise.resolve(update())) };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
     // skeleton in its place, shaped like its content (course cards on Grades, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
@@ -1249,12 +1485,23 @@
     if (!alive()) return;
     dressHead(el, r.screen); // the theme's photo on this screen's header, if it has one
     if (quiet) el.classList.add('bcv-screen--still'); // (drawn again in place: no rise)
-    else el.classList.add(nav === 'pop' ? 'bcv-screen--back' : 'bcv-screen--fwd'); // (the way it arrives: see the motion rules in app.css)
-    if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
+    else {
+      el.classList.add(nav === 'pop' ? 'bcv-screen--back' : 'bcv-screen--fwd'); // (the phone's push and pop: app.css)
+      el.dataset.bcvArrive = kind; // (the way it arrives, without view transitions: app.css)
+    }
+    if (el.parentNode !== main) { // a screen that kept its shell (a course's rail) stays put
+      const from = main.firstElementChild;
+      const moving = !!kind && !!from && !from.classList.contains('bcv-screen--skel'); // (over a skeleton the content simply lands: the move was the press's, a moment ago)
+      if (moving && vtHere()) el.classList.add('bcv-screen--vt'); // (the transition carries it: no entrance of its own on top)
+      await swap(() => main.replaceChildren(el), moving ? kind : null, main);
+      if (!alive()) return;
+    }
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
     BCV.canvas.settled?.(); // from here on this screen's requests are warm-ups: the next press takes their slots
     warmAround(r);
+    if ((BCV.canvas.keptCount?.() ?? 0) > kept0) redrawWhenAnswered(id, r); // (drawn from what was kept: Canvas's own answer puts it right)
+    else html.classList.remove('bcv-kept');
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.iosShell?.rendered(); // (the iPhone app's bar takes the screen's title)
@@ -1266,6 +1513,31 @@
     else if (r.params.get('bcv') === 'whatsnew' && BCV.whatsnew) whatsnewHere();
     else if (r.params.get('bcv') === 'simquiz') simQuizHere();
     else if (r.params.get('bcv') === 'rubric') rubricHere();
+  }
+
+  /** A screen drawn from answers kept between page loads (store.restoreKept), or lapsed in the memo, is
+   *  drawn again, in place and still, once Canvas has answered — only when an answer differs, once its
+   *  arrival has played out, and never under the student: not when something is open over it, being
+   *  typed in or selected, nor once they have pressed or typed anything on it (Canvas's answers are in
+   *  the memo then, for the next draw). A screen they have moved on from is left alone.
+   *  (html.bcv-kept marks a screen on show from such answers, until Canvas has answered for it.) */
+  let touchedAt = 0; // the student's last press or key: a screen they have started on is never drawn again under them
+  document.addEventListener('pointerdown', () => { touchedAt = Date.now(); }, true);
+  document.addEventListener('keydown', () => { touchedAt = Date.now(); }, true);
+  function redrawWhenAnswered(id, r) {
+    const drawnAt = Date.now();
+    html.classList.add('bcv-kept');
+    const done = () => { if (id === state.renderId) html.classList.remove('bcv-kept'); };
+    BCV.canvas.revalidated().then(async (differs) => {
+      // Only a list is drawn again — a root screen, a course's home or one of its tabs, whose rows are what was kept. An
+      // item's own page drew nothing kept but its course's header, which a later visit has right.
+      if (!differs || id !== state.renderId || depthOf(r) > 1 || r.params.get('bcv')) return done(); // (nor a screen with work of its own over it: the setup, a hand-in, a quiz)
+      await U.afterMotion(main, 900); // (its arrival plays out first: the rows are not swapped mid-entrance)
+      const busy = () => overlayOpen() || !!document.querySelector('.bcv-pv, .bcv-quicknav, .bcv-spot-ov') || BCV.welcome?.active?.() || BCV.setup?.active?.() || quizHere() || state.submitOpen
+        || (document.activeElement && document.activeElement.matches?.('input, textarea, select, [contenteditable="true"]')) || !!String(window.getSelection?.() || '').trim();
+      if (id !== state.renderId || touchedAt > drawnAt || busy()) return done(); // (in use: Canvas's answers are in the memo for the next draw)
+      await render({ quiet: true });
+    }).catch(done);
   }
 
   /** The theme's photo behind a root screen's header (the Theme step's Headers): sharp at the right,
@@ -1335,16 +1607,21 @@
   }
 
   async function loadShellData({ force = false } = {}) {
+    const kept0 = BCV.canvas.keptCount?.() ?? 0;
     store.groups({ force }).catch(() => {}); // alongside, not awaited: Groups and the calendar's contexts both want it, and neither should pay a round trip for it later
-    const [me, favs, term, todos, unread, account, notifs] = await Promise.all([
+    const shellP = Promise.all([
       store.me({ force }).catch(() => null),
       store.favorites({ force }).catch(() => []),
       store.currentTerm().catch(() => ''),
       store.todo({ force }).catch(() => null),
       store.unreadCount({ force }).catch(() => null),
       store.account().catch(() => null),
-      store.notifUnread({ force }).catch(() => null),
     ]);
+    // (the notifications' count reads the activity stream, which is not kept between page loads: its badge fills in
+    // where it is when it lands, rather than the sidebar waiting for it — asked for after the rest, in the order it always was)
+    const notifsP = store.notifUnread({ force }).catch(() => null);
+    const [me, favs, term, todos, unread, account] = await shellP;
+    const was = shellLook();
     state.me = me;
     state.favs = favs;
     if (!state.loadKey && !html.classList.contains('bcv-settled')) progress(true, loadKeyFor(state.route || parseRoute())); // a course page's own favourite row, once the favourites are known
@@ -1352,9 +1629,14 @@
     state.todoCount = todos ? todos.length : null;
     state.unread = unread;
     state.account = account;
-    state.notifCount = notifs;
-    renderSide();
+    if (!force && side?.querySelector('.bcv-nav') && was === shellLook()) paintCounts(); // (the same rows: the badges in place, nothing rebuilt under the pointer)
+    else renderSide();
+    notifsP.then((n) => { state.notifCount = n; paintCounts(); });
+    // drawn from what was kept between page loads: Canvas's own answers put it right once they are in
+    if (!force && (BCV.canvas.keptCount?.() ?? 0) > kept0) BCV.canvas.revalidated().then((differs) => { if (differs) loadShellData(); }).catch(() => {});
   }
+  /** What the sidebar's rows are drawn from (the badges aside): who is signed in, and the favourites. */
+  const shellLook = () => JSON.stringify([state.me?.name, state.me?.avatar, (state.favs || []).map((c) => [c.id, c.shortName || c.name, c.color])]);
 
   async function refreshCounts() {
     const [todos, unread, notifs] = await Promise.all([store.todo().catch(() => null), store.unreadCount().catch(() => null), store.notifUnread().catch(() => null)]);
@@ -1690,7 +1972,11 @@
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
     if (welcome === 'search' && (html.classList.contains('bcv-phone') || parseRoute().screen !== 'dashboard')) welcome = false; // (the search box is the Dashboard's, and a phone has none: it waits for the Dashboard)
     if (welcome) BCV.welcome.cover();
+    // (2.99.33) what the first screen opens with, as it was last read, into the memo — read alongside the photos below,
+    // so the screen is drawn at once and put right in place when Canvas answers (store.restoreKept)
+    const keptP = state.lookOn ? store.restoreKept?.().catch(() => 0) : null;
     state.themeImages = await BCV.theme?.loadImages?.({ need: picSlots(parseRoute().screen) }).catch(() => null); // the theme's photos (lib/theme.js): the index, and the pictures this page shows
+    await keptP;
     if (state.themeImages) BCV.theme?.fillTones?.(state.themeImages).catch(() => {}); // photos kept before tones were: read now, saved, drawn again by the listener below
     await applySkin(state.lookOn);
     mountLookToggle();

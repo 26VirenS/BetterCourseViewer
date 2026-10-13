@@ -1105,6 +1105,123 @@
     const all = await keptRead, uid = keptUser(), now = Date.now();
     return new Map(Object.entries(all).filter(([, v]) => v && v.uid === uid && now - (v.at || 0) < KEPT_AGE).map(([cid, v]) => [cid, { list: Array.isArray(v.list) ? v.list : null, weights: v.weights && typeof v.weights === 'object' ? v.weights : null }]));
   }
+  // ---- what a page opens with, kept between page loads (2.99.33) ---------------------------------------
+  // The same idea as the assignments above, for the lists the first screen of a page draws from: who you
+  // are, the course list with its colours, cards and current totals, what is due and what you added
+  // yourself, the announcements' titles, the unread count, your groups, and the courses opened last
+  // (their tabs, front page, modules and to do). Kept in storage.local on this device only — this site
+  // and this user, at most a week old — without the long texts no screen reads before Canvas has
+  // answered again (the bodies of announcements, groups and planner items). lib/canvas-api.js hands a
+  // kept answer out (or one of these lapsed in the memo) and asks Canvas for it again in the same
+  // breath; the app draws the screen again in place when the two differ. The Grades screens never draw
+  // from it: they ask with maxAge, which nothing kept meets. Not in the apps: their own screens ask
+  // through native-app.js, which takes Canvas's answers as they come (keptFormOf says no there).
+  const answersKey = `kept:answers:${location.host}`;
+  const ANSWERS_AGE = 7 * 24 * 60 * MIN;
+  const ANSWERS_MAX = 768 * 1024; // (bytes, all of it: the courses opened longest ago go first)
+  const without = (fields) => (list) => (Array.isArray(list) ? list.map((x) => { if (!x || typeof x !== 'object') return x; const o = { ...x }; for (const f of fields) delete o[f]; return o; }) : list);
+  const plainPlanner = (list) => (Array.isArray(list) ? list.map((it) => (it?.plannable && typeof it.plannable === 'object' ? { ...it, plannable: without(['details', 'description', 'message'])([it.plannable])[0] } : it)) : list);
+  /** [the keys, the form kept (null: as Canvas gave it), how many of each kind at most — a kind being the key without its
+   *  course's id, so 8 is eight courses' tabs and eight courses' front pages]. */
+  const KEEP = [
+    [/^(me|account|colors|courses:all|cards|planner:overrides|unread)$/, null, 1],
+    [/^planner:(21|mine)$/, plainPlanner, 2],
+    [/^annfeed$/, without(['message']), 1],
+    [/^groups$/, without(['description']), 1],
+    [/^(tabs:courses|front:courses):\d+$/, null, 8],
+    [/^(modules|ctodo):\d+$/, null, 8],
+  ];
+  const keepRule = (key) => KEEP.find(([re]) => re.test(key)) || null;
+  const keepable = () => !self.BCVBridge?.native && !!api?.storage?.local && window.self === window.top;
+  /** The form an answer is kept in, or undefined when it is not one that is kept (nor, in the apps, any). */
+  function keptFormOf(key, value) {
+    if (!keepable()) return undefined;
+    const rule = keepRule(key);
+    if (!rule || value === undefined) return undefined;
+    return rule[1] ? rule[1](value) : value;
+  }
+  let answersRead = null; // (one read per page load, kept up to date by this page's own writes)
+  const readAnswers = () => { if (!answersRead) answersRead = api.storage.local.get(answersKey).then((r) => r?.[answersKey] || null).catch(() => null); return answersRead; };
+  const answersQueue = new Map(); // key → { value, at }: answered since the last write
+  let answersDrop = null; // key → whether a write since the last write made it stale
+  let answersTimer = 0, answersChain = Promise.resolve();
+  function keepAnswer(key, value) {
+    if (!keepable()) return;
+    const form = keptFormOf(key, value);
+    if (form === undefined) return;
+    answersQueue.set(key, { value: form, at: Date.now() });
+    if (!answersTimer) answersTimer = setTimeout(flushAnswers, 1500); // (a screen's answers land together: one write for them)
+  }
+  /** A write invalidated these keys (lib/canvas-api.js): what is kept of them goes too, so the next page never opens on
+   *  what the student has just changed (a task ticked off, a course starred). Canvas's next answer is kept again. */
+  function dropAnswers(which) {
+    if (!keepable()) return;
+    const was = answersDrop;
+    answersDrop = was ? (k) => was(k) || which(k) : which;
+    for (const k of [...answersQueue.keys()]) if (which(k)) answersQueue.delete(k);
+    if (!answersTimer) answersTimer = setTimeout(flushAnswers, 1500);
+  }
+  function flushAnswers() {
+    clearTimeout(answersTimer); answersTimer = 0;
+    const drop = answersDrop; answersDrop = null;
+    if (!answersQueue.size && !drop) return;
+    const batch = [...answersQueue]; answersQueue.clear();
+    answersChain = answersChain.then(async () => {
+      try {
+        const uid = keptUser();
+        if (!uid) return;
+        const had = await readAnswers();
+        const entries = had?.uid === uid && had.entries && typeof had.entries === 'object' ? { ...had.entries } : {};
+        let changed = false;
+        if (drop) for (const k of Object.keys(entries)) if (drop(k) && !batch.some(([b]) => b === k)) { delete entries[k]; changed = true; }
+        for (const [key, e] of batch) {
+          const was = entries[key];
+          // (the same answer again is not written: only refreshed once a day, so it does not age out)
+          if (was && e.at - (was.at || 0) < 24 * 60 * MIN && JSON.stringify(was.value) === JSON.stringify(e.value)) continue;
+          entries[key] = e;
+          changed = true;
+        }
+        if (!changed) return;
+        // each kind to its own count, the newest kept; then the whole to its size, the oldest course's going first
+        const now = Date.now();
+        for (const [key, e] of Object.entries(entries)) if (!keepRule(key) || now - (e?.at || 0) > ANSWERS_AGE) delete entries[key];
+        const kinds = new Map(); // kind → its keys
+        for (const k of Object.keys(entries)) { const kind = k.replace(/:\d+$/, ''); kinds.set(kind, [...(kinds.get(kind) || []), k]); }
+        for (const keys of kinds.values()) {
+          keys.sort((a, b) => entries[b].at - entries[a].at);
+          for (const k of keys.slice(keepRule(keys[0])[2])) delete entries[k];
+        }
+        let size = JSON.stringify(entries).length;
+        const byAge = Object.keys(entries).filter((k) => keepRule(k)?.[2] > 2).sort((a, b) => entries[a].at - entries[b].at);
+        while (size > ANSWERS_MAX && byAge.length) { const k = byAge.shift(); size -= JSON.stringify(entries[k]).length; delete entries[k]; }
+        if (size > ANSWERS_MAX) return; // (the lists themselves past the size: not kept rather than kept in part)
+        const record = { uid, entries };
+        await api.storage.local.set({ [answersKey]: record });
+        answersRead = Promise.resolve(record);
+      } catch { /* (nothing kept: the next page asks Canvas, as before) */ }
+    });
+  }
+  addEventListener('pagehide', flushAnswers); // (answers that land as the page is left are still kept)
+  C.keepWith({ form: keptFormOf, answered: keepAnswer, dropped: dropAnswers });
+  /** Puts what was kept for this user into the memo, for the first screen to draw from (the app calls it as the page boots). Returns how many answers. */
+  async function restoreKept() {
+    if (!keepable()) return 0;
+    const had = await readAnswers();
+    const uid = keptUser();
+    if (!uid || !had || had.uid !== uid || !had.entries) return 0;
+    const now = Date.now();
+    const fresh = Object.fromEntries(Object.entries(had.entries).filter(([key, e]) => keepRule(key) && e && now - (e.at || 0) < ANSWERS_AGE));
+    C.seed(fresh);
+    return Object.keys(fresh).length;
+  }
+  /** Everything kept between page loads for this site, gone (signing out). */
+  async function forgetKept() {
+    answersQueue.clear(); keepQueue.clear(); answersDrop = null;
+    clearTimeout(answersTimer); answersTimer = 0;
+    answersRead = Promise.resolve(null); keptRead = Promise.resolve({});
+    try { await api.storage.local.remove([answersKey, keptKey]); } catch { /* nothing to forget */ }
+  }
+
   // ---- grades change behind the page's back ------------------------------------------------------
   // A grade lands in Canvas while this page keeps what it read: a tool (an LTI plugin marking work
   // in its own frame), a teacher elsewhere. Every screen that shows a score forgets its answers here,
@@ -1705,6 +1822,7 @@
 
   BCV.store = {
     keptAssignments, // (2.98.92)
+    restoreKept, forgetKept, // (2.99.33)
     env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, createNotes, deleteNote, deleteNotes, REPEATS, repeatDates, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
