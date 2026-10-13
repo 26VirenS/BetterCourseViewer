@@ -41,10 +41,11 @@ public readonly record struct VaultFile(VaultState State, byte[]? Plain)
 }
 
 /// <summary>
-/// Simpl's own encryption: the student wanted what Simpl keeps of theirs walled off, and nothing to unlock. Every store of
-/// theirs on this PC — the preferences, the extension's storage, the answers kept, the flashcards, the saved sign-in — is
-/// sealed with one key, AES-256-GCM, each file bound to what it is (its purpose is the cipher's associated data, so one
-/// cannot be swapped for another) and a cache's file named by an HMAC of what it holds, so the names say nothing either.
+/// Simpl's own encryption: the student wanted what Simpl keeps of theirs walled off, and nothing to unlock as Simpl
+/// opens. Every store of theirs on this PC — the preferences, the extension's storage, the answers kept, the flashcards,
+/// the saved sign-in (its password locked with Windows Hello besides, where it is set up: LoginVault) — is sealed with
+/// one key, AES-256-GCM, each file bound to what it is (its purpose is the cipher's associated data, so one cannot be
+/// swapped for another) and a cache's file named by an HMAC of what it holds, so the names say nothing either.
 /// <para/>
 /// The key is 32 random bytes, made the first time and kept in vault.key wrapped twice: inside, by an RSA-2048 key of
 /// this PC's TPM that never leaves the chip (Windows' Platform Crypto Provider, this user's own key store, OAEP); outside,
@@ -54,8 +55,8 @@ public readonly record struct VaultFile(VaultState State, byte[]? Plain)
 /// <para/>
 /// What it stops: the files copied, backed up, read by another account or an administrator, a lost disk — all noise
 /// without this user's Windows sign-in on this very PC. What it cannot: a program running as this same user, while Simpl
-/// is installed, may ask the TPM and Windows just as Simpl does; only an unlock prompt (Windows Hello) closes that, and
-/// the student chose to have none.
+/// is installed, may ask the TPM and Windows just as Simpl does; only an unlock prompt closes that — which is why the
+/// saved sign-in's password is locked with Windows Hello too (Hello), and nothing else is: Simpl opens with no prompt.
 /// <para/>
 /// A vault.key that cannot be opened (the TPM cleared, the profile copied to another PC or user) never stops Simpl: one
 /// line in the log, it and what it sealed moved to an Unreadable-… folder beside them (not deleted: put back, they open
@@ -411,15 +412,16 @@ public static class Vault
     /// The TPM's name for the vault's key: SimplCourses.Simpl.Vault for Simpl's own folder; a --profile's (the screenshot
     /// suite's, a developer's) its own, so erasing one never takes another's key with it.
     /// </summary>
-    private static string KeyName
+    private static string KeyName => KeyNameFor("SimplCourses.Simpl.Vault");
+
+    /// <summary>A key's name in Windows' stores for this profile: <paramref name="name"/> for Simpl's own folder; with
+    /// --profile, followed by 8 hex characters of the SHA-256 of that folder's path (the vault's TPM key, the saved
+    /// sign-in's Windows Hello key).</summary>
+    public static string KeyNameFor(string name)
     {
-        get
-        {
-            const string name = "SimplCourses.Simpl.Vault";
-            if (Launch.Get("profile") == null) return name;
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(AppPaths.Root).TrimEnd('\\', '/').ToLowerInvariant()));
-            return name + "." + Convert.ToHexString(hash, 0, 4).ToLowerInvariant();
-        }
+        if (Launch.Get("profile") == null) return name;
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(AppPaths.Root).TrimEnd('\\', '/').ToLowerInvariant()));
+        return name + "." + Convert.ToHexString(hash, 0, 4).ToLowerInvariant();
     }
 
     /// <summary>

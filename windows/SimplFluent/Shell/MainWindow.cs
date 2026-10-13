@@ -358,15 +358,18 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         return new Grid { Children = { v } };
     }
 
-    /// <summary>"Stay logged in?", once Canvas is reached with details typed in the card (the Mac's alert).</summary>
+    /// <summary>"Stay logged in?", once Canvas is reached with details typed in the card (the Mac's alert): where Windows
+    /// Hello is set up, the details are locked with it (Stay Logged In has Windows Hello ask once: LoginVault).</summary>
     private void AskStay()
     {
         if (engine == null || stayAsked) return;
         stayAsked = true;
         var e = engine;
         var icon = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 64, Height = 64, HorizontalAlignment = HorizontalAlignment.Left };
-        var body = K.V(14, icon,
-            K.Wrapped("Simpl keeps your username and password on this PC only, encrypted inside Simpl, and signs you in when your school asks again. Two-step codes still come to you.", Ty.Body, B.Text));
+        var words = Hello.Supported == true
+            ? "Simpl keeps your username and password on this PC only, locked with Windows Hello, and signs you in with your face, fingerprint or PIN when your school asks again. Two-step codes still come to you."
+            : "Simpl keeps your username and password on this PC only, encrypted inside Simpl, and signs you in when your school asks again. Two-step codes still come to you.";
+        var body = K.V(14, icon, K.Wrapped(words, Ty.Body, B.Text));
         var s = new Sheet { Title = "Stay logged in?", Body = body, Width = 420 };
         s.Add("Stay Logged In", SheetButtonKind.Primary, () => e.Login.Stay(true));
         s.Add("Not Now", SheetButtonKind.Close, () => e.Login.Stay(false));

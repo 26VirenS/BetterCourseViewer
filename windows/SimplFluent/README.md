@@ -108,20 +108,46 @@ run Simpl; SmartScreen's warning on a new download fades as the signed releases 
 
 ## Data and encryption
 
-What Simpl keeps of the student's in `%LOCALAPPDATA%\Simpl` is encrypted by Simpl itself (`Support/Vault.cs`), with
-nothing to unlock:
+What Simpl keeps of the student's in `%LOCALAPPDATA%\Simpl` is encrypted with Windows' own protection — DPAPI, its
+key in this PC's TPM — and opened with nothing to unlock as Simpl starts. The saved sign-in's password is locked with
+**Windows Hello** besides: Windows asks for the student's face, fingerprint or PIN before Simpl can type it in.
 
-- **Encrypted**: the preferences (`prefs.json`), the extension's storage (`storage.json`: settings, grade history,
-  goals), the answers kept for a quick start (`Answers\`), the flashcards (`flashcards.json`) and the saved sign-in
-  (`login.bin`; no longer Windows' Credential Manager). Each is AES-256-GCM, its file beginning `SIMPLENC`, bound to
-  what it is (one file cannot be passed off as another); an answer's file and its school's folder are named by an
-  HMAC under the key, so the names say nothing either.
+- **Encrypted** (`Support/Vault.cs`): the preferences (`prefs.json`), the extension's storage (`storage.json`:
+  settings, grade history, goals), the answers kept for a quick start (`Answers\`), the flashcards (`flashcards.json`)
+  and the saved sign-in (`login.bin`; no longer Windows' Credential Manager). Each is AES-256-GCM, its file beginning
+  `SIMPLENC`, bound to what it is (one file cannot be passed off as another); an answer's file and its school's folder
+  are named by an HMAC under the key, so the names say nothing either.
 - **The key**: 32 random bytes made the first time, kept in `vault.key` wrapped twice: by an RSA-2048 key in this PC's
   TPM that cannot be exported (the Platform Crypto Provider, this user's keys, `SimplCourses.Simpl.Vault`; a
   `--profile` has one of its own), RSA-OAEP SHA-256 (SHA-1 on a TPM that refuses it); then by Windows for this user
   (DPAPI). A PC or VM with no TPM keeps the DPAPI wrap alone. `Program.Main` starts unwrapping it first of all, on a
   worker (the TPM takes 50–300 ms). A new vault is kept by DPAPI alone for the seconds the TPM takes to make its key,
   then by both. Settings ▸ Data ▸ Encryption says which holds it; simpl.log's `vault:` lines say what happened.
+- **The saved sign-in** (`Support/LoginVault.cs`, `Support/Hello.cs`, `Support/LoginRecord.cs`): `login.bin`, sealed
+  by the vault, holds its facts — the sign-in page's host, the username, when it was saved, how its password is locked
+  — so Settings and the sign-in know there is one, and whose, without a prompt. Where Windows Hello is set up (a PIN at
+  least: `KeyCredentialManager.IsSupportedAsync`), **Stay Logged In** has Windows make a key for Simpl in this user's
+  Windows Hello container (`KeyCredentialManager.RequestCreateAsync`, `SimplCourses.Simpl.SignIn`, a `--profile`'s
+  its own; in the TPM where there is one, never exportable), which signs only after the face, fingerprint or PIN. It
+  signs 32 random bytes kept in the record (the challenge) twice: the same signature both times (RSA PKCS#1 v1.5 is),
+  its SHA-256 is the AES-256-GCM key the password is sealed with, bound to the host and username; only that sealed
+  password is kept. When the school's sign-in page comes up, Simpl finds the key (`OpenAsync`), asks it to sign the
+  challenge (`RequestSignAsync`: Windows asks, under "Logging you in", which says so), opens the password with the
+  key, fills it in and sends it; the key, the signature and the bytes they passed through are zeroed after.
+  (KeePassXC's Windows Hello quick unlock works the same way.) Windows' prompt can open behind the window of an app
+  without a package: Simpl looks for it (`Credential Dialog Xaml Host`) three times 150 ms apart and once more 600 ms
+  on, and brings it forward.
+  - **No Windows Hello** (no PIN set up), Windows refusing, or two signatures that differ: the password stays in the
+    vault, as 0.2.7 kept it. Settings ▸ General says so, with how to set Windows Hello up and a button to Windows'
+    Sign-in options; Settings ▸ General's **Lock with Windows Hello** locks it once Windows Hello is there.
+  - **Cancelled**: at Stay Logged In, kept in the vault, not locked (Lock with Windows Hello does it later); at the
+    sign-in page, nothing is filled — the school's page shows, to sign in by hand.
+  - **Windows Hello's key gone** (Windows Hello reset, the PIN removed): what it locked can never be opened, so the
+    saved sign-in is forgotten — one line in simpl.log — Simpl's card comes up with the username in it, and the next
+    Stay Logged In keeps it again.
+  - **From 0.2.7** (the password in the vault only), on a PC with Windows Hello: locked at its next use, just after
+    Simpl has signed in with it (one prompt, "Lock your saved sign-in with Windows Hello"); cancelled, not asked again.
+  - **Forget, Sign out, Reset Everything and Uninstall's erase** delete Windows Hello's key too (`DeleteAsync`).
 - **Not encrypted, on purpose**: simpl.log (for a bug report; no password or username is written to it, the
   screenshot suite's `--sign-in` included); what the student saves where they choose (exports, CSVs, converted files);
   files opened in another app or previewed (Windows' temporary folder, as they are, for the app that opens them); the
@@ -129,19 +155,31 @@ nothing to unlock:
   Chromium's own profile (the school's site data and cache), whose cookies Chromium encrypts itself with DPAPI.
 - **From an earlier Simpl**: a plain file is read once and written over sealed (the preferences and the storage within
   a second of starting, the flashcards as it starts); the answers kept in plain text are deleted (only a cache); a
-  sign-in in Credential Manager (`Simpl Courses/sign-in`) is moved into `login.bin` and deleted there. The first
-  Windows app (`windows/Simpl`) shares the folder and cannot read sealed files: going back to it starts it afresh.
+  sign-in in Credential Manager (`Simpl Courses/sign-in`) is moved into `login.bin` and deleted there (then locked
+  with Windows Hello at its next use, as 0.2.7's). The first Windows app (`windows/Simpl`) shares the folder and cannot
+  read sealed files: going back to it starts it afresh.
 - **A key that cannot be opened** (the TPM cleared, the folder copied to another PC or user): one line in simpl.log,
   `vault.key` and what it sealed moved to `Unreadable-<date>-<time>\` (not deleted: put back, they open again if the
   key ever does), the answers deleted, and a new vault made. Simpl never stops or asks.
-- **Erasing**: Reset Everything and Uninstall's "Also erase" delete `vault.key`, the TPM's key, `login.bin`, anything
-  set aside and the rest, so what was sealed can never be opened again, wherever a copy went. Reset Everything keeps
-  the flashcard sets (as the Mac does), sealed again under a new vault; Uninstall's erase deletes them too.
+- **Erasing**: Reset Everything and Uninstall's "Also erase" delete `vault.key`, the TPM's key, Windows Hello's key,
+  `login.bin`, anything set aside and the rest, so what was sealed can never be opened again, wherever a copy went.
+  Reset Everything keeps the flashcard sets (as the Mac does), sealed again under a new vault; Uninstall's erase
+  deletes them too.
 
-What this protects is data at rest: the files copied or backed up, read by another Windows account or an
-administrator browsing the disk, or a lost disk. What it cannot stop: a program running as the same Windows user,
-while Simpl is installed, can ask the TPM and DPAPI to unwrap the key just as Simpl does. Only an unlock prompt
-(Windows Hello) closes that, and the student chose to have none.
+What the vault protects is data at rest: the files copied or backed up, read by another Windows account or an
+administrator browsing the disk, or a lost disk. A program running as the same Windows user, while Simpl is
+installed, can still ask the TPM and DPAPI to unwrap the vault's key just as Simpl does — and so read the preferences,
+grade history and the sign-in's username without a sound. Windows Hello is what stops it from silently unlocking the
+sign-in's password: that needs Windows Hello's key to sign, and Windows asks the student first, on screen. The limit,
+honestly: what Simpl reads, something able to look inside Simpl while it runs can read too — an administrator (or
+malware with an administrator's rights) debugging a running Simpl sees the password the moment Simpl has unlocked it
+to type it in, as it sees anything else Simpl has open. Windows Hello guards the sign-in from other programs, not from
+a PC that is already compromised. Nothing else is behind a prompt, by design: Simpl opens with nothing to unlock.
+
+A development run (the mock, a demo, a picture) keeps the sign-in in memory only and never asks Windows Hello
+anything — CI's runners have none. `--hello-state locked` or `--hello-state none` (a development run only) shows
+Settings as a PC with Windows Hello would, the sign-in locked with it, or as one without: the pictures
+`settings-signin-hello`, `settings-signin-nohello` and `settings-data-hello`.
 
 CI checks it on every push: one part of the pictures (part 1, which signs in with the mock's login) fails if any
 profile's `prefs.json`, `storage.json`, `flashcards.json`, `login.bin` or kept answer does not begin with `SIMPLENC`,

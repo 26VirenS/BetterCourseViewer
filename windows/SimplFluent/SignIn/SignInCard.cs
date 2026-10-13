@@ -138,7 +138,9 @@ public sealed class SignInCard : Grid
 
 /// <summary>
 /// "Logging you in" (the Mac's LoggingInView): Windows' progress ring over the window while the details go into the
-/// school's page — and, after a moment, a way to the page, for a sign-in that wants something done by hand.
+/// school's page — and, after a moment, a way to the page, for a sign-in that wants something done by hand. While
+/// Windows Hello asks for the saved password, what it is asking for is said under it (its prompt is Windows' own, and
+/// can open behind the window).
 /// </summary>
 public sealed class LoggingIn : Grid
 {
@@ -151,11 +153,20 @@ public sealed class LoggingIn : Grid
         buttons.HorizontalAlignment = HorizontalAlignment.Center;
         var offer = K.V(12, K.Text("Something to do on your school’s page?", Ty.Body, B.Text2).Center(), buttons);
         offer.Visibility = Visibility.Collapsed;
-        var v = K.V(16, K.Spinner(32), K.Text("Logging you in", Ty.Subtitle).Center(), offer);
+        var hello = K.Text("", Ty.Body, B.Text2).Center();
+        hello.Visibility = Visibility.Collapsed;
+        var v = K.V(16, K.Spinner(32), K.Text("Logging you in", Ty.Subtitle).Center(), hello, offer);
         v.HorizontalAlignment = HorizontalAlignment.Center;
         v.VerticalAlignment = VerticalAlignment.Center;
         v.Margin = new Thickness(0, 0, 0, 48);
         Children.Add(v);
+        void Asking(string? reason) => Dispatcher.BeginInvoke(() =>
+        {
+            hello.Text = reason ?? "";
+            hello.Visibility = reason == null ? Visibility.Collapsed : Visibility.Visible;
+        });
+        Loaded += (_, _) => { Hello.Asking += Asking; Asking(Hello.Reason); };
+        Unloaded += (_, _) => Hello.Asking -= Asking;
         Loaded += async (_, _) =>
         {
             Motion.FadeIn(v, Motion.Medium);

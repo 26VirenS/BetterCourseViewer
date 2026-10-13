@@ -9,9 +9,10 @@ namespace Simpl.Support;
 /// showing, and Simpl quit at once, for real (not to the notification area), so the uninstaller finds it gone and takes
 /// the program, its shortcuts and that entry away. What Simpl keeps stays (%LOCALAPPDATA%\Simpl, sealed by the vault,
 /// the saved sign-in with it) unless it is erased first, as Reset Everything erases it — the vault's key too (vault.key
-/// and the TPM's), the flashcards with it, and a sign-in an earlier Simpl kept in Credential Manager and this one never
-/// moved in (LoginVault.Clear deletes that as well). A copy run from its zip is removed by deleting its folder; a
-/// development run never uninstalls anything.
+/// and the TPM's), the saved sign-in's key in Windows Hello, the flashcards with it, and a sign-in an earlier Simpl kept
+/// in Credential Manager and this one never moved in (LoginVault.Clear deletes that as well). Uninstalling without
+/// erasing leaves that Windows Hello key with the sign-in it locks, for Simpl installed again. A copy run from its zip
+/// is removed by deleting its folder; a development run never uninstalls anything.
 /// </summary>
 public static class Uninstall
 {

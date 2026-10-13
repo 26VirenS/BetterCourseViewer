@@ -6,12 +6,13 @@ namespace Simpl.Support;
 
 /// <summary>
 /// Settings ▸ Data ▸ Reset Everything (the Mac's EraseAll): everything Simpl keeps on this PC erased — the preferences,
-/// the extension's storage, the answers kept, the saved sign-in, the school's cookies and site data, the photos, and
-/// the vault's key (Vault.Erase: what it sealed can never be opened again, wherever a copy went) — and Simpl opened again
-/// as if it were new. The flashcard sets are the student's own work and stay, as on the Mac: sealed again under the new
-/// vault. No step may hold it up: each has a few seconds, then the next goes on; the new copy waits for this one to have
-/// quit (--after) before it clears the web data this one was still using. Uninstall Simpl's "Also erase…" erases the
-/// same, the flashcards too (no vault is left to keep them), then quits instead.
+/// the extension's storage, the answers kept, the saved sign-in and its key in Windows Hello, the school's cookies and
+/// site data, the photos, and the vault's key (Vault.Erase: what it sealed can never be opened again, wherever a copy
+/// went) — and Simpl opened again as if it were new. The flashcard sets are the student's own work and stay, as on the
+/// Mac: sealed again under the new vault. No step may hold it up: each has a few seconds, then the next goes on; the
+/// new copy waits for this one to have quit (--after) before it clears the web data this one was still using.
+/// Uninstall Simpl's "Also erase…" erases the same, the flashcards too (no vault is left to keep them), then quits
+/// instead.
 /// </summary>
 public static class EraseAll
 {
@@ -35,7 +36,8 @@ public static class EraseAll
     {
         Log.Write("erase: everything");
         engine?.Answers.Stop();
-        try { LoginVault.Clear(); } catch (Exception e) { Log.Write("erase sign-in: " + e.Message); }
+        // (and its key in Windows Hello, given a few seconds like every step)
+        try { await Task.WhenAny(LoginVault.ClearAsync(), Task.Delay(3000)); } catch (Exception e) { Log.Write("erase sign-in: " + e.Message); }
         if (engine?.Web.CoreWebView2 is { } core)
         {
             try

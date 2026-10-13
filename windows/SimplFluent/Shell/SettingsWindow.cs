@@ -70,7 +70,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
     private static readonly (string Key, string Title, SymbolRegular Icon, Color Tint, string Words)[] Tabs =
     {
-        ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential courses goals set up background notification area close taskbar pin uninstall remove delete"),
+        ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential windows hello face fingerprint lock courses goals set up background notification area close taskbar pin uninstall remove delete"),
         ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent photo picture"),
         ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts activity announcements"),
         ("grades", "Grades", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8), "gpa goal history record what-if track"),
@@ -169,11 +169,17 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         Updates.Changed += OnUpdates;
         Updates.ProgressChanged += OnProgress;
         Appearance.Changed += OnAppearance;
+        LoginVault.Changed += OnSignIn;
+        Hello.Changed += OnSignIn;
+        // (coming forward — back from Windows' Settings, perhaps, where Windows Hello was just set up: asked again)
+        Activated += (_, _) => _ = Hello.CheckAsync(fresh: true);
         Closed += (_, _) =>
         {
             Updates.Changed -= OnUpdates;
             Updates.ProgressChanged -= OnProgress;
             Appearance.Changed -= OnAppearance;
+            LoginVault.Changed -= OnSignIn;
+            Hello.Changed -= OnSignIn;
             open = null;
             main.Activate();
         };
@@ -192,6 +198,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (downloadWords != null) downloadWords.Text = DownloadWords();
     });
     private void OnAppearance() => Dispatcher.BeginInvoke(() => { Pane(); if (tab == "appearance") Render(); });
+    /// <summary>The saved sign-in kept, locked or forgotten, or Windows Hello set up or not: General and Data say it.</summary>
+    private void OnSignIn() => Dispatcher.BeginInvoke(() => { if (open == this && tab is "general" or "data") Render(); });
 
     private void Pane()
     {
@@ -261,16 +269,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 K.Row(SymbolRegular.BuildingBank24, engine.LmsName, engine.Host, change),
                 K.Row(SymbolRegular.SignOut24, "Sign out", $"Your {engine.LmsName} session and any saved sign-in are cleared; settings stay.", signOut)));
 
-        v.Children.Add(K.SectionHeader("Sign-in"));
-        var saved = LoginVault.Load();
-        if (saved != null)
-        {
-            var forget = K.Button("Forget…", () => Dialogs.Confirm(this, "Forget the saved sign-in?", "Simpl will ask for your username and password the next time your school does.", "Forget", () => { LoginVault.Clear(); Render(); }));
-            v.Children.Add(K.Group(K.Row(SymbolRegular.Key24, $"Saved for {saved.User}", $"Sign-in page: {saved.Host}", forget)));
-        }
-        else v.Children.Add(K.Row(SymbolRegular.Key24, "Not saved", "When your school’s sign-in page comes up, sign in with Simpl’s card and answer Stay Logged In."));
-        var holder = KeyHolder() is { } h ? $", with its key held by {h}" : "";
-        v.Children.Add(Foot($"Kept inside Simpl on this PC only, encrypted{holder}: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too."));
+        v.Children.Add(SignInSection());
 
         if (engine.Phase == Phase.Native)
         {
@@ -295,6 +294,56 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         v.Children.Add(K.SectionHeader("This PC"));
         v.Children.Add(UninstallRow());
         return v;
+    }
+
+    private const string HelloSetUp = "Set up Windows Hello (Settings ▸ Accounts ▸ Sign-in options) to lock your saved sign-in behind your face, fingerprint or PIN.";
+
+    /// <summary>
+    /// Sign-in: the saved sign-in (Support/LoginVault.cs) and how it is locked. Locked with Windows Hello: said so.
+    /// Kept in the vault where Windows Hello is set up: Lock with Windows Hello beside Forget…. No Windows Hello here:
+    /// said how to set it up, and a row whose button opens Windows' own Sign-in options.
+    /// </summary>
+    private FrameworkElement SignInSection()
+    {
+        var v = Column(K.SectionHeader("Sign-in"));
+        var saved = LoginVault.Load();
+        var hello = Hello.Supported;
+        var locked = saved?.LockedWithHello == true;
+        FrameworkElement row;
+        if (saved != null)
+        {
+            var forget = K.Button("Forget…", () => Dialogs.Confirm(this, "Forget the saved sign-in?", "Simpl will ask for your username and password the next time your school does.", "Forget", () => { LoginVault.Clear(); Render(); }));
+            UIElement actions = !locked && hello == true ? K.H(8, K.Button("Lock with Windows Hello", () => _ = LockSignIn()), forget) : forget;
+            row = K.Row(SymbolRegular.Key24, $"Saved for {saved.User}", $"Sign-in page: {saved.Host}", actions);
+        }
+        else row = K.Row(SymbolRegular.Key24, "Not saved", "When your school’s sign-in page comes up, sign in with Simpl’s card and answer Stay Logged In.");
+        var group = K.Group(row);
+        if (!locked && hello == false)
+            group.Children.Add(K.Row(SymbolRegular.PersonPasskey24, "Windows Hello", "Not set up on this PC",
+                K.Button("Sign-in options", () => Engine.Engine.OpenExternally(new Uri("ms-settings:signinoptions")))));
+        v.Children.Add(group);
+        var holder = KeyHolder() is { } h ? $", with its key held by {h}" : "";
+        var foot = locked
+            ? "Locked with Windows Hello on this PC: Simpl asks for your face, fingerprint or PIN before it signs you in. Never synced, and only ever typed into your school’s own sign-in page."
+            : saved == null && hello == true
+                ? "Once saved, it’s locked with Windows Hello on this PC: Simpl asks for your face, fingerprint or PIN before it signs you in. Never synced, and only ever typed into your school’s own sign-in page."
+                : $"Kept inside Simpl on this PC only, encrypted{holder}: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too.";
+        if (!locked && hello == false) foot += " " + HelloSetUp;
+        v.Children.Add(Foot(foot));
+        return v;
+    }
+
+    /// <summary>Lock with Windows Hello: it asks; locked, said so. Cancelled, nothing is said; refused, why.</summary>
+    private async Task LockSignIn()
+    {
+        if (busy) return;
+        busy = true;
+        var result = await LoginVault.LockAsync(LoginVault.LockReason);
+        busy = false;
+        if (open != this) return; // (Settings closed meanwhile)
+        if (result == HelloResult.Success) Say("Your saved sign-in is locked with Windows Hello.");
+        else if (result != HelloResult.Canceled) Say("Windows Hello couldn’t lock your saved sign-in on this PC.", true);
+        if (tab == "general") Render();
     }
 
     /// <summary>Uninstall Simpl: Uninstall… for the installed copy (off in a development run, as Updates are); for a copy
@@ -666,13 +715,35 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         _ => null,
     };
 
+    /// <summary>Data ▸ Encryption's words: what encrypts Simpl's data and holds its key (Support/Vault.cs), then how the
+    /// saved sign-in is locked (Support/LoginVault.cs) — nothing of that while Windows has not yet said whether Windows
+    /// Hello is set up.</summary>
+    private static string EncryptionWords()
+    {
+        var data = Vault.Protection switch
+        {
+            VaultProtection.Tpm => "Simpl’s data on this PC is encrypted by Windows (DPAPI) with its key in this PC’s TPM.",
+            VaultProtection.WindowsAccount => "Simpl’s data on this PC is encrypted by Windows (DPAPI) with its key held by your Windows account.",
+            _ => "Simpl’s data on this PC is encrypted (AES-256), but Windows couldn’t keep its key, so what Simpl stores lasts only while it runs.",
+        };
+        var saved = LoginVault.Load();
+        var signIn = saved?.LockedWithHello == true ? "Your saved sign-in is locked with Windows Hello."
+            : Hello.Supported switch
+            {
+                true when saved == null => "A sign-in you save is locked with Windows Hello.",
+                true => "Your saved sign-in isn’t locked with Windows Hello yet: lock it in General ▸ Sign-in.",
+                false when saved == null => "A sign-in you save is encrypted the same way: Windows Hello isn’t set up on this PC.",
+                false => "Your saved sign-in is encrypted the same way: Windows Hello isn’t set up on this PC.",
+                null => null,
+            };
+        return signIn == null ? data : data + " " + signIn;
+    }
+
     private FrameworkElement DataPane()
     {
         var v = Column(K.SectionHeader("Data", 0));
-        // (what Simpl keeps here is encrypted, and what holds its key: Support/Vault.cs)
-        var encryption = K.Row(SymbolRegular.ShieldLock24, "Encryption", KeyHolder() is { } holder
-            ? $"Simpl’s data on this PC is encrypted (AES-256). Its key is held by {holder}."
-            : "Simpl’s data on this PC is encrypted (AES-256), but Windows couldn’t keep its key, so what Simpl stores lasts only while it runs.");
+        // (what Simpl keeps here is encrypted, and what holds its key: Support/Vault.cs; the saved sign-in's lock)
+        var encryption = K.Row(SymbolRegular.ShieldLock24, "Encryption", EncryptionWords());
         if (engine.Phase == Phase.Native)
         {
             var buttons = K.H(8, K.Button("Import…", () => Import("settingsImport", "JSON|*.json;*.txt|All files|*.*")), K.Button("Export…", () => _ = Export("settingsExport", "json", "JSON|*.json")));
