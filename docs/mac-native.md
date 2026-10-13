@@ -402,7 +402,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     a move made mid-way starts from where things are and nothing waits in line. A page that arrives waits until its
     content is there (a third of a second at most), so it never slides in empty and then fills. A move within a place
     swaps the stack's screen at once (the screen under it kept as it was) and the new top arrives by itself; one to
-    another place fades the old page out the way the move goes (`PageExit`) while the new one arrives (`PageArrival`).
+    another place fades the old page out the way the move goes (`PageExit`) while the new one arrives (`PageArrival`),
+    unless the place comes with a screen already on it (an assignment opened from Grades, To Do or the Dashboard; Back
+    or Forward to one): then, as with a push, the old page goes at once and the screen on top arrives, its place's
+    stack made alone — a stack made beside another still fading out showed its place's list, not the screen on it.
     Under Reduce Motion every move is a cross-fade. No element is morphed from one screen into the next: the card and
     the course's heading are drawn by different screens, and a morph between them could not be kept clean.
 
@@ -541,12 +544,14 @@ session's answer in memory; `kept`, an answer kept from before, its counts held 
 `fetched`, asked of the page while the screen waited; `alive`, a screen never put away) — and both picture sets take
 `light-01w-walk`: the app walks through its places as a student's clicks would (`-SimplWalk`, Support/OpenClock.swift),
 each root place, a course and an assignment and then each again, so its console has the time of every first visit and
-every visit again. `light-01v-walk-plain` walks the same way beside it, last and by themselves (the copies picturing
-the rest would slow them, and unevenly), with the screens loading as they did before 1.3.78 (`-SimplPlain`: nothing
+every visit again; last, the assignment opened from the Dashboard (its course's place, made with it on top) and Back,
+where the console must say `open Assignment`, not the course's list. `light-01v-walk-plain` walks the same way beside
+it, last and by themselves (the copies picturing the rest would slow them, and unevenly), with the screens loading as they did before 1.3.78 (`-SimplPlain`: nothing
 held or read ahead, the Dashboard not kept), so the two consoles compare like for like — both against a Canvas a
 quarter of a second away, as a school's is (its assignment lists 0.6 s; the mock's `apiDelay`, as the web's fluid suite
 has it), not the mock's instant answers. In the screenshot suite and in
 developer mode the console also times each call (`call grades: 820 ms`, `read ahead home: 40 ms`) and when each screen
-appeared (`appear Grades: 12 ms`). Each picture is taken with its window brought to the front 0.7 s before (Shot.swift):
-a copy another had covered drew nothing new, so an animation under way in it was pictured where it had stopped. A
+appeared (`appear Grades: 12 ms`), and a stack that sets its own path (`stack: grades set its own path, 1 screens
+to 0` — only its own Back should). Each picture is taken with its window brought to the front 0.7 s before
+(Shot.swift): a copy another had covered drew nothing new, so an animation under way in it was pictured where it had stopped. A
 window the window server gives back empty is asked for again, half a second apart, four times at most.

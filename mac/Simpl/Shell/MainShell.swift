@@ -155,7 +155,12 @@ struct DetailStack: View {
             NavigationStack(path: Binding(get: {
                 engine.nav.current.place.identity == place.identity ? engine.nav.current.path : path
             }, set: { p in
-                if engine.nav.current.place.identity == place.identity { engine.nav.setPath(p) }
+                guard engine.nav.current.place.identity == place.identity else { return }
+                // (in the screenshot suite and developer mode the console says so: only the stack's own Back does this)
+                if OpenClock.verbose, p != engine.nav.current.path {
+                    NSLog("[Simpl] stack: %@ set its own path, %d screens to %d", Engine.name(of: place), engine.nav.current.path.count, p.count)
+                }
+                engine.nav.setPath(p)
             })) {
                 PlaceScreen(place: place)
                     .background(PageGround().ignoresSafeArea())

@@ -690,16 +690,20 @@ final class Engine: ObservableObject, ShellListener {
     /// (1.3.78) A move of the window's, timed (OpenClock) and told to the screens (`move`). A move to another place is
     /// animated on the page spring: the page leaving goes the way the move goes as it fades (PageExit) while the new one
     /// arrives (PageArrival). A move within a place swaps its screen at once — the stack keeps the one under it as it
-    /// was — and the screen on top arrives by itself, so a push and a Back move as the places do.
+    /// was — and the screen on top arrives by itself, so a push and a Back move as the places do. So does a move to
+    /// another place with a screen already on it (an assignment opened from Grades, To Do or the Dashboard, or Back to
+    /// one): its stack is made alone, the old one gone at once, and the screen on top arrives by itself — a stack made
+    /// beside another still fading out showed its own place's list, not the screen it was made with.
     private func moving(_ kind: PageMove.Kind, animated: Bool = true, _ change: (inout Navigator) -> Void) {
         var next = nav
         change(&next)
         guard next != nav else { return } // (the place showing, picked again)
         OpenClock.navigated()
         let across = next.current.place.identity != nav.current.place.identity
+        let fades = animated && across && next.current.path.isEmpty
         PageMotion.leaving(kind)
-        var t = Transaction(animation: animated && across ? Motion.page : nil)
-        t.disablesAnimations = !(animated && across)
+        var t = Transaction(animation: fades ? Motion.page : nil)
+        t.disablesAnimations = !fades
         withTransaction(t) {
             whereabouts.move = PageMove(kind: animated ? kind : .none, serial: move.serial + 1)
             nav = next
