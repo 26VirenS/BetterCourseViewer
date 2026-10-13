@@ -178,6 +178,9 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
   shoot light-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot light-03-todo 12 -SimplPlace todo
+  # (1.3.78) the main screens in both looks, so a change to how screens load and move is seen to leave them as they were
+  shoot light-05-calendar 12 -SimplPlace calendar
+  shoot light-08-course 14 -SimplPlace course:101
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.78) Send from Phone: its panel with the code; the phone connected and two files in (posted by phone_send); a
@@ -219,6 +222,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
+  shoot dark-03-todo 12 -SimplPlace todo
+  shoot dark-04-grades 12 -SimplPlace grades
+  shoot dark-05-calendar 12 -SimplPlace calendar
+  shoot dark-08-course 14 -SimplPlace course:101
+  shoot dark-36-external-tools 16 -SimplPlace externaltools
   shoot dark-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
