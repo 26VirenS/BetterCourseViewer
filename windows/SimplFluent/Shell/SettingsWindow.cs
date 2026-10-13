@@ -856,7 +856,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         auto.Checked += (_, _) => Updates.Automatic = true;
         auto.Unchecked += (_, _) => Updates.Automatic = false;
         // (a copy run from its zip cannot put a version in its own place: the toggle is off, and says why)
-        var install = new ToggleSwitch { IsChecked = Updates.Installed && Updates.InstallAutomatically, IsEnabled = !dev && Updates.Installed };
+        var install = new ToggleSwitch { IsChecked = (Updates.Installed || dev) && Updates.InstallAutomatically, IsEnabled = !dev && Updates.Installed };
         install.Checked += (_, _) => Updates.InstallAutomatically = true;
         install.Unchecked += (_, _) => Updates.InstallAutomatically = false;
         var beta = new ToggleSwitch { IsChecked = Updates.Beta, IsEnabled = !dev };

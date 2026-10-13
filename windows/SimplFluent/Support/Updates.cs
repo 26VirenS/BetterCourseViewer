@@ -210,6 +210,9 @@ public static class Updates
     {
         if (started || Off || Application.Current is not { } app) return;
         started = true;
+        // (Simpl just opened counts as Simpl in use: one in front is given its half minute before an update goes in —
+        // not an update played through, whose pictures are taken sooner)
+        if (!Testing) lastInput = Environment.TickCount64;
         InputManager.Current.PreProcessInput += OnInput;
         ticker = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
         ticker.Tick += (_, _) => Tick();
@@ -221,7 +224,7 @@ public static class Updates
         if (Testing)
         {
             Log.Write($"update test: {TestFile}{(Installed ? ", as an installed copy" : "")}{(Launch.Flag("update-test-critical") ? ", a Critical Update" : "")}");
-            if (Launch.Get("update-test-hold") is { Length: > 0 } what) Hold(what, $"when you close {what}");
+            if (Launch.Get("update-test-hold") is { Length: > 0 } what) Hold(what, $"when you close the {what}");
             _ = Check();
             return;
         }
