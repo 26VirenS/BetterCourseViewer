@@ -37,6 +37,9 @@ mac/
     Support/Shot.swift          the screenshot suite's camera (does nothing without its launch argument)
     Support/Updater.swift       updates: the feed, the download and its checks, the swap and relaunch, earlier versions
     Support/Vault.swift         what Simpl keeps, encrypted, its key in the login Keychain (Data and encryption)
+    Support/PhoneServer.swift   Send from Phone's server on this Mac's Wi-Fi, up only while its panel is open
+    Screens/PhoneHandIn.swift   Send from Phone's panel, its QR code and the photos made into one PDF
+    Resources/PhoneHandIn.html  the page the phone opens (the Windows app carries the same file)
 ```
 
 The web layer (`ios/SimplCourses/Web/`), the models the page's answers decode into, the router, the quiz's run, the
@@ -122,6 +125,31 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
   (`quizAssignment`), so a graded quiz shows its score wherever its card is, not only "Graded".
+- **Send from Phone (1.3.78, the Mac and Windows apps only).** Hand In's *Send from Phone…* (beside Choose Files…, for
+  an assignment that takes files) opens a panel over the form with a QR code. The phone's own camera opens it: a page
+  this Mac serves itself (`Resources/PhoneHandIn.html`, the same file as the Windows app's), with the assignment, its
+  course and the kinds of file it takes, *Take Photo* and *Choose Files*, each file's progress and Retry, then "Sent to
+  your Mac — finish handing in there." Each file arrives in the hand-in as if chosen with Choose Files… (its type
+  checked, converted where it must be); the student looks it over and presses Submit on the Mac — nothing is handed in
+  by itself. **No server anywhere:** `Support/PhoneServer.swift` is a small web server (Network.framework, `NWListener`)
+  on this Mac's private Wi-Fi (or Ethernet) address and a random port, up only while the panel is open — it stops when
+  the panel closes, when the hand-in is sent or cancelled, and after 15 minutes with nothing from the phone. The
+  address holds a 128-bit one-time key (compared in constant time); every other path is 404; only private addresses may
+  connect; one file is at most 50 MB (Hand In's own limit) and a session 500 MB; names are made safe; what came is kept
+  in a temporary folder (`SimplPhone-…`) that goes with the hand-in. The phone and the Mac must be on the same Wi-Fi:
+  some school networks keep devices apart (a phone's hotspot works), and with no Wi-Fi address the panel says "Connect
+  this computer to Wi-Fi to use your phone." An assignment that takes PDFs and not pictures offers *Combine photos into
+  one PDF*: the photos, turned upright and made no larger than 2200 pixels, a page each in the order they came, as one
+  PDF named for the assignment. The code (`PhoneQR`: Core Image's generator, correction M, its modules read back) is
+  drawn in one Canvas — softly rounded modules, dark on white even in dark mode, four modules of quiet space — and
+  arrives once: the panel grows from the button (from 96%, fading in, 240 ms, cubic-bezier(0.23, 1, 0.32, 1)), the
+  finder squares settle (from 85%), then the data ripples out from the centre (each module from 60% over 120 ms, all of
+  it in place within 420 ms); under Reduce Motion a 150 ms fade. "Waiting for your phone…" has a breathing dot, never
+  the code. When the phone opens the page the panel cross-fades to "Phone connected", the code shrinking into its
+  corner, and lists each file coming in with its picture. `Info.plist` says why Simpl uses the local network
+  (`NSLocalNetworkUsageDescription`). The Chrome and Safari extensions and the iPhone app do not have it (an extension
+  cannot take a connection). Pictured as `12c-hand-in-phone` (light and dark) and `12d-hand-in-phone-connected`, where
+  `mac-shots.sh` sends a file to the server with `curl` and checks the console for it in the hand-in.
 
 - **The full Periodic Table (1.3.52, Mac only).** `Tools/PeriodicTable.swift`: the table can be coloured by its kind,
   electronegativity, atomic radius, ionization energy, electron affinity, melting or boiling point, density (log scale),

@@ -1090,6 +1090,11 @@ private struct HandInSheet: View {
     @State private var converting: [String] = []
     /// (1.3.2) A chosen file looked at in a pane at the sheet's right, the sheet widening for it (HandInPreview.swift).
     @ObservedObject private var preview = HandInPreview.shared
+    /// (1.3.78) Send from Phone: its session (the server on this Mac's Wi-Fi and what the phone sent), whether its
+    /// panel is up over the form, and the point it grows from — the button that opened it (PhoneHandIn.swift).
+    @StateObject private var phone = PhoneSession()
+    @State private var phoneOpen = false
+    @State private var phoneAnchor = UnitPoint(x: 0.5, y: 0.8)
 
     private static let limit = 50 * 1024 * 1024 // (read whole into memory and handed to the page: kept to a sane size)
 
@@ -1104,6 +1109,7 @@ private struct HandInSheet: View {
         HStack(spacing: 0) {
             form
                 .frame(width: preview.formWidth)
+                .overlay { phoneLayer }
             if preview.file != nil {
                 Divider()
                 HandInPreviewPane(preview: preview)
@@ -1121,8 +1127,16 @@ private struct HandInSheet: View {
             pickedFiles(result)
         }
         .onChange(of: photos) { _, _ in pickedPhotos() }
+        .onReceive(phone.arrived) { fromPhone($0) }
         .onAppear {
             if !dropped.isEmpty { _ = take(dropped) }
+            // (the screenshot suite: -SimplPhone YES opens Send from Phone a moment after the sheet is up, the picture
+            // waiting for its code)
+            if UserDefaults.standard.bool(forKey: "SimplPhone") && assignment.types.contains("online_upload") {
+                Shot.began()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { openPhone() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { Shot.ended() }
+            }
             // (the screenshot suite: -SimplHandInPreview <file> puts a file in and opens its preview)
             // (1.3.8: a moment after the sheet is up, and through add(), as a file chosen is: the preview opens by itself)
             if let path = UserDefaults.standard.string(forKey: "SimplHandInPreview"), let data = FileManager.default.contents(atPath: path) {
@@ -1131,7 +1145,10 @@ private struct HandInSheet: View {
                 }
             }
         }
-        .onDisappear { preview.close(animated: false) }
+        .onDisappear {
+            preview.close(animated: false)
+            phone.end() // (the hand-in sent or cancelled: the server stopped, what the phone sent thrown away)
+        }
         .task { await loadConvertible() }
         .interactiveDismissDisabled(sending)
     }
@@ -1233,14 +1250,20 @@ private struct HandInSheet: View {
                     Text("Converting \(name)…").foregroundStyle(.secondary)
                 }
             }
-            HStack(spacing: 10) {
-                Button { importing = true } label: {
-                    Label("Choose Files…", systemImage: "folder")
+            // (1.3.78) Send from Phone beside them; on its own line when the three will not fit
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    chooseButtons
+                    phoneButton
+                    Spacer(minLength: 0)
                 }
-                PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
-                    Label("Choose from Photos…", systemImage: "photo.on.rectangle")
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        chooseButtons
+                        Spacer(minLength: 0)
+                    }
+                    phoneButton
                 }
-                Spacer(minLength: 0)
             }
         } header: {
             Text("Files")
@@ -1251,6 +1274,24 @@ private struct HandInSheet: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    @ViewBuilder
+    private var chooseButtons: some View {
+        Button { importing = true } label: {
+            Label("Choose Files…", systemImage: "folder")
+        }
+        PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
+            Label("Choose from Photos…", systemImage: "photo.on.rectangle")
+        }
+    }
+
+    /// (1.3.78) Send from Phone: a QR code the phone's camera opens, and what the phone sends comes into this hand-in.
+    private var phoneButton: some View {
+        Button { openPhone() } label: {
+            Label("Send from Phone…", systemImage: "iphone")
+        }
+        .help("Scan a code with your phone to send photos and files to this hand-in")
     }
 
     /// (1.3) A press on it opens the Open panel, as Choose Files… does.
@@ -1337,14 +1378,15 @@ private struct HandInSheet: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 8)
+            // (while Send from Phone is up, Escape and Return are its own)
             Button("Cancel") { dismiss() }
                 .glassButton()
-                .keyboardShortcut(.cancelAction)
+                .keyboardShortcut(phoneOpen ? nil : .cancelAction)
                 .disabled(sending)
             Button("Submit") { submit() }
                 .glassButton(prominent: true)
-                .keyboardShortcut(submitKey)
-                .disabled(!ready || sending)
+                .keyboardShortcut(phoneOpen ? nil : submitKey)
+                .disabled(!ready || sending || phoneOpen)
         }
         .controlSize(.large)
         .padding(.horizontal, 20)
@@ -1370,6 +1412,79 @@ private struct HandInSheet: View {
             .allowsHitTesting(false)
             .transition(.opacity)
         }
+    }
+
+    // MARK: - Send from Phone
+
+    /// (1.3.78) Send from Phone's panel over the form, the form dimmed under it. It grows from the button that opened it
+    /// — from 96%, fading in, quick to start and settling softly — and goes a little quicker than it came; under Reduce
+    /// Motion it fades.
+    private var phoneLayer: some View {
+        ZStack {
+            if phoneOpen {
+                Rectangle()
+                    .fill(Color.black.opacity(0.16))
+                    .contentShape(Rectangle())
+                    .transition(.opacity.animation(.easeOut(duration: reduceMotion ? 0.15 : 0.2)))
+                    .accessibilityHidden(true)
+                PhonePanel(session: phone, title: assignment.title, accent: accent, retry: startPhone, close: closePhone)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(phoneTransition)
+            }
+        }
+    }
+
+    private var phoneTransition: AnyTransition {
+        if reduceMotion { return AnyTransition.opacity.animation(.easeInOut(duration: 0.15)) }
+        return .asymmetric(
+            insertion: AnyTransition.scale(scale: 0.96, anchor: phoneAnchor).combined(with: .opacity)
+                .animation(.timingCurve(0.23, 1, 0.32, 1, duration: 0.24)),
+            removal: AnyTransition.scale(scale: 0.97, anchor: phoneAnchor).combined(with: .opacity)
+                .animation(.easeIn(duration: 0.15)))
+    }
+
+    private func openPhone() {
+        guard !phoneOpen, !sending else { return }
+        phoneAnchor = HandInSheet.pressedAt(formWidth: preview.formWidth) ?? UnitPoint(x: 0.5, y: 0.8)
+        startPhone()
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .timingCurve(0.23, 1, 0.32, 1, duration: 0.24)) { phoneOpen = true }
+    }
+
+    private func startPhone() {
+        phone.start(PhoneSession.Setup(title: assignment.title, course: assignment.context ?? "", color: assignment.color,
+                                       allowed: assignment.allowed ?? [], convertible: convertible.exts, limit: HandInSheet.limit))
+    }
+
+    /// The panel put away: the server stopped. What came stays in the hand-in, to be looked over and handed in.
+    private func closePhone() {
+        phone.stop()
+        withAnimation(.easeIn(duration: 0.15)) { phoneOpen = false }
+    }
+
+    /// What the phone sent, into the hand-in as a file chosen here would be — its type checked, converted where it
+    /// must be — but not opened in the preview (the panel shows it); the photos' PDF in place of the one before it.
+    private func fromPhone(_ arrival: PhoneSession.Arrival) {
+        switch arrival {
+        case .file(let f):
+            add(f, preview: false)
+        case .photos(let f, let old):
+            if let old, let i = files.firstIndex(where: { $0.id == old }) {
+                preview.removed(files[i])
+                withAnimation(Motion.snappy) { files[i] = f }
+                if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("SimplHandIn added %@ (%d files)", f.name, files.count) }
+            } else {
+                add(f, preview: false)
+            }
+        }
+    }
+
+    /// Where the click that opened the panel was, in the form — the sheet's window holds the form at its left, from its
+    /// top — for the panel to grow from. Nil for a key press.
+    private static func pressedAt(formWidth: CGFloat) -> UnitPoint? {
+        guard let e = NSApp.currentEvent, e.type == .leftMouseUp || e.type == .leftMouseDown,
+              let height = e.window?.contentView?.bounds.height, height > 0, formWidth > 0 else { return nil }
+        let p = e.locationInWindow
+        return UnitPoint(x: min(1, max(0, p.x / formWidth)), y: min(1, max(0, (height - p.y) / height)))
     }
 
     // MARK: - What it knows
@@ -1481,24 +1596,27 @@ private struct HandInSheet: View {
         add(PickedFile(name: name, type: mime, data: bytes))
     }
 
-    private func add(_ f: PickedFile) {
+    private func add(_ f: PickedFile, preview open: Bool = true) {
         guard f.data.count <= HandInSheet.limit else {
             error = "\(f.name) is larger than 50 MB. Hand it in on \(engine.lmsName)’s own page."
             return
         }
         guard allowedName(f.name) else {
-            convert(f)
+            convert(f, preview: open)
             return
         }
         error = nil
         guard !files.contains(where: { $0.name == f.name && $0.data.count == f.data.count }) else { return } // (dropped twice)
         withAnimation(Motion.snappy) { files.append(f) }
-        preview.open(f) // (1.3.8: a file added is looked at straight away — the last one added, where several come at once)
+        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("SimplHandIn added %@ (%d files)", f.name, files.count) }
+        // (1.3.8: a file added is looked at straight away — the last one added, where several come at once; one from the
+        // phone is shown in Send from Phone's own panel instead)
+        if open { preview.open(f) }
     }
 
     /// (1.2.13) A file of a type the assignment doesn't take: converted to one it does, as the web hand-in does
     /// (Word, text and pictures to PDF, and so on); said plainly when it can't be.
-    private func convert(_ f: PickedFile) {
+    private func convert(_ f: PickedFile, preview open: Bool = true) {
         guard let allowed = assignment.allowed, !converting.contains(f.name) else { return }
         error = nil
         withAnimation(Motion.snappy) { converting.append(f.name) }
@@ -1510,7 +1628,7 @@ private struct HandInSheet: View {
                     error = "\(f.name) can’t be turned into \(allowedList) here. This assignment takes \(allowedList) files."
                     return
                 }
-                add(PickedFile(name: name, type: r.type ?? "application/octet-stream", data: bytes))
+                add(PickedFile(name: name, type: r.type ?? "application/octet-stream", data: bytes), preview: open)
             } catch {
                 self.error = "\(f.name) could not be converted: \(error.localizedDescription)"
             }
@@ -1525,6 +1643,7 @@ private struct HandInSheet: View {
 
     private func remove(_ f: PickedFile) {
         preview.removed(f)
+        phone.removed(f.id)
         withAnimation(Motion.snappy) { files.removeAll { $0.id == f.id } }
     }
 

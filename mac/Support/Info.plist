@@ -44,6 +44,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Send from Phone lets your phone, on the same Wi-Fi, send photos and files to the hand-in you have open.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Simpl Courses</string>
 	<key>NSPrincipalClass</key>

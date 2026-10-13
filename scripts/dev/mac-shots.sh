@@ -66,6 +66,50 @@ shoot() {
   ) &
 }
 
+# (1.3.78) Send from Phone, tried as a phone would: phone_send <name> <file>… waits for the picture <name>'s app to say
+# its server's address on the console (-SimplPhoneTest), opens the page there, asks for a wrong key's, then posts each
+# file as the phone's page does (X-File-Name, its type, its length); what it got back goes in phone-test.txt. The app
+# holds its picture until a file has come, so the picture shows them arriving; phone_check reads the consoles after.
+phone_send() {
+  local name="$1"
+  shift
+  (
+    local console="$OUT_ABS/console-$name.txt" url="" i=0 codes=""
+    while [ -z "$url" ] && [ $i -lt 360 ]; do
+      url="$(grep -o 'SimplPhone ready http://[^ ]*' "$console" 2>/dev/null | head -1 | cut -d' ' -f3)"
+      if [ -z "$url" ]; then sleep 0.25; i=$((i + 1)); fi
+    done
+    if [ -z "$url" ]; then echo "$name: no address on the console" >> "$OUT_ABS/phone-test.txt"; exit 0; fi
+    local base="${url%/*/}"
+    local page wrong
+    page="$(curl -s -m 10 -o "$OUT_ABS/phone-page-$name.html" -w '%{http_code}' "$url")"
+    wrong="$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$base/AAAAAAAAAAAAAAAAAAAAAA/")"
+    sleep 1
+    for f in "$@"; do
+      local as="${f##*=}" path="${f%%=*}"
+      codes="$codes $(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST -H 'Expect:' -H "X-File-Name: ${as// /%20}" \
+        -H "Content-Type: $(file -b --mime-type "$path")" --data-binary @"$path" "${url}upload")"
+      sleep 0.6
+    done
+    echo "$name: page $page, wrong key $wrong, uploads$codes" >> "$OUT_ABS/phone-test.txt"
+  ) &
+}
+
+# phone_check: what the server answered and what the app's consoles say came into the hand-in, as phone-check.txt
+phone_check() {
+  local out="$OUT_ABS/phone-check.txt" t="$OUT_ABS/phone-test.txt"
+  : > "$out"
+  ok() { if eval "$2"; then echo "ok   $1" >> "$out"; else echo "FAIL $1" >> "$out"; fi; }
+  ok "the page opened (200) and a wrong key did not (404): $(grep 12d "$t" 2>/dev/null)" "grep -q '12d-hand-in-phone-connected: page 200, wrong key 404, uploads 200 200' '$t'"
+  ok "the page has the assignment's name in it" "grep -q 'Composition of Functions' '$OUT_ABS/phone-page-light-12d-hand-in-phone-connected.html'"
+  ok "the phone was seen to connect" "grep -q 'SimplPhone opened' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
+  ok "the photo is in the hand-in" "grep -q 'SimplHandIn added Photo from phone.jpg' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
+  ok "the notes are in the hand-in" "grep -q 'SimplHandIn added Notes.txt' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
+  ok "a PDF-only assignment's photos were taken and an mp3 refused (415): $(grep 12e "$t" 2>/dev/null)" "grep -q '12e-hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415' '$t'"
+  ok "its two photos became one PDF in the hand-in" "[ \"\$(grep -c 'SimplHandIn added project01.pdf (1 files)' '$OUT_ABS/console-dark-12e-hand-in-phone-photos.txt')\" -ge 2 ]"
+  cat "$out"
+}
+
 # a first launch in each worker's home to warm WebKit and the mock (the first start is slow), not pictured
 for i in $(seq 1 "$JOBS"); do MODE=light shoot "warmup$i" 20; done
 wait
@@ -136,6 +180,14 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-03-todo 12 -SimplPlace todo
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
   shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
+  # (1.3.78) Send from Phone: its panel with the code; the phone connected and two files in (posted by phone_send); a
+  # PDF-only assignment's photos made into one PDF, and a kind it does not take refused
+  shoot light-12c-hand-in-phone 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  printf 'Notes from class, sent from a phone.\n' > "$OUT_ABS/phone-notes.txt"
+  printf 'ID3 not really music\n' > "$OUT_ABS/phone-song.mp3"
+  shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
+  phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$OUT_ABS/phone-notes.txt=Notes.txt"
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
   shoot light-22-setup 14 -SimplOpen setup
   shoot light-53-whats-new 12 -SimplOpen whatsnew
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
@@ -170,7 +222,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
+  shoot dark-12c-hand-in-phone 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+  shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
+  phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$OUT_ABS/phone-song.mp3=Song.mp3"
   wait
+  phone_check
   keep_crashes
   exit 0
 fi
@@ -188,6 +244,7 @@ for MODE in light dark; do
   shoot "$MODE-10-assignment" 14 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
   shoot "$MODE-11-course-grades" 14 -SimplPlace section:courses/101:grades
   shoot "$MODE-12-hand-in" 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+  shoot "$MODE-12c-hand-in-phone" 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot "$MODE-13-discussion" 14 -SimplPlace course:101 -SimplPush /courses/101/discussion_topics/7003
   shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
   shoot "$MODE-15-files" 12 -SimplPlace section:courses/101:files
