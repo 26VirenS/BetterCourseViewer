@@ -6266,7 +6266,9 @@ try {
   check((await texts('.bcv-sheet--ask .bcv-sheet__title'))[0] === 'Remove Probe?', 'the bin asks first');
   await page.click('.bcv-sheet--ask .bcv-ask__ok');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
-  check((await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]', 'removed: the card, the pin and its store all go');
+  // (the Tools page draws its thirteen cards as soon as the list is kept; the widget's own store, its pin and the pin's
+  //  record go a moment after — widgets.js remove() — so they are waited for, not caught half way)
+  check(await eventually(async () => (await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]'), 'removed: the card, the pin and its store all go');
   await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { for (const w of await self.BCV.widgets.all()) await self.BCV.widgets.remove(w.id); self.BCV.app.render(); } }); }, BASE);
   await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 11, null, { timeout: 8000 });
   check((await widgetsKept()).length === 0, 'the others removed too: the eleven built-in tools again');
