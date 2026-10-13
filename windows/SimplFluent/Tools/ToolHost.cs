@@ -38,7 +38,7 @@ public sealed class ToolContext
     /// <summary>From the quick version: the whole tool over the window, with details or files for it.</summary>
     public Action<Dictionary<string, string>?, IReadOnlyList<string>?> OpenFull { get; init; } = (_, _) => { };
 
-    /// <summary>From the quick version: the flyout closed.</summary>
+    /// <summary>The flyout (the quick version) or the sheet (the whole tool, over the window) it is in, closed.</summary>
     public Action Close { get; init; } = () => { };
 
     /// <summary>The files handed to the tool, taken once (the Mac's ToolsCenter.takeFiles).</summary>
@@ -49,7 +49,8 @@ public sealed class ToolContext
 }
 
 /// <summary>
-/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc).
+/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; and
+/// the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy, through BioTools.Register).
 /// Each tool's file registers its own from a module initializer, so a tool added is a file added.
 /// </summary>
 public static class ToolRegistry
@@ -155,13 +156,15 @@ public static class ToolsCenter
     {
         "cite" => "Cite", "pomo" => "Focus", "calc" => "Calculator", "graph" => "Graphing", "ptable" => "Elements",
         "need" => "Grade needed", "conv" => "Convert", "units" => "Units", "pdfx" => "Merge & split", "mark" => "Mark up",
-        "ocr" => "Image to text", "fc" => "Flashcards", _ => key,
+        "ocr" => "Image to text", "fc" => "Flashcards",
+        "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
+        "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy", _ => key,
     };
 
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
     public static double FlyoutWidth(string key) => key switch
     {
-        "calc" or "ptable" => 420, "cite" => 400, "graph" => 360, "fc" => 340, _ => 330,
+        "calc" or "ptable" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" => 360, "fc" => 340, _ => 330,
     };
 
     /// <summary>The files a tool takes from its pin's flyout (null: none), as an open dialog's filter.</summary>
@@ -432,7 +435,8 @@ public static class ToolPopup
         var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
         var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
         var sheet = new Sheet { Bare = true, Width = w, Height = h };
-        var c = new ToolContext { Engine = engine, Key = key, Owner = win };
+        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open)
+        var c = new ToolContext { Engine = engine, Key = key, Owner = win, Close = () => sheet.Close() };
         var body = ToolRegistry.Full(c) ?? Missing(kind);
         var done = K.Button("Done", () => sheet.Close());
         done.ToolTip = $"Close {kind.Name} (Esc)";
@@ -471,7 +475,8 @@ public static class ToolHeader
         words.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(words.Col(2));
         if (ToolRegistry.Header(c) is { } extra) { extra.Margin = new Thickness(12, 0, 12, 0); extra.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(extra.Col(3)); }
-        row.Children.Add(PinButton(kind, squished: kind.Key == "ptable").Col(4));
+        // (a header full of the tool's own controls — the Periodic Table's, a biology tool's pages — the pin a symbol alone)
+        row.Children.Add(PinButton(kind, squished: kind.Key == "ptable" || BioTools.Pages(kind.Key).Count > 1).Col(4));
         return row;
     }
 
