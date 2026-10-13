@@ -64,7 +64,7 @@ internal sealed class GXMutationsPage : Grid
         head.Margin = new Thickness(16, 14, 16, 8);
         scroll.Content = rows;
         rows.Picked += Press;
-        centre = K.Card(K.Rows("auto, *", head.Row(0), scroll.Row(1)), new Thickness(0), 12);
+        centre = K.Card(K.Rows("auto, *", head.Row(0), scroll.Row(1)), new Thickness(0));
         centre.Focusable = true;
         centre.FocusVisualStyle = null;
         centre.PreviewKeyDown += OnKeys;
@@ -103,7 +103,9 @@ internal sealed class GXMutationsPage : Grid
 
     private void Refresh()
     {
-        if (GeneExpressionModel.MutationGene != shownGene)
+        // (another coding sequence, or one of one's own made shorter: what was picked is let go)
+        var n = Original.Length;
+        if (GeneExpressionModel.MutationGene != shownGene || selStart >= n || selEnd >= n || gapAfter >= n - 1)
         {
             shownGene = GeneExpressionModel.MutationGene;
             ClearSelection();

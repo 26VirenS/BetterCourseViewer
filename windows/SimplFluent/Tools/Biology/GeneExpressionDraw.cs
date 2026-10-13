@@ -247,15 +247,16 @@ internal abstract class GXCanvas : FrameworkElement
 internal static class GXKit
 {
     /// <summary>A small capsule badge ("Start", "Stop", "Made up for teaching").</summary>
-    public static Border Badge(string text, Color colour)
+    public static Border Badge(string text, Color colour, double size = 11)
     {
         var t = K.Text(text, Ty.Caption);
-        t.FontSize = 11;
+        t.FontSize = size;
+        t.LineHeight = size + 4;
         t.FontWeight = FontWeights.Bold;
         t.Foreground = new SolidColorBrush(K.Darkened(colour));
         return new Border
         {
-            Child = t, Padding = new Thickness(7, 0, 7, 1), CornerRadius = new CornerRadius(8),
+            Child = t, Padding = new Thickness(size < 11 ? 4 : 7, 0, size < 11 ? 4 : 7, 1), CornerRadius = new CornerRadius(8),
             Background = new SolidColorBrush(GXDraw.Alpha(colour, 0.14)), BorderBrush = new SolidColorBrush(GXDraw.Alpha(colour, 0.4)),
             BorderThickness = new Thickness(0.75), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left,
         };

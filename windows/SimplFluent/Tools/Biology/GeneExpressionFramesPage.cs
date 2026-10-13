@@ -67,7 +67,7 @@ internal sealed class GXFramesPage : Grid
         var body = new Grid { Children = { scroll, emptyText } };
         emptyText.VerticalAlignment = VerticalAlignment.Center;
         emptyText.MaxWidth = 360;
-        var card = K.Card(K.Rows("auto, *", head.Row(0), body.Row(1)), new Thickness(0), 12);
+        var card = K.Card(K.Rows("auto, *", head.Row(0), body.Row(1)), new Thickness(0));
 
         Children.Add(BioUI.Work(left, card, orfList));
         void Model() => Refresh();

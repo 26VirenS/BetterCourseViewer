@@ -64,7 +64,7 @@ internal sealed class GXCodonsPage : Grid
         head.Margin = new Thickness(16, 14, 16, 8);
         foot.Margin = new Thickness(12, 8, 12, 12);
         wheel.Margin = new Thickness(16);
-        var card = K.Card(K.Rows("auto, *, auto", head.Row(0), tableHost.Row(1), foot.Row(2)), new Thickness(0), 12);
+        var card = K.Card(K.Rows("auto, *, auto", head.Row(0), tableHost.Row(1), foot.Row(2)), new Thickness(0));
 
         Children.Add(BioUI.Work(left, card, cards));
         void Model() => Refresh();
@@ -141,12 +141,12 @@ internal sealed class GXCodonsPage : Grid
             {
                 var block = K.V(4);
                 for (var third = 0; third < 4; third++) block.Children.Add(Cell(GXCodonTable.Codon(first, second, third), lit, dna));
-                var b = new Border { Child = block, Padding = new Thickness(5), CornerRadius = new CornerRadius(10), Margin = new Thickness(3) };
+                var b = new Border { Child = block, Padding = new Thickness(4), CornerRadius = new CornerRadius(8), Margin = new Thickness(2) };
                 b.Background = K.Brush(GXDraw.Alpha(ColourOfText(), 0.04));
                 g.Children.Add(b.Row(1 + first).Col(1 + second));
             }
             var thirds = K.V(4);
-            thirds.Margin = new Thickness(0, 8, 0, 8);
+            thirds.Margin = new Thickness(0, 6, 0, 6);
             for (var third = 0; third < 4; third++)
             {
                 var l = Letter(third, 13, dna);
@@ -183,15 +183,16 @@ internal sealed class GXCodonsPage : Grid
         var bases = GXKit.Bases(shown, 13);
         bases.TextWrapping = TextWrapping.NoWrap;
         bases.VerticalAlignment = VerticalAlignment.Center;
-        var row = K.Columns("auto, *, auto", bases.Col(0), three.Margin(6, 0, 0, 0).Col(2));
-        if (codon == "AUG") row.Children.Add(GXKit.Badge("Start", GXColors.Start.ToColor()).Margin(4, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
-        row.Margin = new Thickness(8, 0, 8, 0);
+        var row = K.Columns("auto, *, auto", bases.Col(0), three.Margin(5, 0, 0, 0).Col(2));
+        if (codon == "AUG") row.Children.Add(GXKit.Badge("Start", GXColors.Start.ToColor(), 9.5).Margin(3, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
+        row.Margin = new Thickness(6, 0, 6, 0);
         row.VerticalAlignment = VerticalAlignment.Center;
         var face = new Border
         {
-            Child = row, Height = 28, CornerRadius = new CornerRadius(7), Background = K.Brush(GXDraw.Alpha(tint, on || chosen ? 0.32 : 0.12)),
+            Child = row, Height = 28, CornerRadius = new CornerRadius(7), Background = K.Brush(GXDraw.Alpha(tint, on || chosen ? 0.32 : 0.12)), ClipToBounds = true,
             BorderThickness = new Thickness(chosen ? 2 : 1.5),
-            BorderBrush = chosen ? K.Brush(Appearance.Accent) : on ? K.Brush(GXDraw.Alpha(Appearance.Accent, 0.7)) : Brushes.Transparent,
+            BorderBrush = chosen ? K.Brush(Appearance.Accent) : on ? K.Brush(GXDraw.Alpha(Appearance.Accent, 0.7))
+                : codon == "AUG" ? K.Brush(GXDraw.Alpha(GXColors.Start.ToColor(), 0.7)) : Brushes.Transparent,
         };
         var b = K.Subtle(face, () => GeneExpressionModel.Picked = codon, new Thickness(0), 7);
         b.HorizontalContentAlignment = HorizontalAlignment.Stretch;

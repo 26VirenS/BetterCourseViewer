@@ -91,7 +91,7 @@ internal sealed class GXExpressPage : Grid
         sceneArea.Children.Add(empty);
         controls = new BioStepControls(steps, GXProcess.Groups);
         controls.Margin = new Thickness(16, 4, 16, 14);
-        var card = K.Card(K.Rows("auto, *, auto", top.Row(0), sceneArea.Row(1), controls.Row(2)), new Thickness(0), 12);
+        var card = K.Card(K.Rows("auto, *, auto", top.Row(0), sceneArea.Row(1), controls.Row(2)), new Thickness(0));
 
         Children.Add(BioUI.Work(left, card, facts));
         runner.Tick += (_, _) => RunTick();
