@@ -476,9 +476,9 @@ jobs:
 
   # (how quickly Simpl starts and moves about, and how much memory it and its web view take, walked against the mock —
   #  Support/PerfWalk.cs: a fresh profile, cold, then the same one again, warm — and compared with the last green
-  #  run's; for now also the same warm walk with the web view's memory choices to try, and once under dotnet-trace,
-  #  where the window's time goes; it only reports: a slower number never fails the run, and nothing waits for it but
-  #  the pictures' merge)
+  #  run's; for now also the same warm walk without reading ahead (--no-prefetch), to see what reading ahead costs and
+  #  gives, and once under dotnet-trace, where the window's time goes; it only reports: a slower number never fails the
+  #  run, and nothing waits for it but the pictures' merge)
   perf:
     name: Performance walk
     needs: build
@@ -526,7 +526,7 @@ jobs:
             rm -rf prev && mkdir -p prev
           done < runs.txt
           if [ -f prev/from.txt ]; then echo "comparing with $(cat prev/from.txt)"; else echo "no earlier walk to compare with"; fi
-      - name: Walk (cold, then warm; then warm with each choice to try)
+      - name: Walk (cold, then warm; then warm without reading ahead)
         shell: pwsh
         run: |
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host "display 1920x1080" } catch { Write-Host "display left as it is: $_" }
@@ -544,9 +544,7 @@ jobs:
           #  --browser-args=a;b, so Start-Process passes it as one argument)
           $walks = @(
             @('cold', @()), @('warm', @()),
-            @('low', @('--web-memory', 'low')),
-            @('gpu', @('--browser-args=--in-process-gpu')),
-            @('net', @('--browser-args=--enable-features=NetworkServiceInProcess2'))
+            @('noprefetch', @('--no-prefetch'))
           )
           foreach ($w in $walks) {
             $run = $w[0]
@@ -578,7 +576,9 @@ jobs:
             '--perf-course', '101', '--perf-assignment', '1001', '--perf-timeout', '240', '--perf-minimized', '0')
           $p = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
           Start-Sleep -Milliseconds 300
-          $t = Start-Process -FilePath $tool -ArgumentList @('collect', '--process-id', "$($p.Id)", '--profile', 'cpu-sampling', '--duration', '00:00:03:00', '-o', "$PWD/trace/simpl.nettrace") -PassThru -NoNewWindow
+          # (the sampler and the runtime's own events, named outright: dotnet-trace 10 has no cpu-sampling profile)
+          $providers = 'Microsoft-DotNETCore-SampleProfiler,Microsoft-Windows-DotNETRuntime:0x00000014C14FCCBD:4'
+          $t = Start-Process -FilePath $tool -ArgumentList @('collect', '--process-id', "$($p.Id)", '--providers', $providers, '--duration', '00:00:03:00', '-o', "$PWD/trace/simpl.nettrace") -PassThru -NoNewWindow
           if (-not $p.WaitForExit(300000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
           if (-not $t.WaitForExit(120000)) { Stop-Process -Id $t.Id -Force -ErrorAction SilentlyContinue; Write-Host "::warning::dotnet-trace did not end" }
           if (Test-Path trace/simpl.nettrace) {
@@ -600,7 +600,7 @@ jobs:
           const change = (b, a) => b == null || a == null || b <= 0 ? '—' : `${a >= b ? '+' : '-'}${Math.abs(Math.round((a - b) / b * 100))}%`;
           const memRows = (b, a) => {
             const rows = [];
-            for (const when of ['settled', 'walked', 'minimized']) {
+            for (const when of ['settled', 'walked', 'idle', 'minimized']) {
               const x = b?.memory?.[when], y = a?.memory?.[when];
               if (!x && !y) continue;
               rows.push([`memory ${when}, private`, x?.total?.private, y?.total?.private]);
@@ -636,9 +636,9 @@ jobs:
             out.push(...table(`${run}, ms and MB, against ${from}`, before, after));
           }
           const warm = read('shots/perf-warm.json');
-          for (const v of ['low', 'gpu', 'net']) {
+          for (const v of ['noprefetch']) {
             const after = read(`shots/perf-${v}.json`);
-            if (warm && after) out.push(...table(`${v} (${after.args || after.webMemory || ''}), against this run's warm walk`, warm, after));
+            if (warm && after) out.push(...table(`${v}, against this run's warm walk`, warm, after));
           }
           console.log(out.join('\n'));
           if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Performance walk, against ${from || 'nothing earlier'}\n\n\`\`\`\n${out.join('\n')}\n\`\`\`\n`);
