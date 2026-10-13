@@ -466,7 +466,9 @@ extension CEModel {
         case (_, "chloroplast"): s = "\(n) lenses 5.0 × 2.4 µm, each with 14 grana (real: 40–60) of 10 thylakoids"
         case (_, "amyloplast"): s = "\(n), each 2 µm long, with starch grains"
         case (_, "capsule"): s = "A layer 0.15 µm thick, translucent"
-        case (_, "outer"): s = "A shell 0.012 µm thick, outside the thin wall"
+        case (_, "outer"):
+            s = options.gramPositive ? "None: a Gram-positive bacterium has no outer membrane, only its thick wall (turn off Gram-positive wall to see one)"
+                : "A shell 0.012 µm thick, outside the thin wall"
         case (_, "nucleoid"): s = "One chromosome drawn as a tangle of 600 steps in a region 1.3 × 0.64 µm"
         case (_, "plasmid"): s = "\(n) small loops 0.14–0.2 µm across"
         default: s = n > 0 ? "\(n)" : ""

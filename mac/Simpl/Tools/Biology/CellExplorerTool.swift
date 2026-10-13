@@ -489,7 +489,7 @@ struct CECellPage: View {
     /// The camera brought to the part's instance its label points to.
     private func zoomTo(_ part: String) {
         var id = "organelle:\(part)"
-        if let m = model, let a = m.anchors[part], a.instance < m.instances.count { id = m.instances[a.instance].id }
+        if let m = model, let item = CEScene.anchorItemID(m, part: part) { id = item }
         if lookInside && isolate == part { id = "organelle:\(part)" }
         zoom = BioZoomRequest(id: id, serial: (zoom?.serial ?? 0) + 1)
     }

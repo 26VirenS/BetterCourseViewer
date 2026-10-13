@@ -142,6 +142,12 @@ extension BioSelfCheck {
         let looked = CEScene.content(animal, CEView(isolate: "mito", lookInside: true))
         r.check("cell.isolate", "\(iso.items.count),\(looked.items.count)items,\(looked.labels.count)labels",
                 iso.items.allSatisfy { $0.id?.hasPrefix("organelle:mito:") == true } && !looked.items.isEmpty && looked.labels.count == 4)
+        // (thousands of ribosomes drawn as a few dozen clusters; Zoom to finds the one its label points into)
+        let scene = CEScene.content(animal, CEView())
+        let riboItems = Set(scene.items.compactMap(\.id).filter { $0.hasPrefix("organelle:ribosome:") })
+        let zoomID = CEScene.anchorItemID(animal, part: "ribosome") ?? "-"
+        r.check("cell.clusters", "\(riboItems.count)ribosome-objects", riboItems.count > 10 && riboItems.count < 400 && riboItems.contains(zoomID)
+                && scene.items.filter { $0.id?.hasPrefix("organelle:ribosome:") == true }.reduce(0) { $0 + $1.mesh.triangleCount } == (animal.shown["ribosome"] ?? 0) * 20)
         let compare = CEBuild.compareScene(dark: false)
         r.check("cell.compare-scene", "\(compare.items.count)items", Set(compare.items.compactMap(\.id)) == ["cell:animal", "cell:plant", "cell:bacterium"]
                 && compare.labels.count == 3)

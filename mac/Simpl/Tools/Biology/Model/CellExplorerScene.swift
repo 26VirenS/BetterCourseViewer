@@ -32,6 +32,25 @@ enum CEScene {
     /// Whether a part can be looked inside.
     static func canLookInside(_ part: String) -> Bool { ["mito", "chloroplast", "nucleus"].contains(part) }
 
+    /// The parts drawn in clusters: there are hundreds or thousands of them, each a few triangles.
+    static let clustered: Set<String> = ["ribosome", "pore", "actin", "fimbria"]
+
+    /// The scene object an instance is drawn in: itself ("organelle:mito:3"), or, for a clustered part, the cluster of
+    /// the cell's space it sits in ("organelle:ribosome:g2_-1_0"; cubes a third of the cell's radius across, by its
+    /// unexploded centre, so a cluster stays one as the cell explodes).
+    static func itemID(_ inst: CEInstance, in m: CEModel) -> String {
+        guard clustered.contains(inst.part) else { return inst.id }
+        let s = m.cellRadius / 3
+        let c = inst.centre
+        return "organelle:\(inst.part):g\(Int((c.x / s).rounded(.down)))_\(Int((c.y / s).rounded(.down)))_\(Int((c.z / s).rounded(.down)))"
+    }
+
+    /// The scene object a part's label points into (for Zoom to).
+    static func anchorItemID(_ m: CEModel, part: String) -> String? {
+        guard let a = m.anchors[part], a.instance < m.instances.count else { return nil }
+        return itemID(m.instances[a.instance], in: m)
+    }
+
     static func content(_ m: CEModel, _ v: CEView) -> BioSceneContent {
         let explode = v.isolate == nil ? min(max(v.explode, 0), 1) : 0
         let fade = shellFade(explode)
@@ -50,13 +69,29 @@ enum CEScene {
             return BioSceneContent(items: items, labels: inside.labels, frame: nil)
         }
         var moved: [Int: BioVec] = [:]
+        // (the parts of thousands of tiny pieces are drawn in clusters, each its own object: a selection then glows a
+        // few dozen objects rather than thousands, and a click or Zoom to finds a cluster)
+        var clusters: [String: Int] = [:]
         for (i, inst) in m.instances.enumerated() {
             if v.hidden.contains(inst.part) { continue }
             if let iso = v.isolate, inst.part != iso { continue }
             let d = displacement(inst, explode: explode, cellRadius: m.cellRadius)
             moved[i] = d
+            let id = itemID(inst, in: m)
             for p in inst.pieces {
-                items.append(BioSceneItem(id: inst.id, mesh: CEGeo.moved(p.mesh, d), material: material(p, shell: inst.shell), order: p.order))
+                let mat = material(p, shell: inst.shell)
+                let mesh = CEGeo.moved(p.mesh, d)
+                if id != inst.id {
+                    let key = id + "|" + String(describing: mat) + "|\(p.order)"
+                    if let k = clusters[key] {
+                        items[k].mesh.append(mesh)
+                    } else {
+                        clusters[key] = items.count
+                        items.append(BioSceneItem(id: id, mesh: mesh, material: mat, order: p.order))
+                    }
+                } else {
+                    items.append(BioSceneItem(id: id, mesh: mesh, material: mat, order: p.order))
+                }
             }
         }
         for part in CEParts.all(m.options.kind) where !v.hidden.contains(part.id) {
