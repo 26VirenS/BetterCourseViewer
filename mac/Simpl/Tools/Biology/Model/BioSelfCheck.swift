@@ -363,12 +363,15 @@ enum BioSelfCheck {
         let mutant = BioSeq.translate(String(hbb))
         r.check("gene.sickle", String(mutant.prefix(10)), was == "A" && mutant.hasPrefix(BioGenes.sickle.proteinStart)
                 && BioSeq.codons(String(hbb))[6] == "GTG")
-        // (cleaning: a FASTA header, digits and spaces dropped; U in DNA offered as RNA; bad letters placed)
+        // (cleaning: a FASTA header, digits and spaces dropped; U in DNA offered as RNA; bad letters placed; a pasted 5′-…-3′
+        // taken off before the digits go)
         let a = BioSequenceInput(">x\n atg c12gt", as: .dna)
         let b = BioSequenceInput("AUGC", as: .dna)
         let bad = BioSequenceInput("ATGXQ", as: .dna)
+        let ends = BioSequenceInput("5′-ACGTACGT-3′", as: .dna, cap: 4), ends2 = BioSequenceInput("5'-ATG C-3'", as: .dna)
         r.check("seq.clean", a.letters + "," + (b.suggestion?.rawValue ?? "-") + "," + bad.invalid.map { "\($0.letter)\($0.positions)" }.joined(),
-                a.sequence == "ATGCGT" && b.suggestion == .rna && bad.invalid.count == 2 && bad.invalid[0].positions == [4] && bad.sequence == nil)
+                a.sequence == "ATGCGT" && b.suggestion == .rna && bad.invalid.count == 2 && bad.invalid[0].positions == [4] && bad.sequence == nil
+                    && ends.sequence == "ACGT" && ends.truncated && ends2.sequence == "ATGC")
         r.same("seq.reverse-complement", BioSeq.reverseComplement("ATGCN") + "," + BioSeq.complement("ATGC"), "NGCAT,TACG")
         let frames = (0..<3).map { BioSeq.translate("ATGGCCTAA", frame: $0) } + (0..<3).map { BioSeq.translate("ATGGCCTAA", frame: $0, reverse: true) }
         r.same("seq.frames", frames.joined(separator: ","), "MA*,WP,GL,LGH,*A,RP")

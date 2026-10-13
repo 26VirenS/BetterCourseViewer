@@ -76,10 +76,12 @@ struct BioSequenceInput: Equatable {
         var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         // (a FASTA header line, ">name …", dropped)
         if let first = lines.first, first.trimmingCharacters(in: .whitespaces).hasPrefix(">") { lines.removeFirst() }
-        var kept = String(lines.joined().uppercased().filter { !$0.isWhitespace && !$0.isNumber })
-        // (a pasted 5′- and -3′, or 5'- and -3', taken off its ends)
+        var kept = String(lines.joined().uppercased().filter { !$0.isWhitespace })
+        // (a pasted 5′- and -3′, or 5'- and -3', taken off its ends — before the digits go, or its 5 and 3 would go first
+        // and leave the ′ and - behind as letters that do not belong)
         for prefix in ["5′-", "5'-", "5′", "5'"] where kept.hasPrefix(prefix) { kept.removeFirst(prefix.count); break }
         for suffix in ["-3′", "-3'", "3′", "3'"] where kept.hasSuffix(suffix) { kept.removeLast(suffix.count); break }
+        kept = String(kept.filter { !$0.isNumber })
         var cut = false
         if let cap, kept.count > cap {
             kept = String(kept.prefix(cap))
