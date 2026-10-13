@@ -119,6 +119,29 @@ lethalDominantHomozygote, lethalRecessive). `BioCross.gametes(genotype)`, `gamet
 `probability(of: [BioTarget])` → factors and product (the product rule). Exact `BioFrac` throughout (`text` "3/32",
 `percentText` "9.4%"); `BioRatio.reduce/whole/text`.
 
+### The Genetics Crosses and Hardy–Weinberg tools
+
+- **Crosses** (`CrossesTool.swift` and the page, part and model files beside it): `CrossSetup` is the Cross page's
+  cross (one to three genes, one X-linked at most; `genotypes(gene:parent:)` lists only what a parent can be — never a
+  lethal homozygote; `setPattern`, `setLetter`, `applyExample` (§5.3.1's `CrossExamples`), `testCross`, `parse`, and
+  `encoded` for `SimplBio.cross.setup`). `CrossPunnett`, `CrossForkedLine` (by phenotype or genotype),
+  `CrossProbability` (chips per gene, the product and sum rules, at least one / exactly k of n), `ChiSquareWork` (the
+  null hypothesis, the table, AP's conclusion), and `PedigreeModel.swift` (`Pedigree`, `PedigreeChecker`: four modes,
+  the people who rule each out). Hand-offs it takes: `["cross": "AaBb × aaBb"]`, and
+  `["chi": "round:3:5474;wrinkled:1:1850"]` (name:ratio:observed per category) for the Chi-square page.
+- **Hardy–Weinberg** (`HardyWeinbergTool.swift`, `HardyWeinbergPages.swift`, `HardyWeinbergModel.swift`):
+  `HardyWeinberg.calculate(_:_:)` / `calculate(counts:)` (each step as text), `.test(_:df:)` (df 1 by default),
+  `HWSimulation.step/run` in §5.4.3's order — replicate r, counting from 0, draws from SplitMix64 seed S + r, 2N
+  `uniform() < p₃` draws a generation even once an allele is fixed, so Windows gets the same k's. Hand-offs:
+  `["given": "q2", "value": "0.16"]`, `["counts": "50,30,20"]`.
+- **Launch states:** `-SimplTool cross -SimplToolState cross:forked` (`square`, `genotypes`, `why`, `testcross`,
+  `example=yellow` (a `CrossExamples` id), `cross=…` or `-SimplBioCross "AaBb x AaBb"`);
+  `probability:prob=AaBbCc x AaBbCc:target=aa,B_,Cc:children=3`;
+  `chi:fromcross` or `chi:obs=315,108,101,32`; `pedigree:example=xr:mode=xd:select=2`. `-SimplTool popgen
+  -SimplToolState calculate:q2=0.16` (any `HWGiven` raw value, or `counts=50,30,20`); `test:counts=50,30,20:df=2`;
+  `simulate:n=10:p0=0.5:seed=7:reps=5:gens=100:preset=recessiveLethal:F=0.25:u=…:v=…:m=…:pm=…:hover=40`
+  (`infinite` for no drift).
+
 ## Chi-square and randomness (§5.3.4, §5.6.3–4)
 
 `BioChiSquare.test(observed:expected:df:)` → `chi2`, `terms`, `df`, `critical` (p = 0.05), `p`, `reject`,
