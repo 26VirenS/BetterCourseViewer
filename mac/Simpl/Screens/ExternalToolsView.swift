@@ -56,7 +56,7 @@ struct ExternalToolsData: Codable {
 /// is found, and each course it is in, a press away (Knewton Alta and Macmillan in their own popups, the rest in the
 /// tool window). A filter narrows them by name, site or course.
 ///
-/// (1.3.77) The cards stand in columns of their own heights (`ToolColumns`), each in the shortest column so far, so a short
+/// (1.3.77) The cards stand in columns of their own heights (`ExternalToolColumns`), each in the shortest column so far, so a short
 /// card beside a tall one leaves no hole under it; a long course name is cut short inside its chip. A tool used in
 /// assignments or module items is a card that is a button as a whole: it says the next of them still to do and how many
 /// there are, and a press opens the list of every one of them beside it (`ToolPlacesList`), to choose the one to open —
@@ -102,7 +102,7 @@ struct ExternalToolsView: View {
                             // (1.3.77) columns of their own heights, not rows as tall as their tallest card: plain stacks side
                             // by side, each card put in the column with least in it (a popover would not show from a card
                             // placed by a Layout of the app's own)
-                            ToolColumns(tools: shown) { t in
+                            ExternalToolColumns(tools: shown) { t in
                                 ToolCard(tool: t, listed: listedBinding(t),
                                          openTab: { c in open(t, in: c) },
                                          choose: { c, item in choose(t, c, item) })
@@ -763,7 +763,7 @@ private struct PlacesListHeightKey: PreferenceKey {
 /// the page has room for (Page's width), plain stacks side by side, each card in turn put in the column whose cards are
 /// the shortest so far — reckoned by what each draws: its next, its list's foot, its rows of chips. (A Layout of the
 /// app's own placed them before, and a card's popover would not show from it.)
-private struct ToolColumns<Card: View>: View {
+private struct ExternalToolColumns<Card: View>: View {
     let tools: [ExternalToolsData.Tool]
     @ViewBuilder let card: (ExternalToolsData.Tool) -> Card
     @Environment(\.pageWidth) private var pageWidth
