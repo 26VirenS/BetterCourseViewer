@@ -80,6 +80,9 @@ jobs:
     if: ${{ !cancelled() && needs.prior.outputs.found != 'true' && needs.prior.result != 'failure' }}
     runs-on: windows-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # (Azure signed in to, to sign, when the repository can)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -101,6 +104,58 @@ jobs:
           test -n "$v"
           dotnet publish windows/SimplFluent/SimplFluent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/Simpl -nologo "-p:InformationalVersion=$v (v$n)"
           test -f dist/Simpl/Simpl.exe
+      # signed, once the repository has an Artifact Signing account (windows/SimplFluent/README.md, Signing: its six
+      # Actions variables): Azure signed in to without a secret (OIDC), then signtool and Artifact Signing's dlib
+      - name: Azure, to sign
+        if: ${{ vars.SIGNING_ACCOUNT != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Signing tools
+        if: ${{ vars.SIGNING_ACCOUNT != '' }}
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.SIGNING_PROFILE }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'sign'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $nuget = (Get-Command nuget.exe -ErrorAction SilentlyContinue).Source
+          if (-not $nuget) { $nuget = Join-Path $dir 'nuget.exe'; Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile $nuget }
+          & $nuget install Microsoft.Windows.SDK.BuildTools -x -OutputDirectory $dir -NonInteractive | Out-Null
+          & $nuget install Microsoft.ArtifactSigning.Client -x -OutputDirectory $dir -NonInteractive | Out-Null
+          $signtool = Get-ChildItem $dir -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          $dlib = Get-ChildItem $dir -Recurse -Filter Azure.CodeSigning.Dlib.dll | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+          if (-not $signtool -or -not $dlib) { Write-Host "::error::signtool or Artifact Signing's dlib not found"; exit 1 }
+          # (signed in as azure/login left it: the Azure CLI's sign-in, the others not tried)
+          $metadata = Join-Path $dir 'metadata.json'
+          @{
+            Endpoint = $env:SIGNING_ENDPOINT; CodeSigningAccountName = $env:SIGNING_ACCOUNT; CertificateProfileName = $env:SIGNING_PROFILE
+            CorrelationId = "${{ github.run_id }}"
+            ExcludeCredentials = @('ManagedIdentityCredential', 'WorkloadIdentityCredential', 'SharedTokenCacheCredential',
+              'VisualStudioCredential', 'VisualStudioCodeCredential', 'AzurePowerShellCredential', 'AzureDeveloperCliCredential', 'InteractiveBrowserCredential')
+          } | ConvertTo-Json | Set-Content $metadata
+          "SIGNTOOL=$($signtool.FullName)" >> $env:GITHUB_ENV
+          "SIGN_DLIB=$($dlib.FullName)" >> $env:GITHUB_ENV
+          "SIGN_METADATA=$metadata" >> $env:GITHUB_ENV
+          Write-Host "signtool: $($signtool.FullName)"; Write-Host "dlib: $($dlib.FullName)"
+      # (each of the app's files that no one signed — Simpl's own, WPF-UI's, PDFsharp's — signed: the zip and the
+      #  installer carry them signed; .NET's and WebView2's are Microsoft's already)
+      - name: Sign
+        if: ${{ vars.SIGNING_ACCOUNT != '' }}
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem dist/Simpl -Recurse -Include *.exe, *.dll | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -eq 'NotSigned' } | ForEach-Object FullName)
+          Write-Host "signing $($files.Count) files:"; $files | ForEach-Object { Write-Host "  $_" }
+          if ($files.Count -eq 0) { exit 0 }
+          & $env:SIGNTOOL sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib $env:SIGN_DLIB /dmdf $env:SIGN_METADATA @files
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::signing failed ($LASTEXITCODE)"; exit 1 }
+          $bad = @($files | Where-Object { (Get-AuthenticodeSignature $_).Status -ne 'Valid' })
+          if ($bad.Count -gt 0) { Write-Host "::error::not signed: $($bad -join ', ')"; exit 1 }
+          Write-Host "signed by $((Get-AuthenticodeSignature dist/Simpl/Simpl.exe).SignerCertificate.Subject)"
       - name: Zip
         shell: bash
         run: (cd dist && 7z a -tzip -mx=5 ../Simpl-Windows-x64.zip Simpl >/dev/null) && mv Simpl-Windows-x64.zip dist/ && ls -la dist/Simpl-Windows-x64.zip
@@ -475,6 +530,9 @@ jobs:
     if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: windows-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write # (Azure signed in to, to sign Setup and its uninstaller, when the repository can)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -484,6 +542,44 @@ jobs:
       - name: The build
         shell: bash
         run: (cd dist && 7z x -y Simpl-Windows-x64.zip >/dev/null) && test -f dist/Simpl/Simpl.exe && ls dist
+      # signed, once the repository has an Artifact Signing account (windows/SimplFluent/README.md, Signing: its six
+      # Actions variables): Azure signed in to without a secret (OIDC), then signtool and Artifact Signing's dlib
+      - name: Azure, to sign
+        if: ${{ vars.SIGNING_ACCOUNT != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Signing tools
+        if: ${{ vars.SIGNING_ACCOUNT != '' }}
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.SIGNING_PROFILE }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'sign'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $nuget = (Get-Command nuget.exe -ErrorAction SilentlyContinue).Source
+          if (-not $nuget) { $nuget = Join-Path $dir 'nuget.exe'; Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile $nuget }
+          & $nuget install Microsoft.Windows.SDK.BuildTools -x -OutputDirectory $dir -NonInteractive | Out-Null
+          & $nuget install Microsoft.ArtifactSigning.Client -x -OutputDirectory $dir -NonInteractive | Out-Null
+          $signtool = Get-ChildItem $dir -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          $dlib = Get-ChildItem $dir -Recurse -Filter Azure.CodeSigning.Dlib.dll | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+          if (-not $signtool -or -not $dlib) { Write-Host "::error::signtool or Artifact Signing's dlib not found"; exit 1 }
+          # (signed in as azure/login left it: the Azure CLI's sign-in, the others not tried)
+          $metadata = Join-Path $dir 'metadata.json'
+          @{
+            Endpoint = $env:SIGNING_ENDPOINT; CodeSigningAccountName = $env:SIGNING_ACCOUNT; CertificateProfileName = $env:SIGNING_PROFILE
+            CorrelationId = "${{ github.run_id }}"
+            ExcludeCredentials = @('ManagedIdentityCredential', 'WorkloadIdentityCredential', 'SharedTokenCacheCredential',
+              'VisualStudioCredential', 'VisualStudioCodeCredential', 'AzurePowerShellCredential', 'AzureDeveloperCliCredential', 'InteractiveBrowserCredential')
+          } | ConvertTo-Json | Set-Content $metadata
+          "SIGNTOOL=$($signtool.FullName)" >> $env:GITHUB_ENV
+          "SIGN_DLIB=$($dlib.FullName)" >> $env:GITHUB_ENV
+          "SIGN_METADATA=$metadata" >> $env:GITHUB_ENV
+          Write-Host "signtool: $($signtool.FullName)"; Write-Host "dlib: $($dlib.FullName)"
       - name: Installer (Simpl-Setup.exe)
         shell: pwsh
         run: |
@@ -514,9 +610,19 @@ jobs:
           if ($number -notmatch '^\d+\.\d+\.\d+$') { $number = '0.0.0' }
           $version = "$number.${{ github.run_number }}"
           if (-not $display) { $display = $version }
-          & $iscc "/DAppVersion=$version" "/DAppDisplayVersion=$display" "/DSourceDir=$PWD\dist\Simpl" "/DOutputDir=$PWD\dist" windows\SimplFluent\Installer\Simpl.iss
+          # (signed, when it can be: Inno Setup signs Setup and its uninstaller with this — $q a quote, $f the file)
+          $sign = @()
+          if ($env:SIGNTOOL) {
+            $sign = @('/DSign', ('/Ssimpl=$q' + $env:SIGNTOOL + '$q sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib $q' + $env:SIGN_DLIB + '$q /dmdf $q' + $env:SIGN_METADATA + '$q $f'))
+          }
+          & $iscc @sign "/DAppVersion=$version" "/DAppDisplayVersion=$display" "/DSourceDir=$PWD\dist\Simpl" "/DOutputDir=$PWD\dist" windows\SimplFluent\Installer\Simpl.iss
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::ISCC failed ($LASTEXITCODE)"; exit 1 }
           if (-not (Test-Path dist/Simpl-Setup.exe)) { Write-Host "::error::ISCC made no dist/Simpl-Setup.exe"; exit 1 }
+          if ($env:SIGNTOOL) {
+            $sig = Get-AuthenticodeSignature dist/Simpl-Setup.exe
+            if ($sig.Status -ne 'Valid') { Write-Host "::error::Simpl-Setup.exe is not signed ($($sig.Status))"; exit 1 }
+            Write-Host "Simpl-Setup.exe signed by $($sig.SignerCertificate.Subject)"
+          }
           $size = [math]::Round((Get-Item dist/Simpl-Setup.exe).Length / 1MB, 1)
           Write-Host "Simpl-Setup.exe, version $version ($display): $size MB"
       - uses: actions/upload-artifact@v4
