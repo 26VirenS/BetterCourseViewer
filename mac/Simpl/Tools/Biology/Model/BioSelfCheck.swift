@@ -463,13 +463,27 @@ enum BioSelfCheck {
         batch.add(s, id: "b")
         r.check("mesh.batch", (batch.object(atTriangle: 79) ?? "-") + (batch.object(atTriangle: 80) ?? "-"),
                 batch.object(atTriangle: 79) == "a" && batch.object(atTriangle: 80) == "b" && batch.object(atTriangle: batch.mesh.triangleCount) == nil)
-        // (labels: each side's column, at least 22 pt apart, inside the view; 14 at most)
+        // (labels: each side's column, at least 22 pt apart, inside the view; (1.3.79) all of them while the columns
+        // hold them)
         let inputs = (0..<20).map { k in BioLabelInput(id: "o\(k)", text: "Part \(k)", x: k % 2 == 0 ? 300 : 500, y: 380 + Double(k), area: Double(k)) }
         let (placed, more) = BioLabelLayout.layout(inputs, cx: 400, cy: 400, r: 150, width: 800, height: 800)
         let lefts = placed.filter(\.left).sorted { $0.y < $1.y }
         let gapsOK = zip(lefts, lefts.dropFirst()).allSatisfy { $1.y - $0.y >= 22 - 1e-9 }
         let inside = placed.allSatisfy { $0.frame.x >= 16 - 1e-9 && $0.frame.x + $0.frame.width <= 800 - 16 + 1e-9 && $0.frame.y >= 16 - 1e-9 }
-        r.check("labels.layout", "\(placed.count)+\(more)", placed.count == 14 && more == 6 && gapsOK && inside
+        r.check("labels.layout", "\(placed.count)+\(more)", placed.count == 20 && more == 0 && gapsOK && inside
                 && lefts.allSatisfy { $0.edgeX == 400 - 174 && $0.elbowX == 400 - 162 })
+        // (a view 200 pt tall: as many as its two columns hold, 7 each, the larger objects kept, the rest "+6 more")
+        let (short, shortMore) = BioLabelLayout.layout(inputs, cx: 400, cy: 100, r: 60, width: 800, height: 200)
+        r.check("labels.room", "\(short.count)+\(shortMore)", short.count == 14 && shortMore == 6
+                && short.allSatisfy { $0.frame.y >= 16 - 1e-9 && $0.frame.y + $0.frame.height <= 200 - 16 + 1e-9 }
+                && !short.contains { $0.id == "o0" || $0.id == "o5" })
+        // (balanced: 12 anchors left of the middle and 3 right make columns of 8 and 7, the four nearest the middle
+        // crossing; beside a thin model, the columns 24 pt out from its outline)
+        let lopsided = (0..<15).map { k in BioLabelInput(id: "b\(k)", text: "Part \(k)", x: k < 12 ? 390 - Double(k) * 5 : 520, y: 300 + Double(k) * 10) }
+        let (balanced, _) = BioLabelLayout.layout(lopsided, cx: 400, cy: 400, r: 300, width: 800, height: 800, extent: (left: 360, right: 440))
+        let crossed = balanced.filter { !$0.left && $0.anchorX < 400 }.map(\.id).sorted()
+        r.check("labels.balance", "\(balanced.filter(\.left).count)/\(balanced.filter { !$0.left }.count) \(crossed.joined(separator: ","))",
+                balanced.filter(\.left).count == 8 && balanced.count == 15 && crossed == ["b0", "b1", "b2", "b3"]
+                && balanced.allSatisfy { $0.left ? $0.edgeX == 336 : $0.edgeX == 464 })
     }
 }

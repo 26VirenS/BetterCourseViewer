@@ -166,6 +166,29 @@ bio_quick() {
   bio light 65a-biolab-solutions 14 biolab solutions
   bio light 66a-enzyme-competitive 14 enzyme competitive
   bio light 67a-energy-map 14 energy map:stage=calvin
+  bio_plain_all
+}
+
+# (1.3.79) bio_plain <name> <wait> <tool>: a biology tool opened as a student opens it — no launch state, so nothing
+# selected and every setting its own — in dark, in a window 1,024 × 683 and in the smallest one (720 × 520), each with
+# the sidebar out and folded away (dark-<name>-1024, -1024-folded, -720, -720-folded). The pictures of launch states
+# never showed what the owner's 1.3.78 beta did on a plain open: DNA & RNA's helix filling the page with its controls
+# and facts out of sight below it, the animal cell one gold tint with a part's name twice, the amino acid's labels off
+# their parts.
+bio_plain() {
+  local name="$1" wait="$2" tool="$3" size
+  for size in 1024x683 720x520; do
+    MODE=dark SIZE="$size" shoot "dark-$name-${size%%x*}" "$wait" -SimplPlace tools -SimplTool "$tool"
+    MODE=dark SIZE="$size" shoot "dark-$name-${size%%x*}-folded" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplSidebar hidden
+  done
+}
+
+# the plain opens of the three tools the owner's report named: the Cell Explorer (its animal cell), DNA & RNA (its
+# double helix) and the Biomolecule Builder (its amino acids, phenylalanine)
+bio_plain_all() {
+  bio_plain 57z-cell-plain 30 cell
+  bio_plain 58z-dna-plain 16 dna
+  bio_plain 61z-biomol-plain 16 biomol
 }
 
 # every biology tool's pages and what each is for (the full set): 57 Cell Explorer, 58 DNA & RNA, 59 Gene Expression,
@@ -512,6 +535,7 @@ for MODE in light dark; do
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
 done
 bio_full # (1.3.78) the biology toolkit, every tool's pages
+bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
 ui_review # (1.3.78) the UI review's new states
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true

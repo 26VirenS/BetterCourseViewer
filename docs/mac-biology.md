@@ -202,11 +202,18 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   ball's centre whenever the zoom changes it, for a scale bar; `labelBottom` the room the label columns leave clear
   at the bottom, for that scale bar — `CEScaleBar.room`). The build closure
   runs off the main thread — capture copies, not your ObservableObject; it runs again only when `key` changes (put
-  page, options and light/dark in it). The camera frames the content (40°, 1.15·R/sin 20°) on the first scene and when
-  `frameKey` changes; `reset += 1` puts it back; `zoom` frames an object. Click picks (opaque first, through
-  translucent membranes), hover outlines and shows a hand, the selection glows and the rest dims to 35%,
-  ← → ↑ ↓ turn 15°, + − zoom, Escape deselects, double-click zooms (or resets on empty space). Labels with leader
-  lines (§3.5: two columns, 22 pt apart, ≤ 14 with "+N more", 120 ms fades, pressable) come from `labels`; give a
+  page, options and light/dark in it). The camera frames the content on the first scene, when `frameKey` changes and
+  — until the model is turned or zoomed — when the view changes size; `reset += 1` puts it back; `zoom` frames an
+  object. Framing (1.3.79) fills 84% of the room the model has (the view's height, or the width beside the label
+  columns: each the widest label and 40 points), worked out from the content's outline (`BioSceneContent.outline()`,
+  26 extreme points, made off the main thread with the scene by `measured()`), and no nearer than a `frame` ball the
+  scene gives. Click picks (opaque first, through
+  translucent membranes), hover outlines the opaque pieces and shows a hand, the selection glows and the rest dims to
+  35%, ← → ↑ ↓ turn 15°, + − zoom, Escape deselects, double-click zooms (or resets on empty space). Labels with leader
+  lines (§3.5: two columns, 22 pt apart, as many as the columns hold (24 at most) with "+N more" past that, the
+  columns kept within two labels of each other and 24 pt out from the model's outline, 120 ms fades, pressable) come
+  from `labels`; the anchors are projected by `BioProjector` (the camera's own projection, in the overlay's points —
+  not SceneKit's `projectPoint`), laid out again for a second after anything moves. Give a
   convex shell's label a `normal`, else a ray decides what hides it. Each label's capsule is its words measured at
   12 pt semibold plus its padding (`BioLabelWidth.of`; `BioLabelLayout.estimatedWidth` is only the model's guess), so
   none is cut short; two labels may name one object (a β-strand and the C-terminus in it) — the overlay tells them
@@ -231,10 +238,13 @@ launch's step. VoiceOver hears each step.
 `.maternal`, `.hBond` … are `BioHexPair`s: `.color` (SwiftUI, follows the appearance), `.nsColor(dark:)`,
 `.hex(dark:)` (for `BioMaterial`). `BioColor.base`, `BioColor.aminoAcid`. Never colour alone: show the letter or a
 `BioLegend`. Pieces: `BioHeading`, `BioCard(title:swatch:subtitle:) { BioFactRow(label:text:) … }`, `BioValueRow`,
-`BioLegend`, `BioSequenceText`, `PTWorkLayout { left } centre: { } right: { }` (the chemistry layout: in a window
-narrower than 1,100 points the drawing goes across the top, as tall as the window shows (460–640), and the left and
-right columns side by side under it — so a page's centre must fit 460 points: give its cards flexible heights, not
-fixed minimums that add up to more).
+`BioLegend`, `BioSequenceText`, `PTWorkLayout { left } centre: { } right: { }` (the chemistry layout, 1.3.79: 1,100
+points of room or more, the three side by side; 700 or more, the drawing and one column beside it, the controls over
+the facts, each in its own scroller and the top of each in sight (`PTSideColumn`); narrower, the drawing across the
+top — the room less 170 points, so the columns' tops show under it, at most 560 and at least 300 for a 3D view's card
+(`BioSceneCard` says so through `PTDrawingMinKey`) or 450 for a 2D drawing — and the left and right columns under it,
+side by side from 520 points, else one over the other. So a 2D centre must fit 450 points: give its cards flexible
+heights, not fixed minimums that add up to more).
 
 ## Numbers shown
 
@@ -435,7 +445,11 @@ Launch states: a page, then `plant`, `2n=6`, `nocross`, `chiasma=0.3`, `flip`, `
 `scripts/dev/mac-shots.sh`'s `bio <light|dark|both> <name> <wait> <tool> <state>`. A push takes each tool once, in light
 (`bio_quick`): 57 the animal cell, 58a the helix measured, 59a a gene being transcribed, 61b the peptide builder, 62a a
 dihybrid cross, 63a metaphase, 64a Hardy–Weinberg worked out, 65a the lab's solutions, 66a a competitive inhibitor,
-67a the energy map at the Calvin cycle, beside 35b (the Tools page's Biology section). The full set (`bio_full`, a
+67a the energy map at the Calvin cycle, beside 35b (the Tools page's Biology section); and (1.3.79, `bio_plain_all`,
+in both sets) the Cell Explorer, DNA & RNA and the Biomolecule Builder opened plainly — no launch state, so nothing
+selected — in dark at 1,024 × 683 and 720 × 520, the sidebar out and folded (`dark-57z-cell-plain-1024`, `-1024-folded`,
+`-720`, `-720-folded`; `58z-dna-plain`, `61z-biomol-plain` alike): the launch states' pictures never showed what a
+plain open did in the 1.3.78 beta. The full set (`bio_full`, a
 commit saying `[full shots]` or Run workflow → full) takes every tool's pages, in light and dark where the builders
 asked: 57–57l Cell Explorer, 58a–58l DNA & RNA, 59a–59k Gene Expression, 61a–61r Biomolecule Builder, 62a–62h Genetics
 Crosses, 63a–63j Cell Division, 64a–64d Hardy–Weinberg, 65a–65d Bio Lab Calculator, 66a–66b Enzyme Lab, 67a–67e

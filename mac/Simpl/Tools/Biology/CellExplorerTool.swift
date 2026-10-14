@@ -378,7 +378,9 @@ struct CECellPage: View {
                 VStack {
                     if let q = quiz, let current = q.current {
                         CEQuizPrompt(quiz: q, question: current, feedback: feedback, shake: shake)
-                    } else if let h = hovered.flatMap({ CECellPage.partID($0) }), let p = CEParts.part(kind, h) {
+                    } else if !labels, let h = hovered.flatMap({ CECellPage.partID($0) }), let p = CEParts.part(kind, h) {
+                        // (1.3.79) the hovered part's name only while the labels are off: with them on, its label is lit
+                        // already, and the name at the top said it a second time
                         Text(p.label)
                             .font(.system(size: 12, weight: .semibold))
                             .padding(.horizontal, 10)

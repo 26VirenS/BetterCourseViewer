@@ -294,7 +294,9 @@ struct DivisionLabelsOverlay: View {
                         .padding(.horizontal, 10)
                         .frame(width: f.width, height: f.height)
                         .background(.regularMaterial, in: Capsule())
-                        .overlay(Capsule().strokeBorder(hovered == l.id ? Theme.accent : Color.primary.opacity(0.12), lineWidth: 1))
+                        // (1.3.79) hovered, its edge a little stronger in its own grey, as the 3D views' labels: in
+                        // the accent it read as a part selected
+                        .overlay(Capsule().strokeBorder(hovered == l.id ? Color.primary.opacity(0.45) : Color.primary.opacity(0.12), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .onHover { inside in hovered = inside ? l.id : (hovered == l.id ? nil : hovered) }

@@ -80,12 +80,68 @@ struct BioSceneContent: Sendable {
     var labels: [BioLabel3D] = []
     /// The ball the camera frames (centre, radius); nil: worked out from the items.
     var frame: BioSphere?
+    /// (1.3.79) The scene's ball and outline, worked out once off the main thread as the scene is made (`measured()`).
+    var shape: BioSceneShape?
 
     init(items: [BioSceneItem] = [], labels: [BioLabel3D] = [], frame: BioSphere? = nil) {
         self.items = items
         self.labels = labels
         self.frame = frame
     }
+
+    /// The scene with its ball and outline worked out (`shape`), for the view to frame and label it by.
+    func measured() -> BioSceneContent {
+        var c = self
+        c.shape = BioSceneShape(framing: framing, outline: outline())
+        return c
+    }
+
+    /// (1.3.79) Points on the outside of what is drawn: the vertex farthest along each of 26 directions (the axes, and
+    /// the diagonals of a cube's edges and corners), from at most about 4,000 of each item's vertices. The camera frames
+    /// them and the labels sit just beside them, so a long thin model — a helix, a chain — is framed and labelled by its
+    /// own shape: framed and labelled by the ball round it, a helix stood small in a wide card, its labels out at the
+    /// card's edges.
+    func outline() -> [BioVec] {
+        var best = [Float](repeating: -.infinity, count: BioSceneContent.directions.count)
+        var at = [SIMD3<Float>](repeating: .zero, count: BioSceneContent.directions.count)
+        for it in items where !it.mesh.positions.isEmpty {
+            let ps = it.mesh.positions
+            for i in stride(from: 0, to: ps.count, by: max(1, ps.count / 4096)) {
+                let p = ps[i]
+                for k in BioSceneContent.directions.indices {
+                    let d = (p * BioSceneContent.directions[k]).sum()
+                    if d > best[k] { best[k] = d; at[k] = p }
+                }
+            }
+        }
+        var out: [BioVec] = []
+        for k in best.indices where best[k].isFinite {
+            let p = BioVec(Double(at[k].x), Double(at[k].y), Double(at[k].z))
+            if !out.contains(p) { out.append(p) }
+        }
+        return out
+    }
+
+    /// The farthest of `points` along each of the 26 directions `outline()` uses (an outline grown by more points: the
+    /// texts a view adds beside a model).
+    static func extremes(of points: [BioVec]) -> [BioVec] {
+        var out: [BioVec] = []
+        for d in directions {
+            let dir = BioVec(Double(d.x), Double(d.y), Double(d.z))
+            if let p = points.max(by: { BioV.dot($0, dir) < BioV.dot($1, dir) }), !out.contains(p) { out.append(p) }
+        }
+        return out
+    }
+
+    /// The axes and the diagonals of a cube's edges and corners, each of length 1.
+    static let directions: [SIMD3<Float>] = {
+        var dirs: [SIMD3<Float>] = []
+        for x in -1...1 { for y in -1...1 { for z in -1...1 where x != 0 || y != 0 || z != 0 {
+            let d = SIMD3<Float>(Float(x), Float(y), Float(z))
+            dirs.append(d / (d * d).sum().squareRoot())
+        } } }
+        return dirs
+    }()
 
     /// The frame asked for, or one round every item.
     var framing: BioSphere {
@@ -113,4 +169,10 @@ struct BioSceneContent: Sendable {
 struct BioSphere: Equatable, Sendable {
     var centre: BioVec
     var radius: Double
+}
+
+/// (1.3.79) A scene's ball (its frame, or the ball round its items) and its outline (`BioSceneContent.outline()`).
+struct BioSceneShape: Sendable {
+    let framing: BioSphere
+    let outline: [BioVec]
 }
