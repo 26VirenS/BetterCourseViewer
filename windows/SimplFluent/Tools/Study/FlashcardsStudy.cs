@@ -169,7 +169,7 @@ internal sealed class FCRoundView : FCStudyPart
         var undo = StudyKit.IconBtn(SymbolRegular.ArrowUndo24, Undo, "Undo");
         undo.IsEnabled = history.Count > 0;
         var stillCount = StudyKit.Figure($"{learning.Count}", Ty.Subtitle, StudyKit.Orange).Margin(0, 0, 18, 0);
-        var still = StudyKit.Tinted("Still Learning", StudyKit.Orange, () => Mark(c, false), SymbolRegular.Dismiss24);
+        var still = StudyKit.Tinted("Still learning", StudyKit.Orange, () => Mark(c, false), SymbolRegular.Dismiss24);
         still.MinWidth = 150;
         still.Margin = new Thickness(0, 0, 18, 0);
         still.ToolTip = "Still learning (←)";
@@ -229,8 +229,8 @@ internal sealed class FCRoundView : FCStudyPart
         var all = learning.Count == 0;
         var buttons = new List<UIElement>();
         if (!all) buttons.Add(K.Button($"Keep Reviewing {ToolKit.Plural(learning.Count, "Term")}", () => Act(() => Begin(d, learning.ToList())), accent: true));
-        buttons.Add(K.Button("Restart Flashcards", () => Act(() => Begin(d, null)), accent: all));
-        buttons.Add(K.Button("Back to Set", back));
+        buttons.Add(K.Button("Restart flashcards", () => Act(() => Begin(d, null)), accent: all));
+        buttons.Add(K.Button("Back to set", back));
         var counts = K.H(40, BigCount(know.Count, "Know", StudyKit.Green), BigCount(learning.Count, "Still learning", StudyKit.Orange));
         counts.HorizontalAlignment = HorizontalAlignment.Center;
         var v = K.V(18,
@@ -372,7 +372,7 @@ internal sealed class FCLearnView : FCStudyPart
             var m = FCText.Mark(typed, want);
             Answer(c, m != FCMark.Wrong, m == FCMark.Close);
         };
-        var dontKnow = K.Button("Don’t Know", () => Answer(c, false));
+        var dontKnow = K.Button("Don’t know", () => Answer(c, false));
         dontKnow.IsEnabled = feedback == null;
         dontKnow.Margin = new Thickness(10, 0, 0, 0);
         if (feedback == null) TakeKeys(box);
@@ -452,7 +452,7 @@ internal sealed class FCLearnView : FCStudyPart
 
     private FrameworkElement AllLearned()
     {
-        var start = K.Button("Start Over", () => Act(() =>
+        var start = K.Button("Start over", () => Act(() =>
         {
             FlashcardStore.Change(deckID, d =>
             {
@@ -470,7 +470,7 @@ internal sealed class FCLearnView : FCStudyPart
             K.Icon(SymbolRegular.CheckmarkStarburst24, 54, StudyKit.Green, filled: true),
             K.Text("You’ve learned them all!", Ty.Title).Center(),
             K.Wrapped("Every card right twice in a row. They come back for a quick check in a day, then less and less often.", Ty.Body, B.Text2).Center(),
-            Centered(start, K.Button("Back to Set", back)));
+            Centered(start, K.Button("Back to set", back)));
         v.Margin = new Thickness(0, 30, 0, 30);
         Motion.Enter(v, 0, 16);
         return v;
@@ -543,10 +543,10 @@ internal sealed class FCTestView : FCStudyPart
         }
         for (var n = 0; n < questions.Count; n++) v.Children.Add(QuestionCard(n, questions[n]));
         if (marked)
-            v.Children.Add(K.H(10, K.Button("New Test", () => { Make(); Render(); }, accent: true), K.Button("Back to Set", back)));
+            v.Children.Add(K.H(10, K.Button("New test", () => { Make(); Render(); }, accent: true), K.Button("Back to set", back)));
         else
         {
-            var check = K.Button("Check Answers", () => { marked = true; Render(); }, accent: true);
+            var check = K.Button("Check answers", () => { marked = true; Render(); }, accent: true);
             check.IsEnabled = questions.Count > 0;
             v.Children.Add(check.Align(HorizontalAlignment.Left));
         }
@@ -679,7 +679,7 @@ internal sealed class FCMatchView : FCStudyPart
         if (finished != null)
         {
             var done = K.V(12, K.Text(newBest ? "A new best time!" : "All matched.", Ty.Subtitle).Center(),
-                Centered(K.Button("Play Again", Make, accent: true), K.Button("Back to Set", back)));
+                Centered(K.Button("Play again", Make, accent: true), K.Button("Back to set", back)));
             done.Margin = new Thickness(0, 20, 0, 20);
             Motion.Enter(done, 0, 16);
             v.Children.Add(done);

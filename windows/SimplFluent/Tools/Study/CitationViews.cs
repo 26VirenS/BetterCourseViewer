@@ -323,7 +323,7 @@ internal sealed class CitationTool : ContentControl
             v.Children.Add(K.V(8, ToolKit.Note($"Add {string.Join(", ", missing.Select(m => m.Label.ToLowerInvariant()))} to finish this citation."), jumps));
         }
 
-        var copy = K.Button(copied ? "Copied" : "Copy Citation", () =>
+        var copy = K.Button(copied ? "Copied" : "Copy citation", () =>
         {
             StudyKit.CopyRich(new[] { (IReadOnlyList<CiteSeg>)p }, CiteBuilder.Plain(p));
             copied = true;
@@ -348,13 +348,13 @@ internal sealed class CitationTool : ContentControl
         UIElement? copyList = null;
         if (list.Count > 0)
         {
-            var link = K.Link("Copy List", CopyList);
+            var link = K.Link("Copy list", CopyList);
             link.ToolTip = "Copy every saved citation, alphabetically";
             copyList = link;
         }
         var head = Heading.Section(list.Count == 0 ? "Saved" : $"Saved · {list.Count}", null, copyList);
         FrameworkElement body;
-        if (list.Count == 0) body = K.Wrapped("Saved citations stay on this PC. Copy List gives them alphabetically.", Ty.Body, B.Text2);
+        if (list.Count == 0) body = K.Wrapped("Saved citations stay on this PC. Copy list gives them alphabetically.", Ty.Body, B.Text2);
         else
         {
             var rows = K.V(0);
@@ -443,7 +443,7 @@ internal sealed class CitationCompact : ContentControl
         var head = K.Columns("*, auto", K.Text("Saved", Ty.BodyStrong, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0));
         if (list.Count > 0)
         {
-            var copyList = K.Link("Copy List", CitationTool.CopyList, Ty.Caption);
+            var copyList = K.Link("Copy list", CitationTool.CopyList, Ty.Caption);
             copyList.ToolTip = "Copy every saved citation, alphabetically";
             head.Children.Add(copyList.Col(1));
         }

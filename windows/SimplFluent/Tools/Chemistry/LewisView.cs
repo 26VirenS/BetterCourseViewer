@@ -233,6 +233,10 @@ internal sealed class LewisMakerView : Grid
     private readonly ContentControl strip = new() { Focusable = false };
     private readonly LewisEditor editor;
     private readonly SelectorBar wayBar, toolBar, modeBar;
+    private readonly ChemLayout layout;
+
+    /// <summary>The drawing over the rest (a narrow window): its way and preset are in its own heading.</summary>
+    private bool InHead => !layout.Wide;
 
     /// <param name="start">A preset or an element to begin from (null: the molecule it had).</param>
     /// <param name="openIn3D">Where Open in 3D builder goes, the molecule already in the 3D builder (null: the hook, or over the window).</param>
@@ -262,7 +266,10 @@ internal sealed class LewisMakerView : Grid
         legend.HorizontalAlignment = HorizontalAlignment.Center;
         legend.Margin = new Thickness(12);
         var card = K.Card(K.Rows("auto, *, auto, auto", head.Row(0), drawing.Row(1), strip.Row(2), legend.Row(3)), new Thickness(0));
-        Children.Add(new ChemLayout(controls, card, facts));
+        layout = new ChemLayout(controls, card, facts);
+        // (one over the other: Quick or Draw and the preset in the drawing's own heading, in view with it)
+        layout.WideChanged += Refresh;
+        Children.Add(layout);
 
         void Changed() => Refresh();
         void Moved() => editor.InvalidateVisual();
@@ -302,14 +309,12 @@ internal sealed class LewisMakerView : Grid
         wayBar.Select((int)st.Way, false);
         toolBar.Select((int)st.Tool, false);
         modeBar.Select(st.Mode == LewisSolver.Mode.Octet ? 0 : 1, false);
-        controls.Children.Add(wayBar);
-        controls.Children.Add(ChemKit.Heading("Preset"));
-        controls.Children.Add(ChemKit.PresetMenu(LewisPresets.Sections, st.Preset, name =>
+        if (!InHead)
         {
-            st.Load(name);
-            Chemistry.Tell("preset");
-            st.Change();
-        }).TourTarget("lewisPreset"));
+            controls.Children.Add(wayBar);
+            controls.Children.Add(ChemKit.Heading("Preset"));
+            controls.Children.Add(Presets());
+        }
         controls.Children.Add(st.Way == LWay.Quick ? QuickControls() : DrawControls());
         controls.Children.Add(ChemKit.Heading("Charge"));
         controls.Children.Add(K.Columns("*, auto",
@@ -327,6 +332,14 @@ internal sealed class LewisMakerView : Grid
             ? "Every atom kept to its octet (none past eight)."
             : "The smallest formal charges, period 3 atoms and below holding up to twelve."));
     }
+
+    /// <summary>The presets' menu (the tour's "Choose a preset").</summary>
+    private FrameworkElement Presets() => ChemKit.PresetMenu(LewisPresets.Sections, st.Preset, name =>
+    {
+        st.Load(name);
+        Chemistry.Tell("preset");
+        st.Change();
+    }).TourTarget("lewisPreset");
 
     private FrameworkElement QuickControls()
     {
@@ -444,7 +457,19 @@ internal sealed class LewisMakerView : Grid
             top.Children.Add(label.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
         }
         top.Margin = new Thickness(16);
-        head.Content = top;
+        if (!InHead) head.Content = top;
+        else
+        {
+            // (one over the other: Quick or Draw and the preset under the formula, in view with the drawing)
+            ChemKit.Detach(wayBar);
+            wayBar.VerticalAlignment = VerticalAlignment.Center;
+            var ways = K.Columns("auto, auto, auto, *", wayBar.Col(0),
+                ChemKit.Heading("Preset").Margin(16, 0, 10, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1),
+                Presets().Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(2));
+            ways.Margin = new Thickness(16, 0, 16, 12);
+            top.Margin = new Thickness(16, 16, 16, 10);
+            head.Content = K.V(0, top, ways);
+        }
 
         if (r.Drawable)
         {

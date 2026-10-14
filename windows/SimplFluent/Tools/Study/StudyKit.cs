@@ -167,7 +167,7 @@ internal static class StudyKit
         return b;
     }
 
-    /// <summary>A button filled with a colour that means something (Know in green, Still Learning in orange).</summary>
+    /// <summary>A button filled with a colour that means something (Know in green, Still learning in orange).</summary>
     public static Wpf.Ui.Controls.Button Tinted(string text, Color color, Action click, SymbolRegular? icon = null)
     {
         var b = new Wpf.Ui.Controls.Button

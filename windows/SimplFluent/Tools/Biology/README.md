@@ -78,8 +78,9 @@ BioTools.Register("gene", (c, state) => new GeneExpressionTool(c, state), GeneEx
   `SimplBio.<key>.<field>` (§3.2).
 - **State:** keep it in your static model class (`CellExplorerModel` …: it outlives the view being built again; it has
   a `Changed` event and `Tell()` to start from). Views subscribe on `Loaded` and unsubscribe on `Unloaded`.
-- **Hand-off:** `BioTools.Open(c, "gene", new() { ["sequence"] = "ATG…" })` closes the sheet or flyout `c` is in and
-  opens Gene Expression over the window; it reads it once with `c.TakeInfo("sequence")` when it is made.
+- **Hand-off:** `BioTools.Open(c, "gene", new() { ["sequence"] = "ATG…" })` opens Gene Expression in this tool's place
+  on the Tools page ("Tools › Gene Expression", Back returning here) — or, from a sheet or a flyout, closes it and opens
+  Gene Expression over the window; it reads it once with `c.TakeInfo("sequence")` when it is made.
 
 ## Launch flags (pictures)
 

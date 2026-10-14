@@ -295,7 +295,7 @@ internal sealed class GraphPane : Grid
 
     private FrameworkElement Unavailable()
     {
-        var again = K.Button("Try Again", () => web.Reload(), accent: true);
+        var again = K.Button("Try again", () => web.Reload(), accent: true);
         var open = K.Button("Open desmos.com", () => Engine.Engine.OpenExternally(GraphWeb.Desmos));
         var v = K.V(12,
             K.Icon(SymbolRegular.WifiWarning24, 40, B.Text3),
@@ -324,8 +324,8 @@ internal sealed class GraphTool : Grid
         var frame = new Border { Child = new GraphPane(GraphWeb.Full), CornerRadius = new CornerRadius(8), Padding = new Thickness(4), Background = Brushes.White, SnapsToDevicePixels = true };
         frame.Stroke(B.CardStroke);
         Children.Add(frame.Row(0));
-        var newGraph = FileKit.Link("New Graph", () => GraphWeb.Full.Reload(), SymbolRegular.ArrowCounterclockwise24, "Start again with an empty graph");
-        var browser = FileKit.Link("Open in Browser", () => Engine.Engine.OpenExternally(GraphWeb.Desmos), SymbolRegular.Globe24, "Open desmos.com in your browser");
+        var newGraph = FileKit.Link("New graph", () => GraphWeb.Full.Reload(), SymbolRegular.ArrowCounterclockwise24, "Start again with an empty graph");
+        var browser = FileKit.Link("Open in browser", () => Engine.Engine.OpenExternally(GraphWeb.Desmos), SymbolRegular.Globe24, "Open desmos.com in your browser");
         var foot = K.Columns("auto, *, auto, auto",
             K.Text("Powered by Desmos", Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0),
             newGraph.Col(2), browser.Margin(4, 0, 0, 0).Col(3));

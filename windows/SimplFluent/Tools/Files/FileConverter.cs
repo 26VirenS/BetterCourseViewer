@@ -880,7 +880,15 @@ internal sealed class FileConverterTool : ContentControl
         var v = K.V(12, card);
         if (s.Left.Count > 0) v.Children.Add(FileKit.Info($"Left out, being another kind of file than the first: {string.Join(", ", s.Left)}."));
         if (s.Message != null) v.Children.Add(ToolKit.Note(s.Message));
-        return FileKit.Section(s.Kind is { } k ? ConvKinds.Label(k) : "Files", ToolKit.Plural(s.Files.Count, "file"), K.H(8, add, clear), v);
+        // (the kind over how many — "PDFs", "1 file" — and Add and Clear at the heading's right: a count never runs into
+        //  Add, however narrow the column or long the count)
+        var words = K.V(0, K.Text(s.Kind is { } k ? ConvKinds.Label(k) : "Files", Ty.Subtitle), K.Text(ToolKit.Plural(s.Files.Count, "file"), Ty.Caption, B.Text2));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var actions = K.H(8, add, clear);
+        actions.VerticalAlignment = VerticalAlignment.Center;
+        var head = K.Columns("*, auto", words.Col(0), actions.Margin(12, 0, 0, 0).Col(1));
+        head.Margin = new Thickness(0, 0, 0, 10);
+        return K.V(0, head, v);
     }
 
     private FrameworkElement Row(ConvFile f)

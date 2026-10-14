@@ -23,23 +23,38 @@ namespace Simpl.Tools;
 
 /// <summary>
 /// What a tool is given where it opens (the Mac's ToolScreen, PinnedToolPopover and ToolPopup between them): the engine,
-/// whether it is the quick version in a pin's flyout, the files and details handed to it (from a pin's flyout, a
-/// command), and how to open the whole tool or close the flyout.
+/// whether it is the quick version in a pin's flyout, whether it is open on the Tools page, the files and details handed
+/// to it (from a pin's flyout, a command), how to open the whole tool or close what it is in, and how to tell its heading
+/// what it shows.
 /// </summary>
 public sealed class ToolContext
 {
     public required Engine.Engine Engine { get; init; }
     public required string Key { get; init; }
-    /// <summary>The quick version, in a pin's flyout (the Mac's FocusTimerCompact, CalculatorCompact …).</summary>
+    /// <summary>The quick version, in a pin's flyout or pulled out of it (the Mac's FocusTimerCompact, CalculatorCompact …).</summary>
     public bool Quick { get; init; }
+    /// <summary>Open on the Tools page ("Tools › Calculator", the Mac's ToolScreen), not in a sheet or a window of its own.</summary>
+    public bool InPage { get; init; }
     /// <summary>The window it is in (for its dialogs).</summary>
     public Window? Owner { get; init; }
 
     /// <summary>From the quick version: the whole tool over the window, with details or files for it.</summary>
     public Action<Dictionary<string, string>?, IReadOnlyList<string>?> OpenFull { get; init; } = (_, _) => { };
 
-    /// <summary>The flyout (the quick version) or the sheet (the whole tool, over the window) it is in, closed.</summary>
+    /// <summary>The flyout (the quick version), the sheet or the window (the whole tool) it is in, closed; on the Tools
+    /// page, nothing (the page stays).</summary>
     public Action Close { get; init; } = () => { };
+
+    /// <summary>
+    /// The heading told which of the tool's own pages shows (the Periodic Table's "Lewis structures"): its name for the
+    /// title, after the tool's ("Tools › Periodic table › Lewis structures"), and the way back to the tool's first page
+    /// (the breadcrumb's tool part); null, the tool's first page again.
+    /// </summary>
+    public Action<string?, Action?> ShowPage { get; init; } = (_, _) => { };
+
+    /// <summary>The heading told whether the tool's line under its name ("Make a set. Flip, learn, test, match.") is worth
+    /// its room now: not while a set is studied.</summary>
+    public Action<bool> ShowNote { get; init; } = _ => { };
 
     /// <summary>The files handed to the tool, taken once (the Mac's ToolsCenter.takeFiles).</summary>
     public IReadOnlyList<string> TakeFiles() => ToolsCenter.TakeFiles(Key);
@@ -112,8 +127,9 @@ public interface ITimerState
 }
 
 /// <summary>
-/// What the tools share across the window (the Mac's ToolsCenter): a tool opened whole, and files and details handed to
-/// it to take when it opens.
+/// What the tools share across the window (the Mac's ToolsCenter): the tool open on the Tools page — kept while you go
+/// elsewhere, so the Tools place opens on it again — a tool opened whole, and files and details handed to it to take when
+/// it opens.
 /// </summary>
 public static class ToolsCenter
 {
@@ -121,10 +137,29 @@ public static class ToolsCenter
     private static string? handoffTool;
     private static Dictionary<string, string> handoffInfo = new();
 
-    /// <summary>A tool opened whole from anywhere (a pin's flyout, a command), with files or details for it: over the
-    /// window, as from its tile.</summary>
-    public static void Show(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null) =>
-        PopUp(key, engine, null, files, info);
+    /// <summary>The tool open on the Tools page (the Mac's ToolsCenter.open), kept while you go elsewhere: picking the
+    /// Tools place again opens on it (Engine.OpensOn); null once the tiles show again.</summary>
+    public static string? Open { get; set; }
+
+#pragma warning disable CA2255
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void Remember() =>
+        Engine.Engine.OpensOn = place => place == Place.Tools && Open is { } k && KindOf(k) != null ? Route.Tool(k) : null;
+#pragma warning restore CA2255
+
+    /// <summary>
+    /// A tool opened whole from anywhere (its tile, a pin's menu, a command, another tool handing it something), with
+    /// files or details for it: on the Tools page, under "Tools › Calculator" (the Mac's show) — from the tiles a step
+    /// deeper, from another tool in its place, from elsewhere the Tools place with the tool on it, as one step.
+    /// </summary>
+    public static void Show(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
+    {
+        if (KindOf(key) == null) return;
+        Hand(key, files, info);
+        var route = Route.Tool(key);
+        if (engine.Nav.Current.Place == Place.Tools) engine.SetPath(new[] { route });
+        else engine.Open(route);
+    }
 
     /// <summary>A pinned tool opened whole, over the window where you are (the Mac's popUp): the screen stays under it.</summary>
     public static void PopUp(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
@@ -134,12 +169,25 @@ public static class ToolsCenter
     }
 
     /// <summary>The whole tool in a window of its own (the Mac's floating tool window): what a pin opens from a popup that
-    /// holds the window (a quiz, Knewton Alta, Macmillan), where a sheet over the window would wait behind the popup.</summary>
+    /// holds the window (a quiz, Knewton Alta, Macmillan, a tool's sheet), where a sheet over the window would wait behind
+    /// the popup.</summary>
     public static void Float(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
     {
         Hand(key, files, info);
         ToolWindow.Show(key, engine, owner);
     }
+
+    /// <summary>The whole tool from a pin's quick version: over Simpl's window as a sheet — or, a sheet holding the window
+    /// already (a popup, another tool's sheet), in a window of its own beside it.</summary>
+    public static void OpenWhole(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
+    {
+        var main = Application.Current?.MainWindow;
+        if (main is ISheetWindow { Sheets.IsOpen: true }) Float(key, engine, main, files, info);
+        else PopUp(key, engine, main, files, info);
+    }
+
+    /// <summary>Files or details are waiting for this tool (it takes them as it is made).</summary>
+    public static bool Handed(string key) => (handoffTool == key && handoff.Count > 0) || handoffInfo.Count > 0;
 
     private static void Hand(string key, IReadOnlyList<string>? files, Dictionary<string, string>? info)
     {
@@ -159,7 +207,8 @@ public static class ToolsCenter
 
     public static string? TakeInfo(string name) => handoffInfo.Remove(name, out var v) ? v : null;
 
-    /// <summary>A tool's short name, for its pin's flyout (the Mac's ToolKind.shortName).</summary>
+    /// <summary>A tool's short name (the Mac's ToolKind.shortName), where room is tight; its flyout and its window say its
+    /// whole name, as its tile does.</summary>
     public static string ShortName(string key) => key switch
     {
         "cite" => "Cite", "pomo" => "Focus", "calc" => "Calculator", "graph" => "Graphing", "ptable" => "Elements",
@@ -172,8 +221,12 @@ public static class ToolsCenter
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
     public static double FlyoutWidth(string key) => key switch
     {
-        "calc" or "ptable" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" => 360, "fc" => 340, _ => 330,
+        // (the periodic table's a little wider, and its padding less: squares big enough to point at)
+        "ptable" => 460, "calc" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" => 360, "fc" => 340, _ => 330,
     };
+
+    /// <summary>The room inside its pin's flyout round its content.</summary>
+    public static double FlyoutPadding(string key) => key == "ptable" ? 10 : 16;
 
     /// <summary>The files a tool takes from its pin's flyout (null: none), as an open dialog's filter.</summary>
     public static string? Accepts(string key) => key switch
@@ -304,6 +357,35 @@ public static class ToolKit
     /// <summary>A section's card of a tool: its heading over its content.</summary>
     public static FrameworkElement Section(string title, UIElement content, UIElement? trailing = null) =>
         K.V(10, trailing == null ? K.Text(title, Ty.BodyStrong) : K.Columns("*, auto", K.Text(title, Ty.BodyStrong).Col(0), trailing.Col(1)), K.Card(content, new Thickness(16)));
+
+    /// <summary>
+    /// A hairline under a tool's heading that shows only while the tool scrolls beneath it (Windows 11's scroll edge):
+    /// <paramref name="line"/> fades in once <paramref name="body"/>'s own page scroller — as tall as most of the tool, not
+    /// a list inside it — has left its top, and out again at the top.
+    /// </summary>
+    public static void ScrollEdge(UIElement line, FrameworkElement body)
+    {
+        line.Opacity = 0;
+        var shown = false;
+        body.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((_, e) =>
+        {
+            if (e.OriginalSource is not ScrollViewer sv || sv.ActualHeight < body.ActualHeight * 0.5) return;
+            var on = sv.VerticalOffset > 0.5;
+            if (on == shown) return;
+            shown = on;
+            Motion.To(line, UIElement.OpacityProperty, on ? 1 : 0, Motion.Fast);
+        }));
+    }
+
+    /// <summary>A tool's view on the Tools page, with the scroll edge along its top (under the page's heading).</summary>
+    public static FrameworkElement Edged(FrameworkElement body)
+    {
+        var line = K.Divider();
+        line.VerticalAlignment = VerticalAlignment.Top;
+        line.IsHitTestVisible = false;
+        ScrollEdge(line, body);
+        return new Grid { Children = { body, line } };
+    }
 }
 
 /// <summary>
@@ -432,8 +514,11 @@ public static class Files
 
 // ---- a tool opened whole over the window (the Mac's ToolPopup) ----
 
-/// <summary>A pinned tool opened whole, over the window, in a sheet nearly the window's size: its heading's Done, or
-/// Escape, closes it.</summary>
+/// <summary>
+/// A pinned tool opened whole from its flyout, over the window, in a sheet nearly the window's size (the Mac's ToolPopup):
+/// its heading's Done, or Escape, closes it. The sheet opens at the tool's top, a hairline under the heading once the tool
+/// scrolls beneath it; the other pinned tools sit in its heading, since the sheet covers the title bar.
+/// </summary>
 public static class ToolPopup
 {
     public static void Show(string key, Engine.Engine engine, Window? owner)
@@ -443,14 +528,22 @@ public static class ToolPopup
         var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
         var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
         var sheet = new Sheet { Bare = true, Width = w, Height = h };
-        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open)
-        var c = new ToolContext { Engine = engine, Key = key, Owner = win, Close = () => sheet.Close() };
+        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open; what the
+        //  tool tells its heading as it is made is kept for the heading made after it)
+        var told = new ToolHeading.Told();
+        var c = new ToolContext { Engine = engine, Key = key, Owner = win, Close = () => sheet.Close(), ShowPage = told.Page, ShowNote = told.Note };
         var body = ToolRegistry.Full(c) ?? Missing(kind);
         var done = K.Button("Done", () => sheet.Close());
         done.ToolTip = $"Close {kind.Name} (Esc)";
-        var head = ToolHeader.Make(kind, c, done);
+        var head = ToolHeader.Make(kind, c, done, new PinBar(engine, inPopup: true));
+        told.Heading = head;
         head.Margin = new Thickness(40, 20, 40, 12);
-        var g = K.Rows("auto, *", head.Row(0), body.Row(1));
+        var edge = K.Divider();
+        edge.VerticalAlignment = VerticalAlignment.Bottom;
+        edge.IsHitTestVisible = false;
+        ToolKit.ScrollEdge(edge, body);
+        var top = new Grid { Children = { head, edge } };
+        var g = K.Rows("auto, *", top.Row(0), body.Row(1));
         g.Bg(B.Window);
         sheet.Body = g;
         // (one Done, the heading's: no strip of buttons at the foot; Escape still closes it, as a sheet with no Close does)
@@ -494,9 +587,11 @@ public sealed class ToolWindow : FluentWindow, ISheetWindow
         MinWidth = 560;
         MinHeight = 420;
         WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
-        var c = new ToolContext { Engine = engine, Key = kind.Key, Owner = this };
+        var told = new ToolHeading.Told();
+        var c = new ToolContext { Engine = engine, Key = kind.Key, Owner = this, Close = Close, ShowPage = told.Page, ShowNote = told.Note };
         var body = ToolRegistry.Full(c) ?? ToolPopup.Missing(kind);
         var head = ToolHeader.Make(kind, c, null);
+        told.Heading = head;
         head.Margin = new Thickness(32, 4, 32, 12);
         var bar = new TitleBar { Title = kind.Name };
         var root = K.Rows("auto, auto, *", bar.Row(0), head.Row(1), body.Row(2));
@@ -512,42 +607,130 @@ public sealed class ToolWindow : FluentWindow, ISheetWindow
     }
 }
 
-/// <summary>A tool's heading over it when opened whole: Done, its tile, its name and line, its own controls, its pin.</summary>
-public static class ToolHeader
+/// <summary>
+/// A tool's heading over it in a sheet or a window of its own: Done, its tile, its name — and the page of its own that
+/// shows, after it ("Periodic table › Lewis structures", the tool's name going back to its first page) — and its line, its
+/// own controls, its pin, and, where the heading covers the title bar, the other pinned tools.
+/// </summary>
+public sealed class ToolHeading : Grid
 {
-    public static FrameworkElement Make(ToolsScreen.Kind kind, ToolContext c, UIElement? leading)
+    private readonly ToolsScreen.Kind kind;
+    private readonly StackPanel titleRow = new() { Orientation = Orientation.Horizontal };
+    private readonly TextBlock note;
+    private bool noteWanted = true;
+
+    internal ToolHeading(ToolsScreen.Kind kind, ToolContext c, UIElement? leading, UIElement? pins)
     {
-        var words = K.V(2, K.Text(kind.Name, Ty.Title));
-        if (kind.Key != "ptable") words.Children.Add(K.Text(kind.Note, Ty.Body, B.Text2));
-        var row = K.Columns("auto, auto, *, auto, auto");
-        if (leading != null) { ((FrameworkElement)leading).Margin = new Thickness(0, 0, 14, 0); ((FrameworkElement)leading).VerticalAlignment = VerticalAlignment.Center; row.Children.Add(leading.Col(0)); }
-        row.Children.Add(K.IconTile(kind.Symbol, kind.Color, 44).Margin(0, 0, 14, 0).Col(1));
+        this.kind = kind;
+        note = K.Text(kind.Note, Ty.Body, B.Text2);
+        var words = K.V(2, titleRow, note);
+        Page(null, null);
+        Note(true);
+        foreach (var w in new[] { "auto", "auto", "*", "auto", "auto", "auto" }) ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
+        if (leading is FrameworkElement l) { l.Margin = new Thickness(0, 0, 14, 0); l.VerticalAlignment = VerticalAlignment.Center; Children.Add(l.Col(0)); }
+        Children.Add(K.IconTile(kind.Symbol, kind.Color, 44).Margin(0, 0, 14, 0).Col(1));
         words.VerticalAlignment = VerticalAlignment.Center;
-        row.Children.Add(words.Col(2));
-        if (ToolRegistry.Header(c) is { } extra) { extra.Margin = new Thickness(12, 0, 12, 0); extra.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(extra.Col(3)); }
-        // (a header full of the tool's own controls — the Periodic Table's, a biology tool's pages — the pin a symbol alone)
-        row.Children.Add(PinButton(kind, squished: kind.Key == "ptable" || BioTools.Pages(kind.Key).Count > 1).Col(4));
-        return row;
+        Children.Add(words.Col(2));
+        if (ToolRegistry.Header(c) is { } extra) { extra.Margin = new Thickness(12, 0, 12, 0); extra.VerticalAlignment = VerticalAlignment.Center; Children.Add(extra.Col(3)); }
+        // (a header full of the tool's own controls — a biology tool's pages — the pin a symbol alone)
+        Children.Add(ToolHeader.PinButton(kind, squished: ToolHeader.Squished(kind.Key)).Col(4));
+        if (pins is FrameworkElement p) { p.Margin = new Thickness(10, 0, 0, 0); p.VerticalAlignment = VerticalAlignment.Center; Children.Add(p.Col(5)); }
     }
 
-    /// <summary>A tool's pin in its header: "Pin to Title Bar", or "Pinned" in the accent while it is pinned.</summary>
+    /// <summary>The page of the tool's own that shows ("Lewis structures"), after its name; null, its first page.</summary>
+    public void Page(string? name, Action? back)
+    {
+        titleRow.Children.Clear();
+        if (name == null)
+        {
+            titleRow.Children.Add(K.Text(kind.Name, Ty.Title));
+            Note(noteWanted);
+            return;
+        }
+        var t = K.Text(kind.Name, Ty.Title, back != null ? B.Text2 : B.Text);
+        if (back != null)
+        {
+            var b = K.Subtle(t, back, new Thickness(2, 0, 2, 0));
+            b.Cursor = Cursors.Hand;
+            b.ToolTip = $"Back to the {kind.Name.ToLowerInvariant()}";
+            titleRow.Children.Add(b);
+        }
+        else titleRow.Children.Add(t);
+        titleRow.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0));
+        titleRow.Children.Add(K.Text(name, Ty.Title));
+        note.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>The line under the name shown, or not (the Periodic Table has none).</summary>
+    public void Note(bool on)
+    {
+        noteWanted = on;
+        note.Visibility = on && kind.Key != "ptable" && kind.Note.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>What a tool tells its heading (ToolContext.ShowPage, ShowNote) — kept from before the heading is made (the
+    /// tool is made first), and passed on once it is.</summary>
+    internal sealed class Told
+    {
+        private string? page;
+        private Action? back;
+        private bool note = true;
+        private ToolHeading? heading;
+
+        public ToolHeading? Heading
+        {
+            get => heading;
+            set
+            {
+                heading = value;
+                heading?.Note(note);
+                if (page != null) heading?.Page(page, back);
+            }
+        }
+
+        public void Page(string? name, Action? toFirst)
+        {
+            page = name;
+            back = toFirst;
+            heading?.Page(name, toFirst);
+        }
+
+        public void Note(bool on)
+        {
+            note = on;
+            heading?.Note(on);
+        }
+    }
+}
+
+/// <summary>A tool's heading and its pin, where the tool opens whole.</summary>
+public static class ToolHeader
+{
+    public static ToolHeading Make(ToolsScreen.Kind kind, ToolContext c, UIElement? leading, UIElement? pins = null) => new(kind, c, leading, pins);
+
+    /// <summary>A tool whose own controls fill its heading (a biology tool's pages): its pin a symbol alone.</summary>
+    public static bool Squished(string key) => BioTools.Pages(key).Count > 1;
+
+    /// <summary>
+    /// A tool's pin in its heading, named for what a press does (the Mac's "Pin to Toolbar" / "Unpin from Toolbar"): "Pin
+    /// to title bar", or "Unpin" while it is pinned — or, in a heading full of the tool's own controls, its symbol alone.
+    /// </summary>
     public static FrameworkElement PinButton(ToolsScreen.Kind kind, bool squished = false)
     {
         var host = new ContentControl { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
         void Draw()
         {
             var on = ToolsPins.IsPinned(kind.Key);
-            var b = K.Button(on ? "Pinned" : "Pin to Title Bar", () => ToolsPins.Toggle(kind.Key), accent: on, icon: SymbolRegular.Pin24);
+            var b = K.Button(on ? "Unpin" : "Pin to title bar", () => ToolsPins.Toggle(kind.Key), icon: on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24);
             if (squished)
             {
-                // (a header full of the tool's own controls: the pin a symbol alone, the size of theirs)
                 b.Icon = null;
-                b.Content = K.Icon(SymbolRegular.Pin24, 16, on ? B.OnAccent : B.Text, filled: on);
+                b.Content = K.Icon(on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24, 16, B.Text);
                 b.MinWidth = 0;
                 b.Padding = new Thickness(10, 6, 10, 6);
             }
-            b.ToolTip = on ? "In the title bar on every screen. Press to take it out." : $"Keep {kind.Name} in the title bar on every screen";
-            System.Windows.Automation.AutomationProperties.SetName(b, on ? $"Unpin {kind.Name}" : $"Pin {kind.Name}");
+            b.ToolTip = on ? $"Take {kind.Name} out of the title bar" : $"Keep {kind.Name} in the title bar on every screen";
+            System.Windows.Automation.AutomationProperties.SetName(b, on ? $"Unpin {kind.Name}" : $"Pin {kind.Name} to the title bar");
             host.Content = b;
         }
         Draw();
@@ -562,10 +745,11 @@ public static class ToolHeader
 
 /// <summary>
 /// The tools pinned to the title bar, on every screen: a button each in its tool's colour; a press opens a flyout with
-/// the tool's quickest use, and its name opens the whole tool. A running focus timer is live in its pin (it borrows a
-/// pin while it runs if the timer is not pinned). A pin's menu opens, moves or unpins it. The same pins sit in the
-/// header of a popup that covers the title bar (a quiz, Knewton Alta, Macmillan: inPopup), their flyouts over it and the
-/// whole tool in a window of its own beside it (ToolsCenter.Float) — a sheet would wait behind the popup.
+/// the tool's quickest use — its name (with ›) opens the whole tool, Pop out pulls the quick version into a small window of
+/// its own (ToolFloat). A running focus timer is live in its pin (it borrows a pin while it runs if the timer is not
+/// pinned). A pin's menu opens it, pops it out, moves or unpins it. The same pins sit in the heading of a popup that
+/// covers the title bar (a quiz, Knewton Alta, Macmillan, a tool's sheet: inPopup), their flyouts over it and the whole
+/// tool in a window of its own beside it (ToolsCenter.Float) — a sheet would wait behind the popup.
 /// </summary>
 public sealed class PinBar : StackPanel
 {
@@ -575,6 +759,10 @@ public sealed class PinBar : StackPanel
     private ITimerState? timer;
     private Popup? flyout;
     private string? flyoutKey;
+    /// <summary>The flyout stays until it is closed by hand (the screenshot suite's --pin-open: another copy of Simpl's
+    /// window coming forward would otherwise fold it away before its picture).</summary>
+    private bool flyoutKept;
+    private Window? flyoutWindow;
 
     public PinBar(Engine.Engine engine, bool inPopup = false)
     {
@@ -594,20 +782,19 @@ public sealed class PinBar : StackPanel
             if (timer != null) timer.Changed -= Draw;
             timer = null;
             tick.Stop();
-            CloseFlyout();
+            CloseFlyout("gone");
         };
         Draw();
         // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch, and keeps it open: CI
         //  starts three copies of Simpl at once, and another's window coming forward would close a flyout that closes when
         //  its window is left, so the picture showed the bar without it)
-        if (Launch.Take("", "pin-open") is { Length: > 0 } k)
+        if (!inPopup && Launch.Take("", "pin-open") is { Length: > 0 } k)
         {
             var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
             t.Tick += (_, _) =>
             {
                 t.Stop();
-                OpenFlyout(k);
-                if (flyout != null) flyout.StaysOpen = true;
+                OpenFlyout(k, kept: true);
             };
             t.Start();
         }
@@ -676,7 +863,7 @@ public sealed class PinBar : StackPanel
             }
         if (flyout != null && flyoutKey != null)
         {
-            if (buttons.TryGetValue(flyoutKey, out var nb)) flyout.PlacementTarget = nb; else CloseFlyout();
+            if (buttons.TryGetValue(flyoutKey, out var nb)) flyout.PlacementTarget = nb; else CloseFlyout("unpinned");
         }
     }
 
@@ -792,6 +979,8 @@ public sealed class PinBar : StackPanel
         return t;
     }
 
+    /// <summary>A pin's menu (Windows' sentence case): open the tool, pop it out, the running timer's own, move it, unpin
+    /// it — unpinning is here, a deliberate choice, not a button in the flyout a slip can press.</summary>
     private ContextMenu Menu(ToolsScreen.Kind kind)
     {
         var m = new ContextMenu();
@@ -801,24 +990,25 @@ public sealed class PinBar : StackPanel
             i.Click += (_, _) => a();
             return i;
         }
-        m.Items.Add(Item($"Open {kind.Name}", () => ToolsCenter.Show(kind.Key, engine)));
+        m.Items.Add(Item($"Open {kind.Name}", () => OpenWhole(kind.Key, null, null)));
+        if (ToolRegistry.Has(kind.Key) && ToolsCenter.Accepts(kind.Key) == null) m.Items.Add(Item("Pop out", () => PopOut(kind.Key)));
         if (kind.Key == "pomo" && timer?.Active == true)
         {
             var t = timer;
             m.Items.Add(new Separator());
             m.Items.Add(Item(t.Running ? "Pause" : "Resume", t.Toggle));
-            m.Items.Add(Item($"Skip to {t.NextPhaseName}", t.Skip));
-            m.Items.Add(Item("Cancel Session", t.Reset));
+            m.Items.Add(Item($"Skip to {t.NextPhaseName.ToLowerInvariant()}", t.Skip));
+            m.Items.Add(Item("Cancel session", t.Reset));
         }
         m.Items.Add(new Separator());
         var pins = ToolsPins.Pinned;
         if (ToolsPins.IsPinned(kind.Key))
         {
-            m.Items.Add(Item("Move Left", () => ToolsPins.Move(kind.Key, -1), pins.FirstOrDefault() != kind.Key));
-            m.Items.Add(Item("Move Right", () => ToolsPins.Move(kind.Key, 1), pins.LastOrDefault() != kind.Key));
-            m.Items.Add(Item("Unpin from Title Bar", () => ToolsPins.Toggle(kind.Key)));
+            m.Items.Add(Item("Move left", () => ToolsPins.Move(kind.Key, -1), pins.FirstOrDefault() != kind.Key));
+            m.Items.Add(Item("Move right", () => ToolsPins.Move(kind.Key, 1), pins.LastOrDefault() != kind.Key));
+            m.Items.Add(Item("Unpin from title bar", () => ToolsPins.Toggle(kind.Key)));
         }
-        else m.Items.Add(Item("Pin to Title Bar", () => ToolsPins.Toggle(kind.Key)));
+        else m.Items.Add(Item("Pin to title bar", () => ToolsPins.Toggle(kind.Key)));
         return m;
     }
 
@@ -828,27 +1018,40 @@ public sealed class PinBar : StackPanel
         return s >= 3600 ? $"{s / 3600}:{s / 60 % 60:00}:{s % 60:00}" : $"{s / 60}:{s % 60:00}";
     }
 
-    /// <summary>A pin's flyout: the tool's name (a press opens the whole tool), its pin, and its quickest use.</summary>
-    public void OpenFlyout(string key)
+    /// <summary>The whole tool, from a pin: on the Tools page from the title bar's pins' menu; over the window as a sheet
+    /// from a flyout (the screen stays under it); from a popup's pins, in a window of its own beside it.</summary>
+    private void OpenWhole(string key, Dictionary<string, string>? info, IReadOnlyList<string>? files, bool fromFlyout = false)
     {
-        if (flyout != null) { var same = flyoutKey == key; CloseFlyout(); if (same) return; }
+        CloseFlyout("opened");
+        if (inPopup) ToolsCenter.Float(key, engine, Window.GetWindow(this), files, info);
+        else if (fromFlyout) ToolsCenter.PopUp(key, engine, Window.GetWindow(this), files, info);
+        else ToolsCenter.Show(key, engine, files, info);
+    }
+
+    /// <summary>The quick version pulled out of the flyout into a small window of its own (ToolFloat).</summary>
+    private void PopOut(string key)
+    {
+        CloseFlyout("popped out");
+        ToolFloat.Show(key, engine, Window.GetWindow(this) ?? Application.Current?.MainWindow);
+    }
+
+    /// <summary>
+    /// A pin's flyout: the tool's whole name (with ›, a press opens the whole tool), Pop out, and its quickest use — under
+    /// its pin, over whatever is up (a flyout is a window of its own). It folds back on a press anywhere else in the window,
+    /// the window left, moved or resized, Escape, or its pin pressed again; never while the keyboard moves inside it.
+    /// </summary>
+    public void OpenFlyout(string key) => OpenFlyout(key, kept: false);
+
+    private void OpenFlyout(string key, bool kept)
+    {
+        if (flyout != null) { var same = flyoutKey == key; CloseFlyout("pin pressed"); if (same) return; }
         if (ToolsCenter.KindOf(key) is not { } kind) return;
         var anchor = buttons.GetValueOrDefault(key);
         var owner = Window.GetWindow(this);
-        void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files)
-        {
-            CloseFlyout();
-            if (inPopup) ToolsCenter.Float(key, engine, owner, files, info);
-            else ToolsCenter.PopUp(key, engine, owner, files, info);
-        }
-        var c = new ToolContext { Engine = engine, Key = key, Quick = true, Owner = owner, OpenFull = Full, Close = CloseFlyout };
+        void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files) => OpenWhole(key, info, files, fromFlyout: true);
+        var c = new ToolContext { Engine = engine, Key = key, Quick = true, Owner = owner, OpenFull = Full, Close = () => CloseFlyout("closed by the tool") };
 
-        var name = K.Subtle(K.H(4, K.Text(ToolsCenter.ShortName(key), Ty.BodyStrong), K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2)), () => Full(null, null), new Thickness(4, 2, 4, 2));
-        name.ToolTip = $"Open {kind.Name}";
-        var on = ToolsPins.IsPinned(key);
-        var pin = K.IconButton(on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24, () => { ToolsPins.Toggle(key); CloseFlyout(); }, on ? "Unpin from the title bar" : "Pin to the title bar", 16, 30);
-        var grow = K.IconButton(SymbolRegular.ArrowMaximize24, () => Full(null, null), $"Open {kind.Name} full size", 16, 30);
-        var head = K.Columns("auto, auto, *, auto, auto", K.IconTile(kind.Symbol, kind.Color, 28).Margin(0, 0, 10, 0).Col(0), name.Col(1), pin.Col(3), grow.Col(4));
+        var head = QuickHead(kind, () => Full(null, null), ToolRegistry.Has(key) && ToolsCenter.Accepts(key) == null ? () => PopOut(key) : null);
 
         FrameworkElement body;
         if (ToolsCenter.Accepts(key) is { } filter)
@@ -866,22 +1069,35 @@ public sealed class PinBar : StackPanel
 
         var card = new Border
         {
-            Width = ToolsCenter.FlyoutWidth(key), Padding = new Thickness(16), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
+            Width = ToolsCenter.FlyoutWidth(key), Padding = new Thickness(ToolsCenter.FlyoutPadding(key)), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
             Child = K.V(14, head, body), Margin = new Thickness(12, 4, 12, 20), Effect = K.Shadow(24, 6, 0.22),
         };
         card.Bg(B.Flyout);
         card.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
         card.SetResourceReference(TextElement.ForegroundProperty, B.Text);
+        KeyboardNavigation.SetTabNavigation(card, KeyboardNavigationMode.Cycle);
+        // (Escape folds it back, the keyboard back on its pin — an open drop-down inside it closes first)
+        card.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape || (Keyboard.FocusedElement is System.Windows.Controls.ComboBox { IsDropDownOpen: true })) return;
+            e.Handled = true;
+            CloseFlyout("Escape");
+            anchor?.Focus();
+        };
         // (its right edge under its pin's: the pins sit at the window's right, so the flyout opens towards the page)
         var target = (FrameworkElement?)anchor ?? this;
+        // (it stays open by itself — StaysOpen — and folds back as Fold says: a light-dismiss popup also folds when the
+        //  keyboard or the mouse goes into a part of its own that is a window of its own, Desmos's)
         flyout = new Popup
         {
-            Child = card, StaysOpen = false, AllowsTransparency = true, PlacementTarget = target,
+            Child = card, StaysOpen = true, AllowsTransparency = true, PlacementTarget = target,
             Placement = PlacementMode.Bottom, HorizontalOffset = target.ActualWidth - (card.Width + 24) + 12, PopupAnimation = PopupAnimation.None,
         };
         flyoutKey = key;
-        flyout.Closed += (_, _) => { if (flyout?.IsOpen != true) { flyout = null; flyoutKey = null; } };
+        flyoutKept = kept;
         flyout.IsOpen = true;
+        Watch(owner);
+        if (Shot.Asked || Launch.IsDevelopment) Log.Write($"pin flyout open: {key}");
         if (Motion.On)
         {
             var t = new TranslateTransform(0, -12);
@@ -894,13 +1110,149 @@ public sealed class PinBar : StackPanel
         Shot.Moved();
     }
 
-    public void CloseFlyout()
+    /// <summary>A flyout's (or a pulled-out window's) heading: the tool's tile and whole name — the name (with ›) opening
+    /// the whole tool, the one way to it — and Pop out at its right.</summary>
+    internal static FrameworkElement QuickHead(ToolsScreen.Kind kind, Action openWhole, Action? popOut)
     {
+        var words = K.Text(kind.Name, Ty.BodyStrong);
+        var name = K.Subtle(K.H(4, words, K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2)), openWhole, new Thickness(4, 2, 4, 2));
+        name.HorizontalAlignment = HorizontalAlignment.Left;
+        name.ToolTip = $"Open {kind.Name}";
+        System.Windows.Automation.AutomationProperties.SetName(name, $"Open {kind.Name}");
+        var head = K.Columns("auto, *, auto", K.IconTile(kind.Symbol, kind.Color, 28).Margin(0, 0, 10, 0).Col(0), name.Col(1));
+        if (popOut != null) head.Children.Add(K.IconButton(SymbolRegular.WindowArrowUp24, popOut, "Pop out into a window of its own", 16, 30).Col(2));
+        return head;
+    }
+
+    /// <summary>What folds the flyout back while it is open: a press in the window outside it (not on its own pin, which
+    /// folds it itself), the window left (to another app; not to the flyout), moved or resized.</summary>
+    private void Watch(Window? w)
+    {
+        Unwatch();
+        if (w == null) return;
+        flyoutWindow = w;
+        w.PreviewMouseDown += OnWindowPress;
+        w.Deactivated += OnWindowLeft;
+        w.LocationChanged += OnWindowMoved;
+        w.SizeChanged += OnWindowSized;
+    }
+
+    private void Unwatch()
+    {
+        if (flyoutWindow is not { } w) return;
+        w.PreviewMouseDown -= OnWindowPress;
+        w.Deactivated -= OnWindowLeft;
+        w.LocationChanged -= OnWindowMoved;
+        w.SizeChanged -= OnWindowSized;
+        flyoutWindow = null;
+    }
+
+    private void OnWindowPress(object? sender, MouseButtonEventArgs e)
+    {
+        if (flyoutKept || flyoutKey == null) return;
+        var source = e.OriginalSource as DependencyObject;
+        // (a press inside the flyout reaches the window too — a popup hands its content's events to its parent — and is
+        //  the flyout's own; its own pin pressed: the pin's click folds it, rather than folding here and opening again there)
+        if (flyout?.Child is { } card && Within(source, card)) return;
+        if (buttons.GetValueOrDefault(flyoutKey) is { } pin && Within(source, pin)) return;
+        CloseFlyout("pressed elsewhere");
+    }
+
+    private static bool Within(DependencyObject? d, DependencyObject root)
+    {
+        for (; d != null; d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, root)) return true;
+        return false;
+    }
+
+    private void OnWindowLeft(object? sender, EventArgs e)
+    {
+        if (flyoutKept) return;
+        // (the keyboard or the pointer gone into the flyout itself — a window of its own inside it, Desmos — is not leaving)
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (flyout?.Child is UIElement card && (card.IsKeyboardFocusWithin || card.IsMouseOver)) return;
+            if (flyoutWindow is { IsActive: false }) CloseFlyout("window left");
+        }, DispatcherPriority.Input);
+    }
+
+    private void OnWindowMoved(object? sender, EventArgs e) { if (!flyoutKept) CloseFlyout("window moved"); }
+
+    private void OnWindowSized(object? sender, SizeChangedEventArgs e) { if (!flyoutKept) CloseFlyout("window resized"); }
+
+    public void CloseFlyout() => CloseFlyout("closed");
+
+    private void CloseFlyout(string why)
+    {
+        Unwatch();
         if (flyout == null) return;
         var f = flyout;
+        var key = flyoutKey;
         flyout = null;
         flyoutKey = null;
+        flyoutKept = false;
         f.IsOpen = false;
+        if (Shot.Asked || Launch.IsDevelopment) Log.Write($"pin flyout closed: {key} ({why})");
+    }
+}
+
+/// <summary>
+/// A pin's quick version pulled out of its flyout (the Mac's ToolFloat): a small window of its own that stays above
+/// Simpl's window and its popups — and above other apps, as Windows' Calculator does kept on top — wherever it is moved,
+/// until its × closes it. Its heading's name opens the whole tool. One a tool: pulled out again, the one there comes
+/// forward. Where it was is remembered for next time.
+/// </summary>
+public sealed class ToolFloat : FluentWindow
+{
+    private static readonly Dictionary<string, ToolFloat> Open = new();
+    private readonly string key;
+
+    private ToolFloat(ToolsScreen.Kind kind, Engine.Engine engine, Window? owner)
+    {
+        key = kind.Key;
+        Title = kind.Name;
+        Owner = owner;
+        Topmost = true;
+        ShowInTaskbar = false;
+        ResizeMode = ResizeMode.NoResize;
+        WindowBackdropType = Appearance.Backdrop;
+        ExtendsContentIntoTitleBar = true;
+        FontFamily = K.TextFace;
+        SetResourceReference(ForegroundProperty, B.Text);
+        SetResourceReference(BackgroundProperty, B.Window);
+        Width = ToolsCenter.FlyoutWidth(kind.Key) + 32;
+        MaxHeight = 760;
+        var c = new ToolContext { Engine = engine, Key = kind.Key, Quick = true, Owner = this, OpenFull = (info, files) => ToolsCenter.OpenWhole(kind.Key, engine, files, info), Close = Close };
+        var body = ToolRegistry.Quick(c) ?? K.Wrapped($"Open {kind.Name} to use it.", Ty.Body, B.Text2);
+        var bar = new TitleBar { Title = "", ShowMinimize = false, ShowMaximize = false, Height = 32 };
+        var head = PinBar.QuickHead(kind, () => ToolsCenter.OpenWhole(kind.Key, engine), null);
+        var content = K.V(14, head, body);
+        content.Margin = new Thickness(16, 0, 16, 16);
+        Content = K.Rows("auto, auto", bar.Row(0), content.Row(1));
+        // (where it was left; the first time, at the window's top right, under the pins)
+        var place = "float-" + kind.Key;
+        var first = Prefs.String($"window:{place}") == null;
+        Placement.Restore(this, place, Width, 400, 200, 120);
+        Width = ToolsCenter.FlyoutWidth(kind.Key) + 32;
+        ClearValue(HeightProperty);
+        SizeToContent = SizeToContent.Height;
+        if (first && owner is { IsLoaded: true } o)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = o.Left + Math.Max(0, o.ActualWidth - Width - 24);
+            Top = o.Top + 56;
+        }
+        LocationChanged += (_, _) => Placement.Save(this, place);
+        Closed += (_, _) => Open.Remove(key);
+    }
+
+    public static void Show(string key, Engine.Engine engine, Window? owner)
+    {
+        if (Open.TryGetValue(key, out var there)) { there.Activate(); return; }
+        if (ToolsCenter.KindOf(key) is not { } kind) return;
+        var w = new ToolFloat(kind, engine, owner);
+        Open[key] = w;
+        w.Show();
     }
 }
 

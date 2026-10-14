@@ -190,6 +190,9 @@ internal sealed class PTGrid : Panel
         leave.Tick += (_, _) => { leave.Stop(); Hover?.Invoke(null); };
         if (!compact)
         {
+            // (the gap over the transition metals, rows 1–3: where the tour's card can sit over the table without hiding
+            //  an element)
+            PTTour.Rooms.AddOrUpdate(this, () => new Rect(2 * (Cell + Gap), 0, 10 * (Cell + Gap) - Gap, 3 * (Cell + Gap) - Gap));
             lanthanides = RowLabel("57–71");
             actinides = RowLabel("89–103");
             Children.Add(lanthanides);
@@ -303,10 +306,13 @@ internal static class PTCornerCard
 // ---- the table as a tool ----
 
 /// <summary>
-/// The full Periodic Table (the Mac's PeriodicTableTool): the table, coloured by any of its properties (with the scale,
-/// each cell's value and the trend arrows), the element under the pointer in its empty top, and a press opening the
-/// element's own page, grown out of its square; beside the table, on its other pages, the Lewis structure maker and the 3D
-/// molecule builder (Tools/Chemistry); and its own short tour, the first time it opens.
+/// The full Periodic Table (the Mac's PeriodicTableTool): its pages named in a bar of their own at its top (Table, Lewis
+/// structures, Molecule builder, and Tour), the page shown named in the heading too; the table, coloured by any of its
+/// properties (with the scale, each cell's value and the trend arrows), as large as the page shows whole — f-block and
+/// all — its key and its colourings each on one line; the element under the pointer in its empty top, and a press
+/// opening the element's own page, grown out of its square; on its other pages the Lewis structure maker and the 3D
+/// molecule builder (Tools/Chemistry); and its own short tour, offered the first time it opens (never started unasked),
+/// that can be skipped from any step or with Escape.
 /// </summary>
 /// <remarks>
 /// The screenshot suite's flags (the Mac's -SimplPT… defaults): --ptable-element Fe (an element's page; a number, symbol or
@@ -315,7 +321,8 @@ internal static class PTCornerCard
 /// electronegativity (category, electronegativity, radius, ionization, affinity, melting, boiling, density, block, state),
 /// --ptable-category metalloid (a kind lit), --ptable-hover Fe (that element's card in the table's top), --ptable-page
 /// lewis|molecules, --ptable-molecule Ethanol, --ptable-lewis "NO₃⁻", --ptable-search ne (the header's search open with its
-/// results), --ptable-tour 4 (the tour at its fourth step), and --ptable-pin-element 25 for the pin's flyout.
+/// results), --ptable-tour 4 (the tour at its fourth step), --ptable-offer (the tour offered, as on a first opening), and
+/// --ptable-pin-element 25 for the pin's flyout.
 /// </remarks>
 internal sealed class PeriodicTableTool : Grid
 {
@@ -325,10 +332,15 @@ internal sealed class PeriodicTableTool : Grid
     private readonly Grid pageHost = new() { Visibility = Visibility.Collapsed };
     private readonly PTGrid grid = new(compact: false);
     private readonly ContentControl top = new() { Focusable = false };
-    private readonly WrapPanel colourBar = new() { Orientation = Orientation.Horizontal };
+    private readonly StackPanel colourBar = new() { Orientation = Orientation.Horizontal };
+    private readonly ScrollViewer colourRow, legendRow;
+    private readonly StackPanel legend = new() { Orientation = Orientation.Horizontal };
     private readonly ColumnDefinition gutter = new() { Width = new GridLength(0) };
     private readonly ContentControl across = new() { Focusable = false, Margin = new Thickness(0, 0, 0, 6) };
     private readonly ContentControl up = new() { Focusable = false, Width = 20, HorizontalAlignment = HorizontalAlignment.Left };
+    private readonly TextBlock hint;
+    private readonly ContentControl offerHost = new() { Focusable = false, Visibility = Visibility.Collapsed };
+    private readonly PTPagesBar pagesBar;
     private FrameworkElement? lewis, molecules;
     private PTElementPage? page;
     private PTElement? open, hovered;
@@ -342,10 +354,12 @@ internal sealed class PeriodicTableTool : Grid
     // the tour
     private List<PTTourStep> steps = new();
     private int? tourStep;
-    private bool tourStuck, tourDone;
+    private bool tourDone;
     private PTTourOverlay? overlay;
-    private DispatcherTimer? stuckTimer, nextTimer;
+    private DispatcherTimer? nextTimer;
     private int? tourAsked;
+    /// <summary>The tour offered ("Take a quick tour?") as the tool comes up — the first time it opens.</summary>
+    private bool offerAsked;
 
     private PTColouring Colouring => PTState.Colouring;
 
@@ -354,9 +368,17 @@ internal sealed class PeriodicTableTool : Grid
         ctx = c;
         ClipToBounds = false;
 
-        // the table's page: the key (or scale), what it is coloured by, the table with its trends, a line on using it
+        // its pages, in a bar of their own over the page shown (an element's page covers it: that page has its own way back)
+        pagesBar = new PTPagesBar(() => Tour(0));
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        // the table's page: the key (or scale), what it is coloured by — each on one line, scrolled sideways where the page
+        // is narrow — the table with its trends, as large as the page shows whole, and a line on using it
         colourBar.TourTarget("ptColours");
-        var trendGrid = new Grid { MaxWidth = 1300, HorizontalAlignment = HorizontalAlignment.Stretch };
+        colourRow = PTKit.ChipRow(colourBar);
+        legendRow = PTKit.ChipRow(legend);
+        var trendGrid = new Grid { MaxWidth = 1300, HorizontalAlignment = HorizontalAlignment.Left };
         trendGrid.ColumnDefinitions.Add(gutter);
         trendGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         trendGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -373,12 +395,15 @@ internal sealed class PeriodicTableTool : Grid
             var p = grid.TranslatePoint(new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2), this);
             OpenElement(e, p);
         };
-        var hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.", Ty.Body, B.Text2);
-        tablePage = ToolKit.Page(K.V(14, top, colourBar, trendGrid, hint));
+        hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.", Ty.Body, B.Text2);
+        tablePage = ToolKit.Page(K.V(14, offerHost, top, colourRow, trendGrid, hint));
+        tablePage.SizeChanged += (_, _) => FitTable();
+        foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint }) part.SizeChanged += (_, _) => FitTable();
 
-        Children.Add(tablePage);
-        Children.Add(chemHost);
-        Children.Add(pageHost);
+        Children.Add(pagesBar.Row(0));
+        Children.Add(tablePage.Row(1));
+        Children.Add(chemHost.Row(1));
+        Children.Add(pageHost.Row(0, 2));
 
         // what it is handed (a pin's flyout: an element), and the screenshot suite's flags
         if (Launch.Take("", "ptable-colour") is { } col && PTColourings.Parse(col) is { } cv) PTState.Colouring = cv;
@@ -405,10 +430,27 @@ internal sealed class PeriodicTableTool : Grid
         var picture = molecule != null || lewisAsk != null || hover != null || handed != null || orbitalsAsked || cloudAsked || Launch.Get("ptable-search") != null
                       || Launch.Get("ptable-colour") != null || Launch.Get("ptable-page") != null || Launch.IsDevelopment;
         if (tourAt != null) tourAsked = int.TryParse(tourAt.Trim(':', ' '), out var n) ? Math.Max(0, n - 1) : 0;
-        else if (!c.Quick && !Prefs.Bool("simpl.ptTourSeen") && !picture) tourAsked = -1;
+        else if (Launch.Take("", "ptable-offer") != null || (!c.Quick && !Prefs.Bool("simpl.ptTourSeen") && !picture)) offerAsked = true;
 
         Loaded += (_, _) => Attach();
         Unloaded += (_, _) => Detach();
+    }
+
+    /// <summary>
+    /// The table as large as the page shows it whole, so the lanthanides and actinides need no scrolling: its height held
+    /// to what the page has left under the tour's offer, its key and its colourings and above its line — its squares then
+    /// as large as that height or the page's width allows, whichever is less (their names drop away below 48). Never so
+    /// small a square is under 30: the page scrolls instead.
+    /// </summary>
+    private void FitTable()
+    {
+        var view = tablePage.ViewportHeight;
+        if (view <= 0) return;
+        static double Part(FrameworkElement e) => e.Visibility == Visibility.Collapsed ? 0 : e.ActualHeight + e.Margin.Top + e.Margin.Bottom + 14;
+        var others = Part(offerHost) + Part(top) + Part(colourRow) + Part(hint) + (across.Visibility == Visibility.Collapsed ? 0 : across.ActualHeight + across.Margin.Bottom)
+                     + tablePage.Padding.Top + tablePage.Padding.Bottom + 2;
+        var h = Math.Max(30 * (9 + PTGrid.GapRow) + 8 * grid.Gap, view - others);
+        if (double.IsInfinity(grid.MaxHeight) || Math.Abs(grid.MaxHeight - h) > 1) grid.MaxHeight = h;
     }
 
     private static void Hand(Action a)
@@ -428,14 +470,17 @@ internal sealed class PeriodicTableTool : Grid
         PTSearch.Submitted += OnSubmitted;
         PTSearch.Picked += OnPicked;
         PTTour.Changed += CheckTour;
+        PTTour.Skip = SkipTour;
         Recolour(false);
         Present(false);
+        Heading();
         if (firstLoad)
         {
             firstLoad = false;
             if (cloudAsked) page?.ShowModel(PTModel.Cloud, subshellAsked);
             else if (orbitalsAsked) page?.ShowModel(PTModel.Orbitals, subshellAsked);
-            if (tourAsked is { } at) PTKit.After(at < 0 ? 0.6 : 1.2, () => { if (IsLoaded) Tour(Math.Max(0, at)); });
+            if (tourAsked is { } at) PTKit.After(1.2, () => { if (IsLoaded) Tour(at); });
+            else if (offerAsked) Offer(true);
         }
         if (tourStep != null) DrawTour();
     }
@@ -449,15 +494,61 @@ internal sealed class PeriodicTableTool : Grid
         PTSearch.Submitted -= OnSubmitted;
         PTSearch.Picked -= OnPicked;
         PTTour.Changed -= CheckTour;
+        if (PTTour.Skip == SkipTour) PTTour.Skip = null;
         overlay?.Hide();
     }
 
     private void OnNav()
     {
-        // (a page chosen in the header while an element is open: back from it to that page)
+        // (a page chosen in the bar while an element is open: back from it to that page)
         if (open != null) CloseElement(false);
         Present(true);
+        Heading();
         CheckTour();
+    }
+
+    /// <summary>The page shown named in the tool's heading ("Tools › Periodic table › Lewis structures", the table's name
+    /// going back to the table); the table itself, the tool's name alone.</summary>
+    private void Heading() =>
+        ctx.ShowPage(PTNav.Page == PTPage.Table ? null : PTNav.Page.Label(), () => PTNav.Choose(PTPage.Table));
+
+    /// <summary>
+    /// "Take a quick tour?" (Windows 11's InfoBar) over the table the first time it opens, in place of a tour started
+    /// unasked: Take the tour starts it; Not now, or its ×, puts it away for good (Tour, in the page bar, is there later).
+    /// </summary>
+    private void Offer(bool on)
+    {
+        if (!on)
+        {
+            if (offerHost.Visibility == Visibility.Collapsed) return;
+            Motion.FadeOut(offerHost, () => { offerHost.Visibility = Visibility.Collapsed; offerHost.Content = null; offerHost.Opacity = 1; }, Motion.Normal);
+            return;
+        }
+        void Away(bool take)
+        {
+            Prefs.Set("simpl.ptTourSeen", true);
+            Offer(false);
+            if (take) Tour(0);
+        }
+        var go = K.Button("Take the tour", () => Away(true), accent: true);
+        var later = K.Button("Not now", () => Away(false));
+        var close = K.IconButton(SymbolRegular.Dismiss16, () => Away(false), "Not now", 12, 28);
+        close.VerticalAlignment = VerticalAlignment.Top;
+        var words = K.V(2, K.Text("Take a quick tour?", Ty.BodyStrong),
+            K.Wrapped("Eleven short steps through the table, Lewis structures and the 3D builder.", Ty.Body, B.Text2));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var buttons = K.H(8, go, later);
+        buttons.VerticalAlignment = VerticalAlignment.Center;
+        var row = K.Columns("auto, *, auto, auto",
+            K.Icon(SymbolRegular.Map24, 20, B.AccentText).Margin(0, 2, 14, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0),
+            words.Col(1), buttons.Margin(16, 0, 8, 0).Col(2), close.Col(3));
+        var bar = new Border { Child = row, Padding = new Thickness(16, 12, 10, 12), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        bar.Background = new SolidColorBrush(K.WithAlpha(Appearance.Accent, Appearance.Dark ? 0.16 : 0.08));
+        bar.BorderBrush = new SolidColorBrush(K.WithAlpha(Appearance.Accent, 0.3));
+        AutomationProperties.SetName(bar, "Take a quick tour of the periodic table?");
+        offerHost.Content = bar;
+        offerHost.Visibility = Visibility.Visible;
+        Motion.FadeIn(offerHost, Motion.Medium);
     }
 
     private void OnChosen()
@@ -524,10 +615,12 @@ internal sealed class PeriodicTableTool : Grid
         grid.Show(hovered, c);
     }
 
-    /// <summary>The kinds, a chip each in its colour: filled when it lights its elements.</summary>
+    /// <summary>The kinds, a chip each in its colour on one line (kept, so a chip pressed far along stays in view): filled
+    /// when it lights its elements.</summary>
     private FrameworkElement Legend()
     {
-        var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+        var wrap = legend;
+        wrap.Children.Clear();
         foreach (var k in PTCategory.All)
         {
             var on = PTState.Category == k.Key;
@@ -552,7 +645,7 @@ internal sealed class PeriodicTableTool : Grid
             AutomationProperties.SetName(b, k.Label);
             wrap.Children.Add(b);
         }
-        return wrap;
+        return legendRow;
     }
 
     /// <summary>The scale of the property the table is coloured by: lowest to highest.</summary>
@@ -623,6 +716,11 @@ internal sealed class PeriodicTableTool : Grid
 
         var side = K.Text(t.UpWords, Ty.Caption, B.Caution);
         side.FontWeight = FontWeights.SemiBold;
+        // (its whole length given it before it is turned on its side: measured turned, in the narrow gutter, it was given
+        //  the gutter's width and cut to "I…")
+        side.TextTrimming = TextTrimming.None;
+        side.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        side.Width = Math.Ceiling(side.DesiredSize.Width) + 2;
         side.LayoutTransform = new RotateTransform(-90);
         side.HorizontalAlignment = HorizontalAlignment.Center;
         side.Margin = new Thickness(0, 4, 0, 4);
@@ -757,9 +855,9 @@ internal sealed class PeriodicTableTool : Grid
         if (i == 0 || steps.Count == 0) steps = PTTourStep.Available();
         if (i < 0 || i >= steps.Count) return;
         var s = steps[i];
+        Offer(false);
         PTTour.Active = true;
         PTTour.ClearEvent();
-        tourStuck = false;
         tourDone = false;
         tourStep = i;
         nextTimer?.Stop();
@@ -794,9 +892,6 @@ internal sealed class PeriodicTableTool : Grid
         // (Draw asked for from the quick way: the quick way's water first)
         if (s.Target == "lewisWay") PTTour.ShowLewis("H₂O");
         if (s.Lewis is { } l) PTTour.ShowLewis(l);
-        // (a step left undone a while: a Next, to go on without it)
-        stuckTimer?.Stop();
-        stuckTimer = PTKit.After(12, () => { if (tourStep == i && !tourDone) { tourStuck = true; DrawTour(); } });
         DrawTour();
         CheckTour();
     }
@@ -824,25 +919,34 @@ internal sealed class PeriodicTableTool : Grid
 
     private void NextTour(int i)
     {
+        if (tourStep != i) return;
         if (i + 1 < steps.Count) Tour(i + 1); else EndTour();
     }
 
-    /// <summary>The tour over (its last step done): not again on its own; the tool left as it is.</summary>
+    /// <summary>The tour over — its last step done, skipped, closed or Escape pressed — and counted as seen: never offered
+    /// again on its own (Tour, in the page bar, takes it again); the tool left as it is.</summary>
     private void EndTour()
     {
         Prefs.Set("simpl.ptTourSeen", true);
         PTTour.Active = false;
         tourStep = null;
-        stuckTimer?.Stop();
         nextTimer?.Stop();
         overlay?.Hide();
+    }
+
+    /// <summary>Skip tour, its ×, or Escape (PTKeys): true if a tour was on.</summary>
+    private bool SkipTour()
+    {
+        if (tourStep == null) return false;
+        EndTour();
+        return true;
     }
 
     private void DrawTour()
     {
         if (tourStep is not { } i || i >= steps.Count || !IsLoaded) return;
         overlay ??= new PTTourOverlay(this);
-        overlay.Show(i, steps.Count, steps[i], tourStuck && !tourDone, tourDone, () => NextTour(i));
+        overlay.Show(i, steps.Count, steps[i], tourDone, () => NextTour(i), () => SkipTour(), i > 0 ? () => { if (tourStep == i) Tour(i - 1); } : null);
     }
 }
 
@@ -862,10 +966,13 @@ internal static class PeriodicTableCompact
         line.VerticalAlignment = VerticalAlignment.Center;
         List<PTElement> Found() => PeriodicTable.Find(box.Text);
         void Open(PTElement e) => c.OpenFull(new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) }, null);
+        // (the element under the pointer, else the first the search finds, in the table's inset card — its facts said
+        //  once, there; the line beside the field only says when nothing matches)
         void Line()
         {
             var e = over ?? Found().FirstOrDefault();
-            line.Text = e != null ? e.Line : box.Text.Trim().Length == 0 ? "" : "No element";
+            grid.Show(e, PTColouring.Category);
+            line.Text = e == null && box.Text.Trim().Length > 0 ? "No element" : "";
         }
         box.TextChanged += (_, _) =>
         {
@@ -878,42 +985,114 @@ internal static class PeriodicTableCompact
             e.Handled = true;
             if (Found().FirstOrDefault() is { } f) Open(f);
         };
-        grid.Hover = e => { over = e; grid.Show(e, PTColouring.Category); Line(); };
+        grid.Hover = e => { over = e; Line(); };
         grid.Pick = (e, _) => Open(e);
         // (the screenshot suite: --ptable-pin-element 25 shows that element's card)
-        if (PeriodicTable.Named(Launch.Take("", "ptable-pin-element")) is { } shown) { over = shown; grid.Show(shown, PTColouring.Category); Line(); }
+        if (PeriodicTable.Named(Launch.Take("", "ptable-pin-element")) is { } shown) { over = shown; Line(); }
         var head = K.Columns("auto, *", box.Col(0), line.Margin(10, 0, 0, 0).Col(1));
         return K.V(10, head, grid);
+    }
+}
+
+// ---- its pages ----
+
+/// <summary>
+/// The Periodic Table's pages in a bar of their own over the page shown (Windows 11's SelectorBar; the Mac's labelled
+/// page control): each page's symbol and name, always in words — the one shown in the text colour over an accent pill
+/// that slides to the page chosen (Motion.Out over 220 ms; at once with Windows' animations off) — and Tour at the bar's
+/// right. On a narrow page the pages scroll sideways rather than drawing in to their symbols.
+/// </summary>
+internal sealed class PTPagesBar : Grid
+{
+    private readonly List<(PTPage Page, Button Button, TextBlock Words)> items = new();
+    private readonly Border pill = new()
+    {
+        Height = 3, Width = 18, CornerRadius = new CornerRadius(1.5), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
+        IsHitTestVisible = false, Margin = new Thickness(0, 0, 0, 2),
+    };
+    private readonly TranslateTransform shift = new();
+    private readonly Grid strip = new();
+    private bool placed;
+
+    public PTPagesBar(Action tour)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var p in Enum.GetValues<PTPage>())
+        {
+            var pp = p;
+            var words = K.Text(p.Label(), Ty.Body);
+            var b = K.Subtle(K.H(8, K.Icon(p.Symbol(), 16, B.Text2), words), () => PTNav.Choose(pp), new Thickness(12, 8, 12, 12), 4);
+            b.ToolTip = p.Help();
+            if (p == PTPage.Lewis) b.TourTarget("ptPageLewis");
+            if (p == PTPage.Molecules) b.TourTarget("ptPageMolecules");
+            items.Add((p, b, words));
+            row.Children.Add(b);
+        }
+        pill.SetResourceReference(Border.BackgroundProperty, B.Accent);
+        pill.RenderTransform = shift;
+        strip.Children.Add(row);
+        strip.Children.Add(pill);
+        AutomationProperties.SetName(strip, "Periodic table pages");
+        var tourButton = K.Button("Tour", tour, icon: SymbolRegular.QuestionCircle24);
+        tourButton.MinWidth = 0;
+        tourButton.ToolTip = "A short tour of the table and its builders";
+        tourButton.VerticalAlignment = VerticalAlignment.Center;
+        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Children.Add(PTKit.ChipRow(strip).Col(0));
+        Children.Add(tourButton.Margin(12, 0, 0, 0).Col(1));
+        // (the first page's symbol in line with the page under it: the page's margin less the button's own room)
+        Margin = new Thickness(28, 0, 40, 4);
+        SizeChanged += (_, _) => Margin = ActualWidth + Margin.Left + Margin.Right < 560 ? new Thickness(8, 0, 20, 4) : new Thickness(28, 0, 40, 4);
+        strip.SizeChanged += (_, _) => Draw(false);
+        void Changed() => Draw(true);
+        Loaded += (_, _) => { PTNav.Changed -= Changed; PTNav.Changed += Changed; Draw(false); };
+        Unloaded += (_, _) => PTNav.Changed -= Changed;
+        Draw(false);
+    }
+
+    /// <summary>The page shown marked: its name in the text colour, the pill under it — slid there, or put there at once.</summary>
+    private void Draw(bool animate)
+    {
+        foreach (var (p, b, w) in items)
+        {
+            var on = p == PTNav.Page;
+            w.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+            w.Fg(on ? B.Text : B.Text2);
+            AutomationProperties.SetName(b, on ? $"{p.Label()}, shown" : p.Label());
+        }
+        var chosen = items.First(i => i.Page == PTNav.Page).Button;
+        if (chosen.ActualWidth <= 0 || !strip.IsAncestorOf(chosen)) return;
+        double x;
+        try { x = chosen.TranslatePoint(new Point(chosen.ActualWidth / 2 - pill.Width / 2, 0), strip).X; } catch { return; }
+        if (animate && placed) Motion.To(shift, TranslateTransform.XProperty, x, Motion.Page, Motion.Out);
+        else { shift.BeginAnimation(TranslateTransform.XProperty, null); shift.X = x; }
+        placed = true;
     }
 }
 
 // ---- the header's controls ----
 
 /// <summary>
-/// The Periodic Table's controls in the tool's header (the Mac's PTHeaderControls): its pages (Table, Lewis structures,
-/// Molecule builder), Tour, and search — a button that opens into a field, the pages drawing in to their symbols to make
-/// room; what the search finds listed under the field, the one the arrow keys are on lit, a press (or Return) opening it.
+/// The Periodic Table's search in the tool's heading, left of its pin (the Mac's PTHeaderControls): a button that opens
+/// into a field; what the search finds listed under the field, the one the arrow keys are on lit, a press (or Return)
+/// opening it. (Its pages have a bar of their own in the tool, PTPagesBar: named, never drawn in to symbols.)
 /// </summary>
 internal sealed class PTHeaderControls : ContentControl
 {
-    private readonly ContentControl pagesHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly ContentControl searchHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
-    private bool? squished;
     private bool? drawnSearching;
-    private PTPage? drawnPage;
     private TextBox? field;
     private FrameworkElement? fieldBox;
     private Border? results;
     private int lit;
-    private Grid? headerGrid;
-    private double? wideNeed;
     private bool focusAsked;
 
     public PTHeaderControls(ToolContext c)
     {
         Focusable = false;
         VerticalAlignment = VerticalAlignment.Center;
-        Content = K.H(8, pagesHost, searchHost);
+        Content = searchHost;
         // (the screenshot suite: --ptable-search ne, the search open with its results)
         if (Launch.Take("", "ptable-search") is { Length: > 0 } q) { PTSearch.Searching = true; PTSearch.Query = q; }
         PTKeys.Hook();
@@ -925,86 +1104,25 @@ internal sealed class PTHeaderControls : ContentControl
     private void Attach()
     {
         Detach();
-        PTNav.Changed += Draw;
         PTSearch.Changed += Draw;
-        headerGrid = HeaderGrid();
-        if (headerGrid != null) headerGrid.SizeChanged += HeaderSized;
         LayoutUpdated += Place;
-        squished = null;
         Draw();
     }
 
     private void Detach()
     {
-        PTNav.Changed -= Draw;
         PTSearch.Changed -= Draw;
-        if (headerGrid != null) headerGrid.SizeChanged -= HeaderSized;
         LayoutUpdated -= Place;
         RemoveResults();
         if (ReferenceEquals(PTKeys.SearchField, field)) PTKeys.SearchField = null;
     }
 
-    private void HeaderSized(object? s, SizeChangedEventArgs e) => Fit();
-
-    /// <summary>The header row this sits in: the first grid above with a column that takes what is left (the title's).</summary>
-    private Grid? HeaderGrid()
-    {
-        for (DependencyObject? p = VisualTreeHelper.GetParent(this); p != null; p = VisualTreeHelper.GetParent(p))
-            if (p is Grid g && g.ColumnDefinitions.Any(cd => cd.Width.IsStar)) return g;
-        return null;
-    }
-
     private void Draw()
     {
-        Fit(force: drawnPage != PTNav.Page);
         if (drawnSearching != PTSearch.Searching) DrawSearch();
         // (cleared elsewhere — the tour's start, an element opened — the field shows it)
         if (field != null && field.Text != PTSearch.Query) field.Text = PTSearch.Query;
         Results();
-    }
-
-    /// <summary>The pages' words where the header has room — and the search is shut — else their symbols.</summary>
-    private void Fit(bool force = false)
-    {
-        var want = PTSearch.Searching || !Room();
-        if (squished == want && !force) return;
-        squished = want;
-        drawnPage = PTNav.Page;
-        pagesHost.Content = Pages(want);
-    }
-
-    private bool Room()
-    {
-        if (headerGrid is not { ActualWidth: > 0 } g) return true;
-        if (wideNeed == null)
-        {
-            double Words(string s) { var t = K.Text(s, Ty.Body); t.FontWeight = FontWeights.SemiBold; t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity)); return t.DesiredSize.Width; }
-            // (each button: its words, its symbol and the room round them; the search's button, the pin and the gaps)
-            var pages = Enum.GetValues<PTPage>().Sum(p => Words(p.Label()) + 52) + 6 * 2 + 8 + Words("Tour") + 52;
-            wideNeed = pages + 8 + 44 + 8 + 48 + 16;
-        }
-        var title = K.Text("Periodic table", Ty.Title);
-        title.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        // (the title, and the breadcrumb before it or the sheet's Done and tile)
-        var taken = title.DesiredSize.Width + 190;
-        return g.ActualWidth - taken >= wideNeed;
-    }
-
-    private FrameworkElement Pages(bool squish)
-    {
-        var group = K.H(6);
-        foreach (var p in Enum.GetValues<PTPage>())
-        {
-            var pp = p;
-            var b = PTKit.Choice(p.Label(), PTNav.Page == p, () => PTNav.Choose(pp), p.Symbol(), squish);
-            b.ToolTip = p.Help();
-            if (p == PTPage.Lewis) b.TourTarget("ptPageLewis");
-            if (p == PTPage.Molecules) b.TourTarget("ptPageMolecules");
-            group.Children.Add(b);
-        }
-        var tour = PTKit.Choice("Tour", false, PTNav.AskTour, SymbolRegular.QuestionCircle24, squish);
-        tour.ToolTip = "A short tour of the table and its builders";
-        return K.H(8, group, tour);
     }
 
     private void DrawSearch()
@@ -1155,8 +1273,9 @@ internal sealed class PTHeaderControls : ContentControl
 }
 
 /// <summary>
-/// Escape where the Periodic Table has a use for it before the window does (the window's own Escape closes the tool): in
-/// the search field it shuts the search; on an element's page it goes back to the table.
+/// Escape where the Periodic Table has a use for it before the window does (the window's own Escape closes the tool's
+/// sheet): with the tour on it ends the tour; in the search field it shuts the search; on an element's page it goes back
+/// to the table.
 /// </summary>
 internal static class PTKeys
 {
@@ -1174,7 +1293,14 @@ internal static class PTKeys
 
     private static void OnKey(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || Keyboard.FocusedElement is not DependencyObject f) return;
+        if (e.Key != Key.Escape) return;
+        // (the tour first: Escape ends it — counted as seen — and leaves the table where it is)
+        if (PTTour.Active && PTTour.Skip is { } skip && skip())
+        {
+            e.Handled = true;
+            return;
+        }
+        if (Keyboard.FocusedElement is not DependencyObject f) return;
         if (SearchField is { IsLoaded: true } box && (ReferenceEquals(f, box) || box.IsAncestorOf(f)))
         {
             e.Handled = true;

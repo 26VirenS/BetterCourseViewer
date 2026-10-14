@@ -356,7 +356,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place in a window of its own (`PlaceWindow`: a pane row's Open in new window, or Shift+click), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole over the window or beside a popup, the pieces tools are made of; a tool on the Tools page is `Screens/More/ToolScreen.cs`), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -554,13 +554,30 @@ internal static class CalculatorRegistration
 }
 ```
 
-The whole tool opens over the window (`ToolPopup`), from its tile on the Tools page, a pin's flyout or a command
-alike; the quick version is the pin's flyout. The pins sit in the header of a popup that covers the title bar too (a
-quiz, Knewton Alta, Macmillan: `PinBar(engine, inPopup: true)`), their flyouts over it; from there the whole tool opens
-in a window of its own beside it (`ToolsCenter.Float`, `ToolWindow`), since a sheet over the window would wait behind
-the popup. `ToolContext` hands it the engine, what
-was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` for the flyout. `ToolKit` has the page, two
-columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
+A tool opens on the Tools page like any other page (`ToolScreen`, a `RouteKind.Tool` step of the Tools place): from its
+tile, a pin's menu, a command or another tool handing it something (`ToolsCenter.Show`), under the breadcrumb "Tools ›
+Calculator" — the breadcrumb's "Tools" and Back go to the tiles, the pane and the title bar's pins stay at hand, and the
+tool open is kept while you look elsewhere: picking Tools again opens on it (`ToolsCenter.Open`, `Engine.OpensOn`). A
+tool that shows pages of its own names the one shown after its name (`ToolContext.ShowPage`: "Tools › Periodic table ›
+Lewis structures"), and may hide its line under its name while it needs the room (`ShowNote`).
+
+A pin's flyout is the tool's quick version, under its whole name (with ›, the one way to the whole tool) and Pop out,
+which pulls the quick version into a small window of its own kept above Simpl and its popups (`ToolFloat`); unpinning
+is in the pin's menu, not in the flyout. The flyout folds back on a press elsewhere in the window, the window left, moved
+or resized, Escape, or its pin pressed again (its opening and closing go to the log in picture runs). From a flyout the
+whole tool opens over the window in a sheet (`ToolPopup`: Done, the tool's heading with the other pinned tools in it, a
+hairline under the heading once the tool scrolls); from a popup's pins (a quiz, Knewton Alta, Macmillan, a tool's
+sheet: `PinBar(engine, inPopup: true)`) in a window of its own beside it (`ToolsCenter.Float`, `ToolWindow`), since a
+sheet would wait behind the popup. A sheet focuses its first field only when it shows without scrolling, and never
+read-only words, so it opens at its top.
+
+`ToolContext` hands a tool the engine, where it is (`Quick`, `InPage`), what was handed over (`TakeFiles`, `TakeInfo`),
+`OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns, fields, notes, the drop zone
+and the scroll edge; `Files` has Windows' file dialogs.
+
+The Tools page lists the tools under what they are for — Study, Math & science, Files, then Biology — a one-line note on
+each tile, three across from about 900 wide. Windows' sentence case on every button and menu ("Pin to title bar",
+"Copy result", "Skip tour").
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state

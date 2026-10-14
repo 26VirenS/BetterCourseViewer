@@ -84,13 +84,19 @@ public static class BioTools
 
     /// <summary>
     /// Another tool opened with something handed to it (spec §3.2: "Open in Gene Expression" hands over
-    /// ["sequence"] = "ATG…"; the tool takes it once with c.TakeInfo("sequence")): the sheet or flyout this one is in
-    /// closed, and the other opened over the window.
+    /// ["sequence"] = "ATG…"; the tool takes it once with c.TakeInfo("sequence")): on the Tools page, the other in this
+    /// one's place ("Tools › Gene Expression", Back returning here); elsewhere, the sheet or flyout this one is in closed,
+    /// and the other opened over the window.
     /// </summary>
     public static void Open(ToolContext from, string key, Dictionary<string, string>? info = null)
     {
         var engine = from.Engine;
         var owner = from.Owner;
+        if (from.InPage)
+        {
+            Application.Current?.Dispatcher.BeginInvoke(() => ToolsCenter.Show(key, engine, null, info), DispatcherPriority.Background);
+            return;
+        }
         from.Close();
         Application.Current?.Dispatcher.BeginInvoke(() => ToolsCenter.PopUp(key, engine, owner, null, info), DispatcherPriority.Background);
     }

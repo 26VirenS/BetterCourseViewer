@@ -37,7 +37,7 @@ internal sealed class CalculatorTool
         surface = new CalcSurface(eng, quick: false);
         display = new CalcDisplay(eng, 60);
         keypad = new CalcKeypad(eng, CalcKey.Scientific, 52, 8, surface.Refocus);
-        copy = K.Button("Copy Result", () =>
+        copy = K.Button("Copy result", () =>
         {
             if (eng.Value is { } v) Everyday.Copy(CalcEngine.Ascii(v));
             surface.Refocus();
@@ -95,8 +95,8 @@ internal sealed class CalculatorTool
         b.ToolTip = "Put the result back on the line";
         AutomationProperties.SetName(b, $"{past.Sum} = {CalcEngine.Format(past.Value)}");
         b.ContextMenu = MoreKit.Menu(
-            ("Copy Result", SymbolRegular.Copy24, () => Everyday.Copy(CalcEngine.Ascii(past.Value))),
-            ("Copy Sum", SymbolRegular.Copy24, () => Everyday.Copy(past.Sum + " = " + CalcEngine.Format(past.Value))));
+            ("Copy result", SymbolRegular.Copy24, () => Everyday.Copy(CalcEngine.Ascii(past.Value))),
+            ("Copy sum", SymbolRegular.Copy24, () => Everyday.Copy(past.Sum + " = " + CalcEngine.Format(past.Value))));
         return b;
     }
 }

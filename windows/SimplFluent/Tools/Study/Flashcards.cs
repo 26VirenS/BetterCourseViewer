@@ -71,11 +71,13 @@ internal sealed class FlashcardsTool : ContentControl
     private static FCWhere last = FCWhere.Sets;
     private FCWhere where;
     private string? note;
+    private readonly ToolContext c;
     private readonly ScrollViewer page;
     private readonly ContentControl bar = StudyKit.Host(), noteHost = StudyKit.Host(), content = StudyKit.Host();
 
     public FlashcardsTool(ToolContext c)
     {
+        this.c = c;
         Focusable = false;
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
         VerticalContentAlignment = VerticalAlignment.Stretch;
@@ -103,18 +105,23 @@ internal sealed class FlashcardsTool : ContentControl
         page.ScrollToTop();
     }
 
-    /// <summary>Where you are among the sets, and the way back.</summary>
+    /// <summary>
+    /// Where you are among the sets, and the way back: in a set, "‹ Your sets" and the set's name; studying it, "‹ Cell
+    /// Biology" and the way of studying alone ("Learn") — the set named once, on the way back. Inside a set the tool's line
+    /// under its name ("Flip, learn, test, match.") makes way (ToolContext.ShowNote): the question wants the room.
+    /// </summary>
     private void Bar()
     {
+        c.ShowNote(where.Deck == null);
         if (where.Deck is not { } id || FlashcardStore.Deck(id) is not { } d) { StudyKit.Put(bar, null); return; }
-        var back = K.Button(where.Kind is "page" or "edit" ? "Your Sets" : d.Title, Back, icon: SymbolRegular.ChevronLeft24);
+        var back = K.Button(where.Kind is "page" or "edit" ? "Your sets" : d.Title, Back, icon: SymbolRegular.ChevronLeft24);
         back.MinWidth = 0;
         var title = K.Text(where.Kind switch
         {
-            "cards" => $"{d.Title} · Flashcards",
-            "learn" => $"{d.Title} · Learn",
-            "test" => $"{d.Title} · Test",
-            "match" => $"{d.Title} · Match",
+            "cards" => "Flashcards",
+            "learn" => "Learn",
+            "test" => "Test",
+            "match" => "Match",
             _ => d.Title,
         }, Ty.Subtitle);
         title.VerticalAlignment = VerticalAlignment.Center;
@@ -152,7 +159,7 @@ internal sealed class FlashcardsTool : ContentControl
 
 // ---- your sets ----
 
-/// <summary>Your sets (the Mac's FCSetsView): Create a Set, Import CSV…, Template, and a tile for each set.</summary>
+/// <summary>Your sets (the Mac's FCSetsView): Create a set, Import CSV…, Template, and a tile for each set.</summary>
 internal sealed class FCSetsView : ContentControl
 {
     private readonly Action<string> open;
@@ -170,7 +177,7 @@ internal sealed class FCSetsView : ContentControl
 
     private void Render()
     {
-        var create = K.Button("Create a Set", () => edit(FlashcardStore.Add(new FCDeck { Name = "Untitled set" }), null), accent: true, icon: SymbolRegular.Add24);
+        var create = K.Button("Create a set", () => edit(FlashcardStore.Add(new FCDeck { Name = "Untitled set" }), null), accent: true, icon: SymbolRegular.Add24);
         var import = K.Button("Import CSV…", Import, icon: SymbolRegular.ArrowDownload24);
         var template = K.Button("Template", SaveTemplate, icon: SymbolRegular.DocumentTable24);
         template.ToolTip = "Save a CSV to fill in: two columns, term and definition";
@@ -203,7 +210,7 @@ internal sealed class FCSetsView : ContentControl
             ("Edit", SymbolRegular.Edit24, () => edit(d.Id, null)),
             ("Export CSV…", SymbolRegular.ArrowUpload24, () => FCKit.Export(d, Window.GetWindow(this))),
             null,
-            ("Delete Set", SymbolRegular.Delete24, () => FlashcardStore.Delete(d.Id)));
+            ("Delete set", SymbolRegular.Delete24, () => FlashcardStore.Delete(d.Id)));
         return tile;
     }
 
@@ -519,7 +526,7 @@ internal sealed class FCEditView : ContentControl
         AutomationProperties.SetName(desc, "Description");
         var meta = K.V(10, title, desc, K.Divider());
 
-        var add = K.Button("Add Card", AddCard, icon: SymbolRegular.Add24);
+        var add = K.Button("Add card", AddCard, icon: SymbolRegular.Add24);
         var finish = K.Button("Done", () => { FlashcardStore.Write(); done(); }, accent: true);
         finish.MinWidth = 80;
         var foot = K.Columns("auto, *, auto", add.Col(0), finish.Col(2));
@@ -561,7 +568,7 @@ internal sealed class FCEditView : ContentControl
     private void Actions()
     {
         var d = FlashcardStore.Deck(deckID);
-        var toggle = K.Button(pasteOpen ? "Close Paste" : "Paste Terms", () => { pasteOpen = !pasteOpen; Actions(); Paste(); }, icon: SymbolRegular.ClipboardPaste24);
+        var toggle = K.Button(pasteOpen ? "Close paste" : "Paste terms", () => { pasteOpen = !pasteOpen; Actions(); Paste(); }, icon: SymbolRegular.ClipboardPaste24);
         var import = K.Button("Import CSV…", Import, icon: SymbolRegular.ArrowDownload24);
         var export = K.Button("Export CSV…", () => { if (FlashcardStore.Deck(deckID) is { } x) FCKit.Export(x, Window.GetWindow(this)); }, icon: SymbolRegular.ArrowUpload24);
         export.IsEnabled = d?.Cards.Count > 0;
@@ -587,7 +594,7 @@ internal sealed class FCEditView : ContentControl
         var found = FCText.CardsFromText(paste).Count;
         var count = K.Text(ToolKit.Plural(found, "card"), Ty.Body, B.Text2);
         count.VerticalAlignment = VerticalAlignment.Center;
-        var addThese = K.Button("Add These Cards", AddPasted, accent: true);
+        var addThese = K.Button("Add these cards", AddPasted, accent: true);
         addThese.IsEnabled = found > 0;
         box.TextChanged += (_, _) =>
         {

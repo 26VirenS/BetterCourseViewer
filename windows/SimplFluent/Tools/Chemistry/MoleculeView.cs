@@ -12,8 +12,9 @@ namespace Simpl.Tools;
 /// <summary>
 /// The 3D molecule builder (the Mac's MoleculeBuilder): a preset, atoms to add (each bonded to the selected one with the
 /// bond chosen), Fill with hydrogen, Delete, Clear, and the view's style, lone pairs and labels at the left; the formula,
-/// the model turning in 3D and Turning/Still in the middle; and at the right its molar mass, counts, polarity and valence
-/// check, the selected atom's bonds, shape and bond angles as the model has them.
+/// the model turning in 3D and its Auto-rotate switch in the middle; and at the right its molar mass, counts, polarity and
+/// valence check, the selected atom's bonds, shape and bond angles as the model has them. With the model over the rest
+/// (a narrow window), the preset is in the model's own heading.
 /// </summary>
 internal sealed class MoleculeBuilderView : Grid
 {
@@ -25,6 +26,7 @@ internal sealed class MoleculeBuilderView : Grid
     private readonly ContentControl head = new() { Focusable = false };
     private readonly SelectorBar orderBar, styleBar;
     private readonly ToggleSwitch lonePairs = new(), labels = new();
+    private readonly ChemLayout layout;
 
     /// <param name="start">A preset, a Lewis preset or an element to begin from (null: the molecule it had).</param>
     public MoleculeBuilderView(string? start)
@@ -47,7 +49,10 @@ internal sealed class MoleculeBuilderView : Grid
         foot.HorizontalAlignment = HorizontalAlignment.Center;
         foot.Margin = new Thickness(12);
         var card = K.Card(K.Rows("auto, *, auto", head.Row(0), new MoleculeSceneView(m).TourTarget("molViewer").Row(1), foot.Row(2)), new Thickness(0));
-        Children.Add(new ChemLayout(controls, card, facts));
+        layout = new ChemLayout(controls, card, facts);
+        // (one over the other: the preset in the model's own heading, in view with it — no scrolling to change molecule)
+        layout.WideChanged += Refresh;
+        Children.Add(layout);
 
         void Changed() => Refresh();
         Loaded += (_, _) =>
@@ -72,14 +77,23 @@ internal sealed class MoleculeBuilderView : Grid
         var top = K.Columns("auto, auto, *, auto", K.Text(m.Formula.Length == 0 ? "Empty" : m.Formula, Ty.Subtitle).Col(0));
         if (m.Title.Length > 0 && m.Title != m.Formula)
             top.Children.Add(K.Text(m.Title, Ty.Body, B.Text2).Margin(10, 0, 0, 2).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(1));
-        // (turning by itself, on or off, at the viewer's top right)
-        var turning = K.Button(m.AutoRotate ? "Turning" : "Still", () => m.AutoRotate = !m.AutoRotate, accent: m.AutoRotate,
-            icon: m.AutoRotate ? SymbolRegular.CubeRotate20 : SymbolRegular.Pause20);
-        turning.MinWidth = 0;
-        turning.ToolTip = m.AutoRotate ? "Stop the model turning by itself" : "Let the model turn by itself";
+        // (turning by itself, at the viewer's top right: a switch named for what it does, as the Mac's — not a button named
+        //  for the state it is in, "Turning" / "Still")
+        var turn = new ToggleSwitch { IsChecked = m.AutoRotate, VerticalAlignment = VerticalAlignment.Center };
+        turn.Checked += (_, _) => m.AutoRotate = true;
+        turn.Unchecked += (_, _) => m.AutoRotate = false;
+        System.Windows.Automation.AutomationProperties.SetName(turn, "Auto-rotate");
+        var turning = K.H(8, K.Text("Auto-rotate", Ty.Body).Align(HorizontalAlignment.Left, VerticalAlignment.Center), turn);
+        turning.ToolTip = "Let the model turn by itself";
         top.Children.Add(turning.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
         top.Margin = new Thickness(16);
-        head.Content = top;
+        if (layout?.Wide != false) { head.Content = top; return; }
+        // (one over the other: the preset under the formula, in the model's own heading)
+        var preset = K.Columns("auto, *", ChemKit.Heading("Preset").Margin(0, 0, 10, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0),
+            ChemKit.PresetMenu(MoleculeModel.PresetSections, MoleculeModel.Presets.Contains(m.Title) ? m.Title : null, m.LoadPreset).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1));
+        preset.Margin = new Thickness(16, 0, 16, 12);
+        top.Margin = new Thickness(16, 16, 16, 10);
+        head.Content = K.V(0, top, preset);
     }
 
     private void Controls()
@@ -91,8 +105,11 @@ internal sealed class MoleculeBuilderView : Grid
         if (lonePairs.IsChecked != m.ShowLonePairs) lonePairs.IsChecked = m.ShowLonePairs;
         if (labels.IsChecked != m.ShowLabels) labels.IsChecked = m.ShowLabels;
 
-        controls.Children.Add(ChemKit.Heading("Preset"));
-        controls.Children.Add(ChemKit.PresetMenu(MoleculeModel.PresetSections, MoleculeModel.Presets.Contains(m.Title) ? m.Title : null, m.LoadPreset));
+        if (layout?.Wide != false)
+        {
+            controls.Children.Add(ChemKit.Heading("Preset"));
+            controls.Children.Add(ChemKit.PresetMenu(MoleculeModel.PresetSections, MoleculeModel.Presets.Contains(m.Title) ? m.Title : null, m.LoadPreset));
+        }
         controls.Children.Add(ChemKit.Heading("Add atom"));
         var grid = new Grid();
         for (var c = 0; c < 4; c++)

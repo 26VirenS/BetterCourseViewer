@@ -43,6 +43,7 @@ public static class ScreenFactory
             RouteKind.Section when r.B == "grades" && r.A.StartsWith("courses/") => new CourseGradesScreen(engine, r.A),
             RouteKind.Section => new SectionScreen(engine, r.A, r.B),
             RouteKind.Web => new WebScreen(engine, engine.Absolute(r.A), string.IsNullOrEmpty(r.B) ? engine.LmsName : r.B),
+            RouteKind.Tool => new ToolScreen(engine, r.A),
             _ => new WebScreen(engine, UrlOf(engine, r), TitleOf(r)),
         };
     }
@@ -101,6 +102,7 @@ public static class ScreenFactory
         RouteKind.Folder => string.IsNullOrEmpty(r.C) ? "Folder" : r.C,
         RouteKind.Conversation => "Conversation",
         RouteKind.Section => r.B,
+        RouteKind.Tool => Simpl.Tools.ToolsCenter.KindOf(r.A)?.Name ?? "Tool",
         _ => r.Kind.ToString(),
     };
 
