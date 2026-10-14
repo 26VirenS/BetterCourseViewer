@@ -581,6 +581,12 @@ public sealed partial class DashboardScreen : Screen
 
     private string? openKey;
     private bool sheetAsked;
+
+    /// <summary>The screenshot suite's --open sheetpreview (with --sheet): the open panel's first row of work, whose quick
+    /// look is opened once it is on screen — the card a counter's row opens, for a picture.</summary>
+    private static bool sheetPreviewPressed;
+    private FrameworkElement? sheetPreviewRow;
+    private Action? sheetPreviewPress;
     private Border? frame;
     /// <summary>The panel moved away from its tile by its heading: the tile shows again, and the panel fades away when it
     /// is closed rather than folding into it.</summary>
@@ -765,6 +771,7 @@ public sealed partial class DashboardScreen : Screen
         else
         {
             var sections = new Stack { Orientation = Orientation.Vertical, Spacing = 14 };
+            sheetPreviewRow = null;
             foreach (var s in data.Sections) sections.Children.Add(Section(key, s));
             body = new ScrollViewer { Content = sections, MaxHeight = 260, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         }
@@ -805,6 +812,21 @@ public sealed partial class DashboardScreen : Screen
                 var r = row;
                 var b = K.Subtle(g, null, new Thickness(8, 7, 8, 7));
                 b.Click += (_, _) => WorkPreview.Press(WorkPreview.Sheet(r, key, engine), b);
+                // (the screenshot suite: --open sheetpreview opens the first row's quick look once it is on screen — that
+                //  row as it is then, the list read again or not)
+                if (sheetPreviewRow == null && Launch.Get("open") == "sheetpreview")
+                {
+                    sheetPreviewRow = b;
+                    sheetPreviewPress = () => WorkPreview.Press(WorkPreview.Sheet(r, key, engine), b);
+                    b.Loaded += async (_, _) =>
+                    {
+                        if (sheetPreviewPressed) return;
+                        sheetPreviewPressed = true;
+                        await Task.Delay(1500);
+                        for (var i = 0; i < 30 && sheetPreviewRow is { IsLoaded: false }; i++) await Task.Delay(100);
+                        sheetPreviewPress?.Invoke();
+                    };
+                }
                 v.Children.Add(b);
             }
             else v.Children.Add(g.Margin(8, 7, 8, 7));

@@ -564,7 +564,8 @@ The card is 0.2.9's: as wide as the row it grows out of and a little more, from 
 list's row), never wider than the page. It says where the work stands once: a graded piece's score and letter as one
 chip, the engine's `grade.chip` ("13/16 · B−"), with no "Graded" beside it; Late, Missing and Submitted stay. From a
 counter's panel (`WorkPreview.Sheet`) it reads the row's parts — its course, its detail, its day — and says the due
-once, on its clock line ("Due today at 11:59 PM", "Was due Oct 13"), never again as a line of detail.
+once, on its clock line ("Due today at 11:59 PM", "Was due Oct 13"), never again as a line of detail
+(`--sheet today --open sheetpreview` opens the panel's first row's card, for the `dashboard-counter-preview` picture).
 
 A counter's panel (`DashboardScreen.PanelContent`) is 0.2.9's too: the counter's symbol, name and number with the
 engine's line beside it, and its list — each row a bar of its course's colour, its title and the engine's one line about
