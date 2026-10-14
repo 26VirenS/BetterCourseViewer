@@ -526,17 +526,15 @@ public static class ToolPopup
         var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
         var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
         var sheet = new Sheet { Bare = true, Width = w, Height = h };
-        ToolHeading? head = null;
-        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open)
-        var c = new ToolContext
-        {
-            Engine = engine, Key = key, Owner = win, Close = () => sheet.Close(),
-            ShowPage = (p, back) => head?.Page(p, back), ShowNote = on => head?.Note(on),
-        };
+        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open; what the
+        //  tool tells its heading as it is made is kept for the heading made after it)
+        var told = new ToolHeading.Told();
+        var c = new ToolContext { Engine = engine, Key = key, Owner = win, Close = () => sheet.Close(), ShowPage = told.Page, ShowNote = told.Note };
         var body = ToolRegistry.Full(c) ?? Missing(kind);
         var done = K.Button("Done", () => sheet.Close());
         done.ToolTip = $"Close {kind.Name} (Esc)";
-        head = ToolHeader.Make(kind, c, done, new PinBar(engine, inPopup: true));
+        var head = ToolHeader.Make(kind, c, done, new PinBar(engine, inPopup: true));
+        told.Heading = head;
         head.Margin = new Thickness(40, 20, 40, 12);
         var edge = K.Divider();
         edge.VerticalAlignment = VerticalAlignment.Bottom;
@@ -587,14 +585,11 @@ public sealed class ToolWindow : FluentWindow, ISheetWindow
         MinWidth = 560;
         MinHeight = 420;
         WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
-        ToolHeading? head = null;
-        var c = new ToolContext
-        {
-            Engine = engine, Key = kind.Key, Owner = this, Close = Close,
-            ShowPage = (p, back) => head?.Page(p, back), ShowNote = on => head?.Note(on),
-        };
+        var told = new ToolHeading.Told();
+        var c = new ToolContext { Engine = engine, Key = kind.Key, Owner = this, Close = Close, ShowPage = told.Page, ShowNote = told.Note };
         var body = ToolRegistry.Full(c) ?? ToolPopup.Missing(kind);
-        head = ToolHeader.Make(kind, c, null);
+        var head = ToolHeader.Make(kind, c, null);
+        told.Heading = head;
         head.Margin = new Thickness(32, 4, 32, 12);
         var bar = new TitleBar { Title = kind.Name };
         var root = K.Rows("auto, auto, *", bar.Row(0), head.Row(1), body.Row(2));
@@ -669,6 +664,40 @@ public sealed class ToolHeading : Grid
     {
         noteWanted = on;
         note.Visibility = on && kind.Key != "ptable" && kind.Note.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>What a tool tells its heading (ToolContext.ShowPage, ShowNote) — kept from before the heading is made (the
+    /// tool is made first), and passed on once it is.</summary>
+    internal sealed class Told
+    {
+        private string? page;
+        private Action? back;
+        private bool note = true;
+        private ToolHeading? heading;
+
+        public ToolHeading? Heading
+        {
+            get => heading;
+            set
+            {
+                heading = value;
+                heading?.Note(note);
+                if (page != null) heading?.Page(page, back);
+            }
+        }
+
+        public void Page(string? name, Action? toFirst)
+        {
+            page = name;
+            back = toFirst;
+            heading?.Page(name, toFirst);
+        }
+
+        public void Note(bool on)
+        {
+            note = on;
+            heading?.Note(on);
+        }
     }
 }
 

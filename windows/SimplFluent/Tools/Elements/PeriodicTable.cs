@@ -535,7 +535,7 @@ internal sealed class PeriodicTableTool : Grid
         var close = K.IconButton(SymbolRegular.Dismiss16, () => Away(false), "Not now", 12, 28);
         close.VerticalAlignment = VerticalAlignment.Top;
         var words = K.V(2, K.Text("Take a quick tour?", Ty.BodyStrong),
-            K.Wrapped("A few short steps: the table, an element’s page, and the Lewis and 3D builders.", Ty.Body, B.Text2));
+            K.Wrapped("Eleven short steps through the table, Lewis structures and the 3D builder.", Ty.Body, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         var buttons = K.H(8, go, later);
         buttons.VerticalAlignment = VerticalAlignment.Center;
@@ -946,7 +946,7 @@ internal sealed class PeriodicTableTool : Grid
     {
         if (tourStep is not { } i || i >= steps.Count || !IsLoaded) return;
         overlay ??= new PTTourOverlay(this);
-        overlay.Show(i, steps.Count, steps[i], tourDone, () => NextTour(i), () => SkipTour());
+        overlay.Show(i, steps.Count, steps[i], tourDone, () => NextTour(i), () => SkipTour(), i > 0 ? () => { if (tourStep == i) Tour(i - 1); } : null);
     }
 }
 

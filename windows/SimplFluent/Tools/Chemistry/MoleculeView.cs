@@ -12,7 +12,7 @@ namespace Simpl.Tools;
 /// <summary>
 /// The 3D molecule builder (the Mac's MoleculeBuilder): a preset, atoms to add (each bonded to the selected one with the
 /// bond chosen), Fill with hydrogen, Delete, Clear, and the view's style, lone pairs and labels at the left; the formula,
-/// the model turning in 3D and Stop turning / Turn in the middle; and at the right its molar mass, counts, polarity and
+/// the model turning in 3D and its Auto-rotate switch in the middle; and at the right its molar mass, counts, polarity and
 /// valence check, the selected atom's bonds, shape and bond angles as the model has them. With the model over the rest
 /// (a narrow window), the preset is in the model's own heading.
 /// </summary>
@@ -77,12 +77,14 @@ internal sealed class MoleculeBuilderView : Grid
         var top = K.Columns("auto, auto, *, auto", K.Text(m.Formula.Length == 0 ? "Empty" : m.Formula, Ty.Subtitle).Col(0));
         if (m.Title.Length > 0 && m.Title != m.Formula)
             top.Children.Add(K.Text(m.Title, Ty.Body, B.Text2).Margin(10, 0, 0, 2).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(1));
-        // (turning by itself, at the viewer's top right: named for what a press does — "Stop turning", "Turn")
-        var turning = K.Button(m.AutoRotate ? "Stop turning" : "Turn", () => m.AutoRotate = !m.AutoRotate,
-            icon: m.AutoRotate ? SymbolRegular.Pause20 : SymbolRegular.CubeRotate20);
-        turning.MinWidth = 0;
-        turning.ToolTip = m.AutoRotate ? "Stop the model turning by itself" : "Let the model turn by itself";
-        System.Windows.Automation.AutomationProperties.SetName(turning, m.AutoRotate ? "Stop turning the model" : "Turn the model by itself");
+        // (turning by itself, at the viewer's top right: a switch named for what it does, as the Mac's — not a button named
+        //  for the state it is in, "Turning" / "Still")
+        var turn = new ToggleSwitch { IsChecked = m.AutoRotate, VerticalAlignment = VerticalAlignment.Center };
+        turn.Checked += (_, _) => m.AutoRotate = true;
+        turn.Unchecked += (_, _) => m.AutoRotate = false;
+        System.Windows.Automation.AutomationProperties.SetName(turn, "Auto-rotate");
+        var turning = K.H(8, K.Text("Auto-rotate", Ty.Body).Align(HorizontalAlignment.Left, VerticalAlignment.Center), turn);
+        turning.ToolTip = "Let the model turn by itself";
         top.Children.Add(turning.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
         top.Margin = new Thickness(16);
         if (layout?.Wide != false) { head.Content = top; return; }

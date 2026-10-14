@@ -84,27 +84,27 @@ public sealed class ToolsScreen : Screen
     /// <summary>The twelve (the Mac's ToolKind), each note short enough for one line on its tile.</summary>
     private static Kind[] Everyday => new Kind[]
     {
-        new("cite", "Citation generator", "Cite in MLA, APA or Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
+        new("cite", "Citation generator", "MLA, APA and Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
         new("pomo", "Focus timer", "Focus, then take a break.", SymbolRegular.Timer24, "#ff9500"),
-        new("calc", "Calculator", "Scientific, from your keyboard.", SymbolRegular.Calculator24, "#ff9f0a"),
+        new("calc", "Calculator", "Scientific, with memory.", SymbolRegular.Calculator24, "#ff9f0a"),
         new("graph", "Graphing calculator", "Desmos, right here.", SymbolRegular.DataLine24, "#5856d6"),
-        new("ptable", "Periodic table", "Every element and its facts.", SymbolRegular.Molecule24, "#30d158"),
-        new("need", "Grade needed", "What you need on the final.", SymbolRegular.TargetArrow24, "#ff375f"),
-        new("conv", "File converter", "Convert Word, PDF and images.", SymbolRegular.ArrowSync24, "#34c759"),
-        new("units", "Unit converter", "Lengths, weights, temperatures.", SymbolRegular.Ruler24, "#64d2ff"),
-        new("pdfx", "Merge & split PDFs", "Join PDFs, or take pages out.", SymbolRegular.DocumentCopy24, "#bf5af2"),
+        new("ptable", "Periodic table", "Elements, Lewis and 3D.", SymbolRegular.Molecule24, "#30d158"),
+        new("need", "Grade needed", "The score your goal needs.", SymbolRegular.TargetArrow24, "#ff375f"),
+        new("conv", "File converter", "Word, PDF and images.", SymbolRegular.ArrowSync24, "#34c759"),
+        new("units", "Unit converter", "Lengths, weights and more.", SymbolRegular.Ruler24, "#64d2ff"),
+        new("pdfx", "Merge & split PDFs", "Join PDFs or take pages out.", SymbolRegular.DocumentCopy24, "#bf5af2"),
         new("mark", "PDF annotator", "Highlight and add notes.", SymbolRegular.Highlight24, "#e5a500"),
         new("ocr", "Image to text", "Copy the words in a picture.", SymbolRegular.ScanText24, "#00b3a4"),
-        new("fc", "Flashcards", "Flip, learn, test and match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
+        new("fc", "Flashcards", "Flip, learn, test, match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
     };
 
-    /// <summary>The Tools page's sections in its order: what each set of tools is for, its tools in the order they are
-    /// reached for (the biology toolkit's ten come after, under "Biology").</summary>
+    /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
+    /// tools first (the biology toolkit's ten come after, under "Biology").</summary>
     public static readonly (string Title, string[] Keys)[] Groups =
     {
-        ("Study", new[] { "fc", "pomo", "cite", "need" }),
-        ("Math & science", new[] { "calc", "graph", "units", "ptable" }),
-        ("Files", new[] { "conv", "pdfx", "mark", "ocr" }),
+        ("Study", new[] { "fc", "cite", "pomo", "need" }),
+        ("Math & science", new[] { "calc", "graph", "ptable", "units" }),
+        ("Files", new[] { "mark", "pdfx", "conv", "ocr" }),
     };
 
     /// <summary>Where the graphing calculator is (the Mac's GraphWeb.desmos), while it has no view of its own here.</summary>
@@ -114,7 +114,7 @@ public sealed class ToolsScreen : Screen
 
     public override string Title => "Tools";
 
-    public override string? Subtitle => "Handy things, right here. Pin one and it sits in the title bar on every screen.";
+    public override string? Subtitle => "Pin a tool to keep it in the title bar: its button there opens a quick version of it.";
 
     public override bool Scrolls => false;
 
@@ -196,8 +196,6 @@ public sealed class ToolsScreen : Screen
         var heading = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");
         page.Children.Add(heading);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
-        if (ToolsPins.Pinned.Count == 0)
-            page.Children.Add(MoreKit.Note(SymbolRegular.Pin24, "Press a tile’s pin to keep that tool in the title bar. Its button there opens a quick version of it.").Margin(0, 10, 0, 0));
         var sv = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
         sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);
         sv.Padding = new Thickness(40, 0, 40, 40);

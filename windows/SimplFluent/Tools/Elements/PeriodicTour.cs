@@ -150,8 +150,8 @@ public static class PTTour
 /// TeachingTip: the window dimmed but for the control lit, ringed in the accent, and the step's card beside it — under it,
 /// over it, right or left of it where there is room; for a control too large for that (the whole table), in the empty
 /// room inside it — never over what the step is about: where it is ("3 of 11") and its ×, what it is, what to do with
-/// its gesture pulsing, a bar for how far — ticked for a moment once done — then Skip tour and Next, on every step (doing
-/// what it asks is never required). Presses go through the dim to the tool, so what the step asks can be done.
+/// its gesture pulsing, a bar for how far — ticked for a moment once done — then Skip tour, Back and Next (Next on every
+/// step: doing what it asks is never required). Presses go through the dim to the tool, so what the step asks can be done.
 /// </summary>
 internal sealed class PTTourOverlay
 {
@@ -185,7 +185,7 @@ internal sealed class PTTourOverlay
         timer.Tick += (_, _) => Arrange(true);
     }
 
-    public void Show(int i, int count, PTTourStep s, bool done, Action next, Action skip)
+    public void Show(int i, int count, PTTourStep s, bool done, Action next, Action skip, Action? back)
     {
         layer ??= PTLayer.Of(tool);
         if (layer == null) return;
@@ -201,7 +201,7 @@ internal sealed class PTTourOverlay
         var newStep = i != index;
         index = i;
         step = s;
-        card.Child = Card(i, count, s, done, next, skip);
+        card.Child = Card(i, count, s, done, next, skip, back);
         // (a new step: from a control lit to the next, the card goes with the light; else it pops in place)
         if (!Arrange(animate: !fresh, force: true, newStep: newStep) && newStep) Motion.Pop(card);
         timer.Start();
@@ -220,7 +220,7 @@ internal sealed class PTTourOverlay
         ring.Visibility = Visibility.Collapsed;
     }
 
-    private static FrameworkElement Card(int i, int count, PTTourStep s, bool done, Action next, Action skip)
+    private static FrameworkElement Card(int i, int count, PTTourStep s, bool done, Action next, Action skip, Action? back)
     {
         // (where it is, and its × — the tour ended, as Skip tour does)
         var close = K.IconButton(SymbolRegular.Dismiss16, skip, "Close the tour", 12, 28);
@@ -248,12 +248,27 @@ internal sealed class PTTourOverlay
         doing.Margin = new Thickness(0, 4, 0, 0);
         v.Children.Add(doing);
         v.Children.Add(K.Bar((i + (done ? 1.0 : 0.0)) / count, Appearance.Accent, 3).Margin(0, 6, 0, 2));
-        // (Skip tour and Next on every step: what a step asks is shown, never required)
-        var skipButton = K.Link("Skip tour", skip);
-        skipButton.Margin = new Thickness(-6, 0, 0, 0);
-        var n = K.Button(i == count - 1 ? "Done" : "Next", next, accent: true);
+        // (Skip tour — but on the last step — Back from the second, and Next on every step: what a step asks is shown,
+        //  never required)
+        var last = i == count - 1;
+        var foot = K.Columns("auto, *, auto, auto");
+        if (!last)
+        {
+            var skipButton = K.Link("Skip tour", skip);
+            skipButton.Margin = new Thickness(-6, 0, 0, 0);
+            skipButton.ToolTip = "End the tour (Esc). Tour, above the table, takes it again.";
+            foot.Children.Add(skipButton.Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0));
+        }
+        if (i > 0 && back != null)
+        {
+            var b = K.Button("Back", back);
+            b.MinWidth = 64;
+            foot.Children.Add(b.Margin(0, 0, 8, 0).Col(2));
+        }
+        var n = K.Button(last ? "Done" : "Next", next, accent: true);
         n.MinWidth = 72;
-        v.Children.Add(K.Columns("auto, *, auto", skipButton.Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), n.Col(2)));
+        foot.Children.Add(n.Col(3));
+        v.Children.Add(foot);
         System.Windows.Automation.AutomationProperties.SetName(v, $"Tour, step {i + 1} of {count}: {s.Title}. {s.Doing}");
         return v;
     }
