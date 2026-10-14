@@ -307,7 +307,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 tour = new TourOverlay(engine, this);
                 // (onboarding-4: Keep Simpl on your taskbar? is asked the third time Simpl is opened, not after the tour)
                 Taskbar.Opened(this, Busy);
-                // (over the title bar too: its buttons dimmed with the page, all but Windows' own caption buttons)
+                // (over the title bar too: its buttons dimmed with the page and out of reach, all but Windows' own caption buttons,
+                //  dimmed but still working)
                 Grid.SetRow(tour, 0);
                 Grid.SetRowSpan(tour, 2);
                 root.Children.Insert(root.Children.IndexOf(sheets), tour);

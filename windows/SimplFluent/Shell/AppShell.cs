@@ -623,13 +623,18 @@ public sealed partial class AppShell : Grid, IDisposable
             }
             else line.Children.Add(t);
         }
-        // (a page of a course's: a square in its colour before the title, as the Mac's headings have — the page's
-        //  course at a glance, the colour of its card and its square in the pane — beside the title's first line)
-        if (current.TitleColor is { } tint && line.Children.Count > 0 && line.Children[^1] is FrameworkElement titleText)
+        // (a page of a course's: a square in its colour at the heading's start, as the Mac's headings have — the page's
+        //  course at a glance, the colour of its card and its square in the pane — beside the title's first line, or,
+        //  where a breadcrumb leads ("F26-MATH 021 20 › Grades"), before the breadcrumb, never between its parts)
+        if (current.TitleColor is { } tint && line.Children.Count > 0)
         {
-            line.Children.Remove(titleText);
             var square = new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) };
-            line.Children.Add(K.Columns("auto, *", square.Col(0), titleText.Col(1)));
+            if (crumbs.Count > 1) line.Children.Insert(0, square);
+            else if (line.Children[^1] is FrameworkElement titleText)
+            {
+                line.Children.Remove(titleText);
+                line.Children.Add(K.Columns("auto, *", square.Col(0), titleText.Col(1)));
+            }
         }
         // (a title that may wrap keeps the commands at the top right, beside its first line)
         commandsHost.VerticalAlignment = current.TitleLines > 1 ? VerticalAlignment.Top : VerticalAlignment.Center;

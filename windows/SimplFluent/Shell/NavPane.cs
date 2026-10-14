@@ -217,8 +217,12 @@ public sealed class NavList : Grid
             if (key != shownKey)
             {
                 shownKey = key;
-                // (once it is laid out; only when the choice moved, so a pane being scrolled by hand stays where it is)
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => { if (row.IsVisible) row.BringIntoView(); });
+                // (once the pane has settled — its foot and its rows laid out — and with a little room round it, so the row
+                //  is never left half under the foot; only when the choice moved, so a pane scrolled by hand stays put)
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
+                {
+                    if (row.IsVisible) row.BringIntoView(new Rect(0, -8, row.ActualWidth, row.ActualHeight + 16));
+                });
             }
         }
         PlacePill(animate: true);

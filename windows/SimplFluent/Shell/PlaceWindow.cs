@@ -103,14 +103,25 @@ public sealed class PlaceWindow : FluentWindow, ISheetWindow
         screen.SetWidth(ContentWidth, ActualWidth);
     }
 
-    /// <summary>The screen's title (its line under it) and its commands, as it says them now; the window named after it.</summary>
+    /// <summary>The screen's title (its line under it) and its commands, as it says them now; the window named after it.
+    /// What the main window's breadcrumb puts before the title comes first here too, with the course's colour — "F26-MATH
+    /// 021 20 › Grades" — since a course's page in a window of its own could otherwise be any course's.</summary>
     private void Header()
     {
-        var words = K.V(2, K.Text(screen.Title, Ty.Title));
+        var line = new WrapPanel { Orientation = Orientation.Horizontal };
+        if (screen.TitleColor is { } tint)
+            line.Children.Add(new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) });
+        foreach (var (crumb, _) in screen.Before)
+        {
+            line.Children.Add(K.Text(crumb, Ty.Title, B.Text2));
+            line.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0));
+        }
+        line.Children.Add(K.Text(screen.Title, Ty.Title));
+        var words = K.V(2, line);
         if (screen.Subtitle is { Length: > 0 } sub) words.Children.Add(K.Text(sub, Ty.Body, B.Text2));
         titleHost.Content = words;
         commandsHost.Content = screen.Commands;
-        Title = screen.Title;
+        Title = screen.Before.Count > 0 ? $"{screen.Title} – {screen.Before[^1].Title}" : screen.Title;
         bar.Title = Title;
     }
 

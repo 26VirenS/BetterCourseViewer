@@ -107,7 +107,8 @@ public static class Tour
 
 /// <summary>
 /// The guided tour over the window (the Mac's TourOverlay; the web's welcome.js), as a Windows 11 TeachingTip: one part
-/// lit at a time, the whole window dimmed round it — the title bar's buttons too, all but Windows' own caption buttons —
+/// lit at a time, the whole window dimmed round it — the title bar's buttons too, Windows' own caption buttons dimmed
+/// with it but still working —
 /// the part ringed in the accent, and a callout beside it with a tail pointing at it: its count, what it is, Skip tour
 /// and × to leave, Back and a Next that always works. A step may suggest something to try (click Grades) and moves on
 /// once it is done, but never waits for it. Six steps, from the Dashboard — the counters, Grades, a course, Tools,
@@ -121,15 +122,18 @@ public sealed class TourOverlay : Grid
 {
     private sealed record Step(string Id, TourSpot? Spot, string Title, string Body, string? Doing = null, Func<bool>? Done = null, string NextLabel = "Next");
 
-    /// <summary>Windows' caption buttons at the title bar's right (minimise, maximise, close): left lit and working
-    /// through the tour.</summary>
+    /// <summary>Windows' caption buttons at the title bar's right (minimise, maximise, close): left working through the
+    /// tour, under a dim a press goes through.</summary>
     private const double CaptionButtons = 138;
 
     private readonly Engine.Engine engine;
     private readonly MainWindow window;
     private readonly Path veil = new();
+    /// <summary>The dim over Windows' caption buttons: drawn with the rest, so the title bar dims as one (no bright block
+    /// at its right), but never in the way — a press goes through to minimise, maximise and close.</summary>
+    private readonly Path captionVeil = new() { IsHitTestVisible = false };
     // (the light and its ring are one shape, so one move carries both: the dim is the window less it — and less
-    //  Windows' caption buttons, which stay as they are)
+    //  Windows' caption buttons, which keep working under a dim of their own that lets a press through)
     private readonly RectangleGeometry whole = new(), captions = new(), light = new() { RadiusX = 10, RadiusY = 10 };
     private readonly CombinedGeometry bare, dim;
     private readonly Path ring = new() { StrokeThickness = 2, IsHitTestVisible = false, Opacity = 0, Visibility = Visibility.Collapsed };
@@ -168,10 +172,14 @@ public sealed class TourOverlay : Grid
         bare = new CombinedGeometry(GeometryCombineMode.Exclude, whole, captions);
         dim = new CombinedGeometry(GeometryCombineMode.Exclude, bare, light);
         veil.Data = bare;
+        captionVeil.Fill = veil.Fill;
+        captionVeil.Data = captions;
+        captionVeil.SetBinding(VisibilityProperty, new System.Windows.Data.Binding(nameof(Visibility)) { Source = veil });
         ring.Data = light;
         ring.SetResourceReference(Shape.StrokeProperty, B.Accent);
         ring.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 0, Opacity = 0.6, Color = Appearance.Accent };
         layer.Children.Add(veil);
+        layer.Children.Add(captionVeil);
         layer.Children.Add(ring);
         layer.Children.Add(card);
         Children.Add(layer);
