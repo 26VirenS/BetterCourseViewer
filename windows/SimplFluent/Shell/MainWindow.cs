@@ -304,7 +304,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 shell = new AppShell(engine, this);
                 Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
-                tour.Completed += () => Taskbar.AfterTour(this);
+                // (onboarding-4: Keep Simpl on your taskbar? is asked the third time Simpl is opened, not after the tour)
+                Taskbar.Opened(this, Busy);
                 // (over the title bar too: its buttons dimmed with the page, all but Windows' own caption buttons)
                 Grid.SetRow(tour, 0);
                 Grid.SetRowSpan(tour, 2);
@@ -542,9 +543,14 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         }
     }
 
+    /// <summary>Something of Simpl's over the window that a question of its own should wait for: a dialog, the tour or
+    /// its offer, the sign-in.</summary>
+    private bool Busy() => sheets.IsOpen || tour?.Busy == true || engine == null || engine.Login.Covers || engine.Phase != Phase.Native;
+
     /// <summary>Brought back (the notification area's icon, Simpl opened again): shown, restored, in front.</summary>
     public void Bring()
     {
+        if (!IsVisible && shell != null) Taskbar.Opened(this, Busy);
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();

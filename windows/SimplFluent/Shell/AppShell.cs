@@ -399,7 +399,10 @@ public sealed partial class AppShell : Grid, IDisposable
             words.Children.Add(t);
         }
         words.VerticalAlignment = VerticalAlignment.Center;
-        var grid = K.Columns("auto, *, auto", avatar.Col(0), words.Margin(12, 0, 4, 0).Col(1), K.Icon(SymbolRegular.MoreHorizontal20, 16, B.Text2).Col(2));
+        // (the ⋯ that says the tile opens a menu: what the tour's last step lights, alone — where Report a bug is)
+        var more = new Border { Width = 28, Height = 28, Child = K.Icon(SymbolRegular.MoreHorizontal20, 16, B.Text2), VerticalAlignment = VerticalAlignment.Center };
+        more.Mark(TourSpot.AccountMenu);
+        var grid = K.Columns("auto, *, auto", avatar.Col(0), words.Margin(12, 0, 4, 0).Col(1), more.Col(2));
         Button? tile = null;
         tile = K.Subtle(grid, () => AccountMenu(tile!), new Thickness(10, 8, 10, 8), 6);
         tile.Margin = new Thickness(4, 0, 4, 0);

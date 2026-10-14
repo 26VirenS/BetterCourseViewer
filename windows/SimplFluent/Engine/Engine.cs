@@ -235,14 +235,15 @@ public sealed partial class Engine : Observable, IShellListener
     }
 
     /// <summary>
-    /// Signed in here before, the setup done: the app's own screens at once, on what they showed last time, while the
-    /// web view starts and the page loads underneath; the live answers replace them as they come.
+    /// Signed in here before, the setup done (or put off with Set up later): the app's own screens at once, on what they
+    /// showed last time, while the web view starts and the page loads underneath; the live answers replace them as they
+    /// come.
     /// </summary>
     private void OpenOnKept()
     {
         if (Phase != Phase.Starting || Prefs.Bool("noKept")) return;
         var s = Kept<Snapshot>("snapshot");
-        if (s == null || s.SetupDone != true || s.Me == null) return;
+        if (s == null || (s.SetupDone != true && !Prefs.Bool(SetupLaterKey)) || s.Me == null) return;
         Snapshot = s;
         if (s.Lms != null) Lms = s.Lms;
         if (Kept<CoursesData>("courses") is { } c) Courses = c.Rows;
@@ -456,9 +457,11 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
         await LoadSidebar();
-        // (a first setup quit halfway, or whose save failed, is asked again — the page may have kept some of it)
-        if (Snapshot?.SetupDone == false && !Launch.IsDevelopment) Prefs.Set(SetupPendingKey, true);
-        if (Snapshot?.SetupDone == false || Prefs.Bool(SetupPendingKey) || Launch.Take("setup") != null) { SetupRequested?.Invoke(); return; }
+        // (a first setup quit halfway, or whose save failed, is asked again — the page may have kept some of it — unless
+        //  it was put off with Set up later, when it waits for Settings ▸ General ▸ Courses shown and goals)
+        var later = Prefs.Bool(SetupLaterKey);
+        if (Snapshot?.SetupDone == false && !later && !Launch.IsDevelopment) Prefs.Set(SetupPendingKey, true);
+        if (((Snapshot?.SetupDone == false || Prefs.Bool(SetupPendingKey)) && !later) || Launch.Take("setup") != null) { SetupRequested?.Invoke(); return; }
         if (Launch.Take("whatsnew") != null) WhatsNewRequested?.Invoke(WhatsNew.All);
         else if (Launch.Take("settings") != null) SettingsRequested?.Invoke();
         else if (WhatsNew.Due() is { } wn) WhatsNewRequested?.Invoke(wn);
@@ -466,6 +469,10 @@ public sealed partial class Engine : Observable, IShellListener
 
     /// <summary>The first setup not finished yet — quit halfway, or its save failed: asked again at the next start.</summary>
     public const string SetupPendingKey = "setup:pending";
+
+    /// <summary>The first setup put off with Set up later (the Mac's SetupLater): not put up again at launch, the app
+    /// opening on what it showed last time meanwhile; a setup finished later clears it.</summary>
+    public const string SetupLaterKey = "setup:later";
 
     /// <summary>A place by the name the screenshot suite gives it.</summary>
     public static Place? PlaceNamed(string raw)
