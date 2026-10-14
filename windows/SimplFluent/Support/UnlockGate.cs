@@ -72,24 +72,33 @@ public sealed class UnlockGate
 
     private async Task Ask(string reason, int at, TaskCompletionSource<string?> done)
     {
-        Answer answer;
-        try { answer = await prompt(reason); }
-        catch { answer = new Answer(null, true); } // (as Windows could not: not asked again by itself)
         string? pass = null;
-        lock (sync)
+        try
         {
-            if (asking == done.Task) asking = null;
-            if (at == generation)
+            Answer answer;
+            try { answer = await prompt(reason); }
+            catch { answer = new Answer(null, true); } // (as Windows could not: not asked again by itself)
+            lock (sync)
             {
-                if (answer.Pass != null)
+                if (asking == done.Task) asking = null;
+                if (at == generation)
                 {
-                    Keep(answer.Pass);
-                    pass = answer.Pass;
+                    if (answer.Pass != null)
+                    {
+                        Keep(answer.Pass);
+                        pass = answer.Pass;
+                    }
+                    else if (answer.Declined) heldBack = true;
                 }
-                else if (answer.Declined) heldBack = true;
             }
         }
-        done.SetResult(pass);
+        finally
+        {
+            // (whatever happened above, the request is over and every one waiting on it is answered: none waits forever,
+            //  and the next one asks anew)
+            lock (sync) if (asking == done.Task) asking = null;
+            done.TrySetResult(pass);
+        }
     }
 
     /// <summary>The password the student has just typed, kept (Stay logged in; a sign-in locked as it is used): held for
@@ -122,10 +131,13 @@ public sealed class UnlockGate
         }
     }
 
-    /// <summary>(Under sync.) Held, in place of anything held before.</summary>
+    /// <summary>(Under sync.) Held, in place of anything held before. Never throws: should it not be held (it could not
+    /// be encrypted), nothing is, and Windows Hello is asked the next time, as before anything was held.</summary>
     private void Keep(string pass)
     {
         held?.Dispose();
-        held = RunSecret.Hold(pass);
+        held = null;
+        try { held = RunSecret.Hold(pass); }
+        catch { /* (not held: never kept unencrypted instead) */ }
     }
 }

@@ -171,6 +171,19 @@ public class UnlockTests
     }
 
     [Fact]
+    public async Task APromptThatFailsLaterStillAnswersEveryoneWaiting()
+    {
+        // (Windows failing after the prompt opened: no one is left waiting, and the gate is not stuck asking)
+        var failing = new TaskCompletionSource<UnlockGate.Answer>();
+        var gate = new UnlockGate(_ => failing.Task);
+        var asks = Enumerable.Range(0, 3).Select(_ => gate.OpenAsync(Reason)).ToArray();
+        failing.SetException(new InvalidOperationException("Windows could not"));
+        Assert.All(await Task.WhenAll(asks), p => Assert.Null(p));
+        Assert.True(gate.HeldBack);
+        Assert.False(gate.Asking);
+    }
+
+    [Fact]
     public void TheHeldPasswordIsNotInMemoryAsText()
     {
         const string pass = "correct horse battery staple ✓";

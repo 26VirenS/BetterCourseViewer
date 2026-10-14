@@ -25,7 +25,8 @@ namespace Simpl.Engine;
 /// - Canvas reached after details typed in the form: "Stay logged in?". Reached with saved details an earlier Simpl
 ///   kept in the vault alone: they are locked with Windows Hello now, where it is set up (LoginVault.LockAtUseAsync).
 /// - a school page that says the sign-in went stale ("Stale Request", an expired request): started again from Canvas
-///   by itself, once a minute at most; and on every school page shown, Start Over does the same by hand.
+///   by itself, once a minute at most (after a cancelled Windows Hello prompt, without asking it again); and on every
+///   school page shown, Start Over does the same by hand.
 ///
 /// The details are kept, when the student says so, encrypted in Simpl's own vault and locked with Windows Hello
 /// (LoginVault) — never by the browser, whose own password saving is off. Nothing here writes them down anywhere else,
@@ -120,19 +121,23 @@ public sealed class LoginAssist : Observable
             return;
         }
         lastAutoRestart = DateTime.UtcNow;
-        Restart();
+        Restart(byStudent: false);
     }
 
     /// <summary>Start Over: whatever sign-in was under way forgotten, and Canvas loaded afresh (it sends the school a new
     /// request); saved details are tried again on the way (Windows Hello asked again, after a cancelled prompt).</summary>
-    public void Restart()
+    public void Restart() => Restart(byStudent: true);
+
+    /// <summary>Started over — by the student (Start Over), or by itself (a stale page): only the student's asks Windows
+    /// Hello again after a cancelled prompt; by itself, the sign-in page shows Simpl's card instead.</summary>
+    private void Restart(bool byStudent)
     {
         Disarm();
         attempt = null;
         navigatedSinceAttempt = false;
         autoOff = false;
         declined = false;
-        LoginVault.AskAgain();
+        if (byStudent) LoginVault.AskAgain();
         Handoff = false;
         if (Phase != Mode.Idle) Phase = Mode.Idle;
         OnRestart?.Invoke();
