@@ -689,6 +689,20 @@ jobs:
             Write-Host "biology self-check: $($sum.Matches[0].Value)"
             if ($sum.Matches[0].Groups[3].Value -ne 'OK') { Select-String -Path $bio -Pattern 'bio-check \S+ \S+ FAIL' | ForEach-Object { Write-Host "::error::$($_.Line)" }; exit 1 }
           }
+          # Hardy–Weinberg's simulation drawn before its pictures were taken: the last thing its chart said it showed before
+          # "picture at" in each one's log (the Simulate page writes "popgen simulate: shows …" when that changes) must be
+          # the finished run, not the empty chart of generation 0 waiting for one
+          foreach ($hw in @(@('bio-popgen-lethal', '1 population to generation 50 of 50'), @('bio-popgen-simulate', '5 populations to generation 100 of 100'))) {
+            if ($script:mine -notcontains $hw[0]) { continue }
+            $hwLog = "shots/profile-$($hw[0]).log"
+            $shown = $null
+            foreach ($l in @(if (Test-Path $hwLog) { Get-Content $hwLog })) {
+              if ($l -match ' picture at ') { break }
+              if ($l -match 'popgen simulate: shows (.+)$') { $shown = $Matches[1] }
+            }
+            if ($shown -ne $hw[1]) { Write-Host "::error::$($hw[0]): its chart showed '$shown' when it was pictured, not '$($hw[1])' ($hwLog)"; exit 1 }
+            Write-Host "$($hw[0]): its chart showed $shown"
+          }
           Get-ChildItem shots
       # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
       #  pictures left them, sign-in-stay's among them: prefs.json, storage.json, flashcards.json, login.bin and every
