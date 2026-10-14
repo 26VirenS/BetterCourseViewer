@@ -287,7 +287,7 @@ internal sealed class DnaToggle : Grid
 /// <summary>
 /// A page laid out in two columns (the drawing and its cards) from 1000 wide, the drawing over the cards below that — for
 /// the pages whose 2D drawing needs more room than the three-column layout's middle (replication: beside a column on a
-/// 1366 window its letters and enzymes' names came out 7 px tall). Over the cards, the drawing is as tall as leaves 110 of
+/// 1366 window its letters and enzymes' names came out 7 px tall). Over the cards, the drawing is as tall as leaves 90 of
 /// the page for the first card's title under it (240 to 640), so the step's card is in sight under it and the fork's words
 /// stay readable in a tool's popup. (It once gave the drawing the page's whole height, and the step's card sat out of
 /// sight below it.)
@@ -315,7 +315,7 @@ internal sealed class DnaTwoColumns : Grid
         return base.MeasureOverride(available);
     }
 
-    private static double NarrowHeight(double page) => Math.Max(240, Math.Min(640, page - 110));
+    private static double NarrowHeight(double page) => Math.Max(240, Math.Min(640, page - 90));
 
     private void Lay(Size size)
     {
@@ -358,6 +358,10 @@ internal abstract class DnaDrawing : FrameworkElement
     /// <summary>The drawing's size in its own units.</summary>
     protected abstract Size Design { get; }
 
+    /// <summary>Where in its own units the part fitted to the room starts (from the top): what it draws above that is
+    /// never shown, so a drawing can leave out the empty band its units leave over what it draws.</summary>
+    protected virtual double DesignTop => 0;
+
     /// <summary>Its units → the element's, and back.</summary>
     protected Matrix Fit
     {
@@ -367,6 +371,7 @@ internal abstract class DnaDrawing : FrameworkElement
             if (ActualWidth <= 0 || ActualHeight <= 0 || d.Width <= 0 || d.Height <= 0) return Matrix.Identity;
             var s = Math.Min(ActualWidth / d.Width, ActualHeight / d.Height);
             var m = Matrix.Identity;
+            m.Translate(0, -DesignTop);
             m.Scale(s, s);
             m.Translate((ActualWidth - d.Width * s) / 2, (ActualHeight - d.Height * s) / 2);
             return m;

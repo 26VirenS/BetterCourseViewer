@@ -121,7 +121,11 @@ internal sealed class DnaForkDrawing : DnaDrawing
 
     public BioStepPhase Phase { get; set; } = BioStepPhase.At(0);
 
-    protected override Size Design => new(960, 470);
+    // (what it draws lies from y 49 — "fork moves →" — to 422, the old strand's words under the bottom rail once the two
+    //  molecules part: the 470 it was drawn in left 50 empty above and below, and in a tool's popup, where its room is
+    //  wide and short, the fork came out a third smaller than it needed to, its words 7 px tall)
+    protected override Size Design => new(960, 400);
+    protected override double DesignTop => 36;
 
     private const double X0 = 64, Dx = 26, TileW = 20, TileH = 18;
 
