@@ -752,9 +752,9 @@ try {
   check(await eventually(async () => !page.url().includes('bcv=native') && !(await page.$('html.bcv-punch'))), 'the back bar gets out of the Canvas page, back to the courses look');
 
   // ---- Canvas's own banners -------------------------------------------------------------------------
-  // (?mockflash=1: an error in Canvas's jQuery holder as the page arrives, its planner's "Nothing planned today" through
-  // InstUI's holder a moment after — mock-canvas.mjs flashScript) Every frame, in the page's own world: any banner of
-  // Canvas's on screen, and Simpl's toasts with their words.
+  // (?mockflash=1: Canvas's "Oops! The last request didn't work out." in its jQuery holder as the page arrives, its planner's
+  // "Nothing planned today" through InstUI's holder a moment after — mock-canvas.mjs flashScript) Every frame, in the page's
+  // own world: any banner of Canvas's on screen, and Simpl's toasts with their words.
   console.log("Canvas's banners");
   await page.addInitScript(() => {
     if (!/[?&]mockflash=1\b/.test(location.search)) return;
@@ -765,9 +765,9 @@ try {
       for (const el of document.querySelectorAll('#flashalert_message_holder > *, #flash_message_holder > *')) if (el.checkVisibility() && el.textContent.trim()) seen.push(el.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
       for (const t of document.querySelectorAll('.bcv-toast')) {
         const words = t.querySelector('.bcv-toast__text')?.textContent || '';
-        if (!(t.__said ||= []).includes(words)) { t.__said.push(words); toasts.push({ words, error: t.classList.contains('bcv-toast--error') }); }
+        if (!(t.__said ||= []).includes(words)) { t.__said.push(words); toasts.push({ words, error: t.classList.contains('bcv-toast--error'), role: t.getAttribute('role'), width: Math.round(t.getBoundingClientRect().width), height: Math.round(t.getBoundingClientRect().height) }); }
       }
-      if (performance.now() - t0 < 9000) requestAnimationFrame(look);
+      if (performance.now() - t0 < 15000) requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
   });
@@ -775,14 +775,20 @@ try {
   await ready();
   await page.waitForFunction(() => !!document.getElementById('flashalert_message_holder'), null, { timeout: 10000 });
   await page.waitForTimeout(500);
+  // (later, something not allowed: what matters, put up the way $.flashError puts one up)
+  const DENIED = 'You are not authorized to perform that action.';
+  await page.evaluate((w) => document.getElementById('flash_message_holder').insertAdjacentHTML('beforeend', `<li class="ic-flash-error"><div class="ic-flash__icon" aria-hidden="true"><i class="icon-warning"></i></div>${w}<button type="button" class="Button Button--icon-action close_link" aria-label="Close"><i class="icon-x" aria-hidden="true"></i></button></li>`), DENIED);
+  await page.waitForTimeout(500);
   const phFlash = await page.evaluate(() => ({
     seen: window.__flashSeen || null, toasts: window.__toastsSeen || null,
     left: [...document.querySelectorAll('#flashalert_message_holder > *, #flash_message_holder > *')].map((e) => e.textContent.trim()).filter(Boolean),
     holders: ['flashalert_message_holder', 'flash_message_holder', 'flash_screenreader_holder'].map((id) => getComputedStyle(document.getElementById(id)).display),
   }));
+  const phDenied = (phFlash.toasts || []).filter((t) => t.words === DENIED);
   check(!!phFlash.seen && !phFlash.seen.length && !phFlash.left.length && phFlash.holders.every((d) => d === 'none')
-    && (phFlash.toasts || []).filter((t) => t.words === "Oops! The last request didn't work out." && t.error).length === 1 && !(phFlash.toasts || []).some((t) => t.words.includes('Nothing planned')),
-  `Today: Canvas's banners never draw over the phone layout and are taken off the page, its live region silent; the error comes up once as Simpl's red toast, the planner's talk does not: ${JSON.stringify(phFlash)}`);
+    && phDenied.length === 1 && phDenied[0].error && phDenied[0].role === 'alert' && phDenied[0].height < 60
+    && !(phFlash.toasts || []).some((t) => t.words.includes('Nothing planned') || t.words.includes('Oops')),
+  `Today: Canvas's banners never draw over the phone layout and are taken off the page, its live region silent; what matters comes up once as Simpl's red toast, on a line or two; the planner's talk and Canvas's failed request of its own do not: ${JSON.stringify(phFlash)}`);
 
   // ---- a quiz ------------------------------------------------------------------------------------
   console.log('quiz');

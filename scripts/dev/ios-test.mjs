@@ -747,7 +747,30 @@ try {
   await sp.waitForFunction(() => location.pathname === '/courses/101/files' && document.documentElement.classList.contains('bcv-settled'), null, { timeout: 15000 });
   check((await sp.evaluate(() => history.length)) === hist, 'a screen the app shows replaces the page\'s entry (the app\'s stack is the history)');
   await sp.screenshot({ path: join(out, '23a-ios-shell-files.png') });
-  check(shellErrors.length === 0, `no page errors with the shell${shellErrors.length ? `: ${shellErrors.slice(0, 3).join(' | ')}` : ''}`);
+  // Canvas's banners with the app's own screens: this page is the app's engine, under them, so nothing of Canvas's comes up
+  // as a toast here (it would never be seen, and the phone would buzz for it) — being signed out has Canvas asked whether
+  // the session is gone instead. (?mockflash=1: Canvas's failed request and its planner's talk, mock-canvas.mjs flashScript)
+  await sp.goto(`${BASE}/?mockflash=1`);
+  await sp.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !!document.getElementById('flashalert_message_holder'), null, { timeout: 25000 });
+  await sp.waitForTimeout(500);
+  await sp.evaluate(() => {
+    const ask = self.BCV.canvas.checkSession;
+    self.__sessionAsked = 0;
+    self.BCV.canvas.checkSession = (...a) => { self.__sessionAsked++; return ask(...a); };
+    const put = (w) => document.getElementById('flash_message_holder').insertAdjacentHTML('beforeend', `<li class="ic-flash-error">${w}<button type="button" class="close_link" aria-label="Close"></button></li>`);
+    put('You are not authorized to perform that action.');
+    put('You are not currently logged in, possibly due to a long period of inactivity.<br/><a href="/login" id="inactivity_login_link" target="_new">Login</a>');
+  });
+  await sp.waitForTimeout(500);
+  const appFlash = await sp.evaluate(() => ({
+    toasts: [...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent.trim()).filter((w) => /Oops|Nothing planned|authorized|logged in/.test(w)),
+    left: [...document.querySelectorAll('#flashalert_message_holder > *, #flash_message_holder > *')].map((e) => e.textContent.trim()).filter(Boolean),
+    buzz: self.__nativeCalls.filter((c) => c.op === 'haptic' && c.kind === 'error').length,
+    asked: self.__sessionAsked,
+    shell: document.documentElement.classList.contains('bcv-native-shell'),
+  }));
+  check(appFlash.shell && !appFlash.toasts.length && !appFlash.left.length && !appFlash.buzz && appFlash.asked === 1, `with the app's own screens, Canvas's banners are taken off the page and none comes up as a toast the app would hide (no buzz for one); being signed out asks Canvas, once, whether the session is gone: ${JSON.stringify(appFlash)}`);
+  check(shellErrors.length === 0,`no page errors with the shell${shellErrors.length ? `: ${shellErrors.slice(0, 3).join(' | ')}` : ''}`);
   await shellCtx.close();
 
   // ---- the sign-in reader ---------------------------------------------------------------------

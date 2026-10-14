@@ -53,7 +53,10 @@ underneath is `APP`.
 
 An error Canvas's own page put up — one of its flash banners, which Simpl never lets draw over its
 screens and passes on as a toast instead — is `SC-X-…`, by what its words say: `401` signed out,
-`403` not allowed, `422` not saved, and `APP` for any other.
+`403` not allowed, `422` not saved, and `APP` for any other. Only a banner Canvas put up as an error
+or a warning is coded by its words: a success or a notice that names a permission is no error. In the
+apps with their own screens (iPhone, Mac, Windows) Canvas's page is hidden under them, so none of its
+banners comes up or is noted.
 
 ## The report page's own codes
 
