@@ -10,14 +10,15 @@ using Simpl.Support;
 
 namespace Simpl.Tools;
 
-// An element in 3D, for its page in the Periodic Table (the Mac's Atom3D.swift, SceneKit there; WPF's Viewport3D here):
+// An element in 3D, for Atoms & Orbitals (AtomsTool.cs; on an element's page in the Periodic Table until 0.3.2 — the Mac's
+// Atom3D.swift, SceneKit there; WPF's Viewport3D here):
 // its atom — the nucleus's protons and neutrons, each shell a ring with its electrons going round — or the shapes of a
 // subshell's orbitals, each with its electrons, or (0.2.1) its electron cloud — every electron a cloud of dots, each dot a
 // place it could be found, densest where it most likely is, with no paths; turned by dragging, zoomed by the scroll wheel,
 // and slowly turning on its own (the nucleus spinning, the electrons going round, the orbitals revolving, the cloud turning
 // and now and then drawing a few of its dots afresh).
 
-/// <summary>The element page's three views of the atom (the Mac's PTModel): the Bohr-style atom, a subshell's orbitals, and
+/// <summary>Atoms &amp; Orbitals' three views of the atom (the Mac's PTModel): the Bohr-style atom, a subshell's orbitals, and
 /// the electron cloud (the quantum-mechanical model).</summary>
 internal enum PTModel { Atom, Orbitals, Cloud }
 

@@ -46,9 +46,8 @@ public sealed class ToolContext
     public Action Close { get; init; } = () => { };
 
     /// <summary>
-    /// The heading told which of the tool's own pages shows (the Periodic Table's "Lewis structures"): its name for the
-    /// title, after the tool's ("Tools › Periodic table › Lewis structures"), and the way back to the tool's first page
-    /// (the breadcrumb's tool part); null, the tool's first page again.
+    /// The heading told which of the tool's own pages shows: its name for the title, after the tool's ("Tool › Page"), and
+    /// the way back to the tool's first page (the breadcrumb's tool part); null, the tool's first page again.
     /// </summary>
     public Action<string?, Action?> ShowPage { get; init; } = (_, _) => { };
 
@@ -64,9 +63,10 @@ public sealed class ToolContext
 }
 
 /// <summary>
-/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; and
-/// the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy, through BioTools.Register).
-/// Each tool's file registers its own from a module initializer, so a tool added is a file added.
+/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; the
+/// Chemistry section's lewis, molecule and atom beside ptable, ChemTools; and the biology toolkit's cell, dna, gene, biomol,
+/// cross, divide, popgen, biolab, enzyme, energy, through BioTools.Register). Each tool's file registers its own from a
+/// module initializer, so a tool added is a file added.
 /// </summary>
 public static class ToolRegistry
 {
@@ -77,7 +77,7 @@ public static class ToolRegistry
     /// <param name="key">The tool's key.</param>
     /// <param name="full">The whole tool (on the Tools page, or over the window).</param>
     /// <param name="quick">Its quick version, for its pin's flyout (null: the flyout offers the whole tool).</param>
-    /// <param name="headerControls">Controls beside its pin in the page header (the Periodic Table's search).</param>
+    /// <param name="headerControls">Controls beside its pin in the page header (the Periodic Table's search and tour).</param>
     public static void Register(string key, Func<ToolContext, FrameworkElement> full, Func<ToolContext, FrameworkElement>? quick = null,
         Func<ToolContext, FrameworkElement>? headerControls = null)
     {
@@ -148,14 +148,33 @@ public static class ToolsCenter
         ToolPopup.Show(key, engine, Application.Current?.MainWindow);
     }
 
-    /// <summary>A tool opened whole by a tool (BioTools.Open, the Biomolecule Builder's molecule for the builder): from a
-    /// tool's popup (<paramref name="owner"/>), that popup turns into the other tool in place; from anywhere else, as
-    /// <see cref="Show"/>.</summary>
+    /// <summary>A tool opened whole by a tool (BioTools.Open, the Biomolecule Builder's molecule for the Molecule
+    /// Builder): from a tool's popup (<paramref name="owner"/>), that popup turns into the other tool in place; from
+    /// anywhere else, as <see cref="Show"/>.</summary>
     public static void PopUp(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
     {
         if (KindOf(key) == null) return;
         Hand(key, files, info);
         if (!ToolPopup.Change(owner, key)) ToolPopup.Show(key, engine, Application.Current?.MainWindow);
+    }
+
+    /// <summary>
+    /// A tool handing something to another (BioTools.Open; the chemistry tools' hand-offs — an element's See it in 3D,
+    /// Lewis Structures' Open in Molecule Builder): from the tool's popup, the popup turns into the other where it is (the
+    /// tool asks its popup closed first, and the other takes its place on the next turn); from a pin's flyout, the flyout
+    /// closes and the other opens over the window. The other takes <paramref name="info"/> once with ToolContext.TakeInfo.
+    /// </summary>
+    public static void HandTo(ToolContext from, string key, Dictionary<string, string>? info = null)
+    {
+        var engine = from.Engine;
+        var owner = from.Owner;
+        if (from.InPage)
+        {
+            Application.Current?.Dispatcher.BeginInvoke(() => Show(key, engine, null, info), DispatcherPriority.Background);
+            return;
+        }
+        from.Close();
+        Application.Current?.Dispatcher.BeginInvoke(() => PopUp(key, engine, owner, null, info), DispatcherPriority.Background);
     }
 
     /// <summary>Files or details are waiting for this tool (it takes them as it is made).</summary>
@@ -185,7 +204,7 @@ public static class ToolsCenter
     {
         "cite" => "Cite", "pomo" => "Focus", "calc" => "Calculator", "graph" => "Graphing", "ptable" => "Elements",
         "need" => "Grade needed", "conv" => "Convert", "units" => "Units", "pdfx" => "Merge & split", "mark" => "Mark up",
-        "ocr" => "Image to text", "fc" => "Flashcards",
+        "ocr" => "Image to text", "fc" => "Flashcards", "lewis" => "Lewis", "molecule" => "Molecules", "atom" => "Orbitals",
         "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
         "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy", _ => key,
     };
@@ -525,9 +544,9 @@ public static class Files
 /// window under its title bar less a margin — over the pane too, so the tool has the window's whole width — and resized
 /// with the window; sized by its edges and corners, the size kept for that tool the next time it opens. Nothing is
 /// dimmed: the Tools page (or whatever shows) behind it, the title bar and its search still at hand. Its heading: the
-/// tool's tile and name (and the page of its own that shows, "Periodic table › Lewis structures", the name going back to
-/// its first page), its line, its own controls (a biology tool's pages, the Periodic Table's search), its pin and ×; the
-/// popup is moved by it. It
+/// tool's tile and name (and the page of its own that shows, "Tool › Page", the name going back to its first page), its
+/// line, its own controls (a biology tool's pages, the Periodic Table's search and tour), its pin and ×; the popup is
+/// moved by it. It
 /// opens at the tool's top, a hairline under the heading once the tool scrolls beneath it; its own pages, and another
 /// tool it hands something to, change inside it. One popup a tool: opened again, the one there comes forward.
 /// </summary>
@@ -637,10 +656,10 @@ public sealed class ToolPopup
 }
 
 /// <summary>
-/// A tool's heading in its popup: its tile, its name — and the page of its own that shows, after it ("Periodic table ›
-/// Lewis structures", the tool's name going back to its first page) — and its line, its own controls (a biology tool's
-/// pages, the Periodic Table's search), its pin and the popup's ×. Where the popup is too narrow for its controls beside
-/// its name, they go on a line of their own under it.
+/// A tool's heading in its popup: its tile, its name — and the page of its own that shows, after it ("Tool › Page", the
+/// tool's name going back to its first page) — and its line, its own controls (a biology tool's pages, the Periodic
+/// Table's search and tour), its pin and the popup's ×. Where the popup is too narrow for its controls beside its name,
+/// they go on a line of their own under it.
 /// </summary>
 public sealed class ToolHeading : Grid
 {
@@ -710,7 +729,7 @@ public sealed class ToolHeading : Grid
         }
     }
 
-    /// <summary>The page of the tool's own that shows ("Lewis structures"), after its name; null, its first page.</summary>
+    /// <summary>The page of the tool's own that shows, after its name; null, its first page.</summary>
     public void Page(string? name, Action? back)
     {
         titleRow.Children.Clear();

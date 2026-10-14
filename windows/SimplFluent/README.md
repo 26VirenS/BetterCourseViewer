@@ -414,7 +414,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -777,14 +777,14 @@ command, a link, or another tool handing it something (`ToolsCenter.Show`) — a
 bar less a margin, over the pane too, and resized with the window; sized by its edges and corners, the size kept for
 that tool the next time (Popups, below); the Tools page (or whatever shows) behind it and the title bar and its search
 still at hand. Its heading, which moves it: the tool's tile and name, its line, its own controls (a biology
-tool's pages, the Periodic Table's search — on a line of their own under the name where the popup is too narrow for
-them beside it), its pin and ×; × or Escape closes it. One popup a tool: opened again, the one there comes forward,
-taking what was handed to it. A tool that shows pages of its own names the one shown after its name
-(`ToolContext.ShowPage`: "Periodic table › Lewis structures", the name going back to its first page), and may hide its
-line while it needs the room (`ShowNote`); a tool handing something to another from its popup (`BioTools.Open`, the
-Biomolecule Builder's molecule for the 3D builder) turns that popup into the other tool in place (`ToolsCenter.PopUp`),
-and the chemistry builders opened from elsewhere are the Periodic Table's own pages in its popup (`ChemSheet`).
-`--tool calc` opens one over the Tools page for a picture.
+tool's pages, the Periodic Table's search and Tour — on a line of their own under the name where the popup is too
+narrow for them beside it), its pin and ×; × or Escape closes it. One popup a tool: opened again, the one there comes
+forward, taking what was handed to it. A tool that shows pages of its own can name the one shown after its name
+(`ToolContext.ShowPage`: "Tool › Page", the name going back to its first page), and may hide its line while it needs
+the room (`ShowNote`); a tool handing something to another from its popup (`ToolsCenter.HandTo`: `BioTools.Open`, an
+element's See it in 3D, Lewis Structures' Open in Molecule Builder, the Biomolecule Builder's molecule for the Molecule
+Builder) turns that popup into the other tool in place (`ToolsCenter.PopUp`), the other taking what it was handed once
+(`TakeInfo`). `--tool calc` opens one over the Tools page for a picture.
 
 A pin's flyout is the tool's quick version, under its whole name (with ›, the one way to the whole tool) and Pop out,
 which pulls the quick version into a small window of its own kept above Simpl and its popups (`ToolFloat`; pictured
@@ -815,9 +815,32 @@ and framing (`3d view …: … % of the view`, `element view …`, `molecule vie
 (`TakeFiles`, `TakeInfo`), `OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns,
 fields, notes, the drop zone and the scroll edge; `Files` has Windows' file dialogs.
 
-The Tools page lists the tools under what they are for — Study, Math & science, Files, then Biology — a one-line note on
-each tile, three across from about 900 wide; a tile opens its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title bar",
-"Copy result", "Skip tour").
+The Tools page lists the tools under what they are for — Study, Math & science, Files, then Chemistry and Biology — a
+one-line note on each tile, three across from about 900 wide (a section's four in full rows); a tile opens its tool's
+popup over the page. Windows' sentence case on every button and menu ("Pin to title bar", "Copy result", "Skip tour").
+`--tools-scroll chemistry` (or `biology`) opens the page scrolled to that section.
+
+The chemistry tools (`Tools/Chemistry/ChemTools.cs`, a "Chemistry" section of their own just before Biology, in a
+palette of their own) were one tool until 0.3.2, the Periodic Table with its Lewis structures and Molecule builder pages
+and its element pages' atom in 3D:
+
+- **Periodic Table** (`ptable`, its key kept, so a pin of it stays the Periodic Table; `Tools/Elements/PeriodicTable.cs`):
+  the table, coloured by any property with its trends, the element under the pointer in its top, an element's own page
+  (its electrons and every fact) and the table's tour (five steps, offered the first time; Tour beside the search
+  takes it again). An element's page has **See it in 3D**, which hands it to Atoms & Orbitals in the same popup
+  (`--ptable-element Fe --ptable-atoms` presses it for a picture).
+- **Lewis Structures** (`lewis`, `Tools/Chemistry/LewisView.cs`): the Lewis maker — quick or drawn, presets, ions,
+  resonance, formal charges and checks; **Open in Molecule Builder** hands the structure shown to the Molecule Builder.
+- **Molecule Builder** (`molecule`, `Tools/Chemistry/MoleculeView.cs`): the 3D builder with VSEPR shapes.
+- **Atoms & Orbitals** (`atom`, `Tools/Elements/AtomsTool.cs`): an element typed by its symbol, name or number (← and →
+  the one before or after) as its atom (shells), a subshell's orbitals or its electron cloud, with its electrons and
+  **Open in Periodic Table**; it remembers its element and view (`SimplChem.atom.element`, `SimplChem.atom.view`).
+
+The builders and Atoms & Orbitals share one layout (`ChemLayout`): the controls and the facts in sight at every size,
+the drawing's own heading holding what to show when the drawing is over the rest. A launch's `--tool-state` names what
+each opens on: `--tool lewis --tool-state NO3-`, `--tool molecule --tool-state Ethanol`, `--tool atom --tool-state
+Fe:cloud:3d` (the element, then atom, orbitals or cloud, then the subshell; `all` for the whole cloud). The search box
+opens each by its words (`/periodic`, `/lewis`, `/molecule` or `vsepr`, `/orbitals` or `electron cloud`).
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
@@ -855,7 +878,7 @@ popups as if the student had sized them so, and `--popup-drag 300` sizes one by 
 pointer pressed there, moved 300 left and let go; CI's check, alone on the runner), the log saying its size and the
 size kept (`large popup … opens at`, `sized by its edges to`, `popup drag: …`).
 
-What each is now: a tool opened whole (its `ToolPopup`; the Periodic Table's builders are its pages in it); Knewton Alta
+What each is now: a tool opened whole (its `ToolPopup`; a tool handing something to another turns into it there); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
 review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
 Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups. The quick look and
