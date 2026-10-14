@@ -64,7 +64,7 @@ internal static class RubricPopup
 /// of the points, blooming in and — marked — bending to its marks and turning to its grades' colours; the total in the
 /// middle, or the criterion under the pointer. A slice, its name (a chip beside it), or Enter opens that criterion into
 /// its bar: its levels stacked beside it, each joined to the height of its points, the one given marked, the marker's
-/// note under them, ‹ 1 of 2 › to switch, and "Ring" beside × (or the little ring on top) to go back. ← → walk the
+/// note under them, ‹ 1 of 2 › to switch, and "Ring" beside × to go back (the little ring on top only pictures where the bar came from). ← → walk the
 /// criteria; Escape steps back, then closes; a press beside the ring closes it too. Ring or Grid at the top right
 /// (RubricGrid.cs).
 /// </summary>
@@ -230,7 +230,7 @@ internal sealed class RubricView : Grid
     {
         get
         {
-            if (open) return model.Graded ? "The bar fills to your mark; each level sits at the height of its points." : "Each level sits on the bar at the height of its points.";
+            if (open) return model.Graded ? "The bar fills to your mark; each tick is a level’s points." : "Each tick on the bar is a level’s points.";
             if (model.Graded) return "Each criterion’s colour is its mark: green for full marks, yellow to orange for part marks, red where most was lost.";
             return "Each criterion’s stretch is its share of the points. Click one to see its levels.";
         }
@@ -566,7 +566,8 @@ internal sealed class RubricView : Grid
             if (RubricGeometry.FullHeadTop(foot, heights, whole.DesiredSize.Height) is { } t) { head = whole; top = t; }
         }
         var places = geo.Places(k, foot, heights, top);
-        var bar = new RubricBarVisual(tone, model.Graded ? c.Frac : 1, foot, places, geo.MarkY(k, foot));
+        var markY = geo.MarkY(k, foot);
+        var bar = new RubricBarVisual(tone, model.Graded ? c.Frac : 1, foot, places, markY, markY != null && c.Score is { } given ? RubricRing.Num(given) : null);
         barLayer.Children.Add(bar);
         for (var i = 0; i < rows.Count; i++)
         {

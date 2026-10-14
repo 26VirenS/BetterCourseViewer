@@ -13,8 +13,9 @@ namespace Simpl.Shell;
 
 /// <summary>
 /// A place of the app in a window of its own (the Mac's File ▸ New Window and a sidebar row's Open in New Window, in its
-/// plainest form): one place's screen — a course's Grades, its Assignments, To Do — beside the main window, to keep in
-/// sight while working in the other (the instructions while handing in, the gradebook during Alta). Its screen reads,
+/// plainest form): one place's screen — a course's Grades, its Assignments, To Do — or one page's — an assignment, a page,
+/// a discussion — beside the main window, to keep in sight while working in the other (the instructions while handing
+/// in, the gradebook during Alta): from a pane row's or a list row's menu, a page's ⋯, or Ctrl+Shift+O for what shows. Its screen reads,
 /// refreshes and follows the look as the main window's do; a row opened in it opens in the main window — the app keeps one
 /// way through its places — and the main window comes forward to show it. Windows 11's window: Mica round the page, the
 /// place's name in the title bar and over the page with its commands, its own dialogs over itself.
@@ -35,13 +36,43 @@ public sealed class PlaceWindow : FluentWindow, ISheetWindow
 
     public SheetHost Sheets => sheets;
 
-    /// <summary>The place opened in a window of its own.</summary>
-    public static void Open(Engine.Engine engine, Place place) => new PlaceWindow(engine, place).Show();
+    /// <summary>Open in new window's shortcut, here and in the main window: what shows, in a window of its own.</summary>
+    public const string Gesture = "Ctrl+Shift+O";
 
-    private PlaceWindow(Engine.Engine engine, Place place)
+    /// <summary>The place opened in a window of its own.</summary>
+    public static void Open(Engine.Engine engine, Place place) => new PlaceWindow(engine, ScreenFactory.For(engine, place), () => Open(engine, place)).Show();
+
+    /// <summary>A page opened on a place — an assignment, a page, a discussion, a course's section — in a window of its own:
+    /// the instructions kept in sight while handing in elsewhere.</summary>
+    public static void Open(Engine.Engine engine, Route route) => new PlaceWindow(engine, ScreenFactory.For(engine, route), () => Open(engine, route)).Show();
+
+    /// <summary>What the main window shows (the page on top of its place, or the place) in a window of its own.</summary>
+    public static void OpenCurrent(Engine.Engine engine)
+    {
+        var at = engine.Nav.Current;
+        if (at.Path.Count > 0) Open(engine, at.Path[^1]);
+        else Open(engine, at.Place);
+    }
+
+    /// <summary>"Open in new window" for a row or a page of the school's that has a screen of the app's own (an
+    /// assignment, a page, a discussion, a course's section); null for one that has none (a file, another site).</summary>
+    public static System.Windows.Controls.MenuItem? MenuItem(Engine.Engine engine, string? url, string title, bool gesture = false)
+    {
+        if (string.IsNullOrEmpty(url) || engine.NativeRoute(url, title) is not { } route) return null;
+        var item = new System.Windows.Controls.MenuItem { Header = "Open in new window", Icon = new SymbolIcon { Symbol = SymbolRegular.WindowNew24 } };
+        if (gesture) item.InputGestureText = Gesture;
+        item.Click += (_, _) => Open(engine, route);
+        return item;
+    }
+
+    /// <summary>This window's page opened again in another (its shortcut pressed here).</summary>
+    private readonly Action again;
+
+    private PlaceWindow(Engine.Engine engine, Screen screen, Action again)
     {
         this.engine = engine;
-        screen = ScreenFactory.For(engine, place);
+        this.screen = screen;
+        this.again = again;
         Title = screen.Title;
         WindowBackdropType = Appearance.Backdrop;
         ExtendsContentIntoTitleBar = true;
@@ -150,9 +181,11 @@ public sealed class PlaceWindow : FluentWindow, ISheetWindow
         Header();
     }
 
-    /// <summary>Escape: the screen's (a panel folded back), else nothing — the window stays until it is closed.</summary>
+    /// <summary>Escape: the screen's (a panel folded back), else nothing — the window stays until it is closed;
+    /// Ctrl+Shift+O, this page in another window.</summary>
     private void OnKey(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape && !sheets.IsOpen && screen.Escape()) e.Handled = true;
+        else if (e.Key == Key.O && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)) { again(); e.Handled = true; }
     }
 }

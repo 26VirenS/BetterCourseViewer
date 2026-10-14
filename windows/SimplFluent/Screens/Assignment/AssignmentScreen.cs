@@ -227,7 +227,7 @@ public sealed partial class AssignmentScreen : Screen
                 var b = K.Button(step.Title, () => Act(d, step), icon: step.Symbol);
                 b.MinWidth = 0;
                 b.ToolTip = step.Help;
-                b.IsEnabled = !step.Pending;
+                b.IsEnabled = !step.Pending && !step.Off;
                 b.Visibility = actionInView ? Visibility.Collapsed : Visibility.Visible;
                 headerStep = b;
                 bar.Children.Add(b);
@@ -236,6 +236,11 @@ public sealed partial class AssignmentScreen : Screen
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () =>
             {
                 var m = new ContextMenu { PlacementTarget = more, Placement = PlacementMode.Bottom };
+                // (the instructions in a window of their own, kept in sight while handing in or working elsewhere)
+                var apart = new System.Windows.Controls.MenuItem { Header = "Open in new window", Icon = new SymbolIcon { Symbol = SymbolRegular.WindowNew24 }, InputGestureText = Shell.PlaceWindow.Gesture };
+                apart.Click += (_, _) => Shell.PlaceWindow.Open(engine, Route.Assignment(course, id));
+                m.Items.Add(apart);
+                m.Items.Add(new Separator());
                 m.Items.Add(AssignKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(CanvasUrl, Title)));
                 m.Items.Add(AssignKit.Item("Copy link", SymbolRegular.Link24, () => { if (engine.Absolute(CanvasUrl) is { } u) AssignKit.Copy(u.ToString()); }));
                 m.IsOpen = true;
@@ -308,6 +313,10 @@ public sealed partial class AssignmentScreen : Screen
         var used = room >= TwoFrom ? Math.Min(room, ReadMax + Gap + SideWidth(room)) : room;
         return Math.Min(w + 80, used + 2 * PadOf(w));
     }
+
+    /// <summary>The heading as wide as the two columns (a reading column and the side beside it), so Previous, Next and ⋯
+    /// end where the side column does on a wide window, not at the window's far edge.</summary>
+    public override double? HeaderWidth => Width > 0 ? Math.Max(0, RootWidthOf(Width) - 2 * Pad) : null;
 
     protected override bool LayoutChanges(double before, double now)
     {
@@ -405,7 +414,7 @@ public sealed partial class AssignmentScreen : Screen
 
     private static SymbolRegular KindGlyph(string? kind) => (kind ?? "").ToLowerInvariant() switch
     {
-        "quiz" => SymbolRegular.TaskListLtr24,
+        "quiz" => Glyph.Work("quiz"),
         "discussion" => SymbolRegular.ChatMultiple24,
         "tool" => SymbolRegular.PuzzlePiece24,
         _ => SymbolRegular.DocumentText24,
@@ -511,8 +520,12 @@ public sealed partial class AssignmentScreen : Screen
     /// <summary>A quiz with an attempt in: handed in, or graded.</summary>
     private static bool QuizTaken(AssignmentData d) => !string.IsNullOrEmpty(d.Submitted) || d.Grade != null;
 
-    /// <summary>The one thing to do next (the lit one, where there are two).</summary>
-    private AssignStep? NextStepOf(AssignmentData d) => NextSteps(d).LastOrDefault();
+    /// <summary>The one thing to do next (the lit one, where there are two; never a step that cannot be taken, where there
+    /// is another).</summary>
+    private AssignStep? NextStepOf(AssignmentData d) => NextSteps(d) is var all && all.LastOrDefault(s => !s.Off) is { } one ? one : all.LastOrDefault();
+
+    /// <summary>New attempt was held beside See feedback while the quiz's own count was read.</summary>
+    private bool againHeld;
 
     /// <summary>What to do next: hand in (again), take the quiz, open the discussion or the tool. A quiz taken: See
     /// feedback where its results can be seen, and New attempt beside it while an attempt is left — New attempt alone where
@@ -524,14 +537,22 @@ public sealed partial class AssignmentScreen : Screen
         if (d.QuizId != null && QuizTaken(d))
         {
             var underWay = quizIntro?.Begin.StartsWith("Continue") == true;
-            if (underWay) return new() { new AssignStep("Continue quiz", SymbolRegular.TaskListLtr24, "Go back to the attempt under way", Again: true) };
+            if (underWay) return new() { new AssignStep("Continue quiz", Glyph.Work("quiz"), "Go back to the attempt under way", Again: true) };
             // (before the intro is in: its feedback, as the quiz was taken)
             var asking = quizIntro == null && !quizIntroFailed;
             var feedback = quizIntro == null || quizIntro.Last?.Feedback == true;
             var again = quizIntro != null ? quizIntro.CanStart : asking && AttemptLeft(d);
             var o = new List<AssignStep>();
             if (feedback) o.Add(new AssignStep("See feedback", SymbolRegular.Comment24, "See your last attempt’s results", "Feedback", Feedback: true));
-            if (again) o.Add(new AssignStep("New attempt", SymbolRegular.ArrowCounterclockwise24, asking ? "Checking the attempts left…" : "Take this quiz again", "Retake", Again: true, Pending: asking));
+            if (again)
+            {
+                o.Add(new AssignStep("New attempt", SymbolRegular.ArrowCounterclockwise24, asking ? "Checking the attempts left…" : "Take this quiz again", "Retake", Again: true, Pending: asking));
+                if (asking) againHeld = true;
+            }
+            // (the place New attempt was held in while the quiz was asked, kept once it says no attempt is left — the
+            //  button greyed, saying so — so See feedback never grows into its room as the answer comes)
+            else if (againHeld && quizIntro != null && feedback)
+                o.Add(new AssignStep("No attempts left", SymbolRegular.ArrowCounterclockwise24, string.IsNullOrEmpty(quizIntro.AttemptsText) ? "Every attempt this quiz allows is used" : quizIntro.AttemptsText!, "None left", Again: true, Off: true));
             if (o.Count > 0) return o;
         }
         if (d.CanSubmit && d.Resubmit == true && HasWork(d))
@@ -558,22 +579,22 @@ public sealed partial class AssignmentScreen : Screen
             return d.Resubmit == true
                 ? new AssignStep("Hand in again", SymbolRegular.ArrowUpload24, "Hand in this assignment again", "Hand in")
                 : new AssignStep("Hand in", SymbolRegular.ArrowUpload24, "Hand in this assignment");
-        if (d.QuizUrl != null) return new AssignStep("Take quiz", SymbolRegular.TaskListLtr24, "Take this quiz");
+        if (d.QuizUrl != null) return new AssignStep("Take quiz", Glyph.Work("quiz"), "Take this quiz");
         if (d.DiscussionUrl != null) return new AssignStep("Open discussion", SymbolRegular.ChatMultiple24, "Open this assignment’s discussion");
         if (d.ToolUrl != null)
             return d.LtiQuiz == true
-                ? new AssignStep("Take quiz", SymbolRegular.TaskListLtr24, "Open this quiz in a window of its own")
+                ? new AssignStep("Take quiz", Glyph.Work("quiz"), "Open this quiz in a window of its own")
                 : new AssignStep("Open tool", SymbolRegular.PuzzlePiece24, "Open this assignment’s tool in a window of its own");
         return null;
     }
 
     private void Act(AssignmentData d, AssignStep? step = null)
     {
-        if (step is { Pending: true }) return; // (the quiz's attempts still being read)
+        if (step is { Pending: true } or { Off: true }) return; // (the quiz's attempts still being read)
         if (step is { Feedback: true } && d.QuizId == null) Review(d, d.Submission?.Files?.FirstOrDefault()); // (work handed in, looked at in the popup)
         else if (step != null && d.QuizId is { } q && (step.Feedback || step.Again))
             engine.OpenQuiz(new QuizLaunch(course, q, d.Title) { Begin = step.Again, Feedback = step.Feedback });
-        else if (NextSteps(d).LastOrDefault(x => !x.Pending) is { } s && (s.Feedback || s.Again)) Act(d, s);
+        else if (NextSteps(d).LastOrDefault(x => !x.Pending && !x.Off) is { } s && (s.Feedback || s.Again)) Act(d, s);
         else if (d.CanSubmit) OpenHandIn(d);
         else if (d.QuizId is { } quiz) engine.OpenQuiz(new QuizLaunch(course, quiz, d.Title));
         else if (d.QuizUrl is { } qu) engine.GoTo(qu, d.Title);

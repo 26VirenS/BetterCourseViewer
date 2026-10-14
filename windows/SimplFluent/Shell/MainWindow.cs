@@ -54,6 +54,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     public void StartTour() => tour?.Start();
 
     private Engine.Engine? engine;
+
+    /// <summary>The school's engine, once there is one (a sheet over the window that puts the title bar's pins in its own
+    /// heading: ChemSheet).</summary>
+    internal Engine.Engine? School => engine;
+
     private AppShell? shell;
     private SchoolPickerView? picker;
     private SignInCard? card;
@@ -477,6 +482,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (sheets.IsOpen) return;
         // (Escape ends the tour wherever the keyboard is; it counts as seen)
         if (e.Key == Key.Escape && tour?.On == true) { tour.Skip(); e.Handled = true; return; }
+        // (the app's own shortcuts wait while the tour is up, as its veil keeps the pointer off the app: Ctrl+K's palette
+        //  would take the keyboard from the tour's card; the card's Enter and arrows are its own)
+        if (tour?.On == true) return;
         var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
         if (e.Key == Key.Escape && shell != null && shell.Escape()) { e.Handled = true; return; }
@@ -488,6 +496,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
         if (ctrl && e.Key == Key.K) { shell?.OpenCommands(); e.Handled = true; return; }
         if (ctrl && shift && e.Key == Key.N) { if (engine is { OnBrightspace: false }) engine.AskNewMessage(); e.Handled = true; return; }
+        // (what shows — an assignment, a course's Grades — in a window of its own, to keep beside the work)
+        if (ctrl && shift && e.Key == Key.O) { if (engine != null) PlaceWindow.OpenCurrent(engine); e.Handled = true; return; }
         // (the Mac's ⌘1–⌘7: the pane's places in order)
         if (ctrl && !shift && engine != null && e.Key is >= Key.D1 and <= Key.D7)
         {

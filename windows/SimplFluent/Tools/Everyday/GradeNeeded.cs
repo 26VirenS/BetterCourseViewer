@@ -223,7 +223,7 @@ internal sealed class GradeNeededTool
         // ---- the answer ----
         var results = K.V(24, answer, Everyday.Section("Every letter", letters));
 
-        View = Everyday.Page(ToolKit.Columns(inputs, results, 420, 980));
+        View = Everyday.Page(ToolKit.Columns(inputs, results, 380, 860, sideFirst: true));
         Start(c);
         Update();
         Everyday.Follow(View, () => { s.Changed += Update; engine.PropertyChanged += OnEngine; Update(); },

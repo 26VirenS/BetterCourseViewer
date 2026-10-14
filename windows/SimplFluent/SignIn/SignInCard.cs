@@ -45,9 +45,22 @@ public sealed class SignInCard : Grid
         var lockTile = K.IconTile(SymbolRegular.LockClosed24, Appearance.Accent, 48, solid: true);
         lockTile.HorizontalAlignment = HorizontalAlignment.Center;
         lockTile.CornerRadius = new CornerRadius(12);
-        // (a long school name wraps, centred, rather than being cut)
-        var title = K.Wrapped(SchoolName.For(engine.Host) is { } school ? $"Sign in to {school}" : "Sign in to your school", Ty.Subtitle).Center();
-        title.TextAlignment = TextAlignment.Center;
+        // ("Sign in to" over the school's name, the name on a line of its own — wrapped, centred, never cut, and never
+        //  with its last word left alone under the rest: "Sign in to University of California," / "Merced")
+        FrameworkElement title;
+        if (SchoolName.For(engine.Host) is { } school)
+        {
+            var lead = K.Text("Sign in to", Ty.Body, B.Text2).Center();
+            var name = K.Wrapped(school, Ty.Subtitle).Center();
+            name.TextAlignment = TextAlignment.Center;
+            title = K.V(2, lead, name);
+        }
+        else
+        {
+            var t = K.Wrapped("Sign in to your school", Ty.Subtitle).Center();
+            t.TextAlignment = TextAlignment.Center;
+            title = t;
+        }
         host = K.Text("", Ty.Caption, B.Text2).Center();
 
         user.TextChanged += (_, _) => Ready();
@@ -107,6 +120,9 @@ public sealed class SignInCard : Grid
         {
             var icon = K.Icon(SymbolRegular.ErrorCircle24, 14, B.Critical, filled: true);
             icon.Margin = new Thickness(0, 0, 6, -2);
+            // (the symbol in the line's own red, light or dark: a resource set on it inside the line's words never
+            //  resolves there, and it fell back to black)
+            icon.SetBinding(System.Windows.Controls.Control.ForegroundProperty, new System.Windows.Data.Binding(nameof(TextBlock.Foreground)) { Source = note });
             note.Inlines.Add(new System.Windows.Documents.InlineUIContainer(icon) { BaselineAlignment = BaselineAlignment.Center });
             note.Inlines.Add(new System.Windows.Documents.Run(error));
             note.Fg(B.Critical);

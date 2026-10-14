@@ -38,7 +38,7 @@ internal sealed class PTCell : Border
     public readonly PTElement Element;
     private readonly bool compact;
     private readonly TextBlock number, symbol, word;
-    private readonly Viewbox wordFit;
+    private readonly Viewbox numberFit, wordFit;
     private readonly SolidColorBrush fill = new(Colors.Transparent);
     private readonly SolidColorBrush edge = new(Colors.Transparent);
     private readonly ScaleTransform zoom = new(1, 1);
@@ -53,12 +53,14 @@ internal sealed class PTCell : Border
         number = Line(e.Number.ToString(CultureInfo.InvariantCulture), FontWeights.Medium).Tabular();
         number.HorizontalAlignment = HorizontalAlignment.Left;
         number.Opacity = 0.75;
+        // (narrowed to the square when it holds a value: "0.09 g/L" is wider than a small square)
+        numberFit = PTKit.Fit(number, HorizontalAlignment.Left);
         symbol = Line(e.Symbol, FontWeights.Bold);
         symbol.HorizontalAlignment = HorizontalAlignment.Center;
         word = Line(e.Name, FontWeights.Normal).Tabular();
         wordFit = PTKit.Fit(word);
         wordFit.Opacity = 0.8;
-        Child = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { number, symbol, wordFit } };
+        Child = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { numberFit, symbol, wordFit } };
         Background = fill;
         BorderBrush = edge;
         BorderThickness = new Thickness(compact ? 1 : 1.5);
@@ -88,8 +90,20 @@ internal sealed class PTCell : Border
         Font(number, size * 0.19);
         Font(symbol, size * (compact ? 0.48 : 0.36));
         Font(word, size * 0.14);
-        number.Visibility = !compact && size >= 34 ? Visibility.Visible : Visibility.Collapsed;
+        numberFit.Visibility = !compact && size >= 34 ? Visibility.Visible : Visibility.Collapsed;
         wordFit.Visibility = !compact && size >= 48 ? Visibility.Visible : Visibility.Collapsed;
+        TopLine();
+    }
+
+    /// <summary>
+    /// The square's top line: its number — or, the table coloured by a property and the square too small for a third
+    /// line (under 48), the value in its place, since in a trend the values are what is read (the Mac's rule as well).
+    /// </summary>
+    private void TopLine()
+    {
+        var value = colouring.Scaled() && cell < 48;
+        number.Text = value ? colouring.Text(Element) : Element.Number.ToString(CultureInfo.InvariantCulture);
+        number.Opacity = value ? 0.92 : 0.75;
     }
 
     /// <summary>Its colour and marks for the view, the search and the kind lit.</summary>
@@ -107,6 +121,7 @@ internal sealed class PTCell : Border
             word.Text = c == PTColouring.Category ? Element.Name : c.Text(Element);
             if (c != PTColouring.Category) { word.Foreground = Brushes.White; number.Foreground = Brushes.White; symbol.Foreground = Brushes.White; }
             else { word.Fg(B.Text); number.Fg(B.Text); symbol.Fg(B.Text); }
+            TopLine();
         }
         Fill(animate && changed);
         if (animate) Motion.To(this, OpacityProperty, dim ? 0.22 : 1, Motion.Normal);
@@ -156,6 +171,9 @@ internal sealed class PTGrid : Panel
     private PTColouring shownColouring;
     private double cornerCell = -1;
     private PTCell? down;
+    /// <summary>Where the pointer last was, on the screen, and the element it was last on.</summary>
+    private Point? pointer;
+    private PTElement? pointed;
 
     /// <summary>A press on an element, with its square's place in the table.</summary>
     public Action<PTElement, Rect>? Pick;
@@ -170,11 +188,22 @@ internal sealed class PTGrid : Panel
         this.compact = compact;
         Children.Add(corner);
         Panel.SetZIndex(corner, 2);
+        // (only the pointer moving changes the element shown: the table resizing or moving under a pointer that is still —
+        //  as it fits its page — raises enters and leaves too, and those would put in an element nobody pointed at, or
+        //  take away the one that was)
+        Loaded += (_, _) => Pointer();
+        PreviewMouseMove += (_, a) =>
+        {
+            // (a pointer that moves on a square it was already over when the table moved under it: that square now)
+            if (!Pointer()) return;
+            for (var o = a.OriginalSource as DependencyObject; o != null && o != this; o = VisualTreeHelper.GetParent(o))
+                if (o is PTCell c) { if (c.Element.Number != pointed?.Number) PointedAt(c.Element); return; }
+        };
         foreach (var e in PeriodicTable.Elements)
         {
             var c = new PTCell(e, compact);
-            c.MouseEnter += (_, _) => { leave.Stop(); Hover?.Invoke(c.Element); };
-            c.MouseLeave += (_, _) => leave.Start();
+            c.MouseEnter += (_, _) => { if (Pointer()) PointedAt(c.Element); };
+            c.MouseLeave += (_, _) => { if (Pointer()) leave.Start(); };
             c.PreviewMouseLeftButtonDown += (_, _) => down = c;
             c.MouseLeftButtonUp += (_, a) =>
             {
@@ -187,7 +216,7 @@ internal sealed class PTGrid : Panel
             cells.Add(c);
             Children.Add(c);
         }
-        leave.Tick += (_, _) => { leave.Stop(); Hover?.Invoke(null); };
+        leave.Tick += (_, _) => { leave.Stop(); pointed = null; Hover?.Invoke(null); };
         if (!compact)
         {
             // (the gap over the transition metals, rows 1–3: where the tour's card can sit over the table without hiding
@@ -199,6 +228,26 @@ internal sealed class PTGrid : Panel
             Children.Add(actinides);
         }
         Paint(PTColouring.Category, null, null, false);
+    }
+
+    /// <summary>The element the pointer came onto.</summary>
+    private void PointedAt(PTElement e)
+    {
+        leave.Stop();
+        pointed = e;
+        Hover?.Invoke(e);
+    }
+
+    /// <summary>Where the pointer is on the screen, noted: whether it has moved since it was last noted.</summary>
+    private bool Pointer()
+    {
+        if (PresentationSource.FromVisual(this) == null) return true;
+        Point at;
+        try { at = PointToScreen(Mouse.GetPosition(this)); }
+        catch (InvalidOperationException) { return true; }
+        var moved = pointer is not { } was || Math.Abs(was.X - at.X) > 0.5 || Math.Abs(was.Y - at.Y) > 0.5;
+        pointer = at;
+        return moved;
     }
 
     private static TextBlock RowLabel(string s)
@@ -225,6 +274,8 @@ internal sealed class PTGrid : Panel
     public void Show(PTElement? e, PTColouring colouring)
     {
         if (e?.Number == shown?.Number && colouring == shownColouring && Math.Abs(cornerCell - Cell) < 0.5) return;
+        // (in a picture run, what the table's top shows each time it changes: CI checks ptable-hover's last one is Fe)
+        if (Shot.Asked && !compact && e?.Number != shown?.Number) Log.Write($"ptable hover card: {e?.Symbol ?? "none"}");
         shown = e;
         shownColouring = colouring;
         cornerCell = Cell;
@@ -395,7 +446,7 @@ internal sealed class PeriodicTableTool : Grid
             var p = grid.TranslatePoint(new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2), this);
             OpenElement(e, p);
         };
-        hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.", Ty.Body, B.Text2);
+        hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Enter to open it.", Ty.Body, B.Text2);
         tablePage = ToolKit.Page(K.V(14, offerHost, top, colourRow, trendGrid, hint));
         tablePage.SizeChanged += (_, _) => FitTable();
         foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint }) part.SizeChanged += (_, _) => FitTable();
@@ -810,6 +861,9 @@ internal sealed class PeriodicTableTool : Grid
                 Motion.FromTo(s, ScaleTransform.ScaleYProperty, 0.06, 1, 460, Motion.Gentle);
                 Motion.FromTo(pageHost, OpacityProperty, 0, 1, Motion.Medium);
                 Motion.To(under, OpacityProperty, 0, Motion.Normal, done: () => { if (v == version) under.Visibility = Visibility.Collapsed; });
+                // (the pages bar goes with the page under it: the element's page has its own way back and its own row at
+                //  the top, which the bar's Table and Tour would otherwise show through)
+                Motion.To(pagesBar, OpacityProperty, 0, Motion.Normal, done: () => { if (v == version) pagesBar.Visibility = Visibility.Collapsed; });
             }
             else
             {
@@ -817,10 +871,19 @@ internal sealed class PeriodicTableTool : Grid
                 pageHost.Opacity = 1;
                 pageHost.RenderTransform = Transform.Identity;
                 under.Visibility = Visibility.Collapsed;
+                pagesBar.BeginAnimation(OpacityProperty, null);
+                pagesBar.Visibility = Visibility.Collapsed;
             }
             return;
         }
         under.Visibility = Visibility.Visible;
+        // (the pages bar back with the page it names)
+        pagesBar.Visibility = Visibility.Visible;
+        if (pagesBar.Opacity < 1 || pagesBar.HasAnimatedProperties)
+        {
+            if (animate && Motion.On) Motion.To(pagesBar, OpacityProperty, 1, Motion.Page, Motion.Out);
+            else { pagesBar.BeginAnimation(OpacityProperty, null); pagesBar.Opacity = 1; }
+        }
         if (pageHost.Visibility == Visibility.Visible && animate && Motion.On)
         {
             var s = pageHost.RenderTransform as ScaleTransform ?? new ScaleTransform(1, 1);
@@ -1186,7 +1249,7 @@ internal sealed class PTHeaderControls : ContentControl
         };
         var close = K.IconButton(SymbolRegular.DismissCircle24, Close, "Close the search", 16, 32);
         var row = K.H(4, f, close);
-        row.ToolTip = "Light the elements that match; Return opens the first";
+        row.ToolTip = "Light the elements that match; Enter opens the first";
         row.TourTarget("ptSearch");
         field = f;
         fieldBox = row;

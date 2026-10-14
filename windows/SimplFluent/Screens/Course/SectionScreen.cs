@@ -157,7 +157,7 @@ internal sealed class CourseQuizzesPart : CourseListPart<RowsData>
     protected override FrameworkElement Content(RowsData d)
     {
         var color = K.Hex(d.Color);
-        if (d.Rows.Count == 0) return CourseKit.EmptyCard(d.Empty ?? "No quizzes", SymbolRegular.TaskListLtr24);
+        if (d.Rows.Count == 0) return CourseKit.EmptyCard(d.Empty ?? "No quizzes", Glyph.Work("quiz"));
         return CourseKit.RowsCard(CourseKit.Divided(d.Rows, r => WorkLink(r, color)));
     }
 }

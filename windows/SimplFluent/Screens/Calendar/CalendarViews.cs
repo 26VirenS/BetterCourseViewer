@@ -21,6 +21,13 @@ public sealed partial class CalendarScreen
     /// <summary>A line of an item on the month's grid: a caption line (16) and its padding, and the gap under it.</summary>
     private const double ChipLine = 20;
 
+    /// <summary>The shortest a day of the month is drawn (its number and three lines), however short the window: the page
+    /// scrolls below that.</summary>
+    private const double MinCell = 96;
+
+    /// <summary>Room kept under the month's last week, inside the page's view.</summary>
+    private const double MonthFoot = 12;
+
     // ---- Month ----
 
     /// <summary>The month's grid with the day picked beside it on a wide page, under it on a narrow one.</summary>
@@ -50,15 +57,50 @@ public sealed partial class CalendarScreen
         }
         var days = new Grid();
         var weeks = WeekCount(anchor);
-        var height = Math.Floor(6 * CellHeight / weeks);
+        // (at most a six-week month's height; less where the page shows less, so the month's last week is in view, its
+        //  days never shorter than MinCell)
+        var most = Math.Floor(6 * CellHeight / weeks);
+        var height = most;
         for (var i = 0; i < 7; i++) days.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         for (var w = 0; w < weeks; w++) days.RowDefinitions.Add(new RowDefinition { Height = new GridLength(height) });
         var first = FirstOfWeek(anchor);
-        for (var i = 0; i < weeks * 7; i++)
+        void Cells()
         {
-            var day = first.AddDays(i);
-            days.Children.Add(DayCell(day, EventsOn(byDay, day), height).Col(i % 7).Row(i / 7));
+            days.Children.Clear();
+            for (var i = 0; i < weeks * 7; i++)
+            {
+                var day = first.AddDays(i);
+                days.Children.Add(DayCell(day, EventsOn(byDay, day), height).Col(i % 7).Row(i / 7));
+            }
         }
+        Cells();
+        // (the days as tall as the page shows from the grid's top down, measured on the page's own scroller — and again as
+        //  the window's height changes)
+        ScrollViewer? page = null;
+        void Fit()
+        {
+            if (page is not { ViewportHeight: > 0, Content: UIElement content } || !days.IsLoaded) return;
+            double top;
+            try { top = days.TranslatePoint(new Point(0, 0), content).Y; }
+            catch (InvalidOperationException) { return; }
+            var h = Math.Clamp(Math.Floor((page.ViewportHeight - top - MonthFoot) / weeks), MinCell, most);
+            if (Math.Abs(h - height) < 1) return;
+            height = h;
+            foreach (var r in days.RowDefinitions) r.Height = new GridLength(h);
+            // (the grid's first item, for the screenshot suite's preview, is the one drawn now)
+            if (firstItem is { } f && days.IsAncestorOf(f.At)) firstItem = null;
+            Cells();
+        }
+        void Sized(object? s, SizeChangedEventArgs e) { if (e.HeightChanged) Fit(); }
+        days.Loaded += (_, _) =>
+        {
+            for (DependencyObject? d = days; d != null; d = VisualTreeHelper.GetParent(d)) if (d is ScrollViewer sv && !ReferenceEquals(sv, days)) { page = sv; break; }
+            if (page == null) return;
+            page.SizeChanged -= Sized;
+            page.SizeChanged += Sized;
+            days.Dispatcher.BeginInvoke(Fit, System.Windows.Threading.DispatcherPriority.Loaded);
+        };
+        days.Unloaded += (_, _) => { if (page != null) page.SizeChanged -= Sized; };
         // (the cells' own gaps at the grid's edges let go, so it lines up with what is under it; a month sliding in is
         // seen inside it only)
         var clip = new Border { Child = days, ClipToBounds = true, Margin = new Thickness(-2) };
@@ -129,6 +171,9 @@ public sealed partial class CalendarScreen
             : new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 2, 6, 2), Background = K.Brush(K.WithAlpha(K.Hex(ev.Color), grey ? 0.55 : 1)) };
         var title = lines > 1 ? K.Wrapped(ev.Title, Ty.Caption, grey ? B.Text2 : missing ? B.Critical : B.Text, lines) : K.Text(ev.Title, Ty.Caption, grey ? B.Text2 : missing ? B.Critical : B.Text);
         if (lines <= 1) title.TextTrimming = TextTrimming.CharacterEllipsis;
+        // (two lines broken between words only: a word too long for the line ends in "…", never split — "Composition"
+        //  rather than "Compositi / on")
+        else { title.TextWrapping = TextWrapping.WrapWithOverflow; title.TextTrimming = TextTrimming.CharacterEllipsis; }
         if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
         var g = K.Columns("auto, *", mark.Col(0), title.Col(1));
         var b = K.Subtle(g, null, new Thickness(3, 1, 4, 1), 5);
@@ -222,7 +267,7 @@ public sealed partial class CalendarScreen
             b.ContextMenu = m;
         }
         peek.Anchor(b, ev);
-        firstItem ??= (ev, b);
+        if (PreviewOf is not { } want || ev.Title.Contains(want, StringComparison.OrdinalIgnoreCase)) firstItem ??= (ev, b);
     }
 
     // ---- Week ----

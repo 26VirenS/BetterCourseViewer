@@ -232,7 +232,10 @@ public sealed class SetupSheet
             cb.Checked += (_, _) => { chosen.Add(id); count.Text = $"{chosen.Count} of {data.Courses.Count} selected"; Footer(); };
             cb.Unchecked += (_, _) => { chosen.Remove(id); count.Text = $"{chosen.Count} of {data.Courses.Count} selected"; Footer(); };
             if (rows.Children.Count > 0) rows.Children.Add(K.Divider());
-            rows.Children.Add(cb.Margin(16, 8, 16, 8));
+            // (rows about 40 tall, a one-line course each: the eight courses of most terms in view at once on a 1024×681
+            //  window, nothing under the footer)
+            cb.MinHeight = 28;
+            rows.Children.Add(cb.Margin(16, 4, 16, 4));
         }
         var list = K.V(8, bar.Margin(2, 0, 2, 0), K.Card(rows, new Thickness(0), 4));
         return K.Rows("auto, *", head.Row(0), Scroll(list).Row(1));

@@ -131,7 +131,7 @@ internal sealed class PaletteCommand
             C("notifications", ["alerts", "activity"], "Notifications", "What’s new in your courses", SymbolRegular.Alert24, PaletteAction.Go(Place.Notifications), "Ctrl+5"),
         };
         if (canvas) c.Add(C("inbox", ["messages", "mail", "conversations"], "Inbox", "Your messages", SymbolRegular.Mail24, PaletteAction.Go(Place.Inbox), "Ctrl+6"));
-        c.Add(C("courses", ["classes"], "All Courses", "Every course you are in", SymbolRegular.Library24, PaletteAction.Go(Place.Courses)));
+        c.Add(C("courses", ["classes"], "All courses", "Every course you are in", SymbolRegular.Library24, PaletteAction.Go(Place.Courses)));
         c.Add(C("course", ["class", "go", "open"], "Open a course", "A course — or one of its sections: /course bio files", SymbolRegular.Book24,
             takes: "‹course› ‹section›", lists: PaletteLists.Courses));
         if (canvas)
@@ -140,12 +140,12 @@ internal sealed class PaletteCommand
             c.Add(C("group", ["team"], "Open a group", "One of your groups", SymbolRegular.PeopleTeam24, takes: "‹group›", lists: PaletteLists.Groups));
         }
         c.Add(C("tools", ["tool", "widgets", "timer", "calculator"], "Tools", "Timer, calculator, flashcards and more", SymbolRegular.Toolbox24, PaletteAction.Go(Place.Tools), "Ctrl+7"));
-        c.Add(C("external", ["external tools", "lti", "apps"], "External Tools", "Every tool your courses use", SymbolRegular.PuzzlePiece24, PaletteAction.Go(Place.ExternalTools)));
+        c.Add(C("external", ["external tools", "lti", "apps"], "External tools", "Every tool your courses use", SymbolRegular.PuzzlePiece24, PaletteAction.Go(Place.ExternalTools)));
         c.Add(C("due", ["upcoming", "soon", "week"], "Due", "What is due: today, tomorrow, this week, or by name", SymbolRegular.Clock24,
             takes: "‹when or name›", lists: PaletteLists.Due));
         c.Add(C("overdue", ["late", "missing"], "Overdue", "Past its date and not handed in", SymbolRegular.ErrorCircle24, takes: "‹name›", lists: PaletteLists.Overdue));
         c.Add(C("assignment", ["hw", "homework", "assignments"], "Assignments", "Find an assignment", SymbolRegular.DocumentText24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
-        c.Add(C("quiz", ["quizzes", "test", "exam"], "Quizzes", "Find a quiz", SymbolRegular.TaskListSquareLtr24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
+        c.Add(C("quiz", ["quizzes", "test", "exam"], "Quizzes", "Find a quiz", Simpl.Kit.Glyph.Work("quiz"), takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
         c.Add(C("announcement", ["ann", "news", "announcements"], "Announcements", "Find an announcement", SymbolRegular.Megaphone24, takes: "‹words›", lists: PaletteLists.Kinds, kinds: ["Announcements"]));
         c.Add(C("discussion", ["disc", "thread", "discussions"], "Discussions", "Find a discussion", SymbolRegular.ChatMultiple24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Discussions"]));
         c.Add(C("page", ["wiki", "pages"], "Pages", "Find a page in your courses", SymbolRegular.DocumentOnePage24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Pages"]));

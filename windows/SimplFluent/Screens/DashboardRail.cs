@@ -219,7 +219,8 @@ public sealed partial class DashboardScreen
             bar.Width = 56;
             var line = K.Columns("auto, *, auto, auto",
                 K.Dot(color, 8).Col(0),
-                K.Text(r.Code, Ty.Body).Margin(8, 0, 10, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1),
+                // (a long code on two lines rather than cut short)
+                K.Wrapped(r.Code, Ty.Body, B.Text, 2).Margin(8, 0, 10, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1),
                 bar.Margin(0, 0, 10, 0).Col(2),
                 K.Text(words, Ty.Caption, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
             var id = r.Id;

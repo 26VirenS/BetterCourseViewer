@@ -108,7 +108,8 @@ internal sealed class QuizReviewPane : IQuizPane
 
     private FrameworkElement Row(QuizQuestion q)
     {
-        var line = K.Wrapped(q.Plain.Length == 0 ? q.Name : q.Plain, Ty.Body, B.Text, 2);
+        // (a letter with a mark of maths over it — "such as v⃗?" — drawn in a face that has the mark, never a box)
+        var line = K.Wrapped(q.Plain.Length == 0 ? q.Name : q.Plain, Ty.Body, B.Text, 2).Marked();
         var meta = K.H(6, K.Text($"Question {q.N}", Ty.Caption, B.Text2));
         if (q.Flagged)
         {
@@ -142,7 +143,7 @@ internal sealed class QuizReviewPane : IQuizPane
     {
         if (q.Kind == "info") return K.Text("Information only", Ty.Caption, B.Text2);
         TextBlock t;
-        if (q.Summary is { } sum) { t = K.Wrapped(sum, Ty.BodyStrong, B.Text, 2); t.Foreground = QuizUi.Ink(s.Tint); }
+        if (q.Summary is { } sum) { t = K.Wrapped(sum, Ty.BodyStrong, B.Text, 2).Marked(); t.Foreground = QuizUi.Ink(s.Tint); }
         else { t = K.Text("Not answered", Ty.BodyStrong); t.Foreground = QuizUi.Ink(QuizUi.Red); }
         t.TextAlignment = TextAlignment.Right;
         return t;

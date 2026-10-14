@@ -293,7 +293,7 @@ internal sealed class QuizSheet
     {
         var stage = Run.Now;
         title.Text = TitleNow;
-        tileHost.Content = K.IconTile(SymbolRegular.TaskListLtr24, Tint, 32);
+        tileHost.Content = K.IconTile(Glyph.Work("quiz"), Tint, 32);
         var context = Run.Attempt?.Context ?? Run.Intro?.Context ?? "";
         var attempt = Run.Attempt is { } a ? $"Attempt {a.Attempt}" : "";
         string[] parts = stage switch

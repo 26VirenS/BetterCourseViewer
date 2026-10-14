@@ -76,6 +76,44 @@ public static class K
     public static readonly FontFamily SmallFace = new("Segoe UI Variable Small, Segoe UI");
     public static readonly FontFamily DisplayFace = new("Segoe UI Variable Display, Segoe UI");
 
+    /// <summary>The face for a letter with a mark of maths over it (v⃗, â, x̄): Segoe UI has no combining arrow (U+20D7)
+    /// and draws a box in its place; Cambria Math has every one.</summary>
+    public static readonly FontFamily MarkFace = new("Cambria Math, Segoe UI");
+
+    private static bool IsMark(char c) => c is >= '̀' and <= 'ͯ' or >= '⃐' and <= '⃿';
+
+    /// <summary>Words as runs, each letter that carries a combining mark (and its marks) in <see cref="MarkFace"/>, the rest
+    /// in the text's own face: the engine's plain text of a question keeps TeX's accents ("such as v⃗?").</summary>
+    public static List<Run> MarkedRuns(string s)
+    {
+        var runs = new List<Run>();
+        var plain = new System.Text.StringBuilder();
+        for (var i = 0; i < s.Length;)
+        {
+            var j = i + 1;
+            while (j < s.Length && IsMark(s[j])) j++;
+            if (j > i + 1)
+            {
+                if (plain.Length > 0) { runs.Add(new Run(plain.ToString())); plain.Clear(); }
+                runs.Add(new Run(s[i..j]) { FontFamily = MarkFace });
+            }
+            else plain.Append(s[i]);
+            i = j;
+        }
+        if (plain.Length > 0) runs.Add(new Run(plain.ToString()));
+        return runs;
+    }
+
+    /// <summary>A text block's words drawn so a letter's mark of maths never shows as a box (<see cref="MarkedRuns"/>).</summary>
+    public static TextBlock Marked(this TextBlock t)
+    {
+        var s = t.Text;
+        if (string.IsNullOrEmpty(s) || !s.Any(IsMark)) return t;
+        t.Inlines.Clear();
+        t.Inlines.AddRange(MarkedRuns(s));
+        return t;
+    }
+
     public static (double Size, FontWeight Weight, FontFamily Face, double Line) Ramp(Ty ty) => ty switch
     {
         Ty.Caption => (12, FontWeights.Normal, SmallFace, 16),
@@ -467,11 +505,11 @@ public static class K
     public static FrameworkElement LoadState(string? error, Action retry)
     {
         if (error == null) return new Grid { MinHeight = 320, Children = { Spinner(32) }, Tag = PlaceholderMark };
-        var again = Button("Try Again", retry, accent: true);
+        var again = Button("Try again", retry, accent: true);
         again.HorizontalAlignment = HorizontalAlignment.Center;
         var v = V(12,
             Icon(SymbolRegular.ErrorCircle24, 40, B.Text3),
-            Text("Couldn’t Load", Ty.Subtitle).Center(),
+            Text("Couldn’t load", Ty.Subtitle).Center(),
             Wrapped(error, Ty.Body, B.Text2).Center(),
             again);
         v.HorizontalAlignment = HorizontalAlignment.Center;

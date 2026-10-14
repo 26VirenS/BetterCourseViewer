@@ -331,16 +331,18 @@ public sealed class GradesScreen : Screen
         var color = K.Hex(r.Color);
         var rings = GradesKit.Rings(r.Pct, color, GradesKit.Bands(r.Cats), 3, 48, 5.5, 3.5, 1.5);
         rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover); // (the tour's "A quick breakdown")
-        var words = K.V(2, K.Text(r.Code, Ty.BodyStrong));
+        // (the course's name whole, on two lines if it needs them; why it has no score — "Hidden by instructor" — under
+        //  how much is graded, in the name's column: only the "–" at the right, which leaves the name its room)
+        var words = K.V(2, K.Wrapped(r.Code, Ty.BodyStrong, B.Text, 2));
         if (GradesKit.SecondName(r) is { } alt) words.Children.Add(K.Text(alt, Ty.Caption, B.Text2));
-        words.Children.Add(K.Text(GradesKit.GradedLine(r), Ty.Caption, B.Text3));
+        words.Children.Add(K.Wrapped(GradesKit.GradedLine(r), Ty.Caption, B.Text3, 2));
+        if (r.Letter == null && GradesKit.Why(r) is { } why) words.Children.Add(GradesKit.WhyNote(r, why).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
         words.VerticalAlignment = VerticalAlignment.Center;
         var score = K.Text(GradesKit.Percent(r.PctText, r.Pct), Ty.BodyLarge, r.Pct == null ? B.Text2 : B.Text).Tabular();
         score.FontWeight = FontWeights.SemiBold;
         score.HorizontalAlignment = HorizontalAlignment.Right;
         var right = K.V(4, score);
         if (r.Letter is { } l) right.Children.Add(GradesKit.Letter(l).Align(HorizontalAlignment.Right, VerticalAlignment.Center));
-        else if (GradesKit.Why(r) is { } why) right.Children.Add(GradesKit.WhyNote(r, why).Align(HorizontalAlignment.Right, VerticalAlignment.Center));
         right.VerticalAlignment = VerticalAlignment.Center;
         var pill = new Border { Width = 3, Height = 16, CornerRadius = new CornerRadius(1.5), VerticalAlignment = VerticalAlignment.Center };
         if (on) pill.Bg(B.Accent);
@@ -418,16 +420,16 @@ public sealed class GradesScreen : Screen
         var rings = GradesKit.Rings(r.Pct, color, GradesKit.Bands(r.Cats), 3, 66, 7, 4.5, 2);
         Shell.Tour.Mark(rings, Shell.TourSpot.GradeRing);
         rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover);
-        var words = K.V(2, K.Text(r.Code, Ty.BodyStrong));
+        var words = K.V(2, K.Wrapped(r.Code, Ty.BodyStrong, B.Text, 2));
         if (GradesKit.SecondName(r) is { } alt) words.Children.Add(K.Text(alt, Ty.Caption, B.Text2));
-        words.Children.Add(K.Text(GradesKit.GradedLine(r), Ty.Caption, B.Text3));
+        words.Children.Add(K.Wrapped(GradesKit.GradedLine(r), Ty.Caption, B.Text3, 2));
+        if (r.Letter == null && GradesKit.Why(r) is { } why) words.Children.Add(GradesKit.WhyNote(r, why).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
         words.VerticalAlignment = VerticalAlignment.Center;
         var score = K.Text(GradesKit.Percent(r.PctText, r.Pct), Ty.Subtitle, r.Pct == null ? B.Text2 : B.Text).Tabular();
         score.HorizontalAlignment = HorizontalAlignment.Right;
         var tags = K.H(6);
         if (r.Target is { } t) tags.Children.Add(K.Text($"Target {t}", Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
         if (r.Letter is { } l) tags.Children.Add(GradesKit.Letter(l));
-        else if (GradesKit.Why(r) is { } why) tags.Children.Add(GradesKit.WhyNote(r, why));
         tags.HorizontalAlignment = HorizontalAlignment.Right;
         var right = K.V(4, score, tags);
         right.VerticalAlignment = VerticalAlignment.Center;

@@ -109,7 +109,11 @@ public static class Shot
     /// in a window of its own has no owner, and would otherwise lose to the main window.</summary>
     public static void Take(string file)
     {
-        var w = Application.Current.Windows.OfType<Window>().Select((x, i) => (Window: x, Order: i)).Where(x => x.Window.IsVisible)
+        // (a small window kept on top of the others — a tool pulled out of its pin, ToolFloat — is pictured over the
+        //  window under it, never on its own)
+        static bool Floating(Window x) => x.Topmost && !x.ShowInTaskbar && x.Owner != null;
+        var visible = Application.Current.Windows.OfType<Window>().Select((x, i) => (Window: x, Order: i)).Where(x => x.Window.IsVisible).ToList();
+        var w = visible.Where(x => !Floating(x.Window))
                     .OrderByDescending(x => x.Window.IsActive).ThenByDescending(x => x.Window.Owner != null).ThenByDescending(x => x.Order)
                     .Select(x => x.Window).FirstOrDefault()
                 ?? Application.Current.MainWindow;
@@ -122,6 +126,11 @@ public static class Shot
         using (var dc = dv.RenderOpen())
         {
             dc.DrawImage(image, new Rect(0, 0, width, height));
+            foreach (var f in visible.Where(x => Floating(x.Window)).OrderBy(x => x.Order).Select(x => x.Window))
+            {
+                if (Print(new WindowInteropHelper(f).Handle) is not { } over) continue;
+                dc.DrawImage(over.Image, new Rect(over.At.L - at.L, over.At.T - at.T, over.At.R - over.At.L, over.At.B - over.At.T));
+            }
             // what floats over it: a menu, a flyout (each a window of its own, drawn by WPF — pictured as WPF draws it,
             // its see-through edges and shadow kept)
             foreach (var s in PresentationSource.CurrentSources.OfType<HwndSource>().ToList())

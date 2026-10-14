@@ -264,9 +264,33 @@ public sealed class SchoolPickerView : Grid
         var b = K.Subtle(holder, act, new Thickness(6, 7, 6, 7));
         b.ToolTip = $"{title}\n{sub}";
         pill.Margin = new Thickness(-6, 0, 0, 0);
-        b.MouseEnter += (_, _) => { chosen = id; Highlight(); };
+        // (only the pointer moving chooses a row: the list gliding up under a pointer that is still — the header shrinking
+        //  as the results come — raises enters too, and Enter then opened a school other than the best match)
+        void Pointed()
+        {
+            if (!PointerMoved(b) || chosen == id) return;
+            chosen = id;
+            Highlight();
+        }
+        b.MouseEnter += (_, _) => Pointed();
+        b.MouseMove += (_, _) => Pointed();
         rows[id] = (b, pill, enter);
         return b;
+    }
+
+    /// <summary>Where the pointer last was, on the screen.</summary>
+    private Point? pointerAt;
+
+    /// <summary>Whether the pointer has moved since it was last noted (and notes where it is now).</summary>
+    private bool PointerMoved(Visual over)
+    {
+        if (PresentationSource.FromVisual(over) == null) return false;
+        Point at;
+        try { at = over.PointToScreen(Mouse.GetPosition((IInputElement)over)); }
+        catch (InvalidOperationException) { return false; }
+        var moved = pointerAt is { } was && (Math.Abs(was.X - at.X) > 0.5 || Math.Abs(was.Y - at.Y) > 0.5);
+        pointerAt = at;
+        return moved;
     }
 
     private void Highlight()

@@ -36,10 +36,10 @@ public static class Chemistry
     public static FrameworkElement Molecule(ToolContext c, string? start) => new MoleculeBuilderView(start);
 
     /// <summary>The Lewis structure maker over the window, in a sheet nearly its size (Done or Escape closes it).</summary>
-    public static void OpenLewis(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, false, start);
+    public static void OpenLewis(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, false, start, engine);
 
     /// <summary>The 3D molecule builder over the window, in a sheet nearly its size (Done or Escape closes it).</summary>
-    public static void OpenMolecule(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, true, start);
+    public static void OpenMolecule(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, true, start, engine);
 
     /// <summary>
     /// The Lewis maker's "Open in 3D builder" when it is not in the builders' own sheet (in a page of the Periodic
@@ -59,15 +59,17 @@ public static class Chemistry
 
 /// <summary>
 /// The builders over the window (the Mac's ToolPopup, with the Periodic Table's page buttons for the two of them): Done,
-/// the page's tile, name and line, and the choice of builder; under them the builder, the whole sheet.
+/// the page's tile, name and line, the choice of builder and — the sheet covering the title bar — the title bar's pins
+/// (PinBar in a popup, as a tool's sheet, a quiz and Alta have them); under them the builder, the whole sheet.
 /// </summary>
 internal static class ChemSheet
 {
     private static readonly Color Tone = Color.FromRgb(0x30, 0xd1, 0x58); // (the Periodic Table's tile colour)
 
-    public static void Show(Window? owner, bool molecule, string? start)
+    public static void Show(Window? owner, bool molecule, string? start, Engine.Engine? engine = null)
     {
         var win = owner ?? Application.Current?.MainWindow;
+        engine ??= (win as MainWindow)?.School ?? (Application.Current?.MainWindow as MainWindow)?.School;
         var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
         var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
         var sheet = new Sheet { Bare = true, Width = w, Height = h };
@@ -91,7 +93,8 @@ internal static class ChemSheet
         words.VerticalAlignment = VerticalAlignment.Center;
         pages.VerticalAlignment = VerticalAlignment.Center;
         pages.Margin = new Thickness(12, 0, 0, 0);
-        var head = K.Columns("auto, auto, *, auto", done.Col(0), K.IconTile(SymbolRegular.Molecule24, Tone, 44).Margin(0, 0, 14, 0).Col(1), words.Col(2), pages.Col(3));
+        var head = K.Columns("auto, auto, *, auto, auto", done.Col(0), K.IconTile(SymbolRegular.Molecule24, Tone, 44).Margin(0, 0, 14, 0).Col(1), words.Col(2), pages.Col(3));
+        if (engine != null) head.Children.Add(new PinBar(engine, inPopup: true).Margin(12, 0, 0, 0).Col(4));
         head.Margin = new Thickness(40, 20, 40, 12);
         var g = K.Rows("auto, *", head.Row(0), host.Row(1));
         g.Bg(B.Window);
@@ -128,7 +131,22 @@ internal sealed class ChemLayout : Grid
 
     /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall,
     /// as tall as the page shows, from 460 to 640.</summary>
-    private double NarrowHeight(double page) => tall ? Math.Max(460, Math.Min(640, page)) : Math.Max(320, Math.Min(560, page * 0.5));
+    private double NarrowHeight(double page) => tall ? Math.Max(460, Math.Min(640, page)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
+
+    /// <summary>The least the drawing is given over the rest (320): more while the drawing's card holds more than the
+    /// drawing — the Lewis maker's resonance structures under it, which left the structure itself a few lines tall.</summary>
+    public double Floor
+    {
+        get => floor;
+        set
+        {
+            if (Math.Abs(floor - value) < 0.5) return;
+            floor = value;
+            if (wide == false) centre.Height = NarrowHeight(page);
+        }
+    }
+
+    private double floor = 320, page;
 
     public ChemLayout(FrameworkElement left, FrameworkElement centre, FrameworkElement right, bool tall = false)
     {
@@ -136,7 +154,7 @@ internal sealed class ChemLayout : Grid
         this.centre = centre;
         this.right = right;
         this.tall = tall;
-        Margin = new Thickness(40, 8, 40, 24);
+        Margin = Edges(true);
         MaxWidth = 1480;
         left.VerticalAlignment = VerticalAlignment.Top;
         right.VerticalAlignment = VerticalAlignment.Top;
@@ -169,13 +187,25 @@ internal sealed class ChemLayout : Grid
         HorizontalContentAlignment = HorizontalAlignment.Left,
     };
 
+    /// <summary>
+    /// Room round the page: side by side, all of it round the three columns; one over the other, the sides' room inside
+    /// the scroller (its padding), so its scroll bar runs down the page's edge, not inside the drawing's card (the
+    /// chemistry pages; the biology tools' pages keep theirs as they are).
+    /// </summary>
+    private Thickness Edges(bool wide) => wide || tall ? new Thickness(40, 8, 40, 24) : new Thickness(0, 8, 0, 0);
+
     private void Lay(Size size)
     {
-        var w = size.Width >= 1100;
-        if (!w) centre.Height = NarrowHeight(size.Height);
+        // (decided on the page's own width and height, the room round it put back: the room moves as the layout does)
+        var width = size.Width + Margin.Left + Margin.Right;
+        page = size.Height + Margin.Top + Margin.Bottom - 32;
+        var w = width >= 1180;
+        if (!w) centre.Height = NarrowHeight(page);
         if (wide == w) return;
         var first = wide == null;
         wide = w;
+        Margin = Edges(w);
+        oneScroll.Padding = w || tall ? new Thickness(0) : new Thickness(40, 0, 40, 0);
         // (told after this layout pass: the builders move their preset and way into the drawing's heading, or back)
         if (!first || !w) Dispatcher.BeginInvoke(() => WideChanged?.Invoke(), DispatcherPriority.Loaded);
         foreach (var e in new[] { left, centre, right }) ChemKit.Detach(e);
@@ -212,7 +242,7 @@ internal sealed class ChemLayout : Grid
             right.Margin = new Thickness(0);
             left.HorizontalAlignment = HorizontalAlignment.Stretch;
             right.HorizontalAlignment = HorizontalAlignment.Stretch;
-            centre.Height = NarrowHeight(size.Height);
+            centre.Height = NarrowHeight(page);
             Grid.SetColumn(centre, 0);
             Grid.SetRow(centre, 0);
             narrow.Children.Add(centre);

@@ -167,7 +167,8 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
         var words = K.V(2, K.Wrapped(it.Title, Ty.Body, locked ? B.Text2 : B.Text, 2));
         if (!string.IsNullOrEmpty(it.Sub)) words.Children.Add(K.Text(it.Sub!, Ty.Caption, B.Text2));
         if (locked && !string.IsNullOrEmpty(it.LockText)) words.Children.Add(K.Wrapped(it.LockText!, Ty.Caption, B.Text2, 2));
-        else if (!string.IsNullOrEmpty(it.Requirement) && !done)
+        // (what the item asks for — "Mark done", "View", "Submit" — unless its own Mark done button says it already)
+        else if (!string.IsNullOrEmpty(it.Requirement) && !done && it.Markable != true)
         {
             var r = K.Text(it.Requirement!, Ty.Caption);
             r.FontWeight = FontWeights.Medium;
@@ -203,7 +204,7 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
     {
         if (it.Url != null || it.Type == "ExternalTool") items.Add(CourseKit.MenuEntry("Open", SymbolRegular.DocumentArrowRight24, () => OpenItem(it)));
         if (it.Markable == true && !locked)
-            items.Add(CourseKit.MenuEntry(done ? "Mark as not done" : "Mark as done", done ? SymbolRegular.DismissCircle24 : SymbolRegular.CheckmarkCircle24, () => Mark(it, m, !done)));
+            items.Add(CourseKit.MenuEntry(done ? "Mark not done" : "Mark done", done ? SymbolRegular.DismissCircle24 : SymbolRegular.CheckmarkCircle24, () => Mark(it, m, !done)));
         if (string.IsNullOrEmpty(it.Url)) return;
         if (items.Count > 0) items.Add(new Separator());
         if (it.External != true) items.Add(CourseKit.MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(PageOf(it.Url!), it.Title)));

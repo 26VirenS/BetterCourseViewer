@@ -76,8 +76,11 @@ public sealed partial class SearchPalette
         var q = words.ToLowerInvariant();
         var outList = new List<PaletteSection>();
         if (q.Length == 0) return outList;
-        if (PaletteSum.Answer(words) is { } a)
-            outList.Add(new PaletteSection("Answer", [new PaletteItem("answer", a.Value, SymbolRegular.EqualCircle24, PaletteAction.Copy(a.Value)) { Sub = a.Sub, Trailing = "Copy", Filled = true }]));
+        // (a sum's answer comes first and is the row Enter runs: it alone says Enter — "Enter to copy" — and the search
+        //  row under it says nothing of Enter)
+        var answer = PaletteSum.Answer(words);
+        if (answer is { } a)
+            outList.Add(new PaletteSection("Answer", [new PaletteItem("answer", a.Value, SymbolRegular.EqualCircle24, PaletteAction.Copy(a.Value)) { Sub = a.Sub, Trailing = "Enter to copy", Filled = true }]));
         if (q.Length >= 2)
         {
             var cmds = PaletteCommand.Matching(PaletteCommand.Catalog(engine), q, strict: true).Take(4).Select(c => c.PlainRow).ToList();
@@ -90,7 +93,7 @@ public sealed partial class SearchPalette
             var groups = GroupItems(q, engine, 3);
             if (groups.Count > 0) outList.Add(new PaletteSection("Groups", groups));
         }
-        outList.Add(new PaletteSection("Search", [SearchRow(words)]));
+        outList.Add(new PaletteSection("Search", [SearchRow(words, enter: answer == null)]));
         return outList;
     }
 
@@ -172,8 +175,8 @@ public sealed partial class SearchPalette
 
     private static PaletteItem Hint(string text, SymbolRegular symbol) => new("hint", text, symbol, PaletteAction.None);
 
-    private PaletteItem SearchRow(string words) =>
-        new("search", $"Search for “{words}”", SymbolRegular.Search24, PaletteAction.Search(words)) { Sub = $"Everything in {engine.LmsName}", Trailing = "Enter" };
+    private PaletteItem SearchRow(string words, bool enter = true) =>
+        new("search", $"Search for “{words}”", SymbolRegular.Search24, PaletteAction.Search(words)) { Sub = $"Everything in {engine.LmsName}", Trailing = enter ? "Enter" : null };
 
     /// <summary>A course's sections before its home has said which it has (the Mac's Sidebar.defaultSections).</summary>
     private static readonly SectionLink[] DefaultSections =
@@ -319,7 +322,9 @@ public sealed partial class SearchPalette
                         var external = r.External == true;
                         items.Add(new PaletteItem($"r.{g.Title}.{i}", r.Title, KindSymbol(g.Title), PaletteAction.Open(r.Url, r.Title, external))
                         {
-                            Sub = r.Sub, Color = r.Color, Trailing = external ? "↗" : null, Filled = true,
+                            // (a result elsewhere opens in Simpl's own window, not the browser: no ↗, which is the
+                            //  browser's mark everywhere else)
+                            Sub = r.Sub, Color = r.Color, Filled = true,
                         });
                     }
                 if (items.Count == 0)

@@ -215,6 +215,7 @@ public sealed partial class TodoScreen
         if (url != null)
         {
             menu.Items.Add(Item("Open", SymbolRegular.Open24, () => engine.OpenWeb(url, row.Title)));
+            if (Shell.PlaceWindow.MenuItem(engine, url, row.Title) is { } apart) menu.Items.Add(apart);
             if (row.Done) menu.Items.Add(Item("See feedback", SymbolRegular.Comment24, () => engine.ActOn(url, row.Title, true)));
             else
             {

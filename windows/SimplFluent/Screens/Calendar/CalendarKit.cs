@@ -74,7 +74,7 @@ internal static class CalendarKit
     public static SymbolRegular Glyph(string? kind) => kind switch
     {
         "Assignment" => SymbolRegular.DocumentText24,
-        "Quiz" => SymbolRegular.TaskListLtr24,
+        "Quiz" => Simpl.Kit.Glyph.Work("quiz"),
         "Discussion" => SymbolRegular.ChatMultiple24,
         "Appointment" => SymbolRegular.People24,
         _ => SymbolRegular.CalendarLtr24,

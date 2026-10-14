@@ -40,7 +40,7 @@ internal sealed record PTTourStep(string Title, string Text, string Doing, strin
         new("Resonance", "Equivalent structures sit side by side.", "Click a structure", "click", PTTourAct.Event, "lewisResonance", Event: PTTourEvent.Resonance, Lewis: "NO₃⁻"),
         new("Build it in 3D", "Open in 3D sends any Lewis structure here too.", "Click Molecule builder", "click", PTTourAct.Page, "ptPageMolecules", Page: PTPage.Molecules),
         new("Turn it", "Scroll to zoom; click an atom for its shape.", "Drag the model", "drag", PTTourAct.Event, "molViewer", Event: PTTourEvent.Turned, Molecule: "Ethanol"),
-        new("Find anything", "A symbol, name or number; Return opens it.", "Search for an element", "type", PTTourAct.Typed, "ptSearch"),
+        new("Find anything", "A symbol, name or number; Enter opens it.", "Search for an element", "type", PTTourAct.Typed, "ptSearch"),
     };
 
     /// <summary>The steps this copy of the app can show: the Lewis maker's and the molecule builder's only once their pages

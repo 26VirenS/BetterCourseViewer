@@ -47,7 +47,7 @@ internal sealed class CalculatorTool
         var bottom = K.Columns("auto, *", copy.Col(0), foot.Margin(16, 0, 0, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1));
         surface.Children.Add(K.V(16, K.Card(display.View, new Thickness(22, 18, 22, 18)), keypad.View, bottom));
         var main = new LeftMax { Max = 820, Child = surface };
-        View = Everyday.Page(ToolKit.Columns(main, history, 360, 1020));
+        View = Everyday.Page(ToolKit.Columns(main, history, 340, 860));
         Update();
         Everyday.Follow(View, () => { eng.Changed += Update; Update(); }, () => eng.Changed -= Update);
     }

@@ -353,7 +353,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). Since 2.99.33 the page also writes the figures, dates and course names it sends (`pctText`, `gpaText`, `goalLine`, `dueLine`, `altName`, `gradedText`…): show those strings as they come rather than formatting the numbers here, so Windows reads every grade, date and course exactly as the Mac does. |
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `RichText` (Canvas's own HTML as Windows text), `Formula` (Canvas's formulas typeset from their TeX with WPF-Math, MIT, drawn in the text's colour; written out as plain maths where they cannot be), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place in a window of its own (`PlaceWindow`: a pane row's Open in new window, or Shift+click), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole over the window or beside a popup, the pieces tools are made of; a tool on the Tools page is `Screens/More/ToolScreen.cs`), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
@@ -377,7 +377,9 @@ public sealed class TodoScreen : Screen
 ```
 
 - The shell gives the page its title (a breadcrumb when something is pushed, and the screen's own `Before` parts ahead
-  of its title: a course's Grades reads "F26-MATH 021 20 › Grades", as Windows 11's Settings names where a page is), the
+  of its title: a course's Grades reads "F26-MATH 021 20 › Grades", as Windows 11's Settings names where a page is — on
+  one line, as WinUI's BreadcrumbBar keeps it: steps that do not fit fold into "…" from the first, `Shell/CrumbLine.cs`),
+  the
   commands at the title's right, a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
   `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
@@ -480,17 +482,21 @@ no picture of the one before it to move from: it arrives by its own entrance (th
   chevron folds out any other); a course's unread announcements are a badge like Notifications', its tooltip and screen
   reader saying what it counts ("2 unread announcements"); one Groups row opens the Groups page and its chevron lists
   the groups. At the foot, Settings (Windows 11's place for it), then the account tile: name, email and the school,
-  each said once. A theme's picture stays faint (15%) behind the rows and shows whole only in the room under them.
+  each said once. In a pane under 760 tall (a 1024×681 or 1366×768 window) the foot keeps compact so the courses keep
+  their room: Settings is a gear beside the account tile, and the email and the school share one line. A theme's
+  picture stays faint (15%) behind the rows and shows whole only in the room under them.
 - **Search box** (`Shell/Search/`): typing only suggests; the full search runs on Enter or *Search for*, so the page
-  never changes under the student. Enter on a sum copies its answer. A command's arguments show as grey placeholders
+  never changes under the student. Enter on a sum copies its answer (only that row says Enter, "Enter to copy"). A
+  result that opens in Simpl's own window has no ↗, which stays the browser's mark. A command's arguments show as grey placeholders
   (`/course ‹course› ‹section›`). Everything is in sentence case.
 - **Tour** (`Shell/Tour.cs`): offered, not begun — once the app first shows with nothing over it, *Take a 1-minute
   tour?* rises in at the window's foot, dimming nothing, with *Not now* (counts as seen) and *Take the tour*
   (`--open touroffer` shows it for a picture). Six steps from the Dashboard's counters (Grades, a course, Tools, Search)
   to *Something wrong? Tell us here*, which lights the account tile's ⋯ alone. Each card has a tail toward what it
-  lights (Windows 11's TeachingTip), ×, *Skip tour*, Back and a Next that always works (a suggested click moves it on,
-  but no step waits for one); Escape ends it; leaving counts as seen; the account menu's *Take the tour* runs it again.
-  Its dim covers the title bar too, all but Windows' caption buttons.
+  lights (Windows 11's TeachingTip), ×, *Skip tour*, Back and a Next that always works (a suggested click moves it on —
+  only one taken while its step shows, so Back to a step already done stays there — but no step waits for one); Escape
+  ends it; the app's own shortcuts wait while it is up; leaving counts as seen; the account menu's *Take the tour* runs
+  it again. Its dim covers the title bar too, all but Windows' caption buttons.
 
 ## First run and Settings
 
@@ -558,10 +564,12 @@ where it must be); the student looks it over and presses Submit on the PC — no
   private addresses may connect; a file is at most 50 MB (Hand In's own limit) and a session 500 MB; names are made safe
   (no folders, nothing Windows forbids, not CON or NUL); what came waits in `%TEMP%\SimplPhone-…`, deleted with the
   hand-in. The page is served with a strict Content-Security-Policy and asks for nothing but its uploads.
-- **Reachability.** The panel says where this PC is ("This PC is on Wi-Fi at 192.168.1.23") and that the phone must be
-  on the same Wi-Fi — some school networks keep devices apart; a phone's hotspot works. With no such address: "Connect
-  this computer to Wi-Fi to use your phone." The first time, before it listens, the panel says Windows will ask whether
-  Simpl may use the network (choose Allow) — `phoneAsked` in prefs.json remembers it was said.
+- **Reachability.** While the code waits, the panel says what the phone needs in the Mac's words — "Your phone needs to
+  be on the same network as this PC (your phone's hotspot works)." — with where this PC is ("This PC is on Wi-Fi at
+  192.168.1.23") and that some school networks keep devices apart folded under *Trouble connecting?*; once a phone has
+  connected, all of that goes. With no such address: "Connect this PC to a network to use your phone." The first time,
+  before it listens, the panel says Windows will ask whether Simpl may use the network (choose Allow) — `phoneAsked` in
+  prefs.json remembers it was said. Done (or Escape) is its one way to close.
 - **Photos into one PDF.** For an assignment that takes PDFs and not pictures, *Combine photos into one PDF*: each photo
   turned upright (its EXIF orientation), no larger than 2200 pixels, a JPEG page each in the order they came (WPF's own
   codecs, off the window's thread), on Letter (or A4 where the region is metric), landscape for a wide photo (`PhotoPdf`,
@@ -600,14 +608,19 @@ tool that shows pages of its own names the one shown after its name (`ToolContex
 Lewis structures"), and may hide its line under its name while it needs the room (`ShowNote`).
 
 A pin's flyout is the tool's quick version, under its whole name (with ›, the one way to the whole tool) and Pop out,
-which pulls the quick version into a small window of its own kept above Simpl and its popups (`ToolFloat`); unpinning
-is in the pin's menu, not in the flyout. The flyout folds back on a press elsewhere in the window, the window left, moved
-or resized, Escape, or its pin pressed again (its opening and closing go to the log in picture runs). From a flyout the
+which pulls the quick version into a small window of its own kept above Simpl and its popups (`ToolFloat`; pictured
+over a quiz with `--pin-popout calc`); unpinning is in the pin's menu, not in the flyout. The flyout folds back on a
+press elsewhere in the window, the window left (not for a part of the flyout that is a window of its own), moved or
+resized, Escape, or its pin pressed again (its opening and closing go to the log in picture runs; CI's `--pin-try
+graph|fc` opens one as a press does, clicks and types in it, and checks it is still open five seconds on). From a flyout the
 whole tool opens over the window in a sheet (`ToolPopup`: Done, the tool's heading with the other pinned tools in it, a
 hairline under the heading once the tool scrolls); from a popup's pins (a quiz, Knewton Alta, Macmillan, a tool's
-sheet: `PinBar(engine, inPopup: true)`) in a window of its own beside it (`ToolsCenter.Float`, `ToolWindow`), since a
-sheet would wait behind the popup. A sheet focuses its first field only when it shows without scrolling, and never
-read-only words, so it opens at its top.
+sheet, the chemistry builders' sheet: `PinBar(engine, inPopup: true)`) in a window of its own beside it
+(`ToolsCenter.Float`, `ToolWindow`), since a sheet would wait behind the popup. A sheet focuses its first field only when
+it shows without scrolling, and never read-only words, so it opens at its top; a tool's page opens at its top too
+(`ToolKit.Edged`), whatever takes the focus as it comes up. The work and its side panel (`ToolKit.Columns`) sit side by
+side from about 860 of the page's width — the page beside the pane, about 980 in a 1366 window — and one over the other
+below that, a side that holds the tool's answer (Grade needed, Citations) first.
 
 `ToolContext` hands a tool the engine, where it is (`Quick`, `InPage`), what was handed over (`TakeFiles`, `TakeInfo`),
 `OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns, fields, notes, the drop zone

@@ -327,7 +327,7 @@ public static class WorkPreview
         return p[2] switch
         {
             "assignments" => ("Assignment", SymbolRegular.DocumentText24),
-            "quizzes" => ("Quiz", SymbolRegular.TaskListLtr24),
+            "quizzes" => ("Quiz", Glyph.Work("quiz")),
             "discussion_topics" => ("Discussion", SymbolRegular.ChatMultiple24),
             "announcements" => ("Announcement", SymbolRegular.Megaphone24),
             "pages" or "wiki" => ("Page", SymbolRegular.DocumentOnePage24),
@@ -497,11 +497,11 @@ public static class WorkPreview
             if (assignment is { } d)
             {
                 var handedIn = Text(d.Submitted) != null || d.Grade != null;
-                if (Text(d.QuizUrl) is { } q && !handedIn) return ("Take quiz", SymbolRegular.TaskListLtr24, () => e.ActOn(q, title, false));
+                if (Text(d.QuizUrl) is { } q && !handedIn) return ("Take quiz", Glyph.Work("quiz"), () => e.ActOn(q, title, false));
                 if (handedIn) return ("See feedback", SymbolRegular.Comment24, () => e.ActOn(url, title, true));
                 if (Text(d.DiscussionUrl) is { } disc) return ("Reply", SymbolRegular.Chat24, () => e.OpenWeb(disc, title));
                 if (d.CanSubmit) return (d.Resubmit == true ? "Resubmit" : "Hand in", SymbolRegular.ArrowUpload24, () => e.ActOn(url, title, false));
-                if (d.ToolUrl != null) return d.LtiQuiz == true ? ("Take quiz", SymbolRegular.TaskListLtr24, () => e.ActOn(url, title, false)) : ("Open tool", SymbolRegular.PuzzlePiece24, () => e.ActOn(url, title, false));
+                if (d.ToolUrl != null) return d.LtiQuiz == true ? ("Take quiz", Glyph.Work("quiz"), () => e.ActOn(url, title, false)) : ("Open tool", SymbolRegular.PuzzlePiece24, () => e.ActOn(url, title, false));
                 return null;
             }
             if (item.Work is not { } wk) return null;
@@ -509,7 +509,7 @@ public static class WorkPreview
             if (!wk.Open) return null;
             return (wk.Kind ?? "").ToLowerInvariant() switch
             {
-                "quiz" => ("Take quiz", SymbolRegular.TaskListLtr24, () => e.ActOn(url, title, false)),
+                "quiz" => ("Take quiz", Glyph.Work("quiz"), () => e.ActOn(url, title, false)),
                 "discussion" or "discussion_topic" => ("Reply", SymbolRegular.Chat24, () => e.ActOn(url, title, false)),
                 "tool" => ("Open", SymbolRegular.PuzzlePiece24, () => e.ActOn(url, title, false)),
                 _ => ("Hand in", SymbolRegular.ArrowUpload24, () => e.ActOn(url, title, false)),

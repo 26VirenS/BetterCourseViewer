@@ -365,6 +365,7 @@ internal static class GradesKit
     public static IEnumerable<object> LinkItems(Engine.Engine engine, string url, string title, string open = "Open")
     {
         yield return Item(open, SymbolRegular.Open24, () => engine.GoTo(url, title));
+        if (Shell.PlaceWindow.MenuItem(engine, url, title) is { } apart) yield return apart;
         yield return new Separator();
         yield return Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url, title));
         yield return Item("Copy link", SymbolRegular.Link24, () => Copy(engine, url));
@@ -378,11 +379,12 @@ internal static class GradesKit
         {
             var u = url();
             if (u == null || b == null) return;
-            var m = Menu(new object[]
-            {
-                Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(u, title())),
-                Item("Copy link", SymbolRegular.Link24, () => Copy(engine, u)),
-            });
+            var items = new List<object>();
+            // (the page in a window of its own, to keep beside the work: Ctrl+Shift+O)
+            if (Shell.PlaceWindow.MenuItem(engine, u, title(), gesture: true) is { } apart) { items.Add(apart); items.Add(new Separator()); }
+            items.Add(Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(u, title())));
+            items.Add(Item("Copy link", SymbolRegular.Link24, () => Copy(engine, u)));
+            var m = Menu(items.ToArray());
             if (m != null) Open(m, b);
         }, "More");
         return b;

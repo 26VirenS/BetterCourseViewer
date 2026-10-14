@@ -195,10 +195,11 @@ internal sealed class QuizTakePane : IQuizPane
     }
 
     /// <summary>How much is answered, as a bar whose track shows even with nothing answered (never a hairline that reads as
-    /// a divider).</summary>
+    /// a divider): the track in Windows' strong control stroke (WinUI's ProgressBar rail), softened — about #DDD on a
+    /// white card, #575757 on a dark one, so it is seen in both themes.</summary>
     private FrameworkElement Progress(double fraction)
     {
-        var track = new Border { Height = 4, CornerRadius = new CornerRadius(2) }.Bg(B.Subtle3);
+        var track = new Border { Height = 4, CornerRadius = new CornerRadius(2), Opacity = 0.3 }.Bg(B.StrongStroke);
         var fill = new Border { Height = 4, CornerRadius = new CornerRadius(2), Background = K.Brush(s.Tint), HorizontalAlignment = HorizontalAlignment.Left };
         var f = Math.Clamp(fraction, 0, 1);
         var g = new Grid { Height = 4, Children = { track, fill } };

@@ -210,7 +210,7 @@ internal static class CourseKit
     /// <summary>The mark at the end of what opens in a Simpl window of its own (a tool, another site): the one symbol for
     /// it everywhere — a course's More, a module's tool, External Tools' course chips — and never the ↗ of a link that
     /// leaves for the browser.</summary>
-    public static FrameworkElement OwnWindowMark(double size = 12, string brush = B.Text3)
+    public static FrameworkElement OwnWindowMark(double size = 14, string brush = B.Text2)
     {
         var i = K.Icon(SymbolRegular.WindowNew20, size, brush).Tip("Opens in a window of its own");
         System.Windows.Automation.AutomationProperties.SetName(i, "Opens in a window of its own");
@@ -389,6 +389,7 @@ internal static class CourseKit
     {
         items.Add(MenuEntry("Open", SymbolRegular.DocumentArrowRight24, open));
         if (string.IsNullOrEmpty(url)) return;
+        if (Shell.PlaceWindow.MenuItem(engine, url, title) is { } apart) items.Add(apart);
         items.Add(new Separator());
         items.Add(MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url!, title)));
         items.Add(MenuEntry("Copy link", SymbolRegular.Link24, () => CopyLink(engine, url)));
@@ -405,6 +406,7 @@ internal static class CourseKit
         var handedIn = k == "good" || word.StartsWith("Submitted", StringComparison.Ordinal);
         var open = k != "muted";
         items.Add(MenuEntry("Open", SymbolRegular.DocumentArrowRight24, () => engine.OpenWeb(r.Url, r.Title)));
+        if (Shell.PlaceWindow.MenuItem(engine, r.Url, r.Title) is { } apart) items.Add(apart);
         if (handedIn) items.Add(MenuEntry("See feedback", SymbolRegular.Comment24, () => engine.ActOn(r.Url, r.Title, true)));
         else if (open)
         {
@@ -438,6 +440,8 @@ internal static class CourseKit
         {
             var u = url();
             var menu = new ContextMenu { PlacementTarget = b, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, MinWidth = 200 };
+            // (the page in a window of its own, to keep beside the work: Ctrl+Shift+O)
+            if (Shell.PlaceWindow.MenuItem(engine, u, title(), gesture: true) is { } apart) { menu.Items.Add(apart); menu.Items.Add(new Separator()); }
             menu.Items.Add(MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => { if (u != null) engine.OpenWebScreen(u, title()); }, u != null));
             menu.Items.Add(MenuEntry("Copy link", SymbolRegular.Link24, () => CopyLink(engine, u), u != null));
             menu.IsOpen = true;

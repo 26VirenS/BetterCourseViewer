@@ -124,7 +124,7 @@ public sealed partial class AppShell : Grid, IDisposable
         nav.SizeChanged += (_, _) => MaskScene();
         navScroll.ScrollChanged += (_, _) => MaskScene();
         foot.SizeChanged += (_, _) => MaskScene();
-        paneHolder.SizeChanged += (_, _) => MaskScene();
+        paneHolder.SizeChanged += (_, _) => { MaskScene(); FootFits(); };
         pane.Mark(TourSpot.Pane);
         searchBox.Mark(TourSpot.Search);
         Children.Add(paneHolder.Col(0));
@@ -177,8 +177,14 @@ public sealed partial class AppShell : Grid, IDisposable
         prefetch.Start();
         // (the screenshot suite: --place-window section:courses/101:grades opens that place in a window of its own, over
         // the main one, once it is up)
-        if (Launch.Take("", "place-window") is { Length: > 0 } apart && Engine.Engine.PlaceNamed(apart) is { } elsewhere)
-            Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, elsewhere), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        // (or a page of the school's by its address — --place-window /courses/101/assignments/1012 — on its own screen)
+        if (Launch.Take("", "place-window") is { Length: > 0 } apart)
+        {
+            if (Engine.Engine.PlaceNamed(apart) is { } elsewhere)
+                Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, elsewhere), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            else if (apart.StartsWith('/') && engine.NativeRoute(apart, "") is { } page)
+                Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, page), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
     }
 
     /// <summary>A screen is being read ahead now (a pointer resting on another waits its turn).</summary>
@@ -287,7 +293,7 @@ public sealed partial class AppShell : Grid, IDisposable
         var toRead = new List<string>();
         // (the Mac's: right under Tools, every tool the school provides in the courses — Canvas's, so not on Brightspace)
         if (!engine.OnBrightspace)
-            list.Add(new NavEntry { Key = "externaltools", Title = "External Tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools), Prepare = Ready(Place.ExternalTools) });
+            list.Add(new NavEntry { Key = "externaltools", Title = "External tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools), Prepare = Ready(Place.ExternalTools) });
         var courses = engine.Courses;
         if (courses.Count > 0)
         {
@@ -327,7 +333,7 @@ public sealed partial class AppShell : Grid, IDisposable
                     }).ToList();
                 list.Add(entry);
             }
-            list.Add(new NavEntry { Key = "courses", Title = "All Courses", Icon = SymbolRegular.Library24, Tint = Gold, Go = () => GoPlace(Place.Courses), Prepare = Ready(Place.Courses) });
+            list.Add(new NavEntry { Key = "courses", Title = "All courses", Icon = SymbolRegular.Library24, Tint = Gold, Go = () => GoPlace(Place.Courses), Prepare = Ready(Place.Courses) });
         }
         var groups = engine.Groups;
         if (groups.Count > 0 && !engine.OnBrightspace)
@@ -414,8 +420,26 @@ public sealed partial class AppShell : Grid, IDisposable
         if (narrow) ClosePane();
     }
 
+    /// <summary>The pane shorter than this (a 1024×681 window, a 1366×768 laptop) keeps its foot compact, so the courses
+    /// keep their room: Settings a gear beside the account's ⋯ instead of a row of its own, and the email and the school
+    /// on one line.</summary>
+    private const double CompactFootBelow = 760;
+
+    private bool footCompact;
+
+    /// <summary>The foot as compact as the pane's height asks (drawn again only when that changes).</summary>
+    private void FootFits()
+    {
+        var compact = paneHolder.ActualHeight > 0 && paneHolder.ActualHeight < CompactFootBelow;
+        if (compact == footCompact) return;
+        footCompact = compact;
+        footNav.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        if (accountDrawn != null) account.Content = AccountTile();
+    }
+
     /// <summary>Who is signed in, at the pane's foot (the Mac's account bar): their name, the email they sign in with, and
-    /// the school they are signed in to — said once, here — and a click opens the account menu.</summary>
+    /// the school they are signed in to — said once, here — and a click opens the account menu. In a short pane
+    /// (<see cref="FootFits"/>), the email and the school on one line and Settings a gear beside the ⋯.</summary>
     private FrameworkElement AccountTile()
     {
         var me = engine.Snapshot?.Me;
@@ -428,7 +452,7 @@ public sealed partial class AppShell : Grid, IDisposable
         var lines = new List<string>();
         if (me?.Email is { Length: > 0 } email) lines.Add(email);
         if (!lines.Contains(school, StringComparer.OrdinalIgnoreCase)) lines.Add(school);
-        foreach (var line in lines)
+        foreach (var line in footCompact ? new[] { string.Join(" · ", lines) } : lines.ToArray())
         {
             var t = K.Text(line, Ty.Caption, B.Text2);
             t.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -446,7 +470,14 @@ public sealed partial class AppShell : Grid, IDisposable
         System.Windows.Automation.AutomationProperties.SetName(tile, $"{string.Join(", ", lines.Prepend(name))}, account menu");
         accountTile = tile;
         tile.Mark(TourSpot.Account);
-        return tile;
+        if (!footCompact) return tile;
+        // (a short pane: Settings as a gear at the account's right, the row it had given back to the courses)
+        var gear = K.IconButton(SymbolRegular.Settings24, () => { if (narrow) ClosePane(); window.OpenSettings(); }, "Settings (Ctrl+,)", 16, 36);
+        gear.Height = 36;
+        gear.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(gear, "Settings");
+        tile.Margin = new Thickness(4, 0, 0, 0);
+        return K.Columns("*, auto", tile.Col(0), gear.Margin(2, 0, 6, 0).Col(1));
     }
 
     private Button? accountTile;
@@ -607,41 +638,38 @@ public sealed partial class AppShell : Grid, IDisposable
         (Screen Screen, string Words, FrameworkElement? Commands) drawn = (current, words, commands);
         if (headerDrawn is { } was && was.Equals(drawn)) return;
         headerDrawn = drawn;
-        var line = new WrapPanel { Orientation = Orientation.Horizontal };
+        // (one line, as Windows 11's BreadcrumbBar: steps that do not fit fold into "…" from the first, so the title never
+        //  sits alone under a "›" — CrumbLine)
+        var steps = new List<(FrameworkElement Step, string Title, Action Go)>();
+        FrameworkElement? titleText = null;
         for (var i = 0; i < crumbs.Count; i++)
         {
             var (title, go) = crumbs[i];
             var last = i == crumbs.Count - 1;
             var t = last && current.TitleLines > 1 ? K.Wrapped(title, Ty.Title, B.Text, current.TitleLines) : K.Text(title, Ty.Title, last ? B.Text : B.Text2);
             if (last) TipWhenCut(t);
-            if (go != null)
+            if (go != null && !last)
             {
                 var b = K.Subtle(t, go, new Thickness(2, 0, 2, 0));
                 b.Cursor = Cursors.Hand;
-                line.Children.Add(b);
-                line.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0));
+                steps.Add((b, title, go));
             }
-            else line.Children.Add(t);
+            else titleText = t;
         }
         // (a page of a course's: a square in its colour at the heading's start, as the Mac's headings have — the page's
         //  course at a glance, the colour of its card and its square in the pane — beside the title's first line, or,
         //  where a breadcrumb leads ("F26-MATH 021 20 › Grades"), before the breadcrumb, never between its parts)
-        if (current.TitleColor is { } tint && line.Children.Count > 0)
-        {
-            var square = new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) };
-            if (crumbs.Count > 1) line.Children.Insert(0, square);
-            else if (line.Children[^1] is FrameworkElement titleText)
-            {
-                line.Children.Remove(titleText);
-                line.Children.Add(K.Columns("auto, *", square.Col(0), titleText.Col(1)));
-            }
-        }
+        Border? square = current.TitleColor is { } tint
+            ? new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) }
+            : null;
+        var line = new CrumbLine(square, steps, titleText ?? K.Text(current.Title, Ty.Title));
         // (a title that may wrap keeps the commands at the top right, beside its first line)
         commandsHost.VerticalAlignment = current.TitleLines > 1 ? VerticalAlignment.Top : VerticalAlignment.Center;
         var stack = K.V(2, line);
         if (subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
         titleHost.Content = stack;
         commandsHost.Content = commands;
+        HeaderWidth();
     }
 
     /// <summary>The title's whole words as its tooltip, while it is cut short (too long for the header beside the
@@ -668,6 +696,16 @@ public sealed partial class AppShell : Grid, IDisposable
     {
         PageWidths();
         header.Margin = page.ActualWidth < 560 ? new Thickness(20, 4, 20, 16) : new Thickness(40, 4, 40, 20);
+        HeaderWidth();
+    }
+
+    /// <summary>The heading as wide as the screen's content where the screen keeps that to a width of its own, so the
+    /// commands at its right line up with the content's right edge, not the window's.</summary>
+    private void HeaderWidth()
+    {
+        var w = current?.HeaderWidth;
+        header.MaxWidth = w is { } x && x > 0 ? x : double.PositiveInfinity;
+        header.HorizontalAlignment = w != null ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
     }
 
     /// <summary>The room under a page that scrolls with the shell.</summary>

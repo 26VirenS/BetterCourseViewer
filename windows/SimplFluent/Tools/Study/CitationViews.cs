@@ -82,7 +82,7 @@ internal sealed class CitationTool : ContentControl
         var top = new WrapPanel { Children = { styleGroup, sourceGroup } };
 
         var side = K.V(26, result, savedList);
-        Content = ToolKit.Page(K.V(20, top, ToolKit.Columns(details, side, 520, 1060)));
+        Content = ToolKit.Page(K.V(20, top, ToolKit.Columns(details, side, 420, 880, sideFirst: true)));
         Details();
         Result();
         Saved();

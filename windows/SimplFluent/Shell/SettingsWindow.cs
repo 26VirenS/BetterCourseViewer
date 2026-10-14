@@ -207,7 +207,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         // (--settings-sheet uninstall: the screenshot suite's picture of Uninstall Simpl's question; customcolour: Custom
         //  colour's; --settings-find <words>: Find a setting's list, as if typed)
         if (Launch.Take("uninstall", "settings-sheet") != null) Loaded += (_, _) => AskUninstall();
-        else if (Launch.Take("customcolour", "settings-sheet") != null) Loaded += (_, _) => CustomColour(null);
+        else if (Launch.Take("customcolour", "settings-sheet") != null) Loaded += (_, _) => CustomColour(Appearance.Accent);
         // (the picture's list stays open while other copies of Simpl, started beside it, take the focus: StaysOpen in a
         //  picture run only — a student's closes as Windows' own does, on a click elsewhere)
         if (Launch.Get("settings-find") is { Length: > 0 } words) Loaded += (_, _) => Dispatcher.BeginInvoke(() => { findPopup.StaysOpen = true; find.Focus(); find.Text = words; find.CaretIndex = words.Length; }, System.Windows.Threading.DispatcherPriority.Loaded);
@@ -292,7 +292,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         found = Spots().Select(s => (s, r: Rank(s))).Where(x => x.r < 9).OrderBy(x => x.r).Select(x => x.s).Take(8).ToList();
         foundAt = 0;
         FoundList();
-        findPopup.Width = Math.Max(240, find.ActualWidth);
+        // (wide enough for a setting's whole name beside its page's — "Install updates automatically · Updates" — as
+        //  Windows Settings' suggestions are, over the pane's edge if need be)
+        findPopup.Width = Math.Max(340, find.ActualWidth);
         findPopup.IsOpen = true;
     }
 
@@ -814,7 +816,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         reset.ToolTip = "Put the picture back where it was, at its own size";
         reset.IsEnabled = movable && (Math.Abs(Appearance.Zoom(slot) - 1) > 0.001 || pan != (0, 0));
         var controls = K.V(4,
-            K.Row(SymbolRegular.ImageMultiple24, "Shows", "A theme’s drawing, a photo of your own (inked in two tones, as on the web), or nothing.", kind),
+            K.Row(SymbolRegular.ImageMultiple24, "Shows", "A theme’s drawing, a photo of your own, or nothing.", kind),
             K.Row(SymbolRegular.FolderOpen24, "Photo", "Kept in Simpl’s folder on this PC, never sent anywhere.", K.H(8, choose, remove)),
             K.Row(SymbolRegular.ZoomIn24, "Zoom", "How large it is drawn in its place. Drag the picture to move it.", K.H(8, zoom, reset)));
         v.Children.Add(K.Columns("auto, 16, *", K.V(6, preview, movable ? K.Text("Drag to move", Ty.Caption, B.Text2) : null).Col(0), controls.Col(2)));
@@ -856,7 +858,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var own = hex != null && Appearance.Colours.All(c => !string.Equals(c.Hex, hex, StringComparison.OrdinalIgnoreCase))
                   && Appearance.ReadyThemes.All(r => !string.Equals(r.Accent, hex, StringComparison.OrdinalIgnoreCase));
         Brush fill = own && Appearance.Hex(hex) is { } c ? K.Brush(c) : Hues();
-        return Dot(fill, own, "Custom colour…", () => CustomColour(own ? Appearance.Accent : (Color?)null),
+        // (it opens on the accent worn — a preset's too — so Use colour pressed with nothing touched changes nothing)
+        return Dot(fill, own, "Custom colour…", () => CustomColour(Appearance.Accent),
             own ? null : K.Icon(SymbolRegular.Add24, 18, Colors.White));
     }
 
@@ -1063,7 +1066,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
 
         v.Children.Add(K.SectionHeader("Grade history"));
         var hist = K.H(8, K.Button("Import…", () => Import("historyImport", "CSV|*.csv;*.txt|All files|*.*")), Enabled(K.Button("Export…", () => _ = Export("historyExport", "csv", "CSV|*.csv")), i.Days > 0));
-        v.Children.Add(K.Row(SymbolRegular.History24, i.History, i.HistoryNote.Length > 0 ? i.HistoryNote : null, hist));
+        // (with Keep grade history off, the row says no more than its name: the switch above already says it keeps one
+        //  snapshot a day — onboarding-20; on, its line says since when)
+        v.Children.Add(K.Row(SymbolRegular.History24, i.History, i.Tracking && i.HistoryNote.Length > 0 ? i.HistoryNote : null, hist));
         v.Children.Add(Foot("Import a grade-history CSV you exported earlier; days you already have are kept."));
 
         v.Children.Add(K.SectionHeader("Record before this term"));
@@ -1337,9 +1342,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             IsExpanded = Launch.Flag("settings-earlier"),
         };
         v.Children.Add(earlier);
-        v.Children.Add(Foot(Updates.Installed
-            ? "A new version is checked against the checksum published with it, and once Simpl is signed against its publisher, before it installs. Installing an earlier version turns Install updates automatically off, so it stays."
-            : "Earlier versions open on the website."));
+        // (a copy from a zip: the expander's own line already says where earlier versions open — no footnote saying it
+        //  again)
+        if (Updates.Installed) v.Children.Add(Foot("Updates are checked before they install. Installing an earlier version turns Install updates automatically off."));
         return v;
     }
 

@@ -852,7 +852,7 @@ internal sealed class FileConverterTool : ContentControl
 
     private void Render()
     {
-        Content = FileKit.Page(Content as ScrollViewer, s.Files.Count == 0 ? Intake() : ToolKit.Columns(List(), Controls(), 380, 940));
+        Content = FileKit.Page(Content as ScrollViewer, s.Files.Count == 0 ? Intake() : ToolKit.Columns(List(), Controls(), 360, 860));
     }
 
     private FrameworkElement Intake()

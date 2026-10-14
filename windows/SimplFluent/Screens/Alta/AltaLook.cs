@@ -74,6 +74,33 @@ internal static class AltaLook
     public static string DueText(DateTime d) =>
         $"Due {d.ToString(d.Year == DateTime.Now.Year ? "MMM d" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} at {d.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)}";
 
+    /// <summary>A time zone's letters after a time ("11:59pm PDT"): the page runs in the PC's own zone, so it says nothing.</summary>
+    private static readonly System.Text.RegularExpressions.Regex Zone = new(@"(?<=\d\s?[AaPp]\.?[Mm]\.?)\s+(?:[A-Z]{2,4}T|UTC|GMT)(?:[+-]\d{1,2}(?::?\d{2})?)?\b");
+
+    /// <summary>A time in the publisher's words ("11:59pm", "8:08 pm", "12am") as every screen writes one ("11:59 PM",
+    /// "8:08 PM", "12:00 AM"), its time zone left out (the engine's canvasTimes rule, for Alta's own lines).</summary>
+    public static string Times(string words)
+    {
+        var s = Zone.Replace(words, "");
+        return System.Text.RegularExpressions.Regex.Replace(s, @"\b(\d{1,2})(?::(\d{2}))?\s?([AaPp])\.?[Mm]\b\.?",
+            m => $"{m.Groups[1].Value}:{(m.Groups[2].Success ? m.Groups[2].Value : "00")} {char.ToUpperInvariant(m.Groups[3].Value[0])}M");
+    }
+
+    /// <summary>
+    /// Alta's own due words ("Monday, Oct 12 11:59pm PDT") read as a date and written as every screen writes a due line
+    /// ("Due Oct 12 at 11:59 PM"); null when they cannot be read — then <see cref="Times"/> at least tidies their time.
+    /// </summary>
+    public static string? DueOf(string words)
+    {
+        var s = Times(words).Trim();
+        // (the weekday at its head says nothing the date does not)
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"^(?:Mon|Tue|Tues|Wed|Thu|Thur|Thurs|Fri|Sat|Sun)[a-z]*\.?,?\s+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        s = s.Replace(" at ", " ");
+        string[] formats = { "MMM d h:mm tt", "MMM d, h:mm tt", "MMMM d h:mm tt", "MMMM d, h:mm tt", "MMM d, yyyy h:mm tt", "MMMM d, yyyy h:mm tt", "M/d/yyyy h:mm tt", "M/d h:mm tt" };
+        return DateTime.TryParseExact(s, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AllowWhiteSpaces, out var d)
+            ? DueText(d) : null;
+    }
+
     /// <summary>The popup's Loading while the vendor's page opens (the Mac's ProgressView with its words).</summary>
     public static FrameworkElement Opening(string words)
     {

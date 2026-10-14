@@ -83,8 +83,12 @@ public sealed partial class DashboardScreen
         var tile = K.IconTile(symbol, color, tileSize);
         tile.VerticalAlignment = VerticalAlignment.Center;
         var meta = new WrapPanel { Orientation = Orientation.Horizontal };
-        var line = string.Join(" · ", new[] { course, kind }.Where(s => !string.IsNullOrEmpty(s)));
-        if (line.Length > 0) meta.Children.Add(K.Text(line, Ty.Caption, B.Text2).Margin(0, 0, 8, 0));
+        // (the course and the kind as two pieces, so a narrow row — the rail, a counter's panel — takes the kind onto a
+        //  second line rather than cutting it: "F26-MATH 021 20 ·" then "Assignment")
+        var hasCourse = !string.IsNullOrEmpty(course);
+        var hasKind = !string.IsNullOrEmpty(kind);
+        if (hasCourse) meta.Children.Add(K.Text(hasKind ? course + " ·" : course!, Ty.Caption, B.Text2).Margin(0, 0, hasKind ? 4 : 8, 0));
+        if (hasKind) meta.Children.Add(K.Text(kind!, Ty.Caption, B.Text2).Margin(0, 0, 8, 0));
         foreach (var f in flags ?? Enumerable.Empty<WorkFlag>()) meta.Children.Add(K.Chip(f.Word, K.Tone(f.Kind)).Margin(0, 0, 6, 0));
         var words = K.V(2, title);
         if (meta.Children.Count > 0) words.Children.Insert(0, meta);
@@ -211,25 +215,57 @@ public sealed partial class DashboardScreen
     private FrameworkElement CourseCard(DashCourse course, double cardW)
     {
         var color = K.Hex(course.Color);
-        var heroWords = new TextBlock { Text = course.Code, FontSize = 16, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 8, 1) };
-        var badges = K.H(6);
-        badges.VerticalAlignment = VerticalAlignment.Center;
+        // (the course's name whole: a name longer than the band's one line takes a second rather than an ellipsis)
+        var heroWords = new TextBlock
+        {
+            Text = course.Code, FontSize = 16, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap,
+            TextTrimming = TextTrimming.CharacterEllipsis, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, LineHeight = 20, MaxHeight = 40,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 8, 1),
+        };
+        // (what wants attention, in words — "2 due today", "2 new" — or, where the name and the words do not both fit in the
+        //  band, as its symbol and number, the words kept in the tooltip and for a screen reader: the course's name is
+        //  never the one cut; failing that too, the pills leave the band for a line of their own under it)
+        Stack Badges(bool brief, bool onCard = false)
+        {
+            // (on the band: white pills with coloured words; under it, on the card, the colour filled with white words)
+            Border Make(string text, Color tone, SymbolRegular? icon) => onCard ? Pill(text, tone, Colors.White, icon) : Pill(text, Colors.White, tone, icon);
+            var row = K.H(6);
+            row.VerticalAlignment = VerticalAlignment.Center;
+            if (course.DueToday is > 0)
+            {
+                var said = $"{course.DueToday} due today";
+                var due = Make(brief ? $"{course.DueToday}" : said, CounterColor("today"), brief ? SymbolRegular.Clock24 : null);
+                due.ToolTip = said;
+                System.Windows.Automation.AutomationProperties.SetName(due, said);
+                row.Children.Add(due);
+            }
+            if (course.Unread is > 0)
+            {
+                var n = course.Unread.Value;
+                var said = string.IsNullOrEmpty(course.UnreadLabel) ? $"{n} unread {(n == 1 ? "announcement" : "announcements")}" : course.UnreadLabel!;
+                var unread = Make(brief ? $"{n}" : string.IsNullOrEmpty(course.UnreadText) ? $"{n} new" : course.UnreadText!, color, SymbolRegular.Megaphone24);
+                unread.ToolTip = said;
+                System.Windows.Automation.AutomationProperties.SetName(unread, said);
+                row.Children.Add(unread);
+            }
+            return row;
+        }
+        static double Wide(FrameworkElement e)
+        {
+            e.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            return e.DesiredSize.Width;
+        }
+        var nameWidth = new FormattedText(course.Code, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(K.DisplayFace, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), 16, Brushes.Black, 1).WidthIncludingTrailingWhitespace;
+        var band = cardW - heroWords.Margin.Left - heroWords.Margin.Right - 12;
+        var badges = Badges(brief: false);
+        Stack? under = null;
+        if (badges.Children.Count > 0 && nameWidth + Wide(badges) > band)
+        {
+            badges = Badges(brief: true);
+            if (nameWidth + Wide(badges) > band) { under = Badges(brief: false, onCard: true); badges = K.H(6); }
+        }
         badges.Margin = new Thickness(0, 0, 12, 0);
-        if (course.DueToday is > 0)
-        {
-            var due = Pill($"{course.DueToday} due today", Colors.White, CounterColor("today"));
-            due.ToolTip = $"{course.DueToday} due today";
-            badges.Children.Add(due);
-        }
-        if (course.Unread is > 0)
-        {
-            var n = course.Unread.Value;
-            var unread = Pill(string.IsNullOrEmpty(course.UnreadText) ? $"{n} new" : course.UnreadText!, Colors.White, color, SymbolRegular.Megaphone24);
-            var said = string.IsNullOrEmpty(course.UnreadLabel) ? $"{n} unread {(n == 1 ? "announcement" : "announcements")}" : course.UnreadLabel!;
-            unread.ToolTip = said;
-            System.Windows.Automation.AutomationProperties.SetName(unread, said);
-            badges.Children.Add(unread);
-        }
         var hero = new Grid
         {
             Height = 48,
@@ -243,8 +279,14 @@ public sealed partial class DashboardScreen
         var ringInside = K.V(0, K.Text(string.IsNullOrEmpty(course.ScoreText) ? "–" : course.ScoreText!, Ty.Caption, course.Score == null ? B.Text2 : B.Text).Strong().Center());
         if (!string.IsNullOrEmpty(course.Grade)) ringInside.Children.Add(K.Text(course.Grade!, Ty.Caption, B.Text2).Center());
         ringInside.VerticalAlignment = VerticalAlignment.Center;
-        var ring = K.Ring(course.Score is { } s ? s / 100 : null, color, 56, 5, ringInside);
-        if (course.Score == null && !string.IsNullOrEmpty(course.ScoreWhy)) ring.ToolTip = course.ScoreWhy;
+        // (on a track in the course's own colour, as the Courses page's card has it; with no score, why in its tooltip over
+        //  the whole ring, not only its stroke)
+        var ring = K.Ring(course.Score is { } s ? s / 100 : null, color, 56, 5, ringInside, tinted: true);
+        if (course.Score == null && !string.IsNullOrEmpty(course.ScoreWhy))
+        {
+            ring.ToolTip = course.ScoreWhy;
+            if (ring is Panel face) face.Background = Brushes.Transparent;
+        }
         var names = K.V(2);
         if (!string.IsNullOrEmpty(course.AltName)) names.Children.Add(K.Text(course.AltName!, Ty.BodyStrong));
         if (!string.IsNullOrEmpty(course.Sub)) names.Children.Add(K.Wrapped(course.Sub!, Ty.Body, B.Text2, 2));
@@ -288,6 +330,7 @@ public sealed partial class DashboardScreen
             else links.Children.Add(K.IconButton(Glyph.Section(link.Kind), Go, name, 16, 32));
         }
         var bodyStack = K.V(12, top, bar, next);
+        if (under != null) { under.HorizontalAlignment = HorizontalAlignment.Left; bodyStack.Children.Insert(0, under); }
         if (links.Children.Count > 0) bodyStack.Children.Add(links.Margin(-8, -4, 0, -6));
         bodyStack.Margin = new Thickness(16, 12, 16, 14);
         var content = K.Rows("auto, auto", hero.Row(0), bodyStack.Row(1));

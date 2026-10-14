@@ -58,14 +58,14 @@ public static class ScreenFactory
     public static string TitleOf(Engine.Engine engine, Place p) => p.Kind switch
     {
         PlaceKind.Dashboard => "Dashboard",
-        PlaceKind.Courses => "All Courses",
+        PlaceKind.Courses => "All courses",
         PlaceKind.Todo => "To Do",
         PlaceKind.Calendar => "Calendar",
         PlaceKind.Grades => "Grades",
         PlaceKind.Notifications => "Notifications",
         PlaceKind.Inbox => "Inbox",
         PlaceKind.Tools => "Tools",
-        PlaceKind.ExternalTools => "External Tools",
+        PlaceKind.ExternalTools => "External tools",
         PlaceKind.Groups => "Groups",
         PlaceKind.Search => string.IsNullOrEmpty(p.Arg) ? "Search" : $"Search: {p.Arg}",
         PlaceKind.Home => ContextName(engine, p.Ctx),

@@ -358,7 +358,7 @@ public sealed class RichText : RichTextBox
                         //  text's height and baseline, and stands level with its letter as a line of words does)
                         into.Add(new Run("\u200B"));
                     }
-                    else into.Add(new Run(Formula.Readable(tex)));
+                    else foreach (var run in K.MarkedRuns(Formula.Readable(tex))) into.Add(run);
                     return;
                 }
                 if (Picture(n) is { } img) into.Add(new InlineUIContainer(img) { BaselineAlignment = BaselineAlignment.Center });

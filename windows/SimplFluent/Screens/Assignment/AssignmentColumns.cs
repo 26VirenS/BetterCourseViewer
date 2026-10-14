@@ -226,9 +226,9 @@ public sealed partial class AssignmentScreen
                 var step = steps[i];
                 var b = new Wpf.Ui.Controls.Button
                 {
-                    Content = StepLabel(step), Appearance = i == steps.Count - 1 ? ControlAppearance.Primary : ControlAppearance.Secondary,
+                    Content = StepLabel(step), Appearance = ReferenceEquals(step, steps.LastOrDefault(s => !s.Off)) ? ControlAppearance.Primary : ControlAppearance.Secondary,
                     HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                    Padding = new Thickness(12, 10, 12, 10), MinHeight = 44, ToolTip = step.Help, IsEnabled = !step.Pending,
+                    Padding = new Thickness(12, 10, 12, 10), MinHeight = 44, ToolTip = step.Help, IsEnabled = !step.Pending && !step.Off,
                 };
                 ToolTipService.SetShowOnDisabled(b, true);
                 System.Windows.Automation.AutomationProperties.SetName(b, step.Title);

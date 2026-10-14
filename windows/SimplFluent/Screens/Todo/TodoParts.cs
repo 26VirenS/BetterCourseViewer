@@ -110,7 +110,7 @@ internal static class TodoWords
     /// <summary>A piece of work's own action, by its kind (the Mac's WorkAction.label): Take quiz, Reply, Open, Hand in.</summary>
     public static (string Label, Wpf.Ui.Controls.SymbolRegular Icon) ActionOf(string? kind) => (kind ?? "").ToLowerInvariant() switch
     {
-        "quiz" => ("Take quiz", Wpf.Ui.Controls.SymbolRegular.TaskListLtr24),
+        "quiz" => ("Take quiz", Glyph.Work("quiz")),
         "discussion" or "discussion_topic" => ("Reply", Wpf.Ui.Controls.SymbolRegular.Chat24),
         "tool" => ("Open", Wpf.Ui.Controls.SymbolRegular.PuzzlePiece24),
         _ => ("Hand in", Wpf.Ui.Controls.SymbolRegular.ArrowUpload24),

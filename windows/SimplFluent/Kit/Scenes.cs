@@ -84,6 +84,22 @@ public static class Scenes
         return g;
     }
 
+    /// <summary>
+    /// The page's colour laid over a small card's scene where its words are (a Dashboard counter: its name over its number
+    /// at the left), about 70% there and thinning towards the card's right edge — so the scene's rings and skyline stay
+    /// faint behind the words and show at the edge. A plain gradient fill: no opacity mask to draw again each frame.
+    /// </summary>
+    public static Rectangle WordsVeil() => new()
+    {
+        IsHitTestVisible = false,
+        Fill = new LinearGradientBrush(new GradientStopCollection
+        {
+            new(Color.FromArgb(190, Page.R, Page.G, Page.B), 0),
+            new(Color.FromArgb(176, Page.R, Page.G, Page.B), 0.68),
+            new(Color.FromArgb(40, Page.R, Page.G, Page.B), 1),
+        }, new Point(0, 0.5), new Point(1, 0.5)),
+    };
+
     /// <summary>A theme's drawing for its tile in Settings: its scene inked in the theme's own colour on its paper.</summary>
     public static FrameworkElement? Swatch(string scene, string image, Color accent)
     {

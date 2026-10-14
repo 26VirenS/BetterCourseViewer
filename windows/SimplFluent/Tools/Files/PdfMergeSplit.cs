@@ -396,7 +396,7 @@ internal sealed class PdfMergeSplitTool : ContentControl
         if (s.Mode == "merge") { Files(); Merged(); } else Split();
         // (merging: the files at the left, the merged PDF with its Merge at the right — one over the other on a narrow
         //  window — so the one thing the page is for is never down a long column with the page's right empty)
-        var body = s.Mode == "merge" ? ToolKit.Columns(filesHost, mergedHost, 400, 960) : (UIElement)splitHost;
+        var body = s.Mode == "merge" ? ToolKit.Columns(filesHost, mergedHost, 380, 860) : (UIElement)splitHost;
         page = FileKit.Page(page, K.V(20, modes, notes, body));
         Content = page;
     }

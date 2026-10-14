@@ -88,10 +88,38 @@ internal sealed class MacmillanPopupView
     /// when it is due beside "Macmillan Learning".</summary>
     private async void Name()
     {
+        Doubled();
         if (await AltaLook.Assignment(engine, launch) is not { } a || closed) return;
-        if (a.Title is { Length: > 0 } name) title.Text = name;
+        if (a.Title is { Length: > 0 } name) { title.Text = name; named = true; }
         if (a.DueLine is { Length: > 0 } due) subtitle.Text = $"Macmillan Learning · {due}";
+        Doubled();
     }
+
+    /// <summary>The header named from the Canvas assignment (else, once the page is in, from the page's own heading).</summary>
+    private bool named;
+
+    /// <summary>
+    /// No Canvas assignment to name it (opened from External Tools' row, which has no assignment): the page's own heading
+    /// ("Chapter 3 Homework") as the title, or its document's title — never "Macmillan Learning" over "Macmillan Learning".
+    /// </summary>
+    private async void NameFromPage(CoreWebView2 core)
+    {
+        if (named || closed) return;
+        try
+        {
+            var json = await core.ExecuteScriptAsync("(function(){var h=document.querySelector('h1');var t=(h&&h.innerText||'').trim();return t||(document.title||'').trim();})()");
+            var heading = System.Text.Json.JsonSerializer.Deserialize<string>(json)?.Trim();
+            if (named || closed || string.IsNullOrEmpty(heading) || heading.Length > 120) return;
+            if (!string.Equals(heading, "Macmillan Learning", StringComparison.OrdinalIgnoreCase)) title.Text = heading;
+        }
+        catch (Exception e) { Log.Write("macmillan heading: " + e.Message); }
+        Doubled();
+    }
+
+    /// <summary>The line under the title only when it says more than the title: with no due line, and the title the
+    /// vendor's own name, no "Macmillan Learning" under "Macmillan Learning".</summary>
+    private void Doubled() =>
+        subtitle.Visibility = string.Equals(subtitle.Text.Trim(), title.Text.Trim(), StringComparison.OrdinalIgnoreCase) ? Visibility.Collapsed : Visibility.Visible;
 
     private void Draw()
     {
@@ -136,8 +164,9 @@ internal sealed class MacmillanPopupView
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsPasswordAutosaveEnabled = false;
         core.Settings.IsGeneralAutofillEnabled = false;
-        core.NavigationCompleted += (_, _) =>
+        core.NavigationCompleted += (_, e) =>
         {
+            if (e.IsSuccess) NameFromPage(core);
             if (!opening) return;
             opening = false;
             Hold(false);

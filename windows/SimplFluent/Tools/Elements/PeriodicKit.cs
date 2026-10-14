@@ -255,7 +255,9 @@ internal static class PTKit
 
     /// <summary>
     /// A row of chips kept on one line (the table's key, its colourings): scrolled sideways where it is wider than the
-    /// page — with its scroll bar, or the wheel with Shift — the wheel alone still scrolling the page under it.
+    /// page — with its scroll bar, or the wheel with Shift — the wheel alone still scrolling the page under it. While it
+    /// scrolls, room is kept under the chips for the bar (Windows 11's bar is drawn over a scroller's content, and would
+    /// otherwise cut through the chips' lower edge).
     /// </summary>
     public static ScrollViewer ChipRow(UIElement row)
     {
@@ -263,6 +265,11 @@ internal static class PTKit
         {
             Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Focusable = false, Padding = new Thickness(0, 0, 0, 2),
+        };
+        sv.ScrollChanged += (_, _) =>
+        {
+            var room = sv.ScrollableWidth > 0.5 ? 14 : 2;
+            if (Math.Abs(sv.Padding.Bottom - room) > 0.1) sv.Padding = new Thickness(0, 0, 0, room);
         };
         sv.PreviewMouseWheel += (_, e) =>
         {

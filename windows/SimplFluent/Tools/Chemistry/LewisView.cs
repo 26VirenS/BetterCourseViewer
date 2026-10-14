@@ -496,6 +496,9 @@ internal sealed class LewisMakerView : Grid
             drawing.Content = v;
         }
         strip.Content = r.Drawable && r.Structures.Count > 1 ? Resonance(r) : null;
+        // (the drawing over the rest, with its resonance structures under it in the card: room for both, so the
+        //  structure itself is never smaller than its own thumbnails)
+        layout.Floor = strip.Content != null ? 480 : 320;
     }
 
     /// <summary>The resonance structures side by side, ↔ between them; a press shows one large.</summary>

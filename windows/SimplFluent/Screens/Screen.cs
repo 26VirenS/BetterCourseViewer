@@ -59,6 +59,10 @@ public abstract class Screen
     /// <summary>The widest the content is laid out (a reading width), or null for the whole page.</summary>
     public virtual double? MaxContentWidth => null;
 
+    /// <summary>How wide the page's heading is, so its commands end where the content does (a page that keeps its content
+    /// to a width of its own on a wide window: an assignment); null, the page's whole width.</summary>
+    public virtual double? HeaderWidth => null;
+
     /// <summary>Something of the student's own is in it still (a reply being written): the shell keeps it, whatever else it lets go.</summary>
     public virtual bool Busy => false;
 

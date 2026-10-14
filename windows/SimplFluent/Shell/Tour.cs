@@ -233,6 +233,9 @@ public sealed class TourOverlay : Grid
         Motion.FadeIn(this, Motion.Medium);
     }
 
+    /// <summary>The step's suggestion was already taken as it showed (Back to a page already open).</summary>
+    private bool doneAtShow;
+
     private void Show(int i)
     {
         // (from a part lit to the next part, the callout goes with the light, as the Mac's does; a step with nothing lit
@@ -242,6 +245,9 @@ public sealed class TourOverlay : Grid
         revealed = false;
         seenEvents = Tour.Events;
         advancing = false;
+        // (what a step asks may be done already — come back to with Back, or done before the step: it then moves on only
+        //  once it is done anew, never by itself straight away)
+        doneAtShow = steps[i].Done?.Invoke() == true;
         BuildCard();
         if (!Arrange(animate: shown, step: true)) Motion.Pop(card);
         Dispatcher.BeginInvoke(() => Focus(), DispatcherPriority.Input);
@@ -329,8 +335,9 @@ public sealed class TourOverlay : Grid
         var later = K.Button("Not now", () => { CloseOffer(); Prefs.Set("tour:done", true); });
         later.ToolTip = "Take it any time from your account menu";
         var take = K.Button("Take the tour", () => Start(), accent: true);
+        // (the main choice first, as every pair of the first run has it — Windows 11's dialogs' order)
         var row = K.Columns("auto, *, auto, auto",
-            spark.Margin(0, 0, 12, 0).Col(0), words.Col(1), later.Margin(12, 0, 8, 0).Col(2), take.Col(3));
+            spark.Margin(0, 0, 12, 0).Col(0), words.Col(1), take.Margin(12, 0, 8, 0).Col(2), later.Col(3));
         offer = new Border
         {
             Child = row, MaxWidth = 460, Padding = new Thickness(18, 10, 10, 10), CornerRadius = new CornerRadius(8),
@@ -366,7 +373,11 @@ public sealed class TourOverlay : Grid
         if (index is not { } i || i >= steps.Count) return;
         Arrange(animate: true);
         var s = steps[i];
-        if (s.Done == null || advancing || !s.Done()) return;
+        if (s.Done == null || advancing) return;
+        var done = s.Done();
+        // (moved on only when the step's suggestion is taken while it shows: from not done to done)
+        if (doneAtShow) { doneAtShow = done; return; }
+        if (!done) return;
         advancing = true;
         var at = i;
         _ = Task.Delay(450).ContinueWith(_ => Dispatcher.BeginInvoke(() => { if (index == at) Next(); }));

@@ -48,6 +48,11 @@ public sealed partial class CalendarScreen : Screen
     private string? toldTitle, toldSub, shownNotice;
     private Window? hooked;
     private bool shotAsked = Launch.Get("open") == "preview";
+
+    /// <summary>The screenshot suite's item to preview, by (part of) its name (--preview-of); null: the first on screen.</summary>
+    internal static string? PreviewOf => Launch.Get("preview-of") is { Length: > 0 } w ? w : null;
+
+    private bool previewDayPicked;
     private (CalEvent Ev, FrameworkElement At)? firstItem;
 
     /// <summary>The day the Calendar's New task asked a task for (the Mac's NewTaskSheet.startDay): New task's sheet takes it once.</summary>
@@ -229,6 +234,14 @@ public sealed partial class CalendarScreen : Screen
         if (Notice(d) is { } n) v.Children.Add(NoticeBar(n.Text, n.Problem));
         else shownNotice = null;
         var byDay = d.Events.GroupBy(e => e.Day).ToDictionary(g => g.Key, g => g.ToList());
+        // (the screenshot suite: --preview-of Lec01-PreQuiz picks that item's day, so its row is in the day's panel — a
+        //  graded quiz is folded into "1 done" on the month's grid — and its preview is the one opened)
+        if (PreviewOf is { } want && !previewDayPicked && d.Events.FirstOrDefault(e => e.Title.Contains(want, StringComparison.OrdinalIgnoreCase)) is { } pe
+            && DateTime.TryParseExact(pe.Day, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var peDay))
+        {
+            previewDayPicked = true;
+            selected = peDay;
+        }
         var content = mode switch
         {
             "week" => WeekView(byDay, slide),

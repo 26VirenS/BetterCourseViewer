@@ -169,7 +169,16 @@ internal static class AltaParts
     public static string StartLabel(AltaCover cover)
     {
         var t = cover.Start.Trim();
-        return t.Length == 0 ? "Start" : CultureInfo.CurrentCulture.TextInfo.ToTitleCase(t.ToLowerInvariant());
+        return t.Length == 0 ? "Start" : Capital(t);
+    }
+
+    /// <summary>A label of Alta's ("STATUS", "START ASSIGNMENT") in Windows' sentence case: "Status", "Start assignment".</summary>
+    private static string Capital(string s)
+    {
+        var t = s.Trim();
+        if (t.Length == 0) return t;
+        var lower = t.ToLower(CultureInfo.CurrentCulture);
+        return char.ToUpper(lower[0], CultureInfo.CurrentCulture) + lower[1..];
     }
 
     private static FrameworkElement StartHeader(AltaCover cover, bool going, Action start, Action review)
@@ -182,8 +191,10 @@ internal static class AltaParts
             var details = new WrapPanel { Orientation = Orientation.Horizontal };
             foreach (var d in shown)
             {
-                var col = K.V(3, K.Text(d.Label.ToUpperInvariant(), Ty.Caption, B.Text2).Strong(), K.Wrapped(d.Value, Ty.BodyStrong));
-                if (!string.IsNullOrEmpty(d.Sub)) col.Children.Add(K.Wrapped(d.Sub!, Ty.Caption, B.Text2));
+                // (its label in Windows' sentence case — "Status", "Grade" — not Alta's capitals; its times as every
+                //  screen writes them: "Last updated Oct 10 at 8:08 PM")
+                var col = K.V(3, K.Text(Capital(d.Label), Ty.Caption, B.Text2).Strong(), K.Wrapped(AltaLook.Times(d.Value), Ty.BodyStrong));
+                if (!string.IsNullOrEmpty(d.Sub)) col.Children.Add(K.Wrapped(AltaLook.Times(d.Sub!), Ty.Caption, B.Text2));
                 col.Margin = new Thickness(0, 0, 28, 6);
                 col.MaxWidth = 260;
                 details.Children.Add(col);
@@ -193,7 +204,7 @@ internal static class AltaParts
         if (!string.IsNullOrEmpty(cover.Note))
         {
             var orange = K.Darkened(K.Tone("orange"));
-            var note = K.Wrapped(cover.Note, Ty.Body);
+            var note = K.Wrapped(AltaLook.Times(cover.Note), Ty.Body);
             note.Foreground = K.Brush(orange);
             v.Children.Add(K.Columns("auto, *", K.Icon(SymbolRegular.Sparkle24, 16, orange).Margin(0, 2, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), note.Col(1)));
         }

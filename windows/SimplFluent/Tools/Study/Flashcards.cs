@@ -336,7 +336,7 @@ internal sealed class FCSetView : ContentControl
     private static readonly (string Key, string Name, SymbolRegular Symbol, string Hex)[] Modes =
     {
         ("cards", "Flashcards", SymbolRegular.SquareMultiple24, "#0a84ff"), ("learn", "Learn", SymbolRegular.Flash24, "#5856d6"),
-        ("test", "Test", SymbolRegular.TaskListLtr24, "#ff9500"), ("match", "Match", SymbolRegular.Grid24, "#34c759"),
+        ("test", "Test", SymbolRegular.DocumentQuestionMark24, "#ff9500"), ("match", "Match", SymbolRegular.Grid24, "#34c759"),
     };
 
     private readonly string deckID;
@@ -356,7 +356,7 @@ internal sealed class FCSetView : ContentControl
         this.edit = edit;
         Focusable = false;
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
-        columns = ToolKit.Columns(K.V(20, tiles, preview), terms, 420, 980);
+        columns = ToolKit.Columns(K.V(20, tiles, preview), terms, 380, 860);
         Render();
         StudyKit.Watch(this, h => FlashcardStore.Changed += h, h => FlashcardStore.Changed -= h, Render);
     }
@@ -444,8 +444,19 @@ internal sealed class FCSetView : ContentControl
         // (the card takes the keys as the page opens, and keeps them as it changes)
         if (hadFocus || !focusedOnce)
         {
+            // (the first time, without scrolling the page down to it: WPF brings what takes the focus into view, and the
+            //  set opened scrolled past its title and its four ways to study)
+            var first = !focusedOnce;
             focusedOnce = true;
-            Dispatcher.BeginInvoke(() => { if (keys == v && v.IsVisible) { v.Focus(); Keyboard.Focus(v); } }, DispatcherPriority.Input);
+            void Stay(object sender, RequestBringIntoViewEventArgs e) => e.Handled = true;
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (keys != v || !v.IsVisible) return;
+                if (first) v.RequestBringIntoView += Stay;
+                v.Focus();
+                Keyboard.Focus(v);
+                if (first) v.RequestBringIntoView -= Stay;
+            }, DispatcherPriority.Input);
         }
     }
 

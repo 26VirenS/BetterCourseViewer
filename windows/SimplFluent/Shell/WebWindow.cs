@@ -33,7 +33,12 @@ public sealed class WebWindow : FluentWindow
         public string? Name { get; set; }
     }
 
-    private readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.Transparent, Visibility = Visibility.Hidden };
+    /// <summary>
+    /// The page, on the white a browser gives a page that sets no background of its own: many tools and plain pages set
+    /// none, and their default black text cannot be read on the window's dark Mica. (It shows only once the page is
+    /// asked for; "Opening …" and the failure are drawn over its row before that.)
+    /// </summary>
+    private readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.White, Visibility = Visibility.Hidden };
     private readonly TitleBar bar;
     private readonly Engine.Engine? engine;
     private readonly ToolLaunch? launch;

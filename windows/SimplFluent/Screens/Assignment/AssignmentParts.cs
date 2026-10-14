@@ -401,7 +401,7 @@ internal static class AssignScroll
 
 /// <summary>An assignment's next step, as its button says it (the Mac's AssignStep): the words, the symbol, the tooltip; the
 /// shorter words for beside another step; and a quiz's own kinds of step (its feedback, a new attempt).</summary>
-internal sealed record AssignStep(string Title, SymbolRegular Symbol, string Help, string? Short = null, bool Feedback = false, bool Again = false, bool Pending = false);
+internal sealed record AssignStep(string Title, SymbolRegular Symbol, string Help, string? Short = null, bool Feedback = false, bool Again = false, bool Pending = false, bool Off = false);
 
 /// <summary>The first of its children that fits the width it is given (the Mac's ViewThatFits): a step's words, then its
 /// shorter words, then those without the symbol.</summary>

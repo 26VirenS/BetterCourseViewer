@@ -64,11 +64,19 @@ public sealed partial class DashboardScreen : Screen
 
     /// <summary>The date, and — while the counts are still the ones kept from last time — that they are being brought up
     /// to date (the Mac's "Updating…"): the numbers stay, dimmed, and the live ones take their places as they come.</summary>
-    public override string? Subtitle => today.Data?.DateLine is { } line ? (Updating ? $"{line} · Updating…" : line) : null;
+    public override string? Subtitle => today.Data?.DateLine is { } line ? (Updating ? $"{line} · Updating…" : Stale ? $"{line} · Couldn’t update" : line) : null;
 
     /// <summary>The counts shown are the ones kept from last time: Today's answer not in yet, or the counts made on their
     /// own (Overdue, Graded) only as kept.</summary>
-    private bool Updating => today.Data != null && (today.Kept || countsFresh.Data == null);
+    private bool Updating => today.Data != null && (TodayUpdating || CountsUpdating);
+
+    /// <summary>Today's live answer, or the live counts, still being read (only then are the kept ones dimmed).</summary>
+    private bool TodayUpdating => today.Kept && today.Loading;
+    private bool CountsUpdating => countsFresh.Data == null && countsFresh.Loading;
+
+    /// <summary>A live read failed (offline, the school's error): the kept counts stand, undimmed, and the page says it
+    /// could not bring them up to date — never that it still is.</summary>
+    private bool Stale => today.Data != null && !Updating && ((today.Kept && !today.Loading) || (countsFresh.Data == null && countsFresh.Error != null));
 
     /// <summary>Cards · List · Activity (Windows 11's SelectorBar) and New task, beside the title.</summary>
     public override FrameworkElement? Commands
@@ -143,7 +151,7 @@ public sealed partial class DashboardScreen : Screen
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         var look = (Appearance.Dark, Appearance.Accent, Appearance.ThemeName);
         var layout = CounterLayout(width, WindowWidth);
-        page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, today.Kept, overdueAdjust, openKey, layout, look }, () => Counters(d, layout)));
+        page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, TodayUpdating, CountsUpdating, overdueAdjust, openKey, layout, look }, () => Counters(d, layout)));
         var two = width >= 900;
         var railW = RailWidth(width);
         var mainW = two ? Math.Min(MainMost, width - railW - 28) : width;
@@ -335,10 +343,18 @@ public sealed partial class DashboardScreen : Screen
     /// the one kept from last time (the live one takes its place as it comes).</summary>
     private static TextBlock Number((int? Value, string? Note, bool Kept) n, bool alert)
     {
-        var count = K.Text(n.Value?.ToString() ?? "–", Ty.Count, n.Value == null ? B.Text3 : alert ? B.Critical : B.Text);
+        var count = K.Text(n.Value?.ToString() ?? "–", Ty.Count, n.Value == null ? B.Text3 : B.Text);
+        if (alert && n.Value != null) count.Foreground = new SolidColorBrush(AlertRed);
         if (n.Value != null && n.Kept) count.Opacity = 0.5;
         return count;
     }
+
+    /// <summary>
+    /// The alert's red, the same whatever the theme: Windows' critical red in light, and in dark a red of Overdue's own
+    /// (#FF5A4F) — dark's critical (#FF99A4) is a pink that a theme's accent can match (Dusk's #FFAABB), and the alert
+    /// must never look like the accent. On the alert's face it reads at over 4:1 in dark, 5:1 in light.
+    /// </summary>
+    private static Color AlertRed => Appearance.Dark ? Color.FromRgb(0xff, 0x5a, 0x4f) : Color.FromRgb(0xc4, 0x2b, 0x1c);
 
     /// <summary>A counter's tile three to a row (two on the narrowest page): its symbol and name, its number, the line under it.</summary>
     private Button Tile(Counter c, bool full)
@@ -385,9 +401,19 @@ public sealed partial class DashboardScreen : Screen
             if (!string.IsNullOrEmpty(n.Note))
             {
                 var noteT = K.Text(n.Note!, Ty.Caption, B.Text2).Margin(RowGap, 0, 0, 5).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1);
-                // (shown when all of it fits, or enough to say something — about nine letters)
-                var enough = Math.Min(WordsWidth(n.Note!, Ty.Caption), 56);
-                noteT.SizeChanged += (_, e) => noteT.Visibility = e.NewSize.Width + 0.5 >= enough ? Visibility.Visible : Visibility.Hidden;
+                noteT.TextTrimming = TextTrimming.None;
+                // (never cut in the middle of a word: as many of its parts — "announcements · 2 courses" is two — as fit
+                //  whole, "announcements" alone where both do not; none where not even the first does, the tooltip and
+                //  what a screen reader says then the whole of it)
+                var parts = n.Note!.Split(" · ");
+                var widths = Enumerable.Range(1, parts.Length).Select(k => WordsWidth(string.Join(" · ", parts.Take(k)), Ty.Caption)).ToArray();
+                noteT.SizeChanged += (_, e) =>
+                {
+                    var fit = 0;
+                    while (fit < parts.Length && widths[fit] <= e.NewSize.Width + 0.5) fit++;
+                    noteT.Text = fit == 0 ? "" : string.Join(" · ", parts.Take(fit));
+                    noteT.Visibility = fit == 0 ? Visibility.Hidden : Visibility.Visible;
+                };
                 line.Children.Add(noteT);
             }
         }
@@ -411,7 +437,12 @@ public sealed partial class DashboardScreen : Screen
     {
         // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
         var face = new Grid();
-        if (Scenes.Backdrop(c.Key) is { } scene) face.Children.Add(scene);
+        if (Scenes.Backdrop(c.Key) is { } scene)
+        {
+            face.Children.Add(scene);
+            // (the scene kept faint behind the name and the number, whole only in the tile's empty corner)
+            if (!alert) face.Children.Add(Scenes.WordsVeil());
+        }
         else if (!alert) face.Children.Add(Wash(color));
         if (alert) face.Children.Add(AlertFace());
         face.Children.Add(content);
@@ -423,12 +454,11 @@ public sealed partial class DashboardScreen : Screen
         return b;
     }
 
-    /// <summary>The alert's face: Windows' critical background, solid, ringed in its critical red.</summary>
+    /// <summary>The alert's face: Windows' critical background, solid, ringed in the alert's red.</summary>
     private static Border AlertFace()
     {
-        var f = new Border { CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1.5), IsHitTestVisible = false };
+        var f = new Border { CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1.5), IsHitTestVisible = false, BorderBrush = new SolidColorBrush(AlertRed) };
         f.SetResourceReference(Border.BackgroundProperty, B.CriticalBack);
-        f.SetResourceReference(Border.BorderBrushProperty, B.Critical);
         return f;
     }
 
@@ -455,7 +485,7 @@ public sealed partial class DashboardScreen : Screen
             if (k?.Overdue is { } o)
             {
                 var n = Math.Max(0, o + overdueAdjust);
-                return (n, overdueAdjust != 0 ? (n > 0 ? $"{n} not submitted" : "Nothing overdue") : k.OverdueNote, fresh == null);
+                return (n, overdueAdjust != 0 ? (n > 0 ? $"{n} not submitted" : "Nothing overdue") : k.OverdueNote, CountsUpdating);
             }
             return (null, null, false);
         }
@@ -463,11 +493,11 @@ public sealed partial class DashboardScreen : Screen
         {
             var k = fresh ?? quick;
             var note = full && !string.IsNullOrEmpty(k?.GradedFullNote) ? k!.GradedFullNote : k?.GradedNote;
-            return k?.Graded is { } g ? (g, note, fresh == null) : (null, null, false);
+            return k?.Graded is { } g ? (g, note, CountsUpdating) : (null, null, false);
         }
         var line = full && !string.IsNullOrEmpty(c.FullNote) ? c.FullNote : c.Note;
         if (today.Data == null || c.Pending == true) return (null, line, false);
-        return (c.Value, line, today.Kept);
+        return (c.Value, line, TodayUpdating);
     }
 
     // ---- the panel a counter grows into (the Mac's DashCounterPanel: 440 wide; here a Windows 11 flyout surface) ----
@@ -626,7 +656,8 @@ public sealed partial class DashboardScreen : Screen
             K.IconTile(Glyph.Counter(key), color, 28).Col(0),
             K.Text(data?.Title ?? FullName(key, c.Label), Ty.BodyStrong).Margin(10, 0, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1),
             close.Col(2));
-        var count = K.Text(n.Value?.ToString() ?? "–", Ty.TitleLarge, n.Value == null ? B.Text3 : alert ? B.Critical : B.Text);
+        var count = K.Text(n.Value?.ToString() ?? "–", Ty.TitleLarge, n.Value == null ? B.Text3 : B.Text);
+        if (alert) count.Foreground = new SolidColorBrush(AlertRed);
         var line = data?.Note ?? n.Note;
         var countRow = K.Columns("auto, *", count.Col(0));
         if (!string.IsNullOrEmpty(line)) countRow.Children.Add(K.Wrapped(line!, Ty.Body, B.Text2, 2).Margin(14, 0, 0, 6).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1));
@@ -696,8 +727,10 @@ public sealed partial class DashboardScreen : Screen
             {
                 var tint = K.Hex(row.Color);
                 if (rq) tint = K.Mix(tint, Color.FromRgb(0x8a, 0x8a, 0x8a), 0.5);
-                var symbol = key == "unread" ? SymbolRegular.Megaphone24 : WorkPreview.KindOf(row.Url)?.Item2 ?? Glyph.Work(row.Kind);
-                g = K.Columns("*, auto", WorkFace(tint, symbol, row.Course, row.Kind, null, title, row.Detail, row.When, stacked: true, tileSize: 28).Col(0));
+                // (the symbol as Coming up chooses it — the row's kind first, so a quiz wears the quiz's symbol here too; in
+                //  the Announcements panel no kind word under each row: the panel's title and the megaphone say it)
+                var symbol = key == "unread" ? SymbolRegular.Megaphone24 : row.Kind != null ? Glyph.Work(row.Kind) : WorkPreview.KindOf(row.Url)?.Item2 ?? Glyph.Work(null);
+                g = K.Columns("*, auto", WorkFace(tint, symbol, row.Course, key == "unread" ? null : row.Kind, null, title, row.Detail, row.When, stacked: true, tileSize: 28).Col(0));
             }
             else
             {

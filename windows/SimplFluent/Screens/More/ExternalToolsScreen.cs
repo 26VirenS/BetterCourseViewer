@@ -105,7 +105,7 @@ public sealed partial class ExternalToolsScreen : Screen
 
     public ExternalToolsScreen(Engine.Engine engine) : base(engine) => model = Watch(new Loader<Data>());
 
-    public override string Title => "External Tools";
+    public override string Title => "External tools";
 
     public override string? Subtitle => model.Data is { Rows.Count: > 0 } d ? d.Sub : null;
 
@@ -296,7 +296,7 @@ public sealed partial class ExternalToolsScreen : Screen
         var row = K.Columns("auto, *, auto",
             K.Dot(K.Hex(c.Color), 7).Margin(0, 0, 6, 0).Col(0),
             name.Col(1),
-            CourseKit.OwnWindowMark(11, B.Text2).Margin(6, 0, 0, 0).Col(2));
+            CourseKit.OwnWindowMark().Margin(6, 0, 0, 0).Col(2));
         // (K.Subtle marks its press handled: the card round it is not pressed, nor opened, by it)
         var b = K.Subtle(row, () => { CloseList(); Open(t, c); }, new Thickness(10, 5, 10, 6), 12);
         b.SetResourceReference(Control.BackgroundProperty, B.Subtle3);

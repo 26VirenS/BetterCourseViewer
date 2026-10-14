@@ -272,12 +272,17 @@ public static class ToolKit
         content.HorizontalAlignment = HorizontalAlignment.Stretch;
     }
 
-    /// <summary>Two columns side by side on a wide window (the work and its side panel), one over the other on a narrow one.</summary>
-    public static FrameworkElement Columns(UIElement main, UIElement side, double sideWidth = 380, double breakpoint = 900, double spacing = 28)
+    /// <summary>
+    /// Two columns side by side on a wide window (the work and its side panel), one over the other on a narrow one — the
+    /// side first there when it holds the tool's answer (<paramref name="sideFirst"/>), so the answer is never under its
+    /// inputs. The breakpoints are for the page beside the navigation pane (about 980 of content in a 1366 window, 900
+    /// in a 1280 one), not for a sheet over the whole window.
+    /// </summary>
+    public static FrameworkElement Columns(UIElement main, UIElement side, double sideWidth = 380, double breakpoint = 860, double spacing = 28, bool sideFirst = false)
     {
         if (main is FrameworkElement m) m.VerticalAlignment = VerticalAlignment.Top;
         if (side is FrameworkElement s) s.VerticalAlignment = VerticalAlignment.Top;
-        return new ToolColumns(main, side, sideWidth, breakpoint, spacing);
+        return new ToolColumns(main, side, sideWidth, breakpoint, spacing, sideFirst);
     }
 
     /// <summary>A labelled field: its label over it, a hint under it, a word after it (a unit, "%").</summary>
@@ -377,14 +382,37 @@ public static class ToolKit
         }));
     }
 
-    /// <summary>A tool's view on the Tools page, with the scroll edge along its top (under the page's heading).</summary>
+    /// <summary>A tool's view on the Tools page, with the scroll edge along its top (under the page's heading), opening
+    /// at its top: whatever takes the focus as a tool comes up (a card, a field) is not let scroll the page down to it,
+    /// past the tool's title and its first controls.</summary>
     public static FrameworkElement Edged(FrameworkElement body)
     {
         var line = K.Divider();
         line.VerticalAlignment = VerticalAlignment.Top;
         line.IsHitTestVisible = false;
         ScrollEdge(line, body);
-        return new Grid { Children = { body, line } };
+        var g = new Grid { Children = { body, line } };
+        void Top(object? sender, RoutedEventArgs e)
+        {
+            g.Loaded -= Top;
+            g.Dispatcher.BeginInvoke(() => { if (PageScroller(body) is { } sv) sv.ScrollToTop(); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        }
+        g.Loaded += Top;
+        return g;
+    }
+
+    /// <summary>A tool's own page scroller: the first scroller in it as tall as most of the tool (not a list inside it).</summary>
+    private static ScrollViewer? PageScroller(FrameworkElement body)
+    {
+        var queue = new Queue<DependencyObject>();
+        queue.Enqueue(body);
+        while (queue.Count > 0)
+        {
+            var d = queue.Dequeue();
+            if (d is ScrollViewer sv && sv.ActualHeight >= body.ActualHeight * 0.5) return sv;
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++) queue.Enqueue(VisualTreeHelper.GetChild(d, i));
+        }
+        return null;
     }
 }
 
@@ -398,14 +426,16 @@ internal sealed class ToolColumns : Panel
 {
     private readonly UIElement main, side;
     private readonly double sideWidth, breakpoint, spacing;
+    private readonly bool sideFirst;
 
-    public ToolColumns(UIElement main, UIElement side, double sideWidth, double breakpoint, double spacing)
+    public ToolColumns(UIElement main, UIElement side, double sideWidth, double breakpoint, double spacing, bool sideFirst = false)
     {
         this.main = main;
         this.side = side;
         this.sideWidth = sideWidth;
         this.breakpoint = breakpoint;
         this.spacing = spacing;
+        this.sideFirst = sideFirst;
         Children.Add(main);
         Children.Add(side);
     }
@@ -440,9 +470,12 @@ internal sealed class ToolColumns : Panel
         }
         else
         {
-            var top = main.DesiredSize.Height;
-            main.Arrange(new Rect(0, 0, w, top));
-            side.Arrange(new Rect(0, top + spacing, w, side.DesiredSize.Height));
+            // (one over the other: the work, then its panel — or the panel first, when it holds the answer)
+            var first = sideFirst ? side : main;
+            var second = sideFirst ? main : side;
+            var top = first.DesiredSize.Height;
+            first.Arrange(new Rect(0, 0, w, top));
+            second.Arrange(new Rect(0, top + spacing, w, second.DesiredSize.Height));
         }
         return final;
     }
@@ -798,6 +831,81 @@ public sealed class PinBar : StackPanel
             };
             t.Start();
         }
+        // (CI's check that a flyout stays open while it is used: --pin-try graph opens that pin's flyout as a press does —
+        //  not kept — then clicks into it and types, as a student does, and says in the log whether it is still open
+        //  five seconds on; run with no other copy of Simpl beside it)
+        if (!inPopup && Launch.Take("", "pin-try") is { Length: > 0 } tk)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            t.Tick += (_, _) =>
+            {
+                t.Stop();
+                OpenFlyout(tk, kept: false);
+                PinTry(tk);
+            };
+            t.Start();
+        }
+        // (the screenshot suite: --pin-popout calc pulls that pin's quick version out into its window of its own, a few
+        //  seconds after launch — over a quiz's popup, say, as a student keeps it beside the questions)
+        if (!inPopup && Launch.Take("", "pin-popout") is { Length: > 0 } pk)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            t.Tick += (_, _) =>
+            {
+                t.Stop();
+                if (Shot.Asked) Log.Write($"pin popped out: {pk}");
+                ToolFloat.Show(pk, engine, Window.GetWindow(this) ?? Application.Current?.MainWindow);
+            };
+            t.Start();
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool IsChild(IntPtr parent, IntPtr child);
+
+    /// <summary>--pin-try: the open flyout used as a student uses it — a click in it (Desmos's graph; the heading beside
+    /// the sets), the keyboard moved into it and a key typed — then, five seconds on, whether it is still open.</summary>
+    private void PinTry(string key)
+    {
+        void After(double s, Action a)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(s) };
+            t.Tick += (_, _) => { t.Stop(); a(); };
+            t.Start();
+        }
+        After(2, () =>
+        {
+            if (flyout?.Child is not FrameworkElement card || !card.IsLoaded) { Log.Write($"pin try: no flyout for {key}"); return; }
+            // (Desmos's graph, in the flyout's middle; else the heading's empty middle, beside the tool's name — a row
+            //  pressed would open the whole tool, which closes the flyout as it should)
+            var at = key == "graph"
+                ? card.PointToScreen(new Point(card.ActualWidth / 2, card.ActualHeight / 2))
+                : card.PointToScreen(new Point(card.ActualWidth * 0.62, ToolsCenter.FlyoutPadding(key) + 14));
+            SetCursorPos((int)at.X, (int)at.Y);
+            mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero); // (left down)
+            mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero); // (left up)
+            Log.Write($"pin try: clicked in the {key} flyout");
+            After(0.8, () =>
+            {
+                if (flyout?.Child is FrameworkElement c2 && !c2.IsKeyboardFocusWithin) c2.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+                keybd_event(0x58, 0, 0, UIntPtr.Zero); // (x)
+                keybd_event(0x58, 0, 0x0002, UIntPtr.Zero);
+                Log.Write($"pin try: typed in the {key} flyout");
+                After(5, () => Log.Write(flyout != null && flyoutKey == key ? $"pin flyout still open: {key}" : $"pin flyout gone: {key}"));
+            });
+        });
+    }
+
+    /// <summary>The flyout's own window (a popup is one) in front: the keyboard gone into a part of the flyout that is a
+    /// window of its own — not the student leaving for another app.</summary>
+    private bool FlyoutInFront()
+    {
+        if (flyout?.Child is not Visual card || PresentationSource.FromVisual(card) is not System.Windows.Interop.HwndSource src) return false;
+        var front = GetForegroundWindow();
+        return front == src.Handle || IsChild(src.Handle, front);
     }
 
     private void Hook()
@@ -1171,7 +1279,7 @@ public sealed class PinBar : StackPanel
         // (the keyboard or the pointer gone into the flyout itself — a window of its own inside it, Desmos — is not leaving)
         Dispatcher.BeginInvoke(() =>
         {
-            if (flyout?.Child is UIElement card && (card.IsKeyboardFocusWithin || card.IsMouseOver)) return;
+            if (flyout?.Child is UIElement card && (card.IsKeyboardFocusWithin || card.IsMouseOver || FlyoutInFront())) return;
             if (flyoutWindow is { IsActive: false }) CloseFlyout("window left");
         }, DispatcherPriority.Input);
     }

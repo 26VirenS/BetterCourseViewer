@@ -177,7 +177,7 @@ public sealed class ToolsScreen : Screen
     {
         timerLine = null;
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 12 };
-        // (a heading for what each set of tools is for, its tiles under it: three across from about 900 wide)
+        // (a heading for what each set of tools is for, its tiles under it: two across, four from about 1200 wide)
         FrameworkElement Heading(string title, string? line)
         {
             var h = K.V(2, K.Text(title, Ty.Subtitle));
@@ -190,7 +190,8 @@ public sealed class ToolsScreen : Screen
         {
             page.Children.Add(Heading(title, null));
             var kinds = keys.Select(k2 => Kinds.FirstOrDefault(t => t.Key == k2)).OfType<Kind>();
-            page.Children.Add(new MoreGrid(TileWidth, 16, kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
+            // (each set's four in full rows: four across on a wide page, else two — never three and one left alone)
+            page.Children.Add(new MoreGrid(TileWidth, 16, kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = true });
         }
         // (the biology toolkit's ten under a heading of their own, as the Mac's Tools page has them)
         var heading = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");

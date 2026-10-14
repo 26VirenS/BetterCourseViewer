@@ -86,6 +86,10 @@ internal sealed class MoreGrid : Panel
     public double RowSpacing { get; set; } = 16;
     public bool Stretch { get; set; }
 
+    /// <summary>Rows kept full: as many columns as fit, less any that would leave a last row short (four tiles two
+    /// across rather than three and one alone).</summary>
+    public bool Even { get; set; }
+
     public MoreGrid(double minColumn, double spacing, IEnumerable<UIElement> kids, double maxColumn = double.PositiveInfinity, bool stretch = false)
     {
         MinColumn = minColumn;
@@ -100,6 +104,12 @@ internal sealed class MoreGrid : Panel
     {
         if (double.IsInfinity(width) || width <= 0) width = MinColumn;
         var cols = Math.Max(1, (int)Math.Floor((width + Spacing) / (MinColumn + Spacing)));
+        var n = InternalChildren.Count;
+        if (Even && n > 0)
+        {
+            cols = Math.Min(cols, n);
+            while (cols > 1 && n % cols != 0) cols--;
+        }
         var w = Math.Min(MaxColumn, (width - Spacing * (cols - 1)) / cols);
         return (cols, Math.Max(0, w));
     }

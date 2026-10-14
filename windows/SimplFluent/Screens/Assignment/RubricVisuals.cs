@@ -337,16 +337,19 @@ internal sealed class RubricBarVisual : FrameworkElement
     private readonly List<RubricBarPlace> places;
     /// <summary>The points given, apart from the level given (null: the mark is the level's own tick).</summary>
     private readonly double? markY;
+    /// <summary>The mark's own number beside its dot ("4"), so the dot is never read as the level row level with it.</summary>
+    private readonly string? markLabel;
 
     public double Grow { get => (double)GetValue(GrowProperty); set => SetValue(GrowProperty, value); }
 
-    public RubricBarVisual(RubricRGB tone, double frac, double foot, List<RubricBarPlace> places, double? markY = null)
+    public RubricBarVisual(RubricRGB tone, double frac, double foot, List<RubricBarPlace> places, double? markY = null, string? markLabel = null)
     {
         this.tone = tone;
         this.frac = frac;
         this.foot = foot;
         this.places = places;
         this.markY = markY;
+        this.markLabel = markLabel;
         Width = RubricRing.Width;
         Height = RubricRing.Height;
         IsHitTestVisible = false;
@@ -445,6 +448,14 @@ internal sealed class RubricBarVisual : FrameworkElement
                 stroke.Freeze();
                 dc.PushOpacity(a);
                 dc.DrawEllipse(Brushes.White, stroke, new Point(RubricRing.BarX, my), 8 * z, 8 * z);
+                // (its points beside it, at the bar's left, in the criterion's colour: the dot says what it is)
+                if (!string.IsNullOrEmpty(markLabel))
+                {
+                    var ink = Support.Appearance.Dark ? tone.Mix(RubricRGB.White, 0.35).Color : tone.Mix(RubricRGB.Black, 0.3).Color;
+                    var text = new FormattedText(markLabel, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                        new Typeface(K.TextFace, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), 12, K.Brush(ink), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                    dc.DrawText(text, new Point(RubricRing.BarX - 14 - text.Width, my - text.Height / 2));
+                }
                 dc.Pop();
             }
         }
@@ -452,9 +463,9 @@ internal sealed class RubricBarVisual : FrameworkElement
 }
 
 /// <summary>
-/// The way back to the ring (the Mac's RubricRingBack): the ring in miniature on top of the bar, the open criterion's slice
-/// missing from it where the thread from the bar comes in — the bar is that slice, pulled out. Under the pointer the
-/// slice fills back into its place and the little ring swells, as a press does to the real one.
+/// The ring in miniature on top of the bar (the Mac's RubricRingBack), the open criterion's slice missing from it where the
+/// thread from the bar comes in — the bar is that slice, pulled out. On Windows a picture only: the way back is "‹ Ring"
+/// beside ×, the screen's one back control.
 /// </summary>
 internal sealed class RubricRingBack : Button
 {
@@ -549,6 +560,16 @@ internal sealed class RubricRingBack : Button
         face.InvalidateVisual();
     }
 
+    /// <summary>For a screen reader, nothing to press here.</summary>
+    protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer() => new Quiet(this);
+
+    private sealed class Quiet : System.Windows.Automation.Peers.FrameworkElementAutomationPeer
+    {
+        public Quiet(FrameworkElement owner) : base(owner) { }
+        protected override bool IsControlElementCore() => false;
+        protected override bool IsContentElementCore() => false;
+    }
+
     public RubricRingBack(RubricModel model, Action back)
     {
         face = new Face(model);
@@ -558,9 +579,11 @@ internal sealed class RubricRingBack : Button
         Padding = new Thickness(0);
         Width = 44;
         Height = 44;
-        Cursor = Cursors.Hand;
-        ToolTip = "Back to the ring (Esc)";
-        System.Windows.Automation.AutomationProperties.SetName(this, "Back to the ring");
+        // (a picture of where the bar came from, not a control: "‹ Ring" beside × is the one way back — Windows'
+        //  one back control a screen — so the pointer, the keyboard and a screen reader pass it by)
+        IsHitTestVisible = false;
+        Focusable = false;
+        IsTabStop = false;
         var scale = new ScaleTransform(1, 1);
         RenderTransformOrigin = new Point(0.5, 0.5);
         RenderTransform = scale;

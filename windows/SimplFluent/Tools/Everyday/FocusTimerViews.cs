@@ -35,7 +35,7 @@ internal sealed class FocusTimerTool
         controls.View.HorizontalAlignment = HorizontalAlignment.Center;
         var column = K.V(24, picker, dial.View, controls.View, endedHost, foot);
         column.Margin = new Thickness(0, 12, 0, 12);
-        var page = Everyday.Page(ToolKit.Columns(column, settings.View, 380, 940));
+        var page = Everyday.Page(ToolKit.Columns(column, settings.View, 360, 860));
         View = page;
         Update();
         Everyday.Follow(page, () => { timer.Changed += Update; Update(); }, () => timer.Changed -= Update);

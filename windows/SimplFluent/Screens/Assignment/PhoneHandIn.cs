@@ -125,10 +125,10 @@ internal sealed class PhoneHandIn
         root.Children.Add(top);
 
         iconHost.Content = K.IconTile(SymbolRegular.Phone24, accent, 40);
-        var close = K.IconButton(SymbolRegular.Dismiss24, Close, "Close Send from phone", 14, 32);
+        // (one way to close it, Done at its foot — and Escape — as a Windows 11 dialog has; no × as well)
         var words = K.V(2, title, subtitle);
         words.VerticalAlignment = VerticalAlignment.Center;
-        var head = K.Columns("auto, *, auto", iconHost.Margin(0, 0, 12, 0).Col(0), words.Col(1), close.Align(HorizontalAlignment.Right, VerticalAlignment.Top).Col(2));
+        var head = K.Columns("auto, *", iconHost.Margin(0, 0, 12, 0).Col(0), words.Col(1));
         head.Margin = new Thickness(24, 20, 20, 10);
 
         var body = K.V(14, stateHost, whereNote, combine);
@@ -427,6 +427,7 @@ internal sealed class PhoneHandIn
         {
             if (qr != null) iconHost.Content = new PhoneQrView(qr, settled: true) { Width = 46, Height = 46 };
             stateHost.Content = arriving;
+            Where(); // (the phone is here: what it needed to get here goes)
             if (Motion.On) Motion.FadeIn(arriving, Motion.Normal); else if (Plain) Fade(arriving, 0, 1, 150);
             Shot.Moved();
         }
@@ -474,8 +475,8 @@ internal sealed class PhoneHandIn
                     Prefs.Set("phoneAsked", true);
                     Start();
                 }, accentButton: true),
-            Phase.NoNetwork => Problem(SymbolRegular.WifiOff24, "Connect this computer to Wi-Fi to use your phone.",
-                "Your phone must be on the same Wi-Fi. Some school networks block this — your phone’s hotspot works.", "Try again", Start),
+            Phase.NoNetwork => Problem(SymbolRegular.WifiOff24, "Connect this PC to a network to use your phone.",
+                SameNetwork, "Try again", Start),
             Phase.Failed => Problem(SymbolRegular.Warning24, "Send from phone couldn’t start.", why, "Try again", Start),
             Phase.Idle => Problem(SymbolRegular.Clock24, "Stopped after 15 minutes without use.", "Start again to get a new code.", "Start again", Start),
             _ => Waiting(),
@@ -531,18 +532,31 @@ internal sealed class PhoneHandIn
         return card;
     }
 
+    /// <summary>What the phone needs, in the Mac's words (work-17): one network, any kind — never "Wi-Fi" beside a PC on
+    /// a cable.</summary>
+    private const string SameNetwork = "Your phone needs to be on the same network as this PC (your phone’s hotspot works).";
+
+    /// <summary>
+    /// While the code waits for a phone: what the phone needs, and — folded under "Trouble connecting?" — where this PC
+    /// is (its connection and address) and that some school networks block this. Gone once a phone has connected.
+    /// </summary>
     private void Where()
     {
         whereNote.Children.Clear();
-        var shown = phase is Phase.Starting or Phase.Waiting or Phase.Connected;
+        var shown = phase is Phase.Starting or Phase.Waiting;
         whereNote.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         if (!shown) return;
+        var need = K.Wrapped(SameNetwork, Ty.Body, B.Text2);
+        need.TextAlignment = TextAlignment.Center;
+        whereNote.Children.Add(need);
+        var more = K.V(6);
         if (address != null)
         {
             var words = address.Kind == "network" ? $"This PC is at {address.Ip}" : $"This PC is on {address.Kind} at {address.Ip}";
-            whereNote.Children.Add(K.H(8, K.Icon(address.Kind == "Wi-Fi" ? SymbolRegular.Wifi124 : SymbolRegular.PlugConnected24, 16, B.Text2), K.Text(words, Ty.Body)));
+            more.Children.Add(K.H(8, K.Icon(address.Kind == "Wi-Fi" ? SymbolRegular.Wifi124 : SymbolRegular.PlugConnected24, 16, B.Text2), K.Text(words, Ty.Body)));
         }
-        whereNote.Children.Add(K.Wrapped("Your phone must be on the same Wi-Fi. Some school networks block this — your phone’s hotspot works.", Ty.Caption, B.Text2));
+        more.Children.Add(K.Wrapped("Some school networks keep devices apart, and the phone cannot reach this PC there: turn on your phone’s hotspot and join it from this PC, then try again.", Ty.Caption, B.Text2));
+        whereNote.Children.Add(new Expander { Header = "Trouble connecting?", Content = more, IsExpanded = false, HorizontalAlignment = HorizontalAlignment.Stretch });
     }
 
     private FrameworkElement Problem(SymbolRegular icon, string words, string? more, string button, Action act, bool accentButton = false)

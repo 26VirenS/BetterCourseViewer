@@ -220,7 +220,7 @@ internal sealed class UnitConverterTool
         result.ContextMenu = MoreKit.Menu(("Copy", SymbolRegular.Copy24, () => { if (s.Result is { } r) Everyday.Copy(UnitMath.WithUnit(r, s.To).Replace("−", "-")); }));
         var answer = K.Card(K.V(6, Everyday.Shrinks(result), line, copy.Margin(0, 6, 0, 0)), new Thickness(24));
         var converter = K.V(20, column, answer);
-        View = Everyday.Page(K.V(20, kinds, ToolKit.Columns(converter, every, 400, 960)));
+        View = Everyday.Page(K.V(20, kinds, ToolKit.Columns(converter, every, 380, 860)));
         Update();
         Everyday.Follow(View, () => { s.Changed += Update; Update(); }, () => s.Changed -= Update);
     }

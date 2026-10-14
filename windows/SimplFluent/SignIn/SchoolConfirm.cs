@@ -17,7 +17,8 @@ namespace Simpl.SignIn;
 /// and takes no clicks — it is a look, not the page. Only a page that came is drawn, on white (a page's own ground):
 /// while it comes, a small card in the theme's colours waits in its place with a spinner, and where it cannot come the
 /// card says so — and that the student can sign in all the same (the Mac's 200 by 160) — never a bright empty square
-/// in a dark window. The square's room is kept throughout, so nothing under it moves.
+/// in a dark window. The square's room is kept while the page may come, so nothing under it moves; once it cannot, the
+/// room closes up to the card. The school's other names (the row's "also: …") are said under its name.
 /// </summary>
 public sealed class SchoolConfirm : Grid
 {
@@ -28,6 +29,8 @@ public sealed class SchoolConfirm : Grid
     private readonly Border waiting;
     private WebView2CompositionControl? web;
     private bool settled;
+    /// <summary>The square's room: kept while the page may still come, let go to the card's own height once it cannot.</summary>
+    private readonly Grid stage;
 
     public SchoolConfirm(SchoolSearch.School school, Action yes, Action no)
     {
@@ -44,7 +47,7 @@ public sealed class SchoolConfirm : Grid
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
         waiting.Bg(B.Card).Stroke(B.CardStroke);
-        var stage = new Grid { Width = Side, Height = Side, HorizontalAlignment = HorizontalAlignment.Center, Children = { square, waiting } };
+        stage = new Grid { Width = Side, Height = Side, HorizontalAlignment = HorizontalAlignment.Center, Children = { square, waiting } };
 
         var name = K.Wrapped(school.Name, Ty.BodyLarge, B.Text, 2).Center();
         name.TextAlignment = TextAlignment.Center;
@@ -52,12 +55,21 @@ public sealed class SchoolConfirm : Grid
             K.Text("Is this your school?", Ty.Subtitle).Center(),
             name,
             K.Text(school.Domain, Ty.Body, B.Text2).Center());
-        var noB = K.Button("No, search again", no);
-        noB.MinWidth = 150;
+        // (the other names it goes by, as its row in the search said them — the one the student knows may be among them:
+        //  "also State Center Community College District")
+        if (school.Also is { Count: > 0 } also)
+        {
+            var others = K.Wrapped("also " + string.Join(", ", also.Take(2)) + (also.Count > 2 ? $" +{also.Count - 2}" : ""), Ty.Caption, B.Text2, 2).Center();
+            others.TextAlignment = TextAlignment.Center;
+            words.Children.Add(others);
+        }
+        // (the main choice first, as a Windows 11 dialog's buttons go — the order every pair of the first run keeps)
         var yesB = K.Button("Yes, sign in", yes, accent: true);
         yesB.MinWidth = 150;
         yesB.IsDefault = true;
-        var buttons = K.H(12, noB, yesB);
+        var noB = K.Button("No, search again", no);
+        noB.MinWidth = 150;
+        var buttons = K.H(12, yesB, noB);
         buttons.HorizontalAlignment = HorizontalAlignment.Center;
         var column = K.V(20, stage, words, buttons);
         column.Width = 520;
@@ -133,6 +145,8 @@ public sealed class SchoolConfirm : Grid
         waiting.Child = none;
         System.Windows.Automation.AutomationProperties.SetName(waiting, "Couldn’t load a preview of this school’s sign-in page. You can still sign in.");
         Motion.FadeIn(none, Motion.Normal);
+        // (a final answer: the square's room let go, so the card sits as close to the question as the rest of the column)
+        stage.Height = waiting.Height;
     }
 
     /// <summary>The square let go of (No, search again; the school opened).</summary>

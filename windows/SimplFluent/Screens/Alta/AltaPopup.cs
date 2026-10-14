@@ -212,7 +212,7 @@ internal sealed class AltaPopupView
 
     /// <summary>"Knewton Alta · Due Oct 12 at 11:59 PM": the Canvas assignment's due line; until it is read (or where it
     /// cannot be), Alta's own due time written the same way — the publisher's words for it ("Monday, Oct 12 11:59pm PDT")
-    /// only as the last resort.</summary>
+    /// only as the last resort, and even then read as a date where they can be (AltaLook.DueOf).</summary>
     private string Subtitle()
     {
         var s = session;
@@ -223,7 +223,9 @@ internal sealed class AltaPopupView
             try { parts.Add(AltaLook.DueText(DateTimeOffset.FromUnixTimeMilliseconds((long)due).LocalDateTime)); }
             catch { }
         }
-        else if (dueLine == null && s.Overview?.DueText is { Length: > 0 } words) parts.Add("Due " + words);
+        // (the publisher's words read as a date and written as every due line is; failing that, their time tidied and
+        //  their time zone left out)
+        else if (dueLine == null && s.Overview?.DueText is { Length: > 0 } words) parts.Add(AltaLook.DueOf(words) ?? "Due " + AltaLook.Times(words));
         if ((s.Report?.Current.Source ?? "").ToUpperInvariant() == "PRACTICE") parts.Add("Practice");
         return string.Join(" · ", parts);
     }
