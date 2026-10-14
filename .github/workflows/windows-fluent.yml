@@ -979,7 +979,7 @@ jobs:
           # list: …" in a picture run)
           foreach ($name in @('more-pane', 'more-pane-dark', 'more-pane-narrow')) {
             if ($script:mine -notcontains $name) { continue }
-            $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'more from canvas: (.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
+            $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'more from canvas: (?!the pane )(.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
             if ($said -notmatch '^History, My Materials \(picture\), Help ') { Write-Host "::error::${name}: More from Canvas was not History, My Materials with its picture, Help ('$said') (shots/profile-$name.log)"; exit 1 }
             # (the pane scrolled to its end, where the section is: "more from canvas: the pane scrolled to <at> of <most>")
             $scrolled = [regex]::Match((Get-Content "shots/profile-$name.log" -Raw -ErrorAction SilentlyContinue), 'the pane scrolled to (\d+) of (\d+)')
