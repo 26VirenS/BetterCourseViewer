@@ -6,8 +6,10 @@
 # Simpl's own Settings — pictured against
 # the mock Canvas, and — when a commit asks for it with "[preview]" in its message, or by hand (Run workflow) —
 # published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
-# real PC. The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update
-# feeds are not touched.
+# real PC — or, with Run workflow ▸ beta, as a beta under a tag of its own (windows-fluent-beta-v<run>), which only a
+# Simpl with Get beta updates on is offered and a copy from before the beta channel (0.3.0 and earlier) never sees.
+# The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update feeds
+# are not touched.
 # Built once (the installer and the zip a release carries); then, at the same time, the pictures in four parts and the
 # installer tried; a release publishes that one build (windows-fluent-ship.yml publishes a green run's, by hand). Beside
 # them, the performance walk, which only reports: no release waits for it; and the models' unit tests with the
@@ -47,6 +49,10 @@ on:
         default: ''
       critical:
         description: A Critical Update (every installed Simpl puts it in at its next check, whatever its update settings)
+        type: boolean
+        default: false
+      beta:
+        description: A beta (windows-fluent-beta-v<run>, offered only with Get beta updates on); off publishes the usual release, a beta's green run too
         type: boolean
         default: false
 
@@ -1554,19 +1560,47 @@ jobs:
         run: |
           # (the number the build carries — "0.2.3 (v041)" — is its own run's: the one published, when it is reused)
           n=$(printf '%03d' "${{ needs.prior.outputs.number || github.run_number }}")
+          sha="${{ needs.prior.outputs.sha || github.sha }}"
           tag="windows-fluent-v$n"
+          title="Simpl for Windows — Windows 11 look, preview (v$n)"
+          beta="${{ github.event_name == 'workflow_dispatch' && inputs.beta }}"
+          critical="${{ github.event_name == 'workflow_dispatch' && inputs.critical }}"
+          # (a beta, asked for by Run workflow ▸ beta: a tag of its own, which Simpl's Updates reads as a beta and offers
+          #  only with Get beta updates on -- and which a Simpl from before the beta channel, 0.3.0 and earlier, never
+          #  reads at all: it lists windows-fluent-v<run> alone. Titled with the version its commit's SimplFluent.csproj
+          #  gives, the commit published, from_run's too. The same green run published again with beta off is the usual
+          #  release, for everyone: the beta promoted)
+          if [ "$beta" = "true" ]; then
+            git fetch -q --depth=1 origin "$sha"
+            v=$(git show "$sha:windows/SimplFluent/SimplFluent.csproj" | sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' | head -1)
+            test -n "$v"
+            tag="windows-fluent-beta-v$n"
+            title="Simpl for Windows $v beta (v$n)"
+          fi
           # (the installer first, the portable zip beside it; Simpl's own Updates finds Simpl-Setup.exe by its name)
           test -f release/Simpl-Setup.exe
           # (a Critical Update, asked for by Run workflow: its notes say so and carry the mark Simpl's Updates looks for,
           #  windows/SimplFluent/Support/Updates.cs -- every installed Simpl older than it puts it in at its next check,
-          #  whatever its update settings, as the Mac's do; RELEASE_NOTES.md itself is left as it is)
+          #  whatever its update settings, as the Mac's do; a beta's, only those getting beta updates. A beta's notes
+          #  begin by saying how to get it. RELEASE_NOTES.md itself is left as it is)
           notes=windows/SimplFluent/RELEASE_NOTES.md
-          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.critical }}" = "true" ]; then
+          if [ "$beta" = "true" ] || [ "$critical" = "true" ]; then
             notes="$RUNNER_TEMP/notes.md"
-            { cat windows/SimplFluent/RELEASE_NOTES.md; printf '\n\n**This is a Critical Update.** Every Simpl for Windows installed with Simpl-Setup.exe installs it at its next update check, whatever its update settings.\n<!-- simpl-critical -->\n'; } > "$notes"
-            echo "published as a Critical Update"
+            {
+              if [ "$beta" = "true" ]; then
+                printf '**A beta, to try before everyone else.** Simpl offers it only to a PC with **Settings ▸ Updates ▸ Get beta updates** on. To try it: download **Simpl-Setup.exe** below and open it (it installs over the Simpl you have, your settings and sign-in as they were), then turn on **Get beta updates**, so each next beta comes by itself. Turning it off later keeps this version until a newer usual release comes out.\n\n'
+              fi
+              cat windows/SimplFluent/RELEASE_NOTES.md
+              if [ "$critical" = "true" ] && [ "$beta" = "true" ]; then
+                printf '\n\n**This is a Critical Update for beta testers.** Every Simpl for Windows installed with Simpl-Setup.exe that gets beta updates installs it at its next update check, whatever its other update settings.\n<!-- simpl-critical -->\n'
+              elif [ "$critical" = "true" ]; then
+                printf '\n\n**This is a Critical Update.** Every Simpl for Windows installed with Simpl-Setup.exe installs it at its next update check, whatever its update settings.\n<!-- simpl-critical -->\n'
+              fi
+            } > "$notes"
+            if [ "$critical" = "true" ]; then echo "published as a Critical Update"; fi
+            if [ "$beta" = "true" ]; then echo "published as a beta"; fi
           fi
-          gh release create "$tag" release/Simpl-Setup.exe release/Simpl-Windows-x64.zip --target "${{ needs.prior.outputs.sha || github.sha }}" --prerelease \
-            --title "Simpl for Windows — Windows 11 look, preview (v$n)" \
+          gh release create "$tag" release/Simpl-Setup.exe release/Simpl-Windows-x64.zip --target "$sha" --prerelease \
+            --title "$title" \
             --notes-file "$notes"
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"
