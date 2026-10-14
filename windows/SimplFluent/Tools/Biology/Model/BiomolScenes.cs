@@ -168,9 +168,11 @@ public static class BiomolScenes
         return out_;
     }
 
-    /// <summary>A charge's sign on its atom: at the atom's centre, lifted to its near side, set to its upper right on the view.</summary>
+    /// <summary>A charge's sign on its atom: at the atom's centre, lifted past its near side and its own hydrogens (an H on
+    /// it reaches 0.9 Å nearer in front, as the builder draws them, and hid the NH₃⁺'s sign), set to its upper right on
+    /// the view.</summary>
     private static BiomolMark Charge(BioVec atom, int q, double radius, BiomolLook look, double size) =>
-        new(atom, q > 0 ? "+" : "−", (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), size, Lift: radius, AtomRadius: radius, Charge: true);
+        new(atom, q > 0 ? "+" : "−", (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), size, Lift: radius + 0.9, AtomRadius: radius, Charge: true);
 
     // ---- amino acids (§4.4 Amino acids) ----
 

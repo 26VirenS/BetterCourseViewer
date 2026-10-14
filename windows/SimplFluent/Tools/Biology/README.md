@@ -369,9 +369,9 @@ page (`DNAHelixPage.cs` … `DNARnaPage.cs`). Launch, in the Mac's words with th
 written as DNA), `nucleotide` (the Nucleotides page; `molecule` read as the same) and `page` (Cell Division's "What
 happens in S phase" opens
 `replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is). The
-Replication page (`DnaTwoColumns`) puts the fork beside its cards from 760 wide (840 with the page's room round it, as
-`BioUI.Work`'s one column beside the drawing); narrower, the fork and its controls are as tall as leaves 170 of the
-page for the step's card under them (240 to 560).
+Replication page (`DnaTwoColumns`) puts the fork beside its cards from 1000 wide (beside a column on a 1366 window its
+letters came out 7 px tall); narrower, the fork and its controls are as tall as leaves 170 of the page for the step's
+card under them (240 to 640), so its words stay readable and the card is in sight.
 
 ## Cell Division (`divide`)
 

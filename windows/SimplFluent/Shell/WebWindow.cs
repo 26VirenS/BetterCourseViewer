@@ -311,7 +311,9 @@ internal static class LightPages
             {
                 try
                 {
-                    if (System.Text.Json.Nodes.JsonNode.Parse(e.ParameterObjectAsJson)?["sessionId"]?.GetValue<string>() is not { Length: > 0 } session) return;
+                    // (a frame — not a worker, which has no colour scheme to be told)
+                    var said = System.Text.Json.Nodes.JsonNode.Parse(e.ParameterObjectAsJson);
+                    if (said?["sessionId"]?.GetValue<string>() is not { Length: > 0 } session || said["targetInfo"]?["type"]?.GetValue<string>() is not ("iframe" or "page")) return;
                     await core.CallDevToolsProtocolMethodForSessionAsync(session, "Emulation.setEmulatedMedia", Light);
                     await core.CallDevToolsProtocolMethodForSessionAsync(session, "Target.setAutoAttach", AutoAttach);
                 }
@@ -330,7 +332,7 @@ internal static class LightPages
         try
         {
             var dark = await core.ExecuteScriptAsync("matchMedia('(prefers-color-scheme: dark)').matches");
-            Log.Write($"{what}: the page prefers {(dark == "true" ? "dark" : "light")}");
+            Log.Write($"{what}: the page prefers {(dark == "true" ? "dark" : "light")} (its profile: {core.Profile.PreferredColorScheme})");
         }
         catch (Exception x) { Log.Write($"{what}: {x.Message}"); }
     }

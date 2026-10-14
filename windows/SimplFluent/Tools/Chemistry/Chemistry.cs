@@ -316,7 +316,8 @@ internal sealed class ChemSide : Panel
         }
         top.Measure(new Size(w, topHeight));
         bottom.Measure(new Size(w, bottomHeight));
-        line.Visibility = want1 + want2 > topHeight + bottomHeight + 0.5 ? Visibility.Visible : Visibility.Hidden;
+        // (its opacity, not its visibility: nothing that would ask for this layout again)
+        line.Opacity = want1 + want2 > topHeight + bottomHeight + 0.5 ? 1 : 0;
         return new Size(double.IsInfinity(w) ? Math.Max(top.DesiredSize.Width, bottom.DesiredSize.Width) : w, topHeight + Gap + bottomHeight);
     }
 
