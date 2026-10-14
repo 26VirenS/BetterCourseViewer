@@ -426,7 +426,7 @@ struct GXExpressPage: View {
         if let aa {
             HStack(spacing: 8) {
                 Circle().fill(aa.group.color).frame(width: 10, height: 10)
-                Text("\(aa.name) (\(aa.three), \(aa.one)) · \(aa.group.label)").font(.sCallout)
+                Text("\(aa.name) (\(aa.three), \(String(aa.one))) · \(aa.group.label)").font(.sCallout)
             }
             .accessibilityElement(children: .combine)
         }

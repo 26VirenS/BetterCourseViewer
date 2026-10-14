@@ -351,7 +351,7 @@ struct DNAHelixPage: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help("Base pair \(k + 1): \(b1)·\(b2)")
+                    .help("Base pair \(k + 1): \(String(b1))·\(String(b2))")
                     .accessibilityLabel("Base pair \(k + 1), \(DNAModel.baseName(b1)) with \(DNAModel.baseName(b2))")
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }

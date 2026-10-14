@@ -421,7 +421,7 @@ enum DNAForkDrawing {
             layer.opacity = opacity
             layer.fill(Path(roundedRect: box, cornerRadius: 12), with: .color(Color.primary.opacity(0.06)))
             let incoming = made[k], partner = template[k]
-            layer.draw(Text("Close-up: DNA polymerase III adds \(incoming) opposite \(partner), at the new strand's 3′ end")
+            layer.draw(Text("Close-up: DNA polymerase III adds \(String(incoming)) opposite \(String(partner)), at the new strand's 3′ end")
                         .font(.system(size: 11.5, weight: .semibold)).foregroundColor(.primary),
                        at: CGPoint(x: box.midX, y: box.minY + 13))
             let left = box.minX + 60
