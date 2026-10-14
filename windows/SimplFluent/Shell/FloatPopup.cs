@@ -298,9 +298,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     {
         if (sizing)
         {
-            card.Width = ActualWidth;
-            card.Height = ActualHeight;
-            chosen = new Size(ActualWidth, ActualHeight);
+            Follow(new Size(ActualWidth, ActualHeight));
             return;
         }
         // (a large one sized by Windows itself — its keys' snap to a side of the screen — put back to its card's size)
@@ -309,11 +307,25 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         Place();
     }
 
-    /// <summary>Let go after sizing it by its edges: the size kept for its kind, for the next time it opens; its place
-    /// kept where it now is (as a popup moved by its heading keeps its), on the window.</summary>
+    /// <summary>The card as large as the window sized by its edges, that size the student's.</summary>
+    private void Follow(Size size)
+    {
+        if (!(size.Width > 0 && size.Height > 0)) return;
+        card.Width = size.Width;
+        card.Height = size.Height;
+        chosen = size;
+    }
+
+    /// <summary>Let go after sizing it by its edges (once what that laid out has been): its size as Windows left it — read
+    /// from the window itself, as with Windows' "Show window contents while dragging" off it is sized only as it is let
+    /// go — kept for its kind, for the next time it opens; its place kept where it now is (as a popup moved by its
+    /// heading keeps its), on the window.</summary>
     private void SizedByEdges()
     {
-        if (ended || chosen is not { } size) return;
+        sizing = false;
+        if (ended) return;
+        if (WindowSize() is { } now) Follow(now);
+        if (chosen is not { } size) return;
         Remember(sheet.SizeKey, size);
         var room = Room();
         var whole = Whole();
@@ -403,16 +415,22 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private const int WM_SIZING = 0x0214, WM_EXITSIZEMOVE = 0x0232, GWL_STYLE = -16, WS_MAXIMIZEBOX = 0x00010000, WS_MINIMIZEBOX = 0x00020000;
 
     /// <summary>Windows' sizing by its edges: under way from its first step (a move by its heading has none) until it is
-    /// let go.</summary>
+    /// let go and what that laid out has been.</summary>
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_SIZING) sizing = true;
-        else if (msg == WM_EXITSIZEMOVE && sizing)
-        {
-            sizing = false;
-            Dispatcher.BeginInvoke(SizedByEdges);
-        }
+        else if (msg == WM_EXITSIZEMOVE && sizing) Dispatcher.BeginInvoke(SizedByEdges, DispatcherPriority.Background);
         return IntPtr.Zero;
+    }
+
+    /// <summary>The window's size on the screen, in screen units (its frame is its card: no border round it).</summary>
+    private Size? WindowSize()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var r) || PresentationSource.FromVisual(this) is not { CompositionTarget: { } target }) return null;
+        var a = target.TransformFromDevice.Transform(new Point(r.L, r.T));
+        var b = target.TransformFromDevice.Transform(new Point(r.R, r.B));
+        return b.X > a.X && b.Y > a.Y ? new Size(Math.Round(b.X - a.X), Math.Round(b.Y - a.Y)) : null;
     }
 
     /// <summary>Sizable by its edges, but never maximized or minimized (a window that can be resized has both boxes, though
@@ -517,6 +535,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
 
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int flags);
     [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out Rect32 rect);
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int index);
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hwnd, int index, int value);
     [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
