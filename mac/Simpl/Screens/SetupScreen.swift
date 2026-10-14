@@ -466,8 +466,15 @@ struct SetupScreen: View {
 
     private func load() async {
         await info.load(engine, "setupInfo")
-        guard let d = info.data, !seeded else { return }
+        guard var d = info.data, !seeded else { return }
         seeded = true
+        // (the screenshot suite: -SimplSetupFirstRun YES draws the setup as a first run has it — every course ticked, Set
+        // Up Later — for a student who has set up already; nothing is saved unless it is finished)
+        if UserDefaults.standard.bool(forKey: "SimplSetupFirstRun"), d.done {
+            d.done = false
+            for i in d.courses.indices { d.courses[i].on = true }
+            info.data = d
+        }
         chosen = Set(d.courses.filter(\.on).map(\.id))
         nicknames = Dictionary(d.courses.map { ($0.id, $0.nickname) }, uniquingKeysWith: { first, _ in first })
         targets = Dictionary(d.courses.map { ($0.id, $0.target) }, uniquingKeysWith: { first, _ in first })

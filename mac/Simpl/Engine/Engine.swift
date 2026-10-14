@@ -88,7 +88,7 @@ final class Engine: ObservableObject, ShellListener {
     @Published var macmillan: AltaLaunch?
     /// An external tool or a page of Canvas's own to open in a window of its own (the window opens it, then clears this).
     @Published var tool: ToolLaunch?
-    /// The guided setup (a sheet): the first run, and Settings → Courses and Goals.
+    /// The guided setup (a sheet): the first run, and Settings ▸ General ▸ Courses shown and goals.
     @Published var setup = false {
         didSet { if !setup && oldValue { schedulePopups() } }
     }
