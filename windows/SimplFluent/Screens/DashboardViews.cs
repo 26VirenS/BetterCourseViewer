@@ -51,7 +51,9 @@ public sealed partial class DashboardScreen
         var days = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
         foreach (var day in l.Days)
         {
-            var date = string.IsNullOrEmpty(day.Date) ? "" : day.Date!.StartsWith(day.Title + ", ") ? day.Date![(day.Title.Length + 2)..] : day.Date!;
+            // (the day's date beside its name, saying only what the name does not — none beside Today: the greeting over
+            //  the counters says it already)
+            var date = string.IsNullOrEmpty(day.Date) || day.Title == "Today" ? "" : day.Date!.StartsWith(day.Title + ", ") ? day.Date![(day.Title.Length + 2)..] : day.Date!;
             var head = K.Columns("auto, *, auto",
                 K.Text(day.Title, Ty.BodyStrong).Col(0),
                 K.Text(date, Ty.Body, B.Text2).Margin(10, 0, 0, 0).Col(1),
@@ -69,33 +71,55 @@ public sealed partial class DashboardScreen
         return v;
     }
 
-    /// <summary>The Mac's DashWorkLine: the check; its kind on a tile of its course's colour; its course and kind with its
-    /// flags over its title; its points; when it is due.</summary>
+    /// <summary>
+    /// The Dashboard's one row of work — Coming up's, Today's and a counter panel's alike, so the same work reads the same
+    /// wherever it shows: its kind's symbol on a tile of its course's colour; its course and kind (with its flags) over
+    /// its title; its points and when it is due at its right — side by side in a wide list, the time over the points
+    /// where the row is narrow (the rail beside the view, a counter's panel).
+    /// </summary>
+    internal static Grid WorkFace(Color color, SymbolRegular symbol, string? course, string? kind, IEnumerable<WorkFlag>? flags, TextBlock title,
+        string? points, string? when, bool stacked, double tileSize = 32, double whenWidth = 0)
+    {
+        var tile = K.IconTile(symbol, color, tileSize);
+        tile.VerticalAlignment = VerticalAlignment.Center;
+        var meta = new WrapPanel { Orientation = Orientation.Horizontal };
+        var line = string.Join(" · ", new[] { course, kind }.Where(s => !string.IsNullOrEmpty(s)));
+        if (line.Length > 0) meta.Children.Add(K.Text(line, Ty.Caption, B.Text2).Margin(0, 0, 8, 0));
+        foreach (var f in flags ?? Enumerable.Empty<WorkFlag>()) meta.Children.Add(K.Chip(f.Word, K.Tone(f.Kind)).Margin(0, 0, 6, 0));
+        var words = K.V(2, title);
+        if (meta.Children.Count > 0) words.Children.Insert(0, meta);
+        words.VerticalAlignment = VerticalAlignment.Center;
+        if (stacked)
+        {
+            var right = K.V(1);
+            right.VerticalAlignment = VerticalAlignment.Center;
+            right.MaxWidth = 150;
+            if (!string.IsNullOrEmpty(when)) right.Children.Add(K.Text(when!, Ty.Body, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center));
+            if (!string.IsNullOrEmpty(points)) right.Children.Add(K.Text(points!, Ty.Caption, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center));
+            return K.Columns("auto, *, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), right.Margin(10, 0, 0, 0).Col(2));
+        }
+        var due = K.Text(when ?? "", Ty.Body, B.Text2);
+        due.TextAlignment = TextAlignment.Right;
+        due.MinWidth = whenWidth;
+        var pts = K.Text(points ?? "", Ty.Body, B.Text2);
+        pts.TextAlignment = TextAlignment.Right;
+        pts.MinWidth = whenWidth >= 112 && !string.IsNullOrEmpty(points) ? 64 : 0;
+        return K.Columns("auto, *, auto, auto",
+            tile.Margin(0, 0, 12, 0).Col(0), words.Col(1),
+            pts.Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(2),
+            due.Margin(8, 0, 6, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
+    }
+
+    /// <summary>A row of Coming up (the Mac's DashWorkLine): the check, then the Dashboard's row of work.</summary>
     private FrameworkElement WorkLine(DashRow row, string day, bool wide)
     {
         var done = Done(row.Id, row.Done);
         var check = new CheckCircle(done, done ? "Mark as not done" : "Mark as done");
         check.Toggled += on => Tick(row.Id, on);
-        var color = K.Hex(row.Color);
-        var tile = K.IconTile(Glyph.Work(row.Type ?? row.Kind), color, 32);
-        var sub = string.Join(" · ", new[] { row.Course, row.Kind }.Where(s => !string.IsNullOrEmpty(s)));
-        var meta = new WrapPanel { Orientation = Orientation.Horizontal };
-        if (sub.Length > 0) meta.Children.Add(K.Text(sub, Ty.Caption, B.Text2).Margin(0, 0, 8, 0));
-        foreach (var f in row.Flags ?? new()) meta.Children.Add(K.Chip(f.Word, K.Tone(f.Kind)).Margin(0, 0, 6, 0));
         var title = K.Wrapped(row.Title, Ty.Body, done ? B.Text2 : B.Text, 2);
         if (done) title.Struck();
-        var words = K.V(2, meta, title);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var due = K.Text(row.Due ?? row.Time ?? "", Ty.Body, B.Text2);
-        due.TextAlignment = TextAlignment.Right;
-        due.MinWidth = wide ? 112 : 90;
-        var points = K.Text(row.Points ?? "", Ty.Body, B.Text2);
-        points.TextAlignment = TextAlignment.Right;
-        points.MinWidth = wide && !string.IsNullOrEmpty(row.Points) ? 64 : 0;
-        var g = K.Columns("auto, auto, *, auto, auto",
-            check.Margin(6, 0, 12, 0).Col(0), tile.Margin(0, 0, 12, 0).Col(1), words.Col(2),
-            points.Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3),
-            due.Margin(8, 0, 6, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(4));
+        var face = WorkFace(K.Hex(row.Color), Glyph.Work(row.Type ?? row.Kind), row.Course, row.Kind, row.Flags, title, row.Points, row.Due ?? row.Time, stacked: false, whenWidth: wide ? 112 : 90);
+        var g = K.Columns("auto, *", check.Margin(6, 0, 12, 0).Col(0), face.Col(1));
         // (a click: its quick look, grown out of the row; a double-click: the work whole)
         var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
         b.Click += (_, _) => WorkPreview.Press(WorkPreview.Dash(row, day, engine, on => Tick(row.Id, on)), b);
@@ -158,9 +182,10 @@ public sealed partial class DashboardScreen
             if (r > 0) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(gap) });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
+        var cardW = (w - gap * (cols - 1)) / cols;
         for (var k = 0; k < c.Rows.Count; k++)
         {
-            var card = CourseCard(c.Rows[k]);
+            var card = CourseCard(c.Rows[k], cardW);
             Grid.SetColumn(card, (k % cols) * 2);
             Grid.SetRow(card, (k / cols) * 2);
             grid.Children.Add(card);
@@ -174,29 +199,55 @@ public sealed partial class DashboardScreen
 
     private static readonly HashSet<string> NativeSections = new() { "announcements", "assignments", "discussions", "files", "grades", "modules", "pages", "people", "quizzes", "syllabus" };
 
-    private FrameworkElement CourseCard(DashCourse course)
+    /// <summary>Cards this wide or wider name their quick links beside their symbols; narrower ones have the symbols, each
+    /// named in its tooltip.</summary>
+    private const double LabelledLinksFrom = 400;
+
+    /// <summary>
+    /// A course as a card (the Mac's DashCourseCard): a band of its colour with the name the pane gives it and what wants
+    /// attention (work due today, "2 new" announcements); under it its term and teacher — and its other name only where it
+    /// says something new — its score in a ring, how much is handed in, what is next, and its quick links.
+    /// </summary>
+    private FrameworkElement CourseCard(DashCourse course, double cardW)
     {
         var color = K.Hex(course.Color);
-        // its colour at the top, its code on it, what wants attention at its corner
-        var heroWords = new TextBlock { Text = course.Code, FontSize = 20, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, MaxHeight = 52, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(16, 0, 16, 12) };
+        var heroWords = new TextBlock { Text = course.Code, FontSize = 16, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 8, 1) };
         var badges = K.H(6);
-        badges.HorizontalAlignment = HorizontalAlignment.Right;
-        badges.VerticalAlignment = VerticalAlignment.Top;
-        badges.Margin = new Thickness(0, 12, 12, 0);
-        if (course.DueToday is > 0) badges.Children.Add(Pill($"{course.DueToday} due today", Color.FromRgb(0xe8, 0x4a, 0x3f), Colors.White));
-        if (course.Unread is > 0) badges.Children.Add(Pill(course.Unread.Value.ToString(), Colors.White, color, SymbolRegular.Megaphone24));
+        badges.VerticalAlignment = VerticalAlignment.Center;
+        badges.Margin = new Thickness(0, 0, 12, 0);
+        if (course.DueToday is > 0)
+        {
+            var due = Pill($"{course.DueToday} due today", Colors.White, CounterColor("today"));
+            due.ToolTip = $"{course.DueToday} due today";
+            badges.Children.Add(due);
+        }
+        if (course.Unread is > 0)
+        {
+            var n = course.Unread.Value;
+            var unread = Pill(string.IsNullOrEmpty(course.UnreadText) ? $"{n} new" : course.UnreadText!, Colors.White, color, SymbolRegular.Megaphone24);
+            var said = string.IsNullOrEmpty(course.UnreadLabel) ? $"{n} unread {(n == 1 ? "announcement" : "announcements")}" : course.UnreadLabel!;
+            unread.ToolTip = said;
+            System.Windows.Automation.AutomationProperties.SetName(unread, said);
+            badges.Children.Add(unread);
+        }
         var hero = new Grid
         {
-            Height = 96,
+            Height = 48,
             Background = new LinearGradientBrush(color, K.Mix(color, Colors.Black, 0.18), 90),
-            Children = { heroWords, badges },
         };
-        // its name, term and teacher; its score in a ring
-        var ringInside = K.V(0, K.Text(course.ScoreText ?? "N/A", Ty.Caption, course.Score == null ? B.Text2 : B.Text).Strong().Center());
+        hero.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        hero.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        hero.Children.Add(heroWords.Col(0));
+        hero.Children.Add(badges.Col(1));
+        // its other name where it says something new, its term and teacher; its score in a ring
+        var ringInside = K.V(0, K.Text(string.IsNullOrEmpty(course.ScoreText) ? "–" : course.ScoreText!, Ty.Caption, course.Score == null ? B.Text2 : B.Text).Strong().Center());
         if (!string.IsNullOrEmpty(course.Grade)) ringInside.Children.Add(K.Text(course.Grade!, Ty.Caption, B.Text2).Center());
         ringInside.VerticalAlignment = VerticalAlignment.Center;
         var ring = K.Ring(course.Score is { } s ? s / 100 : null, color, 56, 5, ringInside);
-        var names = K.V(2, K.Text(course.Name ?? course.Code, Ty.BodyStrong), K.Text(course.Sub ?? " ", Ty.Caption, B.Text2));
+        if (course.Score == null && !string.IsNullOrEmpty(course.ScoreWhy)) ring.ToolTip = course.ScoreWhy;
+        var names = K.V(2);
+        if (!string.IsNullOrEmpty(course.AltName)) names.Children.Add(K.Text(course.AltName!, Ty.BodyStrong));
+        if (!string.IsNullOrEmpty(course.Sub)) names.Children.Add(K.Wrapped(course.Sub!, Ty.Body, B.Text2, 2));
         names.VerticalAlignment = VerticalAlignment.Center;
         var top = K.Columns("*, auto", names.Margin(0, 0, 12, 0).Col(0), ring.Col(1));
         // how much is handed in
@@ -205,27 +256,36 @@ public sealed partial class DashboardScreen
         var bar = K.Columns("*, auto", K.Bar(p is { Total: > 0 } ? (double)p.Done / p.Total : 0, color).Col(0), K.Text(handed, Ty.Caption, B.Text2).Margin(10, 0, 0, 0).Col(1));
         // what is next
         FrameworkElement next;
-        if (course.Next is { } n)
+        if (course.Next is { } nx)
         {
             var line = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
             K.Style(line, Ty.Body);
             line.Inlines.Add(new System.Windows.Documents.Run("Next  ") { Foreground = Res(B.Text2) });
-            line.Inlines.Add(new System.Windows.Documents.Run(n.Title) { FontWeight = FontWeights.SemiBold, Foreground = Res(B.Text) });
-            if (!string.IsNullOrEmpty(n.When)) line.Inlines.Add(new System.Windows.Documents.Run("  ·  " + n.When) { Foreground = Res(B.Text2) });
+            line.Inlines.Add(new System.Windows.Documents.Run(nx.Title) { FontWeight = FontWeights.SemiBold, Foreground = Res(B.Text) });
+            if (!string.IsNullOrEmpty(nx.When)) line.Inlines.Add(new System.Windows.Documents.Run("  ·  " + nx.When) { Foreground = Res(B.Text2) });
             next = line;
         }
         else next = K.Text("Nothing due", Ty.Body, B.Text2);
-        // its quick links
-        var links = K.H(2);
+        // its quick links: named beside their symbols on a wide card, by their tooltips on a narrow one
+        var labelled = cardW >= LabelledLinksFrom;
+        var links = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var link in (course.Links ?? new()).Take(5))
         {
             var lk = link;
-            var b = K.IconButton(Glyph.Section(link.Kind), () =>
+            void Go()
             {
                 if (lk.Kind is { } kind && NativeSections.Contains(kind)) engine.Go(Place.Section("courses/" + course.Id, kind));
                 else if (lk.Url != null) engine.OpenWeb(lk.Url, lk.Label ?? course.Code);
-            }, link.Label ?? link.Kind ?? "", 16, 32);
-            links.Children.Add(b);
+            }
+            var name = link.Label ?? ScreenFactory.SectionName(engine, "courses/" + course.Id, link.Kind);
+            if (labelled)
+            {
+                var b = K.Subtle(K.H(6, K.Icon(Glyph.Section(link.Kind), 16, B.Text2), K.Text(name, Ty.Caption, B.Text2)), Go, new Thickness(8, 6, 10, 6));
+                b.ToolTip = name;
+                System.Windows.Automation.AutomationProperties.SetName(b, name);
+                links.Children.Add(b);
+            }
+            else links.Children.Add(K.IconButton(Glyph.Section(link.Kind), Go, name, 16, 32));
         }
         var bodyStack = K.V(12, top, bar, next);
         if (links.Children.Count > 0) bodyStack.Children.Add(links.Margin(-8, -4, 0, -6));
@@ -237,7 +297,7 @@ public sealed partial class DashboardScreen
         // (the hero's corners follow the card's)
         hero.Clip = null;
         content.SizeChanged += (_, e) => content.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
-        card.ToolTip = course.Name ?? course.Code;
+        card.ToolTip = string.IsNullOrEmpty(course.AltName) ? course.Code : $"{course.Code} · {course.AltName}";
         return card;
     }
 

@@ -39,31 +39,31 @@ public sealed partial class DashboardScreen
         if (rows.Count == 0) list.Children.Add(K.Empty(SymbolRegular.WeatherSunny24, d.List.Empty ?? "Nothing due."));
         for (var k = 0; k < rows.Count; k++)
         {
-            if (k > 0) list.Children.Add(K.Divider(44));
+            if (k > 0) list.Children.Add(K.Divider(84));
             list.Children.Add(TodayLine(rows[k], narrow));
         }
         v.Children.Add(K.Card(list, new Thickness(4)));
         return v;
     }
 
-    /// <summary>The Mac's DashTodayLine: the check, the title over its course (a dot in its colour) and line, its flag; its time at the end.</summary>
+    /// <summary>A row of the day's work (the Mac's DashTodayLine): the check, then the Dashboard's one row of work — its
+    /// course and kind over its title, its flag, its time and points at its right (one over the other in the rail, side by
+    /// side across a one-column page) — as Coming up and the counters' panels draw the same work.</summary>
     private FrameworkElement TodayLine(WorkRow row, bool narrow)
     {
         var done = Done(row.Id, row.Done);
         var check = new CheckCircle(done, done ? "Mark as not done" : "Mark as done");
         check.Toggled += on => Tick(row.Id, on);
-        check.VerticalAlignment = VerticalAlignment.Top;
-        check.Margin = new Thickness(6, 1, 12, 0);
         var title = K.Wrapped(row.Title, Ty.Body, done ? B.Text2 : B.Text, 2);
         if (done) title.Struck();
-        var meta = new WrapPanel { Orientation = Orientation.Horizontal };
-        if (!string.IsNullOrEmpty(row.Course)) meta.Children.Add(K.H(6, K.Dot(K.Hex(row.Color), 7), K.Text(row.Course!, Ty.Caption, B.Text2)).Margin(0, 0, 8, 0));
-        if (!string.IsNullOrEmpty(row.Sub)) meta.Children.Add(K.Text(row.Sub!, Ty.Caption, B.Text2));
-        var words = K.V(2, title, meta);
-        if (row.Flag != null) words.Children.Add(K.Chip(row.Flag.Word, K.Tone(row.Flag.Kind)).Margin(0, 3, 0, 0));
-        var time = K.Text(row.Time ?? "", Ty.Body, B.Text2).Margin(8, 0, 6, 0);
-        time.VerticalAlignment = VerticalAlignment.Top;
-        var g = K.Columns("auto, *, auto", check.Col(0), words.Col(1), time.Col(2));
+        var custom = row.Custom == true;
+        var type = row.Type ?? row.Id.Split(':')[0];
+        var symbol = custom ? SymbolRegular.CheckboxChecked24 : Glyph.Work(type);
+        // (a page from before the row's kind and points came: its line as it was, "Assignment · 10 pts", for the kind)
+        var kind = row.Kind ?? (row.Pts == null ? row.Sub : null);
+        var flags = row.Flag != null ? new[] { row.Flag } : null;
+        var face = WorkFace(K.Hex(row.Color), symbol, row.Course, kind, flags, title, row.Pts, row.Time, stacked: !narrow, whenWidth: 90);
+        var g = K.Columns("auto, *", check.Margin(6, 0, 12, 0).Col(0), face.Col(1));
         var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
         b.Click += (_, _) => WorkPreview.Press(WorkPreview.Work(row, engine, on => Tick(row.Id, on)), b);
         return b;
@@ -102,12 +102,13 @@ public sealed partial class DashboardScreen
             var color = K.Hex(c.Color);
             var ghost = c.Score == null;
             var tower = Tower(c, towerW, th, color, ghost);
-            var label = K.Text(c.Score is { } s2 ? $"{(int)Math.Round(s2)}%" : "—", Ty.Caption, ghost ? B.Text2 : B.Text).Strong().Center();
+            // (its whole percent as the engine works it out from the shown figure, half up — never .NET's banker's rounding)
+            var label = K.Text(c.ScoreWhole is { } whole ? $"{whole}%" : c.Score is { } s2 ? $"{(int)Math.Round(s2, MidpointRounding.AwayFromZero)}%" : "–", Ty.Caption, ghost ? B.Text2 : B.Text).Strong().Center();
             var col = new Stack { Orientation = Orientation.Vertical, Spacing = 4, VerticalAlignment = VerticalAlignment.Bottom, Children = { label, tower } };
             var id = c.Id;
             var b = K.Subtle(col, () => engine.Go(Place.Section("courses/" + id, "grades")), new Thickness(0), 6);
             b.VerticalAlignment = VerticalAlignment.Bottom;
-            b.ToolTip = $"{c.Name}: {(c.Score is { } s3 ? $"{s3:0.#}%" : "no grade yet")}";
+            b.ToolTip = $"{c.Name}: {(c.Score != null && !string.IsNullOrEmpty(c.ScoreText) ? c.ScoreText : c.Score is { } s3 ? $"{Math.Round((decimal)s3, 1, MidpointRounding.AwayFromZero):0.#}%" : "no grade yet")}";
             city.Children.Add(b.Col(k));
             // the towers rise, one after another, the first time the Dashboard shows (Windows' decelerate)
             if (!skyRisen)
@@ -201,23 +202,35 @@ public sealed partial class DashboardScreen
 
     // ---- the week's load (the Mac's DashWeekLoad) ----
 
+    /// <summary>The week's load: a line a course, about 28 tall — its colour, its name, a short bar and "2 / 9 handed in"
+    /// — under the caption the engine gives ("Handed in this week"), each a way to the course's assignments.</summary>
     private FrameworkElement? WeekLoad(Today d)
     {
         if (d.Load == null || d.HasCourses == false) return null;
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-        v.Children.Add(Heading.Section("Week load", "Handed in of assigned"));
-        var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 4 };
+        v.Children.Add(Heading.Section("Week load", string.IsNullOrEmpty(d.LoadCaption) ? "Handed in this week" : d.LoadCaption));
+        var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
         if (d.Load.Count == 0) rows.Children.Add(K.Empty(SymbolRegular.WeatherSunny24, "Nothing assigned this week."));
         foreach (var r in d.Load)
         {
             var color = K.Hex(r.Color);
-            var top = K.Columns("auto, *, auto", K.Dot(color, 9).Col(0), K.Text(r.Code, Ty.BodyStrong).Margin(8, 0, 8, 0).Col(1), K.Text($"{r.Done} of {r.Total}", Ty.Body, B.Text2).Col(2));
+            var words = string.IsNullOrEmpty(r.Text) ? $"{r.Done} / {r.Total} handed in" : r.Text!;
+            var bar = K.Bar(r.Total > 0 ? (double)r.Done / r.Total : 0, color);
+            bar.Width = 56;
+            var line = K.Columns("auto, *, auto, auto",
+                K.Dot(color, 8).Col(0),
+                K.Text(r.Code, Ty.Body).Margin(8, 0, 10, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1),
+                bar.Margin(0, 0, 10, 0).Col(2),
+                K.Text(words, Ty.Caption, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
             var id = r.Id;
-            var row = K.Subtle(K.V(8, top, K.Bar(r.Total > 0 ? (double)r.Done / r.Total : 0, color)), () => engine.Go(Place.Section("courses/" + id, "assignments")), new Thickness(10, 8, 10, 10));
+            var row = K.Subtle(line, () => engine.Go(Place.Section("courses/" + id, "assignments")), new Thickness(10, 5, 10, 5));
+            row.MinHeight = 28;
+            row.ToolTip = $"{r.Code}: {words}";
+            System.Windows.Automation.AutomationProperties.SetName(row, $"{r.Code}, {words}");
             rows.Children.Add(row);
         }
-        if (d.Idle is > 0) rows.Children.Add(K.Text($"{d.Idle} {(d.Idle == 1 ? "course" : "courses")} with nothing assigned this week", Ty.Caption, B.Text2).Margin(10, 4, 10, 4));
-        v.Children.Add(K.Card(rows, new Thickness(6, 8, 6, 8)));
+        if (d.Idle is > 0) rows.Children.Add(K.Text($"{d.Idle} {(d.Idle == 1 ? "course" : "courses")} with nothing assigned this week", Ty.Caption, B.Text2).Margin(10, 6, 10, 4));
+        v.Children.Add(K.Card(rows, new Thickness(6)));
         return v;
     }
 }

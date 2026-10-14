@@ -29,8 +29,12 @@ public sealed class Loader<T> where T : class
         {
             data = value;
             text = null;
+            Kept = false;
         }
     }
+    /// <summary>What it has is the answer kept from last time: the page's own is not in yet (the Dashboard draws its counts
+    /// dimmed meanwhile, saying it is updating).</summary>
+    public bool Kept { get; private set; }
     public string? Error { get; private set; }
     public bool Loading { get; private set; }
     /// <summary>The last answer said word for word what the data came from, and nothing had failed: <see cref="Data"/> is
@@ -63,6 +67,7 @@ public sealed class Loader<T> where T : class
         if (data == null && engine.Kept<T>(name, a) is { } kept)
         {
             data = kept;
+            Kept = true;
             // (for other arguments the answer is shown whatever it says: what was kept for them may never have been drawn)
             if (!moved) text = TextOf(engine, name, a);
             // read moments ago, nothing changed since: that answer is this one's
@@ -70,6 +75,7 @@ public sealed class Loader<T> where T : class
             {
                 if (moved) text = TextOf(engine, name, a);
                 answeredAt = at;
+                Kept = false;
                 Error = null;
                 LastSame = !moved;
                 generation++; // (a read still on its way, for other arguments, is no longer this one's)
@@ -126,6 +132,7 @@ public sealed class Loader<T> where T : class
                 text = t;
             }
             Error = null;
+            Kept = false;
             answeredAt = Environment.TickCount64;
             if (Support.Launch.IsDevelopment) Support.Log.Write($"read {name}: {(DateTime.UtcNow - started).TotalSeconds:0.0}s{(same ? ", as before" : "")}");
         }

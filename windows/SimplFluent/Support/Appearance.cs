@@ -34,7 +34,7 @@ public static class Appearance
     public static readonly (string Key, string Name)[] Slots =
     {
         ("side", "Navigation pane"), ("today", "Due today"), ("tomorrow", "Tomorrow"), ("next", "Next 7 days"),
-        ("overdue", "Overdue"), ("unread", "Unread"), ("graded", "Graded"),
+        ("overdue", "Overdue"), ("unread", "Announcements"), ("graded", "Graded this week"),
     };
 
     /// <summary>"light", "dark" or "system".</summary>

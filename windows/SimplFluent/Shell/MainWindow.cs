@@ -33,11 +33,22 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private readonly SheetHost sheets = new();
     private readonly TitleBar titleBar;
     private readonly System.Windows.Controls.Button back;
+    private readonly System.Windows.Controls.Button refresh;
+    private readonly RotateTransform refreshTurn = new();
     private readonly System.Windows.Controls.Button menuButton;
+    private readonly System.Windows.Controls.Button searchButton;
+    /// <summary>Where the pane's search box goes while the window is too narrow for the pane (AppShell.OpenSearchBar).</summary>
+    private readonly ContentControl searchSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
     private readonly ContentControl trailing = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly HandoffBar handoff;
     private Tray? tray;
     private TourOverlay? tour;
+
+    /// <summary>The title bar's place for the search box on a narrow window.</summary>
+    public ContentControl SearchSlot => searchSlot;
+
+    /// <summary>The search box came up into the title bar, or went back to the pane: the title bar laid out again.</summary>
+    public void SearchMoved() => UpdateTitleButtons();
 
     /// <summary>The account menu's Take the tour.</summary>
     public void StartTour() => tour?.Start();
@@ -73,20 +84,19 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Content = root;
 
-        // the title bar: Back and the pane's button at its left (outside the drag area), then the app's icon and name,
-        // a Start Over while the school's sign-in shows, and Windows' caption buttons
-        back = K.IconButton(SymbolRegular.ArrowLeft24, () => engine?.GoBack(), "Back", 14, 40);
-        back.Height = 36;
-        back.Margin = new Thickness(4, 6, 0, 6);
-        back.VerticalAlignment = VerticalAlignment.Top;
-        back.HorizontalAlignment = HorizontalAlignment.Left;
-        back.Visibility = Visibility.Collapsed;
-        menuButton = K.IconButton(SymbolRegular.LineHorizontal320, () => shell?.TogglePane(), "Navigation", 16, 40);
-        menuButton.Height = 36;
-        menuButton.Margin = new Thickness(48, 6, 0, 6);
-        menuButton.VerticalAlignment = VerticalAlignment.Top;
-        menuButton.HorizontalAlignment = HorizontalAlignment.Left;
-        menuButton.Visibility = Visibility.Collapsed;
+        // the title bar: Back and Refresh at its left (outside the drag area) — with the pane's button and Search while
+        // the window is too narrow for the pane — then the app's icon and name, a Start over while the school's sign-in
+        // shows, and Windows' caption buttons
+        back = TitleButton(SymbolRegular.ArrowLeft24, () => engine?.GoBack(), "Back (Alt+Left)", 14);
+        refresh = TitleButton(SymbolRegular.ArrowClockwise24, () => engine?.Refresh(), "Refresh (F5)", 16);
+        if (refresh.Content is UIElement turning)
+        {
+            turning.RenderTransformOrigin = new Point(0.5, 0.5);
+            turning.RenderTransform = refreshTurn;
+        }
+        menuButton = TitleButton(SymbolRegular.LineHorizontal320, () => shell?.TogglePane(), "Navigation", 16);
+        searchButton = TitleButton(SymbolRegular.Search24, () => shell?.OpenSearchBar(), "Search (Ctrl+F)", 16);
+        searchButton.Mark(TourSpot.Search); // (the tour's Search on a narrow window, the pane's box folded away)
         titleBar = new TitleBar
         {
             Title = "Simpl", Height = TitleBarHeight, Margin = new Thickness(8, 0, 0, 0),
@@ -107,7 +117,10 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         };
         root.Children.Add(titleBar);
         root.Children.Add(back);
+        root.Children.Add(refresh);
         root.Children.Add(menuButton);
+        root.Children.Add(searchButton);
+        root.Children.Add(searchSlot);
 
         Grid.SetRow(stage, 1);
         root.Children.Add(stage);
@@ -205,6 +218,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         var n = e.PropertyName ?? "";
         if (n == nameof(Engine.Engine.Phase) || n.StartsWith("Login", StringComparison.Ordinal) || n == nameof(Engine.Engine.Snapshot)) Phased();
         if (n == nameof(Engine.Engine.NavVersion)) UpdateTitleButtons();
+        if (n == nameof(Engine.Engine.Refreshing)) Refreshing();
         if (n == "Login.AskStay" && engine?.Login.AskStay == true) AskStay();
     }
 
@@ -290,7 +304,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
                 tour.Completed += () => Taskbar.AfterTour(this);
-                Grid.SetRow(tour, 1);
+                // (over the title bar too: its buttons dimmed with the page, all but Windows' own caption buttons)
+                Grid.SetRow(tour, 0);
+                Grid.SetRowSpan(tour, 2);
                 root.Children.Insert(root.Children.IndexOf(sheets), tour);
                 tour.AutoStart();
                 Taskbar.ShowIfAsked(this);
@@ -333,23 +349,74 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private FrameworkElement StartOverButton()
     {
         if (startOver != null) return startOver;
-        var b = K.Button("Start Over", () => engine?.Login.Restart(), icon: SymbolRegular.ArrowCounterclockwise24);
+        var b = K.Button("Start over", () => engine?.Login.Restart(), icon: SymbolRegular.ArrowCounterclockwise24);
         b.Margin = new Thickness(0, 0, 8, 0);
         b.ToolTip = "Begin signing in again from the start";
         return startOver = b;
     }
 
-    /// <summary>Back in the title bar while the app shows (enabled when there is somewhere to go back to); the pane's
-    /// button while the window is too narrow for the pane.</summary>
+    /// <summary>A button of the title bar's left end (Back, Refresh, the pane's, Search): a symbol in a 40 by 36 box.</summary>
+    private static System.Windows.Controls.Button TitleButton(SymbolRegular symbol, Action click, string tip, double size)
+    {
+        var b = K.IconButton(symbol, click, tip, size, 40);
+        b.Height = 36;
+        b.VerticalAlignment = VerticalAlignment.Top;
+        b.HorizontalAlignment = HorizontalAlignment.Left;
+        b.Visibility = Visibility.Collapsed;
+        return b;
+    }
+
+    /// <summary>Back and Refresh in the title bar while the app shows (Back enabled when there is somewhere to go back
+    /// to); the pane's button and Search beside them while the window is too narrow for the pane — so Search is in sight
+    /// at every width, as on the Mac — and, while it is asked for there, the search box itself in Search's place, as wide
+    /// as the title bar spares (the app's name and the pinned tools moved along, Windows' caption buttons kept clear).</summary>
     private void UpdateTitleButtons()
     {
         var app = engine != null && engine.Phase == Phase.Native && !engine.Login.Covers;
-        back.Visibility = app ? Visibility.Visible : Visibility.Collapsed;
-        back.IsEnabled = engine?.Nav.CanGoBack == true;
         var narrow = app && shell != null && shell.Narrow;
-        menuButton.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
-        var left = (app ? 44 : 0) + (narrow ? 44 : 0);
-        titleBar.Margin = new Thickness(8 + left, 0, 0, 0);
+        var searching = narrow && searchSlot.Content != null;
+        var x = 4.0;
+        foreach (var (b, shown) in new[] { (back, app), (refresh, app), (menuButton, narrow), (searchButton, narrow && !searching) })
+        {
+            b.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+            if (!shown) continue;
+            b.Margin = new Thickness(x, 6, 0, 6);
+            x += 44;
+        }
+        searchSlot.Visibility = searching ? Visibility.Visible : Visibility.Collapsed;
+        if (searching)
+        {
+            // (Windows' caption buttons take 138 at the right, the pinned tools theirs, the app's name about 90)
+            var room = ActualWidth - x - 138 - trailing.ActualWidth - 90 - 8;
+            searchSlot.Width = Math.Clamp(room, 160, 360);
+            searchSlot.Margin = new Thickness(x + 2, 7, 0, 7);
+            x += searchSlot.Width + 10;
+        }
+        back.IsEnabled = engine?.Nav.CanGoBack == true;
+        titleBar.Margin = new Thickness(8 + (x - 4), 0, 0, 0);
+        Refreshing();
+    }
+
+    /// <summary>Refresh while Simpl reads everything again: its arrow turns (Motion off: it dims instead), and it says so.</summary>
+    private void Refreshing()
+    {
+        var on = engine?.Refreshing == true;
+        var tip = on ? "Refreshing…" : "Refresh (F5)";
+        if (Equals(refresh.ToolTip, tip)) return;
+        refresh.ToolTip = tip;
+        System.Windows.Automation.AutomationProperties.SetName(refresh, tip);
+        if (refresh.Content is not UIElement arrow) return;
+        if (on && Motion.On)
+        {
+            // (constant motion, so linear: a turn every 0.9 s for as long as it reads)
+            refreshTurn.BeginAnimation(RotateTransform.AngleProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 360, Motion.Ms(900)) { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
+        }
+        else
+        {
+            refreshTurn.BeginAnimation(RotateTransform.AngleProperty, null);
+            refreshTurn.Angle = 0;
+        }
+        arrow.Opacity = on && !Motion.On ? 0.45 : 1;
     }
 
     /// <summary>While the first page loads: the app's mark and its name, not a blank window (the Mac's Splash).</summary>
@@ -377,8 +444,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
             : "Simpl keeps your username and password on this PC only, encrypted inside Simpl, and signs you in when your school asks again. Two-step codes still come to you.";
         var body = K.V(14, icon, K.Wrapped(words, Ty.Body, B.Text));
         var s = new Sheet { Title = "Stay logged in?", Body = body, Width = 420 };
-        s.Add("Stay Logged In", SheetButtonKind.Primary, () => e.Login.Stay(true));
-        s.Add("Not Now", SheetButtonKind.Close, () => e.Login.Stay(false));
+        s.Add("Stay logged in", SheetButtonKind.Primary, () => e.Login.Stay(true));
+        s.Add("Not now", SheetButtonKind.Close, () => e.Login.Stay(false));
         s.Closed += () =>
         {
             stayAsked = false;
@@ -402,6 +469,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private void OnKey(object sender, KeyEventArgs e)
     {
         if (sheets.IsOpen) return;
+        // (Escape ends the tour wherever the keyboard is; it counts as seen)
+        if (e.Key == Key.Escape && tour?.On == true) { tour.Skip(); e.Handled = true; return; }
         var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
         if (e.Key == Key.Escape && shell != null && shell.Escape()) { e.Handled = true; return; }
