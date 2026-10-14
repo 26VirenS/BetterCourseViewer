@@ -304,7 +304,8 @@ internal sealed class DnaTwoColumns : Grid
         this.main = main;
         this.side = side;
         Margin = new Thickness(40, 8, 40, 24);
-        MaxWidth = 1480;
+        // (held only on the widest screens, as the shared work layout is: the drawing takes the room a wide popup gives)
+        MaxWidth = 2200;
         side.VerticalAlignment = VerticalAlignment.Top;
         SizeChanged += (_, e) => Lay(e.NewSize);
     }

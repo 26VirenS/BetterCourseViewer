@@ -462,8 +462,10 @@ public static class CEMembrane
             L("part:peripheral", "Peripheral protein", new BioVec(PeripheralPlaces[0].X, -HeadY - 1.9, PeripheralPlaces[0].Z + 1.4), 8),
             L("part:glycoprotein", "Glycoprotein", new BioVec(g.X + 0.4, 5.6, g.Z + 0.2), 8),
             L("part:glycolipid", "Glycolipid", new BioVec(GlycolipidPlaces[3].X, HeadY + 2.0, GlycolipidPlaces[3].Z), 7),
-            L("side:outside", "Extracellular side", new BioVec(-22, 6.5, Half + 1), 6),
-            L("side:inside", "Cytoplasm side", new BioVec(-22, -HeadY, Half - 0.5), 6, new BioVec(0, -0.4, 1)),
+            // (the two sides kept before any part when the view has no room for every label — the 3D view folds the
+            //  smallest first into "+N more" — as they say which way up the patch is)
+            L("side:outside", "Extracellular side", new BioVec(-22, 6.5, Half + 1), 13),
+            L("side:inside", "Cytoplasm side", new BioVec(-22, -HeadY, Half - 0.5), 13, new BioVec(0, -0.4, 1)),
         };
     }
 }

@@ -16,9 +16,10 @@ namespace Simpl.Tools;
 /// <summary>
 /// The biology toolkit's 3D view (spec §3.4, §3.5, §9), the Mac's BioSceneView: WPF's Viewport3D with the molecule
 /// builder's lights on a clear ground, and an orbit camera — drag to turn, scroll to zoom, right-drag to pan; framing the
-/// model with a 40° field of view as every 3D view does (SceneFrame: 85% of the view where the model meets its edges
-/// first, its labels kept off it — <see cref="FitDistance"/>) on first show, on Reset view and whenever the view's size
-/// changes (a tool's popup sized by its edges); double-click empty space to reset, an object to zoom to it.
+/// model with a 40° field of view as every 3D view does (SceneFrame: 85% of the view where the model's outline meets its
+/// edges first, centred, and never under 75% for its labels' sake, its labels kept off it — <see cref="Fit"/>) on first
+/// show, on Reset view and whenever the view's size changes (a tool's popup sized by its edges); double-click empty space
+/// to reset, an object to zoom to it.
 /// A scene is made off the UI thread from values (<see cref="BioSceneContent"/>, by <see cref="Show"/>) and batched one
 /// frozen mesh per material; a click picks an object by its id (the nearest opaque one, through translucent membranes);
 /// the pointer over an object outlines it in the accent and turns to a hand; the selection glows and the rest dims to
@@ -60,9 +61,9 @@ public sealed class BioSceneView : Grid
     // (what is drawn: the scene, its batches by model, and what each model's vertices belong to)
     private BioSceneContent? content;
     private BioSphere framing = new(BioVec.Zero, 1);
-    /// <summary>The content as up to 256 boxes in its own space (least and greatest x, y, z of a run of items), for the
-    /// labels' room round the model: one box round it all would be drawn far wider than the model by its near corners.</summary>
-    private List<(BioVec Min, BioVec Max)> extents = new();
+    /// <summary>The content's outermost points (BioSceneContent.OuterPoints), for its outline on the view: what the camera
+    /// frames and the labels are kept off.</summary>
+    private List<BioVec> outer = new();
     private List<(BioMaterial Material, int Order, BioMeshBatch Batch, MeshGeometry3D Mesh)> batches = new();
     private readonly Dictionary<GeometryModel3D, (BioMeshBatch? Batch, string? Id, bool Translucent)> pickMap = new();
     private List<(BioBillboard Board, TranslateTransform3D Move)> boards = new();
@@ -134,7 +135,7 @@ public sealed class BioSceneView : Grid
             // (40° is the height's field of view, as SceneKit's; WPF's is the width's)
             if (e.NewSize.Height > 0) camera.FieldOfView = 2 * Math.Atan(Tan20 * e.NewSize.Width / e.NewSize.Height) * 180 / Math.PI;
             labelSignature = "";
-            Refit();
+            RefitSoon();
             PlaceMarks();
             Wake();
         };
@@ -259,7 +260,7 @@ public sealed class BioSceneView : Grid
         Task.Run(() =>
         {
             var made = build();
-            return (Made: made, Parts: BioWpf.Batches(made.Items), Frame: made.Framing, Extents: Extents(made));
+            return (Made: made, Parts: BioWpf.Batches(made.Items), Frame: made.Framing, Outer: made.OuterPoints());
         }).ContinueWith(t => Dispatcher.BeginInvoke(() =>
         {
             spinnerTimer.Stop();
@@ -270,7 +271,7 @@ public sealed class BioSceneView : Grid
                 buildingKey = null;
                 builtKey = key;
                 spinnerHost.Content = null;
-                extents = t.Result.Extents;
+                outer = t.Result.Outer;
                 Apply(t.Result.Made, t.Result.Parts, t.Result.Frame, frameKey);
             }
             finally { Shot.Ended(); }
@@ -332,7 +333,7 @@ public sealed class BioSceneView : Grid
         }
         else
         {
-            fitDistance = FitDistance(framing, fitTurn);
+            (fitDistance, fitOffset) = Fit(framing, fitTurn);
             Place();
         }
         SetHover(null);
@@ -383,121 +384,123 @@ public sealed class BioSceneView : Grid
 
     // ---- the camera ----
 
-    /// <summary>The camera framing a scene: 40° field of view, looking along −z at its ball's centre, as far off as fills
-    /// its room with the model (<see cref="FitDistance"/>).</summary>
+    /// <summary>The camera framing a scene: 40° field of view, looking along −z at its model's middle (its ball's centre
+    /// moved across to centre the model's outline), as far off as fills its room with the model (<see cref="Fit"/>).</summary>
     private void Frame(BioSphere s, bool animated, bool resetTurn)
     {
         var q = resetTurn && !Turning ? Quaternion.Identity : orientation;
-        var d = FitDistance(s, q);
+        var (d, offset) = Fit(s, q);
         fitTurn = q;
         fitDistance = d;
+        fitOffset = offset;
         camera.NearPlaneDistance = Math.Max(0.001, d * 0.01);
         camera.FarPlaneDistance = d * 20;
         turn.CenterX = s.Centre.X;
         turn.CenterY = s.Centre.Y;
         turn.CenterZ = s.Centre.Z;
-        MoveCamera(BioWpf.P(s.Centre), d, q, animated && Motion.On ? 0.5 : 0);
+        MoveCamera(BioWpf.P(s.Centre) + offset, d, q, animated && Motion.On ? 0.5 : 0);
     }
 
-    /// <summary>The distance the scene was last fitted at (0: none yet), and the turn it was fitted for.</summary>
+    /// <summary>The distance the scene was last fitted at (0: none yet), the turn it was fitted for, and where the camera
+    /// looked then, from the ball's centre.</summary>
     private double fitDistance;
     private Quaternion fitTurn = Quaternion.Identity;
+    private Vector3D fitOffset;
 
     /// <summary>
-    /// How far from its ball's centre the camera stands for the model, turned by <paramref name="q"/>: as near as leaves
-    /// its labels off it. From the model filling 85% of the view where it meets the view's edges first (SceneFrame.Fill,
-    /// every 3D view's share) — measured on its own boxes (<see
-    /// cref="extents"/>), not its ball, so a long helix or a wide cell fills its view — the camera stands back a step at a
-    /// time, the labels laid out at each step as they will be drawn (<see cref="LabelsOn"/>), until none lies on the
-    /// model's box or on another label's anchor: the room is what the labels placed there take — none at a side with no
-    /// column, a row's height for those moved above or below it. (A column's room kept at each side for the widest label,
-    /// whether or not a label sat there, held every model under half the view's width, and labels wider than that room
-    /// still landed on it.) Never past 2.5 times as far; with no step clear, the nearest with the fewest on it. Before the
-    /// view has a size, or for an empty scene: the ball at 1.15·R / sin 20°, as before.
+    /// How far from its ball's centre the camera stands for the model turned by <paramref name="q"/>, and where it looks
+    /// from that centre: as near as leaves its labels off it. The model is measured by its outline — its outermost points
+    /// (<see cref="outer"/>) as the camera sees them — not its box (a round cell's box, seen in perspective, was wider than
+    /// the cell by its near corners, and its labels kept clear of the box's empty corners held the cell to half its view),
+    /// and the camera looks at the outline's middle, not the ball's centre (an amino acid lies off its ball's centre, and
+    /// was framed 85% on one side, 60% on the other). From the model filling SceneFrame.Fill of the view where it meets
+    /// the view's edges first, the camera stands back a step at a time, the labels laid out at each step as they will be
+    /// drawn (<see cref="LabelsOn"/>), until none lies on the model, over another's anchor or with its leader through
+    /// another's capsule — but never past the model filling SceneFrame.Least: where the labels do not all fit by then, the
+    /// step that folds fewest into "+N more" (the nearest of those). Before the view has a size, or for an empty scene: the
+    /// ball at 1.15·R / sin 20°, as before.
     /// </summary>
-    private double FitDistance(BioSphere s, Quaternion q)
+    private (double D, Vector3D Offset) Fit(BioSphere s, Quaternion q)
     {
         var ball = 1.15 * Math.Max(s.Radius, 1e-3) / Math.Sin(20 * Math.PI / 180);
-        if (ActualWidth < 40 || ActualHeight < 40 || extents.Count == 0) return ball;
-        var f = ActualHeight / (2 * Tan20);
-        double hw = SceneFrame.Fill / 2 * ActualWidth, hh = SceneFrame.Fill / 2 * ActualHeight;
+        if (ActualWidth < 40 || ActualHeight < 40 || outer.Count == 0) return (ball, new Vector3D());
+        double w = ActualWidth, h = ActualHeight, f = h / (2 * Tan20);
         var c = BioWpf.P(s.Centre);
         var m = Matrix3D.Identity;
         m.RotateAt(q, c);
-        var corners = Corners(s, m, c);
-        double d = 0, front = double.MinValue;
-        foreach (var p in corners)
-        {
-            // (the camera at the centre and d out along +z: this corner is d − p.Z in front of it, and shows |p.X|·f / (d −
-            //  p.Z) from the view's middle)
-            d = Math.Max(d, p.Z + Math.Max(Math.Abs(p.X) * f / hw, Math.Abs(p.Y) * f / hh));
-            front = Math.Max(front, p.Z);
-        }
+        var points = Outer(s, m, c);
+        // (the camera d out along +z from the point it looks at: a point p shows (p.X − aim)·f / (d − p.Z) from the view's
+        //  middle; the aim across and up that lets it nearest)
+        var aim = new Vector3D(Middle(points.Select(p => (p.Z, p.X)), f / (SceneFrame.Fill / 2 * w)),
+            Middle(points.Select(p => (p.Z, p.Y)), f / (SceneFrame.Fill / 2 * h)), 0);
+        double Filling(double share) => points.Max(p => p.Z + Math.Max(Math.Abs(p.X - aim.X) * f / (share / 2 * w), Math.Abs(p.Y - aim.Y) * f / (share / 2 * h)));
         // (never inside the model)
-        d = Math.Max(d, front + 0.05 * Math.Max(s.Radius, 1e-3));
-        if (!double.IsFinite(d) || d <= 0) return ball;
-        fitReach = BioLabelLayout.Reach;
-        if (!showLabels || content is not { Labels.Count: > 0 }) return d;
-        (double D, int InRows) Search(double reach)
+        var d = Math.Max(Filling(SceneFrame.Fill), points.Max(p => p.Z) + 0.05 * Math.Max(s.Radius, 1e-3));
+        if (!double.IsFinite(d) || d <= 0) return (ball, new Vector3D());
+        if (!showLabels || content is not { Labels.Count: > 0 }) return (d, aim);
+        var far = Math.Max(d, Filling(SceneFrame.Least));
+        var steps = new List<double>();
+        for (var k = d; k < far; k *= 1.04) steps.Add(k);
+        steps.Add(far);
+        foreach (var k in steps)
+            if (LabelsOn(s, m, c, points, aim, k, f, fold: false) == 0) return (k, aim);
+        var (best, fewest) = (d, int.MaxValue);
+        foreach (var k in steps)
         {
-            var (best, fewest, inRows) = (d, int.MaxValue, 0);
-            for (var k = d; k <= 2.5 * d; k *= 1.04)
-            {
-                var (on, rowed) = LabelsOn(s, m, c, corners, k, f, reach);
-                if (on < fewest) (best, fewest, inRows) = (k, on, rowed);
-                if (on == 0) break;
-            }
-            return (best, inRows);
+            var folded = LabelsOn(s, m, c, points, aim, k, f, fold: true);
+            if (folded < fewest) (best, fewest) = (k, folded);
         }
-        // (twice: with a label a little over the model kept in its column, and with every label over it moved to a row
-        //  above or below — the rows taken only where they make the model a sixth larger or more and hold six labels at
-        //  most, so a peptide's five go above and below it and a cell's sixteen keep to their columns, their leaders
-        //  uncrossed, not run down across the cell)
-        var columns = Search(BioLabelLayout.Reach);
-        var rows = Search(4);
-        if (rows.D > 0.85 * columns.D || rows.InRows > 6) return columns.D;
-        fitReach = 4;
-        return rows.D;
+        return (best, aim);
     }
 
-    /// <summary>How far a column's label may reach into a narrow model before it moves to a row, as the fit last chose it
-    /// (<see cref="BioLabelLayout.Reach"/>, or 4 where rows made the model larger): the labels are laid out with it.</summary>
-    private double fitReach = BioLabelLayout.Reach;
-
-    /// <summary>The corners of the content's boxes, turned by <paramref name="m"/>, from its ball's centre — a scene that
-    /// names the ball to frame kept to it (a bacterium's long flagella reach far past the cell its ball holds: fitting them
-    /// all left the cell a speck, and its labels had no room off them).</summary>
-    private List<Vector3D> Corners(BioSphere s, Matrix3D m, Point3D c)
+    /// <summary>Along one of the view's axes, where the camera looks so it can stand nearest with every point inside the
+    /// view: the least, over aims o, of the most of a + k·|x − o| (a point's depth term a, its place x), found by thirds.</summary>
+    private static double Middle(IEnumerable<(double A, double X)> points, double k)
     {
-        var held = content?.Frame != null;
-        double Held(double v, double mid) => held ? Math.Clamp(v, mid - s.Radius, mid + s.Radius) : v;
-        var out_ = new List<Vector3D>(extents.Count * 8);
-        foreach (var (lo, hi) in extents)
-            for (var i = 0; i < 8; i++)
-                out_.Add(m.Transform(new Point3D(Held((i & 1) == 0 ? lo.X : hi.X, s.Centre.X), Held((i & 2) == 0 ? lo.Y : hi.Y, s.Centre.Y),
-                    Held((i & 4) == 0 ? lo.Z : hi.Z, s.Centre.Z))) - c);
-        return out_;
+        var list = points.ToList();
+        double lo = list.Min(p => p.X), hi = list.Max(p => p.X);
+        double Most(double o) => list.Max(p => p.A + k * Math.Abs(p.X - o));
+        for (var i = 0; i < 48 && hi - lo > 1e-9; i++)
+        {
+            double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+            if (Most(m1) <= Most(m2)) hi = m2; else lo = m1;
+        }
+        return (lo + hi) / 2;
     }
 
-    /// <summary>How many labels would lie on the model (its box on the view) or on another label's anchor with the camera
-    /// <paramref name="d"/> from its ball's centre along +z: the labels laid out as <see cref="TickLabels"/> lays them —
-    /// the box kept clear too — each anchor seen unless its normal faces away or a ray has found it hidden.</summary>
-    private (int On, int InRows) LabelsOn(BioSphere s, Matrix3D m, Point3D c, List<Vector3D> corners, double d, double f, double reach)
+    /// <summary>The scene's outermost points, turned by <paramref name="m"/>, from its ball's centre — a scene that names the
+    /// ball to frame kept to it (a bacterium's long flagella reach far past the cell its ball holds: fitting them all left
+    /// the cell a speck, and its labels had no room off them).</summary>
+    private List<Vector3D> Outer(BioSphere s, Matrix3D m, Point3D c) => outer.Select(p => m.Transform(BioWpf.P(Held(p, s))) - c).ToList();
+
+    /// <summary>A point kept to the ball of a scene that names the ball to frame (each of its coordinates within the ball's
+    /// reach of its centre).</summary>
+    private BioVec Held(BioVec p, BioSphere s)
+    {
+        if (content?.Frame == null) return p;
+        double Keep(double v, double mid) => Math.Clamp(v, mid - s.Radius, mid + s.Radius);
+        return new BioVec(Keep(p.X, s.Centre.X), Keep(p.Y, s.Centre.Y), Keep(p.Z, s.Centre.Z));
+    }
+
+    /// <summary>With the camera <paramref name="d"/> out along +z from <paramref name="aim"/> (from the ball's centre), how
+    /// many labels would lie on the model's outline, over another label's anchor or with their leaders through another's
+    /// capsule — or, <paramref name="fold"/>, how many would be folded into "+N more" for none to: the labels laid out as
+    /// <see cref="TickLabels"/> lays them, the box kept clear too, each anchor seen unless its normal faces away or a ray has
+    /// found it hidden.</summary>
+    private int LabelsOn(BioSphere s, Matrix3D m, Point3D c, List<Vector3D> points, Vector3D aim, double d, double f, bool fold)
     {
         double w = ActualWidth, h = ActualHeight, near = Math.Max(0.001, d * 0.01);
-        (double X, double Y, bool InFront) At(Vector3D p) => d - p.Z <= near ? (0, 0, false) : (w / 2 + p.X * f / (d - p.Z), h / 2 - p.Y * f / (d - p.Z), true);
-        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
-        foreach (var p in corners)
+        (double X, double Y, bool InFront) At(Vector3D p) =>
+            d - p.Z <= near ? (0, 0, false) : (w / 2 + (p.X - aim.X) * f / (d - p.Z), h / 2 - (p.Y - aim.Y) * f / (d - p.Z), true);
+        var seen = new List<(double X, double Y)>(points.Count);
+        foreach (var p in points)
         {
             var a = At(p);
-            if (!a.InFront) return (int.MaxValue, 0);
-            x0 = Math.Min(x0, a.X);
-            y0 = Math.Min(y0, a.Y);
-            x1 = Math.Max(x1, a.X);
-            y1 = Math.Max(y1, a.Y);
+            if (!a.InFront) return int.MaxValue;
+            seen.Add((a.X, a.Y));
         }
-        var box = new BioLabelBox(Math.Max(x0, 0), Math.Max(y0, 0), Math.Min(x1, w), Math.Min(y1, h));
-        var eye = new Vector3D(0, 0, d);
+        if (BioOutline.Round(seen)?.Within(w, h) is not { } outline) return 0;
+        var eye = new Vector3D(aim.X, aim.Y, d);
         var inputs = new List<BioLabelInput>();
         foreach (var l in content!.Labels)
         {
@@ -507,26 +510,48 @@ public sealed class BioSceneView : Grid
             else if (visible && !l.Always) visible = rayVisible.GetValueOrDefault(l.Id, true);
             inputs.Add(new BioLabelInput(l.Id, l.Text, x, y, visible, l.Area, LabelWidth(l.Text)));
         }
-        var (placed, _) = BioLabelLayout.Layout(inputs, w / 2, h / 2, Math.Min(f * s.Radius / d, w * 0.32), w, h, box, KeepClearBox(), reach);
-        return (BioLabelLayout.Conflicts(placed, box), placed.Count(p => p.Row));
+        var box = outline.Box;
+        var folded = fold ? new List<string>() : null;
+        var (placed, _) = BioLabelLayout.Layout(inputs, (box.X0 + box.X1) / 2, (box.Y0 + box.Y1) / 2, Math.Min(f * s.Radius / d, w * 0.32), w, h, box, KeepClearBox(),
+            outline: outline, folded: folded);
+        return folded?.Count ?? BioLabelLayout.Conflicts(placed, box, outline);
     }
 
     /// <summary>The view's corner kept clear of labels, as a box on the view (none: null).</summary>
     private BioLabelBox? KeepClearBox() => labelKeepClear.Width > 0 && labelKeepClear.Height > 0
         ? new BioLabelBox(0, ActualHeight - labelKeepClear.Height, labelKeepClear.Width, ActualHeight) : null;
 
+    private bool refitting;
+
+    /// <summary>A refit asked for as the view's size changes, done once the size has settled for this pass of the
+    /// dispatcher: a popup sized by its edge changes the view's size at every move of the pointer, and fitting the labels
+    /// at each took longer than a frame.</summary>
+    private void RefitSoon()
+    {
+        if (refitting) return;
+        refitting = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            refitting = false;
+            Refit();
+        });
+    }
+
     /// <summary>The model kept filling its room as the view's size (or the labels' room) changes: the camera's distance
-    /// scaled by how the fit has changed — the scene framed again if the student has not zoomed, a zoom of their own kept as
-    /// the same share of it.</summary>
+    /// scaled by how the fit has changed, and its aim moved with the fit's — the scene framed again if the student has
+    /// not zoomed or panned, a zoom of their own kept as the same share of it.</summary>
     private void Refit()
     {
         if (content == null || fitDistance <= 0) return;
-        var fit = FitDistance(framing, fitTurn);
+        var (fit, offset) = Fit(framing, fitTurn);
         var k = fit / fitDistance;
+        var shift = offset - fitOffset;
         fitDistance = fit;
-        if (!double.IsFinite(k) || Math.Abs(k - 1) < 1e-3) return;
+        fitOffset = offset;
+        if (!double.IsFinite(k) || (Math.Abs(k - 1) < 1e-3 && shift.Length < 1e-9)) return;
         distance *= k;
-        if (move is { } mv) move = (mv.Start, mv.Duration, mv.T0, mv.T1, mv.D0 * k, mv.D1 * k, mv.Q0, mv.Q1);
+        target += shift;
+        if (move is { } mv) move = (mv.Start, mv.Duration, mv.T0 + shift, mv.T1 + shift, mv.D0 * k, mv.D1 * k, mv.Q0, mv.Q1);
         camera.NearPlaneDistance = Math.Max(0.001, fit * 0.01);
         camera.FarPlaneDistance = fit * 20;
         Place();
@@ -1064,89 +1089,56 @@ public sealed class BioSceneView : Grid
             inputs.Add(new BioLabelInput(l.Id, l.Text, x, y, visible, l.Area, LabelWidth(l.Text)));
         }
         if (still) raysDone = true;
-        // (the model's circle on the view: its framing ball's centre and edge, projected)
+        // (the model's circle on the view: its framing ball's centre and edge, projected — and its outline, whose middle the
+        //  labels are laid out round, kept off it; those that cannot be are folded into "+N more")
         var c = Project(framing.Centre);
         var r = ActualHeight / (2 * Tan20) * framing.Radius / Math.Max(distance, 1e-6);
-        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox(), KeepClearBox(), fitReach);
+        var outline = ModelOutline();
+        var (mx, my) = outline is { Box: var b } ? ((b.X0 + b.X1) / 2, (b.Y0 + b.Y1) / 2) : (c.X, c.Y);
+        var (placed, more) = BioLabelLayout.Layout(inputs, mx, my, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, outline?.Box, KeepClearBox(),
+            outline: outline, folded: outline != null ? new List<string>() : null);
         DrawLabels(placed, more);
-        if (still) SayFill(placed);
+        if (still) SayFill(placed, outline, more);
     }
 
     private string saidFill = "";
 
     /// <summary>For the screenshot suite's log (a development run's), once the labels have settled: how much of the view
-    /// the model fills, and the model with its labels — SceneFrame's 85% where it meets the view first.</summary>
-    private void SayFill(List<BioLabelPlacement> placed)
+    /// the model itself fills where it meets the view first (SceneFrame.Least at the least, Fill at the most), and the
+    /// model with its labels, and how many labels were folded into "+N more".</summary>
+    private void SayFill(List<BioLabelPlacement> placed, BioOutline? outline, int more)
     {
-        if (!Launch.IsDevelopment || ModelBox() is not { } b) return;
+        if (!Launch.IsDevelopment || outline is not { Box: var b }) return;
         double x0 = b.X0, y0 = b.Y0, x1 = b.X1, y1 = b.Y1;
         foreach (var p in placed)
         {
             var (fx, fy, fw, fh) = p.Frame;
             (x0, y0, x1, y1) = (Math.Min(x0, fx), Math.Min(y0, fy), Math.Max(x1, fx + fw), Math.Max(y1, fy + fh));
         }
-        var share = Math.Max((x1 - x0) / Math.Max(ActualWidth, 1), (y1 - y0) / Math.Max(ActualHeight, 1));
+        double w = Math.Max(ActualWidth, 1), h = Math.Max(ActualHeight, 1);
+        var own = Math.Max((b.X1 - b.X0) / w, (b.Y1 - b.Y0) / h);
+        var share = Math.Max((x1 - x0) / w, (y1 - y0) / h);
         var said = FormattableString.Invariant(
-            $"3d view {ActualWidth:0}×{ActualHeight:0}: the model {b.X1 - b.X0:0}×{b.Y1 - b.Y0:0}, with its labels {x1 - x0:0}×{y1 - y0:0}, {share * 100:0}% of the view ({Accessibility})");
+            $"3d view {ActualWidth:0}×{ActualHeight:0}: the model {b.X1 - b.X0:0}×{b.Y1 - b.Y0:0}, {own * 100:0}% of the view; with its {placed.Count} labels {x1 - x0:0}×{y1 - y0:0}, {share * 100:0}% (+{more} more) ({Accessibility})");
         if (said == saidFill) return;
         saidFill = said;
         Log.Write(said);
     }
 
-    /// <summary>The content as boxes: its items in runs (one item a run for up to 256 of them), each run's least and greatest
-    /// x, y and z.</summary>
-    private static List<(BioVec Min, BioVec Max)> Extents(BioSceneContent c)
+    /// <summary>The model's outline on the view: its outermost points where the turn and the camera put them (as Project
+    /// does), kept to the ball of a scene that names the ball to frame, as the camera is (the bacterium's labels sit
+    /// beside its cell, not out past its flagella); null for an empty scene, or while a point is behind the camera.</summary>
+    private BioOutline? ModelOutline()
     {
-        var boxes = new List<(BioVec Min, BioVec Max)>();
-        var items = c.Items.Where(i => i.Mesh.VertexCount > 0).ToList();
-        var per = Math.Max(1, (items.Count + 255) / 256);
-        for (var start = 0; start < items.Count; start += per)
+        if (outer.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return null;
+        var seen = new List<(double X, double Y)>(outer.Count);
+        foreach (var p in outer)
         {
-            float x0 = float.MaxValue, y0 = float.MaxValue, z0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue, z1 = float.MinValue;
-            for (var k = start; k < Math.Min(start + per, items.Count); k++)
-                foreach (var q in items[k].Mesh.Positions)
-                {
-                    if (q.X < x0) x0 = q.X;
-                    if (q.Y < y0) y0 = q.Y;
-                    if (q.Z < z0) z0 = q.Z;
-                    if (q.X > x1) x1 = q.X;
-                    if (q.Y > y1) y1 = q.Y;
-                    if (q.Z > z1) z1 = q.Z;
-                }
-            boxes.Add((new BioVec(x0, y0, z0), new BioVec(x1, y1, z1)));
+            var (x, y, front, _) = Project(Held(p, framing));
+            if (!front) return null;
+            seen.Add((x, y));
         }
-        return boxes;
-    }
-
-    /// <summary>The model's box on the view: the corners of its boxes where the turn and the camera put them (as Project
-    /// does), their least and greatest x and y — kept to the ball of a scene that names the ball to frame, as the camera
-    /// is (the bacterium's labels sit beside its cell, not out past its flagella); null for an empty scene, or while a
-    /// corner is behind the camera.</summary>
-    private BioLabelBox? ModelBox()
-    {
-        if (extents.Count == 0) return null;
-        var m = turn.Value;
-        var eye = camera.Position;
-        var f = ActualHeight / (2 * Tan20);
-        var s = framing;
-        var held = content?.Frame != null;
-        double Held(double v, double mid) => held ? Math.Clamp(v, mid - s.Radius, mid + s.Radius) : v;
-        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
-        foreach (var (lo, hi) in extents)
-            for (var i = 0; i < 8; i++)
-            {
-                var w = m.Transform(new Point3D(Held((i & 1) == 0 ? lo.X : hi.X, s.Centre.X), Held((i & 2) == 0 ? lo.Y : hi.Y, s.Centre.Y),
-                    Held((i & 4) == 0 ? lo.Z : hi.Z, s.Centre.Z)));
-                var v = w - eye;
-                var z = -v.Z;
-                if (z <= camera.NearPlaneDistance) return null;
-                double x = ActualWidth / 2 + v.X * f / z, y = ActualHeight / 2 - v.Y * f / z;
-                x0 = Math.Min(x0, x);
-                y0 = Math.Min(y0, y);
-                x1 = Math.Max(x1, x);
-                y1 = Math.Max(y1, y);
-            }
-        return new BioLabelBox(Math.Max(x0, 0), Math.Max(y0, 0), Math.Min(x1, ActualWidth), Math.Min(y1, ActualHeight));
+        return BioOutline.Round(seen)?.Within(ActualWidth, ActualHeight);
     }
 
     private void ClearLabels()

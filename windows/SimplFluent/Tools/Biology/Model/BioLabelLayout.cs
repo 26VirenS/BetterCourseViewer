@@ -19,14 +19,22 @@ namespace Simpl.Tools;
 //
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
 // model's box on the view, a label that would hide its own anchor or another label's, or (beside a model narrower than
-// 70% of the view) reach more than Reach into the model's box (40, or 4 where the 3D view finds rows make the model
-// larger; over half its own width, for a short label), goes instead to a row just above the model (an anchor in its
+// 70% of the view) reach more than Reach into the model's box (40; over half its own width, for a short label), goes
+// instead to a row just above the model (an anchor in its
 // upper half) or below it, or (an anchor in the middle half of its height) the other side where its own has no room. A
 // row's labels are packed side by side in their anchors' order, each as near over its anchor as the others allow (a
 // label already there slides aside for a new one) and clear of the leaders crossing the row on their way to a column,
 // their own leaders straight up or down and never through a capsule in a row nearer the model; a label that fits no row
 // (three at most) stays in its column. An anchor straight over or under its own column label is
 // led straight to the label's edge. The 3D view stands its camera back until no label lies on the model (Conflicts).
+//
+// Given the model's outline on the view (BioOutline: the hull of its outermost points as the camera sees them), the 3D
+// view's labels are kept off the model itself, not its box: each column's labels, in order round the model's middle,
+// are spread down the column to the heights nearest their anchors where each fits beside the outline (24 from it, inside
+// the view, off the box kept clear) — so a cell filling three quarters of its view has its labels in the corners its
+// round outline leaves, not in columns beside its widest part that held it to half the view. A label with no such place
+// goes to a row above or below the model; one still in the way (on the model, over another's anchor, or led through
+// another's capsule) is folded into "+N more", the smallest object's first.
 
 /// <summary>A label to place: its object, its words, where its anchor projects (y down), whether it can be seen (not
 /// behind the camera or hidden by another object), how much of the screen its object covers (the larger keep their labels
@@ -55,6 +63,131 @@ public sealed record BioLabelPlacement(string Id, string Text, bool Left, double
 /// <summary>The model's box on the view (y down).</summary>
 public readonly record struct BioLabelBox(double X0, double Y0, double X1, double Y1);
 
+/// <summary>
+/// The model's outline on the view (y down): the convex hull of its outermost points as the camera shows them. A round
+/// cell leaves its box's corners empty, and the box of a model seen in perspective is wider than the model by its near
+/// corners: labels kept off the box held a cell to half its view, so with an outline they are kept off the model itself.
+/// </summary>
+public sealed class BioOutline
+{
+    private readonly (double X, double Y)[] hull;
+
+    private BioOutline((double X, double Y)[] hull, BioLabelBox box)
+    {
+        this.hull = hull;
+        Box = box;
+    }
+
+    /// <summary>Its corners, in order round it.</summary>
+    public IReadOnlyList<(double X, double Y)> Points => hull;
+
+    /// <summary>Its box.</summary>
+    public BioLabelBox Box { get; }
+
+    /// <summary>The outline round some points (Andrew's monotone chain); null for none.</summary>
+    public static BioOutline? Round(IEnumerable<(double X, double Y)> points)
+    {
+        var p = points.Where(q => double.IsFinite(q.X) && double.IsFinite(q.Y)).Distinct().OrderBy(q => q.X).ThenBy(q => q.Y).ToArray();
+        if (p.Length == 0) return null;
+        var box = new BioLabelBox(p.Min(q => q.X), p.Min(q => q.Y), p.Max(q => q.X), p.Max(q => q.Y));
+        if (p.Length < 3) return new BioOutline(p, box);
+        static double Turn((double X, double Y) o, (double X, double Y) a, (double X, double Y) b) => (a.X - o.X) * (b.Y - o.Y) - (a.Y - o.Y) * (b.X - o.X);
+        var h = new (double X, double Y)[2 * p.Length];
+        var k = 0;
+        for (var i = 0; i < p.Length; i++)
+        {
+            while (k >= 2 && Turn(h[k - 2], h[k - 1], p[i]) <= 0) k--;
+            h[k++] = p[i];
+        }
+        for (int i = p.Length - 2, lower = k + 1; i >= 0; i--)
+        {
+            while (k >= lower && Turn(h[k - 2], h[k - 1], p[i]) <= 0) k--;
+            h[k++] = p[i];
+        }
+        return new BioOutline(h[..Math.Max(1, k - 1)], box);
+    }
+
+    /// <summary>The outline kept to the view (a model running off its edges), for the labels' sake.</summary>
+    public BioOutline Within(double w, double h) => new(hull, new BioLabelBox(Math.Max(Box.X0, 0), Math.Max(Box.Y0, 0), Math.Min(Box.X1, w), Math.Min(Box.Y1, h)));
+
+    /// <summary>The least and greatest x the outline reaches between the heights <paramref name="y0"/> and
+    /// <paramref name="y1"/>; null where it does not reach them.</summary>
+    public (double X0, double X1)? Across(double y0, double y1)
+    {
+        if (y1 < Box.Y0 || y0 > Box.Y1 || hull.Length == 0) return null;
+        // (a pixel row at a time, the rows reaching the band's ends taken whole: never less than the outline is)
+        Rows();
+        int from = Math.Max(0, (int)Math.Floor(y0) - rowFirst), to = Math.Min(rowMin!.Length - 1, (int)Math.Ceiling(y1) - rowFirst);
+        double x0 = double.MaxValue, x1 = double.MinValue;
+        for (var k = from; k <= to; k++)
+        {
+            x0 = Math.Min(x0, rowMin[k]);
+            x1 = Math.Max(x1, rowMax![k]);
+        }
+        return x0 <= x1 ? (x0, x1) : null;
+    }
+
+    private double[]? rowMin, rowMax;
+    private int rowFirst;
+
+    /// <summary>The outline's least and greatest x in each pixel row its box spans (y to y + 1), worked out once: the labels'
+    /// layout asks for them a few thousand times.</summary>
+    private void Rows()
+    {
+        if (rowMin != null) return;
+        rowFirst = (int)Math.Floor(Box.Y0);
+        var n = Math.Max(1, (int)Math.Ceiling(Box.Y1) - rowFirst + 1);
+        rowMin = new double[n];
+        rowMax = new double[n];
+        Array.Fill(rowMin, double.MaxValue);
+        Array.Fill(rowMax, double.MinValue);
+        void Take(int k, double x)
+        {
+            if (k < 0 || k >= n) return;
+            rowMin[k] = Math.Min(rowMin[k], x);
+            rowMax[k] = Math.Max(rowMax[k], x);
+        }
+        for (var i = 0; i < hull.Length; i++)
+        {
+            var a = hull[i];
+            var b = hull[(i + 1) % hull.Length];
+            // (each side where it crosses each row's top and bottom, and its ends in their own rows)
+            Take((int)Math.Floor(a.Y) - rowFirst, a.X);
+            double lo = Math.Min(a.Y, b.Y), hi = Math.Max(a.Y, b.Y);
+            for (var y = (int)Math.Ceiling(lo); y <= hi; y++)
+            {
+                var x = hi - lo < 1e-9 ? a.X : a.X + (b.X - a.X) * (y - a.Y) / (b.Y - a.Y);
+                Take(y - rowFirst, x);
+                Take(y - 1 - rowFirst, x);
+            }
+        }
+    }
+
+    /// <summary>Whether a rectangle lies on the outline by more than <paramref name="by"/> each way: the rectangle drawn in
+    /// by it on each side, and the two tested as the convex shapes they are (no line between them).</summary>
+    public bool Overlaps(double x0, double y0, double x1, double y1, double by = 0)
+    {
+        (x0, y0, x1, y1) = (x0 + by, y0 + by, x1 - by, y1 - by);
+        if (x1 <= x0 || y1 <= y0 || hull.Length == 0) return false;
+        // (along x and y: the outline's box)
+        if (x1 <= Box.X0 || x0 >= Box.X1 || y1 <= Box.Y0 || y0 >= Box.Y1) return false;
+        // (across each of the outline's sides)
+        var corners = new[] { (X: x0, Y: y0), (X: x1, Y: y0), (X: x1, Y: y1), (X: x0, Y: y1) };
+        for (var i = 0; i < hull.Length && hull.Length >= 2; i++)
+        {
+            var a = hull[i];
+            var b = hull[(i + 1) % hull.Length];
+            double nx = b.Y - a.Y, ny = a.X - b.X;
+            if (nx == 0 && ny == 0) continue;
+            double h0 = double.MaxValue, h1 = double.MinValue, r0 = double.MaxValue, r1 = double.MinValue;
+            foreach (var q in hull) { var t = q.X * nx + q.Y * ny; h0 = Math.Min(h0, t); h1 = Math.Max(h1, t); }
+            foreach (var c in corners) { var t = c.X * nx + c.Y * ny; r0 = Math.Min(r0, t); r1 = Math.Max(r1, t); }
+            if (r1 <= h0 || r0 >= h1) return false;
+        }
+        return true;
+    }
+}
+
 public static class BioLabelLayout
 {
     public const double Height = 18;
@@ -68,17 +201,57 @@ public static class BioLabelLayout
     /// <summary>Rows above (or below) the model a label may move to.</summary>
     public const int BandRows = 3;
     /// <summary>How far a column's label may reach into a narrow model before it moves to a row (or half its width, for a
-    /// short label): the 3D view asks for 4 instead where moving every label off the model makes the model a sixth larger
-    /// or more with six labels in rows at most (a peptide's five; never a cell's sixteen, whose leaders would cross it).</summary>
+    /// short label).</summary>
     public const double Reach = 40;
 
     /// <summary>The labels placed round a model whose screen circle is centred at (cx, cy) with radius r, in a view w × h;
     /// given the model's box, labels that would hide what they name, or reach more than <paramref name="reach"/> into a
     /// narrow model, move to rows above or below it; given a box to keep clear (a scale bar over the view's corner), no
-    /// label goes over it. Returns the placements and how many visible labels were left out.</summary>
+    /// label goes over it. Given the model's outline (its box is then the outline's), each label is kept off the model
+    /// itself rather than its box: a column's label comes in from its column, where the view's edge asks it to, no nearer
+    /// the outline than a column is to the box (<see cref="ColumnOffset"/>), and the column's labels, in their anchors'
+    /// order, each sit as near its anchor's height as leaves it beside the outline — a long label beside the middle of a
+    /// round cell goes up or down to where the cell narrows, so the cell can fill its view and its labels use the corners
+    /// its box left empty; and given <paramref name="folded"/> too, a label that still lies on the model, over another's
+    /// anchor or with its leader through another's capsule tries a row above or below the model, and then, the smallest
+    /// object's first, is folded into "+N more" (its id added to the list). Returns the placements and how many visible
+    /// labels were left out.</summary>
     public static (List<BioLabelPlacement> Placed, int More) Layout(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model = null,
-        BioLabelBox? keepClear = null, double reach = Reach)
+        BioLabelBox? keepClear = null, double reach = Reach, BioOutline? outline = null, List<string>? folded = null)
     {
+        if (outline == null || folded == null) return Place(inputs, cx, cy, r, w, h, model, keepClear, reach, outline);
+        // (beside an outline, asked to: a label that cannot be placed off the model, or whose leader runs through another's
+        //  capsule, is folded into "+N more" — the smallest object's first, of those in one another's way — and the rest
+        //  laid out again, until none is: the 3D view does not stand its camera back past SceneFrame's least for a label)
+        var shownNow = inputs.ToList();
+        var toRows = new HashSet<(string, string)>();
+        while (true)
+        {
+            var (placed, more) = Place(shownNow, cx, cy, r, w, h, model, keepClear, reach, outline, toRows);
+            var bad = Conflicting(placed, outline.Box, outline, withOthers: true);
+            if (bad.Count == 0) return (placed, more + folded.Count);
+            // (a label in the way that has not tried a row above or below the model tries one first)
+            var unrowed = bad.Where(p => !p.Row && !toRows.Contains((p.Id, p.Text))).ToList();
+            if (unrowed.Count > 0)
+            {
+                foreach (var p in unrowed) toRows.Add((p.Id, p.Text));
+                continue;
+            }
+            // (one with no room beside the model at all: any label of its column, folded, would make room for it)
+            var crowded = bad.Where(p => !p.Row && outline.Overlaps(p.Frame.X, p.Frame.Y, p.Frame.X + p.Frame.Width, p.Frame.Y + p.Frame.Height, 4)).ToList();
+            var drop = bad.Concat(placed.Where(o => !o.Row && crowded.Any(p => p.Left == o.Left))).Distinct()
+                .OrderBy(p => shownNow.First(i => i.Id == p.Id && i.Text == p.Text).Area).ThenBy(p => p.Id, StringComparer.Ordinal).First();
+            var at = shownNow.FindIndex(i => i.Id == drop.Id && i.Text == drop.Text);
+            shownNow[at] = shownNow[at] with { Visible = false };
+            folded.Add(drop.Id);
+        }
+    }
+
+    private static (List<BioLabelPlacement> Placed, int More) Place(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model,
+        BioLabelBox? keepClear, double reach, BioOutline? outline, HashSet<(string, string)>? toRows = null)
+    {
+        if (outline != null) model = outline.Box;
+        var hugging = outline != null;
         var shown = inputs.Where(i => i.Visible).ToList();
         const double step = Height + Gap;
         // (each label's side, kept even: the side with three or more labels more than the other gives its label nearest
@@ -138,6 +311,7 @@ public static class BioLabelLayout
         }
         var more = 0;
         var out_ = new List<BioLabelPlacement>();
+        var homeless = new HashSet<(string, string)>(toRows ?? new HashSet<(string, string)>());
         foreach (var left in new[] { true, false })
         {
             var mine = Members(left);
@@ -153,23 +327,64 @@ public static class BioLabelLayout
                 more += mine.Count - holds;
                 mine = mine.Where(keep.Contains).ToList();
             }
-            var column = mine.Select(i => shown[i]).OrderBy(l => l.Y).ThenBy(l => l.Id, StringComparer.Ordinal).ToList();
-            var ys = column.Select(l => Math.Max(l.Y, top)).ToArray();
-            for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + step);
-            if (ys[^1] > bottom)
+            // (in their anchors' order down the column — or, beside an outline, round the model's middle from its top to its
+            //  bottom: a label sent up to a corner is led there from the anchor highest round that side, not across the
+            //  leaders of those below it)
+            var column = (!hugging ? mine.Select(i => shown[i]).OrderBy(l => l.Y)
+                    : mine.Select(i => shown[i]).OrderBy(l => -Math.Atan2(cy - l.Y, left ? cx - l.X : l.X - cx)))
+                .ThenBy(l => l.Id, StringComparer.Ordinal).ToList();
+            // (with the outline: a label's edge at a height — its column's, or nearer the model where the view's edge asks,
+            //  but never nearer the outline there than a column is to the box; where the outline does not reach that
+            //  height, its side of the middle — and whether it fits there, inside the view and off the box kept clear. The
+            //  outline's edge at each height is worked out once a column: the spread asks for it at every height for every
+            //  label)
+            var hugs = hugging ? new double[Math.Max(1, (int)Math.Ceiling(h - Inset - Height / 2 - top) + 2)] : Array.Empty<double>();
+            Array.Fill(hugs, double.NaN);
+            double Hug(double y)
             {
-                ys[^1] = bottom;
-                for (var i = ys.Length - 2; i >= 0; i--) ys[i] = Math.Min(ys[i], ys[i + 1] - step);
-                // (and down again from the top, if pushing up took the first above it: they then share the room)
-                if (ys[0] < top)
-                {
-                    ys[0] = top;
-                    for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + step);
-                }
+                var s = (int)Math.Round(y - top);
+                if (s >= 0 && s < hugs.Length && !double.IsNaN(hugs[s])) return hugs[s];
+                var across = outline!.Across(y - Height / 2 - Gap, y + Height / 2 + Gap);
+                var hug = across is { } a ? (left ? a.X0 - ColumnOffset : a.X1 + ColumnOffset) : (left ? cx - Gap : cx + Gap);
+                if (s >= 0 && s < hugs.Length && Math.Abs(y - top - s) < 1e-9) hugs[s] = hug;
+                return hug;
             }
-            double ElbowOf(BioLabelInput l)
+            double Beside(BioLabelInput l, double y)
             {
                 var e = EdgeOf(l);
+                if (!hugging) return e;
+                return left ? Math.Min(e, Hug(y)) : Math.Max(e, Hug(y));
+            }
+            // (one with no room there kept inside the view all the same: it then lies on the model, and counts against the fit)
+            double EdgeAt(BioLabelInput l, double y) => left ? Math.Max(Beside(l, y), Inset + l.Width) : Math.Min(Beside(l, y), w - Inset - l.Width);
+            bool Fits(BioLabelInput l, double y)
+            {
+                var e = Beside(l, y);
+                var x0 = left ? e - l.Width : e;
+                if (x0 < Inset - 1e-9 || x0 + l.Width > w - Inset + 1e-9) return false;
+                return keepClear is not { } kc || x0 >= kc.X1 || x0 + l.Width <= kc.X0 || y + Height / 2 <= kc.Y0 || y - Height / 2 >= kc.Y1;
+            }
+            double[] ys;
+            if (hugging) ys = Spread(column, Fits, top, h - Inset - Height / 2, step);
+            else
+            {
+                ys = column.Select(l => Math.Max(l.Y, top)).ToArray();
+                for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + step);
+                if (ys[^1] > bottom)
+                {
+                    ys[^1] = bottom;
+                    for (var i = ys.Length - 2; i >= 0; i--) ys[i] = Math.Min(ys[i], ys[i + 1] - step);
+                    // (and down again from the top, if pushing up took the first above it: they then share the room)
+                    if (ys[0] < top)
+                    {
+                        ys[0] = top;
+                        for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + step);
+                    }
+                }
+            }
+            double ElbowOf(BioLabelInput l, double y)
+            {
+                var e = EdgeAt(l, y);
                 // (an anchor beyond the label's far edge — at the view's very edge — is led to that edge instead)
                 if (left && l.X < e - l.Width) return e - l.Width - Elbow;
                 if (!left && l.X > e + l.Width) return e + l.Width + Elbow;
@@ -183,7 +398,10 @@ public static class BioLabelLayout
                 for (var i = 0; i < column.Count && !swapped; i++)
                     for (var j = i + 1; j < column.Count && !swapped; j++)
                     {
-                        if (!Crossing(column[i].X, column[i].Y, ElbowOf(column[i]), ys[i], column[j].X, column[j].Y, ElbowOf(column[j]), ys[j])) continue;
+                        if (!Crossing(column[i].X, column[i].Y, ElbowOf(column[i], ys[i]), ys[i], column[j].X, column[j].Y, ElbowOf(column[j], ys[j]), ys[j])) continue;
+                        // (beside an outline, only where each still fits at the other's height, and the swap uncrosses them)
+                        if (hugging && (!Fits(column[i], ys[j]) || !Fits(column[j], ys[i])
+                            || Crossing(column[i].X, column[i].Y, ElbowOf(column[i], ys[j]), ys[j], column[j].X, column[j].Y, ElbowOf(column[j], ys[i]), ys[i]))) continue;
                         (ys[i], ys[j]) = (ys[j], ys[i]);
                         swapped = true;
                     }
@@ -192,18 +410,67 @@ public static class BioLabelLayout
             for (var k = 0; k < column.Count; k++)
             {
                 var l = column[k];
-                var e = EdgeOf(l);
+                var e = EdgeAt(l, ys[k]);
                 var x0 = left ? e - l.Width : e;
+                if (hugging && !Fits(l, ys[k])) homeless.Add((l.Id, l.Text));
                 // (an anchor straight over or under its own capsule — out past the model, in the column's way: the
                 //  bacterium's flagella — is led straight to the capsule's edge facing it, not round the capsule's end)
                 if (l.X >= x0 && l.X <= x0 + l.Width && Math.Abs(l.Y - ys[k]) > Height / 2)
                     out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, Math.Clamp(l.X, x0 + 9, x0 + l.Width - 9),
                         l.Y < ys[k] ? ys[k] - Height / 2 : ys[k] + Height / 2));
-                else out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, ElbowOf(l)));
+                else out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, ElbowOf(l, ys[k])));
             }
         }
-        if (model is { } box) IntoBands(out_, box, w, h, keepClear, reach);
+        if (model is { } box) IntoBands(out_, box, w, h, keepClear, reach, outline, homeless);
         return (out_, more);
+    }
+
+    /// <summary>A column's heights beside an outline: its labels kept in their anchors' order and at least
+    /// <paramref name="step"/> apart between <paramref name="top"/> and <paramref name="bottom"/>, each where it fits
+    /// (<paramref name="fits"/>) and, of the ways that do, the one nearest their anchors' heights in all (worked out two
+    /// pixels at a time). A label that fits nowhere is put nearest its anchor all the same: it then lies on the model, and
+    /// the 3D view stands its camera further back.</summary>
+    private static double[] Spread(IReadOnlyList<BioLabelInput> column, Func<BioLabelInput, double, bool> fits, double top, double bottom, double step)
+    {
+        var n = column.Count;
+        const double pitch = 2;
+        var slots = Math.Max(1, (int)Math.Floor((bottom - top) / pitch) + 1);
+        var gap = (int)Math.Ceiling(step / pitch - 1e-9);
+        // (more than the height holds: as many as it holds are spread, the rest follow on below, as the column did)
+        if ((n - 1) * gap >= slots)
+        {
+            var ys = new double[n];
+            for (var i = 0; i < n; i++) ys[i] = top + i * step;
+            return ys;
+        }
+        const double Off = 1e6;
+        var cost = new double[n, slots];
+        var from = new int[n, slots];
+        for (var i = 0; i < n; i++)
+        {
+            // (the best place for the labels before this one, at or above each height)
+            double best = double.PositiveInfinity;
+            var bestAt = -1;
+            for (var s = 0; s < slots; s++)
+            {
+                var y = top + s * pitch;
+                var here = Math.Abs(y - column[i].Y) + (fits(column[i], y) ? 0 : Off);
+                if (i == 0) { cost[i, s] = here; continue; }
+                var before = s - gap;
+                if (before >= 0 && cost[i - 1, before] < best) (best, bestAt) = (cost[i - 1, before], before);
+                cost[i, s] = bestAt < 0 ? double.PositiveInfinity : here + best;
+                from[i, s] = bestAt;
+            }
+        }
+        var end = 0;
+        for (var s = 1; s < slots; s++) if (cost[n - 1, s] < cost[n - 1, end]) end = s;
+        var placed = new double[n];
+        for (var i = n - 1; i >= 0; i--)
+        {
+            placed[i] = top + end * pitch;
+            end = from[i, end];
+        }
+        return placed;
     }
 
     /// <summary>Whether two leaders' slanting runs (anchor → elbow) cross.</summary>
@@ -221,25 +488,69 @@ public static class BioLabelLayout
         return placed.Any(o => !ReferenceEquals(o, p) && o.AnchorX >= f.X - 2 && o.AnchorX <= f.X + f.Width + 2 && o.AnchorY >= f.Y - 2 && o.AnchorY <= f.Y + f.Height + 2);
     }
 
-    /// <summary>How many placed labels lie on the model's box (more than 4 into it each way) or over another label's
-    /// anchor: the 3D view stands its camera back until there are none.</summary>
-    public static int Conflicts(IReadOnlyList<BioLabelPlacement> placed, BioLabelBox box)
+    /// <summary>How many placed labels lie on the model's box — or, given it, its outline — (more than 4 into it each way)
+    /// or over another label's anchor: the 3D view stands its camera back until there are none.</summary>
+    public static int Conflicts(IReadOnlyList<BioLabelPlacement> placed, BioLabelBox box, BioOutline? outline = null) => Conflicting(placed, box, outline).Count;
+
+    /// <summary>The placed labels that lie on the model, over another's anchor or — beside an outline — whose leader runs
+    /// through another's capsule; <paramref name="withOthers"/>: with the labels they lie over or run through, either of
+    /// which, folded away, would clear it.</summary>
+    private static List<BioLabelPlacement> Conflicting(IReadOnlyList<BioLabelPlacement> placed, BioLabelBox box, BioOutline? outline, bool withOthers = false)
     {
-        var n = 0;
+        var bad = new List<BioLabelPlacement>();
         foreach (var p in placed)
         {
             var f = p.Frame;
             var across = Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0);
             var down = Math.Min(f.Y + f.Height, box.Y1) - Math.Max(f.Y, box.Y0);
-            if ((across > 4 && down > 4) || CoversAnchor(p, placed)) n++;
+            var on = outline?.Overlaps(f.X, f.Y, f.X + f.Width, f.Y + f.Height, 4) ?? (across > 4 && down > 4);
+            var over = placed.Where(o => !ReferenceEquals(o, p) && o.AnchorX >= f.X - 2 && o.AnchorX <= f.X + f.Width + 2 && o.AnchorY >= f.Y - 2 && o.AnchorY <= f.Y + f.Height + 2).ToList();
+            // (beside an outline, labels sent up or down to a corner: a leader that runs through another label's capsule
+            //  on its way there counts too)
+            var through = outline != null ? RunsThrough(p, placed) : new List<BioLabelPlacement>();
+            if (!on && over.Count == 0 && through.Count == 0) continue;
+            bad.Add(p);
+            if (withOthers) bad.AddRange(over.Concat(through));
         }
-        return n;
+        return bad.Distinct().ToList();
+    }
+
+    /// <summary>The labels whose capsules a label's leader runs through (more than 2 into them).</summary>
+    private static List<BioLabelPlacement> RunsThrough(BioLabelPlacement p, IReadOnlyList<BioLabelPlacement> placed)
+    {
+        var points = new List<(double X, double Y)> { (p.AnchorX, p.AnchorY) };
+        points.AddRange(p.Leader);
+        var hit = new List<BioLabelPlacement>();
+        foreach (var o in placed)
+        {
+            if (ReferenceEquals(o, p)) continue;
+            var f = o.Frame;
+            double x0 = f.X + 2, y0 = f.Y + 2, x1 = f.X + f.Width - 2, y1 = f.Y + f.Height - 2;
+            for (var i = 0; i + 1 < points.Count; i++)
+                if (SegmentMeets(points[i], points[i + 1], x0, y0, x1, y1)) { hit.Add(o); break; }
+        }
+        return hit;
+    }
+
+    /// <summary>Whether a line from a to b meets a rectangle (clipped to it, Liang–Barsky).</summary>
+    private static bool SegmentMeets((double X, double Y) a, (double X, double Y) b, double x0, double y0, double x1, double y1)
+    {
+        double t0 = 0, t1 = 1, dx = b.X - a.X, dy = b.Y - a.Y;
+        foreach (var (pk, qk) in new[] { (-dx, a.X - x0), (dx, x1 - a.X), (-dy, a.Y - y0), (dy, y1 - a.Y) })
+        {
+            if (Math.Abs(pk) < 1e-12) { if (qk < 0) return false; continue; }
+            var t = qk / pk;
+            if (pk < 0) t0 = Math.Max(t0, t); else t1 = Math.Min(t1, t);
+            if (t0 > t1) return false;
+        }
+        return true;
     }
 
     /// <summary>Each label that would hide its own anchor or another label's, or reach well into a narrow model, moved to a
     /// row just above the model (an anchor in its upper half) or below it, as near over its anchor as the row allows (and
     /// never over the box kept clear, or the leaders crossing the row to a column).</summary>
-    private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h, BioLabelBox? keepClear, double reach)
+    private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h, BioLabelBox? keepClear, double reach, BioOutline? outline,
+        HashSet<(string, string)>? homeless = null)
     {
         const double step = Height + Gap, space = 6;
         var narrow = box.X1 - box.X0 < 0.7 * w;
@@ -247,9 +558,11 @@ public static class BioLabelLayout
         {
             var f = p.Frame;
             var onAnchor = p.AnchorX >= f.X - 4 && p.AnchorX <= f.X + f.Width + 4 && Math.Abs(p.AnchorY - p.Y) <= Height;
+            // (how far it reaches into the model: its box, or across the outline at the label's own height)
+            var (m0, m1) = outline == null ? (box.X0, box.X1) : outline.Across(f.Y, f.Y + f.Height) ?? (0, 0);
             var acrossModel = p.Y + Height / 2 >= box.Y0 && p.Y - Height / 2 <= box.Y1
-                && Math.Max(0, Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0)) > Math.Min(reach, 0.5 * f.Width);
-            return onAnchor || (narrow && acrossModel) || CoversAnchor(p, placed);
+                && Math.Max(0, Math.Min(f.X + f.Width, m1) - Math.Max(f.X, m0)) > Math.Min(reach, 0.5 * f.Width);
+            return onAnchor || (narrow && acrossModel) || CoversAnchor(p, placed) || homeless?.Contains((p.Id, p.Text)) == true;
         }
         var moving = placed.Where(Hides).OrderBy(p => p.AnchorX).ThenBy(p => p.Id, StringComparer.Ordinal).ToList();
         if (moving.Count == 0) return;

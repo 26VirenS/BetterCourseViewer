@@ -25,9 +25,11 @@ namespace Simpl.Shell;
 /// Escape while it has the keyboard, or by Alt+F4. It opens centred over the page beside the pane, and moves with the
 /// window, keeping the place it was moved to. A large one (a tool, Knewton Alta, Macmillan, feedback, a rubric) spans the
 /// window under its title bar less a margin all round — over the pane too, the owner's choice — sized again with the
-/// window, one over another a step down and along; it is sized by its edges and corners too (Windows' own sizing), and
-/// the size the student gives it is kept for its kind (<see cref="Sheet.SizeKey"/>, a tool's key) and taken the next time
-/// it opens, kept to the window and the screen. Its own questions show over it, not over the window.
+/// window, one over another a step down and along (and that much smaller, inside the window); it is sized by its edges
+/// and corners too (Windows' own sizing), and the size the student gives it is kept for its kind (<see
+/// cref="Sheet.SizeKey"/>, a tool's key) and taken the next time it opens, kept to the window and the screen — a sizing
+/// the student takes back (Escape, or a right-click, while sizing) keeps nothing. Its own questions show over it, not over
+/// the window.
 /// </summary>
 public sealed class FloatPopup : FluentWindow, ISheetWindow
 {
@@ -40,11 +42,16 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private readonly Grid root = new();
     /// <summary>Where it was moved to, from where it opens (centred over the page).</summary>
     private Vector offset;
+    /// <summary>A large one's step down and along from the large ones already open over its window (none: the first).</summary>
+    private Vector cascade;
     /// <summary>A large one's size as the student gave it by its edges — now, or an earlier time (kept by its sheet's
     /// SizeKey): null, as large as its room.</summary>
     private Size? chosen;
     /// <summary>Being sized by its edges (Windows' sizing under way): the card follows the window, not the window the card.</summary>
     private bool sizing;
+    /// <summary>Its size, and the size the student had given it, as the sizing by its edges began.</summary>
+    private Size sizedFrom;
+    private Size? chosenBefore;
     private bool placing, closing, ended, shown;
 
     /// <summary>The least a large one is sized to by its edges — less than the room of the smallest window Simpl allows (720
@@ -64,8 +71,14 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     {
         while (over is FloatPopup { Owner: { } under }) over = under;
         var w = new FloatPopup(s, over);
-        // (a large one over another opens a step down and along, so both are seen — the Mac's 28)
-        if (s.Large) w.offset = new Vector(28, 28) * All.Count(p => p.sheet.Large && ReferenceEquals(p.over, over));
+        // (a large one over another opens a step down and along, so both are seen — the Mac's 28 — the fifth back where
+        //  the first is; made that much smaller, its right and bottom edges where the first's are: at its room's whole
+        //  size and moved along, its edges that size it lay outside the window — off the screen with the window maximized)
+        if (s.Large)
+        {
+            w.cascade = new Vector(28, 28) * (All.Count(p => p.sheet.Large && ReferenceEquals(p.over, over)) % 4);
+            w.offset = w.cascade / 2;
+        }
         All.Add(w);
         if (over.IsVisible) w.Open();
         else
@@ -203,7 +216,8 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
                 Place();
                 Said("changed to");
             };
-            if (Launch.IsDevelopment && Launch.Get("popup-drag") is { } drag) DragSoon(drag);
+            if (Launch.IsDevelopment && Launch.Get("popup-move") is { } move) MoveSoon(move);
+            else if (Launch.IsDevelopment && Launch.Get("popup-drag") is { } drag) DragSoon(drag);
         }
         Fit();
     }
@@ -260,8 +274,10 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
             MaxWidth = most.Width;
             MaxHeight = most.Height;
             var want = chosen ?? sheet.Most ?? most;
-            card.Width = Math.Clamp(want.Width, LeastLarge.Width, most.Width);
-            card.Height = Math.Clamp(want.Height, LeastLarge.Height, most.Height);
+            // (one a step down and along: that much smaller, so its edges stay inside the window)
+            var fits = new Size(Math.Max(LeastLarge.Width, most.Width - cascade.X), Math.Max(LeastLarge.Height, most.Height - cascade.Y));
+            card.Width = Math.Clamp(want.Width, LeastLarge.Width, fits.Width);
+            card.Height = Math.Clamp(want.Height, LeastLarge.Height, fits.Height);
             return;
         }
         card.MaxWidth = Math.Max(280, whole.Width - 2 * m);
@@ -324,7 +340,18 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     {
         sizing = false;
         if (ended) return;
-        if (WindowSize() is { } now) Follow(now);
+        var now = WindowSize();
+        // (taken back — Escape or a right-click while sizing: Windows puts it back as it was — the size before kept, and
+        //  nothing kept as the student's that they did not give it)
+        if (now is not { } given || (Math.Abs(given.Width - sizedFrom.Width) <= 1 && Math.Abs(given.Height - sizedFrom.Height) <= 1))
+        {
+            chosen = chosenBefore;
+            Fit();
+            Place();
+            Said("sizing taken back, at");
+            return;
+        }
+        Follow(given);
         if (chosen is not { } size) return;
         Remember(sheet.SizeKey, size);
         var room = Room();
@@ -415,10 +442,16 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private const int WM_SIZING = 0x0214, WM_EXITSIZEMOVE = 0x0232, GWL_STYLE = -16, WS_MAXIMIZEBOX = 0x00010000, WS_MINIMIZEBOX = 0x00020000;
 
     /// <summary>Windows' sizing by its edges: under way from its first step (a move by its heading has none) until it is
-    /// let go and what that laid out has been.</summary>
+    /// let go and what that laid out has been — its size as that began noted, for a sizing taken back.</summary>
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_SIZING) sizing = true;
+        if (msg == WM_SIZING && !sizing)
+        {
+            // (its first step, before Windows has sized it: what it was, for a sizing taken back)
+            sizing = true;
+            sizedFrom = WindowSize() ?? new Size(card.ActualWidth, card.ActualHeight);
+            chosenBefore = chosen;
+        }
         else if (msg == WM_EXITSIZEMOVE && sizing) Dispatcher.BeginInvoke(SizedByEdges, DispatcherPriority.Background);
         return IntPtr.Zero;
     }
@@ -487,40 +520,84 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private void DragSoon(string said)
     {
         if (!double.TryParse(said, NumberStyles.Float, CultureInfo.InvariantCulture, out var by) || by <= 0) by = 300;
-        void After(double s, Action a)
+        After(6, () => ByEdge(by));
+    }
+
+    /// <summary>
+    /// --popup-move -120,40 (CI's check that a large one moved by its heading is still sized by its edges; a development
+    /// run's alone): six seconds after it opens, the pointer pressed on its heading (a tool's tile), moved that far a step
+    /// at a time and let go — Windows' own move, with sizing turned off for it and on again after — then sized by its right
+    /// edge 200 narrower (--popup-drag's way); the log says where it went and the size kept.
+    /// </summary>
+    private void MoveSoon(string said)
+    {
+        var p = said.Split(',');
+        double dx = -120, dy = 40;
+        if (p.Length == 2)
         {
-            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(s) };
-            t.Tick += (_, _) => { t.Stop(); if (!ended) a(); };
-            t.Start();
+            double.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out dx);
+            double.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out dy);
         }
         After(6, () =>
         {
             Activate();
-            var start = PointToScreen(new Point(ActualWidth - 2, ActualHeight / 2));
-            var end = PointToScreen(new Point(ActualWidth - 2 - by, ActualHeight / 2));
-            SetCursorPos((int)start.X, (int)start.Y);
-            Log.Write($"popup drag: on the right edge at {(int)start.X},{(int)start.Y}");
-            After(0.4, () =>
+            var (left, top) = (Left, Top);
+            // (on the heading where nothing is a control: a tool's tile at its top left — the heading's empty room takes no
+            //  press — or, with no heading named, its top)
+            var at = sheet.Handle is FrameworkElement h && h.IsVisible ? h.TranslatePoint(new Point(22, Math.Min(28, h.ActualHeight / 2)), this) : new Point(ActualWidth / 2, 20);
+            var start = PointToScreen(at);
+            var end = PointToScreen(new Point(at.X + dx, at.Y + dy));
+            Log.Write($"popup move: on the heading at {(int)start.X},{(int)start.Y}");
+            PointerDrag(start, end, () => After(1.5, () =>
             {
-                mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero); // (left down)
-                var k = 0;
-                void Step()
-                {
-                    k++;
-                    SetCursorPos((int)(start.X + (end.X - start.X) * k / 12), (int)start.Y);
-                    mouse_event(0x0001, 0, 0, 0, UIntPtr.Zero); // (a move, where it now is)
-                    if (k < 12) { After(0.05, Step); return; }
-                    After(0.3, () =>
-                    {
-                        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero); // (left up)
-                        Log.Write("popup drag: let go");
-                        After(1.5, () => Log.Write(string.Create(CultureInfo.InvariantCulture,
-                            $"popup drag: {sheet.SizeKey} is {ActualWidth:0}×{ActualHeight:0}, kept as {Prefs.String($"popup:{sheet.SizeKey}") ?? "nothing"}")));
-                    });
-                }
-                After(0.2, Step);
-            });
+                Log.Write(string.Create(CultureInfo.InvariantCulture, $"popup move: moved by {Left - left:0},{Top - top:0} to {Left:0},{Top:0}; sizable: {ResizeMode}"));
+                After(0.5, () => ByEdge(200));
+            }));
         });
+    }
+
+    /// <summary>Sized by its right edge as the student sizes it, <paramref name="by"/> narrower, the size kept said in the log.</summary>
+    private void ByEdge(double by)
+    {
+        Activate();
+        var start = PointToScreen(new Point(ActualWidth - 2, ActualHeight / 2));
+        var end = PointToScreen(new Point(ActualWidth - 2 - by, ActualHeight / 2));
+        Log.Write($"popup drag: on the right edge at {(int)start.X},{(int)start.Y}");
+        PointerDrag(start, end, () => After(1.5, () => Log.Write(string.Create(CultureInfo.InvariantCulture,
+            $"popup drag: {sheet.SizeKey} is {ActualWidth:0}×{ActualHeight:0}, kept as {Prefs.String($"popup:{sheet.SizeKey}") ?? "nothing"}"))));
+    }
+
+    /// <summary>The real pointer pressed at <paramref name="start"/>, moved to <paramref name="end"/> in twelve steps and let
+    /// go (Windows' own moving or sizing between, its loop letting these steps run), then <paramref name="done"/>.</summary>
+    private void PointerDrag(Point start, Point end, Action done)
+    {
+        SetCursorPos((int)start.X, (int)start.Y);
+        After(0.4, () =>
+        {
+            mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero); // (left down)
+            var k = 0;
+            void Step()
+            {
+                k++;
+                SetCursorPos((int)(start.X + (end.X - start.X) * k / 12), (int)(start.Y + (end.Y - start.Y) * k / 12));
+                mouse_event(0x0001, 0, 0, 0, UIntPtr.Zero); // (a move, where it now is)
+                if (k < 12) { After(0.05, Step); return; }
+                After(0.3, () =>
+                {
+                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero); // (left up)
+                    Log.Write("popup drag: let go");
+                    done();
+                });
+            }
+            After(0.2, Step);
+        });
+    }
+
+    private void After(double seconds, Action a)
+    {
+        var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
+        t.Tick += (_, _) => { t.Stop(); if (!ended) a(); };
+        t.Start();
     }
 
     [StructLayout(LayoutKind.Sequential)] private struct Rect32 { public int L, T, R, B; }

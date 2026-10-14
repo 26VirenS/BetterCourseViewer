@@ -62,6 +62,34 @@ public sealed class BioSceneContent
         }
     }
 
+    /// <summary>The scene's outermost points: for each of <paramref name="directions"/> directions spread evenly over a
+    /// sphere, the vertex that reaches furthest that way — the corners of the hull round the scene, near enough (a 256th
+    /// of the sphere apart, about 1% of its size at worst) for its outline on the view, wherever the camera stands. The 3D
+    /// view frames the model and keeps its labels off it by these (BioOutline): a box round it, seen in perspective, was
+    /// wider than a round cell by its near corners and left the corners beside the cell empty.</summary>
+    public List<BioVec> OuterPoints(int directions = 256)
+    {
+        var dirs = new System.Numerics.Vector3[directions];
+        var turn = Math.PI * (3 - Math.Sqrt(5));
+        for (var i = 0; i < directions; i++)
+        {
+            var y = 1 - 2 * (i + 0.5) / directions;
+            var r = Math.Sqrt(1 - y * y);
+            dirs[i] = new System.Numerics.Vector3((float)(Math.Cos(turn * i) * r), (float)y, (float)(Math.Sin(turn * i) * r));
+        }
+        var best = new float[directions];
+        var at = new System.Numerics.Vector3[directions];
+        Array.Fill(best, float.MinValue);
+        foreach (var it in Items)
+            foreach (var q in it.Mesh.Positions)
+                for (var k = 0; k < directions; k++)
+                {
+                    var t = System.Numerics.Vector3.Dot(q, dirs[k]);
+                    if (t > best[k]) { best[k] = t; at[k] = q; }
+                }
+        return Enumerable.Range(0, directions).Where(k => best[k] > float.MinValue).Select(k => new BioVec(at[k].X, at[k].Y, at[k].Z)).Distinct().ToList();
+    }
+
     /// <summary>The items whose id is <paramref name="id"/> or begins with <c>id:</c> (so "organelle:mito" names every mitochondrion).</summary>
     public List<BioSceneItem> ItemsMatching(string id) => Items.Where(i => Matches(i.Id, id)).ToList();
 

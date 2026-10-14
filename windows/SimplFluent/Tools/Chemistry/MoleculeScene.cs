@@ -16,7 +16,8 @@ namespace Simpl.Tools;
 /// the accent, the ring always facing the viewer. Lit by a soft ambient light, a key light from the upper right and a
 /// fill from behind. Dragged to turn, scrolled to zoom, an atom selected by a click; turning slowly by itself if asked,
 /// waiting three seconds after the last touch. A new molecule is framed afresh, as every 3D view frames its model
-/// (SceneFrame): filling 85% of the view at its widest turn about the view's up, and again as the view's size changes.
+/// (SceneFrame): filling 85% of the view as it stands — or, while it turns by itself, at its widest turn about the view's
+/// up — and again as the view's size changes or it starts or stops turning.
 /// </summary>
 internal sealed class MoleculeSceneView : Border
 {
@@ -44,6 +45,7 @@ internal sealed class MoleculeSceneView : Border
     private double fitted;
     private string drawn = "";
     private int framing = -1;
+    private bool framedTurning;
     private Point? downAt;
     private bool turning;
     private DateTime pausedUntil;
@@ -98,7 +100,8 @@ internal sealed class MoleculeSceneView : Border
     private const double Lens = 40;
 
     /// <summary>How far back the camera stands for the molecule to fill the view (SceneFrame): each atom's sphere, and each
-    /// lone pair's lobe, at its widest turn about the view's up — the way it turns by itself and by a drag across.</summary>
+    /// lone pair's lobe, as it stands — or, while it turns by itself, at its widest turn about the view's up, the way it
+    /// turns. (Framed for a turn it was not taking, ethanol at rest filled 64–71% of its view.)</summary>
     private double Fitted()
     {
         if (model.Atoms.Count == 0) return 3.6;
@@ -117,7 +120,7 @@ internal sealed class MoleculeSceneView : Border
                 d.Normalize();
                 points.Add(a.Pos + d * (Radius(a.Symbol, style) + 0.22 + 0.25));
             }
-        return Math.Max(1.2, SceneFrame.Points(points, Lens, ActualWidth, ActualHeight, upright: true));
+        return Math.Max(1.2, SceneFrame.Points(points, Lens, ActualWidth, ActualHeight, upright: model.AutoRotate));
     }
 
     /// <summary>The molecule kept filling the view as its size changes: framed again for the new size, a zoom of the
@@ -136,7 +139,8 @@ internal sealed class MoleculeSceneView : Border
     /// <summary>For the screenshot suite's log (a development run's): the view's size and the camera's distance.</summary>
     private void Said()
     {
-        if (Launch.IsDevelopment) Log.Write(FormattableString.Invariant($"molecule view {ActualWidth:0}×{ActualHeight:0}: framed at {fitted:0.00} ({model.Atoms.Count} atoms, {SceneFrame.Fill * 100:0}% of the view)"));
+        if (Launch.IsDevelopment)
+            Log.Write(FormattableString.Invariant($"molecule view {ActualWidth:0}×{ActualHeight:0}: framed at {fitted:0.00} ({model.Atoms.Count} atoms, {SceneFrame.Fill * 100:0}% of the view {(model.AutoRotate ? "at its widest turn, turning" : "as it stands")})"));
     }
 
     // ---- the model drawn ----
@@ -155,10 +159,17 @@ internal sealed class MoleculeSceneView : Border
         if (framing != model.Framing)
         {
             framing = model.Framing;
+            framedTurning = model.AutoRotate;
             distance = fitted = Fitted();
             yaw = pitch = spin = 0;
             Apply();
             Said();
+        }
+        // (turning by itself started or stopped: framed for its widest turn, or as it stands)
+        else if (framedTurning != model.AutoRotate)
+        {
+            framedTurning = model.AutoRotate;
+            Refit();
         }
         Rendering(model.AutoRotate && IsLoaded);
     }

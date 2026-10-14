@@ -140,6 +140,8 @@ internal sealed class SubmissionReview : Grid
         generation++;
         ReleaseViews();
         PaintMore();
+        // (the room round the page in the card's colour until a page says its own: Tint)
+        viewer.ClearValue(Border.BackgroundProperty);
         if (picked is { } f)
         {
             if (f.Preview is { } p && engine.Absolute(p) is { } u) viewer.Child = CanvasViewer(u);
@@ -181,10 +183,29 @@ internal sealed class SubmissionReview : Grid
             await core.AddScriptToExecuteOnDocumentCreatedAsync(AssignDocViewerSkin.Script());
             core.NewWindowRequested += (_, e) => { e.Handled = true; engine.GoTo(e.Uri, ""); };
             core.NavigationStarting += (_, _) => { bar.Visibility = Visibility.Visible; Shot.Moved(); };
-            core.NavigationCompleted += (_, _) => { bar.Visibility = Visibility.Collapsed; Shot.Moved(); };
+            core.NavigationCompleted += (_, _) => { bar.Visibility = Visibility.Collapsed; Shot.Moved(); _ = Tint(core); };
         });
         owned.Add(web);
         return new Grid { Children = { web, bar } };
+    }
+
+    /// <summary>The room kept round the page (clear of the popup's edges, which size it) painted in the page's own ground —
+    /// DocViewer's grey round the file — so it reads as the page's, not a strip of the card beside it.</summary>
+    private async Task Tint(CoreWebView2 core)
+    {
+        try
+        {
+            var said = await core.ExecuteScriptAsync(
+                "(() => { const c = e => e ? getComputedStyle(e).backgroundColor : ''; const b = c(document.body); return b && b !== 'rgba(0, 0, 0, 0)' && b !== 'transparent' ? b : c(document.documentElement); })()");
+            var css = System.Text.Json.JsonSerializer.Deserialize<string>(said) ?? "";
+            var m = System.Text.RegularExpressions.Regex.Match(css, @"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)");
+            if (!m.Success || (m.Groups[4].Success && double.Parse(m.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture) < 0.99)) { viewer.ClearValue(Border.BackgroundProperty); return; }
+            var colour = Color.FromRgb(byte.Parse(m.Groups[1].Value), byte.Parse(m.Groups[2].Value), byte.Parse(m.Groups[3].Value));
+            var brush = new SolidColorBrush(colour);
+            brush.Freeze();
+            viewer.Background = brush;
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.Text.Json.JsonException or FormatException or OverflowException or System.Runtime.InteropServices.COMException) { }
     }
 
     /// <summary>A file the school has no viewer for, fetched with the session and shown here.</summary>

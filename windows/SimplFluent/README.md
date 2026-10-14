@@ -805,16 +805,32 @@ side from about 860 of the popup's width — the popup is the window's width les
 1024 one, 748 in a 780 one) — and one over the other below that, a side that holds the tool's answer (Grade needed,
 Citations) first. The chemistry builders' and the biology tools' layout (`ChemLayout`) puts the controls, the drawing
 and the facts side by side from 1180 of it (a 1366 window), the drawing beside one column of the controls over the
-facts from 840 (a 1024 window), and the drawing over the two below that (a 780 window).
+facts from 840 (a 1024 window), and the drawing over the two below that (a 780 window); it is held to 2200 wide (the
+DNA tool's two columns too), so in a 1920 window the drawing takes the popup's width (held to 1480, 180 of it went
+empty at each side).
 
-Every 3D view frames its model the same way (`Tools/SceneFrame.cs`): the model, with its labels, fills about 85% of the
-view where it meets the view's edges first — the biology tools' (`BioSceneView`, its labels kept off the model), the
-element's atom, orbitals and electron cloud (`Atom3DView`: the atom by the ball round it, the orbitals at their widest
-turn, the cloud by the ball 95% of its dots lie in, at 80%) and the molecule builder's (`MoleculeSceneView`, at its
-widest turn about the view's up) — on first show, on Reset view, and whenever the view's size changes (a popup sized by
-its edges, or with the window), a zoom of the student's own kept as the same share of it. The lens is measured across
-the view's smaller side, so a tall narrow view keeps the model's sides. A development run's log says each view's size
-and framing (`3d view …: … % of the view`, `element view …`, `molecule view …`).
+Every 3D view frames its model the same way (`Tools/SceneFrame.cs`): the model fills about 85% of the view where it
+meets the view's edges first — the element's atom, orbitals and electron cloud (`Atom3DView`: the atom by the ball round
+it, the orbitals at their widest turn as they revolve, as they stand with Windows' animations off, the cloud by the ball
+95% of its dots lie in, at 80%), the molecule builder's (`MoleculeSceneView`: as it stands, or at its widest turn about
+the view's up while it turns by itself) and the biology tools' (`BioSceneView`) — on first show, on Reset view, and
+whenever the view's size changes (a popup sized by its edges, or with the window), a zoom of the student's own kept as
+the same share of it. The lens is measured across the view's smaller side, so a tall narrow view keeps the model's
+sides.
+
+The biology tools' view measures its model by its outline, not its box: the scene's outermost points
+(`BioSceneContent.OuterPoints`, the vertex furthest out in each of 256 directions) as the camera sees them, their hull
+(`BioOutline`). The camera looks at the outline's middle (an amino acid lies off its ball's centre) and stands where the
+model fills 85% of the view, then back a step at a time while its labels do not fit round it — but never past the model
+filling 75% (`SceneFrame.Least`). The labels are kept off the model itself (`BioLabelLayout` given the outline): each
+column's labels, in order round the model's middle, are spread down the column to the heights nearest their anchors
+where each fits beside the outline, so a round cell has its labels in the corners its outline leaves (beside its box,
+sixteen labels in columns held the cell to half its view: 46% of a 1280 window's view); one with no room there goes to a
+row above or below it, and one still in the way — on the model, over another's anchor, or led through another's capsule
+— is folded into "+N more", the smallest object's first. The fit is worked out again once the view's size settles, not
+at every step of a popup sized by its edge. A development run's log says each view's size and framing (`3d view …: the
+model W×H, N% of the view; with its L labels …, M% (+F more)`, `element view …`, `molecule view …`); CI holds the
+biology views' own share to 70% or more.
 
 `ToolContext` hands a tool the engine, where it is (`Quick`; `Owner`, the window it is in), what was handed over
 (`TakeFiles`, `TakeInfo`), `OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns,
@@ -872,16 +888,21 @@ A large one (`Large`: a tool, Knewton Alta, Macmillan, a submission's feedback, 
 title bar — over the pane too (`MainWindow.LargePopupRoom`; the owner's choice, Oct 2026: in 0.3.1 it kept to the page
 beside the pane, 688 wide in a 1024 window) — less a margin all round (24, 16 under 900 wide), never larger than the
 screen's work area nor, the feedback and the rubric, than their `Most` (1500 × 1000, 1180 × 880); it is sized again with
-the window, and one over another opens a step down and along (28). It is sized by its edges and corners too: Windows'
+the window, and one over another opens a step down and along (28, the fifth back where the first is), that much
+smaller so its edges stay inside the window. It is sized by its edges and corners too: Windows'
 own sizing (`ResizeMode.CanResize`, WPF-UI's 4 of edge), at least 480 × 340 and at most its room, what it shows laid
 out afresh as it goes; never maximized, minimized or snapped (its boxes taken off, `NoBoxes`, and not sizable while its
-heading moves it). Let go, the size is the student's: kept in the preferences under its `SizeKey` (`popup:tool:dna`,
+heading moves it). A sizing taken back (Escape or a right-click while sizing) keeps nothing. Let go, the size is the
+student's: kept in the preferences under its `SizeKey` (`popup:tool:dna`,
 `popup:alta`, `popup:macmillan`, `popup:feedback`, `popup:rubric` — width and height) and taken the next time it opens,
 held to the room it then has; a window made smaller takes it in with it, and larger again gives back that size. A tool
 handing over to another in its popup takes that one's size. In a development run `--popup-size 900x560` opens large
-popups as if the student had sized them so, and `--popup-drag 300` sizes one by its right edge as the student does (the
-pointer pressed there, moved 300 left and let go; CI's check, alone on the runner), the log saying its size and the
-size kept (`large popup … opens at`, `sized by its edges to`, `popup drag: …`).
+popups as if the student had sized them so, `--popup-drag 300` sizes one by its right edge as the student does (the
+pointer pressed there, moved 300 left and let go; CI's check, alone on the runner), and `--popup-move -120,40` first
+moves one by its heading, then sizes it by its edge 200 narrower, the log saying its size and the size kept (`large
+popup … opens at`, `sized by its edges to`, `popup move: moved by …`, `popup drag: …`). A web page shown edge to edge in
+one (Knewton Alta's, Macmillan's, a submission's file) keeps 4 in from its sides and foot, which size it (a web view
+there takes the pointer); round a submission's file that room is painted in the page's own ground.
 
 What each is now: a tool opened whole (its `ToolPopup`; a tool handing something to another turns into it there); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's

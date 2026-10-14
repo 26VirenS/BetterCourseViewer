@@ -17,6 +17,12 @@ internal static class SceneFrame
     /// <summary>The share of the view the model fills where it meets the view first.</summary>
     public const double Fill = 0.85;
 
+    /// <summary>The least share a labelled model is left with for its labels' sake (the biology views): the camera stands
+    /// back from <see cref="Fill"/> while its labels do not fit round the model, but no further than this, and those that
+    /// still do not are folded into "+N more". (A cell's sixteen labels in columns beside it held the cell to half its
+    /// view, small in the middle with its labels round it: the owner's complaint.)</summary>
+    public const double Least = 0.75;
+
     /// <summary>WPF's field of view (measured across the view's width) for a lens of <paramref name="degrees"/> across the
     /// view's smaller side.</summary>
     public static double FieldOfView(double degrees, double width, double height) =>

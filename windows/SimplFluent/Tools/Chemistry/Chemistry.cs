@@ -130,7 +130,9 @@ internal sealed class ChemLayout : Grid
         this.right = right;
         this.tall = tall;
         Margin = Edges(true);
-        MaxWidth = 1480;
+        // (held only on the widest screens: the side columns keep their widths, so the drawing takes the rest — held to
+        //  1480, a tool's popup on a 1920 window, over the pane, left 180 of it empty at each side)
+        MaxWidth = 2200;
         left.VerticalAlignment = VerticalAlignment.Top;
         right.VerticalAlignment = VerticalAlignment.Top;
         narrow.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

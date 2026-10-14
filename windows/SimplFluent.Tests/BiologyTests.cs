@@ -567,6 +567,45 @@ public class BiologyTests
         Assert.Equal(0, BioLabelLayout.Conflicts(new[] { new BioLabelPlacement("x", "Beside", true, 296, 300, 80, 320, 300, 308) }, box));
     }
 
+    [Fact]
+    public void AnOutlineIsTheModelsHullAndLabelsAreKeptOffIt()
+    {
+        // (a round cell's outline: its hull, its width at a height, and its box's empty corners)
+        var round = BioOutline.Round(Enumerable.Range(0, 72).Select(k => (292 + 160 * Math.Cos(k * Math.PI / 36), 229 + 160 * Math.Sin(k * Math.PI / 36))))!;
+        Assert.Equal(132, round.Box.X0, 0);
+        Assert.Equal(452, round.Box.X1, 0);
+        var middle = round.Across(220, 238)!.Value;
+        Assert.True(middle.X0 < 134 && middle.X1 > 450);
+        Assert.Null(round.Across(20, 60));
+        var nearTop = round.Across(72, 80)!.Value;
+        Assert.True(nearTop.X1 - nearTop.X0 < 140, $"{nearTop}");
+        Assert.True(round.Overlaps(280, 220, 320, 240));
+        Assert.False(round.Overlaps(136, 73, 180, 91), "a label in the box's corner lies off the round cell");
+        Assert.False(round.Overlaps(452, 220, 500, 238));
+        // (sixteen labels round a cell three quarters of a 584 × 458 view: in the corners its outline leaves, none on it,
+        //  over another's anchor or led through another's capsule; those with no room folded into "+N more")
+        var cell = BioOutline.Round(Enumerable.Range(0, 72).Select(k => (292 + 215 * Math.Cos(k * Math.PI / 36), 229 + 172 * Math.Sin(k * Math.PI / 36))))!;
+        var labels = Enumerable.Range(0, 16).Select(k =>
+        {
+            var a = k * Math.PI / 8 + 0.2;
+            return new BioLabelInput($"part:{k}", $"Part number {k}", 292 + 120 * Math.Cos(a), 229 + 100 * Math.Sin(a), Area: 16 - k, Width: 110);
+        }).ToList();
+        var folded = new List<string>();
+        var (placed, more) = BioLabelLayout.Layout(labels, 292, 229, 180, 584, 458, cell.Box, new BioLabelBox(0, 398, 200, 458), outline: cell, folded: folded);
+        Assert.Equal(16, placed.Count + more);
+        Assert.Equal(folded.Count, more);
+        Assert.True(placed.Count >= 12, $"only {placed.Count} placed");
+        Assert.Equal(0, BioLabelLayout.Conflicts(placed, cell.Box, cell));
+        Assert.All(placed, p => Assert.False(cell.Overlaps(p.Frame.X, p.Frame.Y, p.Frame.X + p.Frame.Width, p.Frame.Y + p.Frame.Height, 4), p.Text));
+        Assert.All(placed, p => Assert.True(p.Frame.X >= 16 - 1e-9 && p.Frame.X + p.Frame.Width <= 568 + 1e-9 && p.Frame.Y >= 16 - 1e-9 && p.Frame.Y + p.Frame.Height <= 442 + 1e-9, p.Text));
+        Assert.All(placed, p => Assert.False(p.Frame.X < 200 && p.Frame.Y + p.Frame.Height > 398, $"{p.Text} over the scale bar"));
+        // (the smallest objects' labels are the ones folded)
+        Assert.All(folded, id => Assert.True(int.Parse(id.Split(':')[1]) >= 8, id));
+        // (without being asked to fold, the same layout leaves those in the way where they are, counted by Conflicts)
+        var (all, _) = BioLabelLayout.Layout(labels, 292, 229, 180, 584, 458, cell.Box, outline: cell);
+        Assert.Equal(16, all.Count);
+    }
+
     // ---- the step-through (§3.6) ----
 
     [Fact]

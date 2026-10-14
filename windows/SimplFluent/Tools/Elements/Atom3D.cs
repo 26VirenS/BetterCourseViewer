@@ -41,8 +41,8 @@ internal static class ElectronClouds
 /// The 3D view of an element (the Mac's Atom3DView): its atom or a subshell's orbitals, lit from above left, or its electron
 /// cloud, on nothing (the card shows through). Drag turns it, the wheel zooms; it moves on its own while Windows' animation
 /// effects are on. Framed as every 3D view frames its model (SceneFrame): the atom by the ball round it, the orbitals at
-/// their widest turn, the cloud by the ball 95% of its dots lie in, each filling the view, and again as the view's size
-/// changes.
+/// their widest turn (as they stand, with the animations off), the cloud by the ball 95% of its dots lie in, each filling
+/// the view, and again as the view's size changes.
 /// </summary>
 internal sealed class Atom3DView : Border
 {
@@ -426,8 +426,9 @@ internal static class AtomScene
         /// <summary>The atom or the orbitals themselves, the lights left out (turned by the drag, and the orbitals by their
         /// revolving).</summary>
         public required Model3DGroup Model { get; init; }
-        /// <summary>It revolves about the view's up (the orbitals' row): framed for every turn of it; else (the atom) by
-        /// the ball round it, which keeps it whole in view at any slant a drag gives it.</summary>
+        /// <summary>It revolves about the view's up (the orbitals' row): framed for every turn of it (as it stands, with
+        /// Windows' animations off, when it does not revolve); else (the atom) by the ball round it, which keeps it whole
+        /// in view at any slant a drag gives it.</summary>
         public bool Revolves { get; init; }
         public List<(AxisAngleRotation3D Rotation, double PerSecond)> Spins { get; } = new();
         public Model3DGroup? Glass { get; init; }
@@ -441,7 +442,10 @@ internal static class AtomScene
         {
             points ??= PointsOf(Model);
             if (points.Count == 0) return 6;
-            return Revolves ? SceneFrame.Points(points, degrees, width, height, upright: true) : SceneFrame.Ball(points.Max(p => p.Length), degrees);
+            if (!Revolves) return SceneFrame.Ball(points.Max(p => p.Length), degrees);
+            // (the row revolves only with Windows' animations on: still, it is framed as it stands — framed for a turn it
+            //  never took, carbon's 2p row filled 74% of its view)
+            return SceneFrame.Points(points, degrees, width, height, upright: Motion.On);
         }
 
         /// <summary>Where every part's surface stands as it was made — each mesh moved by its own place and slant, the
