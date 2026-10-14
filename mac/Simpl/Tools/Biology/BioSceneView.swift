@@ -19,6 +19,28 @@ struct BioSceneBuild: @unchecked Sendable {
     init(_ make: @escaping () -> BioSceneContent) { self.make = make }
 }
 
+/// The scenes being made, by key. A view made again while its scene is on its way — SwiftUI re-creating a tool's page
+/// as the window settles at its size, which the screenshot suite's pictures showed for every page — waits for that
+/// scene rather than making it a second time beside it: a large cell is many seconds of work in a debug build, and two
+/// at once took twice as long (the plant cell 39 s, pictured before it came).
+@MainActor
+enum BioSceneMaking {
+    private static var making: [String: (serial: Int, task: Task<BioSceneContent, Never>)] = [:]
+    private static var serial = 0
+
+    /// The scene for `key`: the one already being made, or one made now off the main thread.
+    static func content(_ key: String, _ build: BioSceneBuild) async -> BioSceneContent {
+        if let on = making[key] { return await on.task.value }
+        serial += 1
+        let mine = serial
+        let task = Task.detached(priority: .userInitiated) { build.make() }
+        making[key] = (mine, task)
+        let made = await task.value
+        if making[key]?.serial == mine { making[key] = nil }
+        return made
+    }
+}
+
 /// A request to frame an object (its id, as picking names it); a new `serial` asks again.
 struct BioZoomRequest: Equatable {
     let id: String
@@ -446,7 +468,7 @@ final class BioSceneCoordinator: NSObject {
         Shot.began()
         let started = Date()
         Task { [weak self] in
-            let made = await Task.detached(priority: .userInitiated) { build.make() }.value
+            let made = await BioSceneMaking.content(key, build)
             if OpenClock.verbose {
                 NSLog("[Simpl] bio scene: %@ made in %d ms, %d objects", String(key.prefix(90)),
                       Int(Date().timeIntervalSince(started) * 1000), made.items.count)
