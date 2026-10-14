@@ -1008,6 +1008,9 @@ struct LewisMaker: View {
             .padding(12)
         }
         .card(radius: 20)
+        // (1.3.80) laid out narrow, the resonance structures under the molecule take 118 points of its card: the card
+        // asks for 420, so the molecule keeps about 150 of its own — at the short drawing's 260 it had a few
+        .preference(key: PTDrawingMinKey.self, value: r.drawable && r.structures.count > 1 ? 420 : nil)
     }
 
     /// The resonance structures side by side, ↔ between them; a press shows one large.

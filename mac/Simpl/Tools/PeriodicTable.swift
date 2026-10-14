@@ -795,7 +795,8 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
     @ViewBuilder var centre: Centre
     @ViewBuilder var right: Right
     /// The least height the drawing says it can be drawn in, laid out narrow (`PTDrawingMinKey`: a 3D view's card
-    /// says 300); nil, 450 — a 2D step-through's own parts need about that.
+    /// says 300, the Lewis maker's with its resonance structures 420); nil, 450 — a 2D step-through's own parts need
+    /// about that — or 260 for a short drawing.
     @State private var drawingMin: CGFloat?
 
     /// The narrowest room the three columns sit side by side in, and the narrowest the drawing keeps a column beside it in.
@@ -832,7 +833,7 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
                         // (1.3.79) the drawing short enough that the columns' tops show under it, the page scrolling to
                         // the rest: as tall as the window (1.3.78), it hid them
                         centre
-                            .frame(height: Self.drawingHeight(g.size.height, short: shortDrawing, least: drawingMin ?? 450))
+                            .frame(height: Self.drawingHeight(g.size.height, short: shortDrawing, least: drawingMin ?? (shortDrawing ? 260 : 450)))
                             .onPreferenceChange(PTDrawingMinKey.self) { drawingMin = $0 }
                         if g.size.width >= 520 {
                             HStack(alignment: .top, spacing: 18) {
@@ -859,15 +860,17 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
 
     /// A narrow layout's drawing: the room less 170 points for the tops of the columns under it, never under `least`
     /// (a 3D view 300, a biology tool's 2D drawing 450); or (`short`: the Lewis maker's and the molecule builder's) 58%
-    /// of the room, never under 260 — at most 560.
+    /// of the room, never under `least` (260 unless the drawing says more) — at most 560.
     static func drawingHeight(_ room: CGFloat, short: Bool, least: CGFloat) -> CGFloat {
-        short ? min(560, max(260, room * 0.58)) : min(560, max(least, room - 170))
+        short ? min(560, max(least, room * 0.58)) : min(560, max(least, room - 170))
     }
 }
 
 /// (1.3.79) The least height a drawing in `PTWorkLayout`'s centre can be laid out in, narrow: a 3D view's card says 300
 /// (its model is framed to whatever room it has); a 2D drawing says nothing and is given 450, its parts placed for about
-/// that (a replication fork with its close-up under it, a tRNA's cloverleaf).
+/// that (a replication fork with its close-up under it, a tRNA's cloverleaf). (1.3.80) A short drawing says nothing and
+/// is given 260; the Lewis maker's says 420 while its resonance structures are drawn under it, or the molecule itself had
+/// what was left of 260 once its heading, the structures and the key were in — a sliver a few points tall.
 struct PTDrawingMinKey: PreferenceKey {
     static let defaultValue: CGFloat? = nil
     static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
