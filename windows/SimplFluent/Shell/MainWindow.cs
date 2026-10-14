@@ -229,6 +229,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (engine == null) return;
         Prefs.Remove("school");
         SchoolName.Forget(engine.Host);
+        Prefs.Remove(Engine.Engine.SetupLaterKey); // (another school's first setup is put up as any first setup is)
         var old = engine;
         engine = null;
         old.PropertyChanged -= OnEngine;
@@ -543,9 +544,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         }
     }
 
-    /// <summary>Something of Simpl's over the window that a question of its own should wait for: a dialog, the tour or
-    /// its offer, the sign-in.</summary>
-    private bool Busy() => sheets.IsOpen || tour?.Busy == true || engine == null || engine.Login.Covers || engine.Phase != Phase.Native;
+    /// <summary>Something of Simpl's over the window that a question of its own should wait for: a dialog, the tour, the
+    /// sign-in. (Not the tour's offer: it dims nothing and may be left unanswered all day.)</summary>
+    private bool Busy() => sheets.IsOpen || tour?.On == true || engine == null || engine.Login.Covers || engine.Phase != Phase.Native;
 
     /// <summary>Brought back (the notification area's icon, Simpl opened again): shown, restored, in front.</summary>
     public void Bring()

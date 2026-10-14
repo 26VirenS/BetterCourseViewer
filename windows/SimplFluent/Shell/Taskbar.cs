@@ -41,8 +41,8 @@ public static class Taskbar
 
     /// <summary>
     /// Simpl opened (its screens up at a start, or its window brought back): counted, and from the third on, asked once
-    /// — a minute in, when nothing is over the window (<paramref name="busy"/>: a dialog, the tour or its offer, the
-    /// sign-in) and the window is shown and in front. Never in a development run or a picture.
+    /// — a minute in, when nothing is over the window (<paramref name="busy"/>: a dialog, the tour, the sign-in) and the
+    /// window is shown and in front. Never in a development run or a picture.
     /// </summary>
     public static async void Opened(MainWindow window, Func<bool> busy)
     {

@@ -106,7 +106,8 @@ public sealed class SchoolConfirm : Grid
 
     private void Shown()
     {
-        if (web == null) return;
+        // (once: a page that comes after the preview was given up stays given up — no white under a hidden page)
+        if (web == null || settled) return;
         settled = true;
         loading.Visibility = Visibility.Collapsed;
         // (the page's own ground under it, now that there is a page)

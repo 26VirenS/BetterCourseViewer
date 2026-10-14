@@ -101,7 +101,7 @@ public sealed class SetupSheet
             foreach (var c in d.Courses)
             {
                 if (c.On) chosen.Add(c.Id);
-                nicknames[c.Id] = c.Nickname;
+                nicknames[c.Id] = c.Nickname ?? "";
                 targets[c.Id] = string.IsNullOrEmpty(c.Target) ? "A+" : c.Target;
             }
             tracking = d.Tracking;
@@ -152,12 +152,12 @@ public sealed class SetupSheet
         K.V(4, K.Text(title, Ty.Subtitle), K.Wrapped(sub, Ty.Body, B.Text2)).Margin(30, 26, 30, 14);
 
     /// <summary>The course's own name: what the navigation pane shows when it has no nickname.</summary>
-    private static string OwnName(SetupChoices.Course c) => c.Name.Length > 0 ? c.Name : c.Code;
+    private static string OwnName(SetupChoices.Course c) => !string.IsNullOrEmpty(c.Name) ? c.Name : c.Code ?? "";
 
     /// <summary>The name the pane will show once this is saved: the nickname typed here (a saved one arrives typed), else
     /// the course's own.</summary>
     private string Shown(SetupChoices.Course c) =>
-        nicknames.TryGetValue(c.Id, out var n) && n.Trim().Length > 0 ? n.Trim() : OwnName(c);
+        nicknames.TryGetValue(c.Id, out var n) && !string.IsNullOrWhiteSpace(n) ? n.Trim() : OwnName(c);
 
     /// <summary>What the page says is new about a course (its term and teacher, its real title under a nickname), less
     /// anything that only repeats <paramref name="name"/> — never the code over the same name spelled another way
@@ -269,7 +269,9 @@ public sealed class SetupSheet
         var keep = new ToggleSwitch { IsChecked = tracking };
         // (onboarding-20: one name for each, as Settings ▸ Grades says them — grade history, the term GPA goal — and the
         //  goal with its two decimals, kept half up as the engine keeps it)
-        var goalBox = new NumberBox { Value = goal, Minimum = 0, Maximum = 4, SmallChange = 0.05, MaxDecimalPlaces = 2, Width = 140, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, NumberFormatter = new GoalFigure.Formatter() };
+        // (three places kept by the box, so it never rounds a typed 3.425 its own way first: GoalFigure rounds it, and
+        //  shows two)
+        var goalBox = new NumberBox { Value = goal, Minimum = 0, Maximum = 4, SmallChange = 0.05, MaxDecimalPlaces = 3, Width = 140, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, NumberFormatter = new GoalFigure.Formatter() };
         goalBox.ValueChanged += (_, _) => goal = GoalFigure.Value(goalBox.Value ?? 4);
         var goalRow = K.Row(SymbolRegular.Target24, "Term GPA goal", null, goalBox);
         goalRow.Visibility = tracking ? Visibility.Visible : Visibility.Collapsed;

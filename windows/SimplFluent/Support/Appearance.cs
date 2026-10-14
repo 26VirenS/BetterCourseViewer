@@ -227,6 +227,7 @@ public static class Appearance
         Prefs.Remove($"photo:{slot}:zoom");
         Prefs.Remove($"photo:{slot}:x");
         Prefs.Remove($"photo:{slot}:y");
+        Prefs.Remove($"photo:{slot}:scene"); // (back to the worn theme's drawing, not one picked before the photo)
         Changed?.Invoke();
     }
 }

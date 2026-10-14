@@ -473,13 +473,16 @@ public static class Updates
     /// An earlier version put in this one's place (Settings ▸ Updates ▸ Earlier versions ▸ Install…, the Mac's): for the
     /// copy the installer put here, that version's installer downloaded and checked as an update's is, then run as one
     /// is — Simpl closes and opens again on it. Install updates automatically turns off first, or the newer version would
-    /// go back in at the next quiet moment (a Critical Update still does). Null once it is going in, else why not.
+    /// go back in at the next quiet moment (a Critical Update still does). Null once it is going in, else why not — and
+    /// then all is as it was: the setting as the student had it, the versions read again for what is really newer.
     /// </summary>
     public static async Task<string?> InstallEarlier(Release r)
     {
-        if (Off || !Installed || r.Setup == null) return "This copy can’t put another version in its place: its page has the download.";
+        if (Off || !Installed || r.Setup == null || r.Run >= CurrentRun) return "This copy can’t put that version in its place: its page has the download.";
         if (checking || restarting || State is Mode.Checking or Mode.Downloading or Mode.Installing) return "Simpl is busy with an update. Try again in a moment.";
-        InstallAutomatically = false;
+        var wasAutomatic = InstallAutomatically;
+        var wasFailures = failures;
+        Prefs.Set("updates:install", false); // (not the setter: nothing should go in meanwhile, nor be fetched)
         Found = r;
         Critical = false;
         downloaded = null;
@@ -488,9 +491,23 @@ public static class Updates
         Log.Write($"update: {r.Version} asked for, in this version's place");
         Changed?.Invoke();
         await Download();
-        if (State != Mode.Ready || Found != r) return Message ?? $"Could not download {r.Version}.";
-        InstallAndRestart();
-        return null;
+        if (State == Mode.Ready && Found == r)
+        {
+            InstallAndRestart();
+            return null;
+        }
+        var why = Message ?? $"Could not download {r.Version}.";
+        Log.Write($"update: {r.Version} not put in ({why})");
+        Prefs.Set("updates:install", wasAutomatic);
+        Found = null;
+        downloaded = null;
+        State = Mode.Idle;
+        Message = null;
+        retryAt = null;
+        failures = wasFailures;
+        Changed?.Invoke();
+        _ = Check();
+        return why;
     }
 
     /// <summary>The installer fetched into <paramref name="part"/>, after what an earlier try left there when the server

@@ -873,7 +873,10 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     {
         var (h0, l0) = from is { } f ? HueShade(f) : (210.0, 0.5);
         double hue = h0, shade = l0;
-        Color Picked() => Hsl(hue, 0.85, shade);
+        // (the colour as it is — the accent worn, or a code typed — until the spectrum is touched: opened and used as it
+        //  is, it changes nothing)
+        Color? exact = from;
+        Color Picked() => exact ?? Hsl(hue, 0.85, shade);
         const double W = 320, H = 150;
         var spectrum = new Grid { Width = W, Height = H, Cursor = Cursors.Cross, ClipToBounds = true };
         spectrum.Children.Add(new Border { Background = Hues(), CornerRadius = new CornerRadius(6) });
@@ -898,6 +901,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         }
         void At(Point p)
         {
+            exact = null;
             hue = Math.Clamp(p.X / W, 0, 1) * 360;
             shade = 0.85 - Math.Clamp(p.Y / H, 0, 1) * 0.7;
             Paint();
@@ -909,9 +913,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         {
             if (Appearance.Hex(code.Text.Trim()) is not { } c || code.Text.Trim().TrimStart('#').Length != 6) return;
             typing = true;
+            exact = c; // (as typed, not as the spectrum would mix it)
             (hue, shade) = HueShade(c);
             Paint();
-            sample.Background = K.Brush(c); // (as typed, not as the spectrum would mix it)
             typing = false;
         };
         Paint();
@@ -925,8 +929,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         };
         s.Add("Use colour", SheetButtonKind.Primary, () =>
         {
-            var hex = Appearance.Hex(code.Text.Trim()) is { } typed && code.Text.Trim().TrimStart('#').Length == 6 ? typed : Picked();
-            Appearance.SetAccent($"#{hex.R:x2}{hex.G:x2}{hex.B:x2}");
+            var c = Picked();
+            Appearance.SetAccent($"#{c.R:x2}{c.G:x2}{c.B:x2}");
         });
         s.Add("Cancel", SheetButtonKind.Close);
         sheets.Show(s);
@@ -1030,7 +1034,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         track.Checked += (_, _) => { i.Tracking = true; Save(new { tracking = true }); };
         track.Unchecked += (_, _) => { i.Tracking = false; Save(new { tracking = false }); };
         // (onboarding-20: two decimals always, "4.00"; kept half up on its decimal value, as the engine keeps it)
-        var goal = new NumberBox { Value = GoalFigure.Value(i.Goal), Minimum = 0, Maximum = 4, SmallChange = 0.05, LargeChange = 0.5, MaxDecimalPlaces = 2, Width = 140, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, NumberFormatter = new GoalFigure.Formatter() };
+        // (three places kept by the box, so it never rounds a typed 3.425 its own way first: GoalFigure rounds it, and shows two)
+        var goal = new NumberBox { Value = GoalFigure.Value(i.Goal), Minimum = 0, Maximum = 4, SmallChange = 0.05, LargeChange = 0.5, MaxDecimalPlaces = 3, Width = 140, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, NumberFormatter = new GoalFigure.Formatter() };
         var goalTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         goalTimer.Tick += async (_, _) =>
         {
@@ -1308,8 +1313,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (!versionsAsked && known == null && !dev) { versionsAsked = true; _ = LoadVersions(); }
         if (known == null) list.Children.Add(versionsProblem != null ? K.Row(SymbolRegular.ErrorCircle24, "Couldn’t read the versions", versionsProblem, K.Button("Try again", () => { versionsProblem = null; versionsAsked = false; Render(); }))
             : K.Row(null, dev ? "Not in a development run" : "Reading the versions…", null, dev ? null : K.Spinner(20)));
-        else if (known.Count == 0) list.Children.Add(K.Row(null, "No versions are published yet.", null));
-        else foreach (var r in known.Take(12))
+        else if (!known.Any(r => r.Run <= Updates.CurrentRun)) list.Children.Add(K.Row(null, "No earlier versions are published.", null));
+        // (this one and those before it: a newer one is the update above, never put in from here)
+        else foreach (var r in known.Where(r => r.Run <= Updates.CurrentRun).Take(12))
         {
             var installed = r.Run == Updates.CurrentRun;
             var inPlace = Updates.Installed && r.Setup != null;
