@@ -53,6 +53,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     /// <summary>The account menu's Take the tour.</summary>
     public void StartTour() => tour?.Start();
 
+    /// <summary>The tour is up (the live check waits for it).</summary>
+    internal bool Touring => tour?.On == true;
+
     private Engine.Engine? engine;
 
     /// <summary>The school's engine, once there is one (a sheet over the window that puts the title bar's pins in its own

@@ -31,6 +31,9 @@ public sealed class ContextHomeScreen : Screen
 
     public override string Title => data.Data?.Title is { Length: > 0 } t ? t : ScreenFactory.ContextName(engine, ctx);
 
+    /// <summary>A course's (or a group's) home: checked every ten minutes.</summary>
+    public override bool CoursePage => true;
+
     /// <summary>Its colour, in the square before its title.</summary>
     public override Color? TitleColor => Support.Appearance.Hex(data.Data?.Color) ?? CourseKit.ContextColor(engine, ctx);
 

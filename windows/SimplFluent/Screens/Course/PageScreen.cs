@@ -46,6 +46,9 @@ public sealed class PageScreen : Screen
 
     public override string Title => data.Data?.Title is { Length: > 0 } t ? t : "Page";
 
+    /// <summary>A course's page: checked every ten minutes.</summary>
+    public override bool CoursePage => true;
+
     /// <summary>Its course, and when it was last edited and by whom (the Mac's subtitle and the line under its heading);
     /// the shell drops the course where the breadcrumb names it already.</summary>
     public override string? Subtitle => data.Data is { } d ? string.Join(" · ", new[] { d.Context, d.Edited }.Where(s => !string.IsNullOrEmpty(s))) : null;

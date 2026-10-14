@@ -45,14 +45,22 @@ internal abstract class CoursePart
     public virtual void Hide() { }
 
     /// <summary>A loader whose answers build the screen again (as a screen's own do: an answer that says what the last one
-    /// did, not at all).</summary>
+    /// did, not at all; one a live check found new, as the screen's LiveApplied says).</summary>
     protected Loader<T> Watch<T>(Loader<T> l) where T : class
     {
-        l.Changed += () => { if (!l.LastSame) RenderSoon(); };
+        l.Changed += () => { if (!l.LastSame && !l.LastLive) RenderSoon(); };
+        l.Driven = () => Driven();
         drawn.Add(l.Drawn);
         loading.Add(() => l.Loading);
+        Live.Add(l);
         return l;
     }
+
+    /// <summary>What the live check reads again while the screen shows (the loaders watched).</summary>
+    internal readonly List<ILiveRead> Live = new();
+
+    /// <summary>The screen holding it is looked after by the live check.</summary>
+    internal Func<bool> Driven = () => false;
 
     /// <summary>The screen was built: the loaders watched are told (one still reading then shows its answer, whatever it says).</summary>
     internal void Drawn()
@@ -77,9 +85,14 @@ public abstract class CoursePartScreen : Screen
         part.RenderSoon = RenderSoon;
         part.HeaderChange = HeaderChange;
         part.Width = () => Width;
+        part.Driven = () => LiveDriven;
         WhenBuilt(part.Drawn);
         WhenReading(() => part.Reading);
+        CheckedPart(part.Live);
     }
+
+    /// <summary>A course's (or a group's) section, a folder of its files: its page, checked every ten minutes.</summary>
+    public override bool CoursePage => true;
 
     public override string Title => part.Title;
     public override string? Subtitle => part.Subtitle;

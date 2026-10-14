@@ -65,6 +65,9 @@ public sealed class TopicScreen : Screen
 
     public override string Title => model.Data?.Title is { Length: > 0 } t ? t : "Discussion";
 
+    /// <summary>A course's discussion or announcement: checked every ten minutes (a reply being written holds it, Busy).</summary>
+    public override bool CoursePage => true;
+
     /// <summary>"Discussion · F26-MATH 021 20" (the shell drops the course where the breadcrumb names it already).</summary>
     public override string? Subtitle => model.Data is { } d ? KindLine(d) : null;
 

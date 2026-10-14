@@ -25,8 +25,9 @@ public sealed class AnswerCache
         "syllabus", "dashCourses", "dashList", "dashActivity", "dashSkyline", "externalTools", "moreFromCanvas",
     };
 
-    /// <summary>An answer the page gave this long ago, nothing changed since, is as good as asking again.</summary>
-    public static readonly TimeSpan FreshFor = TimeSpan.FromSeconds(90);
+    /// <summary>An answer the page gave this long ago, nothing changed since, is as good as asking again (the live check's
+    /// minute: what is older is checked).</summary>
+    public static readonly TimeSpan FreshFor = TimeSpan.FromSeconds(LiveRules.Every);
     /// <summary>The most kept in memory: so many answers, so many characters in all.</summary>
     private const int MostAnswers = 160, MostChars = 3_000_000;
 
@@ -125,6 +126,15 @@ public sealed class AnswerCache
         if (f == null) return;
         Remember(f, new Kept(text, Environment.TickCount64, version));
         Task.Run(() => { try { Directory.CreateDirectory(dir); Vault.Write(PathOf(f), text, Purpose(f)); } catch { } });
+    }
+
+    /// <summary>A live check found the answer kept for this read still the school's (the same, word for word): it counts
+    /// as given now, under DataVersion <paramref name="version"/> — in memory only, nothing written again.</summary>
+    public void Confirm(string name, JsonObject args, int version)
+    {
+        var f = FileName(name, args);
+        if (f == null || !memory.TryGetValue(f, out var k)) return;
+        memory[f] = k with { At = Environment.TickCount64, Version = version };
     }
 
     private void Remember(string f, Kept k)

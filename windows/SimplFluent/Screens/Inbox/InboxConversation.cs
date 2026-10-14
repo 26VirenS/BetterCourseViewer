@@ -29,6 +29,7 @@ public sealed class ConversationScreen : Screen
         thread = new InboxThreadView(engine, id, null) { Side = () => Side(Width) };
         if (View is ContentControl page) page.VerticalContentAlignment = VerticalAlignment.Stretch; // (the thread fills the page's height, its reply box at the foot)
         thread.Changed += HeaderChange;
+        Checked(() => thread.Live);
     }
 
     public override string Title => thread.Data?.Subject ?? "Message";
@@ -200,6 +201,10 @@ internal sealed class InboxThreadView
     }
 
     public FrameworkElement View => outer;
+
+    /// <summary>The conversation as the live check reads it again (the thread draws what changed as an answer, keeping
+    /// the reply being written: a reply in the box holds the check anyway).</summary>
+    internal ILiveRead Live => model;
     public ConversationData? Data => model.Data;
 
     /// <summary>The star shown: the Inbox list's while it holds the conversation, else this one's own.</summary>

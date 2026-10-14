@@ -69,12 +69,20 @@ public sealed partial class AppShell
             var key = loc.Path[^1].ToString();
             if (routeScreens.TryGetValue(key, out var s)) return s;
             if (!make) return null;
-            return routeScreens[key] = ScreenFactory.For(engine, loc.Path[^1]);
+            return routeScreens[key] = Driven(ScreenFactory.For(engine, loc.Path[^1]));
         }
         var id = loc.Place.Identity;
         if (placeScreens.TryGetValue(id, out var p)) return p;
         if (!make) return null;
-        return placeScreens[id] = ScreenFactory.For(engine, loc.Place);
+        return placeScreens[id] = Driven(ScreenFactory.For(engine, loc.Place));
+    }
+
+    /// <summary>A screen of the window's own, looked after by the live check: what it shows that is only old is checked as
+    /// it is shown, not read again.</summary>
+    private static Screen Driven(Screen s)
+    {
+        s.LiveDriven = LiveCheck.Enabled;
+        return s;
     }
 
     /// <summary>The place and what is pushed on it, shown: its screen (kept, or made again from the answers kept), built
@@ -112,6 +120,8 @@ public sealed partial class AppShell
         shownAt[current] = ++showings;
         Trim();
         Header();
+        // (a screen shown again with what it shows a minute old: checked at once)
+        live.Poke();
     }
 
     private static string ScreenName(Screen s) => s.GetType().Name.Replace("Screen", "");

@@ -77,6 +77,9 @@ public sealed class InboxScreen : Screen
     public InboxScreen(Engine.Engine engine) : base(engine)
     {
         inbox.Changed += () => Arrived();
+        // (the live check reads the mailbox shown again, and the conversation open beside it; each draws what changed)
+        Checked(inbox);
+        Checked(() => reader?.Live);
         WhenReading(() => inbox.Loading);
         if (View is ContentControl page) page.VerticalContentAlignment = VerticalAlignment.Stretch; // (the panes fill the page's height)
 

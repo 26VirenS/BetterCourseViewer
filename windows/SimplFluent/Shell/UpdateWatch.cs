@@ -142,8 +142,8 @@ public static class UpdateWatch
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hwnd);
 
     /// <summary>A menu, a flyout, a drop-down or the search's suggestions open (each a window of its own, drawn by WPF;
-    /// a tooltip is not one).</summary>
-    private static bool MenuOpen()
+    /// a tooltip is not one): an update waits for it, and so does the live check (Shell/LiveCheck.cs).</summary>
+    internal static bool MenuOpen()
     {
         foreach (var s in PresentationSource.CurrentSources.OfType<HwndSource>())
         {

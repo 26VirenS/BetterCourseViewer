@@ -31,6 +31,7 @@ public sealed class PlaceWindow : FluentWindow, ISheetWindow
     private readonly Grid page = new();
     private readonly ScrollViewer? scroller;
     private int navAt;
+    private LiveCheck? live;
     /// <summary>When the student last pressed something here: a move of the main window's right after is theirs, from here.</summary>
     private long pressedAt;
 
@@ -109,14 +110,19 @@ public sealed class PlaceWindow : FluentWindow, ISheetWindow
         PreviewMouseDown += (_, e) => { pressedAt = Environment.TickCount64; screen.Pressed(e); };
         PreviewKeyDown += OnKey;
         navAt = engine.NavVersion;
+        // (its screen is checked against the school while this window shows, as the main window's is)
+        screen.LiveDriven = LiveCheck.Enabled;
         Loaded += (_, _) =>
         {
             Widths();
             screen.Show(now: true);
             Header();
+            live ??= new LiveCheck(engine, this, () => screen, main: false);
+            live.Poke();
         };
         Closed += (_, _) =>
         {
+            live?.Dispose();
             engine.PropertyChanged -= OnEngine;
             Appearance.Changed -= Restyle;
             screen.HeaderChanged -= Header;

@@ -712,6 +712,10 @@ public static partial class Updates
         return h;
     }
 
+    /// <summary>Something by this name holds updates now (the quiz, Knewton Alta, Macmillan Learning): the live check
+    /// waits for it too (Shell/LiveCheck.cs).</summary>
+    public static bool Holds(string what) => holds.Any(h => h.What == what);
+
     /// <summary>One closed: with none left, a waiting update may go in (a moment on, once what closed has gone).</summary>
     private static void Let(Holding h)
     {

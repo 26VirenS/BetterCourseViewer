@@ -87,6 +87,9 @@ public sealed partial class AssignmentScreen : Screen
     private string CanvasUrl => model.Data?.CanvasUrl ?? $"/courses/{course}/assignments/{id}?bcv=native";
 
     public override string Title => model.Data?.Title ?? "Assignment";
+
+    /// <summary>A course's assignment: checked every ten minutes (its own submission is always read fresh).</summary>
+    public override bool CoursePage => true;
     // (no line under the title: the course is named by the chip under it — its way back — and, opened from the course,
     // by the breadcrumb; a long name wraps to a second line rather than being cut)
     public override int TitleLines => 2;

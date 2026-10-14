@@ -72,6 +72,13 @@ public sealed class CourseGradesScreen : Screen
 
     public override bool Scrolls => false;
 
+    /// <summary>A course's grades: checked every ten minutes.</summary>
+    public override bool CoursePage => true;
+
+    /// <summary>What-If on (or scores tried, assignments added): no live check meanwhile — the grades shown are the
+    /// student's own trying.</summary>
+    public override string? LiveHold => whatIf || drafts.Count > 0 || added.Count > 0 ? "What-If" : base.LiveHold;
+
     /// <summary>The course's colour before the title, as every course page wears it (the Mac's heading square).</summary>
     public override Color? TitleColor => Appearance.Hex(grades.Data?.Color) ?? CourseKit.ContextColor(engine, $"courses/{courseId}");
 

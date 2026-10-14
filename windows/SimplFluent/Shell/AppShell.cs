@@ -70,6 +70,8 @@ public sealed partial class AppShell : Grid, IDisposable
     private readonly Dictionary<Screen, long> shownAt = new();
     private long showings;
     private readonly Prefetcher prefetch;
+    /// <summary>The screen on show checked against the school while the window shows (Shell/LiveCheck.cs).</summary>
+    private readonly LiveCheck live;
     private Screen? current;
     private bool narrow, paneOpen, sheetOpen;
     private int lastNav = -1;
@@ -184,6 +186,7 @@ public sealed partial class AppShell : Grid, IDisposable
         engine.PropertyChanged += OnEngine;
         engine.PrepareRequested += OnPrepare;
         prefetch = new Prefetcher(engine, loc => ScreenAt(loc, make: false) != null, () => (ContentWidth, WindowActualWidth));
+        live = new LiveCheck(engine, window, () => current, main: true);
         Updates();
         Navigate();
         paneScene.Content = Scenes.Backdrop("side");
@@ -889,6 +892,7 @@ public sealed partial class AppShell : Grid, IDisposable
     {
         disposed = true;
         prefetch.Stop();
+        live.Dispose();
         palette.Dispose();
         engine.PropertyChanged -= OnEngine;
         engine.PrepareRequested -= OnPrepare;

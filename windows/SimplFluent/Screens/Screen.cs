@@ -211,6 +211,8 @@ public abstract class Screen
         Placeholder = K.IsPlaceholder(content);
         if (!ReferenceEquals(host.Content, content)) host.Content = content;
         Support.Perf.Built(GetType().Name, perfAt, first);
+        // (the screenshot suite's live runs: each build said, so its checks can tell that a check built nothing)
+        if (Shell.LiveCheck.Says) Support.Log.Write($"live: {LiveName} built");
         Support.Shot.Moved();
         builtAt = Environment.TickCount64;
         foreach (var d in drawn) d();
@@ -254,13 +256,73 @@ public abstract class Screen
     protected void HeaderChange() => HeaderChanged?.Invoke();
 
     /// <summary>A loader whose answers build the screen again (soon after, several close together once; an answer that
-    /// says what the last one did, not at all).</summary>
+    /// says what the last one did, not at all; one a live check found new, as <see cref="LiveApplied"/> says). The live
+    /// check reads it again while the screen shows.</summary>
     protected Loader<T> Watch<T>(Loader<T> l) where T : class
     {
-        l.Changed += () => { if (!l.LastSame) RenderSoon(); };
+        l.Changed += () => { if (!l.LastSame && !l.LastLive) RenderSoon(); };
         drawn.Add(l.Drawn);
         reading.Add(() => l.Loading);
+        Checked(l, builds: true);
         return l;
+    }
+
+    // ---- the live check (Shell/LiveCheck.cs) ----
+
+    /// <summary>What the live check reads again while the screen shows, and of those, what builds the screen again when
+    /// it changes.</summary>
+    private readonly List<Func<ILiveRead?>> live = new();
+    private readonly HashSet<ILiveRead> builds = new();
+
+    /// <summary>A read the live check asks again while the screen shows (a loader the screen follows by itself — the
+    /// Inbox's — or a part's); <paramref name="builds"/>: a new answer builds the screen again.</summary>
+    private protected void Checked<T>(Loader<T> l, bool builds = false) where T : class
+    {
+        l.Driven = () => LiveDriven;
+        live.Add(() => l);
+        if (builds) this.builds.Add(l);
+    }
+
+    /// <summary>A read the live check asks again while the screen shows, whichever it is at the time (the conversation
+    /// open beside the Inbox's list), shown by its own view as it changes.</summary>
+    private protected void Checked(Func<ILiveRead?> read) => live.Add(read);
+
+    /// <summary>The window's live check looks after this screen (one of the main window's): what is only old is not read
+    /// again as it is shown — the check, asked at once, reads it with the engine's maxAge and changes only what changed.</summary>
+    public bool LiveDriven { get; set; }
+
+    /// <summary>What it shows that a live check can read again now (each has something on screen, nothing on its way).</summary>
+    public IReadOnlyList<ILiveRead> LiveReads => live.Select(f => f()).OfType<ILiveRead>().Where(r => r.CanCheck).ToList();
+
+    /// <summary>A course's page (its home, a section, a page, an assignment, a discussion, its grades): checked every ten
+    /// minutes, not every minute.</summary>
+    public virtual bool CoursePage => false;
+
+    /// <summary>The screen as the log names it ("dashboard", "todo"): never anything of the student's.</summary>
+    public virtual string LiveName => GetType().Name.Replace("Screen", "").ToLowerInvariant();
+
+    /// <summary>Why a check waits on this screen now — What-If on, a panel or a reply open on it — or null.</summary>
+    public virtual string? LiveHold => Busy ? "something of yours in it" : null;
+
+    /// <summary>
+    /// A live check found new answers and they are now the loaders' (each told its watchers as an answer is, marked
+    /// <see cref="Loader{T}.LastLive"/>): the screen shows them. By default it is built again, once, as for any answer
+    /// (where the scroll stays); the Dashboard changes only the parts that changed, in place. What changed, for the log.
+    /// </summary>
+    public virtual string LiveApplied(IReadOnlyList<ILiveRead> changed)
+    {
+        if (changed.Any(builds.Contains)) RenderSoon();
+        return string.Join(",", changed.Select(c => c.Call));
+    }
+
+    /// <summary>A part's own loaders, for the live check (a course part's), each building the screen again when it changes.</summary>
+    private protected void CheckedPart(IEnumerable<ILiveRead> reads)
+    {
+        foreach (var r in reads)
+        {
+            live.Add(() => r);
+            builds.Add(r);
+        }
     }
 
     /// <summary>Told each time the screen is built, as the loaders it watches are (a part's own).</summary>

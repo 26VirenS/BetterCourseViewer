@@ -97,6 +97,8 @@ public sealed partial class Engine : Observable, IShellListener
     public event Action? NewMessageRequested;
 
     private bool ready;
+    /// <summary>The page has said it is ready (shell.state), and no page load has come since: a call is answered at once.</summary>
+    public bool Ready => ready;
     private bool shownNative;
     private bool openedOnKept;
     private bool launchPlaceTaken;
@@ -502,7 +504,8 @@ public sealed partial class Engine : Observable, IShellListener
     {
         try
         {
-            var s = await Call<Snapshot>("snapshot");
+            var (s, text) = await CallWithText<Snapshot>("snapshot");
+            Pane.Read(text);
             Snapshot = s;
             CountsLive = true;
             if (s.Lms != null && s.Lms != Lms) Lms = s.Lms;
@@ -574,7 +577,11 @@ public sealed partial class Engine : Observable, IShellListener
     /// under way), and tries again if the page went away mid-call. A read already asked with the same arguments, not
     /// answered yet, is not asked twice: its answer is this one's too.
     /// </summary>
-    public async Task<T> Call<T>(string name, object? args = null)
+    public async Task<T> Call<T>(string name, object? args = null) => (await CallWithText<T>(name, args)).Value;
+
+    /// <summary>A call's answer decoded, with the JSON text it was decoded from: what a screen's loader compares the next
+    /// answer with — a live check's too — for every call, one whose answers are never kept as well.</summary>
+    public async Task<(T Value, string Text)> CallWithText<T>(string name, object? args = null)
     {
         var a = ArgsOf(args);
         var asked = DataVersion;
@@ -582,7 +589,7 @@ public sealed partial class Engine : Observable, IShellListener
         // (decoded off the window's thread: a long answer holds up nothing on screen)
         var answer = await Task.Run(() => Decode<T>(name, text));
         Answers.Keep(text, name, a, asked);
-        return answer;
+        return (answer, text);
     }
 
     /// <summary>
@@ -620,7 +627,7 @@ public sealed partial class Engine : Observable, IShellListener
     }
 
     /// <summary>An answer read (off the window's thread): the page's own error said as one, else the answer decoded.</summary>
-    private static T Decode<T>(string name, string text)
+    internal static T Decode<T>(string name, string text)
     {
         if (text.Length > 0 && text[0] == '{')
         {
