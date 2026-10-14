@@ -661,6 +661,9 @@ public static class CellExplorerModel
 
     /// <summary>§4.1 item 4: on by default.</summary>
     public static bool Cutaway { get; set; } = true;
+    /// <summary>A launch picked a part (select=…): its card is brought into view once the page is laid out — beside the
+    /// navigation pane the columns sit under the scene, and the card was out of sight below it.</summary>
+    public static bool CardAsked { get; set; }
     /// <summary>§4.1 item 2: on by default.</summary>
     public static bool Labels { get; set; } = true;
     /// <summary>§4.1 item 7: teaching scale by default.</summary>

@@ -176,7 +176,11 @@ internal static class CellExplorerSettings
         foreach (var p in (s.Value("hide") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)) CellExplorerModel.Cell(kind).Hidden.Add(p);
         if (s.Value("inside") is { } ins && CEScene.CanLookInside(ins) && CEParts.Part(kind, ins) != null) CellExplorerModel.Isolate(kind, ins, lookInside: true);
         else if (s.Value("isolate") is { } iso && CEParts.Part(kind, iso) != null) CellExplorerModel.Isolate(kind, iso, s.Has("inside"));
-        else if (s.Value("select") is { } sel && CEParts.Part(kind, sel) != null) CellExplorerModel.Select(kind, sel);
+        else if (s.Value("select") is { } sel && CEParts.Part(kind, sel) != null)
+        {
+            CellExplorerModel.Select(kind, sel);
+            CellExplorerModel.CardAsked = true;
+        }
         if (s.Value("quiz") is { } quiz)
         {
             // (a picture's quiz: the same questions every time)

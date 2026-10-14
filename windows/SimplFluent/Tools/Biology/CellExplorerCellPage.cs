@@ -152,6 +152,11 @@ internal sealed class CellPage : Grid
             Appearance.Changed -= Look;
             Appearance.Changed += Look;
             Refresh();
+            if (CellExplorerModel.CardAsked)
+            {
+                CellExplorerModel.CardAsked = false;
+                Dispatcher.BeginInvoke(() => right.BringIntoView(), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
         };
         Unloaded += (_, _) =>
         {

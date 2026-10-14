@@ -10,9 +10,8 @@ namespace Simpl.Tools;
 // ("+N more"). Device-independent pixels, y down.
 //
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
-// model's box on the view, a label that would hide its own anchor, (beside a model narrower than 70% of the view) reach
-// more than 40 into the model's box (or over half its own width, for a short label), or lead over another label's
-// anchor (so the two leaders seem to end at one point), goes instead to a row just
+// model's box on the view, a label that would hide its own anchor, or (beside a model narrower than 70% of the view)
+// reach more than 40 into the model's box (or over half its own width, for a short label), goes instead to a row just
 // above the model (an anchor in its upper half) or below it. A row's labels are packed side by side in their anchors'
 // order, each as near over its anchor as the others allow (a label already there slides aside for a new one), their
 // leaders straight up or down and never through a capsule in a row nearer the model; a label that fits no row (three
@@ -118,13 +117,8 @@ public static class BioLabelLayout
             var onAnchor = p.AnchorX >= f.X - 4 && p.AnchorX <= f.X + f.Width + 4 && Math.Abs(p.AnchorY - p.Y) <= Height;
             var acrossModel = p.Y + Height / 2 >= box.Y0 && p.Y - Height / 2 <= box.Y1
                 && Math.Max(0, Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0)) > Math.Min(40, 0.5 * f.Width);
-            return onAnchor || (narrow && acrossModel) || OverAnother(p);
+            return onAnchor || (narrow && acrossModel);
         }
-        // (a leader that runs over another label's anchor on its way out reads as ending there: the tRNA's "Acceptor
-        //  stem", along its arm, seemed to point at the 3′ end that "Amino acid attaches here" names)
-        bool OverAnother(BioLabelPlacement p) => placed.Any(q => !ReferenceEquals(q, p)
-            && Math.Abs(q.AnchorX - p.AnchorX) + Math.Abs(q.AnchorY - p.AnchorY) > 8
-            && (Near(q.AnchorX, q.AnchorY, p.AnchorX, p.AnchorY, p.ElbowX, p.Y) || Near(q.AnchorX, q.AnchorY, p.ElbowX, p.Y, p.LeaderX, p.Y)));
         var moving = placed.Where(Hides).OrderBy(p => p.AnchorX).ThenBy(p => p.Id, StringComparer.Ordinal).ToList();
         if (moving.Count == 0) return;
         var mid = (box.Y0 + box.Y1) / 2;
@@ -221,6 +215,15 @@ public static class BioLabelLayout
                 break;
             }
         }
+        // (a label that found no row stays in its column, where a row's label may since have been packed over it — the
+        //  membrane's "Peripheral protein" under "Extracellular side": that one goes back to its own column too)
+        var inRows = rows.Values.SelectMany(r => r.Select(m => m.P)).ToHashSet();
+        var stuck = moving.Where(p => !inRows.Contains(p)).Select(p => p.Frame).ToList();
+        foreach (var key in rows.Keys.ToList())
+        {
+            var y = RowY(key.Above, key.Row);
+            rows[key] = rows[key].Where(m => !stuck.Any(f => Math.Abs(f.Y + Height / 2 - y) < Height + Gap / 2 && m.X < f.X + f.Width + space && m.X + m.P.Width > f.X - space)).ToList();
+        }
         foreach (var ((above, k), list) in rows)
         {
             var yRow = RowY(above, k);
@@ -228,15 +231,6 @@ public static class BioLabelLayout
                 placed[placed.IndexOf(p)] = new BioLabelPlacement(p.Id, p.Text, false, x, yRow, p.Width, p.AnchorX, p.AnchorY, ElbowOf(p, x),
                     above ? yRow + Height / 2 : yRow - Height / 2);
         }
-    }
-
-    /// <summary>Whether a point lies within 5 of a segment.</summary>
-    private static bool Near(double x, double y, double x0, double y0, double x1, double y1)
-    {
-        double dx = x1 - x0, dy = y1 - y0, len2 = dx * dx + dy * dy;
-        var t = len2 < 1e-9 ? 0 : Math.Clamp(((x - x0) * dx + (y - y0) * dy) / len2, 0, 1);
-        double px = x0 + t * dx - x, py = y0 + t * dy - y;
-        return px * px + py * py < 25;
     }
 
     /// <summary>A label's width for its text at 12 semibold in a capsule (10 padding a side): an estimate for layouts made

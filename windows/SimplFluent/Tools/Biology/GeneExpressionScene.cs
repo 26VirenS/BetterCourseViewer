@@ -826,9 +826,12 @@ internal sealed class GXPainter
         if (G.Cell != GXCell.Prokaryote || F.Stage != GXStage.TxElong || G.CdsStart is not { } s0 || F.Made < s0 + GXProcess.CouplingLag) return;
         var pl = Place(s0 + 1);
         var sw = 8 * cell;
+        // (out of view to the left once the polymerase has moved on: not drawn, or only the end of its words showed past
+        //  the lane's names — a stray "y")
+        if (pl.X + sw / 2 < left) return;
         var colour = GXColors.Ribosome.ToColor();
         GXDraw.Round(dc, GXDraw.Brush(colour, 0.18), GXDraw.Dashed(colour, 1.4, 4, 3), new Rect(pl.X - sw / 2, pl.Y + 9, sw, 22), 11);
-        Text(dc, "a ribosome can start already", new Point(pl.X - sw / 2 + 2, pl.Y + 42), 10.5, FontWeights.Bold, colour, GXDraw.Anchor.Leading);
+        Text(dc, "a ribosome can start already", new Point(Math.Max(pl.X - sw / 2 + 2, left + 2), pl.Y + 42), 10.5, FontWeights.Bold, colour, GXDraw.Anchor.Leading);
     }
 
     // ---- a tooltip on an amino acid or a codon ----

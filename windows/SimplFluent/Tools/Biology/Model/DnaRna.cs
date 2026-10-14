@@ -292,7 +292,9 @@ public static class DnaTrna
         BioVec Mean(int from, int to) => Enumerable.Range(from, to - from + 1).Aggregate(BioVec.Zero, (s, k) => s + pos[k - 1]) / (to - from + 1);
         labels.Add(new BioLabel3D("arm:anticodon", "Anticodon (G34 A35 A36)", anti, Area: 6));
         labels.Add(new BioLabel3D("arm:acceptor", "Amino acid attaches here (3′ CCA)", end, Area: 6));
-        labels.Add(new BioLabel3D("arm:acceptor", "Acceptor stem", Mean(1, 7), Area: 4));
+        // (the stem's foot, on its 3′ strand: at its middle — nucleotides 1–7, level with the 3′ end — the label's leader ran
+        //  along the arm over the end that "Amino acid attaches here" names, and the two seemed to point at one place)
+        labels.Add(new BioLabel3D("arm:acceptor", "Acceptor stem", Mean(68, 70), Area: 4));
         labels.Add(new BioLabel3D("arm:d", "D arm", Mean(14, 21), Area: 4));
         labels.Add(new BioLabel3D("arm:t", "T arm (TΨC)", Mean(54, 60), Area: 4));
         labels.Add(new BioLabel3D("arm:variable", "Variable loop", Mean(44, 48), Area: 2));

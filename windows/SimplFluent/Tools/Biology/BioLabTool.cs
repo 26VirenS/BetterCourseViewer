@@ -40,7 +40,7 @@ internal sealed class BioLabTool : Grid
     {
         new("solutions", "Solutions", SymbolRegular.Drop24, "Molarity, dilutions and percent solutions"),
         new("microscopy", "Microscopy", SymbolRegular.Microscope24, "Magnification, field of view and size"),
-        new("cells", "Cells", SymbolRegular.ShapeOrganic24, "Surface area to volume, water potential, cell counts"),
+        new("cells", "Cells", SymbolRegular.GridCircles24, "Surface area to volume, water potential, cell counts"),
         new("stats", "Statistics", SymbolRegular.DataBarVertical24, "Mean, standard deviation, error bars, chi-square"),
         new("ecology", "Populations", SymbolRegular.LeafTwo24, "Growth, rate and diversity"),
         new("molecules", "Molecules", SymbolRegular.Molecule24, "Absorbance, PCR, centrifuges, pH and Q₁₀"),
