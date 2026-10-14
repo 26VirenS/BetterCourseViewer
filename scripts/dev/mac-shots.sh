@@ -292,19 +292,18 @@ ui_review() {
   MODE=light shoot light-30b-palette-sum 14 -SimplOpen "palette:12*4"
   MODE=light shoot light-29b-tour-search 16 -SimplOpen tour:5
   MODE=light shoot light-27b-tour-offer 8 -SimplOpen touroffer
-  MODE=light shoot light-18b-quiz-code 14 -SimplOpen quiz:102:10019
-  MODE=light shoot light-19g-quiz-multiple 18 -SimplOpen quiz:101:9011:take:2
-  MODE=light SIZE=1440x900 shoot light-10g-assignment-rubric-wide 12 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001
-  MODE=light shoot light-10h-assignment-rubric 12 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001
+  MODE=light shoot light-18b-quiz-code 22 -SimplOpen quiz:102:10019
+  MODE=light shoot light-19g-quiz-multiple 24 -SimplOpen quiz:101:9011:take:2
+  MODE=light SIZE=1440x900 shoot light-10g-assignment-rubric-wide 20 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001
+  MODE=light shoot light-10h-assignment-rubric 20 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001
   MODE=light shoot light-55m-ptable-tour-offer 14 -SimplPlace tools -SimplTool ptable -SimplPTTourOffer YES
   MODE=light SIZE=1440x1200 shoot light-55n-ptable-element-compare 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
   MODE=light shoot light-56-tool-cite 12 -SimplPlace tools -SimplTool cite
   MODE=light shoot light-57-tool-units 12 -SimplPlace tools -SimplTool units
   MODE=light shoot light-54e-pin-need 14 -SimplPinnedTools need -SimplPinOpen need
-  # (a PDF of the fixture photo, for the annotator and Merge & Split: one PDF opens Split)
-  [ -f "$HOMES/shot.pdf" ] || sips -s format pdf "$PWD/scripts/dev/fixtures/photo.jpg" --out "$HOMES/shot.pdf" >/dev/null 2>&1 || true
-  MODE=light shoot light-58-tool-annotate 14 -SimplPlace tools -SimplTool mark -SimplToolFile "$HOMES/shot.pdf"
-  MODE=light shoot light-58b-tool-split 14 -SimplPlace tools -SimplTool pdfx -SimplToolFile "$HOMES/shot.pdf"
+  # (a two-page reading, for the annotator and Merge & Split: one PDF opens Split)
+  MODE=light shoot light-58-tool-annotate 14 -SimplPlace tools -SimplTool mark -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
+  MODE=light shoot light-58b-tool-split 14 -SimplPlace tools -SimplTool pdfx -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
   MODE=light shoot light-05w-calendar-week 12 -SimplPlace calendar -SimplCalView week
   MODE=light shoot light-05l-calendar-list 12 -SimplPlace calendar -SimplCalView list
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
@@ -315,7 +314,7 @@ ui_review() {
   MODE=light shoot light-14b-modules-locked 12 -SimplPlace section:courses/102:modules
   MODE=light shoot light-14c-people 12 -SimplPlace section:courses/101:people
   MODE=light shoot light-02c-courses-future 12 -SimplPlace courses -SimplCoursesFilter future
-  MODE=light shoot light-22b-setup-first 14 -SimplOpen setup -SimplSetupFirstRun YES
+  MODE=light shoot light-22b-setup-first 20 -SimplOpen setup -SimplSetupFirstRun YES
   MODE=light BASE=http://localhost:8802 shoot light-60b-logging-in 6 -SimplShowLoggingIn YES
   MODE=dark shoot dark-26c-school-confirm-failed 10 -SimplPicker catcourses -SimplPickerConfirm YES -SimplPreviewFail YES
   MODE=light shoot light-23c-settings-grades 12 -SimplOpen settings -SimplSettingsTab grades
@@ -348,11 +347,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
   shoot light-21f-alta-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable" # (1.3.73: the toolbar's pins on the popup's own bar)
   shoot light-21g-alta-float 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc # (1.3.73: a quick panel pulled out, floating over the popup)
-  shoot light-21d-macmillan 20 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
+  shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
-  shoot light-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
+  shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
@@ -371,7 +370,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   shoot light-19-quiz-question 14 -SimplOpen quiz:101:9011:take:5
   shoot light-19d-quiz-click 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick 4
-  shoot light-19f-quiz-feedback 18 -SimplOpen quiz:101:9001:feedback
+  shoot light-19f-quiz-feedback 24 -SimplOpen quiz:101:9001:feedback
   shoot light-19e-quiz-click-next 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick next
   shoot light-35-tools 10 -SimplPlace tools
   shoot light-26-school 8 -SimplPicker merced
@@ -399,8 +398,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
   phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
   curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
-  shoot light-22-setup 14 -SimplOpen setup
-  shoot light-53-whats-new 12 -SimplOpen whatsnew
+  shoot light-22-setup 20 -SimplOpen setup
+  shoot light-53-whats-new 20 -SimplOpen whatsnew
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
   # (1.3.52) the full Periodic Table: coloured by electronegativity with its trend arrows; an element's page; the Lewis
   # maker; the 3D molecule builder
@@ -435,7 +434,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-05-calendar 12 -SimplPlace calendar
   shoot dark-08-course 14 -SimplPlace course:101
   shoot dark-36-external-tools 16 -SimplPlace externaltools
-  shoot dark-36b-external-tools-list 7 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
+  shoot dark-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
   shoot dark-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
@@ -483,7 +482,7 @@ for MODE in light dark; do
   shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
   shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
   shoot "$MODE-21g-alta-float" 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc
-  shoot "$MODE-22-setup" 14 -SimplOpen setup
+  shoot "$MODE-22-setup" 20 -SimplOpen setup
   shoot "$MODE-23-settings" 12 -SimplOpen settings
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
