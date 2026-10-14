@@ -11,52 +11,36 @@ using Wpf.Ui.Controls;
 
 namespace Simpl.Tools;
 
-/// <summary>What a tour step may wait for that the tool's own state does not show (the Mac's PTTourEvent): the element
-/// page's Orbitals; the Lewis maker's preset chosen, Draw, a resonance structure; the molecule builder's model turned.</summary>
-public enum PTTourEvent { Orbitals, Preset, Draw, Resonance, Turned }
+/// <summary>What a tour step may wait for that the tool's own state does not show (the Mac's PTTourEvent): an element
+/// page's See it in 3D pressed.</summary>
+public enum PTTourEvent { Atoms }
 
 /// <summary>What a step asks for, done.</summary>
-internal enum PTTourAct { Hover, Colour, Open, Typed, Page, Event }
+internal enum PTTourAct { Hover, Colour, Open, Typed, Event }
 
 /// <summary>
-/// A step of the Periodic Table's tour (the Mac's PTTourStep), shown the first time the whole table opens and from its
-/// Tour button. As the app's own tour, each step asks for one thing — hover an element, pick a colour view, open an
-/// element, see its orbitals, go to the Lewis builder, choose a preset, draw, look at a resonance structure, go to the 3D
-/// builder, turn the model, search — and moves on by itself once it is done; a Next shows only if a step is left undone a
-/// while.
+/// A step of the Periodic Table's tour (the Mac's PTTourStep), shown the first time the whole table opens and from the
+/// Tour in its heading. As the app's own tour, each step asks for one thing — hover an element, pick a colour view,
+/// search, open an element, see it in 3D — and moves on by itself once it is done; Next is on every step. (Until 0.3.2 it
+/// went on through the Lewis structures and Molecule builder pages, tools of their own since.)
 /// </summary>
 internal sealed record PTTourStep(string Title, string Text, string Doing, string Gesture, PTTourAct Act, string Target,
-    PTPage? Page = null, PTTourEvent? Event = null, int? Element = null, string? Lewis = null, string? Molecule = null)
+    PTTourEvent? Event = null, int? Element = null)
 {
     public static readonly PTTourStep[] All =
     {
         new("The periodic table", "Point at any element to see its card up top.", "Hover an element", "hover", PTTourAct.Hover, "ptGrid"),
         new("Colour by a property", "Each view colours the table; arrows show its trend.", "Click Electronegativity", "click", PTTourAct.Colour, "ptColours"),
-        new("Every element, in depth", "Its page has a 3D atom, its electrons and every fact.", "Click an element", "click", PTTourAct.Open, "ptGrid"),
-        new("Orbitals", "See the shapes its electrons fill. Drag to turn it.", "Click Orbitals", "click", PTTourAct.Event, "ptModel", Event: PTTourEvent.Orbitals, Element: 6),
-        new("Lewis structures", "Draw any molecule’s bonds and lone pairs.", "Click Lewis structures", "click", PTTourAct.Page, "ptPageLewis", Page: PTPage.Lewis),
-        new("Start from a preset", "Or pick a centre atom and what surrounds it.", "Choose a preset", "click", PTTourAct.Event, "lewisPreset", Event: PTTourEvent.Preset),
-        new("Draw your own", "Place atoms, drag to bond, click a bond to change it.", "Click Draw", "click", PTTourAct.Event, "lewisWay", Event: PTTourEvent.Draw),
-        new("Resonance", "Equivalent structures sit side by side.", "Click a structure", "click", PTTourAct.Event, "lewisResonance", Event: PTTourEvent.Resonance, Lewis: "NO₃⁻"),
-        new("Build it in 3D", "Open in 3D sends any Lewis structure here too.", "Click Molecule builder", "click", PTTourAct.Page, "ptPageMolecules", Page: PTPage.Molecules),
-        new("Turn it", "Scroll to zoom; click an atom for its shape.", "Drag the model", "drag", PTTourAct.Event, "molViewer", Event: PTTourEvent.Turned, Molecule: "Ethanol"),
         new("Find anything", "A symbol, name or number; Enter opens it.", "Search for an element", "type", PTTourAct.Typed, "ptSearch"),
+        new("Every element, in depth", "Its page has its electrons and every fact.", "Click an element", "click", PTTourAct.Open, "ptGrid"),
+        // (pressed, the popup turns into Atoms & Orbitals for the element: the tour ends there, counted as seen)
+        new("See it in 3D", "Atoms & Orbitals shows its shells, orbitals and electron cloud.", "Click See it in 3D", "click", PTTourAct.Event, "ptAtoms", Event: PTTourEvent.Atoms, Element: 6),
     };
-
-    /// <summary>The steps this copy of the app can show: the Lewis maker's and the molecule builder's only once their pages
-    /// are here (Tools/Chemistry).</summary>
-    public static List<PTTourStep> Available() => All.Where(s =>
-    {
-        var lewis = s.Page == PTPage.Lewis || s.Target.StartsWith("lewis", StringComparison.Ordinal);
-        var molecules = s.Page == PTPage.Molecules || s.Target == "molViewer";
-        return (!lewis || PTChemistry.LewisView != null) && (!molecules || PTChemistry.MoleculeView != null);
-    }).ToList();
 }
 
 /// <summary>
 /// The tour's word with the parts that keep their own state (the Mac's PTTour and PTTourFrames): where each control it
-/// can light is (<see cref="TourTarget{T}"/>, for the table's views and Tools/Chemistry's), what was just done
-/// (<see cref="Did"/>), and a Lewis structure handed to the Lewis maker for a step.
+/// can light is (<see cref="TourTarget{T}"/>), and what was just done (<see cref="Did"/>).
 /// </summary>
 public static class PTTour
 {
@@ -70,8 +54,7 @@ public static class PTTour
     /// <summary>The tour on screen ended, as Skip tour does (Escape, PTKeys): true if one was on.</summary>
     internal static Func<bool>? Skip;
 
-    /// <summary>Something a step may be waiting for, done in the tool (the Lewis maker's preset, Draw, a resonance
-    /// structure; the molecule builder's model turned).</summary>
+    /// <summary>Something a step may be waiting for, done in the tool (an element page's See it in 3D).</summary>
     public static void Did(PTTourEvent e)
     {
         if (!Active) return;
@@ -81,8 +64,8 @@ public static class PTTour
 
     internal static void ClearEvent() => Event = null;
 
-    /// <summary>A control the tour can light, by name ("lewisPreset", "lewisWay", "lewisResonance", "molViewer" in
-    /// Tools/Chemistry); the first of a name on screen — the topmost, then the leftmost — is lit.</summary>
+    /// <summary>A control the tour can light, by name ("ptGrid", "ptColours", "ptSearch", "ptAtoms"); the first of a
+    /// name on screen — the topmost, then the leftmost — is lit.</summary>
     public static T TourTarget<T>(this T e, string id) where T : FrameworkElement
     {
         if (!Targets.TryGetValue(id, out var list)) Targets[id] = list = new();
@@ -136,12 +119,6 @@ public static class PTTour
             catch { }
         }
         return null;
-    }
-
-    /// <summary>A structure for the Lewis maker to show for a step (the Mac's showLewis).</summary>
-    internal static void ShowLewis(string name)
-    {
-        try { PTChemistry.OpenLewis?.Invoke(name); } catch (Exception e) { Log.Write($"ptable tour lewis: {e.Message}"); }
     }
 }
 
@@ -256,7 +233,7 @@ internal sealed class PTTourOverlay
         {
             var skipButton = K.Link("Skip tour", skip);
             skipButton.Margin = new Thickness(-6, 0, 0, 0);
-            skipButton.ToolTip = "End the tour (Esc). Tour, above the table, takes it again.";
+            skipButton.ToolTip = "End the tour (Esc). Tour, at the top beside the search, takes it again.";
             foot.Children.Add(skipButton.Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0));
         }
         if (i > 0 && back != null)

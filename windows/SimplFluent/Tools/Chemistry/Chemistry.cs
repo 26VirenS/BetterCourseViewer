@@ -15,17 +15,18 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Tools;
 
 /// <summary>
-/// The Periodic Table's chemistry builders (the Mac's LewisMaker and MoleculeBuilder, the full Periodic Table's
-/// "Lewis structures" and "Molecule builder" pages): as views to put in a page, or opened from elsewhere as those pages
-/// of the Periodic Table in its popup. Not tools of their own: the Periodic Table opens them.
+/// The chemistry builders (the Mac's LewisMaker and MoleculeBuilder): Lewis Structures and the Molecule Builder, tools of
+/// their own in the Tools page's Chemistry section since 0.3.2 (ChemTools; until then the Periodic Table's pages) — as
+/// views for their popups, or opened from elsewhere with a molecule for them.
 /// </summary>
 public static class Chemistry
 {
     /// <summary>
     /// The Lewis structure maker. <paramref name="start"/>: a preset by its name or formula ("H₂O", "NO3-", "Benzene"), or
-    /// an element for the central atom ("N"); null keeps the molecule it had.
+    /// an element for the central atom ("N"); null keeps the molecule it had. Its Open in Molecule Builder hands the
+    /// structure shown to the Molecule Builder, in this tool's popup's place.
     /// </summary>
-    public static FrameworkElement Lewis(ToolContext c, string? start) => new LewisMakerView(start, null);
+    public static FrameworkElement Lewis(ToolContext c, string? start) => new LewisMakerView(start, () => ToolsCenter.HandTo(c, "molecule"));
 
     /// <summary>
     /// The 3D molecule builder. <paramref name="start"/>: a preset by its name or formula ("Methane", "CH4"), a Lewis
@@ -34,32 +35,18 @@ public static class Chemistry
     /// </summary>
     public static FrameworkElement Molecule(ToolContext c, string? start) => new MoleculeBuilderView(start);
 
-    /// <summary>The Lewis structure maker: the Periodic Table's page in its popup (ChemSheet).</summary>
+    /// <summary>Lewis Structures in its popup (ChemSheet).</summary>
     public static void OpenLewis(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, false, start, engine);
 
-    /// <summary>The 3D molecule builder: the Periodic Table's page in its popup (ChemSheet).</summary>
+    /// <summary>The Molecule Builder in its popup (ChemSheet).</summary>
     public static void OpenMolecule(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, true, start, engine);
-
-    /// <summary>
-    /// The Lewis maker's "Open in 3D builder" (in a page of the Periodic Table's): handed the Lewis view, with the
-    /// molecule already in the 3D builder's model. Not set: the Periodic Table opens on its 3D builder (ChemSheet).
-    /// </summary>
-    public static Action<FrameworkElement>? OpenIn3D { get; set; }
-
-    /// <summary>
-    /// Something done in a builder that the Periodic Table's tour may wait for (the Mac's PTTour.did): "preset", "draw",
-    /// "resonance", "turned".
-    /// </summary>
-    public static event Action<string>? Did;
-
-    internal static void Tell(string what) => Did?.Invoke(what);
 }
 
 /// <summary>
-/// The builders opened from outside the Periodic Table (the Biomolecule Builder's molecule handed to the 3D builder, the
-/// Lewis maker's Open in 3D where it is not one of the table's pages, the --lewis and --molecule pictures): the Periodic
-/// Table's own Lewis structures or Molecule builder page, in its popup (the Mac's ToolPopup) — from a tool's popup, that
-/// popup turning into the Periodic Table in place, as a tool handing something to another does (ToolsCenter.PopUp).
+/// The builders opened from outside their own tiles (the Biomolecule Builder's molecule handed to the Molecule Builder,
+/// the --lewis and --molecule pictures): Lewis Structures or the Molecule Builder in its popup (the Mac's ToolPopup), with
+/// the molecule asked for — from a tool's popup, that popup turning into the builder in place, as a tool handing
+/// something to another does (ToolsCenter.PopUp).
 /// </summary>
 internal static class ChemSheet
 {
@@ -67,20 +54,24 @@ internal static class ChemSheet
     {
         engine ??= (Application.Current?.MainWindow as MainWindow)?.School;
         if (engine == null) return;
-        if (start is { Length: > 0 }) (molecule ? PTChemistry.OpenMolecule : PTChemistry.OpenLewis)?.Invoke(start);
-        PTNav.Page = molecule ? PTPage.Molecules : PTPage.Lewis;
-        ToolsCenter.PopUp("ptable", engine, owner);
+        if (start is { Length: > 0 })
+        {
+            if (molecule) MoleculeModel.Shared.Start(start);
+            else if (LewisState.Shared.Start(start)) LewisState.Shared.Change();
+        }
+        ToolsCenter.PopUp(molecule ? "molecule" : "lewis", engine, owner);
     }
 }
 
 /// <summary>
-/// The Lewis maker's, the molecule builder's and the biology tools' layout (the Mac's PTWorkLayout), made so the controls
-/// and the facts are in sight at every size: on a wide page the controls, the drawing and the facts side by side, each
-/// scrolling on its own; on a middling one (a tool's popup on a 1280 or 1366 window) the drawing beside one column, the
-/// controls over the facts, each in its own share of it and scrolling on its own (<see cref="ChemSide"/>); and
-/// on a page narrower than that, the drawing across the top and the controls and facts side by side under it, all
-/// scrolling as one. There the drawing is about half the page (the chemistry builders, which put their preset and way of
-/// making in the drawing's own heading: <see cref="WideChanged"/>) or, for the biology tools (<c>tall</c>), as tall as
+/// The Lewis maker's, the molecule builder's, Atoms &amp; Orbitals' and the biology tools' layout (the Mac's
+/// PTWorkLayout), made so the controls and the facts are in sight at every size: on a wide page the controls, the drawing
+/// and the facts side by side, each scrolling on its own; on a middling one (a tool's popup on a 1280 or 1366 window) the
+/// drawing beside one column, the controls over the facts, each in its own share of it and scrolling on its own
+/// (<see cref="ChemSide"/>); and on a page narrower than that, the drawing across the top and the controls and facts side
+/// by side under it, all scrolling as one. There the drawing is about half the page (the chemistry tools, which put their
+/// preset and way of making — Atoms &amp; Orbitals its element and view — in the drawing's own heading:
+/// <see cref="WideChanged"/>) or, for the biology tools (<c>tall</c>), as tall as
 /// leaves the columns' first controls in view under it. (The biology tools once gave the drawing the page's whole height
 /// under 1180 — at 1366 beside the pane too — and their controls and facts sat out of sight below it, with nothing to
 /// say so.)

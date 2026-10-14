@@ -13,59 +13,18 @@ using TextBox = System.Windows.Controls.TextBox;
 
 namespace Simpl.Tools;
 
-// What the Periodic Table's views share across the window (the Mac's PTSearch, PTNav and the tool's own state), the hooks
-// the Lewis structure maker and the molecule builder (Tools/Chemistry) plug into, and the small pieces its views are
-// drawn with.
+// What the Periodic Table's views share across the window (the Mac's PTSearch, PTNav and the tool's own state), and the
+// small pieces its views are drawn with. (Its Lewis structures and Molecule builder pages, and its element page's atom in
+// 3D, are tools of their own since 0.3.2: Tools/Chemistry/ChemTools.cs.)
 
-/// <summary>The full Periodic Table's pages, chosen in its header (the Mac's PeriodicTableTool.Page).</summary>
-public enum PTPage { Table, Lewis, Molecules }
-
-/// <summary>
-/// Which page of the full Periodic Table is shown — chosen in the tool's header — and the tour asked for there (the Mac's
-/// PTNav). Kept while the tool's views come and go.
-/// </summary>
+/// <summary>The Periodic Table's tour asked for in the tool's heading (its Tour, beside the search; the Mac's PTNav),
+/// heard by the table on screen.</summary>
 public static class PTNav
 {
-    private static PTPage page;
-
-    public static event Action? Changed;
-    /// <summary>A page pressed in the header, the one shown or another: an element's page open goes back to it.</summary>
-    public static event Action? Chosen;
-    /// <summary>The header's Tour pressed.</summary>
+    /// <summary>The heading's Tour pressed.</summary>
     public static event Action? TourAsked;
 
-    public static PTPage Page
-    {
-        get => page;
-        set { if (page == value) return; page = value; Changed?.Invoke(); }
-    }
-
-    /// <summary>A page pressed in the header.</summary>
-    public static void Choose(PTPage p)
-    {
-        Page = p;
-        Chosen?.Invoke();
-    }
-
     public static void AskTour() => TourAsked?.Invoke();
-
-    public static string Label(this PTPage p) => p switch { PTPage.Table => "Table", PTPage.Lewis => "Lewis structures", _ => "Molecule builder" };
-
-    /// <summary>A page's symbol: the 3D builder's a cube, not the Periodic Table's own molecule (the tool's tile and pin).</summary>
-    public static SymbolRegular Symbol(this PTPage p) => p switch { PTPage.Table => SymbolRegular.Grid24, PTPage.Lewis => SymbolRegular.GridDots24, _ => SymbolRegular.Cube24 };
-
-    public static string Help(this PTPage p) => p switch
-    {
-        PTPage.Table => "The periodic table",
-        PTPage.Lewis => "Draw a molecule’s Lewis structure",
-        _ => "Build a molecule and turn it in 3D",
-    };
-
-    /// <summary>"lewis" → the page (the Mac's rawValue), else null.</summary>
-    public static PTPage? Parse(string? raw) => raw?.Trim().ToLowerInvariant() switch
-    {
-        "table" => PTPage.Table, "lewis" => PTPage.Lewis, "molecules" or "molecule" => PTPage.Molecules, _ => null,
-    };
 }
 
 /// <summary>
@@ -111,32 +70,6 @@ internal static class PTState
 {
     public static PTColouring Colouring = PTColouring.Category;
     public static string? Category;
-}
-
-/// <summary>
-/// The full Periodic Table's other two pages, made in Tools/Chemistry (the Mac's LewisMaker and MoleculeBuilder, which sit
-/// beside the table in the same tool): set from there, and the table shows them, hands them a molecule or an element, and
-/// lights their controls in its tour. Unset, their pages say they are on their way.
-/// </summary>
-public static class PTChemistry
-{
-    /// <summary>The Lewis structure maker's page, made once per opening of the tool (the Mac's LewisMaker).</summary>
-    public static Func<ToolContext, FrameworkElement>? LewisView { get; set; }
-
-    /// <summary>The 3D molecule builder's page, made once per opening of the tool (the Mac's MoleculeBuilder).</summary>
-    public static Func<ToolContext, FrameworkElement>? MoleculeView { get; set; }
-
-    /// <summary>A formula or an element handed to the Lewis structure maker (the tour's "H₂O" and "NO₃⁻", the Mac's
-    /// PTTour.showLewis; --ptable-lewis): it shows that structure.</summary>
-    public static Action<string>? OpenLewis { get; set; }
-
-    /// <summary>A molecule (a preset's name, "Ethanol") or a formula handed to the molecule builder (the tour's step, the
-    /// Mac's MoleculeModel.loadPreset; --ptable-molecule): it builds that molecule.</summary>
-    public static Action<string>? OpenMolecule { get; set; }
-
-    /// <summary>The Lewis structure maker's "Open in 3D" (the Mac's molecule.load then the page changed): call this after
-    /// handing the builder the molecule.</summary>
-    public static void ShowMolecules() => PTNav.Page = PTPage.Molecules;
 }
 
 /// <summary>The small pieces the Periodic Table's views are drawn with.</summary>

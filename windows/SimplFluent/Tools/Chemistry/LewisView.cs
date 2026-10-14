@@ -220,12 +220,12 @@ internal sealed class LewisState
 /// The Lewis structure maker (the Mac's LewisMaker): the way it is made, a preset, the quick way's central atom and the
 /// atoms round it (or the drawing's element and tool), the charge and the ranking at the left; the formula, the drawing
 /// and its resonance structures in the middle; and at the right its electrons, polarity, notes and warnings, the selected
-/// atom's shape, every atom's electrons, the average bond orders, and Open in 3D builder.
+/// atom's shape, every atom's electrons, the average bond orders, and Open in Molecule Builder.
 /// </summary>
 internal sealed class LewisMakerView : Grid
 {
     private readonly LewisState st = LewisState.Shared;
-    private readonly Action? openIn3D;
+    private readonly Action openIn3D;
     private readonly Stack controls = K.V(14);
     private readonly Stack facts = K.V(14);
     private readonly ContentControl head = new() { Focusable = false };
@@ -239,19 +239,18 @@ internal sealed class LewisMakerView : Grid
     private bool InHead => !layout.Wide;
 
     /// <param name="start">A preset or an element to begin from (null: the molecule it had).</param>
-    /// <param name="openIn3D">Where Open in 3D builder goes, the molecule already in the 3D builder (null: the hook, or over the window).</param>
-    public LewisMakerView(string? start, Action? openIn3D)
+    /// <param name="openIn3D">Where Open in Molecule Builder goes, the molecule already in the builder's model (the
+    /// Molecule Builder, in this tool's popup's place: Chemistry.Lewis).</param>
+    public LewisMakerView(string? start, Action openIn3D)
     {
         this.openIn3D = openIn3D;
         if (st.Graph.Atoms.Count == 0) st.BuildQuick();
         st.Start(start);
         editor = new LewisEditor(st);
         wayBar = new SelectorBar(new[] { "Quick", "Draw" }, (int)st.Way);
-        wayBar.TourTarget("lewisWay"); // (the Periodic Table's tour: "Draw your own")
         wayBar.Changed += i =>
         {
             st.Way = (LWay)i;
-            if (st.Way == LWay.Draw) Chemistry.Tell("draw");
             st.Change();
         };
         toolBar = new SelectorBar(new[] { "Draw", "Move", "Erase" }, (int)st.Tool);
@@ -333,13 +332,12 @@ internal sealed class LewisMakerView : Grid
             : "The smallest formal charges, period 3 atoms and below holding up to twelve."));
     }
 
-    /// <summary>The presets' menu (the tour's "Choose a preset").</summary>
+    /// <summary>The presets' menu.</summary>
     private FrameworkElement Presets() => ChemKit.PresetMenu(LewisPresets.Sections, st.Preset, name =>
     {
         st.Load(name);
-        Chemistry.Tell("preset");
         st.Change();
-    }).TourTarget("lewisPreset");
+    });
 
     private FrameworkElement QuickControls()
     {
@@ -349,7 +347,6 @@ internal sealed class LewisMakerView : Grid
         {
             st.Central = s;
             st.BuildQuick();
-            Chemistry.Tell("preset");
             st.Change();
         }));
         v.Children.Add(ChemKit.Heading("Surrounding atoms"));
@@ -504,7 +501,7 @@ internal sealed class LewisMakerView : Grid
     /// <summary>The resonance structures side by side, ↔ between them; a press shows one large.</summary>
     private FrameworkElement Resonance(LResult r)
     {
-        var row = K.H(6).TourTarget("lewisResonance");
+        var row = K.H(6);
         for (var k = 0; k < r.Structures.Count; k++)
         {
             if (k > 0)
@@ -523,7 +520,6 @@ internal sealed class LewisMakerView : Grid
             var b = K.Subtle(ChemKit.Tint(inner, shown ? B.Accent : B.Text, shown ? 0.14 : 0.04, 8), () =>
             {
                 st.Shown = n;
-                Chemistry.Tell("resonance");
                 st.Change();
             }, new Thickness(0), 8);
             b.ToolTip = k == 0 ? "The major structure" : $"Structure {k + 1} ({word})";
@@ -566,15 +562,15 @@ internal sealed class LewisMakerView : Grid
             facts.Children.Add(AtomTable(s));
             if (Averages(r) is { } av) facts.Children.Add(av);
         }
-        var open = ChemKit.Wide("Open in 3D builder", () =>
+        // (the structure shown, built in 3D: the Molecule Builder in this tool's place, named for the tool it opens)
+        var open = ChemKit.Wide("Open in Molecule Builder", () =>
         {
             var rr = st.Result();
             if (ShownStructure(rr) is not { } shown) return;
             MoleculeModel.Shared.Load(st.Graph, shown);
-            if (openIn3D != null) openIn3D();
-            else if (Chemistry.OpenIn3D is { } hook) hook(this);
-            else ChemSheet.Show(Window.GetWindow(this), true, null);
+            openIn3D();
         }, accent: true, icon: SymbolRegular.CubeRotate20);
+        open.ToolTip = "Build this structure in 3D";
         open.MinHeight = 40;
         open.IsEnabled = s != null && r.Drawable && g.Atoms.Count >= 2;
         facts.Children.Add(open);

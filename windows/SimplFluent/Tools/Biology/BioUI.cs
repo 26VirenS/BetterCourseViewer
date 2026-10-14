@@ -135,13 +135,14 @@ public static class BioUI
     }
 }
 
-/// <summary>A pin's flyout for a biology tool without a quick version (the Mac's BioQuickOpen): its tile, its line, and Open.</summary>
+/// <summary>A pin's flyout for a biology tool without a quick version (the Mac's BioQuickOpen) — and for the chemistry
+/// builders and Atoms &amp; Orbitals, whose work wants the whole popup: its tile, its line, and Open.</summary>
 public sealed class BioQuickOpen : ContentControl
 {
     public BioQuickOpen(ToolContext c)
     {
         Focusable = false;
-        var kind = BioTools.Kind(c.Key);
+        var kind = ToolsCenter.KindOf(c.Key);
         var name = kind?.Name ?? c.Key;
         var words = K.V(3, K.Text(name, Ty.BodyStrong), K.Wrapped(kind?.Note ?? "", Ty.Body, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;

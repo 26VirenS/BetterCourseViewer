@@ -271,11 +271,7 @@ internal sealed class MoleculeSceneView : Border
     }
 
     /// <summary>The model handled: its turning paused, taken up again three seconds after the last touch.</summary>
-    private void Handled()
-    {
-        pausedUntil = DateTime.UtcNow.AddSeconds(3);
-        Chemistry.Tell("turned");
-    }
+    private void Handled() => pausedUntil = DateTime.UtcNow.AddSeconds(3);
 
     // ---- the pointer ----
 
