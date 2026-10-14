@@ -257,7 +257,11 @@ public sealed class CoursesScreen : Screen
         var score = K.Text(c.ScoreText.Length > 0 ? c.ScoreText : "–", Ty.Caption, c.Score == null ? B.Text2 : B.Text).Strong().Center();
         score.VerticalAlignment = VerticalAlignment.Center;
         var ring = K.Ring(c.Score is { } s ? s / 100 : null, color, 56, 5, score, tinted: true);
-        if (c.Score == null && c.ScoreWhy is { Length: > 0 } why) ring.ToolTip = why;
+        if (c.Score == null && c.ScoreWhy is { Length: > 0 } why)
+        {
+            ring.ToolTip = why;
+            if (ring is Panel face) face.Background = Brushes.Transparent; // (the whole ring answers the pointer, not only its stroke)
+        }
         var facts = K.Columns("*, auto", words.Margin(0, 0, 14, 0).Col(0), ring.Col(1));
         facts.Margin = new Thickness(16, 14, 16, 14);
 

@@ -98,6 +98,7 @@ public sealed class GroupsScreen : Screen
             var courseText = K.Text(course, Ty.Body, B.Text2);
             var courseLine = K.Columns("auto, *", K.Dot(color, 8).Margin(0, 0, 6, 0).Col(0), courseText.Col(1));
             courseLine.ToolTip = g.CourseCode is { Length: > 0 } code ? $"{course} ({code})" : course;
+            courseLine.Background = Brushes.Transparent; // (the whole line answers the pointer, not only its letters)
             words.Children.Add(courseLine);
         }
         if (members != null) words.Children.Add(K.H(6, K.Icon(SymbolRegular.People24, 14, B.Text2), K.Text(members, Ty.Body, B.Text2)));
