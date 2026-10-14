@@ -8,6 +8,8 @@ import SwiftUI
 struct CardSection<Content: View, Accessory: View>: View {
     let title: String
     var trailing: String? = nil
+    /// (courses-35) How many it holds, right after the heading (PageSection.count).
+    var count: Int? = nil
     var padding: CGFloat = 10
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
@@ -15,7 +17,7 @@ struct CardSection<Content: View, Accessory: View>: View {
     @Environment(\.cardTopSpace) private var topSpace
 
     var body: some View {
-        PageSection(title: title, trailing: trailing, accessory: accessory) {
+        PageSection(title: title, trailing: trailing, count: count, accessory: accessory) {
             VStack(alignment: .leading, spacing: 0) { content() }
                 .padding(padding)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -53,8 +55,8 @@ extension EnvironmentValues {
 }
 
 extension CardSection where Accessory == EmptyView {
-    init(title: String, trailing: String? = nil, padding: CGFloat = 10, @ViewBuilder content: @escaping () -> Content) {
-        self.init(title: title, trailing: trailing, padding: padding, accessory: { EmptyView() }, content: content)
+    init(title: String, trailing: String? = nil, count: Int? = nil, padding: CGFloat = 10, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, trailing: trailing, count: count, padding: padding, accessory: { EmptyView() }, content: content)
     }
 }
 
@@ -187,9 +189,20 @@ struct PostRowView: View {
     var color: Color = Theme.accent
     var previewLines: Int = 2
 
+    /// (courses-25) A Brightspace topic names its forum, not a person: "in Weekly Discussions", on the discussion's
+    /// symbol — never the forum's initials as if someone wrote it.
+    private var forum: String? {
+        guard (row.author ?? "").isEmpty, let f = row.forum, !f.isEmpty else { return nil }
+        return "in \(f)"
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            PersonAvatar(name: row.author ?? "", avatar: row.avatar, size: 34)
+            if forum != nil {
+                IconTile(symbol: "bubble.left.and.bubble.right.fill", color: color, size: 34)
+            } else {
+                PersonAvatar(name: row.author ?? "", avatar: row.avatar, size: 34)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     if row.unread == true {
@@ -197,7 +210,7 @@ struct PostRowView: View {
                     }
                     Text(row.title).font(row.unread == true ? .sBody.weight(.semibold) : .sBody).lineLimit(2)
                 }
-                Text([row.author, row.when].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                Text([forum ?? row.author, row.when].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.sFootnote).foregroundStyle(.secondary).lineLimit(1)
                 if let p = row.preview, !p.isEmpty {
                     Text(p).font(.sCallout).foregroundStyle(.secondary).lineLimit(previewLines)

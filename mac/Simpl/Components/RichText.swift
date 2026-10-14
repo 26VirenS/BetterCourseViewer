@@ -9,13 +9,55 @@ import WebKit
 struct RichText: View {
     let html: String
     var size: CGFloat = 14
+    /// (courses-1) Its words drawn natively, as plain text, until the web view has measured what it holds: a web view
+    /// paints in a process of its own, and on a busy Mac a discussion's post stood as an empty strip with nothing to say
+    /// its words were missing. Once measured, the web view's own drawing (links, pictures, formulas) fades in instead.
+    var placeholder = false
     @EnvironmentObject private var engine: Engine
     @State private var height: CGFloat = 24
+    @State private var measured = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HTMLBlock(html: html, base: engine.web.baseURL, size: size, height: $height) { url in engine.openLink(url) }
-            .frame(height: height)
-            .accessibilityElement(children: .contain)
+        let waiting = placeholder && !measured
+        ZStack(alignment: .topLeading) {
+            HTMLBlock(html: html, base: engine.web.baseURL, size: size, height: $height, measured: $measured) { url in engine.openLink(url) }
+                .frame(height: waiting ? 1 : height) // (laid out at the column's width, measuring, out of sight)
+                .opacity(waiting ? 0 : 1)
+                .accessibilityHidden(waiting)
+            if waiting {
+                Text(RichText.plainText(html))
+                    .font(.system(size: size))
+                    .lineSpacing(size * 0.36)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .timingCurve(0.23, 1, 0.32, 1, duration: 0.2), value: measured) // (a crossfade, once)
+        .accessibilityElement(children: .contain)
+        .task(id: html) {
+            // (the screenshot suite: a post whose web view never measured is said in the console, its words natively shown)
+            guard placeholder, UserDefaults.standard.string(forKey: "SimplShotFile") != nil else { return }
+            try? await Task.sleep(nanoseconds: 12_000_000_000)
+            if !Task.isCancelled, !measured { NSLog("[richtext] not measured after 12 s, shown as plain text: %@", String(html.prefix(48))) }
+        }
+    }
+
+    /// HTML's words as plain text: a line for each paragraph, line break and list item, the tags left out, the common
+    /// entities written out. For a placeholder only — the web view draws the real thing.
+    static func plainText(_ html: String) -> String {
+        var s = html
+        for (pattern, with) in [("(?i)<br\\s*/?>", "\n"), ("(?i)</(p|div|li|h[1-6]|tr|blockquote)>", "\n"), ("(?i)<li[^>]*>", "• "), ("<[^>]+>", "")] {
+            s = s.replacingOccurrences(of: pattern, with: with, options: .regularExpression)
+        }
+        for (entity, char) in [("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&#x27;", "'"), ("&rsquo;", "’"), ("&lsquo;", "‘"), ("&ldquo;", "“"), ("&rdquo;", "”"), ("&mdash;", "—"), ("&ndash;", "–"), ("&amp;", "&")] {
+            s = s.replacingOccurrences(of: entity, with: char)
+        }
+        let lines = s.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return lines.joined(separator: "\n")
     }
 }
 
@@ -33,6 +75,8 @@ struct HTMLBlock: NSViewRepresentable {
     @Binding var height: CGFloat
     /// (1.3.17) Maths written as TeX ($$…$$, Alta's $_…$_, \(…\), \[…\]) typeset with the KaTeX the app carries.
     var math = false
+    /// (courses-1) Set once the page inside has told its height for the first time (RichText's placeholder waits on it).
+    var measured: Binding<Bool>? = nil
     let onLink: (URL) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -130,6 +174,9 @@ struct HTMLBlock: NSViewRepresentable {
             }
             if abs(h - parent.height) > 0.5 {
                 DispatchQueue.main.async { self.parent.height = h }
+            }
+            if let m = parent.measured, !m.wrappedValue {
+                DispatchQueue.main.async { m.wrappedValue = true } // (after the height above: the view grows, then shows)
             }
         }
 
