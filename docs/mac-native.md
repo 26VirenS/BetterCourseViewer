@@ -86,6 +86,24 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `WindowWidthProbe`), not the page's, so showing the sidebar or the side column coming in never sends the row back to
   two. A tile's panel still opens over the page from its tile: the first from its left edge, the last from its right,
   one between them in step, each kept on the page.
+- **Grades, To Do, Calendar, Notifications, the Inbox and the rubric (1.3.78).** Grades shows the engine's figures as
+  they come (`gpaText`, `pctText`, `gradedText`; the goal's gap from the GPA as shown, so the two add up; the stepper's
+  own goal written half up, `HalfUp` in `GradesView.swift`), says why a course has no score ("Hidden by instructor",
+  "No grade yet") where its letter would be, names a course once (`altName`), keeps the GPA and Goal cards 540 points
+  wide on a wide window, and puts two course cards side by side only where each has 340 points. To Do leads with
+  what is left ("17 left", or "1 overdue" in red) under its ring, keeps the flag's slot only where a row shows a
+  priority, and has New Task once (the toolbar's +). The Calendar keeps Month / Week / List in the toolbar and ‹ Today
+  › beside the period's title on the page (none in List); a month draws only the weeks it touches, its days taller in
+  a five-week month; a day lists its open items first (a name on two lines where there is room) and folds work handed
+  in into one line ("2 more · 3 done"); only handed-in or excused work is struck through, anything over is greyed
+  (`struck`, `past`). Notifications says a row's kind by its symbol (its word is the tooltip) and has Mark All Read and
+  Clear All once (the toolbar's). The Inbox names every mailbox where the list has room, and New Message and a reply
+  take files (Attach, or dropped on New Message): each is uploaded to the student's conversation-attachments folder as
+  it is picked (`messageUpload`) and goes with the message by its id. The rubric is modal: the window under it rests
+  (its toolbar's buttons and title too); the ring has a gap between criteria and its names are chips; inside a
+  criterion, "‹ Ring" goes back, ‹ 1 of 2 › switches, the levels stack under the description (all of it where there
+  is room) with a leader to their points on the bar, and a mark that is not its level's points says so ("Your mark ·
+  4 pts", the dot at 4).
 
 - **Knewton Alta (1.3.17, Mac only; cut back in 1.3.45).** Open Tool on a Knewton Alta assignment (the engine's
   `alta`: its launch address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): Close and
