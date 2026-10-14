@@ -106,8 +106,14 @@ internal sealed class AtomsTool : Grid
     /// <summary>The field with the element before and after either side, and the line under it.</summary>
     private readonly FrameworkElement picker;
     private readonly Stack controls = K.V(14);
+    /// <summary>The controls' top: the element and the view (moved to the model's heading while it is over the rest).</summary>
+    private readonly Stack choose = K.V(14);
+    /// <summary>The view's own parts, under them.</summary>
+    private readonly ContentControl parts = new() { Focusable = false };
     private readonly Stack facts = K.V(14);
-    private readonly ContentControl head = new() { Focusable = false };
+    private readonly ContentControl title = new() { Focusable = false };
+    /// <summary>The model's heading's second line, while the model is over the rest: the element and the view.</summary>
+    private readonly Grid headRow = K.Columns("*, 16, auto");
     private readonly ChemLayout layout;
     private PTElement e;
     /// <summary>The look last drawn in (light or dark, and the accent of the chosen chip).</summary>
@@ -171,7 +177,10 @@ internal sealed class AtomsTool : Grid
         hint.HorizontalAlignment = HorizontalAlignment.Center;
         hint.Margin = new Thickness(12);
         atom.MinHeight = 200;
-        var card = K.Card(K.Rows("auto, *, auto", head.Row(0), atom.Row(1), hint.Row(2)), new Thickness(0));
+        headRow.Margin = new Thickness(16, 0, 16, 12);
+        controls.Children.Add(choose);
+        controls.Children.Add(parts);
+        var card = K.Card(K.Rows("auto, *, auto", K.V(0, title, headRow).Row(0), atom.Row(1), hint.Row(2)), new Thickness(0));
         // (one over the other: the element and the view in the model's own heading, in view with it — and the card given
         //  room for them over a model still large enough to turn)
         layout = new ChemLayout(controls, card, facts) { Floor = 460 };
@@ -244,8 +253,9 @@ internal sealed class AtomsTool : Grid
         before.IsEnabled = e.Number > 1;
         after.IsEnabled = e.Number < PeriodicTable.Elements.Count;
         Note();
-        Controls(view, sub);
-        Head();
+        Place();
+        Title();
+        Parts(view, sub);
         Facts();
         Shot.Moved();
         // (in a picture run, what it shows each time that changes: CI checks the element an element page handed it)
@@ -263,61 +273,59 @@ internal sealed class AtomsTool : Grid
             : $"No element matches “{q}”";
     }
 
-    // ---- the model's heading ----
+    // ---- the element and the view, and the model's heading ----
 
-    /// <summary>The element's tile, name, number and kind over the model; with the model over the rest, the element's
-    /// field and the view under them (taken from the controls, Controls having left them out).</summary>
-    private void Head()
+    /// <summary>
+    /// The element's field and the view at the top of the controls, or — the model over the rest — on the model's heading's
+    /// second line, in view with it. Moved only when the layout changes, so the field keeps the keyboard as an element is
+    /// typed after another.
+    /// </summary>
+    private void Place()
+    {
+        var into = InHead ? (Panel)headRow : choose;
+        if (picker.Parent == into) return;
+        ChemKit.Detach(picker);
+        ChemKit.Detach(views);
+        choose.Children.Clear();
+        headRow.Children.Clear();
+        if (InHead)
+        {
+            views.VerticalAlignment = VerticalAlignment.Top;
+            headRow.Children.Add(picker.Col(0));
+            headRow.Children.Add(views.Col(2));
+        }
+        else
+        {
+            views.VerticalAlignment = VerticalAlignment.Stretch;
+            choose.Children.Add(ChemKit.Heading("Element"));
+            choose.Children.Add(picker);
+            choose.Children.Add(ChemKit.Heading("Show"));
+            choose.Children.Add(views);
+        }
+        headRow.Visibility = InHead ? Visibility.Visible : Visibility.Collapsed;
+        choose.Visibility = InHead ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>The element's tile, name, number, kind and mass over the model.</summary>
+    private void Title()
     {
         var words = K.V(1, K.Text(e.Name, Ty.Subtitle), K.Text($"{e.Number} · {e.Kind.Label} · {e.MassText} u", Ty.Caption, B.Text2).Tabular());
         words.VerticalAlignment = VerticalAlignment.Center;
-        var title = K.Columns("auto, *", PTKit.Tile(e, 40, 18, 8).Col(0), words.Margin(12, 0, 0, 0).Col(1));
-        title.Margin = new Thickness(16);
-        if (!InHead)
-        {
-            head.Content = title;
-            return;
-        }
-        ChemKit.Detach(picker);
-        ChemKit.Detach(views);
-        views.VerticalAlignment = VerticalAlignment.Top;
-        var row = K.Columns("*, 16, auto", picker.Col(0), views.Col(2));
-        row.Margin = new Thickness(16, 0, 16, 12);
-        title.Margin = new Thickness(16, 16, 16, 10);
-        head.Content = K.V(0, title, row);
+        var row = K.Columns("auto, *", PTKit.Tile(e, 40, 18, 8).Col(0), words.Margin(12, 0, 0, 0).Col(1));
+        row.Margin = InHead ? new Thickness(16, 16, 16, 10) : new Thickness(16);
+        title.Content = row;
     }
 
-    // ---- the controls ----
+    // ---- the view's parts ----
 
-    /// <summary>The element and the view (unless they are in the model's heading), then the view's own parts.</summary>
-    private void Controls(PTModel view, PTSubshell? sub)
+    private void Parts(PTModel view, PTSubshell? sub)
     {
-        controls.Children.Clear();
-        ChemKit.Detach(picker);
-        ChemKit.Detach(views);
-        if (!InHead)
+        parts.Content = view switch
         {
-            views.VerticalAlignment = VerticalAlignment.Stretch;
-            controls.Children.Add(ChemKit.Heading("Element"));
-            controls.Children.Add(picker);
-            controls.Children.Add(ChemKit.Heading("Show"));
-            controls.Children.Add(views);
-        }
-        switch (view)
-        {
-            case PTModel.Cloud:
-                controls.Children.Add(ChemKit.Heading("Electrons"));
-                controls.Children.Add(CloudParts());
-                break;
-            case PTModel.Orbitals when sub is { } s:
-                controls.Children.Add(ChemKit.Heading("Subshell"));
-                controls.Children.Add(OrbitalParts(s));
-                break;
-            default:
-                controls.Children.Add(ChemKit.Heading("Parts"));
-                controls.Children.Add(Legend());
-                break;
-        }
+            PTModel.Cloud => K.V(14, ChemKit.Heading("Electrons"), CloudParts()),
+            PTModel.Orbitals when sub is { } s => K.V(14, ChemKit.Heading("Subshell"), OrbitalParts(s)),
+            _ => K.V(14, ChemKit.Heading("Parts"), Legend()),
+        };
     }
 
     // ---- the cloud's parts (cloud-spec.md §4.2) ----
