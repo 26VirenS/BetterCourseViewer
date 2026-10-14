@@ -204,8 +204,11 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         };
         Go(tab);
         if (engine.Phase == Phase.Native) _ = LoadInfo();
-        // (--settings-sheet uninstall: the screenshot suite's picture of Uninstall Simpl's question)
+        // (--settings-sheet uninstall: the screenshot suite's picture of Uninstall Simpl's question; customcolour: Custom
+        //  colour's; --settings-find <words>: Find a setting's list, as if typed)
         if (Launch.Take("uninstall", "settings-sheet") != null) Loaded += (_, _) => AskUninstall();
+        else if (Launch.Take("customcolour", "settings-sheet") != null) Loaded += (_, _) => CustomColour(null);
+        if (Launch.Get("settings-find") is { Length: > 0 } words) Loaded += (_, _) => Dispatcher.BeginInvoke(() => { find.Focus(); find.Text = words; find.CaretIndex = words.Length; }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnUpdates() => Dispatcher.BeginInvoke(() => { if (tab == "updates") Render(); });

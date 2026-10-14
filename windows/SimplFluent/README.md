@@ -120,7 +120,7 @@ window's side of it, `Shell/UpdateWatch.cs`:
   notification area, out of sight, its engine running as ever, when it was there (`updates:resume`, used once, within
   half an hour).
 - **What the student sees**: Settings ▸ Updates says where it stands — found, downloading, "Version v132 is ready —
-  Simpl updates when you close the quiz, and opens again where you were", installing — with Restart to Update to put it
+  Simpl updates when you close the quiz, and opens again where you were", installing — with Restart to update to put it
   in at once, whatever is open (the Mac's Update Now). The notice in the title bar's band (under it on a narrow window),
   over everything in the window, sheets too: "Simpl updates to v132 when you close the quiz." for a few seconds, once for
   each thing it waits for; "Updating Simpl to v132 — it opens again in a moment." as it goes in. Nothing interrupts:
@@ -136,6 +136,12 @@ window's side of it, `Shell/UpdateWatch.cs`:
   the hourly look but installs nothing by itself, a Critical Update apart. Settings ▸ Updates says so.
 - **A copy run from its zip** cannot put a version in its own place: it says one is available, and Download opens its
   page. Install updates automatically is off there, and says why.
+- **Earlier versions** (Settings ▸ Updates, folded away as the Mac's are; `--settings-earlier yes` opens it for a
+  picture): the last twelve, each with its date ("Oct 11"; the year only when it is not this one) and size. For the copy
+  the installer put here each has Install… (the Mac's), which asks first, turns Install updates automatically off (or
+  the newer version would go back in at the next quiet moment; a Critical Update still does), then downloads that
+  version's Simpl-Setup.exe, checks it as an update's is and runs it the same way (`Updates.InstallEarlier`). A copy run
+  from its zip has Open…, the version's page.
 
 `simpl.log`'s `update:` lines say each step: found, downloaded and checked (or why not), `held (quiz)`, `no longer held
 (by quiz)`, `where it was: grades, the window hidden`, `installing …, and quitting`; and, opened again, `back after
@@ -347,7 +353,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). Since 2.99.33 the page also writes the figures, dates and course names it sends (`pctText`, `gpaText`, `goalLine`, `dueLine`, `altName`, `gradedText`…): show those strings as they come rather than formatting the numbers here, so Windows reads every grade, date and course exactly as the Mac does. |
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder). |
@@ -378,7 +384,9 @@ public sealed class TodoScreen : Screen
   (compact tiles, about 72 tall: the name over the number and its line), and three to a row (two on the narrowest page)
   on a narrower one.
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
-  light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`).
+  light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`). In the
+  light theme `B.Text2` and `B.Text3` are solid greys (#5F5F5F, #707070; `Appearance.ReadableText`): Fluent's
+  see-through blacks drew paler than they ask (about 3.2 to 1 on the window) once WPF had drawn them.
 - Type follows Windows 11's ramp (`Ty.Caption` 12, `Ty.Body` 14, `Ty.BodyStrong`, `Ty.Subtitle` 20, `Ty.Title` 28).
   Section headings on a page are `Heading.Section(title, trailing, action)`; groups of settings-like rows use
   `K.SectionHeader` and `K.Row`.
@@ -453,10 +461,38 @@ no picture of the one before it to move from: it arrives by its own entrance (th
 - **Search box** (`Shell/Search/`): typing only suggests; the full search runs on Enter or *Search for*, so the page
   never changes under the student. Enter on a sum copies its answer. A command's arguments show as grey placeholders
   (`/course ‹course› ‹section›`). Everything is in sentence case.
-- **Tour** (`Shell/Tour.cs`): six steps from the Dashboard's counters (Grades, a course, Tools, Search) to *Something
-  wrong? Tell us here*. Each card has ×, *Skip tour*, Back and a Next that always works (a suggested click moves it on,
+- **Tour** (`Shell/Tour.cs`): offered, not begun — once the app first shows with nothing over it, *Take a 1-minute
+  tour?* rises in at the window's foot, dimming nothing, with *Not now* (counts as seen) and *Take the tour*
+  (`--open touroffer` shows it for a picture). Six steps from the Dashboard's counters (Grades, a course, Tools, Search)
+  to *Something wrong? Tell us here*, which lights the account tile's ⋯ alone. Each card has a tail toward what it
+  lights (Windows 11's TeachingTip), ×, *Skip tour*, Back and a Next that always works (a suggested click moves it on,
   but no step waits for one); Escape ends it; leaving counts as seen; the account menu's *Take the tour* runs it again.
   Its dim covers the title bar too, all but Windows' caption buttons.
+
+## First run and Settings
+
+- **The school** (`SignIn/`): the search lists a site once — listings at one address are one row under the name that
+  matched best (a tie: the shorter), the others under it ("scccd.instructure.com · also: State Center SCCCD";
+  `SchoolSearch.BySite` and `Join`, the Mac's rule) — and, while it lists, the welcome steps back (a smaller mark, no
+  line under the name) and the list is as tall as its rows, five at most, so the page never scrolls at the usual size;
+  the field glides there and then stays put. A preview that cannot load is a small card in the theme's colours ("You can
+  still sign in."). The name picked is kept for its address (`SchoolName`), so the card says "Sign in to State Center
+  Community College District", the host under it ("at login.school.edu"); `--school-name` gives a development run one
+  for its pictures. Start over is in the title bar only over the school's own page with nothing of Simpl's on it;
+  "Logging you in" becomes "Still signing in…" with Open sign-in page and its own Start over.
+- **The setup** (`Shell/SetupSheet.cs`): opens on "Which courses should Simpl show?" (every current course ticked on a
+  first run; one line a course: the name the pane will show, then the term and teacher), then nicknames, grade history
+  and the term GPA goal (`GoalFigure`: half up to the hundredth, always two decimals), and a read-back. A first run has
+  *Set up later*: nothing saved, and the setup not put up again at launch (`setup:later`); Settings ▸ General ▸ Courses
+  shown and goals runs it.
+- **Settings** (`Shell/SettingsWindow.cs`): *Find a setting* lists what matches as Windows' Settings does ("Get beta
+  updates — Updates"; ↑ ↓ Enter), opens the page and lights the row for a moment; "No matching settings" when nothing
+  does. A sign-in not saved has *Save sign-in…* (it signs out, so the card can save one). Appearance has *Use system
+  setting*, a ninth swatch for a colour of one's own (*Custom colour*: a spectrum to drag, and a hex code), the Default
+  theme drawn as a small page, and the photos editor: the seven places side by side, the one picked larger, its picture
+  dragged to move it (`Appearance.Pan`), Reset, and any theme's drawing for any place (`Appearance.SceneFor`). Headers
+  never repeat the page's or a row's name; the words are plain ("can only be opened from your Windows account", "Import
+  a grade-history CSV you exported earlier"), and no folder's path is printed (Open folder instead).
 
 ## The quick look
 

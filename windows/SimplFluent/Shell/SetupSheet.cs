@@ -95,6 +95,9 @@ public sealed class SetupSheet
         try
         {
             d = await engine.Call<SetupChoices>("setupInfo");
+            // (--setup-first yes, a development run's: the setup as a first run shows it — Set up later, no Cancel — for
+            //  the pictures, whose student has set up before)
+            if (Launch.IsDevelopment && Launch.Flag("setup-first")) d.Done = false;
             foreach (var c in d.Courses)
             {
                 if (c.On) chosen.Add(c.Id);
