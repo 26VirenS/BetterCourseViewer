@@ -171,8 +171,13 @@ final class ToolsCenter: ObservableObject {
         let raw = UserDefaults.standard.string(forKey: ToolsCenter.pinsKey) ?? ""
         var seen = Set<ToolKind>()
         pinned = raw.split(separator: ",").compactMap { ToolKind(rawValue: String($0).trimmingCharacters(in: .whitespaces)) }.filter { seen.insert($0).inserted }
-        // (the screenshot suite: -SimplTool calc opens the Calculator on the Tools page)
+        // (the screenshot suite: -SimplTool calc opens the Calculator on the Tools page; -SimplToolFile <path> hands the
+        // tool opened a file, as a drop on its pin does — the annotator's page, Split's pages)
         if let t = LaunchOpen.take("", key: "SimplTool"), let k = ToolKind(rawValue: t) { open = k }
+        if let k = open, let path = LaunchOpen.take("", key: "SimplToolFile"), !path.isEmpty {
+            handoff = [URL(fileURLWithPath: path)]
+            handoffTool = k
+        }
     }
 
     func isPinned(_ k: ToolKind) -> Bool { pinned.contains(k) }

@@ -453,6 +453,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   one column. *PDF annotator*: "Select words on the page to highlight, underline or strike them." on the page until
   words are selected; *Merge & split*: "Click a page to leave it out. ⟳ turns it.", the turn button larger with a
   tooltip. *Flashcards*: studying, the bar reads "‹ Cell Biology  Learn" and the tool's line under its name makes way.
+  For pictures, `-SimplTool <key> -SimplToolFile <path>` hands the tool opened a file as a drop on its pin does (a PDF:
+  the annotator's page; Merge & split opens it in Split).
 
 - **Fast and fluid (1.3.78).** A screen shows its whole content at once whenever this session has already read what
   it shows, and the window moves the same way however it is moved:
