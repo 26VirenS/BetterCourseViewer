@@ -108,11 +108,13 @@ internal static class ChemSheet
 /// drawing and the facts side by side, each side scrolling on its own; on a narrower one, the drawing across the top —
 /// about half the height, so the controls under it start in view (and the builder puts its preset and its way of making
 /// in the drawing's own heading: <see cref="WideChanged"/>) — and the controls and facts side by side under it, all
-/// scrolling as one.
+/// scrolling as one. The biology tools (<c>tall</c>) give their drawing the page's whole height there, as the Mac's do
+/// (PTWorkLayout without shortDrawing): a 3D model or a step-through squeezed into half a page lost its parts.
 /// </summary>
 internal sealed class ChemLayout : Grid
 {
     private readonly FrameworkElement left, centre, right;
+    private readonly bool tall;
     private readonly ScrollViewer leftScroll = Scroller(), rightScroll = Scroller(), oneScroll = Scroller();
     private readonly Grid narrow = new();
     private readonly Grid under = new();
@@ -124,14 +126,16 @@ internal sealed class ChemLayout : Grid
     /// <summary>The layout changed between side by side and one over the other.</summary>
     public event Action? WideChanged;
 
-    /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost.</summary>
-    private static double NarrowHeight(double page) => Math.Max(320, Math.Min(560, page * 0.5));
+    /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall,
+    /// as tall as the page shows, from 460 to 640.</summary>
+    private double NarrowHeight(double page) => tall ? Math.Max(460, Math.Min(640, page)) : Math.Max(320, Math.Min(560, page * 0.5));
 
-    public ChemLayout(FrameworkElement left, FrameworkElement centre, FrameworkElement right)
+    public ChemLayout(FrameworkElement left, FrameworkElement centre, FrameworkElement right, bool tall = false)
     {
         this.left = left;
         this.centre = centre;
         this.right = right;
+        this.tall = tall;
         Margin = new Thickness(40, 8, 40, 24);
         MaxWidth = 1480;
         left.VerticalAlignment = VerticalAlignment.Top;

@@ -17,8 +17,9 @@ namespace Simpl.Tools;
 public static class BioUI
 {
     /// <summary>The chemistry builders' layout (ChemLayout, the Mac's PTWorkLayout): controls, the drawing and the facts
-    /// side by side from 1100 wide, the drawing over the two below that.</summary>
-    public static FrameworkElement Work(FrameworkElement left, FrameworkElement centre, FrameworkElement right) => new ChemLayout(left, centre, right);
+    /// side by side from 1100 wide; below that the drawing over the two, as tall as the page shows (460 to 640) — on the
+    /// Tools page, beside the navigation pane, a 1366 window is narrower than that.</summary>
+    public static FrameworkElement Work(FrameworkElement left, FrameworkElement centre, FrameworkElement right) => new ChemLayout(left, centre, right, tall: true);
 
     /// <summary>A side column's heading, as the molecule builder's ("Preset", "View").</summary>
     public static TextBlock Heading(string text)

@@ -124,8 +124,9 @@ public sealed class BioStepControls : ContentControl
         row.Children.Add(speed);
         row.VerticalAlignment = VerticalAlignment.Center;
         // (under a narrow scene the dots give way first — to a shorter bar of progress, then to nothing, as the caption
-        //  says which step it is — so the caption is read whole; only past that does it give way itself, the whole of it
-        //  in its tooltip, so the speed stays in view)
+        //  says which step it is — so the caption is read whole; past that it goes onto two lines, broken after a " · "
+        //  — "Step 92 of 99 · Elongation", then "codon 4: AGC → Ser" — as the end of it is what the step is about; only
+        //  a line still too long gives way, the whole of it in its tooltip, so the speed stays in view)
         if (ActualWidth > 0)
         {
             var others = 0.0;
@@ -156,6 +157,20 @@ public sealed class BioStepControls : ContentControl
                 else room += 6;
             }
             caption.MaxWidth = Math.Max(caption.MinWidth, room);
+            var parts = words.Split(" · ");
+            if (words0 > caption.MaxWidth && parts.Length > 1)
+            {
+                double Width(string s)
+                {
+                    var t = K.Text(s, Ty.BodyStrong);
+                    t.FontFeatures();
+                    t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    return t.DesiredSize.Width;
+                }
+                var k = parts.Length - 1;
+                while (k > 1 && Width(string.Join(" · ", parts[..k])) > caption.MaxWidth) k--;
+                caption.Text = string.Join(" · ", parts[..k]) + "\n" + string.Join(" · ", parts[k..]);
+            }
         }
         var capsule = new Border { CornerRadius = new CornerRadius(22), Padding = new Thickness(10, 6, 12, 6), Child = row, BorderThickness = new Thickness(1) };
         capsule.Bg(B.Card).Stroke(B.CardStroke);

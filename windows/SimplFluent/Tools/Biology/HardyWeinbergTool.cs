@@ -171,12 +171,42 @@ internal static class HWCountField
 /// <summary>A page that draws again whenever the tool's state or the app's appearance changes, while it is on screen.</summary>
 internal abstract class HWPageBase : Grid
 {
+    private bool listening;
+
     protected HWPageBase()
     {
-        void Changed() => CrossKit.KeepFocus(this, Draw);
-        Loaded += (_, _) => { HardyWeinbergModel.Changed -= Changed; HardyWeinbergModel.Changed += Changed; Appearance.Changed -= Changed; Appearance.Changed += Changed; Draw(); };
-        Unloaded += (_, _) => { HardyWeinbergModel.Changed -= Changed; Appearance.Changed -= Changed; };
+        Loaded += (_, _) => Listen();
+        IsVisibleChanged += (_, e) => { if (e.NewValue is true) Listen(); };
+        // (WPF can send Unloaded after the Loaded that follows it when a template above the page is made again — WPF-UI's
+        //  styles arrive in steps as Simpl starts — and a page that stopped listening then would never hear the simulation
+        //  finish: it lets go only if it is still out of the window once the dispatcher has caught up)
+        Unloaded += (_, _) => Dispatcher.BeginInvoke(() => { if (PresentationSource.FromVisual(this) == null) Quiet(); }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
+
+    private void Changed() => CrossKit.KeepFocus(this, Draw);
+
+    private void Listen()
+    {
+        if (!listening)
+        {
+            listening = true;
+            HardyWeinbergModel.Changed += Changed;
+            Appearance.Changed += Changed;
+        }
+        Shown();
+        Draw();
+    }
+
+    private void Quiet()
+    {
+        if (!listening) return;
+        listening = false;
+        HardyWeinbergModel.Changed -= Changed;
+        Appearance.Changed -= Changed;
+    }
+
+    /// <summary>The page came on screen (before it draws).</summary>
+    protected virtual void Shown() { }
 
     protected abstract void Draw();
 }

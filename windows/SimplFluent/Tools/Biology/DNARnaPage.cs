@@ -291,8 +291,8 @@ internal sealed class DnaRnaPage : Grid
                 break;
             default:
                 right.Children.Add(BioUI.Card("rRNA and ribosomes", null, null,
-                    BioUI.FactRow("Bacterial", "70S = 30S (16S rRNA + about 21 proteins) + 50S (23S + 5S rRNA + about 33 proteins)."),
-                    BioUI.FactRow("Eukaryotic", "80S = 40S (18S rRNA) + 60S (28S + 5.8S + 5S rRNA)."),
+                    BioUI.FactRow("Bacterial", "30S (16S rRNA + about 21 proteins) + 50S (23S + 5S rRNA + about 33 proteins) → 70S."),
+                    BioUI.FactRow("Eukaryotic", "40S (18S rRNA) + 60S (28S + 5.8S + 5S rRNA) → 80S."),
                     BioUI.FactRow("Not additive", "Svedberg units measure how fast a particle settles in a centrifuge, which depends on its shape as well as its mass: a 30S and a 50S subunit make a 70S ribosome, not an 80S one."),
                     BioUI.FactRow("Organelles", "Mitochondria and chloroplasts have 70S-type ribosomes, like bacteria."),
                     BioUI.FactRow("rRNA’s job", "The ribosome’s RNA, not its proteins, joins the amino acids: the ribosome is a ribozyme.")));
@@ -582,6 +582,6 @@ internal sealed class DnaRibosomeDrawing : DnaDrawing
         Say(dc, r.Small.Name, cx, sy + 2, 20, text, strong: true);
         Say(dc, r.Small.Rna, cx, sy + 26, 13, text);
         if (r.Small.Proteins.Length > 0) Say(dc, r.Small.Proteins, cx, 380, 12, text2);
-        Say(dc, $"{r.Small.Name} + {r.Large.Name} = {r.Name}", cx, 420, 15, text, strong: true);
+        Say(dc, $"{r.Small.Name} + {r.Large.Name} → {r.Name}", cx, 420, 15, text, strong: true);
     }
 }
