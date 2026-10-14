@@ -380,7 +380,7 @@ enum DNAText {
         return String(f.filter { $0 != " " }.map { sub[$0] ?? $0 })
     }
 
-    /// A number with a thousands separator and `digits` decimals.
+    /// A number with a thousands separator and `digits` decimals, rounded half up (`Double.bioHalfUp`).
     static func number(_ v: Double, digits: Int = 2) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
