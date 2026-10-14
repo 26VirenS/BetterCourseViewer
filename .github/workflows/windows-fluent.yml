@@ -4,10 +4,12 @@
 # (held by a quiz, put in once it closes, Simpl opened again where it was), updated over an open Simpl as Restart to
 # Update runs it, an update that cannot finish, uninstalled with Simpl open, installed again and uninstalled from
 # Simpl's own Settings — pictured against
-# the mock Canvas, and — when a commit asks for it with "[preview]" in its message, or by hand (Run workflow) —
-# published as a pre-release (windows-fluent-v<run>, zero-padded; Simpl-Setup.exe and the portable zip) to try on a
-# real PC — or, with Run workflow ▸ beta, as a beta under a tag of its own (windows-fluent-beta-v<run>), which only a
-# Simpl with Get beta updates on is offered and a copy from before the beta channel (0.3.0 and earlier) never sees.
+# the mock Canvas, and — by hand (Run workflow) — published as a pre-release (windows-fluent-v<run>, zero-padded;
+# Simpl-Setup.exe and the portable zip), which every installed Simpl takes; or, with Run workflow ▸ beta, as a beta
+# under a tag of its own (windows-fluent-beta-v<run>), which only a Simpl with Get beta updates on is offered and a copy
+# from before the beta channel (0.3.0 and earlier) never sees. Run workflow ▸ promote publishes a beta's own files as
+# the usual release. A push whose commit asks for it with "[preview]" in its subject line is published as a beta: only
+# Run workflow with beta off reaches every PC.
 # The first Windows app (windows/Simpl, windows-app-v*) and Simpl's Mac and iPhone builds, releases and update feeds
 # are not touched.
 # Built once (the installer and the zip a release carries); then, at the same time, the pictures in four parts and the
@@ -44,7 +46,11 @@ on:
         type: boolean
         default: true
       from_run:
-        description: Or publish this green run (its id), whatever its commit
+        description: Or publish this green run (its id, the long number in its link), whatever its commit
+        type: string
+        default: ''
+      promote:
+        description: Or make this beta the usual release, for everyone (its tag, windows-fluent-beta-v<run>; beta off)
         type: string
         default: ''
       critical:
@@ -69,29 +75,57 @@ concurrency:
 
 jobs:
   # (Run workflow, to publish: the run a push already made for this commit, once it is green, is published as it is —
-  #  a minute, not a build and its pictures again; without one, or with reuse off, it is built and tried here)
+  #  a minute, not a build and its pictures again; without one, or with reuse off, it is built and tried here. from_run
+  #  names another green run, promote a beta's release: one not found stops here, and never builds the branch instead —
+  #  that would publish a build nobody tried in the named one's place)
   prior:
     name: The run already made for this commit
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview && inputs.reuse }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview && (inputs.reuse || inputs.from_run != '' || inputs.promote != '') }}
     runs-on: ubuntu-latest
     outputs:
       found: ${{ steps.find.outputs.found }}
       run: ${{ steps.find.outputs.run }}
       number: ${{ steps.find.outputs.number }}
       sha: ${{ steps.find.outputs.sha }}
+      promote: ${{ steps.find.outputs.promote }}
     steps:
       - id: find
         env:
           GH_TOKEN: ${{ github.token }}
           FROM_RUN: ${{ inputs.from_run }}
+          PROMOTE: ${{ inputs.promote }}
+          BETA: ${{ inputs.beta }}
         run: |
-          api="repos/${{ github.repository }}/actions/workflows/windows-fluent.yml/runs?head_sha=${{ github.sha }}&event=push&per_page=5"
-          q='.workflow_runs[0] | "\(.id) \(.run_number) \(.status) \(.conclusion) \(.head_sha)"'
-          if [ -n "$FROM_RUN" ]; then api="repos/${{ github.repository }}/actions/runs/$FROM_RUN"; q='"\(.id) \(.run_number) \(.status) \(.conclusion) \(.head_sha)"'; fi
-          # (a push's run still going is waited for, up to half an hour)
+          repo="${{ github.repository }}"
+          # (a beta promoted: the very files its release carries, published again under the usual tag at the commit it
+          #  was made from — the build the testers had, whatever became of its run and its run's files since)
+          if [ -n "$PROMOTE" ]; then
+            if [ -n "$FROM_RUN" ] || [ "$BETA" = "true" ]; then echo "::error::promote makes a beta the usual release: give it alone, without from_run and with beta off"; exit 1; fi
+            if [[ ! "$PROMOTE" =~ ^windows-fluent-beta-v([0-9]+)$ ]]; then echo "::error::promote takes a beta's tag, windows-fluent-beta-v<run>; \"$PROMOTE\" is not one: not published"; exit 1; fi
+            number=$((10#${BASH_REMATCH[1]}))
+            files=$(gh api "repos/$repo/releases/tags/$PROMOTE" --jq '.assets[].name' 2>/dev/null) || { echo "::error::no release $PROMOTE: not published"; exit 1; }
+            for f in Simpl-Setup.exe Simpl-Windows-x64.zip; do grep -qx "$f" <<< "$files" || { echo "::error::$PROMOTE has no $f: not published"; exit 1; }; done
+            sha=$(gh api "repos/$repo/commits/$PROMOTE" --jq .sha 2>/dev/null) && [ -n "$sha" ] || { echo "::error::the commit $PROMOTE was made from was not found: not published"; exit 1; }
+            echo "found=true" >> "$GITHUB_OUTPUT"; echo "number=$number" >> "$GITHUB_OUTPUT"; echo "sha=$sha" >> "$GITHUB_OUTPUT"; echo "promote=$PROMOTE" >> "$GITHUB_OUTPUT"
+            echo "promoting $PROMOTE ($sha) to windows-fluent-v$(printf '%03d' "$number")"
+            exit 0
+          fi
+          api="repos/$repo/actions/workflows/windows-fluent.yml/runs?head_sha=${{ github.sha }}&event=push&per_page=5"
+          q='.workflow_runs[0] | "\(.id) \(.run_number) \(.status) \(.conclusion) \(.head_sha) \(.path)"'
+          if [ -n "$FROM_RUN" ]; then
+            # (a run's id, the long number in its link — not the v113 a release carries, which is its run number)
+            if [[ ! "$FROM_RUN" =~ ^[0-9]+$ ]]; then echo "::error::from_run takes a run's id, the long number in its link; \"$FROM_RUN\" is not one: not published"; exit 1; fi
+            api="repos/$repo/actions/runs/$FROM_RUN"; q='"\(.id) \(.run_number) \(.status) \(.conclusion) \(.head_sha) \(.path)"'
+          fi
+          # (a run still going is waited for, up to half an hour)
           for i in $(seq 1 120); do
-            read -r id number status conclusion sha < <(gh api "$api" --jq "$q" 2>/dev/null || echo "")
-            [ -z "$id" ] || [ "$id" = "null" ] && { echo "no push run for this commit: built here"; echo "found=false" >> "$GITHUB_OUTPUT"; exit 0; }
+            line=$(gh api "$api" --jq "$q" 2>/dev/null) || line=""
+            read -r id number status conclusion sha path <<< "$line"
+            if [ -z "$id" ] || [ "$id" = "null" ]; then
+              if [ -n "$FROM_RUN" ]; then echo "::error::no run $FROM_RUN here (from_run is a run's id, the long number in its link — not the v<run> a release carries): not published"; exit 1; fi
+              echo "no push run for this commit: built here"; echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            if [ "$path" != ".github/workflows/windows-fluent.yml" ]; then echo "::error::run $id is not this workflow's (it is $path's): not published"; exit 1; fi
             [ "$status" = "completed" ] && break
             echo "run $id is $status: waiting"; sleep 15
           done
@@ -1570,32 +1604,52 @@ jobs:
         if: ${{ needs.prior.outputs.found == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          PROMOTE: ${{ needs.prior.outputs.promote }}
         run: |
-          # (a run from before the build was kept as one "release": its installer and its zip apart)
-          # (the zip as "release" and the installer as "release-setup"; a run from before kept both as "release", and
-          #  one from before that each apart)
-          run="${{ needs.prior.outputs.run }}"
-          get() { gh run download "$run" -R "${{ github.repository }}" -n "$1" -D release 2>/dev/null; }
-          get release || get Simpl-Windows-x64
-          [ -f release/Simpl-Setup.exe ] || get release-setup || get Simpl-Setup
+          if [ -n "$PROMOTE" ]; then
+            # (a beta promoted: the two files its release carries, byte for byte what the testers installed)
+            gh release download "$PROMOTE" -R "${{ github.repository }}" -p Simpl-Setup.exe -p Simpl-Windows-x64.zip -D release
+          else
+            # (a run from before the build was kept as one "release": its installer and its zip apart)
+            # (the zip as "release" and the installer as "release-setup"; a run from before kept both as "release", and
+            #  one from before that each apart)
+            run="${{ needs.prior.outputs.run }}"
+            get() { gh run download "$run" -R "${{ github.repository }}" -n "$1" -D release 2>/dev/null; }
+            get release || get Simpl-Windows-x64
+            [ -f release/Simpl-Setup.exe ] || get release-setup || get Simpl-Setup
+          fi
           ls -la release
           test -f release/Simpl-Setup.exe && test -f release/Simpl-Windows-x64.zip
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          # (a push publishes only when its commit's subject line asks for a [preview]: the word in a commit's body —
+          #  a message that only speaks of it — is no ask)
+          if [ "${{ github.event_name }}" = "push" ]; then
+            shopt -s nocasematch
+            case "${HEAD_MESSAGE%%$'\n'*}" in
+              *"[preview]"*) ;;
+              *) echo "[preview] is in the commit's body, not its subject line: nothing published"; exit 0 ;;
+            esac
+            shopt -u nocasematch
+          fi
           # (the number the build carries — "0.2.3 (v041)" — is its own run's: the one published, when it is reused)
           n=$(printf '%03d' "${{ needs.prior.outputs.number || github.run_number }}")
           sha="${{ needs.prior.outputs.sha || github.sha }}"
           tag="windows-fluent-v$n"
           title="Simpl for Windows — Windows 11 look, preview (v$n)"
-          beta="${{ github.event_name == 'workflow_dispatch' && inputs.beta }}"
+          # (a push's [preview] is a beta, always: the usual release, which every installed Simpl takes -- 0.3.0 and
+          #  earlier, which install it by themselves, too -- comes only from Run workflow with beta off, so a commit of
+          #  anyone's that happens to carry the word never reaches every PC)
+          beta="${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.beta) }}"
           critical="${{ github.event_name == 'workflow_dispatch' && inputs.critical }}"
-          # (a beta, asked for by Run workflow ▸ beta: a tag of its own, which Simpl's Updates reads as a beta and offers
-          #  only with Get beta updates on -- and which a Simpl from before the beta channel, 0.3.0 and earlier, never
-          #  reads at all: it lists windows-fluent-v<run> alone. Titled with the version its commit's SimplFluent.csproj
-          #  gives, the commit published, from_run's too. The same green run published again with beta off is the usual
-          #  release, for everyone: the beta promoted)
+          # (a beta, asked for by Run workflow ▸ beta or a push's [preview]: a tag of its own, which Simpl's Updates reads
+          #  as a beta and offers only with Get beta updates on -- and which a Simpl from before the beta channel, 0.3.0
+          #  and earlier, never reads at all: it lists windows-fluent-v<run> alone. Titled with the version its commit's
+          #  SimplFluent.csproj gives, the commit published, from_run's too. Run workflow ▸ promote publishes a beta's
+          #  own files again with beta off: the usual release, for everyone)
           if [ "$beta" = "true" ]; then
             git fetch -q --depth=1 origin "$sha"
             v=$(git show "$sha:windows/SimplFluent/SimplFluent.csproj" | sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' | head -1)
@@ -1630,3 +1684,10 @@ jobs:
             --title "$title" \
             --notes-file "$notes"
           echo "https://github.com/${{ github.repository }}/releases/tag/$tag"
+          # (Simpl 0.3.0 and earlier read only the first 40 releases GitHub lists for the repository, the Mac's and the
+          #  extension's among them, and in GitHub's order, which is not quite the order of publishing: a usual release
+          #  of an older commit, a beta promoted days on, can land below them, and those copies never see it. They
+          #  cannot be changed now -- said here, so a newer commit's run can be published for them)
+          if [ "$beta" != "true" ] && ! gh api "repos/${{ github.repository }}/releases?per_page=40" --jq '.[].tag_name' | grep -qx "$tag"; then
+            echo "::warning::$tag is not among the first 40 releases GitHub lists: Simpl for Windows 0.3.0 and earlier do not see it (0.3.1 and later read 100). A newer commit's green run published as the usual release reaches them."
+          fi
