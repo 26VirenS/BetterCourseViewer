@@ -584,7 +584,8 @@ internal sealed class HWSimulatePage : HWPageBase
                 n.Width = 18;
                 n.TextAlignment = TextAlignment.Right;
                 n.Margin = new Thickness(0, 0, 8, 0);
-                v.Children.Add(K.Columns("auto, *", n.Col(0), GenotypeBar.Make(x.AA, x.Aa, x.aa, pops.Count > 5 ? 10 : 14, r == pops.Count - 1).Col(1)));
+                // (one population: its frequencies under its bar; several: each bar's in its tooltip, and the colours' key below)
+                v.Children.Add(K.Columns("auto, *", n.Col(0), GenotypeBar.Make(x.AA, x.Aa, x.aa, pops.Count > 5 ? 10 : 14, pops.Count == 1).Col(1)));
             }
             else
             {
@@ -593,6 +594,7 @@ internal sealed class HWSimulatePage : HWPageBase
                 v.Children.Add(t);
             }
         }
+        if (pops.Count > 1) v.Children.Add(GenotypeBar.Key().Margin(26, 0, 0, 0));
         return v;
     }
 

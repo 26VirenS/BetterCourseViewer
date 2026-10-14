@@ -126,6 +126,16 @@ internal static class GenotypeBar
         AutomationProperties.SetName(v, $"Genotype frequencies: AA {HardyWeinberg.Num(aA)}, Aa {HardyWeinberg.Num(het)}, aa {HardyWeinberg.Num(rec)}");
         return v;
     }
+
+    /// <summary>The colours' key alone (AA, Aa, aa), for several bars at once: the frequencies under the last bar would
+    /// read as everyone's.</summary>
+    public static FrameworkElement Key()
+    {
+        var row = new WrapPanel();
+        foreach (var (name, c) in new[] { ("AA", HWColors.AA.ToColor()), ("Aa", HWColors.Aa.ToColor()), ("aa", HWColors.aa.ToColor()) })
+            row.Children.Add(K.H(5, K.Dot(c, 9), K.Text(name, Ty.Caption)).Margin(0, 0, 14, 2));
+        return row;
+    }
 }
 
 /// <summary>A hundred people, coloured by genotype (AA, then Aa, then aa, row by row), and how many of each.</summary>

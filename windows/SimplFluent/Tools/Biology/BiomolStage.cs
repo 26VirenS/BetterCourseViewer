@@ -10,7 +10,8 @@ namespace Simpl.Tools;
 
 /// <summary>
 /// The Biomolecule Builder's 3D view (spec §4.4, §3.4): the shared <see cref="BioSceneView"/> with what the builder adds
-/// to it — a scene's marks (ring carbons' numbers, charges) drawn as text facing the viewer, a scene asked for only when
+/// to it — a scene's marks (charges drawn as text facing the viewer; ring carbons' numbers drawn over the whole model as
+/// the view's marks, so an atom in front never hides one), a scene asked for only when
 /// its key is new (so a mark set made with one build is never lost to another), and the short motions the pages play
 /// (a residue sliding in as water lifts off, a sugar split by water, ubiquitin unfolding). A motion's moving parts are
 /// drawn over the scene, turning with it, frame by frame for as long as it runs; the scene under it is made at its end
@@ -63,7 +64,11 @@ internal sealed class BiomolStage
             return s.Content;
         }, frameKey, () =>
         {
-            lock (marks) return marks.Select(Board).ToList();
+            lock (marks) return marks.Where(m => !m.OnTop).Select(Board).ToList();
+        }, () =>
+        {
+            // (a carbon's number over the whole model, so no atom in front of it hides it)
+            lock (marks) return marks.Where(m => m.OnTop).Select(m => new BioMark(m.Text, m.Pos, m.Size, m.Atom, m.AtomRadius)).ToList();
         });
     }
 

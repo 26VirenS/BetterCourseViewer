@@ -49,7 +49,11 @@ public readonly record struct BiomolLook(BioAtomStyle Style = BioAtomStyle.BallS
 /// <param name="Hex">"#rrggbb", or null for the atom-symbol white.</param>
 /// <param name="Size">Its size (Å).</param>
 /// <param name="Lift">How far toward the viewer it sits (an atom's radius, so it shows on the atom's near side).</param>
-public sealed record BiomolMark(BioVec Pos, string Text, string? Hex = null, double Size = 0.42, double Lift = 0);
+/// <param name="OnTop">Drawn over the whole model in the page's text colour (the view's marks), not in the scene, so no
+/// atom in front hides it: a carbon's number.</param>
+/// <param name="Atom">The atom an on-top mark numbers: it is kept just outside the atom's disc as the view turns.</param>
+public sealed record BiomolMark(BioVec Pos, string Text, string? Hex = null, double Size = 0.42, double Lift = 0,
+    bool OnTop = false, BioVec? Atom = null, double AtomRadius = 0);
 
 /// <summary>A short motion (§4.4 Animate dehydration, the sugar's hydrolysis): groups of items, each moved from one offset
 /// to another and faded, after a delay; a <c>Pulse</c> flashes in and out (a new bond).</summary>
@@ -494,24 +498,28 @@ public static class BiomolScenes
         return new BioSceneContent { Items = items, Labels = labels };
     }
 
-    /// <summary>The sugar carbons' numbers 1′–5′ on a nucleotide (<paramref name="primes"/>), or a sugar's 1–6, as marks on
-    /// the atoms' near sides.</summary>
+    /// <summary>The sugar carbons' numbers 1′–5′ on a nucleotide (<paramref name="primes"/>), or a sugar's 1–6, drawn over
+    /// the model (on-top marks), each just outside its atom on the side away from the molecule's middle: drawn in the scene,
+    /// a number sat behind the H or O in front of it (on α-glucose 1, 3 and 5 could not be seen).</summary>
     public static List<BiomolMark> CarbonMarks(BioMoleculeModel m, bool primes, BiomolLook look, BiomolChem chem)
     {
         var out_ = new List<BiomolMark>();
-        if (look.Style == BioAtomStyle.Sticks) return out_;
-        var lift = Radius("C", look, chem) * 1.03;
+        if (look.Style == BioAtomStyle.Sticks || m.Atoms.Count == 0) return out_;
+        var r = Radius("C", look, chem);
+        var mid = m.Atoms.Aggregate(BioVec.Zero, (s, a) => s + a.Pos) / m.Atoms.Count;
+        BiomolMark Mark(BioMoleculeModel.Atom a, string text) =>
+            new(a.Pos + BioV.Unit(a.Pos - mid) * (r + 0.42), text, Size: 0.62, OnTop: true, Atom: a.Pos, AtomRadius: r);
         foreach (var a in m.Atoms)
         {
             if (a.Element != "C") continue;
             if (primes)
             {
                 if (!a.Name.EndsWith('\'') || a.Name.Length < 2 || !char.IsDigit(a.Name[1])) continue;
-                out_.Add(new BiomolMark(a.Pos, $"{a.Name[1]}′", Lift: lift));
+                out_.Add(Mark(a, $"{a.Name[1]}′"));
                 continue;
             }
             var digits = new string(a.Name.Where(char.IsDigit).ToArray());
-            if (digits.Length > 0) out_.Add(new BiomolMark(a.Pos, digits, Lift: lift));
+            if (digits.Length > 0) out_.Add(Mark(a, digits));
         }
         return out_;
     }
@@ -634,7 +642,7 @@ public static class BiomolScenes
             c.Items.AddRange(one.Content.Items.Select(it => it with { Mesh = it.Mesh.Translated(shift), Id = it.Id is { } id ? $"{prefix}:{id}" : null }));
             c.Labels.AddRange(one.Content.Labels.Where(l => l.Id == "part:anomeric").Select(l =>
                 new BioLabel3D($"{prefix}:{l.Id}", code == "GLC" ? "α-glucose: C1 –OH opposite C6" : "β-glucose: C1 –OH beside C6", l.Anchor + shift, Area: l.Area)));
-            marks.AddRange(one.Marks.Select(m => m with { Pos = m.Pos + shift }));
+            marks.AddRange(one.Marks.Select(m => m with { Pos = m.Pos + shift, Atom = m.Atom is { } at ? at + shift : null }));
         }
         return new BiomolScene { Content = c, Marks = marks };
     }

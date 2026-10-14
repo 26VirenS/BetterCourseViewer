@@ -286,7 +286,8 @@ internal sealed class DnaToggle : Grid
 
 /// <summary>
 /// A page laid out in two columns (the drawing and its cards) from 1000 wide, the drawing over the cards below that — for
-/// the pages whose 2D drawing needs more room than the three-column layout's middle (replication).
+/// the pages whose 2D drawing needs more room than the three-column layout's middle (replication). Narrow, the drawing
+/// is as tall as the page shows (480 to 640), like the tall three-column layout's, so its words stay readable.
 /// </summary>
 internal sealed class DnaTwoColumns : Grid
 {
@@ -311,10 +312,12 @@ internal sealed class DnaTwoColumns : Grid
         return base.MeasureOverride(available);
     }
 
+    private static double NarrowHeight(double page) => Math.Max(480, Math.Min(640, page));
+
     private void Lay(Size size)
     {
         var w = size.Width >= 1000;
-        if (!w) main.Height = Math.Max(480, Math.Min(620, size.Height * 0.78));
+        if (!w) main.Height = NarrowHeight(size.Height);
         if (wide == w) return;
         wide = w;
         foreach (var e in new[] { main, side }) ChemKit.Detach(e);
@@ -338,7 +341,7 @@ internal sealed class DnaTwoColumns : Grid
         {
             side.Width = double.NaN;
             side.Margin = new Thickness(0, 18, 0, 24);
-            main.Height = Math.Max(480, Math.Min(620, size.Height * 0.78));
+            main.Height = NarrowHeight(size.Height);
             all.Content = K.V(0, main, side);
             Children.Add(all);
         }

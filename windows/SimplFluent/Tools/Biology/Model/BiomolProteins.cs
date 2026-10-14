@@ -217,11 +217,14 @@ public static class BiomolProteins
                 items.Add(new BioSceneItem($"chain:{c}:ss:{k}", meshes[k], new BioMaterial(ChainHex.GetValueOrDefault(c) ?? "#8e8e93", Roughness: 0.45)));
             if (labels && rs.Count > 0)
             {
-                // (a third of the way along the chain, or the nearest residue to it 12 Å clear of every heme: β₂'s third
-                //  sat on its heme, and its label's leader and the heme's ended on one point)
+                // (a third of the way along the chain, or the nearest residue to it that the first view shows 12 Å clear
+                //  of every heme, on the chain's near side: β₂'s third sat on its heme, and its label's leader and the
+                //  heme's ended on one point. The first view looks down z, so "clear" is measured across x and y.)
                 var third = Math.Min(rs.Count / 3, rs.Count - 1);
-                var mid = Enumerable.Range(0, rs.Count).OrderBy(i => Math.Abs(i - third)).Select(i => rs[i])
-                    .FirstOrDefault(r => hemeCentres.All(h => BioV.Distance(r.Ca, h) >= 12)) ?? rs[third];
+                var nearZ = rs.Average(r => r.Ca.Z);
+                bool Clear(BioData.TraceResidue r) => hemeCentres.All(h => Math.Sqrt((r.Ca.X - h.X) * (r.Ca.X - h.X) + (r.Ca.Y - h.Y) * (r.Ca.Y - h.Y)) >= 12);
+                var order = Enumerable.Range(0, rs.Count).OrderBy(i => Math.Abs(i - third)).Select(i => rs[i]).ToList();
+                var mid = order.FirstOrDefault(r => Clear(r) && r.Ca.Z >= nearZ) ?? order.FirstOrDefault(Clear) ?? rs[third];
                 ls.Add(new BioLabel3D($"chain:{c}", $"{ChainName.GetValueOrDefault(c)} chain ({(c is 'A' or 'C' ? "α" : "β")}, {rs.Count} aa)", mid.Ca, Area: 10));
             }
             if ((c == 'B' || c == 'D') && rs.FirstOrDefault(r => r.I == 6) is { } glu)

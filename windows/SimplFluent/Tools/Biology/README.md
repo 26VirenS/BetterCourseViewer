@@ -169,6 +169,8 @@ P, Phenotype, Dies, Carrier; `Phenotypes` (born); `GenotypicRatio(Text)`, `BornG
   `Uniform() < p₃` draws a generation — so a seed gives the Mac's populations; run by `HWRunner`: an infinite
   population at once, as its settings change (well under a millisecond), finite ones off the UI thread; each run's
   start, end or cancelling in the log, and the Simulate page asks for a run whenever it comes on screen without one.
+  With several populations its genotype bars carry their frequencies in their tooltips and a colour key goes under
+  them (under the last bar they read as every population's).
   `HWFormat.Fixed` writes numbers as printf's `%.Nf` does, rounded half-up as every bio tool rounds (Numbers, below), so
   the working reads as on the Mac. Hand-offs:
   `["given"] = "q2", ["value"] = "0.16"`, `["counts"] = "50,30,20"`.
@@ -236,7 +238,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   `BioWpf.P/V/B` conversions, `BioBillboards.Text(s, size, colour, glow)`, `BioBillboard(model, anchor, lift, id)`
   (drawn in the scene, so the model can hide it), and `BioMark(text, anchor, size, atom, atomRadius)`: a few letters
   in 2D over the whole model, 11–17 px, an atom's number set just outside its atom's disc (DNA & RNA's "5′" and "3′"
-  and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`).
+  and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`; the Biomolecule Builder's ring and sugar
+  carbons' numbers: `BiomolMark(…, OnTop: true)`, which `BiomolStage` hands the view as marks).
 
 ## Step-through (§3.6)
 
@@ -320,7 +323,10 @@ Pages `amino`, `proteins`, `nucleic`, `carbs`, `lipids`. `Model/BiomoleculeBuild
 `biomol.…` checks), `BiomolPeptide.cs` (a typed sequence built as a helix, strand, coil or the rarer shapes, side
 chains turned apart), `BiomolProteins.cs` (ubiquitin's and haemoglobin's four levels, denature and refold),
 `BiomolMolecules.cs` and `BiomolScenes.cs` (nucleotides joined into a strand, sugars and their glycosidic bonds,
-cellulose and starch, fats, phospholipids, cholesterol). Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
+cellulose and starch, fats, phospholipids, cholesterol). A sugar's or a nucleotide's carbons are numbered over the
+whole model, each just outside its atom (in the scene the H or O in front hid them). Haemoglobin's chains are each
+named at the residue nearest a third of the way along that the first view (down z) shows 12 Å clear of every heme, on
+the chain's near side, so no chain's leader ends on a heme. Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
 layer added to the shared 3D view), `BiomolDrawings.cs`, `BiomolAminoPage.cs`, `BiomolProteinPage.cs`,
 `BiomolMoleculePages.cs`. Every page opens its molecule in the Molecule Builder (`MoleculeModel.Shared`, atom ids from
 1,000,000). The built peptide is shown laid out as the Mac lays it out (`BiomoleculeBuilderModel.ShownPeptide`): its CA
@@ -346,7 +352,9 @@ page (`DNAHelixPage.cs` … `DNARnaPage.cs`). Launch, in the Mac's words with th
 `mrna`, `ribosome`), `modified`, `base=34`, `arm=anticodon`. Takes `sequence` (shown on the Sequence page, RNA letters
 written as DNA), `nucleotide` (the Nucleotides page; `molecule` read as the same) and `page` (Cell Division's "What
 happens in S phase" opens
-`replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is).
+`replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is). The
+Replication page (`DnaTwoColumns`) puts the fork beside its cards from 1000 wide; narrower, the fork and its controls
+are as tall as the page shows, 480 to 640, like `BioUI.Work`'s scene, so its words stay readable.
 
 ## Cell Division (`divide`)
 
