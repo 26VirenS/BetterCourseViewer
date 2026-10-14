@@ -23,6 +23,8 @@ struct CalendarView: View {
     /// The span last asked for: an answer for another (a move made since) is not shown.
     @State private var asked = ""
     @State private var modeRead = false
+    /// The screenshot suite's -SimplCalView looked at (each Calendar drawn looks once).
+    @State private var launchViewRead = false
     @State private var choosing = false
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
@@ -84,9 +86,14 @@ struct CalendarView: View {
         .toolbar { toolbarItems }
         .onAppear(perform: seed)
         .task(id: engine.dataVersion) {
-            // (the screenshot suite: -SimplCalView week|list opens on that view, once, in place of the one kept — the kept
-            // one then not read at all, so a read still on its way when the task starts again cannot undo it)
-            let asked = LaunchOpen.take("", key: "SimplCalView").flatMap { Self.modes.contains($0) ? $0 : nil }
+            // (the screenshot suite: -SimplCalView week|list opens on that view, in place of the one kept — the kept one
+            // then not read at all, so a read still on its way when the task starts again cannot undo it; read by each
+            // Calendar drawn, once, as the window's screens are made again while the app's answers come in)
+            var asked: String?
+            if !launchViewRead {
+                launchViewRead = true
+                asked = UserDefaults.standard.string(forKey: "SimplCalView").flatMap { Self.modes.contains($0) ? $0 : nil }
+            }
             if !modeRead {
                 modeRead = true
                 if asked == nil, let v = try? await engine.read("calView", as: OK.self).view, Self.modes.contains(v) { mode = v }
