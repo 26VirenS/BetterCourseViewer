@@ -16,8 +16,11 @@ struct MainShell: View {
     @State private var wasWide: Bool?
     @StateObject private var palette = SearchPalette()
     @ObservedObject private var appearance = AppearanceStore.shared
+    /// (home-28) While the tour is on, the toolbar's buttons rest — dimmed with the window, and not to be pressed past it.
+    @ObservedObject private var tour = MacTour.shared
 
     var body: some View {
+        let touring = tour.step != nil
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
                 .id(appearance.revision) // (1.3.1: a colour worn, the sidebar drawn again in it — never the whole split view)
@@ -44,8 +47,9 @@ struct MainShell: View {
                 .environmentObject(engine)
         }
         // (1.2) the field finds and does: its suggestions are the web search box's — a sum, commands, courses and their
-        // sections, groups — and "/" (or ">") lists every command (Shell/SearchCommands.swift); one picked runs
-        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search \(engine.lmsName) or type /")
+        // sections, groups — and "/" (or ">") lists every command (Shell/SearchCommands.swift); one picked runs.
+        // (home-29) Its prompt short enough to show whole in the field on every school ("Search Brightspa…" was cut).
+        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search or type /")
         .searchSuggestions { PaletteSuggestions(palette: palette) }
         .onSubmit(of: .search) {
             if palette.take(engine.query, engine: engine) { return }
@@ -54,11 +58,11 @@ struct MainShell: View {
         .onChange(of: engine.query) { _, q in
             if palette.take(q, engine: engine) { return }
             palette.update(q, engine: engine)
+            // (home-13) What is typed is answered in the suggestions only — a sum, a command, a course — and the page
+            // stays where it is: everything is searched on Return, or "Search for …" picked. (Emptied on the results,
+            // the field goes back to where it was.)
             let t = q.trimmingCharacters(in: .whitespacesAndNewlines)
-            if SearchPalette.isCommand(t) { return } // (a command typed: its list is in the suggestions, nothing is searched)
-            if t.count >= 2 {
-                engine.search(t)
-            } else if t.isEmpty, case .search = engine.nav.current.place {
+            if t.isEmpty, case .search = engine.nav.current.place {
                 engine.goBack()
             }
         }
@@ -71,14 +75,14 @@ struct MainShell: View {
                     } label: {
                         Label("Back", systemImage: "chevron.left")
                     }
-                    .disabled(!engine.nav.canGoBack)
+                    .disabled(!engine.nav.canGoBack || touring)
                     .help("Back")
                     Button {
                         engine.goForward()
                     } label: {
                         Label("Forward", systemImage: "chevron.right")
                     }
-                    .disabled(!engine.nav.canGoForward)
+                    .disabled(!engine.nav.canGoForward || touring)
                     .help("Forward")
                 }
                 .controlGroupStyle(.navigation)
@@ -91,7 +95,7 @@ struct MainShell: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                         .modifier(Turning(on: engine.refreshing))
                 }
-                .disabled(engine.phase != .native)
+                .disabled(engine.phase != .native || touring)
                 .help("Refresh (⌘R): everything read from \(engine.lmsName) again")
             }
             // (1.2) the tools pinned to the toolbar, on every screen: a press opens the tool's quick version in a popover;
@@ -100,6 +104,7 @@ struct MainShell: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     ForEach(tools.toolbarPins(timerActive: focus.active)) { kind in
                         PinnedToolButton(kind: kind, engine: engine)
+                            .disabled(touring)
                     }
                 }
             }
@@ -404,7 +409,8 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .labelStyle(SidebarThemeLabel()) // (1.3.1) a colour worn: the rows' glyphs and words in it
+        .labelStyle(SidebarThemeLabel()) // (home-16) a colour worn: the row chosen's glyph in it, the words as the Mac's
+        .environment(\.sidebarPlace, engine.nav.current.place)
         .environment(\.sidebarRowSize, .large)
         .animation(Motion.gentle, value: open)
         .animation(Motion.gentle, value: engine.courses)
@@ -444,9 +450,13 @@ struct Sidebar: View {
                 .lineLimit(1)
             Spacer(minLength: 4)
             if engine.coursesLive, let n = c.unread, n > 0 {
+                // (home-14) a count, as the Notifications row's, that says what it counts when the pointer rests on it
+                let said = PreviewFormat.text(c.unreadLabel) ?? "\(n) unread \(n == 1 ? "announcement" : "announcements")"
                 Text("\(n)")
                     .font(.sCaption2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .help(said)
+                    .accessibilityLabel(said)
             }
             Button {
                 withAnimation(Motion.gentle) {
@@ -502,11 +512,13 @@ private struct WindowMenu: ViewModifier {
 }
 
 private extension View {
-    func windowMenu(_ place: Place) -> some View { modifier(WindowMenu(place: place)) }
+    /// A sidebar row's menu and read-ahead, and (home-16) whether it is the row chosen, for its glyph's colour.
+    func windowMenu(_ place: Place) -> some View { modifier(WindowMenu(place: place)).sidebarRow(place) }
 }
 
-/// Who is signed in, at the sidebar's foot, with what was under the avatar on the web: Settings, What's New, the Canvas
-/// profile, and Sign Out.
+/// Who is signed in, at the sidebar's foot — (home-31) their name and the address they sign in with (the school is named
+/// once, at the sidebar's head) — with what was under the avatar on the web: Settings, What's New, the Canvas profile,
+/// Report a Bug and Sign Out.
 struct AccountBar: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var session: AppSession
@@ -521,10 +533,11 @@ struct AccountBar: View {
                     .font(.sCallout.weight(.semibold))
                     .lineLimit(1)
                 if engine.countsLive {
-                    Text(engine.snapshot?.site ?? engine.host)
+                    Text(PreviewFormat.text(me?.email) ?? engine.snapshot?.site ?? engine.host)
                         .font(.sCaption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 } else {
                     // (1.2) the screens are showing what was kept from last time while the live answers come in
                     HStack(spacing: 5) {

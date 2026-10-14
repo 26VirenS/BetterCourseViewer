@@ -85,7 +85,8 @@ struct DashIconButtonStyle: ButtonStyle {
     }
 }
 
-/// A course's score in a ring of its colour, its letter under the number.
+/// A course's score in a ring of its colour, its letter under the number. With no score: "–", and why (No grade yet,
+/// Hidden by instructor) when the pointer rests on it.
 struct DashScoreRing: View {
     let course: DashCourse
     var size: CGFloat = 56
@@ -94,7 +95,7 @@ struct DashScoreRing: View {
         ZStack {
             Ring(value: course.score, color: Color(hex: course.color), lineWidth: 5, key: "dash:\(course.id)")
             VStack(spacing: 0) {
-                Text(course.scoreText ?? "N/A")
+                Text(course.scoreText ?? "–")
                     .font(.system(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundStyle(course.score == nil ? .secondary : .primary)
                     .minimumScaleFactor(0.6)
@@ -108,10 +109,13 @@ struct DashScoreRing: View {
             .padding(7)
         }
         .frame(width: size, height: size)
+        .help(PreviewFormat.text(course.scoreWhy) ?? "")
     }
 }
 
-/// A course's quick links (its first sections, as Canvas's card has them): each opens that section.
+/// A course's quick links (its first sections, as Canvas's card has them): each opens that section. (home-24) Its
+/// symbol with its name where the card has room for every name, else its symbol alone — named when the pointer rests on
+/// it either way.
 struct DashQuickLinks: View {
     let course: DashCourse
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
@@ -120,17 +124,38 @@ struct DashQuickLinks: View {
 
     static func count(_ course: DashCourse) -> Int { min(course.links?.count ?? 0, 4) }
 
+    private var links: [DashLink] { Array((course.links ?? []).prefix(4)) }
+
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Array((course.links ?? []).prefix(4).enumerated()), id: \.offset) { _, link in
-                Button { open(link) } label: {
-                    Image(systemName: Glyph.section(link.kind ?? ""))
-                        .font(.system(size: 13.5, weight: .medium))
-                        .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                ForEach(Array(links.enumerated()), id: \.offset) { _, link in
+                    Button { open(link) } label: {
+                        Label(link.label ?? "", systemImage: Glyph.section(link.kind ?? ""))
+                            .font(.sCaption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .padding(.horizontal, 8)
+                            .frame(height: 26)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .background(Capsule().fill(Color.primary.opacity(0.06)))
+                    .help(link.label ?? "")
                 }
-                .buttonStyle(DashIconButtonStyle())
-                .help(link.label ?? "")
-                .accessibilityLabel(link.label ?? "Open")
+            }
+            HStack(spacing: 2) {
+                ForEach(Array(links.enumerated()), id: \.offset) { _, link in
+                    Button { open(link) } label: {
+                        Image(systemName: Glyph.section(link.kind ?? ""))
+                            .font(.system(size: 13.5, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(DashIconButtonStyle())
+                    .help(link.label ?? "")
+                    .accessibilityLabel(link.label ?? "Open")
+                }
             }
         }
     }
@@ -144,9 +169,9 @@ struct DashQuickLinks: View {
     }
 }
 
-/// A course as a card: its colour (or its picture) with its code and what wants attention (due today, unread
-/// announcements); its name, term and teacher; its score in a ring; how much is handed in; what is due next; its
-/// quick links.
+/// A course as a card: (home-24) a short band of its colour (or its picture) with its name as the sidebar has it and what
+/// wants attention (due today, "2 new" announcements); its term and teacher (its other name over them only where that
+/// says something new); its score in a ring; how much is handed in; what is due next; its quick links.
 struct DashCourseCard: View {
     let course: DashCourse
     let progress: CourseProgress?
@@ -168,7 +193,7 @@ struct DashCourseCard: View {
             .contextMenu { DashCourseMenu(course: course, engine: engine) }
             .readsAhead { engine.readAhead(url: course.url) } // (1.3.78: its home, read ahead)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("\(course.code), \(course.scoreText ?? "")")
+            .accessibilityLabel("\(course.code), \(course.scoreText ?? "–")")
     }
 
     private var face: some View {
@@ -177,9 +202,13 @@ struct DashCourseCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(course.name ?? course.code)
-                            .font(.sBody.weight(.semibold))
-                            .lineLimit(1)
+                        // (home-24) the band says its name; here only what is new: its other name where that says
+                        // something, then its term and teacher
+                        if let alt = PreviewFormat.text(course.altName) {
+                            Text(alt)
+                                .font(.sBody.weight(.semibold))
+                                .lineLimit(1)
+                        }
                         Text(course.sub?.isEmpty == false ? course.sub! : " ")
                             .font(.sCallout)
                             .foregroundStyle(.secondary)
@@ -215,38 +244,51 @@ struct DashCourseCard: View {
                     }
                 }
             }
-            .overlay(alignment: .bottomLeading) {
-                Text(course.code)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+            .overlay {
+                // (home-24) a band of the course's colour about 48 points tall: its name, and on the right what wants
+                // attention
+                HStack(spacing: 10) {
+                    Text(course.code)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+                        .help(course.code)
+                    Spacer(minLength: 4)
+                    badges
+                }
+                .padding(.horizontal, 16)
             }
-            .overlay(alignment: .topTrailing) { badges.padding(12) }
-            .frame(height: 96)
+            .frame(height: 48)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous))
     }
 
     private var badges: some View {
         HStack(spacing: 6) {
             if let n = course.dueToday, n > 0 {
+                // (home-1) in the accent, as the Due today counter: red is for late work only. Ringed in white, so it
+                // reads on a band of the same colour.
                 Text("\(n) due today")
                     .font(.sCaption.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.red, in: Capsule())
+                    .background(Theme.accent, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.7), lineWidth: 1))
+                    .fixedSize()
             }
             if let n = course.unread, n > 0 {
-                Label("\(n)", systemImage: "megaphone.fill")
+                // (home-24) what the number is, on the pill itself: "2 new", named in full when the pointer rests on it
+                let label = PreviewFormat.text(course.unreadLabel) ?? "\(n) unread \(n == 1 ? "announcement" : "announcements")"
+                Label(PreviewFormat.text(course.unreadText) ?? "\(n) new", systemImage: "megaphone.fill")
                     .font(.sCaption.weight(.bold))
                     .foregroundStyle(color)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(.white, in: Capsule())
-                    .help("\(n) unread \(n == 1 ? "announcement" : "announcements")")
+                    .fixedSize()
+                    .help(label)
+                    .accessibilityLabel(label)
             }
         }
     }

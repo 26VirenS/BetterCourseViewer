@@ -58,6 +58,10 @@ struct WorkRow: Codable, Identifiable, Hashable {
     var priShort: String?
     var type: String?
     var series: Int?
+    /// (2.99.33) Today's facts one by one, for the Dashboard's one row design: its kind ("Assignment", "Quiz", "My
+    /// task") and its points ("10 pts", "1 pt", "").
+    var kind: String?
+    var pts: String?
 }
 
 struct Counter: Codable, Identifiable, Hashable {
@@ -66,9 +70,13 @@ struct Counter: Codable, Identifiable, Hashable {
     var value: Int?
     var tone: String?
     var pending: Bool?
-    /// The line under the number ("35 points total", "From 2 courses"): the Mac's Dashboard shows it (Mac 1.2).
+    /// The line under the number ("35 points total", "announcements · 2 courses"): the Mac's Dashboard shows it (Mac 1.2).
     var note: String?
     var id: String { key }
+    /// (2.99.33) The name that says exactly what it counts ("Announcements", "Graded this week") and its line ("3 unread ·
+    /// 2 courses"), for a tile with room for it; `label` and `note` fit any tile.
+    var fullLabel: String?
+    var fullNote: String?
 }
 
 struct TodayList: Codable {
@@ -84,6 +92,8 @@ struct LoadRow: Codable, Identifiable, Hashable {
     var color: String?
     var done: Int
     var total: Int
+    /// (2.99.33) "2 / 9 handed in".
+    var text: String?
 }
 
 struct Today: Codable {
@@ -95,14 +105,18 @@ struct Today: Codable {
     var load: [LoadRow]?
     var idle: Int?
     var hasCourses: Bool?
+    /// (2.99.33) The week's load's caption: "Handed in this week".
+    var loadCaption: String?
 }
 
 struct TodayCounts: Codable {
     var overdue: Int?
     var graded: Int?
-    /// The lines under Overdue's and Graded's numbers (Mac 1.2).
+    /// The lines under Overdue's and Graded's numbers (Mac 1.2): Graded's with its short name ("this week · 19 / 49
+    /// points"), and (2.99.33) with its full name "Graded this week" ("19 / 49 points").
     var overdueNote: String?
     var gradedNote: String?
+    var gradedFullNote: String?
 }
 
 struct SheetRow: Codable, Identifiable, Hashable {
@@ -114,6 +128,14 @@ struct SheetRow: Codable, Identifiable, Hashable {
     var key: String?
     var clearable: Bool?
     var id: String { (key ?? "") + "|" + (url ?? "") + "|" + title }
+    /// (2.99.33) `sub`'s facts one by one, for an app that lays them out in columns: the course (the sidebar's name, ""
+    /// for none), its kind, `detail` beside the course ("10 pts", "Missing · 15 pts", "19 / 19"), `when` on the right
+    /// ("11:59 PM", "Wed 10:30 AM", "Oct 12") and the ISO `date`.
+    var course: String?
+    var kind: String?
+    var detail: String?
+    var when: String?
+    var date: String?
 }
 
 struct SheetSection: Codable, Identifiable, Hashable {
@@ -144,6 +166,11 @@ struct CourseRow: Codable, Identifiable, Hashable {
     /// (Mac 1.2.1, allCourses) In the sidebar — the setup's choice — or not; and its term.
     var chosen: Bool?
     var term: String?
+    /// (2.99.33) The course's other name only when it says something its label does not ("" otherwise), its term and
+    /// first teacher ("Fall 2026 · Yue Lei"), and its unread count in words ("2 unread announcements").
+    var altName: String?
+    var detail: String?
+    var unreadLabel: String?
 }
 
 struct CoursesData: Codable {
@@ -217,6 +244,9 @@ struct GradeRow: Codable, Identifiable, Hashable {
     /// (Mac 1.2.17) The course's grading scale (its instructor's, where the student entered it), and whether it is theirs.
     var scale: [ScaleStep]?
     var ownScale: Bool?
+    /// (2.99.33) The course's other name only when it says something new (""), and "7 of 18 graded · 1 not posted yet".
+    var altName: String?
+    var gradedText: String?
 }
 
 struct ScaleStep: Codable, Hashable {
@@ -253,6 +283,8 @@ struct GradesData: Codable {
     var trend: [TrendPoint]?
     var minY: Double?
     var maxY: Double?
+    /// (2.99.33) The GPA as it is shown: "3.43" (half up), "–" with none.
+    var gpaText: String?
 }
 
 struct CalEvent: Codable, Identifiable, Hashable {
@@ -350,6 +382,8 @@ struct Release: Codable, Identifiable, Hashable {
     var date: String?
     var notes: [ReleaseNote]
     var id: String { version }
+    /// (2.99.33) The day as every date is written: "Oct 12" (the year only when it is not this one).
+    var dateText: String?
 }
 
 struct WhatsNewData: Codable {

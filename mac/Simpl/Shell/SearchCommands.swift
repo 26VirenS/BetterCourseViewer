@@ -139,11 +139,15 @@ final class SearchPalette: ObservableObject {
         return true
     }
 
-    /// Return in the field: a command's first suggestion runs (as the web box chooses its first row as you type); words
-    /// are searched.
+    /// Return in the field: a command's first suggestion runs (as the web box chooses its first row as you type); (home-13)
+    /// a sum's answer is copied, as its row offers — never a search with no results for it; words are searched.
     func submit(_ text: String, engine: Engine) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
+        if let a = QuickSum.answer(t) {
+            Self.perform(.copy(a.value), engine: engine, fromField: false)
+            return
+        }
         if Self.isCommand(t) {
             for s in sections {
                 if let first = s.items.first(where: { $0.action != .nothing }) {
@@ -480,15 +484,26 @@ final class SearchPalette: ObservableObject {
         return found.filter { $0.code.lowercased().hasPrefix(s) } + found.filter { !$0.code.lowercased().hasPrefix(s) }
     }
 
-    /// Your courses for the words — or, when none has them all, a course and one of its sections ("bio files").
+    /// Your courses for the words — or, when none has them all, a course and one of its sections ("bio files"). (home-32)
+    /// Each by the sidebar's name for it, its second line something new: its other name only where that says what the
+    /// first does not, else its term and teacher.
     static func courseItems(_ q: String, _ engine: Engine, limit: Int) -> [PaletteItem] {
         let found = courses(q, engine)
         if !found.isEmpty {
             return found.prefix(limit).map { c in
-                PaletteItem(id: "c.\(c.id)", title: c.code, sub: c.name == c.code ? nil : c.name, symbol: "book.closed.fill", color: c.color, trailing: (c.unread ?? 0) > 0 ? "\(c.unread ?? 0) new" : nil, action: .go(.home("courses/\(c.id)")))
+                PaletteItem(id: "c.\(c.id)", title: c.code, sub: secondLine(c), symbol: "book.closed.fill", color: c.color, trailing: (c.unread ?? 0) > 0 ? "\(c.unread ?? 0) new" : nil, action: .go(.home("courses/\(c.id)")))
             }
         }
         return sectionItems(q, engine, limit: limit)
+    }
+
+    /// (home-32) A course's second line: its other name where it says something new (the engine's `altName`), else its
+    /// term and teacher (`detail`); from a page before them, its name where it differs from the sidebar's.
+    static func secondLine(_ c: CourseRow) -> String? {
+        if c.altName != nil || c.detail != nil {
+            return PreviewFormat.text(c.altName) ?? PreviewFormat.text(c.detail)
+        }
+        return c.name == c.code ? nil : c.name
     }
 
     private static func sectionItems(_ q: String, _ engine: Engine, limit: Int) -> [PaletteItem] {
@@ -500,7 +515,7 @@ final class SearchPalette: ObservableObject {
             let ctx = "courses/\(c.id)"
             for s in engine.sections[ctx] ?? Sidebar.defaultSections {
                 guard s.kind != "home", s.kind.lowercased().hasPrefix(last) || s.label.lowercased().hasPrefix(last) else { continue }
-                out.append(PaletteItem(id: "s.\(ctx).\(s.kind)", title: "\(s.label) — \(c.code)", sub: c.name, symbol: Glyph.section(s.kind), color: c.color, action: .go(.section(ctx, s.kind))))
+                out.append(PaletteItem(id: "s.\(ctx).\(s.kind)", title: "\(s.label) — \(c.code)", sub: secondLine(c), symbol: Glyph.section(s.kind), color: c.color, action: .go(.section(ctx, s.kind))))
             }
         }
         return Array(out.prefix(limit))
@@ -515,27 +530,40 @@ final class SearchPalette: ObservableObject {
     }
 
     /// /grades: the overview (with the GPA once read) and each course's grade — the sidebar's scores at once, the
-    /// Grades screen's own (with the letter) once they are in.
+    /// Grades screen's own (with the letter) once they are in. (home-32) The GPA once, on the right, as the engine writes
+    /// it; each course by the sidebar's name, its line saying something new: how much of it is graded.
     private func gradeItems(_ q: String, _ engine: Engine) -> [PaletteItem] {
         var items: [PaletteItem] = []
         let data = gradesCache?.data
         if q.isEmpty {
-            let gpa = data?.gpa.map { String(format: "%.2f", $0) }
-            items.append(PaletteItem(id: "grades.all", title: "Grades Overview", sub: gpa.map { "GPA \($0) · every course" } ?? "Every course, and your GPA", symbol: "chart.bar.xaxis", trailing: gpa, action: .go(.grades)))
+            let gpa = data.flatMap(Self.gpaShown)
+            items.append(PaletteItem(id: "grades.all", title: "Grades Overview", sub: gpa == nil ? "Every course" : "Every course, and your GPA", symbol: "chart.bar.xaxis", trailing: gpa.map { "GPA \($0)" }, action: .go(.grades)))
         }
         if let data {
             for r in data.rows {
                 guard q.isEmpty || r.code.lowercased().contains(q) || (r.name ?? "").lowercased().contains(q) else { continue }
                 let score = [r.pctText, r.letter ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
-                items.append(PaletteItem(id: "grade.\(r.id)", title: r.code, sub: "Grades in \(r.name ?? r.code)", symbol: "chart.bar.fill", color: r.color, trailing: score, action: .go(.section("courses/\(r.id)", "grades"))))
+                let line = (PreviewFormat.text(r.gradedText) ?? PreviewFormat.text(r.altName)).map { "Grades · \($0)" } ?? "Grades"
+                items.append(PaletteItem(id: "grade.\(r.id)", title: r.code, sub: line, symbol: "chart.bar.fill", color: r.color, trailing: score, action: .go(.section("courses/\(r.id)", "grades"))))
             }
         } else {
             for c in Self.courses(q, engine) {
-                items.append(PaletteItem(id: "grade.\(c.id)", title: c.code, sub: "Grades in \(c.name ?? c.code)", symbol: "chart.bar.fill", color: c.color, trailing: c.scoreText, action: .go(.section("courses/\(c.id)", "grades"))))
+                let line = PreviewFormat.text(c.altName).map { "Grades · \($0)" } ?? "Grades"
+                items.append(PaletteItem(id: "grade.\(c.id)", title: c.code, sub: line, symbol: "chart.bar.fill", color: c.color, trailing: c.scoreText, action: .go(.section("courses/\(c.id)", "grades"))))
             }
         }
         if items.isEmpty { items.append(Self.hint("No course by that name", "chart.bar")) }
         return items
+    }
+
+    /// (home-32) The GPA as the engine writes it ("3.43", half up; none for "–"); from a page before `gpaText`, the raw
+    /// GPA half up on its decimal value, as the engine would write it.
+    private static func gpaShown(_ d: GradesData) -> String? {
+        if let t = d.gpaText { return t.isEmpty || t == "–" ? nil : t }
+        guard let g = d.gpa, g.isFinite else { return nil }
+        let half = NSDecimalNumberHandler(roundingMode: .plain, scale: 2, raiseOnExactness: false, raiseOnOverflow: false,
+                                          raiseOnUnderflow: false, raiseOnDivideByZero: false)
+        return String(format: "%.2f", NSDecimalNumber(string: "\(g)").rounding(accordingToBehavior: half).doubleValue)
     }
 
     // MARK: - What is asked for

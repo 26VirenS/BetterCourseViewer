@@ -358,7 +358,8 @@ private struct AppearancePane: View {
             } header: {
                 Text("Colour")
             } footer: {
-                Text("The sidebar, the cards' glyphs, the titles and every control take it, each shade stepped until it reads.")
+                // (home-16: words and titles keep their own colours)
+                Text("Every control and link takes it, with the cards' glyphs and the sidebar's chosen row, each shade stepped until it reads.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
