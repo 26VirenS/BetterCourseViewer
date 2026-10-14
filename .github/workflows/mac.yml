@@ -51,10 +51,11 @@ concurrency:
   cancel-in-progress: true # (a newer push cancels the run before it: only the newest is worth waiting for)
 
 jobs:
-  # (the models that need no window, checked on their own beside the build — the elements' data, VSEPR's shapes and
-  #  the biology toolkit's models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a
-  #  tool's builder adds files there without touching this): scripts/dev/swift-checks/main.swift compiled with the files
-  #  it checks and run, in about a minute)
+  # (the models that need no window, checked on their own beside the build — the elements' data, VSEPR's shapes, the
+  #  biology toolkit's models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's
+  #  builder adds files there without touching this) and (1.3.80) the chemistry tools' (every file in
+  #  mac/Simpl/Tools/Chemistry/Model): scripts/dev/swift-checks/main.swift compiled with the files it checks and run, in
+  #  about a minute)
   models:
     name: Models
     runs-on: macos-26
@@ -68,7 +69,8 @@ jobs:
       - name: The models' checks
         run: |
           swiftc -O -o "$RUNNER_TEMP/model-checks" mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
-            mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift scripts/dev/swift-checks/main.swift
+            mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
+            scripts/dev/swift-checks/main.swift
           "$RUNNER_TEMP/model-checks"
 
   mac:

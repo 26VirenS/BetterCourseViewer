@@ -1,10 +1,11 @@
 import AppKit
 import SwiftUI
 
-// (1.3.54) The Lewis structure builder, in the full Periodic Table. A molecule is a graph — atoms (an element and where it
-// is drawn), bonds (two atoms and an order) and a total charge — made either quickly (a central atom, the atoms round it
-// and a charge) or drawn freely (atoms placed, bonded by dragging, bonds' orders cycled by a click, atoms and bonds
-// erased): chains, branches, rings and two-atom molecules alike, of any main-group element.
+// (1.3.54) The Lewis structure builder — (1.3.80) Lewis Structures, a chemistry tool of its own where it was a page of
+// the Periodic Table's, keeping the molecule it was left with (ChemLewisDraft). A molecule is a graph — atoms (an
+// element and where it is drawn), bonds (two atoms and an order) and a total charge — made either quickly (a central
+// atom, the atoms round it and a charge) or drawn freely (atoms placed, bonded by dragging, bonds' orders cycled by a
+// click, atoms and bonds erased): chains, branches, rings and two-atom molecules alike, of any main-group element.
 //
 // For any graph its electrons are placed (LewisSolver): the total is the valence electrons less the charge; every
 // assignment of bond orders the atoms allow is tried, outer atoms filled first and the rest on inner atoms (expanded to
@@ -670,7 +671,6 @@ struct LewisMaker: View {
     @State private var counts: [String: Int] = ["H": 2]
     @State private var charge = 0
     @State private var preset: String? = "H₂O"
-    @ObservedObject private var tour = PTTour.shared
     @State private var memo = LewisMemo()
 
     private static let outers = ["H", "O", "N", "C", "F", "Cl", "Br", "I", "S"]
@@ -687,16 +687,16 @@ struct LewisMaker: View {
             facts(r)
         }
         .onAppear {
-            if graph.atoms.isEmpty { buildQuick() }
+            // (1.3.80) the molecule it was left with, else water
+            if graph.atoms.isEmpty && !restore() { buildQuick() }
             // (the screenshot suite: -SimplLewisPreset "NO₃⁻")
             if let p = UserDefaults.standard.string(forKey: "SimplLewisPreset") { load(p) }
-            // (the tour's preset, when it opens the builder at a step)
-            if let p = tour.lewisPreset { load(p) }
-        }
-        .onChange(of: tour.lewisNonce) { _, _ in
-            if let p = tour.lewisPreset { load(p) }
         }
         .onChange(of: graph) { _, _ in shown = 0 }
+        // (1.3.80) kept as it changes — its atoms, bonds or charge, how it is made, the ranking — and as the tool goes
+        // (where its atoms were last dragged to)
+        .onChange(of: "\(graph.topologyKey)|\(way.rawValue)|\(mode.rawValue)") { _, _ in save() }
+        .onDisappear(perform: save)
     }
 
     // MARK: Controls
@@ -740,16 +740,12 @@ struct LewisMaker: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .tourTarget("lewisWay")
-        .onChange(of: way) { _, w in if w == .draw { PTTour.shared.did(.draw) } }
     }
 
     private var presetMenu: some View {
         PresetMenu(sections: LewisPresets.sections, selected: preset) { name in
             load(name)
-            PTTour.shared.did(.preset)
         }
-        .tourTarget("lewisPreset")
     }
 
     private var quickControls: some View {
@@ -758,9 +754,7 @@ struct LewisMaker: View {
             LElementPicker(selected: central) { s in
                 central = s
                 buildQuick()
-                PTTour.shared.did(.preset)
             }
-            .tourTarget("lewisCentre")
             heading("Surrounding atoms")
             // (1.3.58) two columns of small cards: the element (a dot of its colour, the symbol in the text colour so a
             // dark one stays readable) and its count
@@ -920,6 +914,39 @@ struct LewisMaker: View {
         }
     }
 
+    // MARK: Kept (1.3.80)
+
+    /// The molecule as it is, kept for the next opening (ChemPrefs `lewis.draft`, in ChemLewisDraft's lines): how it was
+    /// made, the quick way's choices, the ranking, and each atom where it is drawn.
+    private func save() {
+        guard !graph.atoms.isEmpty else { return }
+        let draft = ChemLewisDraft(way: way.rawValue, mode: mode.rawValue, central: central, counts: counts, charge: graph.charge,
+                                   preset: preset, manual: graph.manual,
+                                   atoms: graph.atoms.map { ChemLewisDraft.Atom(id: $0.id, symbol: $0.symbol, x: Double($0.pos.x), y: Double($0.pos.y)) },
+                                   bonds: graph.bonds.map { ChemLewisDraft.Bond(id: $0.id, a: $0.a, b: $0.b, order: $0.order) })
+        ChemPrefs.set(.lewis, "draft", draft.text)
+    }
+
+    /// The molecule it was left with, if one was kept and reads whole (else the builder starts as it always did): true
+    /// when it is back.
+    private func restore() -> Bool {
+        guard let text = ChemPrefs.string(.lewis, "draft"), let d = ChemLewisDraft(text: text) else { return false }
+        var g = LGraph(charge: d.charge)
+        g.atoms = d.atoms.map { LAtom(id: $0.id, symbol: $0.symbol, pos: CGPoint(x: $0.x, y: $0.y)) }
+        g.bonds = d.bonds.map { LBond(id: $0.id, a: $0.a, b: $0.b, order: $0.order) }
+        g.manual = d.manual
+        g.nextID = d.nextID
+        way = Way(rawValue: d.way) ?? .quick
+        mode = LewisSolver.Mode(rawValue: d.mode) ?? .formal
+        central = d.central
+        counts = d.counts
+        charge = d.charge
+        preset = d.preset
+        graph = g
+        selected = nil
+        return true
+    }
+
     // MARK: The drawing
 
     private func drawing(_ r: LResult, narrow: Bool) -> some View {
@@ -981,7 +1008,6 @@ struct LewisMaker: View {
             .padding(12)
         }
         .card(radius: 20)
-        .tourTarget("lewisCanvas")
     }
 
     /// The resonance structures side by side, ↔ between them; a press shows one large.
@@ -992,7 +1018,6 @@ struct LewisMaker: View {
                     if k > 0 { Text("↔").font(.system(size: 18, weight: .semibold)).foregroundStyle(.secondary) }
                     Button {
                         withAnimation(Motion.snappy) { shown = k }
-                        PTTour.shared.did(.resonance)
                     } label: {
                         VStack(spacing: 2) {
                             LewisStructureCanvas(graph: graph, structure: r.structures[k], result: r, scale: 0.42, selected: nil, preview: nil)
@@ -1010,7 +1035,6 @@ struct LewisMaker: View {
             .padding(.horizontal, 14)
         }
         .frame(height: 118)
-        .tourTarget("lewisResonance")
     }
 
     // MARK: Facts
@@ -1042,13 +1066,15 @@ struct LewisMaker: View {
                 atomTable(s)
                 averages(r)
             }
+            // (1.3.80) the 3D builder is the Molecule Builder, a tool of its own: the molecule handed to it, in this popup
             Button {
                 if let s { openIn3D(graph, s) }
             } label: {
-                Label("Open in 3D builder", systemImage: "rotate.3d").frame(maxWidth: .infinity)
+                Label("Open in Molecule Builder", systemImage: ToolKind.molecule.symbol).frame(maxWidth: .infinity)
             }
             .glassButton(prominent: true)
             .controlSize(.large)
+            .help("See it in 3D, shaped by VSEPR, in the Molecule Builder")
             .disabled(s == nil || !r.drawable || graph.atoms.count < 2)
         }
     }

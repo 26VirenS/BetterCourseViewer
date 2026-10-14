@@ -2,13 +2,14 @@ import AppKit
 import SceneKit
 import SwiftUI
 
-// (1.3.51) The 3D molecule builder, in the full Periodic Table: atoms added to the one selected with a single, double or
-// triple bond, hydrogens filled in, presets, and a molecule from the Lewis maker — shaped as VSEPR has it: (1.3.74) each
-// atom's bonds and lone pairs set out in the directions their number gives (MoleculeShape.swift), so water bends,
-// ammonia forms a pyramid, methane a tetrahedron and carbon dioxide a line. Turned and zoomed by dragging and
-// scrolling; an atom selected by a click. Shown as ball and stick, space filling or sticks, with its lone pairs and
-// labels if asked, and turning by itself if asked; beside it, its formula, molar mass, counts, a valence check, its
-// polarity, and the selected atom's bonds, shape and bond angles as the model has them.
+// (1.3.51) The 3D molecule builder — (1.3.80) the Molecule Builder, a chemistry tool of its own where it was a page of
+// the Periodic Table's (ChemTools.swift's MoleculeBuilderTool opens it and keeps the molecule it was left with): atoms
+// added to the one selected with a single, double or triple bond, hydrogens filled in, presets, and a molecule from the
+// Lewis maker — shaped as VSEPR has it: (1.3.74) each atom's bonds and lone pairs set out in the directions their number
+// gives (MoleculeShape.swift), so water bends, ammonia forms a pyramid, methane a tetrahedron and carbon dioxide a line.
+// Turned and zoomed by dragging and scrolling; an atom selected by a click. Shown as ball and stick, space filling or
+// sticks, with its lone pairs and labels if asked, and turning by itself if asked; beside it, its formula, molar mass,
+// counts, a valence check, its polarity, and the selected atom's bonds, shape and bond angles as the model has them.
 
 struct MBAtom: Identifiable, Equatable {
     let id: Int
@@ -60,8 +61,9 @@ final class MoleculeModel: ObservableObject {
     @Published var style: Style = .ballStick
     @Published var showLonePairs = true
     @Published var showLabels = true
-    /// (1.3.58) On from the start: the model turns slowly until it is switched off.
-    @Published var autoRotate = true
+    /// (1.3.58) On from the start: the model turns slowly until it is switched off — (1.3.80) unless the Mac is set to
+    /// reduce motion, when it starts still (Turn starts it).
+    @Published var autoRotate = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     @Published var message: String?
     @Published private(set) var title = ""
     /// Raised when the model is new (a preset, the Lewis maker's): the view frames it afresh.
@@ -276,6 +278,45 @@ final class MoleculeModel: ObservableObject {
         return true
     }
 
+    // MARK: Kept (1.3.80)
+
+    /// The molecule as text to keep (ChemMoleculeDraft): its title, whether its shape is the one it came with, each atom
+    /// where it is with the lone electrons the Lewis maker gave it, and its bonds by the atoms' places.
+    var savedText: String {
+        let place = Dictionary(uniqueKeysWithValues: atoms.enumerated().map { ($0.element.id, $0.offset) })
+        let draft = ChemMoleculeDraft(title: title, fixed: fixedShape,
+                                      atoms: atoms.map { ChemMoleculeDraft.Atom(symbol: $0.symbol, x: $0.pos.x, y: $0.pos.y, z: $0.pos.z, lone: $0.lone) },
+                                      bonds: bonds.compactMap { b -> ChemMoleculeDraft.Bond? in
+                                          guard let i = place[b.a], let j = place[b.b] else { return nil }
+                                          return ChemMoleculeDraft.Bond(a: i, b: j, order: b.order)
+                                      })
+        return draft.text
+    }
+
+    /// The molecule kept (`savedText`) back as it was left, laid out again as it always is (a fixed shape left as it is);
+    /// false when there is none to read, and nothing changes.
+    @discardableResult
+    func restore(_ text: String) -> Bool {
+        guard let d = ChemMoleculeDraft(text: text) else { return false }
+        clear()
+        title = d.title
+        var ids: [Int] = []
+        for a in d.atoms {
+            atoms.append(MBAtom(id: nextID, symbol: a.symbol, pos: SIMD3(a.x, a.y, a.z), lone: a.lone))
+            ids.append(nextID)
+            nextID += 1
+        }
+        for b in d.bonds {
+            bonds.append(MBBond(id: nextID, a: ids[b.a], b: ids[b.b], order: b.order))
+            nextID += 1
+        }
+        fixedShape = d.fixed
+        selected = atoms.first?.id
+        relax()
+        framing += 1
+        return true
+    }
+
     // MARK: Presets and the Lewis maker
 
     func loadPreset(_ name: String) {
@@ -448,7 +489,6 @@ struct MoleculeBuilder: View {
                 .padding(12)
         }
         .card(radius: 20)
-        .tourTarget("molViewer")
     }
 
     private func heading(_ t: String) -> some View {
@@ -619,7 +659,6 @@ struct MoleculeSceneView: NSViewRepresentable {
 
         /// The model handled: its turning paused, taken up again three seconds after the last touch.
         func handled() {
-            PTTour.shared.did(.turned)
             guard let spin = view?.scene?.rootNode.childNode(withName: "spin", recursively: false) else { return }
             spin.isPaused = true
             resume?.cancel()

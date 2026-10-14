@@ -124,13 +124,14 @@ struct BiomolLookControls: View {
                 Button {
                     guard let h = handOff() else { return }
                     let text = BiomolHandOff.text(h.model, title: h.title, hydrogens: noHydrogens == nil && s.hydrogens(page, atoms: atoms))
-                    BioTools.open(.ptable, info: ["molecule": text])
+                    // (1.3.80: the Molecule Builder is a chemistry tool of its own, no longer a page of the Periodic Table's)
+                    BioTools.open(.molecule, info: ["molecule": text])
                 } label: {
-                    Label("Open in Molecule Builder", systemImage: "atom").frame(maxWidth: .infinity)
+                    Label("Open in Molecule Builder", systemImage: ToolKind.molecule.symbol).frame(maxWidth: .infinity)
                 }
                 .glassButton()
                 .controlSize(.large)
-                .help("See its formula, molar mass, polarity and bond angles in the Periodic Table's molecule builder (its shape kept as it is)")
+                .help("See its formula, molar mass, polarity and bond angles in the Molecule Builder (its shape kept as it is)")
             }
         }
         .font(.sCallout)

@@ -404,8 +404,8 @@ and `page`; the last step's "Open in Biomolecule Builder" hands over the protein
 `BiomolNucleicPage`, `BiomolCarbPage`, `BiomolLipidPage`. Model: `BiomoleculeBuilderModel.swift` (input, easing,
 `biomolChecks`), `BiomolPeptide.swift` (§6.4: NeRF backbone, side chains, clash relief, proline's rule),
 `BiomolProteins.swift` (ubiquitin 1UBQ, haemoglobin 2HHB), `BiomolMolecules.swift`, `BiomolScenes.swift`.
-"Open in Molecule Builder" hands the atoms to the Periodic Table's builder, which keeps their shape
-(`MoleculeModel.load(handOff:)`, `fixedShape`).
+"Open in Molecule Builder" hands the atoms to the Molecule Builder (1.3.80: a chemistry tool of its own, `molecule`,
+no longer a page of the Periodic Table's), which keeps their shape (`MoleculeModel.load(handOff:)`, `fixedShape`).
 
 Launch states (the page first): any page `style=ball|space|sticks`, `colour=element|part|class`, `neutral`,
 `nolabels`, `h=on|off`, `select=<id>`; `amino:aa=W[:dform]`; `proteins[:build][:level=primary|secondary|tertiary|

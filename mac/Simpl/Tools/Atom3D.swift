@@ -2,13 +2,14 @@ import AppKit
 import SceneKit
 import SwiftUI
 
-// (1.3.51) An element in 3D, for its page in the Periodic Table: its atom (the nucleus's protons and neutrons, each shell
-// a ring with its electrons going round) or the shapes of a subshell's orbitals, each with its electrons — turned and
-// zoomed by dragging and scrolling (SceneKit's own camera control).
+// (1.3.51) An element in 3D — on its page in the Periodic Table, and since 1.3.80 in Atoms & Orbitals, a tool of its own
+// (Chemistry/AtomsOrbitals.swift): its atom (the nucleus's protons and neutrons, each shell a ring with its
+// electrons going round) or the shapes of a subshell's orbitals, each with its electrons — turned and zoomed by dragging
+// and scrolling (SceneKit's own camera control); (1.3.80) still, not going round, when the Mac is set to reduce motion.
 // (1.3.76) Or its electron cloud: every electron as dots where it could be found, densest where it most likely is, and no
 // paths (ElectronCloud.swift).
 
-/// (1.3.76) The element page's three views of the atom.
+/// (1.3.76) The three views of the atom (1.3.80: Atoms & Orbitals').
 enum PTModel: String { case atom, orbitals, cloud }
 
 struct Atom3DView: NSViewRepresentable {
@@ -140,7 +141,9 @@ enum AtomScene {
             node.position = SCNVector3(CGFloat(r * ring * cos(phi)), CGFloat(r * y), CGFloat(r * ring * sin(phi)))
             nucleus.addChildNode(node)
         }
-        nucleus.runAction(.repeatForever(.rotateBy(x: 0.2, y: .pi * 2, z: 0, duration: 24)))
+        // (1.3.80) nothing going round when the Mac is set to reduce motion
+        let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if !still { nucleus.runAction(.repeatForever(.rotateBy(x: 0.2, y: .pi * 2, z: 0, duration: 24))) }
         root.addChildNode(nucleus)
 
         let electron = SCNSphere(radius: 0.055)
@@ -160,7 +163,7 @@ enum AtomScene {
                 node.position = SCNVector3(CGFloat(r * cos(a)), 0, CGFloat(r * sin(a)))
                 spin.addChildNode(node)
             }
-            spin.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 3 + Double(i) * 1.6)))
+            if !still { spin.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 3 + Double(i) * 1.6))) }
             tilt.addChildNode(spin)
             root.addChildNode(tilt)
         }
@@ -262,7 +265,9 @@ enum AtomScene {
             }
             root.addChildNode(holder)
         }
-        root.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 40)))
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            root.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 40)))
+        }
         return scene
     }
 

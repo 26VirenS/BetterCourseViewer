@@ -884,7 +884,7 @@ enum BiomolScenes {
 
 /// A molecule handed to the chemistry builder (§4.4 shared controls: "Open in Molecule Builder", its VSEPR relax not run
 /// on it): its title, then a line an atom ("atom C x y z") and a line a bond ("bond i j order"), atoms numbered from 0 —
-/// the text the Periodic Table tool's builder reads (MoleculeModel.load(handOff:)).
+/// the text the Molecule Builder reads (MoleculeModel.load(handOff:); 1.3.80: a chemistry tool of its own).
 enum BiomolHandOff {
     static func text(_ m: BioMoleculeModel, title: String, hydrogens: Bool = true) -> String {
         var lines = ["title \(title)"]

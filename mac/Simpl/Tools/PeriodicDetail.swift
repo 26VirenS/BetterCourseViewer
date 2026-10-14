@@ -1,41 +1,24 @@
 import AppKit
 import SwiftUI
 
-/// (1.3.51) An element's own page, grown out of its square in the table: its tile, name and kinds; its atom in 3D (or
-/// its orbitals' shapes, or — 1.3.76 — its electron cloud) to turn; its facts; how it compares with every element; its
-/// successive ionization energies; its electrons, shell by shell and orbital by orbital; where it sits in the table; its
-/// neighbours; and its story. ← and → step through the elements; (tools-29) the tool's heading has the one Back, "‹ Table"
-/// (⌘[), that returns to the table.
+/// (1.3.51) An element's own page, grown out of its square in the table: its tile, name and kinds; (1.3.80) its shells
+/// drawn flat, with the way to its atom, orbitals and electron cloud in 3D — Atoms & Orbitals, a tool of its own, where
+/// the 3D view on this page was; its facts; how it compares with every element; its successive ionization energies;
+/// its electrons, shell by shell and orbital by orbital; where it sits in the table; its neighbours; and its story. ←
+/// and → step through the elements; (tools-29) the tool's heading has the one Back, "‹ Table" (⌘[), that returns to the
+/// table.
 struct PTElementPage: View {
     let element: PTElement
     let close: () -> Void
     let go: (Int) -> Void
-    /// (1.3.76) Atom, Orbitals or Cloud: kept from element to element, as the Orbitals view was.
-    @State private var model: PTModel = PTElementPage.shotModel
-    @State private var subshellID: String? = PTElementPage.shotModel == .cloud ? nil : PTElementPage.shotSubshell
-    /// (1.3.76) The Cloud view's chosen subshell ("3d"); nil, the whole atom. Its own, apart from the Orbitals' subshell,
-    /// and back to the whole atom on every element.
-    @State private var cloudFocus: String? = PTElementPage.shotModel == .cloud && PTElementPage.shotSubshell != "all" ? PTElementPage.shotSubshell : nil
-
-    /// (1.3.76) The screenshot suite's -SimplPTModel cloud (the view: atom, orbitals or cloud) and -SimplPTSubshell 3d
-    /// (the Cloud's chosen subshell, all for the whole atom; in another view, the Orbitals'): read whenever the page is
-    /// made, as the table's other -SimplPT* settings are — a page made again before the picture keeps them.
-    private static var shotModel: PTModel { PTModel(rawValue: UserDefaults.standard.string(forKey: "SimplPTModel") ?? "") ?? .atom }
-    private static var shotSubshell: String? { UserDefaults.standard.string(forKey: "SimplPTSubshell") }
-    @Environment(\.colorScheme) private var scheme
     @FocusState private var focused: Bool
     /// The page's width inside its margins, which picks the layout.
     @State private var width: CGFloat = 0
+    /// (the screenshot suite's -SimplPTHandOff atoms: Open in Atoms & Orbitals pressed once, the first time a page is up)
+    @MainActor private static var handedOff = false
 
     private var e: PTElement { element }
     private var valenceSubs: [PTSubshell] { PTConfig.valence(of: e) }
-    private var allSubs: [PTSubshell] { PTConfig.subshells(of: e) }
-    /// The subshell whose orbitals are shown: the one picked, else the outer one being filled (3d for cobalt, not 4s).
-    private var subshell: PTSubshell? {
-        if let picked = allSubs.first(where: { $0.id == subshellID }) { return picked }
-        let top = valenceSubs.map(\.l).max() ?? 0
-        return valenceSubs.last { $0.l == top } ?? allSubs.last
-    }
 
     var body: some View {
         ScrollView {
@@ -64,15 +47,17 @@ struct PTElementPage: View {
         .onKeyPress(.rightArrow) { step(1); return .handled }
         .onAppear {
             focused = true
-            // (1.3.76) the screenshot suite's -SimplCloudCheck YES: the cloud model's test vectors on the console
-            if UserDefaults.standard.bool(forKey: "SimplCloudCheck") { ElectronCloud.selfCheck() }
+            // (the screenshot suite: -SimplPTHandOff atoms, Atoms & Orbitals as a student comes to it from an element's
+            // facts — the button pressed a moment after the page is up, the picture held until then)
+            if !Self.handedOff, UserDefaults.standard.string(forKey: "SimplPTHandOff") == "atoms" {
+                Self.handedOff = true
+                Shot.began()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    openAtom()
+                    Shot.ended()
+                }
+            }
         }
-        .onChange(of: e.number) { _, _ in
-            subshellID = nil
-            cloudFocus = nil
-        }
-        // (the tour's Orbitals step is done by Orbitals alone, not by Cloud)
-        .onChange(of: model) { _, m in if m == .orbitals { PTTour.shared.did(.orbitals) } }
     }
 
     /// (1.3.56) By the page's width (measured, as text that wraps would make a fitting test think nothing fits): wide,
@@ -84,7 +69,7 @@ struct PTElementPage: View {
             HStack(alignment: .top, spacing: 18) {
                 // (each card its own height: the cards stretch only to match each other side by side)
                 VStack(spacing: 18) {
-                    modelCard.fixedSize(horizontal: false, vertical: true)
+                    atomCard.fixedSize(horizontal: false, vertical: true)
                     configCard.fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(width: 430)
@@ -93,7 +78,7 @@ struct PTElementPage: View {
         } else if width >= 620 {
             VStack(spacing: 18) {
                 HStack(alignment: .top, spacing: 18) {
-                    modelCard.frame(maxWidth: .infinity)
+                    atomCard.frame(maxWidth: .infinity)
                     configCard.frame(maxWidth: .infinity)
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -101,7 +86,7 @@ struct PTElementPage: View {
             }
         } else {
             VStack(spacing: 18) {
-                modelCard.fixedSize(horizontal: false, vertical: true)
+                atomCard.fixedSize(horizontal: false, vertical: true)
                 configCard.fixedSize(horizontal: false, vertical: true)
                 right
             }
@@ -175,205 +160,50 @@ struct PTElementPage: View {
         .background(Color.primary.opacity(0.07), in: Capsule())
     }
 
-    // MARK: The model
+    // MARK: The atom (1.3.80)
 
-    private var modelCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Picker("", selection: $model.animation(Motion.gentle)) {
-                    Text("Atom").tag(PTModel.atom)
-                    Text("Orbitals").tag(PTModel.orbitals)
-                    Text("Cloud").tag(PTModel.cloud)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 220)
-                Spacer()
-            }
-            Atom3DView(element: e, model: model, subshell: subshell, focus: cloudFocus, dark: scheme == .dark)
-                .frame(height: 330)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                // (tools-14) how to move it, on one line at the view's foot, as the molecule builder has it — no longer
-                // squeezed into three lines beside Atom, Orbitals and Cloud
-                .overlay(alignment: .bottom) {
-                    Text("Drag to turn · scroll to zoom")
+    /// Where the element's 3D view was: its shells drawn flat, what its atom is made of, and the way to its atom, its
+    /// orbitals' shapes and its electron cloud in 3D — Atoms & Orbitals, a tool of its own, opened on this element in the
+    /// same popup.
+    private var atomCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Atom")
+            HStack(alignment: .center, spacing: 16) {
+                PTBohrSketch(element: e)
+                    .frame(width: 124, height: 124)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Shells \(e.shells.map(String.init).joined(separator: " · "))")
+                        .font(.sCallout.weight(.semibold).monospacedDigit())
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(e.number) protons · \(e.neutrons) neutrons · \(e.number) electrons")
                         .font(.sCaption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 8)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Turn its atom, its orbitals' shapes and its electron cloud in 3D.")
+                        .font(.sCaption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityElement()
-                .accessibilityLabel(modelLabel)
-                .accessibilityHint("Drag to turn, scroll to zoom")
-            switch model {
-            case .atom:
-                atomLegend
-            case .orbitals:
-                if let sub = subshell { orbitalParts(sub) } else { atomLegend }
-            case .cloud:
-                cloudParts
+                Spacer(minLength: 0)
             }
+            Button(action: openAtom) {
+                Label("Open in Atoms & Orbitals", systemImage: ToolKind.atoms.symbol)
+                    .frame(maxWidth: .infinity)
+            }
+            .glassButton(prominent: true)
+            .controlSize(.large)
+            .help("\(e.name)'s atom, orbitals and electron cloud in 3D, in Atoms & Orbitals")
         }
         .padding(16)
         .frame(maxHeight: .infinity, alignment: .top)
         .card(radius: 20)
-        .tourTarget("ptModel")
+        .tourTarget("ptAtoms")
     }
 
-    /// (1.3.76) What the 3D view shows, for VoiceOver.
-    private var modelLabel: String {
-        switch model {
-        case .atom:
-            return "\(e.name)'s atom in 3D"
-        case .orbitals:
-            return "The \(subshell?.name ?? "1s") orbitals of \(e.name) in 3D"
-        case .cloud:
-            guard let s = ElectronCloud.cloud(for: e).subs.first(where: { $0.id == cloudFocus }) else {
-                return "\(e.name)'s electron cloud in 3D"
-            }
-            let word = s.count == 1 ? "electron" : "electrons"
-            return "The \(s.id) \(word) of \(e.name) as a cloud in 3D"
-        }
-    }
-
-    /// The Atom view's legend.
-    private var atomLegend: some View {
-        HStack(spacing: 14) {
-            legend("Proton", Color(nsColor: AtomScene.protonColor))
-            legend("Neutron", Color(nsColor: AtomScene.neutronColor))
-            legend("Electron", Color(nsColor: AtomScene.electronColor))
-            Spacer()
-            if e.number + e.neutrons > 72 {
-                Text("72 of \(e.number + e.neutrons) nucleons drawn").font(.sCaption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    /// The Orbitals view's rows: a chip for each subshell, the chosen one's orbitals with their electrons, and what the
-    /// colours are.
-    @ViewBuilder
-    private func orbitalParts(_ sub: PTSubshell) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(allSubs) { s in
-                    Button { withAnimation(Motion.snappy) { subshellID = s.id } } label: {
-                        Text("\(s.name)\(PTConfig.superscript(s.count))")
-                            .font(.sCaption.weight(s.id == sub.id ? .bold : .regular).monospaced())
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(s.id == sub.id ? Theme.accent.opacity(0.25) : Color.primary.opacity(0.06), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        HStack(spacing: 10) {
-            ForEach(Array(AtomScene.orbitalNames(sub.l).enumerated()), id: \.offset) { i, name in
-                let filled = i < sub.filling.count ? sub.filling[i] : 0
-                VStack(spacing: 2) {
-                    Text(name).font(.sCaption.weight(.semibold))
-                    Text(filled == 0 ? "empty" : (filled == 1 ? "1 e⁻" : "2 e⁻")).font(.sCaption2).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        Text(sub.l == 3 ? "The f shapes are drawn simply. Blue and orange are the wave's two signs." : "Each orbital holds two electrons; blue and orange are the wave's two signs. A faint orbital is empty.")
-            .font(.sCaption)
-            .foregroundStyle(.secondary)
-    }
-
-    // MARK: The cloud (1.3.76)
-
-    /// The Cloud view's rows: a chip for the whole atom and one for each subshell (choosing one colours it alone, greys
-    /// the rest and frames the view by it), the legend, the chosen subshell's charge and size, and what the dots are.
-    @ViewBuilder
-    private var cloudParts: some View {
-        let cloud = ElectronCloud.cloud(for: e)
-        let dark = scheme == .dark
-        // (a subshell the element has not — -SimplPTSubshell 5f on iron — is the whole atom, its chip the one lit)
-        let chosen = cloud.subs.first { $0.id == cloudFocus }
-        cloudChips(cloud, chosen: chosen, dark: dark)
-        cloudLegend(cloud, chosen: chosen, dark: dark)
-        if let s = chosen {
-            Text(ElectronCloud.detail(s))
-                .font(.sCaption.monospacedDigit())
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        Text(ElectronCloud.caption(cloud, chosen: chosen))
-            .font(.sCaption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    /// All, then the subshells in order (n, then l; the core's too), each with its colour's dot.
-    private func cloudChips(_ cloud: ElectronCloud.Cloud, chosen: ElectronCloud.Sub?, dark: Bool) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                cloudChip("All", dot: nil, on: chosen == nil, tip: "Show every electron", spoken: "All electrons") { cloudFocus = nil }
-                ForEach(cloud.subs, id: \.id) { s in
-                    cloudChip("\(s.id)\(PTConfig.superscript(s.count))", dot: Color(nsColor: ElectronCloud.color(s.l, dark: dark)),
-                              on: chosen?.id == s.id, tip: ElectronCloud.help(s),
-                              spoken: s.count == 1 ? "\(s.id), 1 electron" : "\(s.id), \(s.count) electrons") { cloudFocus = s.id }
-                }
-            }
-        }
-    }
-
-    /// A chip as the Orbitals view's are, a dot of its subshell's colour before its name (none for All). The chip
-    /// already chosen does nothing.
-    private func cloudChip(_ text: String, dot: Color?, on: Bool, tip: String, spoken: String, pick: @escaping () -> Void) -> some View {
-        Button { if !on { withAnimation(Motion.snappy) { pick() } } } label: {
-            HStack(spacing: 5) {
-                if let dot { Circle().fill(dot).frame(width: 7, height: 7) }
-                Text(text).font(.sCaption.weight(on ? .bold : .regular).monospaced())
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(on ? Theme.accent.opacity(0.25) : Color.primary.opacity(0.06), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(tip)
-        .accessibilityLabel(spoken)
-        .accessibilityAddTraits(on ? AccessibilityTraits.isSelected : [])
-    }
-
-    /// Each kind's electrons in its colour (or the chosen subshell's, and the grey rest's), and the nucleus.
-    private func cloudLegend(_ cloud: ElectronCloud.Cloud, chosen: ElectronCloud.Sub?, dark: Bool) -> some View {
-        HStack(spacing: 14) {
-            if let s = chosen {
-                legend("\(s.id) · \(s.count) e⁻", Color(nsColor: ElectronCloud.color(s.l, dark: dark)))
-                if cloud.electrons > s.count {
-                    // (the rest's grey is quiet on the card: its dot outlined, to be seen)
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(Color(nsColor: ElectronCloud.restColor(dark: dark)))
-                            .overlay(Circle().strokeBorder(Color.secondary, lineWidth: 1))
-                            .frame(width: 9, height: 9)
-                        Text(verbatim: "Rest · \(cloud.electrons - s.count) e⁻").font(.sCaption)
-                    }
-                }
-            } else {
-                ForEach(0..<4, id: \.self) { t in
-                    let n = cloud.subs.filter { $0.l == t }.map(\.count).reduce(0, +)
-                    if n > 0 { legend("\(ElectronCloud.letters[t]) · \(n) e⁻", Color(nsColor: ElectronCloud.color(t, dark: dark))) }
-                }
-            }
-            Spacer()
-            legend("Nucleus", Color(nsColor: ElectronCloud.nucleusColor(dark: dark)))
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func legend(_ name: String, _ color: Color) -> some View {
-        HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 9, height: 9)
-            Text(name).font(.sCaption)
-        }
+    /// Atoms & Orbitals opened on this element, in the popup the table is in (the tour's last step, done).
+    private func openAtom() {
+        PTTour.shared.did(.atoms)
+        ToolsCenter.shared.popUp(.atoms, info: ["element": String(e.number)])
     }
 
     // MARK: Electrons
@@ -635,5 +465,39 @@ struct PTElementPage: View {
 
     private func sectionTitle(_ t: String) -> some View {
         Text(t.uppercased()).font(.system(size: 11.5, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
+    }
+}
+
+/// (1.3.80) An element's shells drawn flat, for its facts page: the nucleus, each shell a ring, its electrons spaced
+/// round it — what its 3D atom in Atoms & Orbitals shows, at a glance, in its colours, and still.
+struct PTBohrSketch: View {
+    let element: PTElement
+
+    private var shells: [Int] { element.shells.isEmpty ? [element.number] : element.shells }
+
+    var body: some View {
+        Canvas { ctx, size in
+            let c = CGPoint(x: size.width / 2, y: size.height / 2)
+            let outer = min(size.width, size.height) / 2 - 4
+            let core = max(5, outer * 0.16)
+            let ring = (outer - core) / CGFloat(max(shells.count, 1))
+            let dot = max(1.6, min(3.2, ring * 0.3))
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - core, y: c.y - core, width: core * 2, height: core * 2)),
+                     with: .color(Color(nsColor: AtomScene.protonColor)))
+            for (i, n) in shells.enumerated() {
+                let r = core + ring * CGFloat(i + 1)
+                ctx.stroke(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                           with: .color(Color.primary.opacity(0.22)), lineWidth: 1)
+                for k in 0..<n {
+                    // (each shell's first electron a little round from the last's, so they do not line up in a spoke)
+                    let a = Double(k) / Double(max(n, 1)) * 2 * .pi - .pi / 2 + Double(i) * 0.35
+                    let p = CGPoint(x: c.x + r * CGFloat(cos(a)), y: c.y + r * CGFloat(sin(a)))
+                    ctx.fill(Path(ellipseIn: CGRect(x: p.x - dot, y: p.y - dot, width: dot * 2, height: dot * 2)),
+                             with: .color(Color(nsColor: AtomScene.electronColor)))
+                }
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("\(element.name)'s electron shells: \(shells.map(String.init).joined(separator: ", "))")
     }
 }

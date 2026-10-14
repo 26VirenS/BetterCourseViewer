@@ -398,7 +398,21 @@ private struct DevInterface: View {
                 HStack {
                     Button("Reset What's New") { UserDefaults.standard.removeObject(forKey: "macWhatsNewSeen") }
                     Button("Reset the Tour") { UserDefaults.standard.removeObject(forKey: "tour:done") }
+                }
+            }
+            // (1.3.80) the four chemistry tools the Periodic Table was split into: each opened over the main window, the
+            // table's tour offered again, and what they keep (ChemPrefs) forgotten
+            Section("Chemistry tools") {
+                HStack {
+                    ForEach(ChemTools.kinds) { k in
+                        Button(k.name) { if let engine { ToolsCenter.shared.popUp(k, engine: engine) } }
+                    }
+                }
+                .disabled(engine == nil)
+                HStack {
                     Button("Reset Periodic Table Tour") { UserDefaults.standard.removeObject(forKey: "simpl.ptTourSeen") }
+                    Button("Forget What They Keep") { ChemPrefs.forgetAll() }
+                        .help("The Periodic Table's colouring and last element, the Lewis maker's and the Molecule Builder's molecules, Atoms & Orbitals' element and view")
                 }
             }
             Section("Look") {

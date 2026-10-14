@@ -410,6 +410,25 @@ tool_popups() {
   done
 }
 
+# (1.3.80) in both sets: the Tools page's Chemistry section — the Periodic Table split into four tools — in light and in
+# dark; Atoms & Orbitals on iron's atom, and narrow on oxygen's 2p orbitals (its controls and facts in sight under the
+# model); Atoms & Orbitals as a student comes to it from carbon's facts page (-SimplPTHandOff atoms presses Open in
+# Atoms & Orbitals there); Lewis Structures in dark (each tool's light picture is in the push's set: light-55-ptable-
+# trends, light-55c-lewis, light-55d-molecule; Atoms & Orbitals' dark one dark-55l-atoms-cloud); Atoms & Orbitals' pin
+# opened; and "orbitals" typed in the search field, its tool among the suggestions
+chem_tools() {
+  local m
+  for m in light dark; do
+    MODE="$m" SIZE=1280x900 shoot "$m-35c-tools-chemistry" 12 -SimplPlace tools -SimplToolsScroll chemistry
+  done
+  MODE=light SIZE=1440x920 shoot light-55o-atoms 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 26
+  MODE=light SIZE=780x700 shoot light-55p-atoms-narrow 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 8 -SimplPTModel orbitals
+  MODE=light SIZE=1440x920 shoot light-55q-atoms-from-facts 18 -SimplPlace tools -SimplTool ptable -SimplPTElement 6 -SimplPTHandOff atoms
+  MODE=dark SIZE=1440x920 shoot dark-55r-lewis 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NO₃⁻"
+  MODE=light shoot light-54h-pin-atoms 14 -SimplPinnedTools atoms -SimplPinOpen atoms
+  MODE=light shoot light-30c-palette-chemistry 14 -SimplOpen "palette:orbitals"
+}
+
 # (1.3.78) a discussion's post that never measured in its web view says so on the console (Components/RichText.swift,
 # in a picture's run only: its words are shown natively meanwhile); said here as a warning of the run
 richtext_check() {
@@ -504,20 +523,24 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-22-setup 20 -SimplOpen setup
   shoot light-53-whats-new 32 -SimplOpen whatsnew
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
-  # (1.3.52) the full Periodic Table: coloured by electronegativity with its trend arrows; an element's page; the Lewis
-  # maker; the 3D molecule builder
+  # (1.3.52) the Periodic Table: coloured by electronegativity with its trend arrows; an element's page (1.3.80: its
+  # shells drawn flat, and Open in Atoms & Orbitals where its 3D view was); (1.3.80) the chemistry tools that were its
+  # pages and its element page's 3D view — Lewis Structures, the Molecule Builder and Atoms & Orbitals — each opened as
+  # a tool of its own (-SimplTool lewis, molecule, atoms; the old -SimplTool ptable -SimplPTPage … flags open them too)
   SIZE=1440x920 shoot light-55-ptable-trends 14 -SimplPlace tools -SimplTool ptable -SimplPTColour electronegativity
   SIZE=1440x920 shoot light-55b-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6
-  # (1.3.76) the element page's Cloud view: carbon's whole atom, and the cloud model's test vectors on its console
-  SIZE=1440x920 shoot light-55k-ptable-cloud 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 6 -SimplPTModel cloud -SimplCloudCheck YES
-  SIZE=1440x920 shoot light-55c-ptable-lewis 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NO₃⁻"
-  SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset Benzene
-  SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool ptable -SimplPTPage lewis -SimplLewisPreset "NaNO₃"
-  SIZE=1440x920 shoot light-55d-ptable-molecule 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Ethanol
+  # (1.3.76) the Cloud view — (1.3.80) Atoms & Orbitals': carbon's whole atom, and the cloud model's test vectors on its
+  # console
+  SIZE=1440x920 shoot light-55k-atoms-cloud 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 6 -SimplPTModel cloud -SimplCloudCheck YES
+  SIZE=1440x920 shoot light-55c-lewis 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NO₃⁻"
+  SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset Benzene
+  SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NaNO₃"
+  SIZE=1440x920 shoot light-55d-molecule 16 -SimplPlace tools -SimplTool molecule -SimplPTMolecule Ethanol
   # (1.3.74) shapes laid out by VSEPR: carbon dioxide straight, water bent
-  SIZE=1440x920 shoot light-55k-molecule-co2 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule "Carbon dioxide"
-  SIZE=1440x920 shoot light-55l-molecule-water 16 -SimplPlace tools -SimplTool ptable -SimplPTPage molecules -SimplPTMolecule Water
-  # (1.3.59) the tour, at its Draw your own step; (1.3.61) and at its first, the table's carbon lit
+  SIZE=1440x920 shoot light-55k-molecule-co2 16 -SimplPlace tools -SimplTool molecule -SimplPTMolecule "Carbon dioxide"
+  SIZE=1440x920 shoot light-55l-molecule-water 16 -SimplPlace tools -SimplTool molecule -SimplPTMolecule Water
+  # (1.3.59) the tour — (1.3.80) at its last step, carbon's page with Open in Atoms & Orbitals lit; (1.3.61) and at its
+  # first, the table's top rows lit
   SIZE=1440x920 shoot light-55h-ptable-tour 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 4
   SIZE=1440x920 shoot light-55i-ptable-tour-start 16 -SimplPlace tools -SimplTool ptable -SimplPTTour 0
   # (1.3.64) the header's search open, with what it finds
@@ -525,8 +548,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=780x700 shoot light-52-narrow-dashboard 14
   MODE=dark
   SIZE=1440x920 shoot dark-55e-ptable-element 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
-  # (1.3.76) iron's cloud in dark, its 3d chosen: the rest of the atom grey
-  SIZE=1440x920 shoot dark-55l-ptable-cloud 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26 -SimplPTModel cloud -SimplPTSubshell 3d
+  # (1.3.76) iron's cloud in dark, its 3d chosen: the rest of the atom grey — (1.3.80) in Atoms & Orbitals
+  SIZE=1440x920 shoot dark-55l-atoms-cloud 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 26 -SimplPTModel cloud -SimplPTSubshell 3d
   shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
@@ -561,6 +584,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   ui_review
   pins_pages # (1.3.79)
   tool_popups # (1.3.79)
+  chem_tools # (1.3.80)
   bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
   wait
   walks
@@ -629,6 +653,7 @@ bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window si
 ui_review # (1.3.78) the UI review's new states
 pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
 tool_popups # (1.3.79) a tool's popup over the Tools page
+chem_tools # (1.3.80) the Chemistry section and its tools
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
 MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

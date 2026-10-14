@@ -344,8 +344,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   nucleotides and ATP, and a DNA strand built nucleotide by nucleotide on the B-DNA model with its phosphodiester bonds.
   *Carbohydrates*: five rings with numbered carbons and α or β read from the atoms, four disaccharides split and joined
   by water, and five polysaccharides as hexagon glyphs. *Lipids*: fatty acids, tristearin, POPC and cholesterol, with
-  esters, the cis kink and head and tails. *Open in Molecule Builder* hands the atoms to the Periodic Table's builder,
-  which keeps their shape (`MoleculeModel.load(handOff:)`, `fixedShape`: no VSEPR). Launch flags for pictures:
+  esters, the cis kink and head and tails. *Open in Molecule Builder* hands the atoms to the Molecule Builder (1.3.80:
+  a chemistry tool of its own), which keeps their shape (`MoleculeModel.load(handOff:)`, `fixedShape`: no VSEPR). Launch flags for pictures:
   `-SimplTool biomol -SimplToolState <page>:<options>` (`BiomoleculeTool.apply` lists them).
   (1.3.55) The Lewis and 3D builders' presets are one grouped dropdown each (`PresetMenu`; `LewisPresets.sections`,
   `MoleculeModel.presetSections`) instead of rows of chips, and an element (the central atom, or the one to draw) is a
@@ -538,7 +538,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   that one coloured, the rest grey, the view framed by its 95% radius, its Z_eff and mean distance said (in pm, to one
   decimal only under 9.95, so never "10.0"), and how much larger it is drawn than in All. The tour's Orbitals step is
   still done by Orbitals alone. `-SimplPTModel cloud` and `-SimplPTSubshell 3d` (or `all`) set the view for the
-  screenshot suite (`light-55k-ptable-cloud`, `dark-55l-ptable-cloud`); `-SimplCloudCheck YES` writes the model's test
+  screenshot suite (`light-55k-ptable-cloud`, `dark-55l-ptable-cloud`; 1.3.80: in Atoms & Orbitals, `light-55k-atoms-cloud`,
+  `dark-55l-atoms-cloud`); `-SimplCloudCheck YES` writes the model's test
   vectors to the console (`cloud-check …`). Moments that cut now move as the rest of the app does: why a reply, a
   comment, a hand-in, the setup or a grading scale was not saved fades in and out (what is under it moving on
   `Motion.snappy`), the Critical Update notice comes down from the top, Match's grid and the school picker crossfade,
@@ -748,6 +749,38 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   its integrity), the first run's setup, the sign-in, the tour, the Mac's confirmations and file choosers. An update
   never installs itself while a popup is up (`Updater.quiet`). The pictures: `light-35p…`/`dark-35p…` a tool's popup
   (the Periodic Table, Cell Explorer, Flashcards) over the Tools page at 1024 and at the narrow size.
+- **The Chemistry section (1.3.80).** The Periodic Table is split into four tools under a *Chemistry* heading on the
+  Tools page, just before Biology and built as its section is (`Tools/Chemistry/ChemTools.swift`: `ChemTools.kinds`,
+  `info` — names, lines, symbols and a palette of their own — and `ChemToolsSection`, which `-SimplToolsScroll
+  chemistry` scrolls to): **Periodic Table** (`ptable`, the key a pin of it always had: the table, its colours and
+  trends, the element under the pointer, an element's facts page and the tour), **Lewis Structures** (`lewis`: the
+  Lewis maker, `LewisStructuresTool`), **Molecule Builder** (`molecule`: the 3D builder, `MoleculeBuilderTool`) and
+  **Atoms & Orbitals** (`atoms`, `Tools/Chemistry/AtomsOrbitals.swift`: the 3D atom, orbitals and electron cloud that
+  were on each element's page, for any element — typed by symbol, name or number, stepped with ‹ › or ↑ ↓ in the field —
+  laid out as the builders are, `PTWorkLayout`). *Math & science* keeps the calculators and the unit converter. Each
+  tool has its own tile, pin (its quick version: the table small; Atoms & Orbitals an element to open; the builders
+  their tile and Open), popup, heading — the Periodic Table's without its pages, its search and Tour on the row under
+  it (`PTHeaderBar`) — and command in the search field (`/ptable`, `/lewis`, `/molecule`, `/atom`; words such as
+  "periodic", "orbitals" or "vsepr" bring them up among the suggestions; `PaletteAction.tool`). They hand over in the
+  same popup rather than being one tool's pages: an element's facts page has its shells drawn flat (`PTBohrSketch`) and
+  *Open in Atoms & Orbitals* where its 3D view was, and Atoms & Orbitals has *Open in Periodic Table* back to the facts;
+  the Lewis maker's *Open in Molecule Builder* hands its molecule over (`ChemTools.openInMoleculeBuilder`), as the
+  Biomolecule Builder's does. The table's tour is the table's alone: hover, colour, open an element, search, and last
+  *Open in Atoms & Orbitals* (`PTTourEvent.atoms`). What each keeps (`ChemPrefs`: UserDefaults
+  `SimplChem.<key>.<field>`, a picture's in a suite of its own): the table's colouring and the last element opened;
+  the Lewis maker's molecule (`lewis.draft`, `ChemLewisDraft`); the builder's molecule and view (`molecule.saved`,
+  `ChemMoleculeDraft`; `.style`, `.lonePairs`, `.labels`); Atoms & Orbitals' element and view, opening on the table's
+  last element when it has none of its own. Before, nothing was kept but the pins (whose `ptable` key is unchanged) and
+  the tour's seen flag, so nothing is carried over. With Reduce Motion the atom's electrons and nucleus, the orbitals
+  and the builder start still. Launch flags: `-SimplTool ptable|lewis|molecule|atoms`; the old `-SimplTool ptable
+  -SimplPTPage lewis|molecules` and `-SimplPTModel …` open the tools they are now (`ChemLaunch`, checked by the Models
+  job); Atoms & Orbitals reads `-SimplPTElement`, `-SimplPTModel` and `-SimplPTSubshell`, the builder
+  `-SimplPTMolecule`, when the launch opened them; `-SimplPTHandOff atoms` presses the facts page's *Open in Atoms &
+  Orbitals*. The Developer window's Interface page opens each tool, resets the table's tour and forgets what they keep.
+  Pictures (`chem_tools`, both sets): `light-35c-tools-chemistry`, `dark-35c-tools-chemistry`, `light-55o-atoms`,
+  `light-55p-atoms-narrow`, `light-55q-atoms-from-facts`, `dark-55r-lewis`, `light-54h-pin-atoms`,
+  `light-30c-palette-chemistry`; and the chemistry pictures before them, pointed at the tools (`light-55c-lewis`,
+  `light-55d-molecule`, `light-55k-atoms-cloud`, `dark-55l-atoms-cloud`).
 
 ## Data and encryption
 

@@ -328,28 +328,19 @@ private struct PTCornerCard: View {
 
 /// (1.3.51) The full Periodic Table: the table, coloured by any of its properties (with the scale, each cell's value and,
 /// if asked, the trend arrows), the element under the pointer in its empty top, and a press opening the element's own
-/// page, grown out of its square; and beside the table, the Lewis structure maker and the 3D molecule builder.
+/// page, grown out of its square. (1.3.80) The table alone: the Lewis structure maker and the 3D molecule builder that
+/// were its other pages, and the 3D atom its element pages had, are tools of their own beside it under Chemistry
+/// (Chemistry/ChemTools.swift) — an element's page opens Atoms & Orbitals on it.
 struct PeriodicTableTool: View {
-    enum Page: String, CaseIterable, Identifiable {
-        case table, lewis, molecules
-        var id: String { rawValue }
-        var label: String { self == .table ? "Table" : (self == .lewis ? "Lewis structures" : "Molecule builder") }
-        /// (tools-4) The heading while the page shows.
-        var title: String { self == .table ? "Periodic table" : label }
-        /// (tools-4) The 3D builder's is its own, not the atom the Periodic Table's tile wears.
-        var symbol: String { self == .table ? "square.grid.3x3" : (self == .lewis ? "circle.grid.cross" : "rotate.3d") }
-    }
-
-    /// (1.3.62) which page is shown, chosen in the tool's header
+    /// (1.3.62) the tour and Back asked for in the tool's header
     @ObservedObject private var nav = PTNav.shared
-    private var page: Page { nav.page }
     @State private var open: PTElement?
     @State private var anchor: UnitPoint = .center
     @State private var hovered: PTElement?
     @ObservedObject private var search = PTSearch.shared
     @State private var category: String?
-    @State private var colouring: PTColouring = .category
-    @StateObject private var molecule = MoleculeModel()
+    /// (1.3.80) Kept from one opening to the next (ChemPrefs `ptable.colour`).
+    @State private var colouring: PTColouring = ChemPrefs.string(.ptable, "colour").flatMap { PTColouring(rawValue: $0) } ?? .category
     /// (1.3.59) The tour: seen once; the step shown, if it is on. (tools-3) Offered the first time the table opens, not
     /// started; skipped, closed or declined, it counts as seen.
     @AppStorage("simpl.ptTourSeen") private var tourSeen = false
@@ -375,9 +366,15 @@ struct PeriodicTableTool: View {
         watched
             // (the tour's step, done: watched for in what the tool shows and what it is told)
             .onChange(of: hovered?.number) { _, _ in checkTour() }
-            .onChange(of: colouring) { _, _ in checkTour() }
-            .onChange(of: open?.number) { _, _ in checkTour() }
-            .onChange(of: nav.page) { _, _ in checkTour() }
+            // (1.3.80: the colouring and the element opened kept, for the next opening and for Atoms & Orbitals)
+            .onChange(of: colouring) { _, c in
+                ChemPrefs.set(.ptable, "colour", c.rawValue)
+                checkTour()
+            }
+            .onChange(of: open?.number) { _, n in
+                if let n { ChemPrefs.set(.ptable, "element", String(n)) }
+                checkTour()
+            }
             .onChange(of: search.query) { _, _ in checkTour() }
             .onChange(of: tourWord.events) { _, _ in checkTour() }
             .onChange(of: search.submitted) { _, _ in openFirstFound() }
@@ -385,14 +382,11 @@ struct PeriodicTableTool: View {
             .onDisappear(perform: disappeared)
     }
 
-    /// The stage, and the header's asks it answers: a page chosen, the tour asked for, the element closed or picked.
+    /// The stage, and the header's asks it answers: the tour asked for, the element closed or picked.
     private var watched: some View {
         stage
-            // (1.3.54) the search, in the tool's header: Return opens the first element it finds
-            // (1.3.62) a page chosen in the header while an element is open: back from it to that page; Tour asked for there
-            .onChange(of: nav.page) { _, _ in
-                if open != nil { withAnimation(Motion.gentle) { open = nil } }
-            }
+            // (1.3.54) the search, in the tool's header: Return opens the first element it finds; (1.3.62) Tour asked for
+            // there
             .onChange(of: nav.tourAsked) { _, _ in
                 withAnimation(Motion.gentle) { offerTour = false }
                 tour(0)
@@ -417,17 +411,8 @@ struct PeriodicTableTool: View {
                                             removal: .scale(scale: 0.06, anchor: anchor).combined(with: .opacity)))
                     .zIndex(1)
                 } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        switch page {
-                        case .table: table(root.size)
-                        case .lewis: LewisMaker { graph, structure in
-                            molecule.load(graph: graph, structure: structure)
-                            withAnimation(Motion.gentle) { nav.page = .molecules }
-                        }
-                        case .molecules: MoleculeBuilder(model: molecule)
-                        }
-                    }
-                    .transition(.opacity)
+                    table(root.size)
+                        .transition(.opacity)
                 }
             }
             .frame(width: root.size.width, height: root.size.height, alignment: .top)
@@ -471,25 +456,21 @@ struct PeriodicTableTool: View {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = m }
     }
 
-    /// The tool opened: an element or a molecule handed to it, the screenshot suite's asks, and the tour.
+    /// The tool opened: an element handed to it (its pin's, Atoms & Orbitals'), the screenshot suite's asks, and the tour.
     private func appeared() {
         if let raw = ToolsCenter.shared.takeInfo("element"), let n = Int(raw), let e = PeriodicTable.byNumber(n) {
             anchor = .center
             open = e
         }
-        // (the screenshot suite: -SimplPTColour, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
+        // (the screenshot suite: -SimplPTColour, -SimplPTElement — 1.3.80: the element only when the launch opened the
+        // table, not when it opened Atoms & Orbitals, which reads it too)
         let d = UserDefaults.standard
         if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
-        if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { nav.page = v }
-        if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
-        // (1.3.78) a molecule handed over by the Biomolecule Builder, shown in the molecule builder as it is
-        if let text = ToolsCenter.shared.takeInfo("molecule"), molecule.load(handOff: text) { nav.page = .molecules }
         let n = d.integer(forKey: "SimplPTElement")
-        if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
-        // (the tour: its step for the screenshot suite, -SimplPTTour 5; else, tools-3, offered on the first opening
-        // — -SimplPTTourOffer YES for the suite's picture of it — and not while the suite pictures the tool (1.3.76:
-        // nor an element's view, -SimplPTModel, which its page reads))
-        let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset", "SimplPTModel"].contains { d.object(forKey: $0) != nil }
+        if n > 0, ChemTools.launched == .ptable, let e = PeriodicTable.byNumber(n) { open = e }
+        // (the tour: its step for the screenshot suite, -SimplPTTour 4; else, tools-3, offered on the first opening
+        // — -SimplPTTourOffer YES for the suite's picture of it — and not while the suite pictures the tool)
+        let shot = ["SimplPTColour", "SimplPTElement", "SimplPTSearch", "SimplPTHandOff"].contains { d.object(forKey: $0) != nil }
         if d.object(forKey: "SimplPTTour") != nil {
             tour(min(max(d.integer(forKey: "SimplPTTour"), 0), PTTourStep.all.count - 1))
         } else if d.bool(forKey: "SimplPTTourOffer") || (!tourSeen && !shot) {
@@ -511,8 +492,8 @@ struct PeriodicTableTool: View {
         withAnimation(Motion.gentle) { offerTour = false }
     }
 
-    /// The tour at a step: the tool set to what the step needs (the page its control is on, an element's page, a
-    /// preset), and nothing yet done for it.
+    /// The tour at a step: the tool set to what the step needs (the table, or an element's page), and nothing yet done
+    /// for it.
     private func tour(_ i: Int, hold: Bool = false) {
         guard PTTourStep.all.indices.contains(i) else { return }
         tourHold = hold ? i : nil
@@ -531,23 +512,12 @@ struct PeriodicTableTool: View {
             }
             if let n = s.element, let e = PeriodicTable.byNumber(n) {
                 if open == nil { anchor = .center; open = e }
+                // (1.3.80: the search's results put away, so the element's page under them is what is lit)
+                search.query = ""
             } else if ["ptGrid", "ptTop", "ptCarbon", "ptColours"].contains(s.target) {
-                open = nil
-                nav.page = .table
-            } else if s.target.hasPrefix("lewis") {
-                open = nil
-                if nav.page != .lewis { nav.page = .lewis }
-            } else if s.target == "molViewer" {
-                open = nil
-                if nav.page != .molecules { nav.page = .molecules }
-            } else if s.target.hasPrefix("ptPage") {
                 open = nil
             }
         }
-        if let m = s.molecule { molecule.loadPreset(m) }
-        // (Draw asked for from the quick way: the quick way's water first)
-        if s.target == "lewisWay" { PTTour.shared.showLewis("H₂O") }
-        if let l = s.lewis { PTTour.shared.showLewis(l) }
         // (tools-3: no wait for a Next — every card has one, the step's thing a suggestion)
         checkTour()
     }
@@ -560,7 +530,6 @@ struct PeriodicTableTool: View {
         case .hover: done = hovered != nil
         case .colour: done = colouring != .category
         case .open: done = open != nil
-        case .page(let p): done = nav.page == p && open == nil
         case .event(let e): done = PTTour.shared.event == e
         case .typed: done = !search.query.trimmingCharacters(in: .whitespaces).isEmpty
         }
@@ -586,7 +555,6 @@ struct PeriodicTableTool: View {
         if PTTour.shared.owner == nil || PTTour.shared.owner == tourOwner {
             PTTour.shared.owner = nil
             PTTour.shared.active = false
-            PTTour.shared.showLewis(nil)
         }
         withAnimation(Motion.gentle) { tourStep = nil }
     }
@@ -811,8 +779,8 @@ struct PTNarrowReader<Content: View>: View {
     var body: some View { content(narrow) }
 }
 
-/// (1.3.52) The Lewis maker's and the molecule builder's layout (and the biology tools'), in three widths, the controls
-/// and the facts in sight in each (1.3.79):
+/// (1.3.52) The Lewis maker's and the molecule builder's layout (and the biology tools', and 1.3.80 Atoms & Orbitals'),
+/// in three widths, the controls and the facts in sight in each (1.3.79):
 /// - wide (1,100 points of room or more): the controls, the drawing and the facts side by side;
 /// - middling (700 or more): the drawing, and beside it one column, the controls over the facts, each with its own
 ///   scroller (`PTSideColumn`). Before, anything under 1,100 put the drawing across the top as tall as the window showed:
@@ -999,10 +967,10 @@ final class PTSearch: ObservableObject {
     }
 }
 
-/// (1.3.62) Which page of the full Periodic Table is shown — chosen in the tool's header — and the tour asked for there.
+/// (1.3.62) What the full Periodic Table's header asks of the table: the tour, and (tools-29) Back from an element.
+/// (1.3.80: no longer which page is shown — the Lewis maker and the molecule builder are tools of their own.)
 final class PTNav: ObservableObject {
     static let shared = PTNav()
-    @Published var page: PeriodicTableTool.Page = .table
     @Published var tourAsked = 0
     /// (tools-29) An element's own page is open: the heading's one Back then says "‹ Table" and closes it. Counted from
     /// the element pages on screen — each says when it comes and goes — so a table drawn afresh (the tool's view made
@@ -1017,11 +985,11 @@ final class PTNav: ObservableObject {
     func closeElement() { closeAsked += 1 }
 }
 
-/// (tools-4) The Periodic Table's second row, under its heading: its pages — Table, Lewis structures, Molecule builder —
-/// in words, as a segmented control (they used to draw in to look-alike symbols in the heading where it ran short of
-/// room), and beside them the search — (1.3.54) a glass button that opens into a field — and Tour, which draws in to its
-/// symbol while the field is open.
-struct PTPageBar: View {
+/// (tools-4) The Periodic Table's second row, under its heading: the search — (1.3.54) a glass button that opens into a
+/// field — and Tour, which draws in to its symbol while the field is open; at the row's right, under the pin, in sight
+/// on the table and on an element's page alike. (1.3.80: the table's pages — Table, Lewis structures, Molecule builder —
+/// are gone from its left: the two builders are tools of their own.)
+struct PTHeaderBar: View {
     @ObservedObject private var nav = PTNav.shared
     @ObservedObject private var search = PTSearch.shared
     @State private var searching = false
@@ -1033,17 +1001,6 @@ struct PTPageBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Picker("Page", selection: Binding(get: { nav.page }, set: { p in withAnimation(Motion.gentle) { nav.page = p } })) {
-                ForEach(PeriodicTableTool.Page.allCases) { p in
-                    Text(p.label).tag(p)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.large)
-            .fixedSize()
-            .help("The periodic table, the Lewis structure maker, or the 3D molecule builder")
-            .tourTarget("ptPages")
             Spacer(minLength: 8)
             searchControl.tourTarget("ptSearch")
             Button { nav.tourAsked += 1 } label: {
@@ -1051,7 +1008,7 @@ struct PTPageBar: View {
             }
             .glassButton()
             .controlSize(.large)
-            .help("A short tour of the table and its builders")
+            .help("A short tour of the table and an element's page")
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: searching)
         .onChange(of: focused) { _, f in

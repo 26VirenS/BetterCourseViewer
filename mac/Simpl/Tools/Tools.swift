@@ -4,18 +4,22 @@ import UniformTypeIdentifiers
 
 // Tools (1.2): the things Simpl does on its own, as the web's Tools page has them — a citation generator, a focus timer,
 // a calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge & split PDFs, a PDF
-// annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them, and
-// (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift). One row in the sidebar opens
-// a page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files and Biology; (1.3.79) a tile
-// opens its tool in a popup over the window — the Tools page staying behind it, and the whole window usable round it
-// (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be pinned: it then
-// sits in the toolbar on every screen and opens a compact version of itself in a popover (PinnedTools.swift). Everything
-// a tool keeps stays on this Mac; nothing is sent to Canvas.
+// annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them,
+// (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift) and (1.3.80) the periodic
+// table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift). One row in the sidebar opens a
+// page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry and Biology;
+// (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
+// usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
+// pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
+// (PinnedTools.swift). Everything a tool keeps stays on this Mac; nothing is sent to Canvas.
 
 /// A tool: its key (the web's own, so a pin means the same thing on both), its name, the line under it, its symbol and
 /// its colour (used for its tile and its pin, nothing else).
 enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     case cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc
+    // (1.3.80) the chemistry tools beside the Periodic Table (`ptable`, the key its pin always had): their names, lines,
+    // symbols and colours, and the Periodic Table's, are ChemTools.info's
+    case lewis, molecule, atoms
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
     case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
 
@@ -27,7 +31,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus timer"
         case .calc: return "Calculator"
         case .graph: return "Graphing calculator"
-        case .ptable: return "Periodic table"
+        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).name
         case .need: return "Grade needed"
         case .conv: return "File converter"
         case .units: return "Unit converter"
@@ -47,7 +51,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus"
         case .calc: return "Calculator"
         case .graph: return "Graphing"
-        case .ptable: return "Elements"
+        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).shortName
         case .need: return "Grade needed"
         case .conv: return "Convert"
         case .units: return "Units"
@@ -66,7 +70,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus, then take a break."
         case .calc: return "Scientific, from your keyboard."
         case .graph: return "Desmos, right here."
-        case .ptable: return "Every element and its facts."
+        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).note
         case .need: return "What you need on the final."
         case .conv: return "Convert Word, PDF and images."
         case .units: return "Lengths, weights, temperatures."
@@ -84,7 +88,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "timer"
         case .calc: return "plus.forwardslash.minus"
         case .graph: return "chart.xyaxis.line"
-        case .ptable: return "atom"
+        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).symbol
         case .need: return "percent"
         case .conv: return "arrow.triangle.2.circlepath"
         case .units: return "ruler"
@@ -102,7 +106,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "#ff9500"
         case .calc: return "#ff9f0a"
         case .graph: return "#5856d6"
-        case .ptable: return "#30d158"
+        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).hex
         case .need: return "#ff375f"
         case .conv: return "#34c759"
         case .units: return "#64d2ff"
@@ -116,16 +120,10 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
 
     var color: Color { Color(hex: hex) }
 
-    /// (tools-4) The name its heading and the window's title show: the Periodic Table's says the page it is on (Lewis
-    /// structures, Molecule builder), as nothing else on those pages names them.
-    var title: String {
-        self == .ptable ? PTNav.shared.page.title : name
-    }
-
     /// The width of its pinned popover. (tools-34) The Periodic Table's wider, for squares big enough to point at.
     var popoverWidth: CGFloat {
         switch self {
-        case .ptable: return 480
+        case .ptable, .lewis, .molecule, .atoms: return ChemTools.popoverWidth(self)
         case .calc: return 420
         case .cite: return 400
         case .graph: return 360
@@ -177,8 +175,9 @@ final class ToolsCenter: ObservableObject {
         pinned = raw.split(separator: ",").compactMap { ToolKind(rawValue: String($0).trimmingCharacters(in: .whitespaces)) }.filter { seen.insert($0).inserted }
         // (the screenshot suite: -SimplTool calc opens the Calculator in its popup, over the Tools page with -SimplPlace
         // tools; -SimplToolFile <path> hands the tool opened a file, as a drop on its pin does — the annotator's page,
-        // Split's pages)
-        if let t = LaunchOpen.take("", key: "SimplTool"), let k = ToolKind(rawValue: t) { launchTool = k }
+        // Split's pages. 1.3.80: the Periodic Table's old page and view flags open the chemistry tools they are now —
+        // -SimplTool ptable -SimplPTPage lewis is Lewis Structures: ChemLaunch)
+        if let t = LaunchOpen.take("", key: "SimplTool"), let k = ToolKind(rawValue: ChemTools.launchKey(t)) { launchTool = k }
         if let k = launchTool, let path = LaunchOpen.take("", key: "SimplToolFile"), !path.isEmpty {
             launchFile = (k, URL(fileURLWithPath: path))
         }
@@ -317,15 +316,17 @@ struct ToolsView: View {
 }
 
 /// (tools-32) The Tools page's sections, in order — what each tool is for, so a tool is found by its kind rather than by
-/// reading every tile; the study tools first.
+/// reading every tile; the study tools first. (1.3.80) The Periodic Table moved out of Math & science into Chemistry,
+/// with the three tools that were its pages.
 enum ToolGroup: CaseIterable {
-    case study, science, files, biology
+    case study, science, files, chemistry, biology
 
     var title: String {
         switch self {
         case .study: return "Study"
         case .science: return "Math & science"
         case .files: return "Files"
+        case .chemistry: return "Chemistry"
         case .biology: return "Biology"
         }
     }
@@ -333,15 +334,16 @@ enum ToolGroup: CaseIterable {
     var kinds: [ToolKind] {
         switch self {
         case .study: return [.fc, .pomo, .cite, .need]
-        case .science: return [.calc, .graph, .units, .ptable]
+        case .science: return [.calc, .graph, .units]
         case .files: return [.conv, .pdfx, .mark, .ocr]
+        case .chemistry: return ChemTools.kinds
         case .biology: return BioTools.kinds
         }
     }
 }
 
 /// The page of tiles: every tool, a press opening it, its pin at its corner — (tools-32) in sections by what they are
-/// for, (1.3.78) the biology toolkit's last, under a heading of its own.
+/// for, (1.3.80) the chemistry tools' and (1.3.78) the biology toolkit's last, each under a heading of its own.
 struct ToolsGrid: View {
     var body: some View {
         ScrollViewReader { proxy in
@@ -350,13 +352,14 @@ struct ToolsGrid: View {
                 ForEach([ToolGroup.study, .science, .files], id: \.self) { g in
                     ToolGroupSection(title: g.title, kinds: g.kinds)
                 }
+                ChemToolsSection()
                 BioToolsSection()
             }
             .task {
-                // (the screenshot suite: -SimplToolsScroll biology, the page scrolled to the Biology section)
-                guard UserDefaults.standard.string(forKey: "SimplToolsScroll") == "biology" else { return }
+                // (the screenshot suite: -SimplToolsScroll chemistry or biology, the page scrolled to that section)
+                guard let to = UserDefaults.standard.string(forKey: "SimplToolsScroll"), ["chemistry", "biology"].contains(to) else { return }
                 try? await Task.sleep(nanoseconds: 400_000_000)
-                proxy.scrollTo("biology", anchor: .top)
+                proxy.scrollTo(to, anchor: .top)
             }
         }
     }
@@ -482,6 +485,9 @@ struct ToolScreen: View {
         case .calc: CalculatorTool()
         case .graph: GraphTool()
         case .ptable: PeriodicTableTool()
+        case .lewis: LewisStructuresTool()
+        case .molecule: MoleculeBuilderTool()
+        case .atoms: AtomsOrbitalsTool()
         case .need: GradeNeededTool()
         case .conv: FileConverterTool()
         case .units: UnitConverterTool()
@@ -495,9 +501,9 @@ struct ToolScreen: View {
 }
 
 /// A tool's heading: the tool's tile, its name and line, its pin and — (1.3.79) at its right end, where every full popup
-/// has its Close — its popup's ×. (tools-4) The Periodic Table's names the page it is on, with its pages, Tour and search
-/// in words on a row of their own under it; (tools-29) while one of its elements is open, "‹ Table" leads it, back to
-/// the table.
+/// has its Close — its popup's ×. (tools-4) The Periodic Table's has its search and Tour on a row of their own under it
+/// (1.3.80: no longer its pages — Lewis Structures and the Molecule Builder are tools of their own, with headings of
+/// their own); (tools-29) while one of its elements is open, "‹ Table" leads it, back to the table.
 struct ToolHeader: View {
     let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
@@ -519,7 +525,7 @@ struct ToolHeader: View {
         } else if kind == .ptable {
             VStack(alignment: .leading, spacing: 12) {
                 row(pages: nil, pinWords: true)
-                PTPageBar()
+                PTHeaderBar()
             }
         } else {
             row(pages: nil, pinWords: true)
@@ -568,7 +574,7 @@ struct ToolHeader: View {
             leading
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
             VStack(alignment: .leading, spacing: 2) {
-                Text(kind.title)
+                Text(kind.name)
                     .font(.sTitle)
                     .lineLimit(1)
                     .contentTransition(.opacity)
