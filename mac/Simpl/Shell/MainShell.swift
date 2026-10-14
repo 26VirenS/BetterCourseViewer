@@ -110,6 +110,7 @@ struct MainShell: View {
                     }
                     if !tools.toolbarSplit(timerActive: focus.active).more.isEmpty {
                         MorePinsMenu(kinds: tools.toolbarSplit(timerActive: focus.active).more, engine: engine)
+                            .disabled(touring)
                     }
                 }
             }

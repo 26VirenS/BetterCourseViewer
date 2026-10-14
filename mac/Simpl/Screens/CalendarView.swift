@@ -959,7 +959,7 @@ private struct CalendarEventLine: View {
     static func glyph(_ kind: String?) -> String {
         switch kind ?? "" {
         case "Assignment": return "doc.text"
-        case "Quiz": return "checklist"
+        case "Quiz": return "questionmark.square" // (courses-8: a quiz's own symbol everywhere; the checklist is To Do's)
         case "Discussion": return "bubble.left.and.bubble.right"
         case "Appointment": return "person.2"
         default: return "calendar"

@@ -332,7 +332,7 @@ struct PreviewCard: View {
         if let d = assignment {
             let handedIn = PreviewFormat.text(d.submitted) != nil || d.grade != nil
             if let q = PreviewFormat.text(d.quizUrl), !handedIn {
-                return PreviewAction(title: "Take Quiz", symbol: "checklist") { e.act(on: q, title: title, feedback: false) }
+                return PreviewAction(title: "Take Quiz", symbol: "questionmark.square") { e.act(on: q, title: title, feedback: false) }
             }
             if handedIn {
                 return PreviewAction(title: "See Feedback", symbol: "text.bubble") { e.act(on: url, title: title, feedback: true) }
@@ -345,7 +345,7 @@ struct PreviewCard: View {
             }
             if d.toolUrl != nil {
                 let quiz = d.ltiQuiz == true
-                return PreviewAction(title: quiz ? "Take Quiz" : "Open Tool", symbol: quiz ? "checklist" : "puzzlepiece.extension") { e.act(on: url, title: title, feedback: false) }
+                return PreviewAction(title: quiz ? "Take Quiz" : "Open Tool", symbol: quiz ? "questionmark.square" : "puzzlepiece.extension") { e.act(on: url, title: title, feedback: false) }
             }
             return nil
         }

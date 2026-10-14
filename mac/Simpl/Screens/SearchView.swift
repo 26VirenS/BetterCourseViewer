@@ -114,7 +114,7 @@ private struct ResultGroup: View {
     let group: SearchGroup
 
     var body: some View {
-        PageSection(title: group.title, trailing: "\(group.rows.count)") {
+        PageSection(title: group.title, count: group.rows.count) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(group.rows.enumerated()), id: \.element.id) { i, r in
                     if i > 0 { RowDivider(inset: 62) }

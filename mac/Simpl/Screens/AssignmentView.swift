@@ -747,7 +747,7 @@ struct AssignmentView: View {
     private func nextSteps(_ d: AssignmentData) -> [NextStep] {
         if let q = d.quizId, quizTaken(d) {
             let underWay = quizIntro?.begin.hasPrefix("Continue") == true
-            if underWay { return [NextStep(title: "Continue Quiz", symbol: "checklist", help: "Go back to the attempt under way", again: true)] }
+            if underWay { return [NextStep(title: "Continue Quiz", symbol: "questionmark.square", help: "Go back to the attempt under way", again: true)] }
             // (before the intro is in: its feedback, as the quiz was taken)
             let feedback = quizIntro.map { $0.last?.feedback == true } ?? true
             let mayRetake = AssignmentView.mayRetake(d, key: "\(course)/\(q)")
@@ -807,13 +807,13 @@ struct AssignmentView: View {
                 ? NextStep(title: "Hand In Again", symbol: "tray.and.arrow.up.fill", help: "Hand in this assignment again", short: "Hand In")
                 : NextStep(title: "Hand In", symbol: "tray.and.arrow.up.fill", help: "Hand in this assignment")
         }
-        if d.quizUrl != nil { return NextStep(title: "Take Quiz", symbol: "checklist", help: "Take this quiz") }
+        if d.quizUrl != nil { return NextStep(title: "Take Quiz", symbol: "questionmark.square", help: "Take this quiz") }
         if d.discussionUrl != nil {
             return NextStep(title: "Open Discussion", symbol: "bubble.left.and.bubble.right.fill", help: "Open this assignment’s discussion")
         }
         if d.toolUrl != nil {
             return d.ltiQuiz == true
-                ? NextStep(title: "Take Quiz", symbol: "checklist", help: "Open this quiz in a window of its own")
+                ? NextStep(title: "Take Quiz", symbol: "questionmark.square", help: "Open this quiz in a window of its own")
                 : NextStep(title: "Open Tool", symbol: "puzzlepiece.extension.fill", help: "Open this assignment’s tool in a window of its own")
         }
         return nil

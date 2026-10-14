@@ -151,7 +151,7 @@ struct QuizScreen: View {
                     .accessibilityLabel("Back to the Quiz")
                     .transition(.opacity)
             }
-            IconTile(symbol: "checklist", color: tint, size: 32)
+            IconTile(symbol: "questionmark.square", color: tint, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.sTitle3)

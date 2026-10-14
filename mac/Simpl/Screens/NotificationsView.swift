@@ -78,7 +78,7 @@ struct NotificationsView: View {
                     .padding(.vertical, 30)
             }
             ForEach(days) { day in
-                CardSection(title: day.title, trailing: "\(day.rows.count)") {
+                CardSection(title: day.title, count: day.rows.count) {
                     ForEach(Array(day.rows.enumerated()), id: \.element.id) { i, n in
                         if i > 0 { RowDivider(inset: 52) }
                         NotificationRow(row: n, open: { open(n) }, mark: { read in mark([n.id], read: read) }, clear: { mark([n.id], gone: true) })
