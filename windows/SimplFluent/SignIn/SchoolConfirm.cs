@@ -14,32 +14,37 @@ namespace Simpl.SignIn;
 /// The school chosen, before it is opened (the Mac's SchoolConfirm): a small square of its sign-in page, live, and "Is
 /// this your school?". Yes opens it and the sign-in goes on as always; No goes back to the search as it was left. The
 /// page in the square keeps nothing (InPrivate: no cookies, no storage), is drawn zoomed out as on a laptop's screen,
-/// and takes no clicks — it is a look, not the page. Only a page that came is drawn on white (a page's own ground):
-/// while it comes the square is the theme's card, and one that cannot come leaves a smaller card that says so — and
-/// that the student can sign in all the same — never a bright empty square in a dark window.
+/// and takes no clicks — it is a look, not the page. Only a page that came is drawn, on white (a page's own ground):
+/// while it comes, a small card in the theme's colours waits in its place with a spinner, and where it cannot come the
+/// card says so — and that the student can sign in all the same (the Mac's 200 by 160) — never a bright empty square
+/// in a dark window. The square's room is kept throughout, so nothing under it moves.
 /// </summary>
 public sealed class SchoolConfirm : Grid
 {
     public const double Side = 320;
-    /// <summary>The card left where no preview came (the Mac's: 200 by 160).</summary>
-    private const double NoneWidth = 200, NoneHeight = 160;
     private readonly Border square;
-    private readonly Grid inside = new();
-    private readonly FrameworkElement loading = K.Spinner(28);
+    private readonly Grid inside = new() { Background = Brushes.White };
+    /// <summary>The card in the square's place while the page comes, or where it could not.</summary>
+    private readonly Border waiting;
     private WebView2CompositionControl? web;
-    private readonly Border webHolder = new() { Opacity = 0 };
     private bool settled;
 
     public SchoolConfirm(SchoolSearch.School school, Action yes, Action no)
     {
-        inside.Children.Add(loading);
         square = new Border
         {
             Width = Side, Height = Side, CornerRadius = new CornerRadius(8), Child = inside, ClipToBounds = true,
-            HorizontalAlignment = HorizontalAlignment.Center, Effect = K.Shadow(36, 10, 0.18),
+            HorizontalAlignment = HorizontalAlignment.Center, Effect = K.Shadow(36, 10, 0.18), Opacity = 0,
         };
-        square.Bg(B.Card).Stroke(B.CardStroke);
+        square.Stroke(B.CardStroke);
         inside.Clip = new RectangleGeometry(new Rect(0, 0, Side - 2, Side - 2), 7, 7);
+        waiting = new Border
+        {
+            Width = 200, Height = 160, CornerRadius = new CornerRadius(8), Child = K.Spinner(24),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        waiting.Bg(B.Card).Stroke(B.CardStroke);
+        var stage = new Grid { Width = Side, Height = Side, HorizontalAlignment = HorizontalAlignment.Center, Children = { square, waiting } };
 
         var name = K.Wrapped(school.Name, Ty.BodyLarge, B.Text, 2).Center();
         name.TextAlignment = TextAlignment.Center;
@@ -54,7 +59,7 @@ public sealed class SchoolConfirm : Grid
         yesB.IsDefault = true;
         var buttons = K.H(12, noB, yesB);
         buttons.HorizontalAlignment = HorizontalAlignment.Center;
-        var column = K.V(20, square, words, buttons);
+        var column = K.V(20, stage, words, buttons);
         column.Width = 520;
         column.HorizontalAlignment = HorizontalAlignment.Center;
         column.VerticalAlignment = VerticalAlignment.Center;
@@ -79,8 +84,7 @@ public sealed class SchoolConfirm : Grid
                 Width = Side, Height = Side,
                 CreationProperties = new CoreWebView2CreationProperties { IsInPrivateModeEnabled = true, UserDataFolder = System.IO.Path.Combine(AppPaths.Root, "Preview") },
             };
-            webHolder.Child = web;
-            inside.Children.Insert(0, webHolder);
+            inside.Children.Add(web);
             await web.EnsureCoreWebView2Async();
             var core = web.CoreWebView2;
             core.Settings.AreDefaultContextMenusEnabled = false;
@@ -104,35 +108,30 @@ public sealed class SchoolConfirm : Grid
         }
     }
 
+    /// <summary>The page came: the square shows it, the waiting card goes (once: a page that comes after the preview was
+    /// given up stays given up).</summary>
     private void Shown()
     {
-        // (once: a page that comes after the preview was given up stays given up — no white under a hidden page)
         if (web == null || settled) return;
         settled = true;
-        loading.Visibility = Visibility.Collapsed;
-        // (the page's own ground under it, now that there is a page)
-        inside.Background = Brushes.White;
-        webHolder.Opacity = 1;
-        Motion.FadeIn(webHolder, Motion.Medium);
+        waiting.Visibility = Visibility.Collapsed;
+        square.Opacity = 1;
+        Motion.FadeIn(square, Motion.Medium);
     }
 
-    /// <summary>No preview (offline, a page that would not come, the pictures): the square becomes a small card in the
-    /// theme's colours saying so, and that signing in still works.</summary>
+    /// <summary>No preview (offline, a page that would not come, the pictures): the waiting card says so, and that
+    /// signing in still works; the square stays away.</summary>
     private void Failed()
     {
         settled = true;
-        loading.Visibility = Visibility.Collapsed;
-        webHolder.Visibility = Visibility.Collapsed;
-        square.Width = NoneWidth;
-        square.Height = NoneHeight;
-        inside.Clip = new RectangleGeometry(new Rect(0, 0, NoneWidth - 2, NoneHeight - 2), 7, 7);
+        square.Visibility = Visibility.Collapsed;
         var said = K.Text("Couldn’t load a preview.", Ty.Caption).Center();
         said.FontWeight = FontWeights.SemiBold;
         var none = K.V(4, K.Icon(SymbolRegular.Globe24, 24, B.Text2).Margin(0, 0, 0, 4), said, K.Text("You can still sign in.", Ty.Caption, B.Text2).Center());
-        System.Windows.Automation.AutomationProperties.SetName(square, "Couldn’t load a preview of this school’s sign-in page. You can still sign in.");
         none.HorizontalAlignment = HorizontalAlignment.Center;
         none.VerticalAlignment = VerticalAlignment.Center;
-        inside.Children.Add(none);
+        waiting.Child = none;
+        System.Windows.Automation.AutomationProperties.SetName(waiting, "Couldn’t load a preview of this school’s sign-in page. You can still sign in.");
         Motion.FadeIn(none, Motion.Normal);
     }
 
