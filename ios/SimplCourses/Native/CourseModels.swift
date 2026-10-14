@@ -39,6 +39,8 @@ struct PostRow: Codable, Identifiable, Hashable {
     var author: String?
     var avatar: String?
     var when: String?
+    /// (2.99.33) On Brightspace the forum the topic is in ("Weekly Discussions"; `author` then ""), "" on Canvas.
+    var forum: String?
     var preview: String?
     var unread: Bool?
     var unreadCount: Int?
@@ -128,6 +130,8 @@ struct TopicData: Codable {
     var author: String?
     var avatar: String?
     var when: String?
+    /// (2.99.33) On Brightspace the forum the topic is in ("Weekly Discussions"; `author` then ""), "" on Canvas.
+    var forum: String?
     var html: String
     var announcement: Bool?
     var graded: String?
@@ -352,6 +356,9 @@ struct FileRow: Codable, Identifiable, Hashable {
     var mime: String?
     var kind: String?
     var locked: Bool?
+    /// (2.99.33) What it is in one word, from one vocabulary: PDF, Image, Spreadsheet, Slides, Document, Text, Video,
+    /// Audio, Archive, Web page, File.
+    var typeText: String?
 }
 
 struct FilesData: Codable {
@@ -463,6 +470,10 @@ struct GroupRow: Codable, Identifiable, Hashable {
     var sub: String?
     var color: String?
     var past: Bool?
+    /// (2.99.33) The group's course by its name ("Academic Success Resource Site (2026-27)", as its home names it), and
+    /// its code only when that says something new ("ASRS"; "" otherwise), for a tooltip.
+    var course: String?
+    var courseCode: String?
 }
 
 struct GroupsData: Codable {

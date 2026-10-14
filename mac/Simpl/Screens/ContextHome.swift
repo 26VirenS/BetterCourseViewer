@@ -33,6 +33,24 @@ struct ContextHome: View {
     /// The id in a context: "courses/101" → "101".
     static func id(of ctx: String) -> String { String(ctx.split(separator: "/").last ?? "") }
 
+    /// (courses-5) Whether a course's name says something none of `shown` does, compared as the engine compares names
+    /// (saysMore): case, spaces, dashes, underscores, dots and a term prefix ("F26-", "SP26 ") set aside, and a name
+    /// that is a part of one shown saying nothing new — "F26-MATH 021 20" under a nickname whose line already reads
+    /// "MATH-021-20 · Fall 2026" is the same name twice.
+    static func saysMore(_ name: String, than shown: [String]) -> Bool {
+        let key = nameKey(name)
+        guard !key.isEmpty else { return false }
+        return !shown.contains { nameKey($0).contains(key) }
+    }
+
+    private static func nameKey(_ s: String) -> String {
+        let term = "^(?:(?:F|S|W|U|FA|SP|SU|WI|SM|FL|SPR|FAL|SUM|WIN)\\d{2,4}|\\d{4}(?:FA|SP|SU|WI|F|S|U|W)?|\\d{6})[-_\\s:]+(?=\\S)"
+        return s.trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: term, with: "", options: [.regularExpression, .caseInsensitive])
+            .lowercased()
+            .replacingOccurrences(of: "[\\s\\-_–—.]+", with: "", options: .regularExpression)
+    }
+
     @ViewBuilder
     private func content(_ d: HomeData) -> some View {
         let color = Color(hex: d.color)
@@ -50,7 +68,7 @@ struct ContextHome: View {
                 ScreenHeading(title: d.title, color: color)
                 // (every line with its symbol in one column, so their words start together)
                 VStack(alignment: .leading, spacing: 8) {
-                    if let name = d.name, !name.isEmpty, name != d.title {
+                    if let name = d.name, ContextHome.saysMore(name, than: [d.title] + (d.sub ?? "").components(separatedBy: " · ")) {
                         Text(name)
                             .font(.sTitle3)
                             .foregroundStyle(.secondary)

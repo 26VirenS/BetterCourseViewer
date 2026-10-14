@@ -78,10 +78,12 @@ struct TopicView: View {
     }
 
     /// The post: who wrote it (or, when Canvas names nobody, the course, on its own colour), when, the assignment it is
-    /// graded as, its words and its files.
+    /// graded as, its words and its files. (courses-25) A Brightspace topic names its forum, not a person: the course on
+    /// the discussion's symbol, "in Weekly Discussions" under it — never a forum's initials as if someone wrote it.
     private func postCard(_ d: TopicData, _ color: Color) -> some View {
         let who = (d.author ?? "").isEmpty ? nil : d.author
-        let parts: [String?] = [who == nil ? nil : d.context, d.when]
+        let forum = (d.forum ?? "").isEmpty ? nil : "in \(d.forum ?? "")"
+        let parts: [String?] = [who == nil ? forum : d.context, d.when]
         let line = parts.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
@@ -103,7 +105,7 @@ struct TopicView: View {
             }
             .accessibilityElement(children: .combine)
             if let g = d.graded, !g.isEmpty { gradedLink(g, d) }
-            if !d.html.isEmpty { RichText(html: d.html) }
+            if !d.html.isEmpty { RichText(html: d.html, placeholder: true) } // (courses-1: its words at once, natively)
             if let files = d.attachments, !files.isEmpty { attachments(files) }
         }
         .padding(22)
@@ -163,7 +165,7 @@ struct TopicView: View {
 
     /// Every reply in reading order, threaded by depth; or why there are none to see.
     private func repliesCard(_ d: TopicData, _ color: Color) -> some View {
-        CardSection(title: "Replies", trailing: d.count.flatMap { $0 > 0 ? "\($0)" : nil }) {
+        CardSection(title: "Replies", count: d.count.flatMap { $0 > 0 ? $0 : nil }) {
             repliesNote(d)
             ForEach(Array(d.entries.enumerated()), id: \.element.id) { i, e in
                 if i > 0 { RowDivider(inset: 47 + CGFloat(max(e.depth, 0)) * TopicView.indent) }

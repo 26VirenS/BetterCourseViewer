@@ -161,6 +161,8 @@ struct CourseRow: Codable, Identifiable, Hashable {
     var color: String?
     var score: Double?
     var scoreText: String
+    /// (2.99.33) Why there is no score ("No grade yet", "Hidden by instructor"; "" with one), for the ring's tooltip.
+    var scoreWhy: String?
     var unread: Int?
     var url: String
     /// (Mac 1.2.1, allCourses) In the sidebar — the setup's choice — or not; and its term.

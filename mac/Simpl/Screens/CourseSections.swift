@@ -67,7 +67,7 @@ private struct DiscussionsList: View {
                     EmptyCard(text: d.empty ?? "No discussions", symbol: "bubble.left.and.bubble.right")
                 }
                 SectionColumns(items: d.sections, weight: { $0.rows.count + 2 }) { s in
-                    CardSection(title: s.title, trailing: "\(s.rows.count)") {
+                    CardSection(title: s.title, count: s.rows.count) {
                         DividedRows(data: s.rows, inset: 54) { r in PostLink(row: r, color: Color(hex: d.color)) }
                     }
                 }
@@ -97,7 +97,7 @@ private struct AssignmentsList: View {
                     EmptyCard(text: d.empty ?? "No assignments", symbol: "doc.text")
                 }
                 SectionColumns(items: d.sections, weight: { $0.rows.count + 2 }) { s in
-                    CardSection(title: s.title, trailing: "\(s.rows.count)") {
+                    CardSection(title: s.title, count: s.rows.count) {
                         DividedRows(data: s.rows) { r in
                             WorkLink(row: r, color: s.title == "Overdue" ? .red : Color(hex: d.color))
                         }
@@ -123,7 +123,7 @@ private struct QuizzesList: View {
             Page {
                 ScreenHeading(title: title, sub: d.context, color: Color(hex: d.color))
                 if d.rows.isEmpty {
-                    EmptyCard(text: d.empty ?? "No quizzes", symbol: "checklist")
+                    EmptyCard(text: d.empty ?? "No quizzes", symbol: Glyph.section("quizzes"))
                 } else {
                     RowsCard {
                         DividedRows(data: d.rows) { r in WorkLink(row: r, color: Color(hex: d.color)) }
@@ -181,7 +181,7 @@ private struct SyllabusView: View {
     }
 
     private func datedWork(_ d: RowsData) -> some View {
-        CardSection(title: "Dated Work", trailing: "\(d.rows.count)") {
+        CardSection(title: "Dated Work", count: d.rows.count) {
             DividedRows(data: d.rows) { r in WorkLink(row: r, color: Color(hex: d.color)) }
         }
     }
@@ -193,7 +193,8 @@ private struct SyllabusView: View {
 
 /// A course's modules, each a card that opens under its name: its items indented as the course sets them, under their
 /// sub-headings — what each asks of you (View, Submit, Mark done), a tick once it is done, why one is locked, and Mark
-/// Done where it is yours to mark. Only the module last opened here opens by itself.
+/// Done where it is yours to mark. Only the module last opened here opens by itself — or (courses-16) a course's only
+/// module; a locked one says when it opens ("Opens Oct 20") under its name, closed.
 private struct ModulesList: View {
     let ctx: String
     @EnvironmentObject private var engine: Engine
@@ -274,11 +275,21 @@ private struct ModulesList: View {
                     .foregroundStyle(.green)
                     .accessibilityLabel("Done")
             }
-            Text(m.name)
-                .font(.sHeadline)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(m.name)
+                    .font(.sHeadline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                // (courses-16: why it is locked, or when it opens, without opening it)
+                if m.locked == true, let t = m.lockText, !t.isEmpty {
+                    Text(t)
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+            }
             Spacer(minLength: 8)
             if let p = m.progress, !p.isEmpty {
                 Text(p)
@@ -297,13 +308,6 @@ private struct ModulesList: View {
             Divider()
                 .padding(.horizontal, 10)
                 .padding(.bottom, 4)
-            if m.locked == true, let t = m.lockText, !t.isEmpty {
-                Label(t, systemImage: "lock.fill")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-            }
             ForEach(Array(m.items.enumerated()), id: \.element.id) { i, it in
                 if i > 0, it.header != true, m.items[i - 1].header != true {
                     RowDivider(inset: 48 + CGFloat(it.indent ?? 0) * 20)
@@ -383,12 +387,20 @@ private struct ModulesList: View {
                     .accessibilityLabel("Done")
                     .transition(tickIn)
             }
+            // (courses-31: ↗ only for what leaves for the browser; a tool opens in a Simpl window, the window's symbol as
+            // the course's More rows and External Tools have it)
             if it.external == true {
                 Image(systemName: "arrow.up.right")
                     .font(.sFootnote)
                     .foregroundStyle(.tertiary)
                     .help("Opens in your browser")
                     .accessibilityLabel("Opens in your browser")
+            } else if it.type == "ExternalTool", !locked {
+                Image(systemName: "macwindow")
+                    .font(.sFootnote)
+                    .foregroundStyle(.tertiary)
+                    .help("Opens in a window of its own")
+                    .accessibilityLabel("Opens in a window of its own")
             }
         }
     }
@@ -445,7 +457,11 @@ private struct ModulesList: View {
     private func restore(_ d: ModulesData) {
         guard !restored else { return }
         restored = true
-        if let last = UserDefaults.standard.string(forKey: lastKey), d.modules.contains(where: { $0.id == last }) { opened = [last] }
+        if let last = UserDefaults.standard.string(forKey: lastKey), d.modules.contains(where: { $0.id == last }) {
+            opened = [last]
+        } else if d.modules.count == 1, let only = d.modules.first {
+            opened = [only.id] // (courses-16: a course's only module open at once — one closed card was a click for nothing)
+        }
     }
 
     private func mark(_ it: ModuleItem, _ m: ModuleData, _ done: Bool) {
@@ -589,9 +605,15 @@ private struct PeopleList: View {
                     EmptyCard(text: d.empty ?? "Nobody to show", symbol: "person.2")
                 }
                 ForEach(d.sections) { s in
-                    CardSection(title: s.title, trailing: "\(s.rows.count)") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], alignment: .leading, spacing: 4) {
-                            ForEach(s.rows) { p in person(p) }
+                    CardSection(title: s.title, count: s.rows.count) {
+                        if s.rows.count == 1, let p = s.rows.first {
+                            // (courses-34: one person — most often the teacher — across the card, Message named at its
+                            // end, not an envelope floating where a second column would start)
+                            person(p, labelled: true)
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], alignment: .leading, spacing: 4) {
+                                ForEach(s.rows) { p in person(p) }
+                            }
                         }
                     }
                 }
@@ -603,7 +625,9 @@ private struct PeopleList: View {
         }
     }
 
-    private func person(_ p: PersonRow) -> some View {
+    /// A person: their picture, name and pronouns, and Message — the envelope alone in a grid of many, named when they
+    /// have the card to themselves (`labelled`).
+    private func person(_ p: PersonRow, labelled: Bool = false) -> some View {
         HStack(spacing: 12) {
             PersonAvatar(name: p.name, avatar: p.avatar, size: 38)
             VStack(alignment: .leading, spacing: 1) {
@@ -613,17 +637,28 @@ private struct PeopleList: View {
                 }
             }
             Spacer(minLength: 4)
-            Button {
-                writeTo = Recipient(id: p.id, name: p.name)
-            } label: {
-                Image(systemName: "envelope")
-                    .font(.sBody)
-                    .frame(width: 30, height: 30)
-                    .contentShape(Rectangle())
+            if labelled {
+                Button {
+                    writeTo = Recipient(id: p.id, name: p.name)
+                } label: {
+                    Label("Message", systemImage: "envelope")
+                }
+                .glassButton()
+                .help("Message \(p.name)")
+                .accessibilityLabel("Message \(p.name)")
+            } else {
+                Button {
+                    writeTo = Recipient(id: p.id, name: p.name)
+                } label: {
+                    Image(systemName: "envelope")
+                        .font(.sBody)
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(RowButtonStyle(radius: 8))
+                .help("Message \(p.name)")
+                .accessibilityLabel("Message \(p.name)")
             }
-            .buttonStyle(RowButtonStyle(radius: 8))
-            .help("Message \(p.name)")
-            .accessibilityLabel("Message \(p.name)")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)

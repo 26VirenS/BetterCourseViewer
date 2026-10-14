@@ -26,12 +26,16 @@ struct ExternalToolsData: Codable {
         var sub: String?
         var status: Status?
         var upcoming: Bool?
+        /// (2.99.33) Its title without the tool's name in front ("Unit 2" for "Knewton Alta: Unit 2"; Windows' rule).
+        var short: String?
     }
     /// (1.3.77) The next place still to do, of all its courses: its title, its line and its course's name.
     struct Next: Codable, Hashable {
         let title: String
         var sub: String?
         var course: String?
+        /// (2.99.33) Its title without the tool's name in front.
+        var short: String?
     }
     struct Tool: Codable, Identifiable {
         let id: String
@@ -276,12 +280,14 @@ private extension ExternalToolsData.Tool {
         return parts.joined(separator: " · ")
     }
 
-    /// (1.3.77) The next still to do: "Knewton Alta: Unit 2", "Due Oct 18 at 11:59 PM · F26-SPRK 010 103".
+    /// (1.3.77) The next still to do: "Unit 2" (courses-26: under the tool's own name, without it again), "Due Oct 18
+    /// at 11:59 PM · F26-SPRK 010 103".
     var nextShown: ToolNext? {
         guard let n = next else { return nil }
         let due = (n.sub ?? "").components(separatedBy: " · ").first ?? ""
         let line = [due, n.course ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
-        return ToolNext(title: n.title, line: line, color: courses.first { $0.name == n.course }?.color)
+        let title = (n.short ?? "").isEmpty ? n.title : (n.short ?? n.title)
+        return ToolNext(title: title, line: line, color: courses.first { $0.name == n.course }?.color)
     }
 
     /// (1.3.77) Which place in the list is that next one (the soonest still to do across its courses, not merely the
@@ -316,6 +322,8 @@ private struct ToolCard: View {
     /// Whether this card's list is showing — the card's own, as a pinned tool keeps its popover's, kept in step with the
     /// page's `listed` (which card's list is open) both ways.
     @State private var shown = false
+    /// (courses-27) Where the card's foot is in its window, for the list under it to be no taller than the room left.
+    @State private var footY: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color { Color(hex: tool.courses.first?.color ?? "#8e8e93") }
@@ -352,6 +360,14 @@ private struct ToolCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { revealButton }
+        .background {
+            // (courses-27: where its foot is, read as its list opens — not on every frame of a scroll)
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { footY = g.frame(in: .global).maxY }
+                    .onChange(of: shown) { _, on in if on { footY = g.frame(in: .global).maxY } }
+            }
+        }
         .modifier(ListCardSurface(lit: hover || listed))
         .scaleEffect(pressed && !reduceMotion ? 0.98 : 1)
         .animation(.easeOut(duration: 0.1), value: pressed)
@@ -382,13 +398,23 @@ private struct ToolCard: View {
         .accessibilityValue(next)
         .accessibilityHint(tool.chooseHelp)
         // (the list hangs from this button — the whole card, under its words — not from the card's glass surface over
-        // it, from which a popover did not show)
-        .popover(isPresented: $shown, arrowEdge: .trailing) {
-            ToolPlacesList(tool: tool, tint: tint, choose: choose, close: { shown = false })
+        // it, from which a popover did not show. courses-27: from the card's foot, under it, its arrow at "5 assignments"
+        // — beside the card it covered the page's heading and the card itself; with no room below, it goes above)
+        .popover(isPresented: $shown, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
+            ToolPlacesList(tool: tool, tint: tint, room: roomBelow, choose: choose, close: { shown = false })
                 // (the screenshot suite's console: when a list shows and goes)
                 .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) } }
                 .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) } }
         }
+    }
+
+    /// (courses-27) The room between the card's foot and the window's, less a margin: the list under the card is no
+    /// taller than that. With too little room the list goes above the card, as tall as it likes (460 points at most).
+    private var roomBelow: CGFloat {
+        let window = NSApp.keyWindow?.contentView?.bounds.height ?? 0
+        guard window > 0, footY > 0 else { return 460 }
+        let room = window - footY - 24
+        return room >= 240 ? min(460, room) : 460
     }
 
     private var header: some View {
@@ -428,22 +454,26 @@ private struct ToolCard: View {
         .background(Theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    /// (1.3.77) The card's foot: how many places it has, and a chevron — there is more inside.
+    /// (1.3.77) The card's foot: how many places it has, and a chevron — there is more inside. (courses-29) It points
+    /// down, to the list that opens under it here (a right chevron promised a page of its own), and up while it is open.
     private var footer: some View {
         VStack(spacing: 10) {
             Divider()
             HStack(spacing: 6) {
                 Text(tool.placesPhrase).font(.sCallout).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(listed ? 180 : 0))
+                    .animation(reduceMotion ? nil : .timingCurve(0.23, 1, 0.32, 1, duration: 0.2), value: listed)
             }
         }
     }
 
     /// Each course it is a tab in, opened there. (1.3.77) A long course name is cut short inside its chip (its tooltip
-    /// says it whole).
+    /// says it whole). (courses-31) Each ends in the window's symbol, as the course home's More rows do: it opens in a
+    /// Simpl window of its own — ↗ is kept for what leaves for the browser.
     private func chips(_ courses: [ExternalToolsData.Course]) -> some View {
         WrapLayout(spacing: 6) {
             ForEach(courses) { c in
@@ -451,7 +481,7 @@ private struct ToolCard: View {
                     HStack(spacing: 6) {
                         Circle().fill(Color(hex: c.color)).frame(width: 7, height: 7)
                         Text(c.name).font(.sCallout.weight(.medium)).lineLimit(1).truncationMode(.tail)
-                        Image(systemName: "arrow.up.forward").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                        Image(systemName: "macwindow").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -536,6 +566,8 @@ private struct NextTag: View {
 private struct ToolPlacesList: View {
     let tool: ExternalToolsData.Tool
     let tint: Color
+    /// (courses-27) The most the whole popover may be tall: the room under its card.
+    let room: CGFloat
     let choose: (ExternalToolsData.Course, ExternalToolsData.Item) -> Void
     let close: () -> Void
 
@@ -550,9 +582,10 @@ private struct ToolPlacesList: View {
 
     private enum Focus: Hashable { case filter, list }
 
-    init(tool: ExternalToolsData.Tool, tint: Color, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
+    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 460, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
         self.tool = tool
         self.tint = tint
+        self.room = room
         self.choose = choose
         self.close = close
         let all = tool.places
@@ -570,8 +603,12 @@ private struct ToolPlacesList: View {
     private var hasFilter: Bool { all.count > 8 }
     /// "5 assignments in 2 courses".
     private var summary: String { "\(tool.placesPhrase) in \(courseCount == 1 ? "1 course" : "\(courseCount) courses")" }
-    /// The list's own height at most: the whole popover no taller than 460 points.
-    private var listMax: CGFloat { hasFilter ? 352 : 396 }
+    /// The list's own height at most: the whole popover no taller than 460 points, (courses-27) nor than the room under
+    /// its card (its head and filter take 64 or 108 of it).
+    private var listMax: CGFloat {
+        let head: CGFloat = hasFilter ? 108 : 64
+        return max(120, min(460, room) - head)
+    }
 
     private var shown: [ToolPlace] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -589,6 +626,8 @@ private struct ToolPlacesList: View {
             list(shown)
         }
         .frame(width: 380)
+        // (courses-27: solid under the list — the card behind showed through the popover's foot as a cut-off line)
+        .background(Color(nsColor: .windowBackgroundColor))
         .background { keyHolder }
         .defaultFocus($focus, firstFocus)
         .task {
@@ -711,7 +750,10 @@ private struct ToolPlacesList: View {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(p.item.title).font(.sCallout.weight(.medium)).lineLimit(2)
+                        // (courses-26: "Unit 2" under the list's "Knewton Alta", not its name again on every row)
+                        Text((p.item.short ?? "").isEmpty ? p.item.title : (p.item.short ?? p.item.title))
+                            .font(.sCallout.weight(.medium))
+                            .lineLimit(2)
                         if p.id == nextID { NextTag() }
                     }
                     if let sub = p.item.sub, !sub.isEmpty {

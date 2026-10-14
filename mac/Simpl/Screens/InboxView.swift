@@ -786,7 +786,8 @@ struct GroupsView: View {
                         .background(PageGround())
                 } else {
                     Page {
-                        ScreenHeading(title: "Groups", sub: summary(d))
+                        // (courses-35: no "1 current · 1 past" under the heading — each section counts its own)
+                        ScreenHeading(title: "Groups")
                         if !d.current.isEmpty { section("Current", d.current) }
                         if !d.past.isEmpty { section("Past", d.past) }
                     }
@@ -806,7 +807,7 @@ struct GroupsView: View {
     }
 
     private func section(_ title: String, _ rows: [GroupRow]) -> some View {
-        PageSection(title: title, trailing: "\(rows.count)") {
+        PageSection(title: title, count: rows.count) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 460), spacing: 16, alignment: .top)], alignment: .leading, spacing: 16) {
                 ForEach(rows) { g in card(g) }
             }
@@ -831,18 +832,12 @@ struct GroupsView: View {
         }
     }
 
-    private func summary(_ d: GroupsData) -> String {
-        var parts: [String] = []
-        if !d.current.isEmpty { parts.append("\(d.current.count) current") }
-        if !d.past.isEmpty { parts.append("\(d.past.count) past") }
-        return parts.joined(separator: " · ")
-    }
-
     private func load() async { await model.load(engine, "groups") }
 }
 
-/// A group as a card: its symbol on its course's colour, its name, its course (with the colour's dot) and how many are
-/// in it.
+/// A group as a card: its symbol on its course's colour, its name — whole, on two lines if it needs them: names that
+/// differ only at their end ("… 2026 1") must not lose it (courses-22) —, its course by name (with the colour's dot;
+/// the code in its tooltip, courses-23) and how many are in it.
 private struct GroupsCard: View {
     let group: GroupRow
 
@@ -854,6 +849,7 @@ private struct GroupsCard: View {
                     .font(.sTitle3)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let course {
                     HStack(spacing: 6) {
                         Circle()
@@ -863,7 +859,9 @@ private struct GroupsCard: View {
                             .font(.sCallout.weight(.medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                            .truncationMode(.middle)
                     }
+                    .help(courseTip)
                 }
                 if let members {
                     Label(members, systemImage: "person.2")
@@ -882,8 +880,15 @@ private struct GroupsCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Its line in parts ("BIO 101 · 4 members").
+    /// Its line in parts ("Academic Success Resource Site (2026-27) · 4 members").
     private var parts: [String] { (group.sub ?? "").components(separatedBy: " · ").filter { !$0.isEmpty } }
     private var members: String? { parts.first { $0.contains("member") } }
-    private var course: String? { parts.first { !$0.contains("member") } }
+    private var course: String? {
+        if let c = group.course, !c.isEmpty { return c }
+        return parts.first { !$0.contains("member") }
+    }
+    /// The course in full, and its code when that says something new ("Academic Success Resource Site (2026-27) · ASRS").
+    private var courseTip: String {
+        [course ?? "", group.courseCode ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
 }

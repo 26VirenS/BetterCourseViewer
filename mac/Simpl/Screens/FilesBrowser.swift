@@ -99,7 +99,7 @@ struct FilesBrowser: View {
                     .card()
             }
             if !d.folders.isEmpty {
-                PageSection(title: "Folders", trailing: "\(d.folders.count)") {
+                PageSection(title: "Folders", count: d.folders.count) {
                     rowsCard {
                         ForEach(Array(d.folders.enumerated()), id: \.element.id) { i, f in
                             if i > 0 { RowDivider(inset: 54) }
@@ -109,7 +109,7 @@ struct FilesBrowser: View {
                 }
             }
             if !d.files.isEmpty {
-                PageSection(title: "Files", trailing: "\(d.files.count)") {
+                PageSection(title: "Files", count: d.files.count) {
                     rowsCard {
                         ForEach(Array(d.files.enumerated()), id: \.element.id) { i, f in
                             if i > 0 { RowDivider(inset: 54) }
@@ -367,8 +367,10 @@ struct FilesBrowser: View {
         }
     }
 
-    /// What a file is, in a word, as Finder would put it.
+    /// What a file is, in a word: (courses-18) the engine's one vocabulary (PDF, Image, Spreadsheet, Slides, Document,
+    /// Text…) — "PNG" beside "….png" said the extension again, and a .txt was a "Document" — else as Finder would put it.
     static func kind(of f: FileRow) -> String {
+        if let t = f.typeText, !t.isEmpty { return t }
         let ext = (f.name as NSString).pathExtension.lowercased()
         switch true {
         case f.kind == "pdf" || ext == "pdf": return "PDF"

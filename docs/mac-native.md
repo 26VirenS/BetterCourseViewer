@@ -476,6 +476,26 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool window). Its chips stay for the courses where it is also a tab. `-SimplExternalToolList knewton` opens the list of
   the first tool whose name has that word (the screenshot suite's `light-36b-external-tools-list` and
   `dark-36b-external-tools-list`).
+- **Courses, a course and its sections, after the UI review (the courses findings; the same on Windows).** Courses:
+  the filter reads Current · Past · Future and the line under the heading says what it shows (allCourses `subs`:
+  "Fall 2026", "2 past courses", "None yet"); Choose Courses is named in the toolbar, on a symbol of its own. A card's
+  banner names the course in white only where white stands 3:1 against its colour (else near-black); under it the
+  course's other name only when it says something new (`altName`: a nickname's real name), else its term and teacher
+  (`detail`); its five sections are named under their symbols (Grades, Work, Modules, Files, News); a course with no
+  score says "–" and why in the ring's tooltip (`scoreWhy`). A section's count sits right after its heading
+  (`PageSection`/`CardSection` `count:`) — Courses, Groups (no "1 current · 1 past" line any more), Files, Discussions,
+  Assignments, People, Replies. Quizzes have their own symbol (`questionmark.square`); the checklist is To Do's. A
+  course home shows the course's name under its title only when nothing on the page says it already. Modules: a course's
+  only module opens by itself, and a locked one says when it opens under its name, closed. A tool in a module, a tool's
+  course chip and the home's More rows end in the window's symbol (a Simpl window); ↗ is only for the browser. People:
+  a section of one (the teacher) runs across the card with a named Message button. Files: one vocabulary for a file's
+  kind (`typeText`: PDF, Image, Spreadsheet, Text…). A discussion's post is drawn as plain text at once and the web
+  view's own drawing fades in once it has measured (`RichText(placeholder:)`; the screenshot suite's console says
+  "[richtext] not measured" if it never does); a Brightspace topic's forum is "in Weekly Discussions" on the
+  discussion's symbol, never a person's initials. Groups: a card's name wraps to two lines, its course is named in full
+  (`course`, the code in its tooltip). External Tools: rows and the card's next say "Unit 2" (`short`), the list opens
+  under its card's foot (a down chevron there, up while open), no taller than the room left in the window, on a solid
+  ground. The tool window's Dark Page moon shows only in Dark Mode, where it does something.
 
 - **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
   Focus timer, Citation generator, Grade needed), *Math & science* (Calculator, Graphing calculator, Unit converter,

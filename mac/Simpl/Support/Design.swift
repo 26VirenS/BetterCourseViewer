@@ -90,6 +90,9 @@ struct GlassGroup<Content: View>: View {
 struct PageSection<Content: View, Accessory: View>: View {
     let title: String
     var trailing: String? = nil
+    /// (courses-35) How many the section holds, right after its heading ("Current 1") — a count at the far end of the
+    /// line read as belonging to something else. `trailing` stays for a note that is not a count.
+    var count: Int? = nil
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
 
@@ -98,6 +101,12 @@ struct PageSection<Content: View, Accessory: View>: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(title)
                     .font(.sTitle3)
+                if let count {
+                    Text("\(count)")
+                        .font(.sCallout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText(value: Double(count)))
+                }
                 Spacer(minLength: 8)
                 if let trailing, !trailing.isEmpty {
                     Text(trailing).font(.sCallout).foregroundStyle(.secondary)
@@ -111,7 +120,7 @@ struct PageSection<Content: View, Accessory: View>: View {
 }
 
 extension PageSection where Accessory == EmptyView {
-    init(title: String, trailing: String? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.init(title: title, trailing: trailing, accessory: { EmptyView() }, content: content)
+    init(title: String, trailing: String? = nil, count: Int? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, trailing: trailing, count: count, accessory: { EmptyView() }, content: content)
     }
 }
