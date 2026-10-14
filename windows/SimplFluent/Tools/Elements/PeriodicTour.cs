@@ -67,6 +67,9 @@ public static class PTTour
     internal static PTTourEvent? Event;
     internal static event Action? Changed;
 
+    /// <summary>The tour on screen ended, as Skip tour does (Escape, PTKeys): true if one was on.</summary>
+    internal static Func<bool>? Skip;
+
     /// <summary>Something a step may be waiting for, done in the tool (the Lewis maker's preset, Draw, a resonance
     /// structure; the molecule builder's model turned).</summary>
     public static void Did(PTTourEvent e)
@@ -113,6 +116,28 @@ public static class PTTour
         return best;
     }
 
+    /// <summary>Empty room inside a control the tour lights, where a step's card can sit without hiding what it is about
+    /// (the table's gap over the transition metals), in the control's own coordinates.</summary>
+    internal static readonly System.Runtime.CompilerServices.ConditionalWeakTable<FrameworkElement, Func<Rect>> Rooms = new();
+
+    /// <summary>The empty room inside the control lit for a step, in an element's coordinates; null when it has none.</summary>
+    internal static Rect? RoomOf(string id, FrameworkElement over)
+    {
+        if (!Targets.TryGetValue(id, out var list)) return null;
+        foreach (var w in list)
+        {
+            if (!w.TryGetTarget(out var e) || !e.IsVisible || !Rooms.TryGetValue(e, out var room)) continue;
+            if (PresentationSource.FromVisual(e) == null || PresentationSource.FromVisual(over) != PresentationSource.FromVisual(e)) continue;
+            try
+            {
+                var r = room();
+                return new Rect(e.TranslatePoint(r.TopLeft, over), r.Size);
+            }
+            catch { }
+        }
+        return null;
+    }
+
     /// <summary>A structure for the Lewis maker to show for a step (the Mac's showLewis).</summary>
     internal static void ShowLewis(string name)
     {
@@ -122,10 +147,11 @@ public static class PTTour
 
 /// <summary>
 /// The guided tour over the tool (the Mac's PTTourOverlay and PTTourCard), in the app tour's look — Windows 11's
-/// TeachingTip: the window dimmed but for the control lit, ringed in the accent, and the step's card beside it (under it
-/// when there is room, else over it): where it is ("3 of 11"), what it is, what to do with its gesture pulsing, a bar for
-/// how far — ticked for a moment once done, a Next only when the step has been left undone a while. Presses go through the
-/// dim to the tool, so what the step asks can be done.
+/// TeachingTip: the window dimmed but for the control lit, ringed in the accent, and the step's card beside it — under it,
+/// over it, right or left of it where there is room; for a control too large for that (the whole table), in the empty
+/// room inside it — never over what the step is about: where it is ("3 of 11") and its ×, what it is, what to do with
+/// its gesture pulsing, a bar for how far — ticked for a moment once done — then Skip tour and Next, on every step (doing
+/// what it asks is never required). Presses go through the dim to the tool, so what the step asks can be done.
 /// </summary>
 internal sealed class PTTourOverlay
 {
@@ -159,7 +185,7 @@ internal sealed class PTTourOverlay
         timer.Tick += (_, _) => Arrange(true);
     }
 
-    public void Show(int i, int count, PTTourStep s, bool stuck, bool done, Action next)
+    public void Show(int i, int count, PTTourStep s, bool done, Action next, Action skip)
     {
         layer ??= PTLayer.Of(tool);
         if (layer == null) return;
@@ -175,7 +201,7 @@ internal sealed class PTTourOverlay
         var newStep = i != index;
         index = i;
         step = s;
-        card.Child = Card(i, count, s, stuck, done, next);
+        card.Child = Card(i, count, s, done, next, skip);
         // (a new step: from a control lit to the next, the card goes with the light; else it pops in place)
         if (!Arrange(animate: !fresh, force: true, newStep: newStep) && newStep) Motion.Pop(card);
         timer.Start();
@@ -194,9 +220,13 @@ internal sealed class PTTourOverlay
         ring.Visibility = Visibility.Collapsed;
     }
 
-    private static FrameworkElement Card(int i, int count, PTTourStep s, bool stuck, bool done, Action next)
+    private static FrameworkElement Card(int i, int count, PTTourStep s, bool done, Action next, Action skip)
     {
-        var v = K.V(8, K.Text($"{i + 1} of {count}", Ty.Caption, B.Text2).Tabular(), K.Wrapped(s.Title, Ty.Subtitle), K.Wrapped(s.Text, Ty.Body, B.Text2));
+        // (where it is, and its × — the tour ended, as Skip tour does)
+        var close = K.IconButton(SymbolRegular.Dismiss16, skip, "Close the tour", 12, 28);
+        close.Margin = new Thickness(0, -6, -10, 0);
+        var where = K.Columns("*, auto", K.Text($"{i + 1} of {count}", Ty.Caption, B.Text2).Tabular().Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), close.Col(1));
+        var v = K.V(8, where, K.Wrapped(s.Title, Ty.Subtitle), K.Wrapped(s.Text, Ty.Body, B.Text2));
         FrameworkElement doing;
         if (done)
         {
@@ -218,12 +248,12 @@ internal sealed class PTTourOverlay
         doing.Margin = new Thickness(0, 4, 0, 0);
         v.Children.Add(doing);
         v.Children.Add(K.Bar((i + (done ? 1.0 : 0.0)) / count, Appearance.Accent, 3).Margin(0, 6, 0, 2));
-        if (stuck)
-        {
-            var n = K.Button(i == count - 1 ? "Done" : "Next", next, accent: true);
-            n.HorizontalAlignment = HorizontalAlignment.Right;
-            v.Children.Add(n);
-        }
+        // (Skip tour and Next on every step: what a step asks is shown, never required)
+        var skipButton = K.Link("Skip tour", skip);
+        skipButton.Margin = new Thickness(-6, 0, 0, 0);
+        var n = K.Button(i == count - 1 ? "Done" : "Next", next, accent: true);
+        n.MinWidth = 72;
+        v.Children.Add(K.Columns("auto, *, auto", skipButton.Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), n.Col(2)));
         System.Windows.Automation.AutomationProperties.SetName(v, $"Tour, step {i + 1} of {count}: {s.Title}. {s.Doing}");
         return v;
     }
@@ -263,9 +293,7 @@ internal sealed class PTTourOverlay
         Ring(lit);
         card.Measure(new Size(CardWidth, double.PositiveInfinity));
         var h = card.DesiredSize.Height;
-        var below = hole.Bottom + h + 16 < size.Height || hole.Top - h - 16 < 0;
-        var x = Math.Min(Math.Max(hole.X + hole.Width / 2 - CardWidth / 2, 16), Math.Max(16, size.Width - CardWidth - 16));
-        var y = below ? Math.Min(hole.Bottom + 10, size.Height - h - 8) : Math.Max(hole.Top - h - 10, 8);
+        var (x, y) = Place(hole, h, size);
         // (a card not placed yet is placed, never slid from nowhere)
         var placed = !double.IsNaN(Canvas.GetLeft(card)) && !double.IsNaN(Canvas.GetTop(card));
         if (placed && (newStep ? travel : animate && Motion.On))
@@ -281,6 +309,29 @@ internal sealed class PTTourOverlay
             Canvas.SetTop(card, y);
         }
         return travel && placed;
+    }
+
+    /// <summary>
+    /// Where the card goes, beside what it points at and never over it: under the control lit, else over it, else to its
+    /// right or left; a control too large for any of those (the whole table) takes the card in its own empty room (the gap
+    /// over the transition metals), its foot at the room's foot; with none, the card keeps to the window's foot.
+    /// </summary>
+    private (double X, double Y) Place(Rect hole, double h, Size size)
+    {
+        const double gap = 10, edge = 8;
+        var midX = Math.Min(Math.Max(hole.X + hole.Width / 2 - CardWidth / 2, 16), Math.Max(16, size.Width - CardWidth - 16));
+        var midY = Math.Min(Math.Max(hole.Y + hole.Height / 2 - h / 2, edge), Math.Max(edge, size.Height - h - edge));
+        if (hole.Bottom + gap + h + edge <= size.Height) return (midX, hole.Bottom + gap);
+        if (hole.Top - gap - h >= edge) return (midX, hole.Top - gap - h);
+        if (hole.Right + gap + CardWidth + edge <= size.Width) return (hole.Right + gap, midY);
+        if (hole.Left - gap - CardWidth >= edge) return (hole.Left - gap - CardWidth, midY);
+        if (step != null && PTTour.RoomOf(step.Target, layer!) is { Width: > 0 } room)
+        {
+            var x = Math.Min(Math.Max(room.Right - CardWidth - gap, room.Left + gap), Math.Max(16, size.Width - CardWidth - 16));
+            var y = Math.Min(Math.Max(room.Bottom - h - gap, edge), Math.Max(edge, size.Height - h - edge));
+            return (x, y);
+        }
+        return (midX, Math.Min(hole.Bottom + gap, size.Height - h - edge));
     }
 
     /// <summary>The ring faded in round a control lit, and out (where it was) when none is (Motion.Normal).</summary>

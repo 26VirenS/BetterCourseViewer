@@ -51,7 +51,8 @@ public static class PTNav
 
     public static string Label(this PTPage p) => p switch { PTPage.Table => "Table", PTPage.Lewis => "Lewis structures", _ => "Molecule builder" };
 
-    public static SymbolRegular Symbol(this PTPage p) => p switch { PTPage.Table => SymbolRegular.Grid24, PTPage.Lewis => SymbolRegular.GridDots24, _ => SymbolRegular.Molecule24 };
+    /// <summary>A page's symbol: the 3D builder's a cube, not the Periodic Table's own molecule (the tool's tile and pin).</summary>
+    public static SymbolRegular Symbol(this PTPage p) => p switch { PTPage.Table => SymbolRegular.Grid24, PTPage.Lewis => SymbolRegular.GridDots24, _ => SymbolRegular.Cube24 };
 
     public static string Help(this PTPage p) => p switch
     {
@@ -250,6 +251,27 @@ internal static class PTKit
         }
         else b.MinWidth = 0;
         return b;
+    }
+
+    /// <summary>
+    /// A row of chips kept on one line (the table's key, its colourings): scrolled sideways where it is wider than the
+    /// page — with its scroll bar, or the wheel with Shift — the wheel alone still scrolling the page under it.
+    /// </summary>
+    public static ScrollViewer ChipRow(UIElement row)
+    {
+        var sv = new ScrollViewer
+        {
+            Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false, Padding = new Thickness(0, 0, 0, 2),
+        };
+        sv.PreviewMouseWheel += (_, e) =>
+        {
+            e.Handled = true;
+            if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) { sv.ScrollToHorizontalOffset(Math.Clamp(sv.HorizontalOffset - e.Delta, 0, sv.ScrollableWidth)); return; }
+            var up = new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = UIElement.MouseWheelEvent, Source = sv };
+            (VisualTreeHelper.GetParent(sv) as UIElement)?.RaiseEvent(up);
+        };
+        return sv;
     }
 
     /// <summary>A rounded clip that follows an element's size (the Mac's clipShape(RoundedRectangle)).</summary>

@@ -105,8 +105,10 @@ internal static class ChemSheet
 
 /// <summary>
 /// The Lewis maker's and the molecule builder's layout (the Mac's PTWorkLayout): on a wide window, the controls, the
-/// drawing and the facts side by side, each side scrolling on its own; on a narrower one, the drawing across the top and
-/// the controls and facts side by side under it, all scrolling as one.
+/// drawing and the facts side by side, each side scrolling on its own; on a narrower one, the drawing across the top —
+/// about half the height, so the controls under it start in view (and the builder puts its preset and its way of making
+/// in the drawing's own heading: <see cref="WideChanged"/>) — and the controls and facts side by side under it, all
+/// scrolling as one.
 /// </summary>
 internal sealed class ChemLayout : Grid
 {
@@ -115,6 +117,15 @@ internal sealed class ChemLayout : Grid
     private readonly Grid narrow = new();
     private readonly Grid under = new();
     private bool? wide;
+
+    /// <summary>The three side by side (true), or the drawing over the rest (false); not laid out yet: true.</summary>
+    public bool Wide => wide != false;
+
+    /// <summary>The layout changed between side by side and one over the other.</summary>
+    public event Action? WideChanged;
+
+    /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost.</summary>
+    private static double NarrowHeight(double page) => Math.Max(320, Math.Min(560, page * 0.5));
 
     public ChemLayout(FrameworkElement left, FrameworkElement centre, FrameworkElement right)
     {
@@ -157,9 +168,12 @@ internal sealed class ChemLayout : Grid
     private void Lay(Size size)
     {
         var w = size.Width >= 1100;
-        if (!w) centre.Height = Math.Max(460, Math.Min(640, size.Height * 0.75));
+        if (!w) centre.Height = NarrowHeight(size.Height);
         if (wide == w) return;
+        var first = wide == null;
         wide = w;
+        // (told after this layout pass: the builders move their preset and way into the drawing's heading, or back)
+        if (!first || !w) Dispatcher.BeginInvoke(() => WideChanged?.Invoke(), DispatcherPriority.Loaded);
         foreach (var e in new[] { left, centre, right }) ChemKit.Detach(e);
         Children.Clear();
         ColumnDefinitions.Clear();
@@ -194,7 +208,7 @@ internal sealed class ChemLayout : Grid
             right.Margin = new Thickness(0);
             left.HorizontalAlignment = HorizontalAlignment.Stretch;
             right.HorizontalAlignment = HorizontalAlignment.Stretch;
-            centre.Height = Math.Max(460, Math.Min(640, size.Height * 0.75));
+            centre.Height = NarrowHeight(size.Height);
             Grid.SetColumn(centre, 0);
             Grid.SetRow(centre, 0);
             narrow.Children.Add(centre);

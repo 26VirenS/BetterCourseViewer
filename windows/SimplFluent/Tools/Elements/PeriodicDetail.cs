@@ -547,11 +547,15 @@ internal sealed class PTElementPage : Grid
         {
             var track = new Border { Height = 7, CornerRadius = new CornerRadius(3.5), VerticalAlignment = VerticalAlignment.Center }.Bg(B.Subtle);
             var bar = new Grid { Height = 7, VerticalAlignment = VerticalAlignment.Center, Children = { track } };
-            if (c.Fraction(e) is { } f)
+            // (the bar as long as the share of elements this one is above — the figure beside it, "above 59%" — in the
+            //  colour the table gives its value; not the value's place between the lowest and the highest, which read
+            //  against the figure as a contradiction)
+            if (PTRank.Percentile(c, e) is { } p && c.Fraction(e) is { } f)
             {
                 var fill = new Border { Height = 7, CornerRadius = new CornerRadius(3.5), Background = new SolidColorBrush(PTColourings.Ramp(f)), HorizontalAlignment = HorizontalAlignment.Left };
                 bar.Children.Add(fill);
-                bar.SizeChanged += (_, a) => fill.Width = Math.Max(6, a.NewSize.Width * f);
+                bar.SizeChanged += (_, a) => fill.Width = Math.Max(6, a.NewSize.Width * p);
+                bar.ToolTip = $"Higher than {(int)Math.Round((decimal)p * 100, MidpointRounding.AwayFromZero)}% of the elements whose {c.Label().ToLowerInvariant()} is known";
             }
             var label = K.Text(c.Label(), Ty.Body);
             label.VerticalAlignment = VerticalAlignment.Center;
@@ -568,7 +572,7 @@ internal sealed class PTElementPage : Grid
     {
         if (c.Value(e) == null) return "not known";
         var v = $"{c.Text(e)}{(c.Unit().Length == 0 || c == PTColouring.Electronegativity ? "" : " " + c.Unit())}";
-        return PTRank.Percentile(c, e) is { } p ? $"{v} · above {(int)Math.Round(p * 100, MidpointRounding.AwayFromZero)}%" : v;
+        return PTRank.Percentile(c, e) is { } p ? $"{v} · above {(int)Math.Round((decimal)p * 100, MidpointRounding.AwayFromZero)}%" : v;
     }
 
     /// <summary>Successive ionization energies, on a log scale: the jump after the outer electrons shows where the core starts.</summary>

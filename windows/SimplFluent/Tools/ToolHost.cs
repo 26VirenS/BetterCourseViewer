@@ -219,8 +219,12 @@ public static class ToolsCenter
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
     public static double FlyoutWidth(string key) => key switch
     {
-        "calc" or "ptable" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" => 360, "fc" => 340, _ => 330,
+        // (the periodic table's a little wider, and its padding less: squares big enough to point at)
+        "ptable" => 460, "calc" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" => 360, "fc" => 340, _ => 330,
     };
+
+    /// <summary>The room inside its pin's flyout round its content.</summary>
+    public static double FlyoutPadding(string key) => key == "ptable" ? 10 : 16;
 
     /// <summary>The files a tool takes from its pin's flyout (null: none), as an open dialog's filter.</summary>
     public static string? Accepts(string key) => key switch
@@ -1034,7 +1038,7 @@ public sealed class PinBar : StackPanel
 
         var card = new Border
         {
-            Width = ToolsCenter.FlyoutWidth(key), Padding = new Thickness(16), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
+            Width = ToolsCenter.FlyoutWidth(key), Padding = new Thickness(ToolsCenter.FlyoutPadding(key)), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
             Child = K.V(14, head, body), Margin = new Thickness(12, 4, 12, 20), Effect = K.Shadow(24, 6, 0.22),
         };
         card.Bg(B.Flyout);
