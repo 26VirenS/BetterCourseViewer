@@ -44,6 +44,8 @@ public sealed class BioSceneView : Grid
     private readonly Path leaders = new() { StrokeThickness = 1, IsHitTestVisible = false, Opacity = 0.55 };
     private readonly ContentControl spinnerHost = new() { Focusable = false, IsHitTestVisible = false, Margin = new Thickness(14), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly Dictionary<string, FrameworkElement> labelViews = new();
+    // (where the labels' capsules are, for a charge's disc to keep off them)
+    private List<Rect> labelFrames = new();
     private FrameworkElement? moreText;
     private string? moreWords;
 
@@ -517,7 +519,8 @@ public sealed class BioSceneView : Grid
 
     /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them (a charge's disc
     /// 16–22 across), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end
-    /// on, away from the model's centre); a charge's disc on the atom's edge at the upper right, as N⁺ is written.</summary>
+    /// on, away from the model's centre); a charge's disc on the atom's edge at the upper right, as N⁺ is written, or at
+    /// the first other corner clear of the labels (a label moved in over the model covered the carboxyl's).</summary>
     private void PlaceMarks()
     {
         if (marks.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
@@ -533,17 +536,29 @@ public sealed class BioSceneView : Grid
             else if (v is TextBlock t) t.FontSize = Math.Clamp(size, 11, 17);
             v.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var (w, h) = (v.DesiredSize.Width, v.DesiredSize.Height);
-            if (m.Atom is { } atom && Project(atom) is { InFront: true } a)
+            if (m.Atom is { } atom && Project(atom) is { InFront: true } a && m.Charge)
             {
-                double dx = x - a.X, dy = y - a.Y;
-                if (m.Charge) (dx, dy) = (1, -1);
-                else if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (a.X - c.X, a.Y - c.Y);
+                // (a charge's disc a little over the atom's edge at the upper right, as a superscript sits — or, where a
+                //  label's capsule lies there, the first other corner clear of every capsule)
+                var reach = (m.AtomRadius * f / Math.Max(a.Distance, 1e-6) + 0.2 * w) * Math.Sqrt(0.5);
+                (x, y) = (a.X + reach, a.Y - reach);
+                foreach (var (sx, sy) in new[] { (1, -1), (-1, -1), (1, 1), (-1, 1) })
+                {
+                    var spot = new Rect(a.X + sx * reach - w / 2, a.Y + sy * reach - h / 2, w, h);
+                    if (labelFrames.Any(r => r.IntersectsWith(spot))) continue;
+                    (x, y) = (spot.X + w / 2, spot.Y + h / 2);
+                    break;
+                }
+            }
+            else if (m.Atom is { } numbered && Project(numbered) is { InFront: true } n)
+            {
+                double dx = x - n.X, dy = y - n.Y;
+                if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (n.X - c.X, n.Y - c.Y);
                 var len = Math.Sqrt(dx * dx + dy * dy);
                 if (len < 1) (dx, dy, len) = (1, 0, 1);
-                // (a charge's disc a little over the atom's edge, as a superscript sits; a number clear of it)
-                var disc = m.AtomRadius * f / Math.Max(a.Distance, 1e-6);
-                var reach = m.Charge ? disc + 0.2 * w : disc + Math.Max(w, h) / 2 + 1;
-                (x, y) = (a.X + dx / len * reach, a.Y + dy / len * reach);
+                // (a number clear of its atom's disc)
+                var reach = m.AtomRadius * f / Math.Max(n.Distance, 1e-6) + Math.Max(w, h) / 2 + 1;
+                (x, y) = (n.X + dx / len * reach, n.Y + dy / len * reach);
             }
             Canvas.SetLeft(v, x - w / 2);
             Canvas.SetTop(v, y - h / 2);
@@ -979,6 +994,7 @@ public sealed class BioSceneView : Grid
     {
         labelViews.Clear();
         labelLayer.Children.Clear();
+        labelFrames = new List<Rect>();
         leaders.Data = null;
         moreText = null;
     }
@@ -1001,6 +1017,7 @@ public sealed class BioSceneView : Grid
         geo.Freeze();
         leaders.Data = geo;
         leaders.SetResourceReference(Shape.FillProperty, B.Text);
+        labelFrames = placed.Select(p => new Rect(p.Frame.X, p.Frame.Y, p.Frame.Width, p.Frame.Height)).ToList();
         var now = placed.Select(p => LabelKey(p.Id, p.Text)).ToHashSet();
         foreach (var gone in labelViews.Keys.Where(k => !now.Contains(k)).ToList())
         {
@@ -1060,6 +1077,8 @@ public sealed class BioSceneView : Grid
             moreText = null;
             moreWords = null;
         }
+        // (a charge's disc kept off the labels just placed)
+        if (marks.Any(m => m.Mark.Charge)) PlaceMarks();
     }
 
     /// <summary>A label: its words in a capsule of the card's colour, edged in the accent while its object is under the

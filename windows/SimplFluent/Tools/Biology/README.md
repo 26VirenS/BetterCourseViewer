@@ -251,8 +251,9 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   "5′" and "3′" and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`; the Biomolecule Builder's ring
   and sugar carbons' numbers: `BiomolMark(…, OnTop: true)`, which `BiomolStage` hands the view as marks), or a charge's
   sign in a disc of the ground 16–22 across, edged in the sign's colour (`BioChargeBadge`: a bare blue + on the blue
-  amino group could not be seen), on its atom's edge at the upper right, over the labels too (a label too wide for
-  its room is moved in over the model, and hid the carboxyl's −) (a free amino acid's: drawn in the
+  amino group could not be seen), on its atom's edge at the upper right — or the first other corner clear of the
+  labels' capsules — over the labels (a label too wide for its room is moved in over the model, and hid the carboxyl's
+  −) (a free amino acid's: drawn in the
   scene, lysine's side-chain NH₃⁺ sign was hidden behind the carbon next to it; a peptide's many stay in the scene,
   so the chain hides those at its back).
 
