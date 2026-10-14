@@ -97,11 +97,15 @@ struct ToolWindow: View {
                     .help("More")
                 }
             }
-            // (1.2.16) the tools pinned in the main window, here too
+            // (1.2.16) the tools pinned in the main window, here too — (tools-6) three at most, the rest in the Tools pull-down
             if let engine = model.engine, !tools.toolbarPins(timerActive: focus.active).isEmpty {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    ForEach(tools.toolbarPins(timerActive: focus.active)) { kind in
+                    ForEach(tools.toolbarSplit(timerActive: focus.active).shown) { kind in
                         PinnedToolButton(kind: kind, engine: engine)
+                            .environmentObject(engine)
+                    }
+                    if !tools.toolbarSplit(timerActive: focus.active).more.isEmpty {
+                        MorePinsMenu(kinds: tools.toolbarSplit(timerActive: focus.active).more, engine: engine)
                             .environmentObject(engine)
                     }
                 }

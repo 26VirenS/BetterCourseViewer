@@ -678,10 +678,11 @@ struct LewisMaker: View {
     var body: some View {
         // (1.3.65) worked out when the molecule or the ranking changes, not each time the builder draws
         let r = memo.result(graph, mode)
+        // (tools-24) laid out narrow, Quick or Draw and the preset ride in the drawing's own heading, always in sight
         PTWorkLayout {
-            controls
+            PTNarrowReader { narrow in controls(narrow: narrow) }
         } centre: {
-            drawing(r)
+            PTNarrowReader { narrow in drawing(r, narrow: narrow) }
         } right: {
             facts(r)
         }
@@ -700,21 +701,14 @@ struct LewisMaker: View {
 
     // MARK: Controls
 
-    private var controls: some View {
+    /// The controls' column; `narrow`: Quick or Draw and the preset are in the drawing's heading instead (tools-24).
+    private func controls(narrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("", selection: $way) {
-                ForEach(Way.allCases) { w in Text(w.label).tag(w) }
+            if !narrow {
+                wayPicker
+                heading("Preset")
+                presetMenu
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .tourTarget("lewisWay")
-            .onChange(of: way) { _, w in if w == .draw { PTTour.shared.did(.draw) } }
-            heading("Preset")
-            PresetMenu(sections: LewisPresets.sections, selected: preset) { name in
-                load(name)
-                PTTour.shared.did(.preset)
-            }
-            .tourTarget("lewisPreset")
             if way == .quick { quickControls } else { drawControls }
             heading("Charge")
             HStack {
@@ -737,6 +731,25 @@ struct LewisMaker: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// Quick (a centre and what surrounds it) or Draw (atoms placed by hand).
+    private var wayPicker: some View {
+        Picker("", selection: $way) {
+            ForEach(Way.allCases) { w in Text(w.label).tag(w) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .tourTarget("lewisWay")
+        .onChange(of: way) { _, w in if w == .draw { PTTour.shared.did(.draw) } }
+    }
+
+    private var presetMenu: some View {
+        PresetMenu(sections: LewisPresets.sections, selected: preset) { name in
+            load(name)
+            PTTour.shared.did(.preset)
+        }
+        .tourTarget("lewisPreset")
     }
 
     private var quickControls: some View {
@@ -909,17 +922,27 @@ struct LewisMaker: View {
 
     // MARK: The drawing
 
-    private func drawing(_ r: LResult) -> some View {
+    private func drawing(_ r: LResult, narrow: Bool) -> some View {
         let s = r.structures.indices.contains(shown) ? r.structures[shown] : r.major
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(LChem.formula(graph.atoms.map(\.symbol), charge: graph.charge)).font(.system(size: 22, weight: .bold))
-                if r.ionic { Text("ionic").font(.sCallout).foregroundStyle(.secondary) }
-                Spacer()
-                if r.structures.count > 1 {
-                    Text(shown == 0 ? "Major contributor" : (shown < r.equivalent ? "Equivalent structure" : "Minor contributor"))
-                        .font(.sCaption.weight(.semibold))
-                        .foregroundStyle(shown < max(r.equivalent, 1) ? Color.green : Color.orange)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(LChem.formula(graph.atoms.map(\.symbol), charge: graph.charge)).font(.system(size: 22, weight: .bold))
+                    if r.ionic { Text("ionic").font(.sCallout).foregroundStyle(.secondary) }
+                    Spacer()
+                    if r.structures.count > 1 {
+                        Text(shown == 0 ? "Major contributor" : (shown < r.equivalent ? "Equivalent structure" : "Minor contributor"))
+                            .font(.sCaption.weight(.semibold))
+                            .foregroundStyle(shown < max(r.equivalent, 1) ? Color.green : Color.orange)
+                    }
+                }
+                // (tools-24) narrow: the controls reached for first, in sight above the drawing
+                if narrow {
+                    HStack(spacing: 10) {
+                        wayPicker.fixedSize()
+                        presetMenu.frame(maxWidth: 240)
+                        Spacer(minLength: 0)
+                    }
                 }
             }
             .padding(16)
@@ -1345,14 +1368,16 @@ struct LewisStructureCanvas: View {
                 }
             }
         }
-        // (brackets round ions and charged molecules, the charge at the top right)
+        // (brackets round ions and charged molecules, the charge at the top right — tools-35: a lone ion's, with no
+        // brackets, at its own symbol's top right, as a superscript; and never smaller than reads in a thumbnail)
         for ion in r.ions where ion.charge != 0 {
             let pts = ion.atoms.compactMap { at($0) }
             guard let minX = pts.map(\.x).min(), let maxX = pts.map(\.x).max(), let minY = pts.map(\.y).min(), let maxY = pts.map(\.y).max() else { continue }
             let pad: CGFloat = 36 * scale
             let w: CGFloat = maxX - minX + 2 * pad, h: CGFloat = maxY - minY + 2 * pad
             let rect = CGRect(x: minX - pad, y: minY - pad, width: w, height: h)
-            if ion.atoms.count > 1 || ion.charge < 0 {
+            let bracketed = ion.atoms.count > 1 || ion.charge < 0
+            if bracketed {
                 var path = Path()
                 path.move(to: CGPoint(x: rect.minX + 7, y: rect.minY))
                 path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
@@ -1368,8 +1393,17 @@ struct LewisStructureCanvas: View {
             let q = ion.charge
             let sign: String = q > 0 ? "+" : "−"
             let qt: String = (abs(q) > 1 ? "\(abs(q))" : "") + sign
-            ctx.draw(Text(qt).font(.system(size: 19 * max(scale, 0.7), weight: .bold)).foregroundColor(.primary),
-                     at: CGPoint(x: rect.maxX + 10, y: rect.minY + 4))
+            let size: CGFloat = 19 * max(scale, 0.7)
+            let spot: CGPoint
+            if bracketed {
+                spot = CGPoint(x: rect.maxX + size * 0.45 + 2, y: rect.minY + size * 0.3)
+            } else {
+                // (half the symbol's width — 30-point bold, about 0.62 of its size a letter — past its middle, and up)
+                let symbol = ion.atoms.first.flatMap { g.atom($0) }?.symbol ?? ""
+                let half: CGFloat = CGFloat(max(symbol.count, 1)) * 9.3 * scale
+                spot = CGPoint(x: minX + half + size * 0.45, y: minY - 12 * scale - size * 0.2)
+            }
+            ctx.draw(Text(qt).font(.system(size: size, weight: .bold)).foregroundColor(.primary), at: spot)
         }
     }
 

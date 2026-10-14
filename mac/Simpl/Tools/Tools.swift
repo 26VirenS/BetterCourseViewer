@@ -6,9 +6,10 @@ import UniformTypeIdentifiers
 // a calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge & split PDFs, a PDF
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them, and
 // (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift). One row in the sidebar opens
-// a page of tiles; a tile opens its tool in the window. Any tool can be pinned: it then sits in the toolbar on every
-// screen and opens a compact version of itself in a popover (PinnedTools.swift). Everything a tool keeps stays on this
-// Mac; nothing is sent to Canvas.
+// a page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files and Biology; a tile opens
+// its tool in the window, under a "‹ Tools" back to the tiles. Any tool can be pinned: it then sits in the toolbar on
+// every screen and opens a compact version of itself in a popover (PinnedTools.swift). Everything a tool keeps stays on
+// this Mac; nothing is sent to Canvas.
 
 /// A tool: its key (the web's own, so a pin means the same thing on both), its name, the line under it, its symbol and
 /// its colour (used for its tile and its pin, nothing else).
@@ -37,7 +38,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// The name a pin's popover and the toolbar's tooltips use.
+    /// A shorter name, kept for what still wants one. (tools-21) A pin's popover and its floating panel say `name`, the
+    /// tile's own, so a panel reads as the tool that was pinned.
     var shortName: String {
         switch self {
         case .cite: return "Cite"
@@ -56,20 +58,21 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// The line under its name: (tools-32) one short line, so a tile reads at a glance.
     var note: String {
         switch self {
-        case .cite: return "Cite a source in MLA, APA or Chicago."
-        case .pomo: return "Focus for a while, then take a break."
-        case .calc: return "Scientific, laid out like the Mac’s."
+        case .cite: return "Cite in MLA, APA or Chicago."
+        case .pomo: return "Focus, then take a break."
+        case .calc: return "Scientific, from your keyboard."
         case .graph: return "Desmos, right here."
-        case .ptable: return "Every element and its facts, in place."
-        case .need: return "What you need on the final to hit your goal."
-        case .conv: return "Word, PDF and images, any way round."
-        case .units: return "Lengths, weights, temperatures and more."
-        case .pdfx: return "Join pages from PDFs into one, or take pages out."
-        case .mark: return "Highlight and add notes, saved in the file."
-        case .ocr: return "Read the words off a picture or a scan."
-        case .fc: return "Make a set. Flip, learn, test, match."
+        case .ptable: return "Every element and its facts."
+        case .need: return "What you need on the final."
+        case .conv: return "Convert Word, PDF and images."
+        case .units: return "Lengths, weights, temperatures."
+        case .pdfx: return "Join PDFs, or take pages out."
+        case .mark: return "Highlight and add notes."
+        case .ocr: return "Copy the words in a picture."
+        case .fc: return "Flip, learn, test and match."
         default: return BioTools.info(self).note
         }
     }
@@ -112,10 +115,17 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
 
     var color: Color { Color(hex: hex) }
 
-    /// The width of its pinned popover.
+    /// (tools-4) The name its heading and the window's title show: the Periodic Table's says the page it is on (Lewis
+    /// structures, Molecule builder), as nothing else on those pages names them.
+    var title: String {
+        self == .ptable ? PTNav.shared.page.title : name
+    }
+
+    /// The width of its pinned popover. (tools-34) The Periodic Table's wider, for squares big enough to point at.
     var popoverWidth: CGFloat {
         switch self {
-        case .calc, .ptable: return 420
+        case .ptable: return 480
+        case .calc: return 420
         case .cite: return 400
         case .graph: return 360
         case .fc: return 340
@@ -153,6 +163,9 @@ final class ToolsCenter: ObservableObject {
     private(set) var handoffTool: ToolKind?
     /// Set by a pin's popover for the tool it opens (a set to study, a link to cite): read once by the tool.
     var handoffInfo: [String: String] = [:]
+    /// (tools-30) Tools whose heading leaves out its line under the name for now: Flashcards, inside a set (its own
+    /// bar names the set and the way back, and the question wants the room).
+    @Published private(set) var quietHeadings: Set<ToolKind> = []
 
     init() {
         let raw = UserDefaults.standard.string(forKey: ToolsCenter.pinsKey) ?? ""
@@ -194,6 +207,26 @@ final class ToolsCenter: ObservableObject {
     func toolbarPins(timerActive: Bool) -> [ToolKind] {
         if timerActive && !pinned.contains(.pomo) { return pinned + [.pomo] }
         return pinned
+    }
+
+    /// (tools-6) How many tools the toolbar holds: a screen's own buttons (the Dashboard's Cards, List and Activity, its
+    /// New Task) keep their room, where a fourth pin used to send them into the toolbar's » menu.
+    static let toolbarRoom = 3
+
+    /// (tools-6) The pins split between the toolbar and its Tools pull-down: all of them while they fit, else the first
+    /// two and the pull-down with the rest — or, while a session runs, the timer (its pin as wide as two, with its
+    /// minutes and seconds) and the pull-down with every other pin.
+    func toolbarSplit(timerActive: Bool) -> (shown: [ToolKind], more: [ToolKind]) {
+        let all = toolbarPins(timerActive: timerActive)
+        guard all.count > Self.toolbarRoom else { return (all, []) }
+        if timerActive { return ([.pomo], all.filter { $0 != .pomo }) }
+        return (Array(all.prefix(Self.toolbarRoom - 1)), Array(all.dropFirst(Self.toolbarRoom - 1)))
+    }
+
+    /// (tools-30) A tool's heading with or without its line under the name.
+    func quietHeading(_ k: ToolKind, _ quiet: Bool) {
+        guard quietHeadings.contains(k) != quiet else { return }
+        if quiet { quietHeadings.insert(k) } else { quietHeadings.remove(k) }
     }
 
     /// A tool opened on the Tools page from anywhere (a pin's popover, the Go menu), with any files or details for it.
@@ -250,9 +283,11 @@ final class ToolsCenter: ObservableObject {
 // MARK: - The Tools place
 
 /// The Tools place: the page of tiles, or the tool open on it with its own heading (Back to the tiles, its name, and its
-/// pin) — a tool switched in place, as the web's popup opens over its page.
+/// pin) — a tool switched in place, as the web's popup opens over its page. (tools-5) The pin is the heading's alone:
+/// the window's toolbar no longer carries a second one while a tool is open.
 struct ToolsView: View {
     @ObservedObject private var tools = ToolsCenter.shared
+    @ObservedObject private var ptNav = PTNav.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -267,48 +302,68 @@ struct ToolsView: View {
             }
         }
         .animation(reduceMotion ? nil : Motion.gentle, value: tools.open)
-        .navigationTitle(tools.open?.name ?? "Tools")
-        .toolbar {
-            if let k = tools.open {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        tools.togglePin(k)
-                    } label: {
-                        Label(tools.isPinned(k) ? "Unpin from Toolbar" : "Pin to Toolbar", systemImage: tools.isPinned(k) ? "pin.slash" : "pin")
-                    }
-                    .help(tools.isPinned(k) ? "Take \(k.name) out of the toolbar" : "Keep \(k.name) in the toolbar on every screen")
-                }
-            }
+        .navigationTitle(tools.open?.title ?? "Tools")
+    }
+}
+
+/// (tools-32) The Tools page's sections, in order — what each tool is for, so a tool is found by its kind rather than by
+/// reading every tile; the study tools first.
+enum ToolGroup: CaseIterable {
+    case study, science, files, biology
+
+    var title: String {
+        switch self {
+        case .study: return "Study"
+        case .science: return "Math & science"
+        case .files: return "Files"
+        case .biology: return "Biology"
+        }
+    }
+
+    var kinds: [ToolKind] {
+        switch self {
+        case .study: return [.fc, .pomo, .cite, .need]
+        case .science: return [.calc, .graph, .units, .ptable]
+        case .files: return [.conv, .pdfx, .mark, .ocr]
+        case .biology: return BioTools.kinds
         }
     }
 }
 
-/// The page of tiles: every tool, a press opening it, its pin at its corner — (1.3.78) the biology toolkit's under a
-/// heading of their own, after the rest.
+/// The page of tiles: every tool, a press opening it, its pin at its corner — (tools-32) in sections by what they are
+/// for, (1.3.78) the biology toolkit's last, under a heading of its own.
 struct ToolsGrid: View {
-    @ObservedObject private var tools = ToolsCenter.shared
-
     var body: some View {
         ScrollViewReader { proxy in
             Page {
-                ScreenHeading(title: "Tools", sub: "Handy things, right here. Pin one and it sits in the toolbar on every screen.")
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                    ForEach(ToolKind.allCases.filter { !$0.isBiology }) { k in
-                        ToolTile(kind: k)
-                    }
+                ScreenHeading(title: "Tools", sub: "Pin a tool to keep it in the toolbar: its button there opens a quick version of it.")
+                ForEach([ToolGroup.study, .science, .files], id: \.self) { g in
+                    ToolGroupSection(title: g.title, kinds: g.kinds)
                 }
                 BioToolsSection()
-                if tools.pinned.isEmpty {
-                    Label("Press a tile’s pin to keep that tool in the toolbar. Its button there opens a quick version of it.", systemImage: "pin")
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                }
             }
             .task {
                 // (the screenshot suite: -SimplToolsScroll biology, the page scrolled to the Biology section)
                 guard UserDefaults.standard.string(forKey: "SimplToolsScroll") == "biology" else { return }
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 proxy.scrollTo("biology", anchor: .top)
+            }
+        }
+    }
+}
+
+/// (tools-32) A section of the Tools page: its heading and its tiles.
+struct ToolGroupSection: View {
+    let title: String
+    let kinds: [ToolKind]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.sTitle3)
+                .accessibilityAddTraits(.isHeader)
+            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+                ForEach(kinds) { k in ToolTile(kind: k) }
             }
         }
     }
@@ -321,13 +376,16 @@ struct ToolTile: View {
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
 
+    /// (tools-32) Three across from about 900 points of page, two below.
+    static let columns = [GridItem(.adaptive(minimum: 280), spacing: 14)]
+
     var body: some View {
         Button {
             withAnimation(Motion.gentle) { tools.open = kind }
         } label: {
-            HStack(alignment: .top, spacing: 14) {
-                IconTile(symbol: kind.symbol, color: kind.color, size: 48)
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top, spacing: 12) {
+                IconTile(symbol: kind.symbol, color: kind.color, size: 44)
+                VStack(alignment: .leading, spacing: 3) {
                     Text(kind.name)
                         .font(.sHeadline)
                         .foregroundStyle(.primary)
@@ -335,18 +393,12 @@ struct ToolTile: View {
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if kind == .pomo && focus.active {
-                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                            Text("\(focus.rec.phase.name) · \(FocusTimer.clock(focus.remaining(at: ctx.date)))\(focus.paused ? " · Paused" : "")")
-                                .font(.sCallout.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(focus.rec.phase.color)
-                        }
-                    }
+                    if kind == .pomo && focus.active { FocusTileLine() }
                 }
                 Spacer(minLength: 36)
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .overlay(alignment: .topTrailing) { pinButton.padding(10) }
@@ -365,14 +417,27 @@ struct ToolTile: View {
             Image(systemName: on ? "pin.fill" : "pin")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(on ? kind.color : Color.secondary)
-                .frame(width: 32, height: 32)
+                .frame(width: 30, height: 30)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .glass(Circle(), tint: on ? kind.color.opacity(0.25) : nil, interactive: true)
-        .help(on ? "Unpin \(kind.name) from the toolbar" : "Pin \(kind.name) to the toolbar")
+        .help(on ? "Pinned to the toolbar. Click to unpin \(kind.name)." : "Pin \(kind.name) to the toolbar")
         .accessibilityLabel(on ? "Unpin \(kind.name)" : "Pin \(kind.name)")
         .tourSpot(kind == .graph && !on ? .toolPin : nil) // (1.2.16: the tour lights the graphing calculator's)
+    }
+}
+
+/// The focus timer's tile while a session goes: the phase and the time left, (tools-25) read from the one second hand
+/// every timer label shares — drawn again each second on its own, not with the whole page of tiles.
+private struct FocusTileLine: View {
+    @ObservedObject private var focus = FocusTimer.shared
+    @ObservedObject private var clock = FocusClock.shared
+
+    var body: some View {
+        Text("\(focus.rec.phase.name) · \(FocusTimer.clock(focus.remaining(at: clock.now)))\(focus.paused ? " · Paused" : "")")
+            .font(.sCallout.weight(.semibold).monospacedDigit())
+            .foregroundStyle(focus.rec.phase.color)
     }
 }
 
@@ -418,11 +483,15 @@ struct ToolScreen: View {
     }
 }
 
-/// A tool's heading: Back to the tiles, the tool's tile, its name and line, and its pin.
+/// A tool's heading: Back to the tiles, the tool's tile, its name and line, and its pin. (tools-4) The Periodic Table's
+/// names the page it is on, with its pages, Tour and search in words on a row of their own under it; (tools-29) while one
+/// of its elements is open, its one Back goes to the table ("‹ Table"), not to the tiles.
 struct ToolHeader: View {
     let kind: ToolKind
     var done: (() -> Void)? = nil
     @ObservedObject private var tools = ToolsCenter.shared
+    @ObservedObject private var ptNav = PTNav.shared
+    @ObservedObject private var ptTour = PTTour.shared
 
     var body: some View {
         // (1.3.78) a biology tool with pages: its pages' names, and its pin's words, only where the header has room for
@@ -434,9 +503,13 @@ struct ToolHeader: View {
                 row(pages: true, pinWords: true)
                 row(pages: true, pinWords: false)
             }
+        } else if kind == .ptable {
+            VStack(alignment: .leading, spacing: 12) {
+                row(pages: nil, pinWords: true)
+                PTPageBar()
+            }
         } else {
-            // (1.3.62) the Periodic Table's header full of its own controls: its pin a symbol alone
-            row(pages: nil, pinWords: kind != .ptable)
+            row(pages: nil, pinWords: true)
         }
     }
 
@@ -448,9 +521,24 @@ struct ToolHeader: View {
                     .font(.sCallout.weight(.medium))
                     .glassButton()
                     .controlSize(.large)
-                    .keyboardShortcut(.cancelAction)
+                    // (tools-3: while the Periodic Table's tour is on, Escape ends the tour, not the sheet)
+                    .keyboardShortcut(kind == .ptable && ptTour.active ? nil : KeyboardShortcut.cancelAction)
                     .help("Close \(kind.name) (Escape)")
-            } else {
+            }
+            if kind == .ptable && ptNav.elementOpen {
+                Button {
+                    ptNav.closeElement()
+                } label: {
+                    Label("Table", systemImage: "chevron.left")
+                        .font(.sCallout.weight(.medium))
+                        .padding(.horizontal, 4)
+                }
+                .glassButton()
+                .controlSize(.large)
+                .keyboardShortcut("[", modifiers: .command)
+                .help("Back to the table (⌘[)")
+                .transition(.opacity)
+            } else if done == nil {
                 Button {
                     withAnimation(Motion.gentle) { tools.open = nil }
                 } label: {
@@ -461,36 +549,40 @@ struct ToolHeader: View {
                 .glassButton()
                 .controlSize(.large)
                 .help("Back to all the tools")
+                .transition(.opacity)
             }
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
             VStack(alignment: .leading, spacing: 2) {
-                Text(kind.name)
+                Text(kind.title)
                     .font(.sTitle)
                     .lineLimit(1)
-                // (1.3.62) the Periodic Table's header its name alone
-                if kind != .ptable {
+                    .contentTransition(.opacity)
+                // (1.3.62) the Periodic Table's header its name alone; (tools-30) a tool may quiet its line for a while
+                if kind != .ptable && !tools.quietHeadings.contains(kind) {
                     Text(kind.note)
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .transition(.opacity)
                 }
             }
             Spacer(minLength: 12)
-            // (1.3.54) the Periodic Table's search, left of its pin; (1.3.78) a biology tool's pages
-            if kind == .ptable { PTHeaderControls() }
+            // (1.3.78) a biology tool's pages
             if kind.isBiology { BioHeaderControls(kind: kind, squished: squished) }
+            // (tools-31) the button says what a press does: Unpin while it is pinned, Pin to Toolbar while it is not
             Button {
                 tools.togglePin(kind)
             } label: {
-                Label(tools.isPinned(kind) ? "Pinned" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.fill" : "pin")
+                Label(tools.isPinned(kind) ? "Unpin" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.slash" : "pin")
                     .font(.sCallout.weight(.medium))
                     .labelStyle(SquishLabel(squished: !pinWords))
             }
-            .glassButton(prominent: tools.isPinned(kind))
-            .tint(kind.color)
+            .glassButton()
             .controlSize(.large)
-            .help(tools.isPinned(kind) ? "In the toolbar on every screen. Press to take it out." : "Keep \(kind.name) in the toolbar on every screen")
+            .help(tools.isPinned(kind) ? "\(kind.name) is in the toolbar on every screen. Click to unpin it." : "Keep \(kind.name) in the toolbar on every screen")
         }
+        .animation(Motion.gentle, value: ptNav.elementOpen)
+        .animation(Motion.gentle, value: tools.quietHeadings)
     }
 }
 

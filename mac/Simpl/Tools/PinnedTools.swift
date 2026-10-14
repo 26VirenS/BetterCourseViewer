@@ -6,7 +6,8 @@ import UniformTypeIdentifiers
 // calculator, Grade needed's three numbers, the periodic table small, a link to cite, a set to study, a file to drop —
 // and its name opens the whole tool. A running focus timer is live in its pin, as the web's island: the minutes left on
 // a ring and in figures, in its phase's colour (it borrows a pin while it runs if the timer is not pinned). A pin's
-// context menu opens, moves or unpins it.
+// context menu opens, moves or unpins it. (tools-6) The toolbar holds three tools at most: past that, two and a Tools
+// pull-down with the rest, so a screen's own buttons keep their room.
 
 /// A pin in the toolbar.
 struct PinnedToolButton: View {
@@ -79,38 +80,72 @@ struct PinnedToolButton: View {
     }
 }
 
-/// The running timer's pin: what is left of the phase on a small ring, and the minutes and seconds beside it.
+/// The running timer's pin: what is left of the phase on a small ring, and the minutes and seconds beside it — (tools-25)
+/// read from the one second hand every timer label shares, so the pin and the dial never say two different seconds.
 struct PinnedTimerLabel: View {
     @ObservedObject private var focus = FocusTimer.shared
+    @ObservedObject private var clock = FocusClock.shared
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let color = focus.rec.phase.color
-            HStack(spacing: 6) {
-                ZStack {
-                    Circle().stroke(color.opacity(0.25), lineWidth: 2.5)
-                    Circle()
-                        .trim(from: 0, to: focus.fraction(at: ctx.date))
-                        .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 15, height: 15)
-                Text(FocusTimer.clock(focus.remaining(at: ctx.date)))
-                    .font(.system(size: 13.5, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(color)
-                if focus.paused {
-                    Image(systemName: "pause.fill")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.secondary)
+        let color = focus.rec.phase.color
+        HStack(spacing: 6) {
+            ZStack {
+                Circle().stroke(color.opacity(0.25), lineWidth: 2.5)
+                Circle()
+                    .trim(from: 0, to: focus.fraction(at: clock.now))
+                    .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 15, height: 15)
+            Text(FocusTimer.clock(focus.remaining(at: clock.now)))
+                .font(.system(size: 13.5, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(color)
+            if focus.paused {
+                Image(systemName: "pause.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 4)
+        .fixedSize()
+    }
+}
+
+/// (tools-6) The pins past the toolbar's room, under one Tools pull-down: a tool picked opens its quick version in a
+/// popover under the pull-down, as its own pin would (or brings its floating panel to the front, when it is out).
+struct MorePinsMenu: View {
+    let kinds: [ToolKind]
+    let engine: Engine
+    @ObservedObject private var floats = ToolFloats.shared
+    @State private var shown: ToolKind?
+
+    var body: some View {
+        Menu {
+            ForEach(kinds) { k in
+                Button {
+                    if floats.isOut(k) { floats.raise(k) } else { shown = k }
+                } label: {
+                    Label(k.name, systemImage: k.symbol)
                 }
             }
-            .padding(.horizontal, 4)
-            .fixedSize()
+            Divider()
+            Button("Show All Tools") { engine.go(.tools) }
+        } label: {
+            Label("Tools", systemImage: "wrench.and.screwdriver")
+        }
+        .help("More pinned tools: \(kinds.map(\.name).joined(separator: ", "))")
+        .accessibilityLabel("More pinned tools")
+        .popover(item: $shown, arrowEdge: .bottom) { k in
+            PinnedToolPopover(kind: k, engine: engine) { shown = nil }
+                .environmentObject(engine)
         }
     }
 }
 
-/// A pin's popover: the tool's name (a press opens the whole tool), its pin, and its quickest use.
+/// A pin's popover: (tools-21) the tool's name as its tile says it — a press opens the whole tool, (tools-22) the one way
+/// to — (tools-20) Pop Out, which takes the quick panel out into a small window of its own that floats over everything,
+/// and the tool's quickest use. Unpinning is in the pin's own menu, not a button beside the name where a slip would make
+/// the pin vanish.
 struct PinnedToolPopover: View {
     let kind: ToolKind
     let engine: Engine
@@ -129,41 +164,31 @@ struct PinnedToolPopover: View {
         .frame(width: kind.popoverWidth)
     }
 
+    /// (a long name beside Pop Out's words: Pop Out its symbol alone)
     private var header: some View {
+        ViewThatFits(in: .horizontal) {
+            headerRow(words: true)
+            headerRow(words: false)
+        }
+    }
+
+    private func headerRow(words: Bool) -> some View {
         HStack(spacing: 10) {
             IconTile(symbol: kind.symbol, color: kind.color, size: 28)
-            Button {
-                openFull()
-            } label: {
-                HStack(spacing: 4) {
-                    Text(kind.shortName).font(.sHeadline)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Open \(kind.name)")
+            QuickPanelName(kind: kind) { openFull() }
             Spacer(minLength: 8)
             Button {
-                tools.togglePin(kind)
+                ToolFloats.shared.popOut(kind, engine: engine)
+                close()
             } label: {
-                Image(systemName: tools.isPinned(kind) ? "pin.slash" : "pin")
-                    .frame(width: 26, height: 26)
-                    .contentShape(Rectangle())
+                Label("Pop Out", systemImage: "pip.exit")
+                    .font(.sCallout.weight(.medium))
+                    .labelStyle(SquishLabel(squished: !words))
             }
-            .buttonStyle(.borderless)
-            .help(tools.isPinned(kind) ? "Unpin from the toolbar" : "Pin to the toolbar")
-            Button {
-                openFull()
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .frame(width: 26, height: 26)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.borderless)
-            .help("Open \(kind.name) full size")
+            .glassButton()
+            .controlSize(.small)
+            .help("Pop out: keep \(kind.name) open in a small window that floats over everything, quizzes too")
+            .accessibilityLabel("Pop Out")
         }
     }
 
@@ -172,6 +197,30 @@ struct PinnedToolPopover: View {
     private func openFull(info: [String: String] = [:], files: [URL] = []) {
         close()
         tools.openFull(kind, engine: engine, files: files, info: info)
+    }
+}
+
+/// (tools-21, tools-22) A quick panel's name, as the tool's tile says it, with a › — a press opens the whole tool.
+struct QuickPanelName: View {
+    let kind: ToolKind
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: 4) {
+                Text(kind.name)
+                    .font(.sHeadline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Open \(kind.name) full size")
+        .accessibilityLabel("Open \(kind.name)")
     }
 }
 

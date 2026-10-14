@@ -95,11 +95,15 @@ struct MainShell: View {
                 .help("Refresh (⌘R): everything read from \(engine.lmsName) again")
             }
             // (1.2) the tools pinned to the toolbar, on every screen: a press opens the tool's quick version in a popover;
-            // a running focus timer shows its minutes here (mac/Simpl/Tools/PinnedTools.swift)
+            // a running focus timer shows its minutes here (mac/Simpl/Tools/PinnedTools.swift). (tools-6) Three at most,
+            // past that two and a Tools pull-down with the rest, so the screen's own buttons keep their room.
             if !tools.toolbarPins(timerActive: focus.active).isEmpty {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    ForEach(tools.toolbarPins(timerActive: focus.active)) { kind in
+                    ForEach(tools.toolbarSplit(timerActive: focus.active).shown) { kind in
                         PinnedToolButton(kind: kind, engine: engine)
+                    }
+                    if !tools.toolbarSplit(timerActive: focus.active).more.isEmpty {
+                        MorePinsMenu(kinds: tools.toolbarSplit(timerActive: focus.active).more, engine: engine)
                     }
                 }
             }
