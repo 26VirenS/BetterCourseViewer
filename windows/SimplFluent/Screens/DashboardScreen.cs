@@ -266,6 +266,10 @@ public sealed partial class DashboardScreen : Screen
     /// Next 7 days, has room at its own size in them only so — at 12 it was shrunk a little to fit.</summary>
     private const double SquarePadTight = 10;
 
+    /// <summary>The room between the narrowest square tiles (12 between the others): on a 1024 window it makes each of
+    /// them 100 wide rather than 97, and so nearer as tall as it is wide.</summary>
+    private const double SquareGapTight = 8;
+
     /// <summary>The tallest a square tile grows: as tall as it is wide on a window up to about 1650 wide; on a wider one (a
     /// 1080p window's tiles are about 246 wide) it stops here, square enough, where a tile as tall as wide would only add
     /// empty colour under its words and push the work under the counters further down.</summary>
@@ -291,8 +295,9 @@ public sealed partial class DashboardScreen : Screen
         }
         var words = (Math.Max(320, page) - 5 * 12) / 6 - 2 - 2 * SquarePad;
         var roomy = words >= SquareSymbol + SquareGap + WidestLabel(full: false) + 2;
-        // (the narrowest tiles' words sit SquarePadTight in from their sides, so they have that much more room)
-        var room = roomy ? words - SquareSymbol - SquareGap : words + 2 * (SquarePad - SquarePadTight);
+        // (the narrowest tiles stand SquareGapTight apart and keep their words SquarePadTight in from their sides, so they
+        //  have that much more room)
+        var room = roomy ? words - SquareSymbol - SquareGap : (Math.Max(320, page) - 5 * SquareGapTight) / 6 - 2 - 2 * SquarePadTight;
         return (6, roomy, room >= WidestLabel(full: true) + 2);
     }
 
@@ -324,10 +329,11 @@ public sealed partial class DashboardScreen : Screen
     {
         var cols = layout.Cols;
         var items = d.Counters.OrderBy(c => Array.IndexOf(Order, c.Key) is var i && i < 0 ? 99 : i).ToList();
+        var gap = cols == 6 && !layout.Roomy ? SquareGapTight : 12;
         var grid = new Grid();
         for (var c = 0; c < cols; c++)
         {
-            if (c > 0) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            if (c > 0) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(gap) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         }
         var rows = (items.Count + cols - 1) / cols;
@@ -414,12 +420,16 @@ public sealed partial class DashboardScreen : Screen
         else
         {
             head = name;
+            // (the number a size smaller here, beside the symbol rather than under it, so the tile — its name, its number
+            //  and two lines about it — is about as tall as it is wide: 100 by 106 on a 1024 window)
+            count.FontSize = 28;
+            count.LineHeight = 32;
             var number = new Viewbox { Child = count, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(SquareGap, 0, 0, 0) };
             line = K.Columns("auto, *", symbol.Col(0), number.Col(1));
         }
-        line.Margin = new Thickness(0, 8, 0, 0);
+        line.Margin = new Thickness(0, roomy ? 8 : 4, 0, 0);
         var content = K.V(0, head, line, new NoteLines(n.Note));
-        content.Margin = roomy ? new Thickness(SquarePad, SquarePad, SquarePad, 10) : new Thickness(SquarePadTight, 10, SquarePadTight, 10);
+        content.Margin = roomy ? new Thickness(SquarePad, SquarePad, SquarePad, 10) : new Thickness(SquarePadTight, 8, SquarePadTight, 8);
         return TileButton(c, content, n, alert, color, square: true);
     }
 

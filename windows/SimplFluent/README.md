@@ -428,7 +428,8 @@ public sealed class TodoScreen : Screen
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
   `WindowLayoutChanges` for its thresholds: the Dashboard's six counters sit in one row of square tiles on a window 1024
   wide or wider (each as tall as it is wide up to 200, about a 1650 window's, never shorter than its words: the symbol
-  and name at the top — the name alone there on the narrowest tiles, the symbol then beside the number — the number,
+  and name at the top — the name alone there on the narrowest tiles, the symbol then beside a number a size smaller
+  and the tiles 8 apart rather than 12, so a 1024 window's are 100 wide by 106 tall — the number,
   and the line about it whole on up to two lines, its parts on lines of their own, or left out, the tooltip saying
   it), and three to a row (two on the narrowest page) on a narrower one. Each tile wears its counter's colour washed
   across it; Overdue's red only while something is overdue (a quiet grey with nothing in it), Due today Windows' blue.
