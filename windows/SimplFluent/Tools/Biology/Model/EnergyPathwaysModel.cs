@@ -122,6 +122,11 @@ public static class EnergyPathwaysModel
         _ => "Cytosol",
     };
 
+    /// <summary>Where a place is, as a card says it: "Stroma · chloroplast"; the cytosol, in no organelle, once ("Cytosol",
+    /// not "Cytosol · cytosol").</summary>
+    public static string WhereText(string place) =>
+        PlaceName(place) == Organelle(place) ? PlaceName(place) : $"{PlaceName(place)} · {Organelle(place).ToLowerInvariant()}";
+
     /// <summary>The common mix-ups (§7 items 27 and 42), as the card says them.</summary>
     public static readonly IReadOnlyList<(string Title, string Text)> MixUps = new (string, string)[]
     {

@@ -59,7 +59,7 @@ internal sealed class DnaSequencePage : Grid
             BioUI.Caption("A, C, G and T (N for a base not known). Spaces, numbers, a FASTA header and 5′- … -3′ are left out. Up to 3,000 letters; the double helix draws the first 40."),
             show, transcribe, random, reset);
         var centre = K.Card(K.Rows("auto, *", heading.Margin(16, 16, 16, 8).Row(0),
-            new ScrollViewer { Content = strands, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(16, 0, 16, 16), Focusable = false }.Row(1)), new Thickness(0));
+            new ScrollViewer { Content = strands, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(16, 0, 16, 16), Focusable = false }.Row(1)), new Thickness(0));
         Children.Add(BioUI.Work(left, centre, right));
 
         void Changed() => Refresh();
@@ -103,13 +103,15 @@ internal sealed class DnaSequencePage : Grid
         if (key == drawn) return;
         drawn = key;
         heading.Text = $"{s.Length:#,##0} base pair{(s.Length == 1 ? "" : "s")}";
+        // (the words wrap to the card's width; only the letters, in lines of 30, scroll sideways when the card is narrower —
+        //  the wheel still scrolls the card, Shift and the wheel the letters)
         strands.Content = K.V(18,
             BioUI.Heading("Both strands"),
             BioUI.Caption("Strand 1 written 5′→3′, its complementary strand under it written 3′→5′: the two run in opposite directions."),
-            Duplex(s),
+            CrossKit.Sideways(Duplex(s)),
             BioUI.Heading("Reverse complement, 5′→3′"),
             BioUI.Caption("Strand 2 read in its own 5′→3′ direction. A complement is not the same as a reverse complement."),
-            Strand(BioSeq.ReverseComplement(s)));
+            CrossKit.Sideways(Strand(BioSeq.ReverseComplement(s))));
         Facts(s);
     }
 

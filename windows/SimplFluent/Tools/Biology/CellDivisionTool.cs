@@ -639,8 +639,8 @@ internal sealed class DivisionProcessPage : Grid
         }
     }
 
-    /// <summary>The right: the counts, the picked chromosome's or part's card, the step's card, and at the end the cells it
-    /// made.</summary>
+    /// <summary>The right: the picked chromosome's or part's card, and at the end the cells it made, first — in view as the
+    /// press or the last step makes them, not under the counts' tall card — then the counts and the step's card.</summary>
     private void Right()
     {
         var seq = Seq;
@@ -650,8 +650,6 @@ internal sealed class DivisionProcessPage : Grid
         title.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
         subtitle.Text = $"{process.Title()} · {(seq.Options.Plant ? "plant" : "animal")} cell · model 2n = {2 * seq.Options.Pairs} (human 2n = 46)";
         right.Children.Clear();
-        counts.Show(seq.Counts[i], i > 0 ? seq.Counts[i - 1] : null);
-        right.Children.Add(counts);
         void Close() { CellDivisionModel.Selected = null; CellDivisionModel.Tell(); }
         if (CellDivisionModel.Selected is { } sel)
         {
@@ -661,8 +659,10 @@ internal sealed class DivisionProcessPage : Grid
             else if (DivParts.Of(sel) is { } info)
                 right.Children.Add(DivParts.PartCard(info, Close));
         }
-        right.Children.Add(StepCard(st));
         if (i == seq.Stages.Count - 1) right.Children.Add(Products(seq));
+        counts.Show(seq.Counts[i], i > 0 ? seq.Counts[i - 1] : null);
+        right.Children.Add(counts);
+        right.Children.Add(StepCard(st));
     }
 
     /// <summary>The step's card: what happens (the specification's bold key terms kept) and what to notice.</summary>

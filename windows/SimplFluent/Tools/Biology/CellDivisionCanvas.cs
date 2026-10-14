@@ -450,7 +450,9 @@ internal sealed class DivisionStageView : Grid
             var p = fit.P(pt);
             if (anchors.ContainsKey(l.Id)) continue;
             anchors[l.Id] = (p, l);
-            inputs.Add(new BioLabelInput(l.Id, l.Text, p.X, p.Y, visible, 1, Measure(l.Text) + 20));
+            // (its words, the capsule's 10 of padding a side and its 1 of edge a side, and a little air: at + 20 the last
+            //  letter was cut)
+            inputs.Add(new BioLabelInput(l.Id, l.Text, p.X, p.Y, visible, 1, Measure(l.Text) + 24));
         }
         var b = f.Bounds;
         var r = b.Width / 2 * fit.Scale;

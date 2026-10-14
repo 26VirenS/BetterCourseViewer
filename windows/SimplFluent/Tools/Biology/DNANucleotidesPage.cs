@@ -20,6 +20,8 @@ internal sealed class DnaNucleotidesPage : Grid
     private readonly DnaPairsDrawing pairs = new();
     private readonly ContentControl body = new() { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
+    // (the nucleotide's name under its code: on one line with the view's switch it was cut short)
+    private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly TextBlock foot = K.Text("", Ty.Caption, B.Text2);
     private readonly ContentControl buttons = new() { Focusable = false };
     private readonly SelectorBar viewBar;
@@ -40,7 +42,11 @@ internal sealed class DnaNucleotidesPage : Grid
         viewBar = new SelectorBar(new[] { "3D", "Base pairs (2D)" }, DNAToolModel.ShowPairs ? 1 : 0);
         viewBar.Changed += i => DNAToolModel.ShowPairs = i == 1;
         scene.Picked += Pick;
-        var bar = K.Columns("*, auto, auto", title.Col(0), viewBar.Margin(8, 0, 8, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1), buttons.Col(2));
+        title.TextTrimming = TextTrimming.CharacterEllipsis;
+        subtitle.TextTrimming = TextTrimming.CharacterEllipsis;
+        var words = K.V(2, title, subtitle);
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var bar = K.Columns("*, auto, auto", words.Col(0), viewBar.Margin(8, 0, 8, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1), buttons.Col(2));
         bar.Margin = new Thickness(16);
         foot.HorizontalAlignment = HorizontalAlignment.Center;
         foot.Margin = new Thickness(12);
@@ -88,6 +94,7 @@ internal sealed class DnaNucleotidesPage : Grid
         if (DNAToolModel.ShowPairs)
         {
             title.Text = "Purines and pyrimidines";
+            subtitle.Text = DNAToolModel.PairWithUracil ? "A·U and G·C, drawn flat" : "A·T and G·C, drawn flat";
             foot.Text = "C1′ to C1′ is 10.9 Å in both pairs: a purine with a pyrimidine is always the same width";
             pairs.Uracil = DNAToolModel.PairWithUracil;
             body.Content = pairs;
@@ -96,7 +103,8 @@ internal sealed class DnaNucleotidesPage : Grid
         else
         {
             var mol = BioData.Molecule(code);
-            title.Text = $"{DnaNucleotides.Short(code)} · {DnaNucleotides.Name(code).ToLowerInvariant()}";
+            title.Text = DnaNucleotides.Short(code);
+            subtitle.Text = DnaNucleotides.Name(code) + (mol?.Formula is { } formula ? " · " + BiomolText.Formula(formula) : "");
             foot.Text = "Drag to turn · scroll to zoom · press a part to learn about it";
             body.Content = scene;
             buttons.Content = sceneButtons ??= BioSceneCard.Buttons(scene);
@@ -190,7 +198,7 @@ internal sealed class DnaNucleotidesPage : Grid
         {
             right.Children.Add(BioUI.Facts(new (string, string, Color?)[]
             {
-                ("Formula", mol?.Formula ?? "—", null),
+                ("Formula", mol?.Formula is { } f ? BiomolText.Formula(f) : "—", null),
                 ("Molar mass", mol?.Mass is { } m ? $"{m:0.00} g/mol" : "—", null),
                 ("Sugar", DnaNucleotides.IsRibose(code) ? "Ribose (2′–OH)" : "Deoxyribose (2′–H)", null),
                 ("Base", $"{Cap(DnaNucleotides.BaseName(b))}, a {(DnaNucleotides.IsPurine(b) ? "purine" : "pyrimidine")}", BioColors.Base(b)),

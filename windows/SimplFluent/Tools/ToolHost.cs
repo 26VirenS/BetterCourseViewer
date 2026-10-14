@@ -535,11 +535,18 @@ public sealed class PinBar : StackPanel
         tick.Tick += (_, _) => { if (timer?.Active == true) Draw(); };
         Loaded += (_, _) => { Hook(); Draw(); };
         Draw();
-        // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch)
+        // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch, and keeps it open: CI
+        //  starts three copies of Simpl at once, and another's window coming forward would close a flyout that closes when
+        //  its window is left, so the picture showed the bar without it)
         if (Launch.Take("", "pin-open") is { Length: > 0 } k)
         {
             var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
-            t.Tick += (_, _) => { t.Stop(); OpenFlyout(k); };
+            t.Tick += (_, _) =>
+            {
+                t.Stop();
+                OpenFlyout(k);
+                if (flyout != null) flyout.StaysOpen = true;
+            };
             t.Start();
         }
     }

@@ -187,7 +187,8 @@ public sealed class ToolsScreen : Screen
     /// <summary>A tool's tile: its symbol on a wash of its colour, its name and line, and its pin at its corner.</summary>
     private FrameworkElement Tile(Kind kind)
     {
-        var words = K.V(4, K.Text(kind.Name, Ty.BodyStrong), K.Wrapped(kind.Note, Ty.Body, B.Text2));
+        // (a long name — Photosynthesis & Respiration — on two lines rather than cut short)
+        var words = K.V(4, K.Wrapped(kind.Name, Ty.BodyStrong, maxLines: 2), K.Wrapped(kind.Note, Ty.Body, B.Text2));
         if (kind.Key == "pomo" && Simpl.Tools.ToolRegistry.Timer is { Active: true } t)
         {
             timerLine = K.Text(TimerWords(t), Ty.BodyStrong);

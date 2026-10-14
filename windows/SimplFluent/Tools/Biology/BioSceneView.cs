@@ -624,11 +624,36 @@ public sealed class BioSceneView : Grid
         hovered = id;
         Cursor = id == null ? Cursors.Arrow : Cursors.Hand;
         Outline(id);
-        foreach (var (lid, v) in labelViews) Ring(v, Lit(lid));
+        foreach (var (key, v) in labelViews) Ring(v, Lit(LabelIdOf(key)));
         HoverChanged?.Invoke(id);
     }
 
     private bool Lit(string labelId) => hovered != null && (BioSceneContent.Matches(hovered, labelId) || BioSceneContent.Matches(labelId, hovered));
+
+    private static readonly Dictionary<string, double> labelWidths = new();
+
+    /// <summary>A label's capsule width: its words measured as the capsule draws them (12 semibold), its 10 of padding a
+    /// side and its edge — never less than the shared estimate. The estimate alone cut short a short label of wide letters
+    /// ("D a…" for "D arm").</summary>
+    private double LabelWidth(string text)
+    {
+        if (labelWidths.TryGetValue(text, out var w)) return w;
+        var face = new Typeface(K.TextFace, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+        var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, 12, Brushes.Black,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        w = Math.Max(BioLabelLayout.EstimatedWidth(text), Math.Ceiling(ft.WidthIncludingTrailingWhitespace) + 22);
+        return labelWidths[text] = w;
+    }
+
+    /// <summary>A label's view is kept by its object and its words together: two labels may name one object (a strand's
+    /// first base and its 5′ end), and each is drawn.</summary>
+    private static string LabelKey(string id, string text) => id + "\u0001" + text;
+
+    private static string LabelIdOf(string key)
+    {
+        var i = key.IndexOf('\u0001');
+        return i >= 0 ? key[..i] : key;
+    }
 
     /// <summary>The hovered object outlined: its surface pushed out a touch and drawn from behind only, in the accent (an
     /// inverted hull), so a rim of the accent shows round it.</summary>
@@ -705,7 +730,7 @@ public sealed class BioSceneView : Grid
                 }
                 visible = rayVisible.GetValueOrDefault(l.Id, true);
             }
-            inputs.Add(new BioLabelInput(l.Id, l.Text, x, y, visible, l.Area, BioLabelLayout.EstimatedWidth(l.Text)));
+            inputs.Add(new BioLabelInput(l.Id, l.Text, x, y, visible, l.Area, LabelWidth(l.Text)));
         }
         if (still) raysDone = true;
         // (the model's circle on the view: its framing ball's centre and edge, projected)
@@ -742,7 +767,7 @@ public sealed class BioSceneView : Grid
         geo.Freeze();
         leaders.Data = geo;
         leaders.SetResourceReference(Shape.FillProperty, B.Text);
-        var now = placed.Select(p => p.Id).ToHashSet();
+        var now = placed.Select(p => LabelKey(p.Id, p.Text)).ToHashSet();
         foreach (var gone in labelViews.Keys.Where(k => !now.Contains(k)).ToList())
         {
             var v = labelViews[gone];
@@ -751,10 +776,10 @@ public sealed class BioSceneView : Grid
         }
         foreach (var l in placed)
         {
-            if (!labelViews.TryGetValue(l.Id, out var v))
+            if (!labelViews.TryGetValue(LabelKey(l.Id, l.Text), out var v))
             {
                 v = LabelView(l.Id, l.Text);
-                labelViews[l.Id] = v;
+                labelViews[LabelKey(l.Id, l.Text)] = v;
                 labelLayer.Children.Add(v);
                 Motion.FadeIn(v, 120);
             }

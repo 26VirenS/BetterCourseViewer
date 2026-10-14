@@ -246,7 +246,7 @@ internal sealed class GXCodonsPage : Grid
             ? $"Charge {a.ChargeText} · pKa ≈ {pk.ToString("0.00", CultureInfo.InvariantCulture)} (can shift inside a protein)"
             : $"Charge {a.ChargeText}"));
         rows.Add(BioUI.FactRow("Hydropathy (Kyte–Doolittle)", a.Hydropathy.ToString("+0.0;−0.0;0.0", CultureInfo.InvariantCulture) + (a.Hydropathy > 0 ? " · hydrophobic" : " · hydrophilic")));
-        rows.Add(BioUI.FactRow("Mass", $"{a.Mass.ToString("0.00", CultureInfo.InvariantCulture)} g/mol free · {a.ResidueMass.ToString("0.00", CultureInfo.InvariantCulture)} g/mol in a chain · {a.Formula}"));
+        rows.Add(BioUI.FactRow("Mass", $"{a.Mass.ToString("0.00", CultureInfo.InvariantCulture)} g/mol free · {a.ResidueMass.ToString("0.00", CultureInfo.InvariantCulture)} g/mol in a chain · {BiomolText.Formula(a.Formula)}"));
         rows.Add(BioUI.FactRow("Note", a.Note));
         var see = ChemKit.Wide("See in 3D", () => BioTools.Open(c, "biomol", new() { ["molecule"] = a.Three.ToUpperInvariant(), ["page"] = "amino" }), icon: SymbolRegular.Cube24);
         see.ToolTip = $"Open {a.Name} in the Biomolecule Builder";

@@ -51,6 +51,8 @@ public sealed class BioStepControls : ContentControl
         Content = K.V(10, explanation, capsuleHost);
         player.Tick += (_, _) => c.Tick();
         BioStepKeys.Attach(this, c);
+        // (the capsule made again for a new width: its caption fitted to it)
+        SizeChanged += (_, e) => { if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) > 0.5) capsuleHost.Content = Capsule(); };
         Draw();
         Loaded += (_, _) =>
         {
@@ -108,14 +110,33 @@ public sealed class BioStepControls : ContentControl
         divider.Bg(B.Divider);
         row.Children.Add(divider);
         row.Children.Add(Dots());
-        var caption = K.Text(BioStepTiming.Caption(c.Index, c.Steps), Ty.BodyStrong);
+        var words = BioStepTiming.Caption(c.Index, c.Steps);
+        var caption = K.Text(words, Ty.BodyStrong);
         caption.MinWidth = 120;
         caption.VerticalAlignment = VerticalAlignment.Center;
         caption.Margin = new Thickness(6, 0, 4, 0);
+        caption.TextTrimming = TextTrimming.CharacterEllipsis;
+        caption.ToolTip = words;
         caption.FontFeatures();
         row.Children.Add(caption);
-        row.Children.Add(Speed());
+        var speed = Speed();
+        row.Children.Add(speed);
         row.VerticalAlignment = VerticalAlignment.Center;
+        // (the caption gives way when the capsule would be wider than the controls — a long step title under a narrow
+        //  scene — so the speed stays in view; the whole caption is in its tooltip)
+        if (ActualWidth > 0)
+        {
+            var others = 0.0;
+            foreach (UIElement e in row.Children)
+            {
+                if (ReferenceEquals(e, caption)) continue;
+                e.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                others += e.DesiredSize.Width;
+            }
+            // (the row's spacing, the capsule's padding and edge, the caption's margins)
+            others += 6 * row.Children.Count + 24 + 10;
+            caption.MaxWidth = Math.Max(caption.MinWidth, ActualWidth - others);
+        }
         var capsule = new Border { CornerRadius = new CornerRadius(22), Padding = new Thickness(10, 6, 12, 6), Child = row, BorderThickness = new Thickness(1) };
         capsule.Bg(B.Card).Stroke(B.CardStroke);
         capsule.ToolTip = groups.Count == 0

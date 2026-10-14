@@ -409,7 +409,7 @@ internal sealed class EnergyPathwaysTool : Grid
             var step = info[i];
             var per = page == "photosynthesis" ? "for one G3P, so far" : "per glucose, so far";
             right.Children.Add(BioUI.Card("Running totals", BioColors.Tool("energy"), $"{BioStepTiming.Caption(i, c.Steps)} · {per}", Totals(step)));
-            var parts = new List<UIElement> { BioUI.FactRow("Where", step.Place == null ? "The whole cell (a summary)" : $"{EnergyPathwaysModel.PlaceName(step.Place)} · {EnergyPathwaysModel.Organelle(step.Place).ToLowerInvariant()}") };
+            var parts = new List<UIElement> { BioUI.FactRow("Where", step.Place == null ? "The whole cell (a summary)" : EnergyPathwaysModel.WhereText(step.Place)) };
             if (step.Inputs.Count > 0) parts.Add(Fact("In", string.Join(", ", step.Inputs)));
             if (step.Outputs.Count > 0) parts.Add(Fact("Out", string.Join(", ", step.Outputs)));
             right.Children.Add(BioUI.Card("This step", null, c.Steps[i].Title, parts.ToArray()));
@@ -422,7 +422,7 @@ internal sealed class EnergyPathwaysTool : Grid
             var atom = EnergyPathwaysModel.Traced == EnergyTrace.Oxygen ? "O" : "C";
             var parts = new List<UIElement> { Formula(t.Formula, t.Molecule) };
             if (t.Carbons > 0) parts.Add(Carbons(new[] { new EnergyCarbons(t.Molecule, 1, t.Carbons) }, t.Traced));
-            parts.Add(BioUI.FactRow("Where", t.Place == null ? "Outside the cell" : $"{EnergyPathwaysModel.PlaceName(t.Place)} · {EnergyPathwaysModel.Organelle(t.Place).ToLowerInvariant()}"));
+            parts.Add(BioUI.FactRow("Where", t.Place == null ? "Outside the cell" : EnergyPathwaysModel.WhereText(t.Place)));
             parts.Add(BioUI.FactRow("How it got there", t.Process));
             right.Children.Add(BioUI.Card($"The {atom} atom is in {t.Molecule.ToLowerInvariant()}", BioColors.Tool("energy"), BioStepTiming.Caption(i, c.Steps), parts.ToArray()));
             right.Children.Add(BioUI.Card("Water on both sides", null, "Photosynthesis with all its water written out",
@@ -639,6 +639,11 @@ internal sealed class EnergyMap : Grid
         var y = oy + at.Y * scale;
         Canvas.SetLeft(e, centred ? x - Centre.Width / 2 : x);
         Canvas.SetTop(e, centred ? y - Centre.Height / 2 : y);
+        // (the words shrink with a board drawn small, to no less than 72% — at their full size over a board drawn at half
+        //  of its own, the pills ran into each other and off the cell's edge)
+        var words = Math.Clamp(scale, 0.72, 1);
+        e.RenderTransformOrigin = centred ? new Point(0.5, 0.5) : new Point(0, 0);
+        e.RenderTransform = words < 1 ? new ScaleTransform(words, words) : Transform.Identity;
     }
 
     /// <summary>The room a pill, a chip or a word is centred in (its own size isn't known until it is laid out).</summary>

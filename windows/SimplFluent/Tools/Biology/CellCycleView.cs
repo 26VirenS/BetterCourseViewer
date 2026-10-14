@@ -71,7 +71,8 @@ internal sealed class CellCycleWheel : FrameworkElement
     private (Point C, double R, double Inner, Point G0) Geometry()
     {
         var c = new Point(ActualWidth / 2, ActualHeight / 2);
-        var r = Math.Max(Math.Min(ActualWidth, ActualHeight) * 0.36, 60);
+        // (the ring small enough that what sits round it — M's name, the gates' pills 44 out — stays inside a short view)
+        var r = Math.Max(Math.Min(Math.Min(ActualWidth, ActualHeight) * 0.36, ActualHeight / 2 - 60), 60);
         return (c, r, r * 0.66, At(c, 75, r * 1.42));
     }
 

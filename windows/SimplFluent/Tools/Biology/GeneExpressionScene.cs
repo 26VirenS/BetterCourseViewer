@@ -270,9 +270,13 @@ internal sealed class GXPainter
             double a = X(r.Range.Lo - 0.5), b = X(r.Range.Hi + 0.5);
             if (!(b > left - 4 && a < right + 4)) continue;
             dc.DrawRectangle(GXDraw.Brush(GXColors.Region(r.Kind)), null, new Rect(a, bandTop, b - a, bandBottom - bandTop));
-            var mid = Math.Min(Math.Max((a + b) / 2, Math.Max(a, left) + 34), Math.Min(b, right) - 34);
+            // (its name kept whole inside the part of it in view: at the view's edge it slides in, and where too little of it
+            //  shows for its name, it goes unnamed — "Coding sequence" was cut to "oding sequence")
+            var half = r.Name.Length * 3.1 + 4;
+            double va = Math.Max(a, left), vb = Math.Min(b, right);
             var lit = r.Kind == GXRegionKind.Intron && (notice.Contains("intron") || notice.Contains("gu-ag"));
-            if (b - a > 30) Text(dc, r.Name, new Point(mid, Y(YRegions)), 10.5, lit ? FontWeights.Bold : FontWeights.SemiBold, lit ? accent : secondary);
+            if (vb - va > 2 * half)
+                Text(dc, r.Name, new Point(Math.Clamp((a + b) / 2, va + half, vb - half), Y(YRegions)), 10.5, lit ? FontWeights.Bold : FontWeights.SemiBold, lit ? accent : secondary);
         }
         // (the boxed marks, their names in one or two rows above)
         var rowEnds = new[] { double.NegativeInfinity, double.NegativeInfinity };
@@ -285,8 +289,11 @@ internal sealed class GXPainter
             var box = new Rect(a, bandTop + 2, b - a, bandBottom - bandTop - 4);
             if (lit) GXDraw.Round(dc, null, GXDraw.Pen(colour, 6, 0.3), box, 4);
             GXDraw.Round(dc, null, GXDraw.Pen(colour, lit ? 2.2 : 1.3), box, 4);
-            var mid = (a + b) / 2;
             var w = m.Name.Length * 6.2 + 8;
+            // (its name over it, kept inside the view: a mark half scrolled out has its name at the edge it is still at —
+            //  "Start codon" was cut to "art codon"; one wholly out of view goes unnamed)
+            if (!(b > left && a < right)) continue;
+            var mid = Math.Clamp((a + b) / 2, left + w / 2, Math.Max(left + w / 2, right - w / 2));
             var row = rowEnds[0] < mid - w / 2 ? 0 : 1;
             rowEnds[row] = mid + w / 2;
             Text(dc, m.Name, new Point(mid, Y(YMarks + row * 13)), 10.5, lit ? FontWeights.Bold : FontWeights.SemiBold, colour);

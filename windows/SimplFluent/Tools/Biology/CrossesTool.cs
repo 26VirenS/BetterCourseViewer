@@ -257,7 +257,10 @@ internal sealed class CrossPage : Grid
         else body.Children.Add(Forked(cross));
         if (Legend(cross.Result()) is { } legend) body.Children.Add(legend);
         int n1 = cross.Gametes1.Count, n2 = cross.Gametes2.Count;
-        var foot = K.Wrapped($"{n1} × {n2} = {ToolKit.Plural(n1 * n2, "cell")}, each as likely as the next. Point at a cell to light every cell with its genotype.", Ty.Caption, B.Text2).Center();
+        // (the forked line has no cells to point at: it says how its lines add up to the square's)
+        var foot = K.Wrapped(CrossesModel.ShownDiagram == CrossesModel.Diagram.Square
+            ? $"{n1} × {n2} = {ToolKit.Plural(n1 * n2, "cell")}, each as likely as the next. Point at a cell to light every cell with its genotype."
+            : $"Each line multiplies one chance from each gene; together the lines make the square's {n1} × {n2} = {ToolKit.Plural(n1 * n2, "cell")}.", Ty.Caption, B.Text2).Center();
         var scroll = CrossKit.Scroller(body, new Thickness(18, 0, 18, 18));
         var g = K.Rows("auto, *, auto", head.Margin(16).Row(0), scroll.Row(1), foot.Margin(12).Row(2));
         return K.Card(g, new Thickness(0), 12);

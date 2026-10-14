@@ -171,6 +171,10 @@ internal static class HWRunner
         if (HardyWeinbergModel.Running && running == null && wait?.IsEnabled != true) Go();
     }
 
+    /// <summary>A run waiting for the settings to rest, which a picture waits for as it waits for a run (on a slow start the
+    /// picture's own timer could otherwise come first and picture the empty chart).</summary>
+    private static bool pending;
+
     private static void Schedule()
     {
         Shot.Moved();
@@ -179,8 +183,14 @@ internal static class HWRunner
         if (wait == null)
         {
             wait = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
-            wait.Tick += (_, _) => { wait.Stop(); Go(); };
+            wait.Tick += (_, _) =>
+            {
+                wait.Stop();
+                Go();
+                if (pending) { pending = false; Shot.Ended(); }
+            };
         }
+        if (!pending) { pending = true; Shot.Began(); }
         wait.Stop();
         wait.Start();
     }
@@ -379,6 +389,12 @@ internal sealed class HWSimulatePage : HWPageBase
         });
         Typography.SetNumeralAlignment(seed, FontNumeralAlignment.Tabular);
         AutomationProperties.SetName(seed, "Seed");
+        // (the sheet gives its first text box the focus as it opens — here the seed, at the foot of the column: the column
+        //  stays at its top, the population's settings in view, until a key or a press of the student's own moves it)
+        var settled = false;
+        PreviewKeyDown += (_, _) => settled = true;
+        PreviewMouseDown += (_, _) => settled = true;
+        seed.RequestBringIntoView += (_, e) => { if (!settled) e.Handled = true; };
         var next = K.IconButton(SymbolRegular.ArrowShuffle24, NextSeed, "Run again with the next seed (Ctrl+Shift+R)");
         var seedLabel = K.Text("Seed", Ty.Body);
         seedLabel.VerticalAlignment = VerticalAlignment.Center;

@@ -390,4 +390,6 @@ still passes.
 `-gametes`, `-plant`, `-pick`, `-compare`, `-cycle`, each with `-dark`; `bio-lab-dilution`, `-stats-dark`,
 `-cells-dark`, `pin-biolab`, `bio-enzyme-competitive`, `-denatured-dark`, `bio-energy-map`, `-respiration-dark`,
 `-photosynthesis`, `-atoms`. An argument with a space in it (a cross typed `AaBb x AaBb`) is put in quotes by the
-workflow's `Shot`.
+workflow's `Shot`. A pin's flyout opened by `--pin-open` stays open (`ToolHost.cs`): three copies of Simpl start at once
+in CI, and another's window coming forward closed it before its picture. A picture waits for Hardy–Weinberg's
+simulation from the moment it is asked for, not only once it runs (`HWRunner`).

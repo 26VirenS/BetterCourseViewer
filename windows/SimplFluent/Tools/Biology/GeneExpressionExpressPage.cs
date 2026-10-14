@@ -75,9 +75,12 @@ internal sealed class GXExpressPage : Grid
             BioUI.Legend(BioAAClasses.All.Select(k => (BioColors.Of(k), k.Label()))));
 
         // (centre: the scene and the controls)
-        var words = K.V(3, titleHost, summary);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var top = K.Columns("*, auto", words.Col(0), runHost.Col(1));
+        // (the title and its badges beside Run and Skip, the badges onto a line of their own when the card is narrow; the
+        //  summary under both, across the card's width — beside the buttons they were cut short)
+        titleHost.VerticalAlignment = VerticalAlignment.Center;
+        runHost.VerticalAlignment = VerticalAlignment.Top;
+        summary.TextWrapping = TextWrapping.Wrap;
+        var top = K.Rows("auto, auto", K.Columns("*, auto", titleHost.Col(0), runHost.Margin(8, 0, 0, 0).Col(1)).Row(0), summary.Margin(0, 3, 0, 0).Row(1));
         top.Margin = new Thickness(16, 14, 16, 4);
         scene.ToolTip = "← → step · Space plays · 1–5 the stages · drag to look aside";
         BioStepKeys.Attach(scene, steps);
@@ -164,9 +167,19 @@ internal sealed class GXExpressPage : Grid
             : "No nucleus and no introns: ribosomes bind the Shine–Dalgarno site, and can start before transcription ends.";
 
         // (the centre: the scene, or what to do when there is nothing to show)
-        var title = K.H(8, K.Text(m?.Gene.Title ?? "Your sequence", Ty.Subtitle));
-        if (GeneExpressionModel.Source == GXSource.Teaching) title.Children.Add(GXKit.Badge("Made up for teaching", Colors.Gray));
-        title.Children.Add(GXKit.Badge(GeneExpressionModel.Cell.Label(), Appearance.Accent));
+        var title = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var name = K.Text(m?.Gene.Title ?? "Your sequence", Ty.Subtitle);
+        name.Margin = new Thickness(0, 0, 8, 2);
+        name.VerticalAlignment = VerticalAlignment.Center;
+        title.Children.Add(name);
+        void Badge(FrameworkElement b)
+        {
+            b.Margin = new Thickness(0, 0, 8, 2);
+            b.VerticalAlignment = VerticalAlignment.Center;
+            title.Children.Add(b);
+        }
+        if (GeneExpressionModel.Source == GXSource.Teaching) Badge(GXKit.Badge("Made up for teaching", Colors.Gray));
+        Badge(GXKit.Badge(GeneExpressionModel.Cell.Label(), Appearance.Accent));
         titleHost.Content = title;
         summary.Text = m != null ? Summary(m.Gene) : "";
         scene.Visibility = m != null ? Visibility.Visible : Visibility.Collapsed;

@@ -264,7 +264,7 @@ internal sealed class CrossChiSquarePage : CrossesPageBase
     private FrameworkElement Rows()
     {
         var g = new Grid();
-        foreach (var w in new[] { "*", "6", "54", "6", "74", "4", "auto" }) g.ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
+        foreach (var w in new[] { "*", "6", "46", "6", "62", "4", "auto" }) g.ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
         g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         g.Children.Add(CrossKit.Label("Category").Col(0));
         g.Children.Add(CrossKit.Label("Ratio").Col(2));
@@ -329,7 +329,8 @@ internal sealed class CrossChiSquarePage : CrossesPageBase
         return CrossKit.CentreCard(body);
     }
 
-    private static string F2(double x) => HWFormat.Fixed(x, 2);
+    /// <summary>To two places, a negative with a true minus sign ("−3.25").</summary>
+    private static string F2(double x) => HWFormat.Fixed(x, 2).Replace('-', '−');
 
     private static FrameworkElement Table(ChiSquareWork w)
     {
@@ -526,7 +527,8 @@ internal sealed class CrossPedigreePage : CrossesPageBase
         var partner = Act("Partner", SymbolRegular.Heart24, () => CrossesModel.EditPedigree(q => { if (q.AddPartner(id) is { } n) CrossesModel.Select(n); }), !hasPartner && !full, hasPartner ? "Already has a partner" : "Add a partner");
         var son = Act("Son", SymbolRegular.Square24, () => CrossesModel.EditPedigree(q => q.AddChild(id, true)), hasPartner && !full, hasPartner ? "Add a son to this couple" : "Add a partner first");
         var daughter = Act("Daughter", SymbolRegular.Circle24, () => CrossesModel.EditPedigree(q => q.AddChild(id, false)), hasPartner && !full, hasPartner ? "Add a daughter to this couple" : "Add a partner first");
-        var adds = K.Columns("*, 6, *, 6, *", partner.Col(0), son.Col(2), daughter.Col(4));
+        // (a partner on a row of its own, the children under it: three across left each word cut short in the left column)
+        var adds = K.V(6, partner, K.Columns("*, 6, *", son.Col(0), daughter.Col(2)));
         var remove = ChemKit.Wide($"Remove {label} and their descendants", () =>
         {
             CrossesModel.Select(null);
@@ -574,7 +576,9 @@ internal sealed class CrossPedigreePage : CrossesPageBase
         var head = K.Columns("*, auto", title.Col(0));
         if (CrossesModel.ShownMode is { } m)
         {
-            var ring = ChemKit.Line(SymbolRegular.ErrorCircle16, $"Ringed: who rules out {m.Title().ToLowerInvariant()}", K.Tone("red"));
+            // (the mode mid-sentence: "autosomal dominant", but X-linked keeps its capital X)
+            var mode = m.Title().StartsWith("X-", StringComparison.Ordinal) ? m.Title() : m.Title().ToLowerInvariant();
+            var ring = ChemKit.Line(SymbolRegular.ErrorCircle16, $"Ringed: who rules out {mode}", K.Tone("red"));
             ring.VerticalAlignment = VerticalAlignment.Center;
             head.Children.Add(ring.Col(1));
         }

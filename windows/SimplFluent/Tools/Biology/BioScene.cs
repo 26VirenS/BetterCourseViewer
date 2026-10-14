@@ -108,7 +108,17 @@ public static class BioBillboards
         var ft = new FormattedText(s, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Face, 100, brush0, 1);
         var geo = ft.BuildGeometry(new Point(0, 0));
         var bounds = geo.Bounds.IsEmpty ? new Rect(0, 0, 60, 70) : geo.Bounds;
-        var brush = new DrawingBrush(new GeometryDrawing(brush0, null, geo)) { Stretch = Stretch.Fill };
+        var drawing = new DrawingGroup();
+        // (a flat sign — "−", a dash — would be stretched to fill the whole quad, a bar many times its size: it is drawn
+        //  inside the height of a capital instead, where the font puts it)
+        var capHeight = Face.CapsHeight * 100;
+        if (bounds.Height < 0.4 * capHeight)
+        {
+            bounds = Rect.Union(bounds, new Rect(bounds.X, ft.Baseline - capHeight, bounds.Width, capHeight));
+            drawing.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(bounds)));
+        }
+        drawing.Children.Add(new GeometryDrawing(brush0, null, geo));
+        var brush = new DrawingBrush(drawing) { Stretch = Stretch.Fill };
         brush.Freeze();
         double w = bounds.Width / bounds.Height * size, h = size;
         var mesh = new MeshGeometry3D();

@@ -335,7 +335,17 @@ internal sealed class GXMutationsPage : Grid
             var parts = new List<UIElement?>();
             foreach (var line in res.Lines) parts.Add(PTKit.Selectable(line, 14, FontWeights.Normal));
             if (res.From is { } a && res.To is { } b)
-                parts.Add(K.H(8, Chip(a), K.Icon(SymbolRegular.ArrowRight16, 14, B.Text2), Chip(b)));
+            {
+                // (the two classes side by side, the second under the first when the card is too narrow for both)
+                var arrow = K.Icon(SymbolRegular.ArrowRight16, 14, B.Text2);
+                arrow.Margin = new Thickness(0, 0, 8, 6);
+                arrow.VerticalAlignment = VerticalAlignment.Center;
+                var first = Chip(a);
+                first.Margin = new Thickness(0, 0, 8, 6);
+                var second = Chip(b);
+                second.Margin = new Thickness(0, 0, 0, 6);
+                parts.Add(new WrapPanel { Children = { first, arrow, second } });
+            }
             if (res.Kept is { } k)
             {
                 var bar = K.Bar(k, GXColors.Stop.ToColor(), 6);
