@@ -1291,12 +1291,15 @@ private struct HandInSheet: View {
         .padding(.bottom, 6)
     }
 
+    /// (1.3.78) A kind's own heading only where no Hand In As picker above already names it.
+    private var kindNamed: Bool { assignment.types.count > 1 }
+
     /// The fields of the kind of hand-in chosen.
     @ViewBuilder
     private var kindSection: some View {
         switch type {
         case "online_text_entry":
-            Section("Your Text") {
+            Section {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $text)
                         .font(.sBody)
@@ -1309,12 +1312,16 @@ private struct HandInSheet: View {
                             .allowsHitTesting(false)
                     }
                 }
+            } header: {
+                if !kindNamed { Text("Your Text") }
             }
         case "online_url":
-            Section("Website Address") {
-                TextField("Address", text: $url, prompt: Text("https://"))
+            Section {
+                TextField("Website Address", text: $url, prompt: Text("https://"))
                     .labelsHidden()
                     .autocorrectionDisabled()
+            } header: {
+                if !kindNamed { Text("Website Address") }
             }
         case "online_upload":
             filesSection
@@ -1333,23 +1340,29 @@ private struct HandInSheet: View {
                     Text("Converting \(name)…").foregroundStyle(.secondary)
                 }
             }
-            // (1.3.78) Send from Phone beside them; on its own line when the three will not fit
+            // (1.3.78) Send from Phone beside them; Photos said shorter before any goes to a line of its own, so the
+            // empty form fits the sheet without scrolling
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) {
-                    chooseButtons
+                    chooseButtons(short: false)
+                    phoneButton
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 10) {
+                    chooseButtons(short: true)
                     phoneButton
                     Spacer(minLength: 0)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
-                        chooseButtons
+                        chooseButtons(short: false)
                         Spacer(minLength: 0)
                     }
                     phoneButton
                 }
             }
         } header: {
-            Text("Files")
+            if !kindNamed { Text("Files") }
         } footer: {
             if let a = assignment.allowed, !a.isEmpty {
                 Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line)."))
@@ -1360,13 +1373,14 @@ private struct HandInSheet: View {
     }
 
     @ViewBuilder
-    private var chooseButtons: some View {
+    private func chooseButtons(short: Bool) -> some View {
         Button { importing = true } label: {
             Label("Choose Files…", systemImage: "folder")
         }
         PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
-            Label("Choose from Photos…", systemImage: "photo.on.rectangle")
+            Label(short ? "Photos…" : "Choose from Photos…", systemImage: "photo.on.rectangle")
         }
+        .help("Choose photos or videos from Photos")
     }
 
     /// (1.3.78) Send from Phone: a QR code the phone's camera opens, and what the phone sends comes into this hand-in.
@@ -1377,30 +1391,25 @@ private struct HandInSheet: View {
         .help("Scan a code with your phone to send photos and files to this hand-in")
     }
 
-    /// (1.3) A press on it opens the Open panel, as Choose Files… does.
+    /// Where files are dropped. (1.3.78) Only that: Choose Files… under it is the one way to pick them, and the zone is
+    /// shorter, so the empty form fits the sheet.
     private var dropZone: some View {
-        Button { importing = true } label: {
-            VStack(spacing: 6) {
-                Image(systemName: "arrow.down.doc")
-                    .font(.system(size: 26))
-                    .foregroundStyle(.secondary)
-                Text("Drop files here")
-                    .font(.sCallout.weight(.semibold))
-                Text("or click to choose them")
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(targeted ? Theme.accent : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.doc")
+                .font(.system(size: 22))
+                .foregroundStyle(targeted ? Theme.accent : Color.secondary)
+            Text("Drop files here")
+                .font(.sCallout.weight(.semibold))
+                .foregroundStyle(targeted ? Theme.accent : Color.primary)
         }
-        .buttonStyle(RowButtonStyle(radius: 10))
-        .help("Choose files to hand in")
-        .accessibilityLabel("Drop files here, or choose them")
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(targeted ? Theme.accent : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+        }
+        .animation(Motion.hover, value: targeted)
+        .accessibilityElement(children: .combine)
     }
 
     /// (1.3) A press on the file shows it in a pane at the sheet's right, the sheet widening for it (again: puts it away).
