@@ -8,6 +8,20 @@ popovers, context menus, Quick Look, a Settings window and a window for each ext
 asked of the page (`BCVNative.call`, `extension/content/app/native-app.js`), exactly as on the iPhone, so the Mac, the
 iPhone and the web count the same things the same way.
 
+Since 2.99.33 the page also **writes** what the apps show, once, for the Mac, Windows and the iPhone alike: every
+percentage to one decimal rounded half up (`pctText`, "81.3%"; a ring's whole percent `pctWhole`, `scoreWhole`, and a
+letter or a grade's colour band, worked out from that shown figure), the term GPA to two (`gpaText` "3.43", with the
+goal's gap worked out from that figure, `goalLine`), letters with the real minus sign, every date and time one way ("Oct
+12 at 11:59 PM", the year only when it is not this year, `dueLine`, `factsLine`; Canvas's own lock notes rewritten the
+same way, "12am" as "12:00 AM"), each Dashboard counter in a name every tile fits and a full one (`label` "Unread" with
+`note` "announcements · 2 courses", `fullLabel` "Announcements" with `fullNote` "3 unread · 2 courses"), a course by the
+sidebar's name with a second name only when it says something new — neither the same name
+in other punctuation nor a part of it (`altName`, `detail`) —, a chip only for what is out of the ordinary (no
+plain "Not submitted"), one graded count for the Grades overview and a course's page (`gradedText`), What-If starting
+from the school's own total (`estimateNote` when Simpl's reading differs), a rubric mark that is the points given
+(`markText`), the words around a quiz's blank (`around`), and a file sent with an Inbox message (`messageUpload`, then
+`attachments`). The apps show these strings as they come rather than formatting the numbers themselves.
+
 It is named **Simpl** with the bundle id `com.simplcourses.mac`, so it never collides with the Safari container app
 (`Simpl Courses`) on the same Mac.
 

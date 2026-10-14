@@ -84,6 +84,74 @@
   const iso = (d) => (d instanceof Date && !Number.isNaN(d.getTime()) ? d.toISOString() : null);
   const TASK = '#5856d6';
   const GRAY = '#8e8e93';
+
+  // ---- numbers, dates and names, written one way (the UI review, 2.99.33) ------------------------------------------
+  // The Mac, Windows and the iPhone each used to format the figures in these answers themselves, and read the same one
+  // three ways: 13/16 was 81.2 % on the Mac (rounding a tie to even) and 81.3 % on Windows, a term GPA of 3.425 read
+  // 3.42 on one and 3.43 on the other, and times came as "11:59pm" from one call and "11:59 PM" from the next. Every
+  // figure, date and course name the apps show from here goes through these, so the apps show the text as it comes.
+  /** Decimal half-up rounding, whatever the binary double holds: 3.425 (held as 3.42499…) → 3.43, 81.25 → 81.3 — the
+   *  store's, which its own figures (a group's percent, a course's total, a score's points) go through too. */
+  const roundHalfUp = store.roundHalfUp;
+  /** A percentage to one decimal, half up, a whole one without its ".0": "81.3%", "92%". '' for none. */
+  const pctFmt = (v) => { const r = roundHalfUp(v, 1); return r === null ? '' : `${r.toFixed(1).replace(/\.0$/, '')}%`; };
+  /** A GPA (or a goal) to two decimals, half up, always both: "3.43", "4.00". '' for none. */
+  const gpaFmt = (v) => { const r = roundHalfUp(v, 2); return r === null ? '' : r.toFixed(2); };
+  /** A whole percent for a ring, worked out from the one-decimal figure shown beside it, so the two agree: 92.46 is shown
+   *  "92.5%" and its ring 93, never 92 next to 92.5. null for none. */
+  const wholeOf = (v) => roundHalfUp(roundHalfUp(v, 1), 0);
+  /** A percentage's grade band (A–F) for a colour, from the figure shown: 89.96 is shown "90%" and is an A, as its letter. */
+  const bandOf = (pct) => {
+    const r = roundHalfUp(pct, 1);
+    if (r === null) return null;
+    const l = BCV.screens?.gpa?.letterFor?.(r)?.[0] || (r >= 90 ? 'A' : r >= 80 ? 'B' : r >= 70 ? 'C' : r >= 60 ? 'D' : 'F');
+    return l[0];
+  };
+  /** "point" or "points" after a figure: "1 point total", "35 points total". */
+  const pointsWord = (n) => (Number(n) === 1 ? 'point' : 'points');
+  /** A letter grade with the real minus sign ("A−", never "A-"); any other grade (Complete, 85%) as it is. */
+  const letterFmt = (l) => {
+    if (l === null || l === undefined || String(l).trim() === '') return null;
+    const s = String(l).trim();
+    return /^[A-F][+\-−]?$/i.test(s) ? s.replace('-', '−') : s;
+  };
+  /** "Oct 12"; with the year only when it is not this year ("Oct 12, 2025"). */
+  const dateText = (v) => { const d = U.parse(v); return d ? (d.getFullYear() === new Date().getFullYear() ? U.fmtShort(d) : U.fmtDateComma(d)) : ''; };
+  /** "Oct 12 at 11:59 PM" (the year only when it is not this year). Every time is the device's own: the page runs in its zone. */
+  const atText = (v) => { const d = U.parse(v); return d ? `${dateText(d)} at ${U.fmtTime(d)}` : ''; };
+  /** "Due Oct 12 at 11:59 PM", '' when there is no date. */
+  const dueText = (v) => (U.parse(v) ? `Due ${atText(v)}` : '');
+  /** When something opens: "Oct 20", with its time unless that is midnight ("Oct 20 at 9:00 AM"). */
+  const opensText = (v) => { const d = U.parse(v); return !d ? '' : d.getHours() || d.getMinutes() ? atText(d) : dateText(d); };
+  /** A day gone by, for "Edited …": "today", "yesterday", "Friday" within the week, else "Sep 28" (the year only when it
+   *  is not this year — ui.js fmtRecent writes it always). */
+  const recentText = (v) => { const d = U.parse(v); if (!d) return ''; const diff = U.dayDiff(d); return diff === 0 ? 'today' : diff === -1 ? 'yesterday' : diff < 0 && diff > -7 ? U.DAYS_LONG[d.getDay()] : dateText(d); };
+  /** When a list row's thing comes (a card's next piece of work): its time today, "Tomorrow", its weekday within the
+   *  week, else "Oct 20" — ui.js whenShort, with tomorrow said apart from today. */
+  const soonText = (v) => { const d = U.parse(v); if (!d) return ''; const diff = U.dayDiff(d); return diff === 0 ? U.fmtTime(d) : diff === 1 ? 'Tomorrow' : diff > 1 && diff < 7 ? U.DAYS[d.getDay()] : dateText(d); };
+  /** When a To Do row's work comes: its time today or tomorrow (under that day's heading), its weekday within the week,
+   *  else its date — ui.js whenShort, with the year when it is not this one. */
+  const rowWhen = (v) => { const d = U.parse(v); if (!d) return 'No date'; const diff = U.dayDiff(d); return diff === 0 || diff === 1 ? U.fmtTime(d) : diff > 1 && diff < 7 ? U.DAYS[d.getDay()] : dateText(d); };
+  /** When a message came: its time today, else its day ("Oct 12"; the year only when it is not this year). */
+  const sentText = (v) => { const d = U.parse(v); return !d ? '' : U.dayDiff(d) === 0 ? U.fmtTime(d) : dateText(d); };
+  /** Canvas's own words with its times written as every other time is ("locked until Oct 20 at 12:00 AM", where Canvas's
+   *  lock_explanation says "12am" and "11:59pm"): for the texts Canvas writes itself and the engine passes on. */
+  const canvasTimes = (s) => String(s || '').replace(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?([ap])(?:m|\.m\.)(?![a-z])/gi, (m, h, mm, ap) => `${Number(h)}:${mm || '00'} ${ap.toUpperCase()}M`);
+  /** A course's name and code are one name when they say the same once case, spaces, dashes, underscores and a term
+   *  prefix ("F26-", "SP26 ", "2026FA-") are set aside: "F26-MATH 021 20" and "MATH-021-20". */
+  const TERM_PREFIX = /^(?:(?:F|S|W|U|FA|SP|SU|WI|SM|FL|SPR|FAL|SUM|WIN)\d{2,4}|\d{4}(?:FA|SP|SU|WI|F|S|U|W)?|\d{6})[-_\s:]+(?=\S)/i;
+  const nameKey = (s) => String(s || '').trim().replace(TERM_PREFIX, '').toLowerCase().replace(/[\s\-_–—.]+/g, '');
+  /** Whether `other` says something `label` does not: neither the same name nor a part of it — "PHYS-008HL" says nothing
+   *  new under "F26-PHYS 008HL 01/PHYS 008L 01", nor "MATH-021" under "F26-MATH 021 20"; "ASRS" does under "Academic
+   *  Success Resource Site (2026-27)". */
+  const saysMore = (other, label) => { const o = nameKey(other); return !!o && !nameKey(label).includes(o); };
+  /** The second name to show under a course's label: the first of `names` that says something the label does not, else ''. */
+  const otherName = (label, ...names) => names.map((n) => String(n || '').trim()).find((n) => n && saysMore(n, label)) || '';
+  /** Why a course has no score to show: its teacher hides the total, or nothing is graded yet. */
+  const noScoreWhy = (c) => (c?.hideFinal ? 'Hidden by instructor' : 'No grade yet');
+  /** A course's score as its card, row or ring shows it: `scoreText` "92.4%" ("–" without one) and `scoreWhole` 92, half
+   *  up from the figure shown (92.5 is 93; null without one) for a figure of whole percents. */
+  const scoreFigures = (v) => { const has = v !== null && v !== undefined && Number.isFinite(Number(v)); return { scoreText: has ? pctFmt(v) : '–', scoreWhole: has ? wholeOf(v) : null }; };
   const byDate = (a, b) => a.date - b.date;
   async function selection() {
     const favs = await store.favorites().catch(() => []);
@@ -93,12 +161,15 @@
   const flagOf = (it) => { const f = store.workFlags(it)[0]; return f ? { word: f.word, kind: f.kind || '' } : null; };
   const items = new Map(); // planner items the screens were last given, by id: what an action acts on
   const keep = (list) => { for (const it of list || []) if (it?.id) items.set(String(it.id), it); };
-  const ptsText = (it) => (it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : '');
+  const ptsText = (it) => (it.points !== null && it.points !== undefined ? ` · ${ptsOf(it.points)}` : '');
   /** A row of work (Today's list, a counter's sheet). */
   const workRow = (it) => ({
     id: String(it.id), title: it.title || 'Untitled', sub: it.custom ? 'My task' : `${it.kind}${ptsText(it)}${it.isDue ? '' : ' · to-do date'}`,
     course: it.course?.shortName || it.courseName || '', color: it.custom && !it.course ? TASK : (it.course?.color || GRAY),
     date: iso(it.date), time: U.fmtTime(it.date), done: !!(it.complete || it.submitted), flag: flagOf(it), url: it.url || null, custom: !!it.custom,
+    // (2.99.33) the facts one by one, for one row design on every Dashboard list (course · kind over the title, points and
+    // due time on the right — the counters' sheets carry the same: sheetRow)
+    kind: it.custom ? 'My task' : (it.kind || ''), pts: it.points !== null && it.points !== undefined ? ptsOf(it.points) : '',
   });
   const meOf = (me) => (me ? { name: me.name || '', email: me.email || me.loginId || '', pronouns: me.pronouns || '', initials: U.initials(me.name || '') || '', avatar: me.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? me.avatar : null } : null);
 
@@ -115,7 +186,8 @@
   // grade history and its goal, the record before this term, what-if scores, and the settings themselves
   // (export, import, reset). The look follows the phone; the interface switch is written by the app itself
   // (Bridge.swift), so it can be turned back on while this page is off.
-  const dayWords = (iso) => { const d = iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`) : null; return d && !Number.isNaN(+d) ? (U.fmtLong ? U.fmtLong(d) : String(iso)) : ''; };
+  // (2.99.33) a day as every date is written ("Oct 12", the year only when it is not this one)
+  const dayWords = (iso) => { const d = iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`) : null; return d && !Number.isNaN(+d) ? dateText(d) : ''; };
   async function settingsInfo() {
     const [tracking, goal, whatIf, snaps] = await Promise.all([store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('whatIfScores'), store.pref('gpaSnapshots')]);
     // the options page's own words (options.js paintGrades / paintRecord), so the two read alike
@@ -125,15 +197,17 @@
     const since = [t?.since, list[0]?.date].filter(Boolean).sort()[0] || null;
     const has = !!t && Number.isFinite(t.priorGpa) && t.priorCourses > 0;
     const rec = has && t.record && Array.isArray(t.record.courses) ? t.record : null;
+    const goalN = goal !== null && Number.isFinite(Number(goal)) ? Number(goal) : 4;
     return {
-      tracking: !!t, goal: goal !== null && Number.isFinite(Number(goal)) ? Number(goal) : 4, whatIf: whatIf !== false, days: n,
+      tracking: !!t, goal: goalN, goalText: gpaFmt(goalN), whatIf: whatIf !== false, days: n,
       history: t ? (n ? `${U.plural(n, 'day')} recorded` : 'Recording from today') : (n ? 'History paused' : 'No history yet'),
-      historyNote: t ? (since ? `Since ${dayWords(since)}` : '') : (n ? 'Existing snapshots kept.' : 'Turn tracking on to keep one snapshot a day.'),
-      record: has ? `${t.priorGpa.toFixed(2)} across ${U.plural(t.priorCourses, 'course')} before this term` : null,
+      // (2.99.33) one name for it everywhere: grade history (the switch is Keep grade history)
+      historyNote: t ? (since ? `Since ${dayWords(since)}` : '') : (n ? 'The days already kept stay.' : 'Turn on Keep grade history to save one snapshot a day.'),
+      record: has ? `${gpaFmt(t.priorGpa)} across ${U.plural(t.priorCourses, 'course')} before this term` : null,
       recordNote: rec
         ? `From ${rec.name || 'a CSV'}${Number.isFinite(rec.credits) ? ` · ${rec.credits} credits, so the GPA is credit-weighted` : ' · every course counts equally'}${rec.skipped ? ` · ${U.plural(rec.skipped, 'row')} skipped (no letter grade)` : ''}`
-        : has ? 'Entered by hand on the Grades page. Upload a CSV of your past courses to replace it.'
-          : 'Upload a CSV of your past courses: a header row, then one course a line (course, grade, and credits and term if you have them). Letters, percentages and 4.0 points all read; P/NP, W and the like are skipped.',
+        : has ? 'Entered by hand on the Grades page. Import a CSV of your past courses to replace it.'
+          : 'Import a CSV of your past courses: one course per row, with its grade (and its credits and term, if you have them). Pass/fail and withdrawn courses are skipped.',
     };
   }
   async function settingsSave({ tracking = null, goal = null, whatIf = null } = {}) {
@@ -143,7 +217,7 @@
     }
     if (goal !== null && goal !== undefined) {
       const g = Math.max(0, Math.min(4, Number(goal)));
-      if (Number.isFinite(g)) await store.setPref('gpaGoal', +g.toFixed(2));
+      if (Number.isFinite(g)) await store.setPref('gpaGoal', roundHalfUp(g, 2));
     }
     if (whatIf !== null && whatIf !== undefined) await store.setPref('whatIfScores', !!whatIf);
     return settingsInfo();
@@ -152,7 +226,7 @@
   async function historyImport({ text = '' } = {}) {
     const R = BCV.recordCsv;
     let rows;
-    try { rows = R.history(String(text)); } catch { throw new Error('That file is not a GPA history: a date (or a term) and a GPA a line.'); }
+    try { rows = R.history(String(text)); } catch { throw new Error('That file is not a grade-history CSV: each row needs a date (or a term) and a GPA.'); }
     const snaps = await store.pref('gpaSnapshots');
     const r = R.mergeHistory(Array.isArray(snaps) ? snaps : [], rows);
     if (r.added) await store.setPref('gpaSnapshots', r.snaps);
@@ -172,7 +246,7 @@
     const before = await store.pref('gpaTracking');
     const t = before && typeof before === 'object' ? before : {};
     await store.setPref('gpaTracking', { ...t, ...rec, since: t.since || new Date().toISOString().slice(0, 10) });
-    return { message: `${rec.priorGpa.toFixed(2)} across ${U.plural(rec.priorCourses, 'course')}${rec.record?.skipped ? `, ${rec.record.skipped} skipped` : ''}.`, info: await settingsInfo() };
+    return { message: `${gpaFmt(rec.priorGpa)} across ${U.plural(rec.priorCourses, 'course')}${rec.record?.skipped ? `, ${rec.record.skipped} skipped` : ''}.`, info: await settingsInfo() };
   }
   async function recordClear() {
     const t = await store.pref('gpaTracking');
@@ -204,6 +278,9 @@
   // dashboard, no sidebar (the app draws those itself). The same answers the web setup writes, read and
   // written here; the app shows it on the first run (snapshot.setupDone false) and from its Settings.
   const SETUP_GRADES = ['C', 'B', 'B+', 'A-', 'A', 'A+'];
+  // (2.99.33) a target as it is kept ("A-", as setTarget keeps one) from either spelling an app sends back; the setup
+  // sends the letters as every screen writes them, with the real minus ("A−")
+  const aimOf = (t) => { const s = String(t ?? '').replace(/−/g, '-'); return SETUP_GRADES.includes(s) || s === 'P/F' ? s : 'A+'; };
   async function setupDone() {
     try { const f = await BCV.api.storage.local.get('setup:done'); return !!(f && f['setup:done']); } catch { return true; }
   }
@@ -211,13 +288,23 @@
     const [all, favs, targetsPref, goal, tracking, done] = await Promise.all([store.courses({ force: true }), store.favorites({ force: true }).catch(() => []), store.pref('gradeTargets'), store.pref('gpaGoal'), store.pref('gpaTracking'), setupDone()]);
     const favIds = new Set((favs || []).map((c) => String(c.id)));
     const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
-    const courses = (all || []).filter((c) => c.state === 'current').map((c) => ({
-      id: String(c.id), code: c.code || c.name || 'Course', name: c.originalName || c.name || '', nickname: c.nickname || '', color: c.color || GRAY,
-      // a first run starts with nothing ticked (the list every screen follows is the student's to choose); run again, it starts from today's
-      on: done && (!!c.favorite || favIds.has(String(c.id))),
-      target: SETUP_GRADES.includes(targets[c.id]) || targets[c.id] === 'P/F' ? targets[c.id] : 'A+',
-    }));
-    return { done, courses, grades: SETUP_GRADES, goal: Number.isFinite(Number(goal)) && goal !== null ? Number(goal) : 4, tracking: done ? !!tracking : true };
+    const courses = (all || []).filter((c) => c.state === 'current').map((c) => {
+      const code = c.code || c.name || 'Course';
+      // (2.99.33) one name a course: `label` is the name the sidebar will show (its nickname, else its name), `sub` what
+      // is new under it (its real title where Canvas has one apart from the label, its code when that says more, its term,
+      // its teacher) — never "F26-MATH 021 20" over "MATH-021-20". `code` and `name` as before
+      const label = c.nickname || c.name || code;
+      return {
+        id: String(c.id), code, name: c.originalName || c.name || '', nickname: c.nickname || '', color: c.color || GRAY,
+        label, sub: [otherName(label, c.originalName, c.code), c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '),
+        // (2.99.33) a first run starts with every current course ticked — what the sidebar shows when nothing is chosen, so
+        // the setup can be left as it stands — and run again, from today's choice
+        on: done ? (!!c.favorite || favIds.has(String(c.id))) : true,
+        target: letterFmt(aimOf(targets[c.id])),
+      };
+    });
+    const g = Number.isFinite(Number(goal)) && goal !== null ? Number(goal) : 4;
+    return { done, courses, grades: SETUP_GRADES.map(letterFmt), goal: g, goalText: gpaFmt(g), tracking: done ? !!tracking : true };
   }
   async function setupSave({ courses: chosen = [], nicknames = {}, targets: aims = {}, tracking = true, goal = 4 } = {}) {
     const all = (await store.courses({ force: true }).catch(() => [])).filter((c) => c.state === 'current');
@@ -226,11 +313,11 @@
     const g = Math.max(0, Math.min(4, Number(goal)));
     const targetsPref = await store.pref('gradeTargets');
     const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
-    for (const c of all) if (on.has(String(c.id))) { const t = aims[c.id]; targets[c.id] = SETUP_GRADES.includes(t) || t === 'P/F' ? t : 'A+'; }
+    for (const c of all) if (on.has(String(c.id))) targets[c.id] = aimOf(aims[c.id]);
     const before = await store.pref('gpaTracking');
     await Promise.all([
       store.setPref('setupDone', true),
-      store.setPref('gpaGoal', Number.isFinite(g) ? +g.toFixed(2) : 4),
+      store.setPref('gpaGoal', Number.isFinite(g) ? roundHalfUp(g, 2) : 4),
       store.setPref('gpaTracking', tracking ? (before && typeof before === 'object' ? before : { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) }) : null),
       store.setPref('gradeTargets', targets),
     ]);
@@ -277,7 +364,7 @@
     const readRecently = feed ? feed.filter((a) => a.read_state !== 'unread' && inSelFeed(a) && U.parse(a.posted_at) >= readSince).sort((x, y) => U.parse(y.posted_at) - U.parse(x.posted_at)) : [];
     const weekAll = live.filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0));
     const dayLine = (d) => `${U.DAYS_LONG[d.getDay()]}, ${U.MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
-    todayState = { W, Wf, now, todayStart, weekStart, dueToday, dueNext, dueTomorrow, unread, readRecently, dayLine, counts: null };
+    todayState = { W, Wf, now, todayStart, weekStart, dueToday, dueNext, dueTomorrow, unread, readRecently, dayLine, sel, counts: null };
     const list = dueToday.length ? dueToday : upcoming.slice(0, 6);
     const latest = dueToday.length ? dueToday[dueToday.length - 1].date : null;
     const load = [];
@@ -285,37 +372,38 @@
     for (const c of sel.list) {
       const mine = weekAll.filter((it) => it.courseId === c.id);
       if (!mine.length) { idle++; continue; }
-      load.push({ id: String(c.id), code: c.shortName || c.name, color: c.color || GRAY, done: mine.filter((it) => it.submitted).length, total: mine.length });
+      const doneN = mine.filter((it) => it.submitted).length;
+      load.push({ id: String(c.id), code: c.shortName || c.name, color: c.color || GRAY, done: doneN, total: mine.length, text: `${doneN} / ${mine.length} handed in` });
     }
-    // (Simpl for Mac 1.2) each counter's line under its number, in the web Dashboard's words
-    const ptsSum = (list) => store.fmtPts(list.reduce((n, it) => n + (Number(it.points) || 0), 0));
-    const unreadNote = (() => {
-      if (!unread) return '';
-      if (!unread.length) return 'All caught up';
-      const per = new Map();
-      const nameOf = (a) => { const c = sel.list.find((x) => `course_${x.id}` === String(a.context_code || '')); return c?.shortName || c?.name || a.context_name || ''; };
-      for (const a of unread) per.set(nameOf(a), (per.get(nameOf(a)) || 0) + 1);
-      if (per.size !== 1) return `From ${U.plural(per.size, 'course')}`;
-      const top = [...per.keys()][0];
-      return top ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : U.plural(unread.length, 'announcement');
-    })();
+    // (Simpl for Mac 1.2) each counter's line under its number, in the web Dashboard's words; (2.99.33) each label says
+    // exactly what its number counts, and an empty counter says so in words, never "0 · 0 points total"
+    const dueNote = (list, none) => {
+      if (!list.length) return none;
+      const pts = list.reduce((n, it) => n + (Number(it.points) || 0), 0);
+      return pts > 0 ? `${store.fmtPts(pts)} ${pointsWord(pts)} total` : U.plural(list.length, 'item');
+    };
     return {
       dateLine: dayLine(now), me: meOf(me), notifUnread: notifs || 0,
+      // (2.99.33) each counter in two wordings, so a name is never cut short and nothing it counts goes unsaid: `label`
+      // and `note`, the short name and the line that says the rest ("Unread" with "announcements · 2 courses", "Graded" with
+      // todayCounts' "this week · 19 / 49 points"), which fit any tile and are what an app that reads only these shows;
+      // and `fullLabel` and `fullNote`, the name that says exactly what it counts ("Announcements" with "3 unread · 2
+      // courses", "Graded this week" with todayCounts' gradedFullNote), for a tile wide enough for it
       counters: [
-        { key: 'today', label: 'Due today', value: dueToday.length, note: `${ptsSum(dueToday)} points total` },
-        { key: 'next', label: 'Next 7 days', value: dueNext.length, note: `Across ${U.plural(W.courseCount(dueNext), 'course')}` },
-        { key: 'unread', label: 'Unread', value: unread ? unread.length : null, note: unreadNote },
-        { key: 'overdue', label: 'Overdue', value: null, tone: 'red', pending: true },
-        { key: 'tomorrow', label: 'Tomorrow', value: dueTomorrow.length, note: dueTomorrow.length ? `${ptsSum(dueTomorrow)} points total` : 'Nothing due tomorrow' },
-        { key: 'graded', label: 'Graded', value: null, pending: true },
-      ],
+        { key: 'today', label: 'Due today', fullLabel: 'Due today', value: dueToday.length, note: dueNote(dueToday, 'Nothing due today') },
+        { key: 'next', label: 'Next 7 days', fullLabel: 'Next 7 days', value: dueNext.length, note: dueNext.length ? `Across ${U.plural(W.courseCount(dueNext), 'course')}` : 'Nothing due' },
+        { key: 'unread', label: 'Unread', fullLabel: 'Announcements', value: unread ? unread.length : null, note: unread ? unreadShort(unread, sel) : '', fullNote: unread ? unreadLine(unread, sel) : '' },
+        { key: 'overdue', label: 'Overdue', fullLabel: 'Overdue', value: null, tone: 'red', pending: true },
+        { key: 'tomorrow', label: 'Tomorrow', fullLabel: 'Tomorrow', value: dueTomorrow.length, note: dueNote(dueTomorrow, 'Nothing due tomorrow') },
+        { key: 'graded', label: 'Graded', fullLabel: 'Graded this week', value: null, pending: true },
+      ].map((c) => ({ ...c, fullNote: c.fullNote ?? c.note })),
       list: {
         heading: dueToday.length ? (now.getHours() >= 17 ? 'Tonight' : 'Today') : 'Next up',
         note: dueToday.length ? `${U.plural(dueToday.length, 'item')} · by ${U.fmtTime(latest)}` : (upcoming.length ? 'Nothing due today' : ''),
         rows: list.map(workRow),
         empty: planner ? 'Nothing due in the next three weeks.' : 'Your planner could not be loaded.',
       },
-      load, idle, hasCourses: sel.list.length > 0,
+      load, idle, hasCourses: sel.list.length > 0, loadCaption: 'Handed in this week',
     };
   }
   /** Overdue and Graded, which read every selected course's assignments: the copy kept from the last visit first (kept: true), then Canvas's answer. */
@@ -333,28 +421,81 @@
       overdue: left, graded: gr.graded.length,
       // (Simpl for Mac 1.2) the lines under the two numbers, as the web Dashboard's counters have them
       overdueNote: overdueNote(left),
-      gradedNote: gr.graded.length ? `${store.fmtPts(gr.earned)} / ${store.fmtPts(gr.possible)} points` : 'No grades posted this week',
+      // (2.99.33) Graded's line beside its name "Graded" says the rest of what it counts ("this week · 19 / 49 points");
+      // `gradedFullNote` goes with its full name "Graded this week" ("19 / 49 points")
+      gradedNote: gr.graded.length ? `this week · ${store.fmtPts(gr.earned)} / ${store.fmtPts(gr.possible)} ${pointsWord(gr.possible)}` : 'No grades posted this week',
+      gradedFullNote: gr.graded.length ? `${store.fmtPts(gr.earned)} / ${store.fmtPts(gr.possible)} ${pointsWord(gr.possible)}` : 'No grades posted this week',
     };
   }
-  /** A counter's list, split the Dashboard's way: what wants attention, then (quieter) the rest of the span. */
-  const sheetRow = (i, quiet = false) => ({ title: i.title, sub: [i.course, i.meta].filter(Boolean).join(' · '), color: i.color || GRAY, url: i.url || null, quiet, key: i.key || null, clearable: !quiet && !!i.item });
+  /** The course an announcement is in, by the sidebar's name for it (else Canvas's), and that course's colour. */
+  const annCourse = (a, sel) => { const c = (sel?.list || []).find((x) => `course_${x.id}` === String(a.context_code || '')); return { name: c?.shortName || c?.name || a.context_name || '', color: c?.color || null }; };
+  /** The line beside the counter's full name "Announcements", and its sheet's: "3 unread · 2 courses", "1 unread · F26-PHYS 008 01". */
+  const unreadLine = (unread, sel) => {
+    if (!unread.length) return 'All caught up';
+    const names = new Set(unread.map((a) => annCourse(a, sel).name || '?'));
+    const only = names.size === 1 ? [...names][0] : '';
+    return `${unread.length} unread · ${only && only !== '?' ? only : U.plural(names.size, 'course')}`;
+  };
+  /** The same line beside the short name "Unread": "announcements · 2 courses", "announcement · F26-PHYS 008 01". */
+  const unreadShort = (unread, sel) => {
+    if (!unread.length) return 'All caught up';
+    const line = unreadLine(unread, sel);
+    return `${unread.length === 1 ? 'announcement' : 'announcements'}${line.slice(line.indexOf(' · '))}`;
+  };
+  /** A counter's row (2.99.33): its title and course, the facts an app lays out in its own columns — `kind`, `detail` (beside
+   *  the course: the points, Missing, the score), `when` (on the right: the due time, the day it was posted) — and `sub`,
+   *  all of it in one line for an app that draws one. */
+  const sheetRow = (i, quiet = false) => {
+    const p = i.parts || null;
+    const pts = p && p.points !== null && p.points !== undefined ? ptsOf(p.points) : '';
+    let detail = i.detail || '', when = i.when || '', inline = i.meta || '';
+    if (p && p.posted !== undefined) { // graded (this week, or the two before)
+      detail = p.excused ? 'Excused' : [p.score !== null && p.score !== undefined ? `${store.fmtPts(p.score)} / ${store.fmtPts(p.points ?? 0)}` : '', letterFmt(p.grade)].filter(Boolean).join(' · ');
+      when = dateText(p.posted); inline = `posted ${when}`;
+    } else if (p && p.handed) { // handed in late
+      detail = [p.due ? `was due ${dateText(p.due)}` : '', p.how].filter(Boolean).join(' · ');
+      when = dateText(p.handed); inline = `handed in ${when}`;
+    } else if (p && p.missing !== undefined) { // overdue
+      detail = [p.missing ? 'Missing' : '', pts].filter(Boolean).join(' · ');
+      when = p.due ? dateText(p.due) : ''; inline = when ? `was due ${when}` : '';
+    } else if (p) { // due in the span (or done in it)
+      const d = U.parse(p.due);
+      const today = !!d && U.sameDay(d, new Date());
+      detail = [pts, p.how].filter(Boolean).join(' · ');
+      when = d ? (today ? U.fmtTime(d) : `${U.DAYS[d.getDay()]} ${U.fmtTime(d)}`) : '';
+      inline = d ? (today ? `due ${when}` : when) : '';
+    }
+    const course = i.course && i.course !== '—' ? i.course : '';
+    // (`sub` keeps the dashboard's "—" in the course's place for a row with none, as it always led: the Mac's quick look
+    // reads the line's first part as its course)
+    return {
+      title: i.title, sub: p ? [course || i.course, detail, inline].filter(Boolean).join(' · ') : [course, inline].filter(Boolean).join(' · '),
+      course, kind: p?.kind || i.kind || '', detail, when, date: iso(U.parse(i.date)),
+      color: i.color || GRAY, url: i.url || null, quiet, key: i.key || null, clearable: !quiet && !!i.item,
+    };
+  };
   const section = (title, rows, quiet = false) => ({ title, quiet, rows: rows.map((i) => sheetRow(i, quiet)) });
   async function todaySheet({ key } = {}) {
     const st = todayState || (await today(), todayState);
-    const { W, todayStart, dayLine } = st;
-    const ptsOf = (list) => list.reduce((n, it) => n + (Number(it.points) || 0), 0);
+    const { W, todayStart } = st;
+    // (2.99.33) a day in a sheet's line as a date is written with its weekday ("Tue, Oct 13"): the panel's header line
+    // fits on one line, where "Tuesday, October 13" wrapped it (the greeting keeps its long date)
+    const dayLine = (d) => `${U.DAYS[d.getDay()]}, ${dateText(d)}`;
+    const sumPts = (list) => list.reduce((n, it) => n + (Number(it.points) || 0), 0);
     const due = (title, list, from, to, day, empty) => {
       const recent = W.recentOf('Already done', W.doneIn(from, to).sort(byDate).map(W.doneRow));
-      return { title, note: list.length ? `${store.fmtPts(ptsOf(list))} points across ${U.plural(W.courseCount(list), 'course')} · ${day}` : day, empty, sections: [section(recent && list.length ? 'Still to do' : '', list.map(W.dueRow)), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
+      return { title, note: list.length ? `${store.fmtPts(sumPts(list))} ${pointsWord(sumPts(list))} across ${U.plural(W.courseCount(list), 'course')} · ${day}` : day, empty, sections: [section(recent && list.length ? 'Still to do' : '', list.map(W.dueRow)), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
     };
-    const annRow = (a, state) => ({ title: a.title || 'Announcement', meta: `Posted ${U.fmtShort(a.posted_at)} · ${state}`, course: a.context_name || '', color: '#ff9500', url: a.html_url });
+    // (2.99.33) an announcement's row names its course (the sidebar's name, in its colour) and the day it was posted — not
+    // "unread" again under a list headed Unread
+    const annRow = (a) => { const c = annCourse(a, st.sel); return { title: a.title || 'Announcement', meta: dateText(a.posted_at), when: dateText(a.posted_at), kind: 'Announcement', course: c.name, color: c.color || '#ff9500', url: a.html_url, date: a.posted_at }; };
     if (key === 'today') return due('Due today', st.dueToday, todayStart, U.addDays(todayStart, 1), dayLine(st.now), 'Nothing is due today.');
     if (key === 'tomorrow') return due('Due tomorrow', st.dueTomorrow, U.addDays(todayStart, 1), U.addDays(todayStart, 2), dayLine(U.addDays(todayStart, 1)), 'Nothing is due tomorrow.');
-    if (key === 'next') return due('Next 7 days', st.dueNext, todayStart, W.nextEnd, `${U.fmtShort(todayStart)} – ${U.fmtShort(U.addDays(todayStart, 6))}`, 'Nothing is due in the next 7 days.');
+    if (key === 'next') return due('Next 7 days', st.dueNext, todayStart, W.nextEnd, `${dateText(todayStart)} – ${dateText(U.addDays(todayStart, 6))}`, 'Nothing is due in the next 7 days.');
     if (key === 'unread') {
       const un = st.unread || [];
-      const recent = W.recentOf('Read recently', st.readRecently.map((a) => annRow(a, 'read')));
-      return { title: 'Unread announcements', note: un.length ? U.plural(un.length, 'announcement') : 'All caught up', empty: 'All caught up.', sections: [section(recent && un.length ? 'Unread' : '', un.map((a) => annRow(a, 'unread'))), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
+      const recent = W.recentOf('Read recently', st.readRecently.map(annRow));
+      return { title: 'Announcements', note: unreadLine(un, st.sel), empty: 'All caught up.', sections: [section(recent && un.length ? 'Unread' : '', un.map(annRow)), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
     }
     if (!st.counts) await todayCounts({ kept: false }).catch(() => null);
     const c = st.counts;
@@ -367,7 +508,7 @@
     }
     const { graded, earlier, earned, possible } = c.gr;
     const recent = W.recentOf('Earlier', earlier);
-    return { title: 'Graded this week', note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(st.weekStart)}` : `Week of ${U.fmtShort(st.weekStart)}`, empty: 'Nothing has been graded this week.', sections: [section(recent && graded.length ? 'This week' : '', graded), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
+    return { title: 'Graded this week', note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} ${pointsWord(possible)} earned · week of ${dateText(st.weekStart)}` : `Week of ${dateText(st.weekStart)}`, empty: 'Nothing has been graded this week.', sections: [section(recent && graded.length ? 'This week' : '', graded), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
   }
   const clearedOverdue = new Set();
   // (Mac 1.2.11) the overdue rows last listed, by key: one dismissed while the Dashboard reads again (its counts not yet
@@ -413,12 +554,16 @@
         const mine = open.filter((it) => String(it.courseId) === String(c.id) && it.date >= todayStart).sort(byDate);
         const score = c.score !== null && c.score !== undefined && !c.hideFinal ? Number(c.score) : null;
         const links = (c.links || []).filter((l) => !l.hidden).slice(0, 4).map((l) => ({ kind: sectionOfLink(l), label: l.label || '', url: l.path || null }));
+        const label = c.shortName || c.name;
+        const unread = unreadFor(c);
         return {
-          id: String(c.id), code: c.shortName || c.name, name: c.nickname ? (c.originalName || c.name) : (c.code && c.code !== c.name ? c.code : c.name),
+          // (2.99.33) `altName`: the course's other name only when it says something `code` (the sidebar's label) does not —
+          // '' for "MATH-021-20" under "F26-MATH 021 20" — for the line under the label; `name` as before
+          id: String(c.id), code: label, name: c.nickname ? (c.originalName || c.name) : (c.code && c.code !== c.name ? c.code : c.name), altName: otherName(label, c.nickname ? (c.originalName || c.name) : '', c.code, c.name),
           sub: [c.cardTerm || c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '), color: c.color || GRAY, image: c.image || null,
-          score, scoreText: score !== null ? `${store.fmtPts(score)}%` : 'N/A', grade: score !== null && c.grade ? String(c.grade) : null,
-          unread: unreadFor(c), dueToday: mine.filter((it) => U.sameDay(it.date, now)).length,
-          next: mine[0] ? { title: mine[0].title || 'Untitled', when: U.whenShort(mine[0].date, now), url: mine[0].url || null } : null,
+          score, ...scoreFigures(score), scoreWhy: score !== null ? '' : noScoreWhy(c), grade: score !== null && c.grade ? letterFmt(c.grade) : null,
+          unread, unreadText: unread ? `${unread} new` : '', unreadLabel: unread ? U.plural(unread, 'unread announcement') : '', dueToday: mine.filter((it) => U.sameDay(it.date, now)).length,
+          next: mine[0] ? { title: mine[0].title || 'Untitled', when: soonText(mine[0].date), url: mine[0].url || null } : null,
           links: links.length ? links : DEFAULT_LINKS.map(([kind, label, seg]) => ({ kind, label, url: `${base}/${seg}` })),
           url: base,
         };
@@ -444,7 +589,7 @@
       color: it.custom && !it.course ? TASK : (it.course?.color || GRAY),
       kind: it.custom ? 'My task' : `${it.kind}${it.isDue ? '' : ' · to-do date'}`, type: it.type || '',
       flags: store.workFlags(it).map((f) => ({ word: f.word, kind: f.kind || '' })),
-      points: it.points !== null && it.points !== undefined ? `${store.fmtPts(it.points)} pts` : '',
+      points: it.points !== null && it.points !== undefined ? ptsOf(it.points) : '',
       due: it.graded ? 'Graded' : it.submitted && it.isDue ? 'Submitted' : `${it.isDue ? 'Due' : 'At'} ${U.fmtTime(it.date)}`,
       time: U.fmtTime(it.date), done: doneOf(it), url: it.url || null, custom: !!it.custom,
     });
@@ -454,7 +599,12 @@
       const k = U.startOfDay(it.date).getTime();
       if (!at.has(k)) {
         if (days.length >= 8) break;
-        at.set(k, { title: U.dayTitle(it.date, now), date: `${U.DAYS_LONG[it.date.getDay()]}, ${U.fmtLong(it.date)}`, rows: [] });
+        // (2.99.33) the day's date as every date is written, saying only what its title does not: "Today" over "Tue, Oct
+        // 13", "Thursday" over "Oct 15", "Oct 22" over "Thursday" (it was "Tuesday, October 13" under each)
+        const diff = U.dayDiff(it.date, now);
+        const named = diff >= -1 && diff <= 1;
+        const weekday = diff > 1 && diff < 7;
+        at.set(k, { title: named || weekday ? U.dayTitle(it.date, now) : dateText(it.date), date: named ? `${U.DAYS[it.date.getDay()]}, ${dateText(it.date)}` : weekday ? dateText(it.date) : U.DAYS_LONG[it.date.getDay()], rows: [] });
         days.push(at.get(k));
       }
       at.get(k).rows.push(row(it));
@@ -470,7 +620,7 @@
     if (posted && hasScore) {
       const possible = a.assignment?.points_possible;
       const score = a.score !== null && a.score !== undefined ? store.fmtPts(a.score) : a.grade;
-      const letter = a.grade && a.score !== null && a.score !== undefined && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : '';
+      const letter = a.grade && a.score !== null && a.score !== undefined && String(a.grade) !== String(a.score) ? ` · ${letterFmt(a.grade)}` : '';
       return `Graded · ${score}${possible !== null && possible !== undefined ? ` / ${store.fmtPts(possible)}` : ''}${letter}`;
     }
     if (comments.length) return comments.length === 1 ? 'Comment' : `${comments.length} comments`;
@@ -495,7 +645,7 @@
         return {
           id: String(a.id), type: a.type || '', kind: `${kind}${extra}`, title: a.title || kind,
           course: c?.name || a.context_name || (a.type === 'Conversation' ? 'Inbox' : ''), color: c?.color || '#5856d6',
-          when: U.fmtShort(a.updated_at || a.created_at), preview: textOf(a.message || a.latest_messages?.[0]?.message || '', 200).replace(/\s+/g, ' '),
+          when: dateText(a.updated_at || a.created_at), preview: textOf(a.message || a.latest_messages?.[0]?.message || '', 200).replace(/\s+/g, ' '),
           url: urlOf(a), unread: unread(a),
         };
       }),
@@ -559,6 +709,8 @@
       courses: lists.map(({ c, list, weights }, i) => ({
         id: String(c.id), name: names[i] || c.shortName || c.name || 'Course', code: c.shortName || c.name || '', color: c.color || GRAY,
         score: c.score === null || c.score === undefined || c.hideFinal ? null : Number(c.score), url: `/courses/${c.id}/grades`,
+        // (2.99.33) the bar's label as every app writes it: "92.4%" ("–" without one), and whole, half up (92.5 is 93)
+        ...scoreFigures(c.score === null || c.score === undefined || c.hideFinal ? null : Number(c.score)),
         windows: list ? windowsOf(list, weights) : null,
       })),
     };
@@ -573,7 +725,7 @@
     const unreadFor = (c) => (feed ? feed.filter((a) => a.read_state === 'unread' && String(a.context_code || '') === `course_${c.id}`).length : 0);
     return {
       sub: `${term ? `${term} · ` : ''}${list.length === current.length ? `${list.length} enrolled` : `${list.length} of ${current.length} selected`}`,
-      rows: list.map((c) => ({ id: String(c.id), code: c.shortName || c.name, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), nickname: c.nickname || '', original: c.originalName || c.name, color: c.color || GRAY, score: c.score !== null && c.score !== undefined ? Number(c.score) : null, scoreText: c.score !== null && c.score !== undefined ? `${store.fmtPts(c.score)}%` : 'N/A', unread: unreadFor(c), url: c.url || `/courses/${c.id}` })),
+      rows: list.map((c) => courseRowOf(c, unreadFor(c), c.shortName || c.name)),
       hidden: list.length < current.length ? `${U.plural(current.length - list.length, 'other course')} hidden here. Change the selection in Settings → Courses & targets.` : '',
       empty: 'No courses selected. Choose them in the guided setup or Settings.',
     };
@@ -587,14 +739,38 @@
     const unreadFor = (c) => (feed ? feed.filter((a) => a.read_state === 'unread' && String(a.context_code || '') === `course_${c.id}`).length : 0);
     const place = new Map(sel.list.map((c, i) => [String(c.id), i]));
     const byPlace = (a, b) => (place.get(String(a.id)) ?? 1e6) - (place.get(String(b.id)) ?? 1e6) || String(a.name || '').localeCompare(String(b.name || ''));
-    const row = (c) => ({ id: String(c.id), code: c.shortName || c.name, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), nickname: c.nickname || '', original: c.originalName || c.name, color: c.color || GRAY, score: c.score !== null && c.score !== undefined ? Number(c.score) : null, scoreText: c.score !== null && c.score !== undefined ? `${store.fmtPts(c.score)}%` : 'N/A', unread: unreadFor(c), url: c.url || `/courses/${c.id}`, chosen: place.has(String(c.id)), term: c.term || '' });
+    const labelOf = (c) => sel.list.find((f) => String(f.id) === String(c.id))?.shortName || c.name;
+    const row = (c) => ({ ...courseRowOf(c, unreadFor(c), labelOf(c)), chosen: place.has(String(c.id)), term: c.term || '' });
     const current = all.filter((c) => c.state !== 'past' && c.state !== 'future').sort(byPlace);
+    const past = all.filter((c) => c.state === 'past').sort(byPlace);
+    const future = all.filter((c) => c.state === 'future').sort(byPlace);
     const hidden = current.filter((c) => !place.has(String(c.id))).length;
+    // (2.99.33) a line for each filter, said once: with the current courses split in two sections that each carry their
+    // count, the term alone; otherwise the term and how many — and Past and Future their own, not the current term's
+    const split = hidden > 0 && hidden < current.length;
+    const subs = {
+      current: split ? (term || U.plural(current.length, 'course')) : `${term ? `${term} · ` : ''}${U.plural(current.length, 'course')}`,
+      past: past.length ? U.plural(past.length, 'past course') : 'None yet',
+      future: future.length ? `${U.plural(future.length, 'course')} to come` : 'None yet',
+    };
     return {
-      sub: `${term ? `${term} · ` : ''}${U.plural(current.length, 'course')}${hidden ? ` · ${hidden} not in the sidebar` : ''}`,
+      sub: subs.current, subs,
       current: current.map(row),
-      past: all.filter((c) => c.state === 'past').sort(byPlace).map(row),
-      future: all.filter((c) => c.state === 'future').sort(byPlace).map(row),
+      past: past.map(row),
+      future: future.map(row),
+    };
+  }
+  /** A course as the course lists send it (2.99.33): `code` is the sidebar's label for it; `altName` its other name only
+   *  when that says something new (else ''; `name` as before); `detail` its term and first teacher, for the line under it;
+   *  `scoreText` '–' with `scoreWhy` (No grade yet, Hidden by instructor) when there is no score; `unreadLabel` for a
+   *  badge's tooltip. */
+  function courseRowOf(c, unread, label) {
+    const has = c.score !== null && c.score !== undefined;
+    return {
+      id: String(c.id), code: label, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), altName: otherName(label, c.nickname ? c.originalName : '', c.code, c.name), nickname: c.nickname || '', original: c.originalName || c.name,
+      detail: [c.cardTerm || c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '),
+      color: c.color || GRAY, score: has ? Number(c.score) : null, ...scoreFigures(has ? c.score : null), scoreWhy: has ? '' : noScoreWhy(c),
+      unread, unreadLabel: unread ? U.plural(unread, 'unread announcement') : '', url: c.url || `/courses/${c.id}`,
     };
   }
   /** Each course's "done of total submitted", which reads its assignments (`all`: every current course, not only the
@@ -675,7 +851,7 @@
     const real = new Set(all.filter((i) => !i.custom).map((i) => i.courseId)).size;
     const seriesN = (it) => { const s = repeatOf(it)?.series; return s ? list.filter((x) => x.custom && x.id !== it.id && rep[x.id]?.series === s).length : 0; };
     const row = (it, withCourse = true) => ({
-      ...workRow(it), sub: withCourse ? `${courseOf(it)} · ${metaOf(it)}` : metaOf(it), courseName: courseOf(it), meta: metaOf(it), when: U.whenShort(it.date),
+      ...workRow(it), sub: withCourse ? `${courseOf(it)} · ${metaOf(it)}` : metaOf(it), courseName: courseOf(it), meta: metaOf(it), when: rowWhen(it.date),
       pri: priOf(it), priShort: priOf(it) ? PRI[priOf(it)][1] : '', type: it.type || '', series: seriesN(it),
     });
     const shown = all.filter((it) => done || isOpen(it));
@@ -692,15 +868,18 @@
       const days = new Map();
       for (const it of [...shown].sort(byDate)) {
         const d = U.dayDiff(it.date, now);
-        const k = d < 0 ? 'Overdue' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 7 ? U.DAYS_LONG[it.date.getDay()] : U.fmtShort(it.date);
+        const k = d < 0 ? 'Overdue' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 7 ? U.DAYS_LONG[it.date.getDay()] : dateText(it.date);
         if (!days.has(k)) days.set(k, []);
         days.get(k).push(it);
       }
       for (const [k, l] of days) block(k, l);
     }
+    // (2.99.33) what is left and what is late, for the progress card's big figure ("17 left", "1 overdue" in red)
+    const overdueN = all.filter((it) => isOpen(it) && !it.custom && it.isDue && it.date && it.date < now).length;
     return {
       sub: `${openN} open across ${U.plural(real, 'course')}${all.some((i) => i.custom) ? ' · with your own tasks' : ''}`,
-      pct: all.length ? Math.round((doneN / all.length) * 100) : 0, done: doneN, total: all.length,
+      pct: all.length ? roundHalfUp((doneN / all.length) * 100, 0) : 0, done: doneN, total: all.length,
+      left: openN, overdue: overdueN, leftText: `${openN} left`, doneText: `${doneN} of ${all.length} done`, overdueText: overdueN ? `${overdueN} overdue` : '',
       group: g, showDone: done, sections,
       empty: done ? 'Nothing in the next seven days.' : 'Nothing to do in the next seven days.',
       courses: sel.list.map((c) => ({ id: String(c.id), name: c.shortName || c.name, color: c.color || GRAY })),
@@ -771,21 +950,20 @@
       const op = t === null || t === undefined ? null : Number(t);
       const pct = op !== null ? op : c.score !== null && c.score !== undefined ? Number(c.score) : null;
       const scored = pct !== null;
-      let graded = 0, total = 0;
-      for (const grp of groups.get(c.id) || []) for (const a of grp.assignments || []) {
-        if (a.published === false || !(Number(a.points_possible) > 0)) continue;
-        total++;
-        if (a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined) graded++;
-      }
+      const counted = gradedOf(groups.get(c.id));
       const ti = G.targetIndex(targets[c.id]);
       const S = G.scaleOf ? G.scaleOf(c.id) : G.SCALE;
       const ownScale = !!G.hasScale?.(c.id);
+      const label = c.shortName || c.name;
       return {
-        id: String(c.id), code: c.shortName || c.name, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), color: c.color || GRAY, url: `/courses/${c.id}/grades`,
-        pct: scored ? pct : null, pctText: scored ? `${store.fmtPts(pct)}%` : 'N/A',
-        letter: scored ? (op !== null || ownScale || !c.grade ? G.letterFor(pct, S)[0] : String(c.grade).replace(/-/g, '−')) : null,
-        points: scored ? (op !== null || ownScale ? G.letterFor(pct, S)[2] : G.pointsFor(c.grade, pct)) : null,
-        graded, total, own: op !== null,
+        id: String(c.id), code: label, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), altName: otherName(label, c.nickname ? c.originalName : '', c.code, c.name), teacher: (c.teachers || [])[0] || '', color: c.color || GRAY, url: `/courses/${c.id}/grades`,
+        // (2.99.33) no score: '–', and why (`why`: the instructor hides the total, or nothing is graded yet), never a bare N/A
+        pct: scored ? pct : null, pctText: scored ? pctFmt(pct) : '–', why: scored ? '' : noScoreWhy(c), hidden: !scored && !!c.hideFinal,
+        // (2.99.33) a letter Simpl works out is the one of the figure shown (89.96 is shown "90%": an A−, not a B+)
+        letter: scored ? letterFmt(op !== null || ownScale || !c.grade ? G.letterFor(roundHalfUp(pct, 1), S)[0] : c.grade) : null,
+        points: scored ? (op !== null || ownScale ? G.letterFor(roundHalfUp(pct, 1), S)[2] : G.pointsFor(c.grade, roundHalfUp(pct, 1))) : null,
+        // (2.99.33) one graded count, the course's own Grades page's too (courseGrades): `gradedText` says it in words
+        graded: counted.graded, total: counted.total, gradedText: counted.text, own: op !== null,
         target: ti >= 0 ? G.SCALE[ti][0] : null,
         scale: S.map(([letter, min, points]) => ({ letter, min, points })), ownScale,
         cats: (gmFor(c).legend || []).slice(0, 4).map((ct) => ({ label: ct.label, weight: ct.weightText || '', value: ct.value, pct: ct.pct ?? null, color: ct.color })),
@@ -797,15 +975,56 @@
     const { items: gi, counts } = G.gradedItems(list, gmFor);
     const tracking = !!(trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa)));
     const snaps = Array.isArray(snapsPref) ? snapsPref.filter((x) => x && x.date && Number.isFinite(x.gpa)) : [];
+    const gpa = scoredRows.length ? scoredRows.reduce((a, r) => a + r.points, 0) / scoredRows.length : null;
     return {
-      term: term || '', gpa: scoredRows.length ? scoredRows.reduce((a, r) => a + r.points, 0) / scoredRows.length : null, goal,
+      term: term || '', gpa, goal, ...gpaWords(gpa, goal), gpaNote: gpaNoteOf(rows),
       scale: G.SCALE.map(([letter, min, points]) => ({ letter, min, points })),
       rows,
-      items: gi.map(({ c, g, band, pct }) => ({ course: c.shortName || c.name, color: c.color || GRAY, name: g.name, band, pct, pctText: `${store.fmtPts(Math.round(pct * 10) / 10)}%`, score: `${store.fmtPts(g.earned)}/${store.fmtPts(g.possible)}`, url: g.url || null })),
+      items: gi.map(({ c, g, band, pct }) => ({ course: c.shortName || c.name, color: c.color || GRAY, name: g.name, band, pct, pctText: pctFmt(pct), score: `${store.fmtPts(g.earned)}/${store.fmtPts(g.possible)}`, url: g.url || null })),
       counts,
-      trend: tracking && snaps.length >= 2 ? snaps.map((s) => ({ date: s.date, gpa: s.gpa })) : [],
+      // (2.99.33) each day's figure and date as the apps write them, for the chart's readout ("Oct 12 · 3.43")
+      trend: tracking && snaps.length >= 2 ? snaps.map((s) => ({ date: s.date, gpa: s.gpa, gpaText: gpaFmt(s.gpa), dateText: dayWords(s.date) })) : [],
       minY: G.MIN_Y, maxY: G.MAX_Y,
     };
+  }
+  /** How much of a course is graded — one count for the Grades overview and the course's own Grades page, on every app
+   *  (2.99.33; the two read 8 and 7 of 18 for one course): of its published work worth points, what carries a score the
+   *  teacher has posted. Excused work and a score held back are said apart ("7 of 18 graded · 1 excused"). */
+  function gradedOf(groups) {
+    let total = 0, graded = 0, excused = 0, held = 0;
+    for (const grp of groups || []) for (const a of grp.assignments || []) {
+      if (a.published === false || !(Number(a.points_possible) > 0)) continue;
+      total++;
+      const s = a.submission || {};
+      if (s.excused) { excused++; continue; }
+      if (s.workflow_state !== 'graded' || s.score === null || s.score === undefined) continue;
+      if (s.posted_at === null) held++; else graded++;
+    }
+    const text = total ? [`${graded} of ${total} graded`, excused ? `${excused} excused` : '', held ? `${held} not posted yet` : ''].filter(Boolean).join(' · ') : 'Nothing graded yet';
+    return { graded, total, excused, held, text };
+  }
+  /** The term GPA as every app shows it (2.99.33): rounded once, half up to two places (3.425 is 3.43, on both apps),
+   *  and the goal's gap worked out from that rounded figure, so the two always add up (3.43 and 0.57 below 4.00). */
+  function gpaWords(gpa, goal) {
+    const shown = roundHalfUp(gpa, 2);
+    const gap = shown === null || !Number.isFinite(Number(goal)) ? null : roundHalfUp(shown - Number(goal), 2);
+    return {
+      gpaText: gpaFmt(gpa) || '–', gpaShown: shown, goalText: gpaFmt(goal), goalGap: gap,
+      goalLine: gap === null ? '' : gap < 0 ? `${gpaFmt(-gap)} below goal` : gap > 0 ? `+${gpaFmt(gap)} above goal` : 'On your goal',
+    };
+  }
+  /** What the term GPA is made of, in words — and which courses it leaves out and why (a total the instructor hides, a
+   *  course with no grade yet): "From 4 courses, each counting equally. F26-PHYS 008HL’s total is hidden by the instructor." */
+  function gpaNoteOf(rows) {
+    const scored = rows.filter((r) => r.points !== null).length;
+    const and = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+    const hidden = rows.filter((r) => r.points === null && r.hidden).map((r) => r.code);
+    const none = rows.filter((r) => r.points === null && !r.hidden).map((r) => r.code);
+    return [
+      scored ? `From ${U.plural(scored, 'course')}, each counting equally.` : 'No course has a score yet.',
+      hidden.length ? `${and(hidden.map((n) => `${n}’s`))} ${hidden.length === 1 ? 'total is' : 'totals are'} hidden by the instructor.` : '',
+      none.length ? `${and(none)} ${none.length === 1 ? 'has' : 'have'} no grade yet.` : '',
+    ].filter(Boolean).join(' ');
   }
   /** (2.99.27) A course's grading scale, as its instructor set it: { letter: min% } from A+ down to D (F is 0), or null for
    *  the standard scale again. Cutoffs must fall letter by letter. */
@@ -830,7 +1049,7 @@
     gradeCache.delete(String(id));
     return { ok: true };
   }
-  async function setGoal({ goal } = {}) { const g = Math.max(0, Math.min(4, Number(goal))); if (!Number.isFinite(g)) return { ok: false }; await store.setPref('gpaGoal', +g.toFixed(2)); return { ok: true }; }
+  async function setGoal({ goal } = {}) { const g = Math.max(0, Math.min(4, Number(goal))); if (!Number.isFinite(g)) return { ok: false }; await store.setPref('gpaGoal', roundHalfUp(g, 2)); return { ok: true }; }
   async function setTarget({ id, letter = null } = {}) {
     const t = (await store.pref('gradeTargets')) || {};
     const next = { ...(typeof t === 'object' ? t : {}) };
@@ -868,7 +1087,9 @@
         id: String(ev.id), title: ev.title || a?.name || 'Untitled', date: iso(date), day: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         allDay: !!ev.all_day && !isA, time: (!!ev.all_day && !isA) ? 'All day' : U.fmtTime(date), kind,
         done: isA ? submitted || excused : date < now, missing: isA && date < now && !submitted && !excused && (submittable || !!sub?.missing), excused,
-        sub: [cc?.name || ev.context_name || '', kind, a?.points_possible !== null && a?.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : '', ev.location_name || ''].filter(Boolean).join(' · '),
+        // (2.99.33) what a view draws: struck through only for work handed in (or excused), in every view; greyed when past
+        struck: !!(isA && (submitted || excused)), past: (allDay ? U.addDays(date, 1) : (!isA && U.parse(ev.end_at)) || date) <= now, // (an event under way is not past yet)
+        sub: [cc?.name || ev.context_name || '', kind, a?.points_possible !== null && a?.points_possible !== undefined ? ptsOf(a.points_possible) : '', ev.location_name || ''].filter(Boolean).join(' · '),
         color: cc?.color || GRAY, url: ev.html_url || a?.html_url || null,
       });
     }
@@ -899,19 +1120,35 @@
     try { [feed, state, sel] = await Promise.all([store.notifications({ force }), store.notifState(), selection()]); } catch { return { error: 'Notifications could not be loaded.' }; }
     nfFeed = (feed || []).filter((n) => { const cid = n.courseId ?? n.course_id; return !cid || sel.ids.has(String(cid)); });
     const live = nfFeed.filter((n) => !state.gone[n.id]);
-    const rel = (d) => { if (!d) return 'Earlier'; const diff = U.dayDiff(d); return diff === 0 ? 'Today' : diff === -1 ? 'Yesterday' : diff > -7 && diff < 0 ? U.DAYS_LONG[d.getDay()] : U.fmtShort(d); };
+    // (2.99.33) work due tomorrow under "Tomorrow", as To Do and the Dashboard say it, not under its date
+    const rel = (d) => { if (!d) return 'Earlier'; const diff = U.dayDiff(d); return diff === 0 ? 'Today' : diff === -1 ? 'Yesterday' : diff === 1 ? 'Tomorrow' : diff > -7 && diff < 0 ? U.DAYS_LONG[d.getDay()] : dateText(d); };
     const days = [];
     const at = new Map();
     for (const n of live) {
       const k = rel(n.when);
       if (!at.has(k)) { at.set(k, { title: k, rows: [] }); days.push(at.get(k)); }
-      at.get(k).rows.push({ id: n.id, cat: n.cat, catLabel: NF[n.cat] || 'System', title: n.title, sub: [n.course, n.note, n.whenText].filter(Boolean).join(' · '), read: !!state.read[n.id], url: n.url || '/', color: n.color || null });
+      at.get(k).rows.push({ id: n.id, cat: n.cat, catLabel: NF[n.cat] || 'System', title: n.title, sub: notifLine(n), read: !!state.read[n.id], url: n.url || '/', color: n.color || null });
     }
     return {
       total: live.length, unread: live.filter((n) => !state.read[n.id]).length, days,
       cats: NF_ORDER.map((k) => ({ key: k, label: NF[k], count: live.filter((n) => n.cat === k).length })).filter((c) => c.count),
       cleared: Object.keys(state.gone).filter((id) => nfFeed.some((n) => n.id === id)).length,
     };
+  }
+  /** A notification's line under its title (2.99.33): each fact once — "Missing · 15 pts · was due Oct 12 at 11:59 PM",
+   *  never Missing, Overdue, "19 hours past" and the due date side by side — with its times written as every other. */
+  function notifLine(n) {
+    const p = n.parts || null;
+    const pts = p && p.points !== null && p.points !== undefined ? ptsOf(p.points) : '';
+    let bits;
+    if (p && n.cat === 'overdue') bits = [n.course, p.missing ? 'Missing' : 'Not handed in', pts, n.when ? `was due ${atText(n.when)}` : ''];
+    else if (p && n.cat === 'soon') bits = [n.course, p.kind, pts, dueText(n.when)];
+    else if (p && n.cat === 'graded' && (p.score !== null || p.grade !== null)) {
+      const score = p.score !== null && p.score !== undefined ? `${store.fmtPts(Number(p.score))}${p.possible !== null && p.possible !== undefined ? ` / ${store.fmtPts(Number(p.possible))}` : ''}` : letterFmt(p.grade);
+      const letter = p.score !== null && p.score !== undefined && p.grade && String(p.grade) !== String(p.score) ? letterFmt(p.grade) : '';
+      bits = [n.course, score, letter];
+    } else bits = [n.course, n.note, n.whenText];
+    return bits.filter(Boolean).join(' · ');
   }
   async function notifMark({ ids = [], read = null, gone = null, restore = false } = {}) {
     const state = await store.notifState();
@@ -927,11 +1164,46 @@
   }
 
   // Search: what the search box finds (search.js's index of the starred courses, Canvas for the rest)
+  // (2.99.33) Each course named as the sidebar names it, in every row (search.js's own rows name it by its code), and
+  // each group in one order however the sources answered — the same words on the same data list the same rows in the
+  // same order, run after run: by how well the title matches (a word's start, the title's start counting for more, as
+  // the box's index ranks), then the nearest date, then the title, then the address.
   async function search({ q = '' } = {}) {
     const S = BCV.search?.find;
     if (!S) return { groups: [] };
-    const groups = await S(String(q || ''));
-    return { groups: groups.map(([title, rows]) => ({ title, rows: rows.filter((r) => r.href || r.url).map((r) => ({ title: r.title || '', sub: r.sub || '', url: r.href || r.url, color: r.tint || r.course?.color || null, external: !!r.url && !r.href, kind: title })) })).filter((g) => g.rows.length) };
+    const [groups, all, sel] = await Promise.all([S(String(q || '')), store.courses().catch(() => []), selection()]);
+    const byId = new Map((all || []).map((c) => [String(c.id), c]));
+    const labelOf = (c) => sel.list.find((f) => String(f.id) === String(c.id))?.shortName || c.name || c.code || '';
+    const courseIn = (u) => { const m = /\/courses\/(\d+)(?:\/|$)/.exec(String(u || '')); return m ? byId.get(m[1]) || null : null; };
+    const words = String(q || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const fit = (title) => {
+      const t = String(title || '').toLowerCase();
+      let n = 0;
+      for (const w of words) { const i = t.indexOf(w); if (i >= 0) n += i === 0 ? 3 : /[^a-z0-9]/.test(t[i - 1]) ? 2 : 1; }
+      return n;
+    };
+    const now = Date.now();
+    const order = (x, y) => (y.fit - x.fit) || (x.far - y.far) || x.row.title.localeCompare(y.row.title, undefined, { numeric: true, sensitivity: 'base' }) || (x.row.url < y.row.url ? -1 : x.row.url > y.row.url ? 1 : 0);
+    const rowOf = (kind, r) => {
+      const url = r.href || r.url;
+      let title = r.title || '', sub = r.sub || '';
+      const c = r.course || courseIn(r.href);
+      if (kind === 'Courses' && r.course) {
+        title = labelOf(c);
+        sub = [otherName(title, c.code, c.name), c.term, (c.teachers || [])[0]].filter(Boolean).join(' · ') || 'Course';
+      } else if (c) {
+        const was = c.nickname || c.code || c.name; // (search.js nameOf: the name its rows lead with)
+        const rest = sub.startsWith(`${was} · `) ? sub.slice(was.length + 3) : sub === was ? '' : null;
+        if (rest !== null) sub = [labelOf(c), r.assignment ? (r.assignment.due_at ? dueText(r.assignment.due_at) : 'Assignment') : rest].filter(Boolean).join(' · ');
+      }
+      return { title, sub, url, color: r.tint || r.course?.color || c?.color || null, external: !!r.url && !r.href, kind };
+    };
+    return {
+      groups: groups.map(([title, rows]) => ({
+        title,
+        rows: rows.filter((r) => r.href || r.url).map((r) => { const row = rowOf(title, r); return { row, fit: fit(row.title), far: Number.isFinite(r.at) ? Math.abs(r.at - now) : Infinity }; }).sort(order).map((x) => x.row),
+      })).filter((g) => g.rows.length),
+    };
   }
 
   // the account menu's own moves
@@ -954,7 +1226,9 @@
       ({ from, to } = d);
       if (!peek) await W.markSeen(to);
     }
-    const rel = (r) => ({ version: r.version || '', date: r.date || '', notes: (r.notes || []).map((x) => ({ kind: x.kind || '', title: x.title || '', body: x.body || '' })) });
+    // (2.99.33) `dateText`: the release's day as the app writes a date ("Oct 13"), never the notes' own 2026-10-13
+    const dayOf = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) ? dateText(new Date(`${d}T12:00:00`)) : '');
+    const rel = (r) => ({ version: r.version || '', date: r.date || '', dateText: dayOf(r.date), notes: (r.notes || []).map((x) => ({ kind: x.kind || '', title: x.title || '', body: x.body || '' })) });
     return { version: to || '', releases: W.since(from, to).map(rel) };
   }
   /** The app's What's New sheet is up: this version is seen. */
@@ -1002,7 +1276,10 @@
   const TEX_SUP = Object.fromEntries([...'0123456789+-=()niaxybcdekmtrs°'].map((c, i) => [c, '⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱᵃˣʸᵇᶜᵈᵉᵏᵐᵗʳˢ°'[i]]));
   const TEX_SUB = Object.fromEntries([...'0123456789+-=()aeinoxkmtjr'].map((c, i) => [c, '₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑᵢₙₒₓₖₘₜⱼᵣ'[i]]));
   const TEX_DROP = new Set(['left', 'right', 'displaystyle', 'textstyle', 'scriptstyle', 'big', 'Big', 'bigg', 'Bigg', 'bigl', 'bigr', 'Bigl', 'Bigr', 'limits', 'nolimits', 'mathstrut']);
-  const TEX_KEEP = new Set(['text', 'textrm', 'mathrm', 'mathbf', 'mathit', 'mathsf', 'mathtt', 'mathcal', 'mathbb', 'operatorname', 'textbf', 'textit', 'mbox', 'boldsymbol', 'bm', 'overline', 'underline', 'vec', 'hat', 'bar', 'tilde', 'dot', 'ddot', 'widehat', 'overrightarrow']);
+  const TEX_KEEP = new Set(['text', 'textrm', 'mathrm', 'mathbf', 'mathit', 'mathsf', 'mathtt', 'mathcal', 'mathbb', 'operatorname', 'textbf', 'textit', 'mbox', 'boldsymbol', 'bm', 'underline']);
+  // (2.99.33) an accent kept on what it marks, as a combining mark — \vec{v} is v⃗, not a bare v (the review line lost the
+  // arrow that makes it a vector); over more than one letter, the group in brackets carries it
+  const TEX_ACCENT = { vec: '\u20d7', overrightarrow: '\u20d7', hat: '\u0302', widehat: '\u0302', bar: '\u0304', overline: '\u0305', tilde: '\u0303', widetilde: '\u0303', dot: '\u0307', ddot: '\u0308' };
   function mathText(tex) {
     const s0 = String(tex || '');
     const atomic = (x) => /^[A-Za-z0-9.]+$/.test(x) || [...x].length === 1 || /^[A-Za-z0-9.′']+\([^()]*\)$/.test(x); // (a name, a number, f(x))
@@ -1036,6 +1313,7 @@
             continue;
           }
           if (TEX_KEEP.has(name)) { const [a, j] = arg(s, i); i = j; out += conv(a, depth + 1); continue; }
+          if (TEX_ACCENT[name]) { const [a, j] = arg(s, i); i = j; const x = conv(a, depth + 1).trim(); out += [...x].length === 1 ? `${x}${TEX_ACCENT[name]}` : `${wrap(x)}${TEX_ACCENT[name]}`; continue; }
           if (TEX_DROP.has(name)) continue;
           if (TEX_SYM[name]) { out += /^[a-z]{2,}$/.test(TEX_SYM[name]) ? `${TEX_SYM[name]} ` : TEX_SYM[name]; continue; }
           if (/^[,;:! ]$/.test(name) || name === 'quad' || name === 'qquad' || name === '\\') { out += ' '; continue; }
@@ -1100,25 +1378,37 @@
     }
     return root.innerHTML;
   }
+  /** When a post was made: "Today at 6:44 PM", "Yesterday at 10:44 PM", "Saturday at 6:44 PM", else "Oct 2 at 9:00 AM". */
   const whenText = (v) => {
     const d = U.parse(v);
     if (!d) return '';
     const diff = U.dayDiff(d);
-    if (diff === 0) return `Today ${U.fmtTime(d)}`;
-    if (diff === -1) return `Yesterday ${U.fmtTime(d)}`;
-    if (diff > -7 && diff < 0) return `${U.DAYS_LONG[d.getDay()]} ${U.fmtTime(d)}`;
-    return d.getFullYear() === new Date().getFullYear() ? U.fmtAtUpper(d) : U.fmtDateComma(d);
+    if (diff === 0) return `Today at ${U.fmtTime(d)}`;
+    if (diff === -1) return `Yesterday at ${U.fmtTime(d)}`;
+    if (diff > -7 && diff < 0) return `${U.DAYS_LONG[d.getDay()]} at ${U.fmtTime(d)}`;
+    return atText(d);
   };
   const ptsOf = (n) => (n === null || n === undefined ? '' : `${store.fmtPts(n)} ${Number(n) === 1 ? 'pt' : 'pts'}`);
   const statusOf = (st) => (st ? { word: st.word, kind: st.kind || '' } : null);
-  const authorOf = (x) => ({ name: x?.author?.display_name || x?.user_name || x?.author_name || '', avatar: x?.author?.avatar_image_url && !/avatar-50|no_pic|dotted_pic/.test(x.author.avatar_image_url) ? x.author.avatar_image_url : null });
+  /** A list row's chip (2.99.33): only what is out of the ordinary — a score, Submitted, Late, Missing, Excused, Closed —
+   *  never a plain "Not submitted" on work that is simply still to do. */
+  const chipOf = (st) => (!st || (st.word === 'Not submitted' && !st.kind) ? null : statusOf({ ...st, word: letterWord(st.word) }));
+  /** A chip's word with a letter grade's real minus ("A− · late" for a letter-graded "A- · late"); any other word as it is. */
+  const letterWord = (w) => String(w ?? '').replace(/^([A-F])-(?=$| )/, '$1−');
+  // (2.99.33) a Brightspace topic has no author: its forum stands in Canvas's author's place (lib/d2l-api.js). It is said as
+  // the forum it is (`forum`), never as a person with initials
+  const authorOf = (x) => {
+    const name = x?.author?.display_name || x?.user_name || x?.author_name || '';
+    const forum = x?.forum?.name && name === x.forum.name ? String(x.forum.name) : '';
+    return { name: forum ? '' : name, forum, avatar: !forum && x?.author?.avatar_image_url && !/avatar-50|no_pic|dotted_pic/.test(x.author.avatar_image_url) ? x.author.avatar_image_url : null };
+  };
   const kindOfA = (a) => { const t = a?.submission_types || []; return t.includes('online_quiz') || a?.is_quiz_assignment || a?.is_quiz_lti_assignment ? 'Quiz' : t.includes('discussion_topic') ? 'Discussion' : t.includes('external_tool') ? 'Tool' : 'Assignment'; };
   const submittedA = (a) => { const s = a?.submission || {}; return !!(s.submitted_at || s.workflow_state === 'submitted' || s.workflow_state === 'pending_review' || (s.workflow_state === 'graded' && s.score !== null && s.score !== undefined)); };
   const ungradable = (a) => (a?.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t));
   const aRow = (a, cid) => ({
     id: String(a.id), title: a.name || 'Untitled', kind: kindOfA(a),
-    sub: [kindOfA(a), ptsOf(a.points_possible), a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'].filter(Boolean).join(' · '),
-    status: statusOf(store.workStatus(a)), url: `/courses/${cid}/assignments/${a.id}`,
+    sub: [kindOfA(a), ptsOf(a.points_possible), a.due_at ? dueText(a.due_at) : 'No due date'].filter(Boolean).join(' · '),
+    status: chipOf(store.workStatus(a)), due: iso(U.parse(a.due_at)), url: `/courses/${cid}/assignments/${a.id}`,
   });
   /** A course's or a group's name, colour and short line. */
   async function contextInfo(c) {
@@ -1128,7 +1418,9 @@
     }
     const [course, favs] = await Promise.all([store.course(c.id), store.favorites().catch(() => [])]);
     const fav = (favs || []).find((f) => String(f.id) === String(c.id));
-    return { name: course?.name || 'Course', title: fav?.shortName || course?.nickname || course?.code || course?.name || 'Course', color: course?.color || fav?.color || GRAY, sub: [course?.code && course.code !== course.name ? course.code : '', course?.term || ''].filter(Boolean).join(' · '), raw: course };
+    const title = fav?.shortName || course?.nickname || course?.code || course?.name || 'Course';
+    // (2.99.33) the line under the title: the course's other name only when it says something new, then its term
+    return { name: course?.name || 'Course', title, color: course?.color || fav?.color || GRAY, sub: [otherName(title, course?.code, course?.name), course?.term || ''].filter(Boolean).join(' · '), raw: course };
   }
   // the sections the app draws itself, from Canvas's tab ids
   const TAB_KIND = { announcements: 'announcements', discussions: 'discussions', assignments: 'assignments', modules: 'modules', pages: 'pages', wiki: 'pages', files: 'files', people: 'people', quizzes: 'quizzes', syllabus: 'syllabus', grades: 'grades' };
@@ -1167,7 +1459,7 @@
     return {
       ctx, kind: 'courses', title: info.title, name: info.name, sub: info.sub, color: info.color,
       teachers: (course.teachers || []).slice(0, 3).join(', '),
-      score: course.score !== null && course.score !== undefined ? Number(course.score) : null, scoreText: course.score !== null && course.score !== undefined ? `${store.fmtPts(course.score)}%` : null, letter: course.grade ? String(course.grade).replace(/-/g, '−') : null,
+      score: course.score !== null && course.score !== undefined ? Number(course.score) : null, scoreText: course.score !== null && course.score !== undefined ? pctFmt(course.score) : null, scoreWhy: course.score !== null && course.score !== undefined ? '' : noScoreWhy(course), letter: letterFmt(course.grade),
       sections: secs.sections, more: secs.more, open: open.slice(0, 12).map((a) => aRow(a, c.id)), openCount: open.length, done: done.map((a) => aRow(a, c.id)), announcements: latest,
       front: fp ? { title: fp.title || 'Front page', excerpt: textOf(fp.body, 220), slug: fp.url || '' } : null, html: '',
     };
@@ -1176,7 +1468,7 @@
   // Announcements and discussions
   function annRow(a, c) {
     const who = authorOf(a);
-    return { id: String(a.id), title: a.title || 'Announcement', author: who.name, avatar: who.avatar, when: whenText(a.delayed_post_at || a.posted_at), preview: textOf(a.message, 180), unread: a.read_state === 'unread' || (a.unread_count || 0) > 0, replies: a.discussion_subentry_count || 0, url: `${c.base}/discussion_topics/${a.id}` };
+    return { id: String(a.id), title: a.title || 'Announcement', author: who.name, forum: who.forum, avatar: who.avatar, when: whenText(a.delayed_post_at || a.posted_at), preview: textOf(a.message, 180), unread: a.read_state === 'unread' || (a.unread_count || 0) > 0, replies: a.discussion_subentry_count || 0, url: `${c.base}/discussion_topics/${a.id}` };
   }
   async function announcements({ ctx } = {}) {
     const c = ctxOf(ctx);
@@ -1190,8 +1482,8 @@
     const sorted = [...(list || [])].sort((x, y) => last(y) - last(x));
     const row = (t) => {
       const who = authorOf(t);
-      const graded = t.assignment ? [ptsOf(t.assignment.points_possible), t.assignment.due_at ? `Due ${U.fmtAt(t.assignment.due_at)}` : ''].filter(Boolean).join(' · ') : '';
-      return { id: String(t.id), title: t.title || 'Discussion', author: who.name, avatar: who.avatar, when: whenText(t.last_reply_at || t.posted_at), preview: graded || textOf(t.message, 140), unread: (t.unread_count || 0) > 0 || t.read_state === 'unread', unreadCount: t.unread_count || 0, replies: t.discussion_subentry_count || 0, graded: !!t.assignment, url: `${c.base}/discussion_topics/${t.id}` };
+      const graded = t.assignment ? [ptsOf(t.assignment.points_possible), dueText(t.assignment.due_at)].filter(Boolean).join(' · ') : '';
+      return { id: String(t.id), title: t.title || 'Discussion', author: who.name, forum: who.forum, avatar: who.avatar, when: whenText(t.last_reply_at || t.posted_at), preview: graded || textOf(t.message, 140), unread: (t.unread_count || 0) > 0 || t.read_state === 'unread', unreadCount: t.unread_count || 0, replies: t.discussion_subentry_count || 0, graded: !!t.assignment, url: `${c.base}/discussion_topics/${t.id}` };
     };
     const sections = [
       { title: 'Pinned', rows: sorted.filter((t) => t.pinned).map(row) },
@@ -1226,13 +1518,13 @@
     const locked = !!(t.locked || t.locked_for_user);
     const needFirst = !!t.require_initial_post && !view;
     return {
-      id: String(t.id), title: t.title || 'Discussion', context: info.title, color: info.color, author: who.name, avatar: who.avatar, when: whenText(t.delayed_post_at || t.posted_at),
+      id: String(t.id), title: t.title || 'Discussion', context: info.title, color: info.color, author: who.name, forum: who.forum, avatar: who.avatar, when: whenText(t.delayed_post_at || t.posted_at),
       html: clean(t.message || ''), announcement: !!(t.is_announcement || t.announcement),
-      graded: t.assignment ? [ptsOf(t.assignment.points_possible), t.assignment.due_at ? `Due ${U.fmtAt(t.assignment.due_at)}` : ''].filter(Boolean).join(' · ') : '',
+      graded: t.assignment ? [ptsOf(t.assignment.points_possible), dueText(t.assignment.due_at)].filter(Boolean).join(' · ') : '',
       assignmentUrl: t.assignment?.id && c.kind === 'courses' ? `/courses/${c.id}/assignments/${t.assignment.id}` : null,
       attachments: (t.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url),
       locked, canReply: !locked && t.permissions?.reply !== false, needFirst,
-      lockText: locked ? (textOf(t.lock_explanation || '', 200) || 'This discussion is closed for comments.') : '',
+      lockText: locked ? (canvasTimes(textOf(t.lock_explanation || '', 200)) || 'This discussion is closed for comments.') : '',
       entries, count: entries.filter((e) => !e.deleted).length,
     };
   }
@@ -1269,7 +1561,8 @@
       modules: (mods || []).map((m) => {
         const locked = m.state === 'locked';
         const pre = (m.prerequisite_module_ids || []).map((x) => byId.get(String(x))?.name).filter(Boolean);
-        const lockText = locked ? (pre.length ? `Complete ${pre.join(', ')} first` : m.unlock_at ? `Unlocks ${U.fmtAt(m.unlock_at)}` : 'Locked') : '';
+        // (2.99.33) why it is locked, short enough for its closed header: "Opens Oct 20" (with the time when it is not midnight)
+        const lockText = locked ? (pre.length ? `Complete ${pre.join(', ')} first` : m.unlock_at ? `Opens ${opensText(m.unlock_at)}` : 'Locked') : '';
         const items = (m.items || []).map((it) => {
           const cr = it.completion_requirement || null;
           const cd = it.content_details || {};
@@ -1277,8 +1570,8 @@
             id: String(it.id), title: it.title || 'Item', type: it.type, indent: Math.min(Number(it.indent) || 0, 3), url: itemUrl(it, c.base),
             file: it.type === 'File', external: it.type === 'ExternalUrl', header: it.type === 'SubHeader',
             requirement: reqWord(cr), done: !!cr?.completed, markable: cr?.type === 'must_mark_done' && !BCV.lms?.d2l, // (Brightspace takes that mark on its own page only)
-            locked: !!cd.locked_for_user, lockText: cd.locked_for_user ? textOf(cd.lock_explanation || '', 160) : '',
-            sub: [cd.points_possible !== undefined && cd.points_possible !== null ? ptsOf(cd.points_possible) : '', cd.due_at ? `Due ${U.fmtAt(cd.due_at)}` : ''].filter(Boolean).join(' · '),
+            locked: !!cd.locked_for_user, lockText: cd.locked_for_user ? canvasTimes(textOf(cd.lock_explanation || '', 160)) : '',
+            sub: [cd.points_possible !== undefined && cd.points_possible !== null ? ptsOf(cd.points_possible) : '', dueText(cd.due_at)].filter(Boolean).join(' · '),
           };
         });
         const req = items.filter((x) => x.requirement);
@@ -1325,7 +1618,7 @@
     // (closed: past its closing date, or Canvas refusing a hand-in it would take here. Canvas says can_submit: false of every
     // tool or quiz assignment, whose hand-in is the tool's or the quiz's own, not its form's: that is not closed)
     const closed = !!(a.lock_at && U.parse(a.lock_at) < new Date()) || (a.can_submit === false && here.length > 0);
-    const why = locked ? (textOf(a.lock_explanation || '', 200) || 'This assignment is locked.')
+    const why = locked ? (canvasTimes(textOf(a.lock_explanation || '', 200)) || 'This assignment is locked.')
       : sub.excused ? 'You are excused from this assignment.'
       : !attemptsLeft ? 'No attempts left.'
       : closed ? 'This assignment is closed.'
@@ -1344,24 +1637,38 @@
       const p = R?.rubricParts ? R.rubricParts(cr, held ? null : assess[cr.id]) : { name: textOf(cr.description, 300), ratings: [], pts: ptsOf(cr.points), comment: null };
       const levels = (cr.ratings || []).filter((r) => r && (r.description || r.points !== null)); // (rubricParts' own list: the same order)
       const got = held ? null : assess[cr.id] || null;
+      const score = got ? numOf(got.points) : null;
+      // (2.99.33) a teacher may pick a level and award other points (Partial, 3 pts, given 4): the mark is the points
+      // given — `adjusted` says they differ from the level's, and `markText` is the badge's words ("Your mark · 4 pts")
+      const ratedValue = p.rated ? numOf(p.rated.points) : null;
+      const adjusted = !held && score !== null && ratedValue !== null && Math.abs(score - ratedValue) > 1e-9;
       return { id: String(cr.id), name: p.name, pts: p.pts, comment: held ? null : p.comment, ratings: (p.ratings || []).map((r, i) => ({ text: r.text, pts: r.pts, got: !held && !!r.got, value: numOf(levels[i]?.points), long: textOf(levels[i]?.long_description || '', 320) })),
-        worth: numOf(cr.points), score: got ? numOf(got.points) : null, desc: textOf(cr.long_description || '', 900), note: got?.comments ? String(got.comments).trim() : null };
+        worth: numOf(cr.points), score, desc: textOf(cr.long_description || '', 900), note: got?.comments ? String(got.comments).trim() : null,
+        adjusted, markText: score === null ? '' : adjusted || !p.rated ? `Your mark · ${ptsOf(score)}` : 'Your mark' };
     });
     const stats = scored && a.score_statistics ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : '';
-    const attemptsText = a.allowed_attempts > 0 ? `${sub.attempt || 0} of ${a.allowed_attempts + (sub.extra_attempts || 0)} attempts used` : (sub.attempt > 1 ? `Attempt ${sub.attempt}` : '');
+    const attemptsText = a.allowed_attempts > 0 ? `${sub.attempt || 0} of ${U.plural(a.allowed_attempts + (sub.extra_attempts || 0), 'attempt')} used` : (sub.attempt > 1 ? `Attempt ${sub.attempt}` : '');
+    const letter = scored ? letterFmt(a.grading_type && a.grading_type !== 'points' && sub.grade ? String(sub.grade) : (pct !== null ? BCV.screens?.gpa?.letterFor?.(roundHalfUp(pct, 1))?.[0] || null : null)) : null;
+    const scoreWords = scored ? (a.grading_type && a.grading_type !== 'points' && sub.grade ? letterFmt(sub.grade) : `${store.fmtPts(Number(sub.score))}/${store.fmtPts(Number(a.points_possible) || 0)}`) : '';
     return {
       id: aid, course: cid, title: a.name || 'Assignment', context: info.title, color: info.color, kind: kindOfA(a),
-      points: ptsOf(a.points_possible), due: a.due_at ? U.fmtAt(a.due_at) : '', available: [a.unlock_at ? `Opens ${U.fmtAt(a.unlock_at)}` : '', a.lock_at ? `Closes ${U.fmtAt(a.lock_at)}` : ''].filter(Boolean).join(' · '),
+      points: ptsOf(a.points_possible), due: atText(a.due_at), dueLine: dueText(a.due_at), available: [a.unlock_at ? `Opens ${atText(a.unlock_at)}` : '', a.lock_at ? `Closes ${atText(a.lock_at)}` : ''].filter(Boolean).join(' · '),
+      // (2.99.33) the facts in one line, for a one-column page that puts the instructions first ("Due Sep 30 at 10:30 AM · 16 pts · 1 of 2 attempts used")
+      factsLine: [a.due_at ? dueText(a.due_at) : 'No due date', ptsOf(a.points_possible), attemptsText].filter(Boolean).join(' · '),
       typesText: types.map((t) => ({ online_text_entry: 'Text entry', online_url: 'Website URL', online_upload: 'File upload', media_recording: 'Media recording', student_annotation: 'Annotation', online_quiz: 'Quiz', discussion_topic: 'Discussion', external_tool: 'External tool', on_paper: 'On paper', none: 'Nothing to hand in', not_graded: 'Not graded' })[t] || t).join(', '),
-      html: clean(a.description || ''), status: statusOf(st),
-      grade: scored ? { text: st.word, score: Number(sub.score), possible: Number(a.points_possible) || 0, pct, letter: a.grading_type && a.grading_type !== 'points' && sub.grade ? String(sub.grade) : (pct !== null ? BCV.screens?.gpa?.letterFor?.(pct)?.[0] || null : null), late: sub.points_deducted ? `−${store.fmtPts(sub.points_deducted)} pts late` : '' } : null,
+      // (2.99.33) the chip says where the work stands, never the score again (the grade card shows that): Graded, or Late
+      // or Missing when it was (a zero for work never handed in stays Missing); no chip for work simply still to do
+      html: clean(a.description || ''), status: scored ? (sub.late ? { word: 'Late', kind: 'warn' } : sub.missing ? { word: 'Missing', kind: 'bad' } : { word: 'Graded', kind: 'good' }) : chipOf(st),
+      // (2.99.33) the grade as every app shows it: `pctText` half up to one decimal ("81.3%"), `pctWhole` for a ring of
+      // whole percents, `band` (A–F) for its colour, and `chip`: the score and letter as one chip ("13/16 · B−")
+      grade: scored ? { text: st.word, score: Number(sub.score), possible: Number(a.points_possible) || 0, pct, pctText: pctFmt(pct), pctWhole: wholeOf(pct), band: a.grading_type === 'pass_fail' || a.grading_type === 'not_graded' ? null : letter && /^[A-F][+\-−]?$/.test(letter) ? letter[0] : bandOf(pct), letter, chip: [scoreWords, letter && letter !== scoreWords ? letter : ''].filter(Boolean).join(' · '), late: sub.points_deducted ? `−${ptsOf(sub.points_deducted)} late` : '' } : null,
       held, stats,
       // (Mac 1.3.10) the class's scores as numbers, for the box plot the web draws (course-detail.js classPlot)
       classStats: scored && a.score_statistics && Number.isFinite(Number(a.score_statistics.mean)) ? (() => {
         const st = a.score_statistics, n = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
         return { min: n(st.min), lowerQ: n(st.lower_q), median: n(st.median), upperQ: n(st.upper_q), max: n(st.max), mean: n(st.mean), mine: n(sub.score), possible: n(a.points_possible) };
       })() : null,
-      submitted: sub.submitted_at ? `Submitted ${U.fmtAt(sub.submitted_at)}${sub.late ? ' · late' : ''}` : '', attemptsText,
+      submitted: sub.submitted_at ? `Submitted ${atText(sub.submitted_at)}${sub.late ? ' · late' : ''}` : '', attemptsText,
       // (Mac 1.3.8) each file's Canvas viewer (preview_url: DocViewer, the teacher's marks on it), and the submission's own
       // page in Canvas (its viewer and comments together) for work with no file
       submission: { files: (sub.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'File', url: absUrl(x.url), preview: x.preview_url ? absUrl(x.preview_url) : null })).filter((x) => x.url), url: sub.url || null, text: sub.body ? textOf(sub.body, 600) : '',
@@ -1446,7 +1753,7 @@
     const c = ctxOf(ctx);
     const [info, list] = await Promise.all([contextInfo(c), store.pages(c.id, c.opts)]);
     const sorted = [...(list || [])].sort((x, y) => Number(!!y.front_page) - Number(!!x.front_page));
-    return { title: 'Pages', context: info.title, color: info.color, rows: sorted.map((p) => ({ slug: p.url, title: p.title || 'Page', sub: [p.front_page ? 'Front page' : '', p.updated_at ? `Edited ${U.fmtRecent(p.updated_at)}` : ''].filter(Boolean).join(' · ') })), empty: 'No pages yet.' };
+    return { title: 'Pages', context: info.title, color: info.color, rows: sorted.map((p) => ({ slug: p.url, title: p.title || 'Page', sub: [p.front_page ? 'Front page' : '', p.updated_at ? `Edited ${recentText(p.updated_at)}` : ''].filter(Boolean).join(' · ') })), empty: 'No pages yet.' };
   }
   /** (Mac 1.3.7) The items either side of one, in the order the web's Previous / Next walks them (store.itemNeighbours:
    *  its own tab's order, else the modules'): { prev, next }, each { name, url } or null. `type`: Assignment, Quiz,
@@ -1462,9 +1769,14 @@
     const [info, p] = await Promise.all([contextInfo(c), slug ? store.page(c.id, slug, c.opts) : store.frontPage(c.id, c.opts)]);
     if (!p) throw new Error(slug ? 'This page could not be loaded.' : 'There is no front page.');
     const locked = !!p.locked_for_user;
-    return { title: p.title || 'Page', context: info.title, color: info.color, slug: p.url || slug, html: locked ? '' : clean(p.body || ''), lockText: locked ? (textOf(p.lock_explanation || '', 200) || 'This page is locked.') : '', edited: p.updated_at ? `Edited ${U.fmtRecent(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}` : '' };
+    return { title: p.title || 'Page', context: info.title, color: info.color, slug: p.url || slug, html: locked ? '' : clean(p.body || ''), lockText: locked ? (canvasTimes(textOf(p.lock_explanation || '', 200)) || 'This page is locked.') : '', edited: p.updated_at ? `Edited ${recentText(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}` : '' };
   }
-  const sizeText = (n) => (!Number.isFinite(Number(n)) ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  // (2.99.33) a file's kind in one vocabulary — PDF, Image, Spreadsheet, Text… — for a type column that says something the
+  // name's extension does not
+  const FILE_TYPES = [[/pdf/, 'PDF'], [/^image\//, 'Image'], [/^video\//, 'Video'], [/^audio\//, 'Audio'], [/spreadsheet|excel|csv/, 'Spreadsheet'], [/presentation|powerpoint/, 'Slides'], [/wordprocessing|msword|opendocument\.text|rtf/, 'Document'], [/zip|compressed|x-tar|gzip/, 'Archive'], [/^text\/html/, 'Web page'], [/^text\//, 'Text']];
+  const MIME_CLASS = { pdf: 'PDF', image: 'Image', video: 'Video', audio: 'Audio', xls: 'Spreadsheet', ppt: 'Slides', doc: 'Document', zip: 'Archive', html: 'Web page', text: 'Text' };
+  const fileType = (x) => { const m = String(x?.['content-type'] || '').toLowerCase(); const hit = m && FILE_TYPES.find(([re]) => re.test(m)); return hit ? hit[1] : MIME_CLASS[String(x?.mime_class || '').toLowerCase()] || 'File'; };
+  const sizeText = (n) => (!Number.isFinite(Number(n)) ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${roundHalfUp(n / 1024, 0)} KB` : `${roundHalfUp(n / 1048576, 1).toFixed(1)} MB`);
   async function files({ ctx, folder = null } = {}) {
     const c = ctxOf(ctx);
     const info = await contextInfo(c);
@@ -1475,7 +1787,7 @@
     return {
       title: 'Files', context: info.title, color: info.color, empty: 'This folder is empty.',
       folders: (box?.folders || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.name || 'Folder', sub: [x.files_count ? U.plural(x.files_count, 'file') : '', x.folders_count ? U.plural(x.folders_count, 'folder') : ''].filter(Boolean).join(' · ') || 'Empty', locked: !!x.locked })),
-      files: (box?.files || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.display_name || x.filename || 'File', sub: [sizeText(x.size), x.updated_at || x.modified_at ? U.fmtShort(x.updated_at || x.modified_at) : ''].filter(Boolean).join(' · '), url: absUrl(x.url), mime: x['content-type'] || '', kind: x.mime_class || '', locked: !!(x.locked_for_user || x.locked) })),
+      files: (box?.files || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.display_name || x.filename || 'File', sub: [sizeText(x.size), x.updated_at || x.modified_at ? dateText(x.updated_at || x.modified_at) : ''].filter(Boolean).join(' · '), url: absUrl(x.url), mime: x['content-type'] || '', kind: x.mime_class || '', typeText: fileType(x), locked: !!(x.locked_for_user || x.locked) })),
     };
   }
   const ROLE = { TeacherEnrollment: 'Teacher', TaEnrollment: 'TA', StudentEnrollment: 'Student', ObserverEnrollment: 'Observer', DesignerEnrollment: 'Designer' };
@@ -1494,7 +1806,7 @@
     const [info, list, as] = await Promise.all([contextInfo(c), store.quizzes(c.id).catch(() => []), store.assignments(c.id).catch(() => [])]);
     const rows = (list || []).filter((q) => q.published !== false).map((q) => {
       const a = (as || []).find((x) => String(x.id) === String(q.assignment_id) || (x.is_quiz_assignment && String(x.quiz_id) === String(q.id)));
-      return { id: String(q.id), title: q.title || 'Quiz', sub: [ptsOf(q.points_possible), q.due_at ? `Due ${U.fmtAt(q.due_at)}` : '', q.time_limit ? `${q.time_limit} min` : '', q.allowed_attempts > 1 ? `${q.allowed_attempts} attempts` : q.allowed_attempts === -1 ? 'Unlimited attempts' : ''].filter(Boolean).join(' · '), status: a ? statusOf(store.workStatus(a)) : null, url: a ? `/courses/${c.id}/assignments/${a.id}` : `/courses/${c.id}/quizzes/${q.id}`, kind: 'Quiz' };
+      return { id: String(q.id), title: q.title || 'Quiz', sub: [ptsOf(q.points_possible), dueText(q.due_at), q.time_limit ? `${q.time_limit} min` : '', q.allowed_attempts > 1 ? `${q.allowed_attempts} attempts` : q.allowed_attempts === -1 ? 'Unlimited attempts' : ''].filter(Boolean).join(' · '), status: a ? chipOf(store.workStatus(a)) : null, url: a ? `/courses/${c.id}/assignments/${a.id}` : `/courses/${c.id}/quizzes/${q.id}`, kind: 'Quiz' };
     });
     for (const a of (as || []).filter((x) => x.is_quiz_lti_assignment && x.published !== false)) rows.push({ ...aRow(a, c.id), kind: 'Quiz' });
     return { title: 'Quizzes', context: info.title, color: info.color, rows, empty: 'No quizzes in this course.' };
@@ -1624,7 +1936,7 @@
     const rows = hist.map((x) => ({
       attempt: Number(x.attempt),
       score: scored(x) ? `${store.fmtPts(x.score)} / ${possible}` : null,
-      when: x.submitted_at ? `Handed in ${U.fmtAtUpper(x.submitted_at)}` : null,
+      when: x.submitted_at ? `Handed in ${atText(x.submitted_at)}` : null,
       why: scored(x) ? '' : (survey ? 'Survey' : hidden ? 'Hidden' : x.workflow_state === 'pending_review' ? 'Waiting to be graded' : ''),
       kept: false,
     }));
@@ -1668,9 +1980,10 @@
       quiz.anonymous_submissions ? ['person.2.fill', 'gray', 'Your responses are anonymous.'] : null,
       timed ? ['timer', 'orange', `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
       quiz.one_question_at_a_time ? ['rectangle.portrait', 'gray', noBack ? 'One question at a time, with no going back.' : 'One question at a time.'] : null,
-      limit.allowed !== null ? ['bolt.fill', 'gray', limit.left > 0 ? `${U.plural(limit.left, 'attempt')} left of ${limit.allowed}.` : `No attempts left — this quiz allows ${U.plural(limit.allowed, 'attempt')}.`] : ['bolt.fill', 'gray', 'Unlimited attempts.'],
-      quiz.lock_at ? ['calendar.badge.clock', 'gray', `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
-      needsCode ? ['key.fill', 'orange', 'This quiz needs an access code from your instructor.'] : null,
+      // (2.99.33) the attempts are said once, in `note` ("Attempt 1 of 5 · 4 more after this one"): a rule only when there is no limit
+      limit.allowed === null ? ['bolt.fill', 'gray', 'Unlimited attempts.'] : null,
+      quiz.lock_at ? ['calendar.badge.clock', 'gray', `Available until ${atText(quiz.lock_at)}.`] : null,
+      // ((2.99.33) an access code is asked for by its own field, which says where it comes from: no rule saying it again)
       quiz.ip_filter ? ['network', 'orange', 'This quiz can only be taken from an allowed network, such as the classroom or campus.'] : null,
       lockdown ? ['lock.shield.fill', 'orange', 'This quiz needs Respondus LockDown Browser. Open Canvas in that browser to take it.'] : null,
     ].filter(Boolean).map(([symbol, tint, text]) => ({ symbol, tint, text }));
@@ -1678,14 +1991,30 @@
     const last = latestFinished(Q);
     const lastHidden = last ? resultsHidden(L, Q, last) : null;
     const lastScore = last && !survey && !lastHidden && last.workflow_state !== 'pending_review' && (last.kept_score ?? last.score) !== null && (last.kept_score ?? last.score) !== undefined ? `${store.fmtPts(last.kept_score ?? last.score)} / ${store.fmtPts(quiz.points_possible || 0)}` : null;
+    // (2.99.33) where the attempts stand, in one line that counts the attempt under way: "Attempt 1 of 5 · 4 more after
+    // this one", "This is your only attempt", "Attempt 1 of 5 · started Oct 13 at 6:45 PM · 4 more after this one"
+    const n = Q.sub ? Number(Q.sub.attempt) || limit.used + 1 : limit.used + 1;
+    const N = limit.allowed;
+    const which = N === null ? `Attempt ${n}` : N === 1 ? 'This is your only attempt' : `Attempt ${n} of ${N}`;
+    const after = N === null || N === 1 ? '' : N - n > 0 ? `${N - n} more after this one` : 'your last one';
+    const note = Q.sub ? [which, `started ${atText(Q.sub.started_at)}`, after].filter(Boolean).join(' · ')
+      : N !== null && limit.left <= 0 ? (N === 1 ? 'Your one attempt is used' : `All ${N} attempts used`)
+      : N !== null ? [which, after].filter(Boolean).join(' · ')
+      : 'Nothing is submitted until you say so.';
+    const attemptsQ = N !== null ? `${limit.used} of ${U.plural(N, 'attempt')} used` : limit.used > 1 ? `Attempt ${limit.used}` : '';
     return {
       title: quiz.title || 'Quiz', context: Q.info.title, color: Q.info.color,
-      facts: [U.plural(quiz.question_count || 0, 'question'), survey ? (gradedSurvey ? `${pts} for taking part` : 'Not graded') : pts, quiz.due_at ? `Due ${U.fmtAtUpper(quiz.due_at)}` : 'No due date'],
+      facts: [U.plural(quiz.question_count || 0, 'question'), survey ? (gradedSurvey ? `${pts} for taking part` : 'Not graded') : pts, quiz.due_at ? dueText(quiz.due_at) : 'No due date'],
+      // (2.99.33) the attempts in the assignment's own words ("1 of 2 attempts used"), from the quiz's own limit — the one
+      // the New Attempt button follows — for the assignment page's facts once this answers
+      attemptsText: attemptsQ, attemptsLeft: limit.left,
+      // (2.99.33) the assignment's one-column facts line with these attempts, so the line and the button agree
+      factsLine: [quiz.due_at ? dueText(quiz.due_at) : 'No due date', survey ? '' : ptsOf(quiz.points_possible), attemptsQ].filter(Boolean).join(' · '),
       html: clean(quiz.description || ''), rules, needsCode, code: needsCode ? codeOf(Q) : '',
       canStart, survey, timed, timeLimit: quiz.time_limit || null, oneAtATime: !!quiz.one_question_at_a_time, noBack,
       begin: canStart ? (Q.sub ? (survey ? 'Continue Survey' : 'Continue Attempt') : (survey ? 'Begin Survey' : 'Begin Attempt')) : lockdown ? 'Needs LockDown Browser' : quiz.locked_for_user ? 'Locked' : 'No Attempts Left',
-      note: Q.sub ? `Started ${U.fmtAtUpper(Q.sub.started_at)} · attempt ${Q.sub.attempt}` : limit.allowed !== null ? (limit.left > 0 ? `Attempt ${limit.used + 1} of ${limit.allowed}` : `${U.plural(limit.used, 'attempt')} used of ${limit.allowed}`) : 'Nothing is submitted until you say so.',
-      lockText: quiz.locked_for_user ? (textOf(quiz.lock_explanation || '', 200) || 'This quiz is locked.') : '',
+      note,
+      lockText: quiz.locked_for_user ? (canvasTimes(textOf(quiz.lock_explanation || '', 200)) || 'This quiz is locked.') : '',
       last: last ? { attempt: Number(last.attempt) || 1, score: lastScore, feedback: !survey && !lastHidden, why: lastHidden || '' } : null,
       ...quizAttempts(L, Q, survey),
       takeUrl: `${Q.url}/take?bcv=native`,
@@ -1695,7 +2024,7 @@
   const BLANK_MARK = 'display:inline-block;min-width:1.5em;padding:0 .35em;margin:0 .12em;border-radius:.5em;background:rgba(10,132,255,.16);color:#0a84ff;font-weight:600;text-align:center;line-height:1.4';
   /** A question's words for the app: Canvas's own HTML, cleaned, with each blank (a field Canvas's page wrote
    *  into the sentence, or the [name] the API writes) shown as its numbered mark (the web screen's weave). */
-  function questionHtml(L, q, blanks) {
+  function questionHtml(L, q, blanks, around = null) {
     const raw = String(q.question_text || '');
     if (!raw.trim()) return q.question_name ? `<p>${esc(q.question_name)}</p>` : '';
     if (!blanks.length) return clean(raw);
@@ -1729,7 +2058,32 @@
       }
       if (last) { frag.append(t.nodeValue.slice(last)); t.replaceWith(frag); }
     }
+    if (around) blankWords(root, num, around);
     return clean(root.innerHTML);
+  }
+  /** (2.99.33) The words on either side of each blank, for its menu's label ("the ___ of"), so a blank's choice can be
+   *  read beside the sentence it fills: up to three words before and after, stopping at another blank. Into `around`, by
+   *  blank id. */
+  function blankWords(root, num, around) {
+    const byN = new Map([...num].map(([b, n]) => [String(n), b]));
+    let text = '';
+    const walk = (node) => {
+      for (const ch of node.childNodes) {
+        if (ch.nodeType === 3) text += ch.nodeValue;
+        else if (ch.nodeType === 1 && ch.getAttribute('style') === BLANK_MARK) text += ` \u0001${ch.textContent}\u0001 `;
+        else if (ch.nodeType === 1) { const block = /^(P|DIV|LI|BR|TR|H\d)$/.test(ch.tagName); if (block) text += ' \u0002 '; walk(ch); if (block) text += ' \u0002 '; }
+      }
+    };
+    walk(root);
+    const parts = text.split(/\u0001/);
+    const words = (s) => s.replace(/\s+/g, ' ').trim();
+    for (let i = 1; i < parts.length; i += 2) {
+      const b = byN.get(parts[i]);
+      if (!b) continue;
+      const before = words(parts[i - 1].split('\u0002').pop()).split(' ').filter(Boolean).slice(-3).join(' ');
+      const after = words((parts[i + 1] || '').split('\u0002')[0]).split(' ').filter(Boolean).slice(0, 3).join(' ');
+      if (before || after) around[b] = [before, '___', after].filter(Boolean).join(' ');
+    }
   }
   const kindOfQ = (L, q) => {
     const t = q.question_type;
@@ -1743,9 +2097,10 @@
   function questionOut(L, Q, q, k) {
     const kind = kindOfQ(L, q);
     const blanks = L.BLANKS.has(q.question_type) ? L.blanksOf(q).map(String) : [];
+    const around = {};
     const a = q.answer;
     const out = {
-      id: String(q.id), n: k + 1, kind, type: q.question_type || '', name: q.question_name || '', html: kind === 'pending' ? '' : questionHtml(L, q, blanks),
+      id: String(q.id), n: k + 1, kind, type: q.question_type || '', name: q.question_name || '', html: kind === 'pending' ? '' : questionHtml(L, q, blanks, around),
       plain: textOf(mathAware(L.noFields(q.question_text || '', q) || ''), 160).replace(/\s+([?.,;:!)])/g, '$1') || q.question_name || `Question ${k + 1}`, // (the review's line: formulas read as maths, not LaTeX)
       points: L.hasNum(q.points_possible) ? Number(q.points_possible) : null, flagged: !!q.flagged, answered: L.isAnswered(q), loaded: q.loaded !== false,
       options: [], matches: [], blanks: [], hint: '',
@@ -1754,7 +2109,7 @@
     if (kind === 'choice' || kind === 'multi' || kind === 'match') out.options = (q.answers || []).map(optOf);
     if (kind === 'match') out.matches = (q.matches || []).filter((m) => L.hasId(m.match_id)).map((m) => ({ id: String(m.match_id), text: String(m.text || '').trim() || textOf(mathAware(m.html || ''), 120) }));
     if (blanks.length) {
-      out.blanks = blanks.map((b, i) => ({ id: b, n: i + 1, label: /^[0-9a-f]{8,}$/i.test(b) ? `Blank ${i + 1}` : b, options: kind === 'drops' ? (q.answers || []).filter((x) => String(x.blank_id) === b).map((x) => ({ id: String(x.id), text: String(x.text || '').trim() || textOf(x.html || '', 120) })) : [] }));
+      out.blanks = blanks.map((b, i) => ({ id: b, n: i + 1, label: /^[0-9a-f]{8,}$/i.test(b) ? `Blank ${i + 1}` : b, around: around[b] || '', options: kind === 'drops' ? (q.answers || []).filter((x) => String(x.blank_id) === b).map((x) => ({ id: String(x.id), text: String(x.text || '').trim() || textOf(x.html || '', 120) })) : [] }));
     }
     if (q.question_type === 'calculated_question' && q.formula_decimal_places !== null && q.formula_decimal_places !== '' && Number.isInteger(Number(q.formula_decimal_places))) {
       const p = Number(q.formula_decimal_places);
@@ -1976,7 +2331,7 @@
     store.todoWindow?.({ force: true }).catch?.(() => {});
     return {
       ok: true, survey, title: survey ? 'Responses Recorded' : 'Attempt Submitted', attempt: Number(d.attempt) || 1,
-      lead: `${Q.quiz.title} · submitted ${U.fmtAtUpper(d.finished_at || new Date())}. ${survey ? (gradedSurvey ? 'Thanks for taking part — the points for it post to your grades.' : 'Thanks for taking part.') : scoreVisible ? '' : 'Your score posts once your instructor releases it.'}`.trim(),
+      lead: `${Q.quiz.title} · submitted ${atText(d.finished_at || new Date())}. ${survey ? (gradedSurvey ? 'Thanks for taking part — the points for it post to your grades.' : 'Thanks for taking part.') : scoreVisible ? '' : 'Your score posts once your instructor releases it.'}`.trim(),
       answered: `${answeredNow.answered} of ${answeredNow.total}`,
       score: scoreVisible ? `${store.fmtPts(d.kept_score ?? d.score)} / ${store.fmtPts(Q.quiz.points_possible || 0)}` : null,
       takingPart: gradedSurvey && Q.quiz.points_possible ? `${store.fmtPts(Q.quiz.points_possible)} ${Number(Q.quiz.points_possible) === 1 ? 'point' : 'points'}` : null,
@@ -2031,7 +2386,7 @@
       const v = verdictOf(r);
       const reveal = v !== 'right' && r.correct !== null && r.shown;
       const yours = L.answerParts(q, Q.files);
-      const worth = r.possible !== null ? `${store.fmtPts(r.possible)} pts` : '';
+      const worth = r.possible !== null ? ptsOf(r.possible) : '';
       let match = null;
       if (L.MATCH.has(q.question_type) && (q.answers || []).length) {
         const set = new Map(L.pairsOf(q.answer).map((p) => [String(p.answer_id), String(p.match_id)]));
@@ -2071,8 +2426,10 @@
     return {
       title: quiz.title || 'Quiz', color: Q.info.color, attempt: Number(sub.attempt) || 1,
       attempts: finished.length > 1 || (Number(live?.attempt) || 0) > 1 ? Array.from({ length: Math.max(...finished.map((s) => Number(s.attempt) || 1), Number(sub.attempt) || 1) }, (_, i) => i + 1) : [],
-      score: score !== null ? store.fmtPts(score) : '—', possible: store.fmtPts(possible), pct: possible > 0 && score !== null ? (score / possible) * 100 : null,
-      summary: `${released ? `${nRight} of ${out.length} correct · ` : ''}${sub.workflow_state === 'pending_review' ? 'awaiting your instructor’s review' : `graded ${U.fmtAtUpper(asub?.graded_at || sub.finished_at || new Date())}`}`,
+      score: score !== null ? store.fmtPts(score) : '–', possible: store.fmtPts(possible), pct: possible > 0 && score !== null ? (score / possible) * 100 : null,
+      // (2.99.33) the same figure the assignment's grade card shows ("81.3%"), whole for the ring (81), and its band for a colour
+      pctText: possible > 0 && score !== null ? pctFmt((score / possible) * 100) : '', pctWhole: possible > 0 && score !== null ? wholeOf((score / possible) * 100) : null, band: possible > 0 && score !== null ? bandOf((score / possible) * 100) : null,
+      summary: `${released ? `${nRight} of ${out.length} correct · ` : ''}${sub.workflow_state === 'pending_review' ? 'awaiting your instructor’s review' : `graded ${atText(asub?.graded_at || sub.finished_at || new Date())}`}`,
       released, comments, rows: out,
     };
   }
@@ -2100,14 +2457,33 @@
     const wi = {};
     for (const [k, v] of Object.entries(tried && typeof tried === 'object' ? tried : {})) wi[k] = v === null || v === undefined ? '' : String(v);
     const extra = (Array.isArray(added) ? added : []).filter((x) => x && x.id && x.groupId).map((x) => ({ id: String(x.id), groupId: String(x.groupId), name: String(x.name || 'What-if assignment').slice(0, 120), possible: Math.max(0, Number(x.possible) || 0) }));
-    const on = !!switchOn || Object.keys(wi).length > 0 || extra.length > 0;
+    const typed = Object.keys(wi).length > 0 || extra.length > 0;
+    const on = !!switchOn || typed;
     const m = store.gradeModel(entry.groups, entry.c, wi, on, false, extra, { ownWeights: entry.own });
-    const total = m.total === null || m.total === undefined ? null : Number(m.total);
+    let total = m.total === null || m.total === undefined ? null : Number(m.total);
+    let note = m.center?.note || '';
+    // (2.99.33) What-If starts from the LMS's own total, not from Simpl's reading of the scores: turned on with nothing
+    // typed, the grade is the one the course shows (92.4% A− stayed 92.4% A−, where it jumped to Simpl's own 100% A+);
+    // a score tried moves it by what that score changes in Simpl's reading — so the total moves only when the student
+    // types. Where Simpl's untouched reading and the LMS's total disagree (work not posted, extra credit, a drop rule),
+    // `estimateNote` says by how much.
+    const lms = BCV.lms?.name || 'Canvas';
+    const canvasTotal = entry.c.score !== null && entry.c.score !== undefined && !entry.own && !entry.c.hideFinal ? roundHalfUp(entry.c.score, 1) : null;
+    let fromCanvas = false, estimateNote = '';
+    if (on && canvasTotal !== null) {
+      const base = store.gradeModel(entry.groups, entry.c, {}, true, false, [], { ownWeights: entry.own }).total;
+      const gap = base !== null && base !== undefined ? roundHalfUp(Math.abs(roundHalfUp(base, 1) - canvasTotal), 1) : 0; // (from the figures as written: 100 and 92.4 differ by 7.6)
+      if (gap > 0) estimateNote = `Simpl’s own estimate differs from ${lms}’s total by ${store.fmtPts(gap)} ${pointsWord(gap)}.`;
+      if (!typed) { total = canvasTotal; fromCanvas = true; note = `${lms}’s total. Try a score to see where it would land.`; }
+      else if (base !== null && base !== undefined && total !== null) { total = Math.max(0, roundHalfUp(canvasTotal + (total - Number(base)), 1)); note = `${lms}’s total, moved by the scores you tried.`; }
+    } else if (!on && !entry.own && canvasTotal !== null) {
+      note = `${lms}’s total, ${m.weighted ? 'weighted across the groups with graded work' : 'from graded work only'}.`; // (the letter is the big one beside it: not said again)
+    }
     await G.loadScales?.();
     const S = G.scaleOf ? G.scaleOf(entry.c.id) : G.SCALE; // (2.99.27) the course's own grading scale, where entered
     const ownScale = !!G.hasScale?.(entry.c.id);
-    const canvasLetter = !on && entry.c.grade && !entry.own && !ownScale ? String(entry.c.grade).replace(/-/g, '−') : null;
-    const letter = total === null ? null : canvasLetter || G.letterFor(total, S)[0];
+    const canvasLetter = (!on || fromCanvas) && entry.c.grade && !entry.own && !ownScale ? letterFmt(entry.c.grade) : null;
+    const letter = total === null ? null : canvasLetter || letterFmt(G.letterFor(total, S)[0]);
     const legend = new Map((m.legend || []).map((g) => [String(g.id), g]));
     const ungraded = new Map((m.ungraded || []).map((g) => [String(g.id), g]));
     // each group keeps its own colour while scores are tried (the web screen greys its rings instead)
@@ -2121,9 +2497,9 @@
       return { id: String(g.id), name: g.name || 'Assignments', weightText: l?.weightText || (u?.weightText ? `${u.weightText} of grade` : ''), value: l ? l.value : 'ungraded', pct: l?.pct ?? null, detail: l?.detail || '', color: entry.colors.get(String(g.id)) || l?.color || null, weight: w ? Number(w.weight) || 0 : null, graded: w ? !!w.graded : l ? true : false };
     });
     const rows = (m.rows || []).map((r) => ({
-      id: String(r.id), name: r.name, groupId: String(r.groupId), possible: Number(r.possible) || 0, earned: r.earned, effective: r.effective, hypothetical: !!r.hypothetical, added: !!r.added, badge: r.badge || '', dropped: !!r.dropped, grade: r.grade || null, counted: r.counted !== false,
-      dueText: r.due ? `Due ${U.fmtShort(r.due)}` : '', due: r.due ? (U.parse(r.due)?.toISOString() || null) : null, url: r.added ? null : `/courses/${key}/assignments/${r.id}`,
-      scoreText: r.effective === null || r.effective === undefined ? `—/${store.fmtPts(r.possible)}` : `${store.fmtPts(r.effective)}/${store.fmtPts(r.possible)}`,
+      id: String(r.id), name: r.name, groupId: String(r.groupId), possible: Number(r.possible) || 0, earned: r.earned, effective: r.effective, hypothetical: !!r.hypothetical, added: !!r.added, badge: r.badge || '', dropped: !!r.dropped, grade: letterFmt(r.grade), counted: r.counted !== false,
+      dueText: r.due ? `Due ${dateText(r.due)}` : '', due: r.due ? (U.parse(r.due)?.toISOString() || null) : null, url: r.added ? null : `/courses/${key}/assignments/${r.id}`,
+      scoreText: r.effective === null || r.effective === undefined ? `–/${store.fmtPts(r.possible)}` : `${store.fmtPts(r.effective)}/${store.fmtPts(r.possible)}`,
     }));
     let gpa = null, gpaIf = null;
     const others = gradesRows || (await grades().then((d) => d.rows).catch(() => null));
@@ -2132,11 +2508,14 @@
       gpa = pts(others.map((r) => r.points));
       if (on && total !== null) gpaIf = pts(others.map((r) => (r.id === key ? G.letterFor(total, S)[2] : r.points)).concat(others.some((r) => r.id === key) ? [] : [G.letterFor(total, S)[2]]));
     }
+    const counted = gradedOf(entry.groups);
     return {
-      id: key, code: entry.short, name: entry.c.name, color: entry.c.color || GRAY,
-      total, totalText: total === null ? '—' : `${store.fmtPts(total)}%`, letter, note: m.center?.note || '', final: m.center?.final || '', whatIf: on, weighted: !!m.weighted,
-      target: entry.target ? String(entry.target).replace(/-/g, '−') : null, scale: S.map(([l, min, points]) => ({ letter: l, min, points })), ownScale,
-      groups, rows, gpa, gpaIf,
+      id: key, code: entry.short, name: entry.c.name, altName: otherName(entry.short, entry.c.name, entry.c.code), color: entry.c.color || GRAY,
+      total, totalText: total === null ? '–' : pctFmt(total), letter, note, estimateNote, final: (m.center?.final || '').replace(/ · ([A-F])-(?= )/, ' · $1−'), whatIf: on, weighted: !!m.weighted,
+      target: entry.target ? letterFmt(entry.target) : null, scale: S.map(([l, min, points]) => ({ letter: l, min, points })), ownScale,
+      groups, rows, gpa, gpaIf, gpaText: gpaFmt(gpa), gpaIfText: gpaFmt(gpaIf),
+      // (2.99.33) the Grades overview's own count (grades → gradedOf), so the two screens agree
+      graded: counted.graded, totalItems: counted.total, gradedText: counted.text,
     };
   }
 
@@ -2144,7 +2523,9 @@
   async function groups() {
     const [list, all] = await Promise.all([store.groups(), store.courses().catch(() => [])]);
     const byId = new Map((all || []).map((c) => [String(c.id), c]));
-    const row = (g) => { const c = byId.get(String(g.course_id)); return { id: String(g.id), name: g.name || 'Group', sub: [c?.nickname || c?.code || c?.name || g.group_category?.name || '', g.members_count ? U.plural(g.members_count, 'member') : ''].filter(Boolean).join(' · '), color: c?.color || GRAY, past: c?.state === 'past' }; };
+    // (2.99.33) a group's course by the same name its home gives it (the course's name, not its code "ASRS"); the code
+    // goes with it for a tooltip
+    const row = (g) => { const c = byId.get(String(g.course_id)); const course = c?.nickname || c?.name || c?.code || ''; return { id: String(g.id), name: g.name || 'Group', sub: [course || g.group_category?.name || '', g.members_count ? U.plural(g.members_count, 'member') : ''].filter(Boolean).join(' · '), course, courseCode: c && c.code && saysMore(c.code, course) ? c.code : '', color: c?.color || GRAY, past: c?.state === 'past' }; };
     const rows = (list || []).map(row);
     return { current: rows.filter((r) => !r.past), past: rows.filter((r) => r.past), empty: 'You are not in any groups.' };
   }
@@ -2165,6 +2546,15 @@
     const hostOf = (u) => { try { return new URL(u, location.origin).hostname.replace(/^www\./, ''); } catch { return ''; } };
     const nameOf = (url, title) => BCV.hub?.toolNameOf?.({ external_tool_tag_attributes: { url }, name: title }) || null;
     const now = new Date();
+    // (2.99.33) an item's title without the tool's own name in front ("Knewton Alta: Unit 2" under Knewton Alta is "Unit 2"),
+    // the one trimming every app uses
+    const shortTitle = (title, tool) => {
+      const t = String(title || '').trim();
+      const n = String(tool || '').trim();
+      if (!n || t.slice(0, n.length).toLowerCase() !== n.toLowerCase()) return t;
+      const m = /^\s*[:\-–—]\s*(\S.*)$/.exec(t.slice(n.length)); // (only after a colon or a dash: "Knewton Altamira" stays whole)
+      return m ? m[1].trim() : t;
+    };
     const tools = new Map();
     const note = (name, host, c, open, kind, item) => {
       const key = norm(name);
@@ -2202,9 +2592,9 @@
         const name = nameOf(url, a.name) || host;
         const d = U.parse(a.due_at);
         const item = {
-          kind: 'assignment', id: String(a.id), title: a.name || 'Untitled', due: a.due_at || null,
-          sub: [a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date', ptsOf(a.points_possible)].filter(Boolean).join(' · '),
-          status: statusOf(store.workStatus(a)), upcoming: !!(d && d >= now && !submittedA(a) && !a.submission?.excused),
+          kind: 'assignment', id: String(a.id), title: a.name || 'Untitled', short: shortTitle(a.name, name), due: a.due_at || null,
+          sub: [a.due_at ? dueText(a.due_at) : 'No due date', ptsOf(a.points_possible)].filter(Boolean).join(' · '),
+          status: chipOf(store.workStatus(a)), upcoming: !!(d && d >= now && !submittedA(a) && !a.submission?.excused),
         };
         if (name) note(name, host, c, { assignment: String(a.id) }, 'Assignments', item);
       }
@@ -2213,7 +2603,7 @@
           if (it.type !== 'ExternalTool') continue;
           const host = hostOf(it.external_url || '');
           const name = nameOf(it.external_url || '', it.title) || host;
-          const item = { kind: 'moduleItem', id: String(it.id), title: it.title || 'Untitled', due: null, sub: m.name ? `In ${m.name}` : 'In Modules', status: null, upcoming: false };
+          const item = { kind: 'moduleItem', id: String(it.id), title: it.title || 'Untitled', short: shortTitle(it.title, name), due: null, sub: m.name ? `In ${m.name}` : 'In Modules', status: null, upcoming: false };
           if (name) note(name, host, c, { moduleItem: String(it.id) }, 'Modules', item);
         }
       }
@@ -2224,7 +2614,7 @@
       const next = items.filter((i) => i.upcoming).sort((a, b) => U.parse(a.due) - U.parse(b.due))[0] || null;
       return {
         id: t.id, name: t.name, host: t.host === t.name ? '' : t.host, kinds: t.kinds, assignments: t.assignments,
-        instances: items.length, next: next ? { title: next.title, sub: next.sub, course: next.course } : null, courses,
+        instances: items.length, next: next ? { title: next.title, short: next.short, sub: next.sub, course: next.course } : null, courses,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
     return { rows, sub: `${U.plural(rows.length, 'tool')} across ${U.plural(cs.length, 'course')}`, empty: 'None of your courses has an external tool.' };
@@ -2240,7 +2630,7 @@
       scope: sc,
       rows: (list || []).map((cv) => {
         const others = (cv.participants || []).filter((p) => String(p.id) !== mine).map((p) => p.name).filter(Boolean);
-        return { id: String(cv.id), subject: cv.subject || '(No subject)', who: others.slice(0, 3).join(', ') + (others.length > 3 ? ` +${others.length - 3}` : '') || 'Me', preview: String(cv.last_message || '').slice(0, 200), when: U.whenShort(cv.last_message_at || cv.last_authored_message_at), unread: cv.workflow_state === 'unread', starred: !!cv.starred, count: cv.message_count || 1, context: cv.context_name || '', attachment: (cv.properties || []).includes('attachments') };
+        return { id: String(cv.id), subject: cv.subject || '(No subject)', who: others.slice(0, 3).join(', ') + (others.length > 3 ? ` +${others.length - 3}` : '') || 'Me', preview: String(cv.last_message || '').slice(0, 200), when: sentText(cv.last_message_at || cv.last_authored_message_at), unread: cv.workflow_state === 'unread', starred: !!cv.starred, count: cv.message_count || 1, context: cv.context_name || '', attachment: (cv.properties || []).includes('attachments') };
       }),
       empty: sc === 'unread' ? 'No unread messages.' : sc === 'sent' ? 'Nothing sent yet.' : 'No messages.',
     };
@@ -2256,10 +2646,20 @@
     });
     return { id: String(id), subject: cv.subject || '(No subject)', context: cv.context_name || '', people: (cv.participants || []).filter((p) => String(p.id) !== mine).map((p) => p.name).join(', '), starred: !!cv.starred, messages: msgs };
   }
-  async function sendReply({ id, body = '' } = {}) {
+  const fileIds = (list) => (Array.isArray(list) ? list : []).map((x) => (x && typeof x === 'object' ? x.id : x)).filter((x) => x !== null && x !== undefined && String(x).trim()).map(String);
+  /** A reply, with the files picked for it (`attachments`: the ids messageUpload gave). */
+  async function sendReply({ id, body = '', attachments = [] } = {}) {
     if (!String(body).trim()) throw new Error('Write a message first.');
-    await store.replyTo(String(id), String(body).trim());
+    await store.replyTo(String(id), String(body).trim(), fileIds(attachments));
     return { ok: true };
+  }
+  /** (2.99.33) A file for a new message or a reply: the app's pick (base64 here) uploaded to the student's own
+   *  "conversation attachments" folder, as Canvas's own Inbox does; its id then goes with the message (`attachments`). */
+  async function messageUpload({ name = 'file', type = '', data = '' } = {}) {
+    if (!String(data || '').trim()) throw new Error('Choose a file to attach.');
+    const file = new File([fromB64(data)], String(name || 'file'), { type: type || 'application/octet-stream' });
+    const id = await store.uploadMessageFile(file);
+    return { id: String(id), name: file.name, size: file.size, sizeText: sizeText(file.size) };
   }
   async function star({ id, on = true } = {}) { await store.setStarred(String(id), !!on); return { ok: true }; }
   async function recipients({ q = '', context = null } = {}) {
@@ -2272,15 +2672,15 @@
     const favs = await store.favorites().catch(() => []);
     return { rows: (favs || []).map((c) => ({ code: `course_${c.id}`, name: c.shortName || c.name, color: c.color || GRAY })) };
   }
-  async function sendMessage({ recipients: to = [], subject = '', body = '', context = null } = {}) {
+  async function sendMessage({ recipients: to = [], subject = '', body = '', context = null, attachments = [] } = {}) {
     if (!Array.isArray(to) || !to.length) throw new Error('Choose who the message is to.');
     if (!String(body).trim()) throw new Error('Write a message first.');
-    await store.compose({ recipients: to.map(String), subject: String(subject || '').trim(), body: String(body).trim(), contextCode: context || null });
+    await store.compose({ recipients: to.map(String), subject: String(subject || '').trim(), body: String(body).trim(), contextCode: context || null, attachmentIds: fileIds(attachments) });
     return { ok: true };
   }
 
   const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
-    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
+    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
@@ -2291,7 +2691,7 @@
     if (!c) throw new Error('That course could not be found.');
     const groups = (await store.assignmentGroups(c.id).catch(() => [])) || [];
     const own = ownPref && typeof ownPref === 'object' && ownPref[c.id] && typeof ownPref[c.id] === 'object' && Object.keys(ownPref[c.id]).length ? ownPref[c.id] : null;
-    const r1 = (v) => Math.round(v * 10) / 10;
+    const r1 = (v) => roundHalfUp(v, 1); // (2.99.33: half up on the decimal figure, as every figure shown)
     let now = c.score === null || c.score === undefined ? null : Number(c.score);
     if (own) { const t = store.gradeModel(groups, c, {}, false, false, [], { ownWeights: own }).total; if (t !== null && t !== undefined) now = Number(t); }
     const items = groups.flatMap((g) => (g.assignments || []).filter((a) => !a.omit_from_final_grade && Number(a.points_possible) > 0).map((a) => ({ a, g })));
@@ -2306,7 +2706,12 @@
       if (sub && sub.score != null && sub.workflow_state === 'graded' && sub.posted_at !== null) continue;
       const pts = Number(a.points_possible);
       const worth = weighted ? (weightOf(g) * pts) / (groupPts[g.id] || pts) : (100 * pts) / (total || pts);
-      pieces.push({ id: String(a.id), name: a.name || 'Untitled', worth: r1(worth), pts, group: g.name || '', groupWeight: weightOf(g), groupPts: groupPts[g.id] || pts, total, due: a.due_at || null });
+      // (2.99.33) the picker's line and the note's, in words every app shows as they come: "Midterm 2 · 28.5% of your grade",
+      // "Midterms are 57% of the grade" (a plural group name takes "are")
+      const gName = g.name || 'Its group';
+      pieces.push({ id: String(a.id), name: a.name || 'Untitled', worth: r1(worth), pts, group: g.name || '', groupWeight: weightOf(g), groupPts: groupPts[g.id] || pts, total, due: a.due_at || null,
+        worthText: `${store.fmtPts(r1(worth))}% of your grade`, label: `${a.name || 'Untitled'} · ${store.fmtPts(r1(worth))}% of your grade`,
+        groupText: weighted ? `${gName} ${/[^su]s$/i.test(gName.trim()) && !/is$/i.test(gName.trim()) ? 'are' : 'is'} ${store.fmtPts(weightOf(g))}% of the grade${own ? ' (your own weights)' : ''}` : `${store.fmtPts(pts)} of the course’s ${store.fmtPts(total)} points` });
     }
     pieces.sort((x, y) => (y.worth - x.worth) || ((Date.parse(y.due || '') || 0) - (Date.parse(x.due || '') || 0)));
     return { id: key, now: now === null || !Number.isFinite(now) ? null : r1(now), weighted, own: !!own, pieces };

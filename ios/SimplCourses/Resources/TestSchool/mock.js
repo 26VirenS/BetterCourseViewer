@@ -919,8 +919,10 @@ on('GET', /^\/api\/v1\/conversations\/unread_count$/, () => ({ unread_count: Str
 on('GET', /^\/api\/v1\/conversations$/, (url) => { const scope = url.searchParams.get('scope'); const f = url.searchParams.getAll('filter[]')[0]; return conversations.filter((c) => (!scope || (scope === 'unread' ? c.workflow_state === 'unread' : scope === 'starred' ? c.starred : true)) && (!f || c.context_code === f)).map(({ messages, ...c }) => c); });
 on('GET', /^\/api\/v1\/conversations\/(\w+)$/, (url, m) => conversations.find((c) => c.id === m[1]) || null);
 on('PUT', /^\/api\/v1\/conversations\/(\w+)$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); if (c && body.conversation) Object.assign(c, body.conversation); return c; });
-on('POST', /^\/api\/v1\/conversations\/(\w+)\/add_message$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); c.messages.unshift({ id: `m${Date.now()}`, author_id: '7', created_at: new Date().toISOString(), body: body.body }); c.last_message = body.body; c.last_message_at = new Date().toISOString(); c.message_count = c.messages.length; return c; });
-on('POST', /^\/api\/v1\/conversations$/, (url, m, body) => { const c = { id: `c${conversations.length + 1}`, subject: body.subject || '(no subject)', workflow_state: 'read', last_message: body.body, last_message_at: new Date().toISOString(), starred: false, context_code: body.context_code, participants: [{ id: '7', name: 'Sam Student' }, ...(body.recipients || []).map((r) => ({ id: r, name: `User ${r}` }))], messages: [{ id: 'mx', author_id: '7', created_at: new Date().toISOString(), body: body.body }] }; conversations.unshift(c); return [c]; });
+// a message's files: the ones uploaded to the student's own files (attachment_ids), as Canvas lists them on the message
+const messageFiles = (body) => (Array.isArray(body.attachment_ids) ? body.attachment_ids : []).map((id) => storedFiles.get(String(id))).filter(Boolean);
+on('POST', /^\/api\/v1\/conversations\/(\w+)\/add_message$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); c.messages.unshift({ id: `m${Date.now()}`, author_id: '7', created_at: new Date().toISOString(), body: body.body, attachments: messageFiles(body) }); c.last_message = body.body; c.last_message_at = new Date().toISOString(); c.message_count = c.messages.length; return c; });
+on('POST', /^\/api\/v1\/conversations$/, (url, m, body) => { const c = { id: `c${conversations.length + 1}`, subject: body.subject || '(no subject)', workflow_state: 'read', last_message: body.body, last_message_at: new Date().toISOString(), starred: false, context_code: body.context_code, participants: [{ id: '7', name: 'Sam Student' }, ...(body.recipients || []).map((r) => ({ id: r, name: `User ${r}` }))], messages: [{ id: 'mx', author_id: '7', created_at: new Date().toISOString(), body: body.body, attachments: messageFiles(body) }] }; conversations.unshift(c); return [c]; });
 // like Canvas: a person's row says which courses you share (common_courses, by course id); a course's how many people it reaches
 on('GET', /^\/api\/v1\/search\/recipients$/, (url) => { const q = (url.searchParams.get('search') || '').toLowerCase(); return [{ id: 't101', name: 'Yue Lei', common_courses: { 101: ['TeacherEnrollment'] } }, { id: 'u2', name: 'Alan Aguilar', common_courses: { 101: ['StudentEnrollment'], 102: ['StudentEnrollment'] } }, { id: 'course_101', name: 'F26-MATH 021 20', user_count: 120, type: 'context' }].filter((r) => r.name.toLowerCase().includes(q)); });
 const groupList = [{ id: '66729', name: 'Attestation Fall 2026 1', course_id: '201', members_count: 4, group_category: { name: 'Attestation' }, description: '<p>Complete the student attestation with your group.</p>', context_type: 'Course' }, { id: '66730', name: 'Study group B', course_id: '301', members_count: 5, context_type: 'Course' }];
@@ -1298,6 +1300,12 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/quiz_submissions\/self\/
   const token = `tok${++fileSeq}`;
   pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
   return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `quiz_submissions/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
+});
+// a file for an Inbox message or a reply: the student's own "conversation attachments" folder, the same preflight and storage step
+on('POST', /^\/api\/v1\/users\/self\/files$/, (url, m, body) => {
+  const token = `tok${++fileSeq}`;
+  pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type, folder: body.parent_folder_path || '' });
+  return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `users/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
 });
 // the storage step: a multipart POST with no CSRF token, like S3 or inst-fs; the file is the last field
 on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {

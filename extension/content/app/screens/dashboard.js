@@ -45,10 +45,11 @@
       const c = it.course;
       const pal = c ? c.palette : U.palette('#8e8e93', dark);
       const when = U.sameDay(it.date, now) ? `due ${U.fmtTime(it.date)}` : `${U.DAYS[it.date.getDay()]} ${U.fmtTime(it.date)}`;
-      return { title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, when].filter(Boolean).join(' · '), course: c?.shortName || it.courseName || '—', color: pal.text, tint: pal.tint, url: it.url, date: it.date };
+      // (2.99.33) `parts`: the row's facts one by one, for the apps' own columns (native-app.js sheetRow)
+      return { title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, when].filter(Boolean).join(' · '), course: c?.shortName || it.courseName || '—', color: pal.text, tint: pal.tint, url: it.url, date: it.date, parts: { kind: it.kind, points: it.points, due: it.date } };
     };
     // a done row says how it was done: graded, handed in, or marked done on the planner
-    const doneRow = (it) => { const r = dueRow(it); r.meta = `${r.meta} · ${it.graded ? 'graded' : it.submitted ? 'handed in' : 'marked done'}`; return r; };
+    const doneRow = (it) => { const r = dueRow(it); const how = it.graded ? 'graded' : it.submitted ? 'handed in' : 'marked done'; r.meta = `${r.meta} · ${how}`; r.parts.how = how; return r; };
     const recentOf = (label, items) => (items.length ? { label, items: items.slice(0, RECENT_MAX) } : null);
     const courseCount = (items) => new Set(items.map((it) => it.courseId || it.courseName)).size;
     const kindOf = (a) => (a.is_quiz_assignment || a.quiz_id || (a.submission_types || []).includes('online_quiz') ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
@@ -84,7 +85,7 @@
         const a = aByKey.get(key);
         if (a && (scored(a.submission) || closed(a))) continue;
         seen.add(key);
-        overdue.push({ key, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
+        overdue.push({ key, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date, parts: { kind: it.kind, points: it.points, due: it.date, missing: !!it.missing } });
       }
       for (const { c, list } of byCourse) {
         for (const a of list || []) {
@@ -100,7 +101,7 @@
           seen.add(`assignment:${a.id}`);
           if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
           const item = plannerByKey.get(key) || { type: key.split(':')[0], raw: { plannable_id: key.split(':')[1], planner_override: overrideByKey.get(key) || overrideByKey.get(`assignment:${a.id}`) || null } };
-          overdue.push({ key, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
+          overdue.push({ key, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now, parts: { kind: kindOf(a), points: a.points_possible ?? null, due: U.parse(a.due_at), missing: !!sub.missing } });
         }
       }
       overdue.sort(byDate);
@@ -114,7 +115,7 @@
           const at = sub && U.parse(sub.submitted_at);
           const due = U.parse(a.due_at);
           if (!at || at < since || !(sub.late || (due && at > due))) continue;
-          lateIn.push({ title: a.name, meta: [kindOf(a), due ? `due ${U.fmtShort(due)}` : null, `handed in ${U.fmtShort(at)}`, scored(sub) ? 'graded' : 'waiting for a grade'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: at });
+          lateIn.push({ title: a.name, meta: [kindOf(a), due ? `due ${U.fmtShort(due)}` : null, `handed in ${U.fmtShort(at)}`, scored(sub) ? 'graded' : 'waiting for a grade'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: at, parts: { kind: kindOf(a), points: a.points_possible ?? null, due, handed: at, how: scored(sub) ? 'graded' : 'waiting for a grade' } });
         }
       }
       lateIn.sort((x, y) => y.date - x.date);
@@ -135,7 +136,7 @@
           if (!g || g < before || g >= weekEnd) continue;
           const isScored = !sub.excused && sub.score !== null && sub.score !== undefined;
           if (!isScored && !sub.excused) continue;
-          const row = { title: a.name, meta: `${kindOf(a)} · ${sub.excused ? 'excused' : `${store.fmtPts(sub.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g };
+          const row = { title: a.name, meta: `${kindOf(a)} · ${sub.excused ? 'excused' : `${store.fmtPts(sub.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g, parts: { kind: kindOf(a), points: a.points_possible ?? null, score: sub.excused ? null : sub.score, excused: !!sub.excused, posted: g, grade: a.grading_type && a.grading_type !== 'points' && sub.grade ? String(sub.grade) : null } };
           if (g < weekStart) { earlier.push(row); continue; }
           if (isScored) { earned += Number(sub.score) || 0; possible += Number(a.points_possible) || 0; }
           graded.push(row);
