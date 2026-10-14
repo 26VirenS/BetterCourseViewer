@@ -586,6 +586,23 @@ try {
     && ka.instances === 5 && kaSprk.items.map((i) => i.id).join() === '4003,4011,4012,4010' && kaSprk.items.every((i) => i.kind === 'assignment' && i.title && i.sub)
     && ka.next?.title === 'Knewton Alta: Unit 2' && rp.instances === 0 && rp.courses.every((c) => c.items.length === 0),
     `external tools: a course's own and one found only in assignments, with where to open each and every place it is used (${JSON.stringify(et.rows?.map((t) => [t.name, t.courses.length, t.kinds.join('+'), t.instances, t.next?.title]))}, ${JSON.stringify(kaSprk?.items?.map((i) => i.id))})`);
+  // (Mac 1.3.79, Windows 0.3.1) a tool is its provider: CHEM's Macmillan assignments, titled by their week first ("W2: Atoms
+  // and Elements", "W2 HW: Measurement", "W7 Homework: Thermochemistry"; three with the tool's id, one without), its module
+  // item and its tab — which the school named "Course Materials", the same tool by its id — are the one tool Macmillan
+  // Learning, each place under its own title; no tool is named by the words of an item's title (before 1.3.79: "W2", "W2
+  // HW", "W7 Homework", "W7 Pre-lecture" and "Course Materials", five tools); a module's tool whose title names its
+  // publisher ("Mastering Physics") is that publisher's
+  const mac = et.rows?.find((t) => t.name === 'Macmillan Learning');
+  const macChem = mac?.courses.find((c) => c.id === '106');
+  const titledTools = new Set(['W2', 'W2 HW', 'W7 Homework', 'W7 Pre-lecture', 'Course Materials', 'Mastering Physics']);
+  check(!!mac && mac.provider === 'macmillan' && mac.icon === 'book' && mac.host === 'lmslink.bfwpub.com' && mac.courses.length === 1 && macChem?.open.tool === '31'
+    && mac.kinds.join() === 'Course navigation,Assignments,Modules' && mac.assignments === 4 && mac.instances === 5
+    && macChem.items.map((i) => `${i.kind}:${i.title}`).join() === 'assignment:W2: Atoms and Elements,assignment:W2 HW: Measurement,assignment:W2: Ions and Molecules,assignment:W7 Homework: Thermochemistry,moduleItem:W7 Pre-lecture: Enthalpy'
+    && macChem.items.every((i) => i.short === i.title) && mac.next?.title === 'W2: Atoms and Elements' && macChem.items.filter((i) => i.upcoming).length === 4
+    && !et.rows.some((t) => titledTools.has(t.name) || /bfwpub/.test(t.name)) && et.rows.filter((t) => /macmillan/i.test(t.name)).length === 1
+    && et.rows.find((t) => t.name === 'Pearson')?.courses.map((c) => c.items.map((i) => i.title).join()).join() === 'Mastering Physics'
+    && ka.provider === 'knewton' && rp.provider === null && rp.icon === null,
+    `external tools by provider: Macmillan's week-titled assignments, its module item and its tab one tool, Macmillan Learning (${JSON.stringify(et.rows?.map((t) => [t.name, t.provider, t.host, t.kinds.join('+'), t.instances]))}, ${JSON.stringify(macChem?.items?.map((i) => i.title))})`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

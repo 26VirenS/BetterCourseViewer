@@ -149,7 +149,17 @@ const A = {
     ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, {}],
     ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, { discussion: '7503' }], // a graded discussion, in its module as the topic (with a must_mark_done requirement)
   ],
-  106: [], 201: [], 202: [], 301: [['9001', 'Final project', 'Projects', 100, 97, -110, 23.98, -111, {}]],
+  // (Mac 1.3.79, Windows 0.3.1) Macmillan Learning's homework as a school sets it up: each assignment a launch of the one
+  // tool on its own host, titled by its week first ("W2: …", "W2 HW: …"), some with the tool's id and one without —
+  // External Tools lists them as one tool, Macmillan Learning, not a tool a week. Due after the planner's three weeks, so
+  // the Dashboard, To Do and their counts stay as they were.
+  106: [
+    ['6001', 'W2: Atoms and Elements', 'Homework', 10, null, 23, 23.98, null, { tool: 'https://lmslink.bfwpub.com/lms/launch?item=w2-atoms', toolId: 31 }],
+    ['6002', 'W2 HW: Measurement', 'Homework', 15, null, 24, 23.98, null, { tool: 'https://lmslink.bfwpub.com/lms/launch?item=w2-hw' }],
+    ['6003', 'W2: Ions and Molecules', 'Homework', 10, null, 25, 23.98, null, { tool: 'https://lmslink.bfwpub.com/lms/launch?item=w2-ions', toolId: 31 }],
+    ['6004', 'W7 Homework: Thermochemistry', 'Homework', 15, null, 30, 23.98, null, { tool: 'https://lmslink.bfwpub.com/lms/launch?item=w7-hw', toolId: 31 }],
+  ],
+  201: [], 202: [], 301: [['9001', 'Final project', 'Projects', 100, 97, -110, 23.98, -111, {}]],
 };
 const GROUPS = { 101: [['Discussion Quizzes', 18], ['Midterms', 57], ['Final', 25], ['Effort', 0], ['Collaboration', 0], ['Coursework (Knewton Alta)', 0]] };
 const rubric = [
@@ -201,7 +211,8 @@ function assignmentObj(courseId, row) {
     submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
     allowed_extensions: mockConfig.ext?.[id] || extra.ext || [], locked_for_user: extra.lockAt !== undefined && extra.lockAt < 0, lock_explanation: extra.lockAt !== undefined && extra.lockAt < 0 ? `This assignment was locked ${at(extra.lockAt, 23, 59)}.` : undefined, // (POST /__mock/config {"ext": {"4002": ["pdf"]}} narrows an assignment's types for a test; lockAt: a lock date in days, closed once past)
     quiz_access_code: extra.code || null, quiz_ip_filter: extra.ip || null, quiz_lockdown: !!extra.lockdown, quiz_survey: extra.survey || null, quiz_code_hidden: !!extra.codeHidden, // (the mock's own notes: what the quiz built from this is restricted by)
-    external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
+    // (toolId: the tool's own id, as Canvas gives it with the launch — content_id — when it knows the tool)
+    external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1', ...(extra.toolId ? { content_type: 'ContextExternalTool', content_id: extra.toolId } : {}) } : undefined,
     can_submit: extra.tool ? false : undefined, // (as Canvas says it of a tool's assignment: handed in through the tool, never its form)
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
@@ -488,6 +499,8 @@ const modules = {
   // a graded discussion sits in its module as the topic, not as its assignment: the sequence asked for
   // the assignment names nothing, as Canvas's does, and the item is found through the modules instead
   105: [{ id: 'm51', name: 'Journals', state: 'started', position: 1, items: [{ id: 'i51', type: 'Discussion', content_id: '7503', title: 'Journal #2', html_url: '/courses/105/discussion_topics/7503', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
+  // (Mac 1.3.79, Windows 0.3.1) Macmillan Learning placed in a module too: the same tool (content_id 31) as CHEM's assignments
+  106: [{ id: 'm61', name: 'Week 7: Thermochemistry', state: 'unlocked', position: 1, items: [{ id: 'i61', type: 'ExternalTool', content_id: 31, title: 'W7 Pre-lecture: Enthalpy', external_url: 'https://lmslink.bfwpub.com/lms/launch?item=w7-pre', html_url: '/courses/106/modules/items/i61' }] }],
 };
 /** Canvas's module_item_sequence: the module item an asset is, and the items either side of it. */
 function moduleItemSequence(courseId, assetType, assetId) {
@@ -1095,7 +1108,8 @@ on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   }
   return filterDates(out, url, 'start_at');
 });
-on('GET', /^\/api\/v1\/courses\/(\w+)\/tabs$/, (url, m) => [['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['assignments', 'Assignments', '/assignments'], ['discussions', 'Discussions', '/discussion_topics'], ['grades', 'Grades', '/grades'], ['people', 'People', '/users'], ['pages', 'Pages', '/pages'], ['files', 'Files', '/files'], ['quizzes', 'Quizzes', '/quizzes'], ['modules', 'Modules', '/modules'], ['context_external_tool_9', 'Resources & Policy', '/external_tools/9']].map(([id, label, seg], i) => ({ id, label, html_url: `/courses/${m[1]}${seg}`, type: id.startsWith('context_external') ? 'external' : 'internal', position: i + 1, visibility: 'public' })));
+// (Mac 1.3.79, Windows 0.3.1: CHEM has Macmillan Learning's tool in its navigation too, under a name of the school's own)
+on('GET', /^\/api\/v1\/courses\/(\w+)\/tabs$/, (url, m) => [['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['assignments', 'Assignments', '/assignments'], ['discussions', 'Discussions', '/discussion_topics'], ['grades', 'Grades', '/grades'], ['people', 'People', '/users'], ['pages', 'Pages', '/pages'], ['files', 'Files', '/files'], ['quizzes', 'Quizzes', '/quizzes'], ['modules', 'Modules', '/modules'], ['context_external_tool_9', 'Resources & Policy', '/external_tools/9'], ...(m[1] === '106' ? [['context_external_tool_31', 'Course Materials', '/external_tools/31']] : [])].map(([id, label, seg], i) => ({ id, label, html_url: `/courses/${m[1]}${seg}`, type: id.startsWith('context_external') ? 'external' : 'internal', position: i + 1, visibility: 'public' })));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/front_page$/, (url, m) => { const p = (pages[m[1]] || []).find((x) => x.front_page); return p ? { ...p, html_url: `/courses/${m[1]}/pages/${p.url}` } : { errors: [{ message: 'No front page' }] }; }, );
 on('GET', /^\/api\/v1\/courses\/(\w+)\/todo$/, (url, m) => allAssignments(m[1]).filter((a) => !a.submission.submitted_at && new Date(a.due_at) > now).slice(0, 5).map((a) => ({ type: 'submitting', assignment: { id: a.id, name: a.name, due_at: a.due_at, html_url: a.html_url, points_possible: a.points_possible }, ignore: `/api/v1/users/self/todo/assignment_${a.id}/submitting?permanent=0`, ignore_permanently: `/api/v1/users/self/todo/assignment_${a.id}/submitting?permanent=1`, html_url: a.html_url, context_type: 'Course', course_id: m[1] })));
 on('DELETE', /^\/api\/v1\/users\/self\/todo\//, () => ({ ok: true }));
