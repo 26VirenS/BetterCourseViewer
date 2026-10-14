@@ -218,12 +218,12 @@ public sealed partial class ExternalToolsScreen
     /// work shows it. A press opens it.</summary>
     private Button ListRow(Tool t, Course c, Item it, bool next)
     {
-        var title = K.Wrapped(Short(t, it.Title), Ty.Body, B.Text, 2);
+        var title = K.Wrapped(it.Short is { Length: > 0 } s0 ? s0 : Short(t, it.Title), Ty.Body, B.Text, 2);
         var sub = K.Text(it.Sub ?? "", Ty.Caption, B.Text2);
         FrameworkElement line = sub;
         if (next) line = K.Columns("auto, *", K.Chip("Next", Appearance.Accent, strong: true).Margin(0, 0, 6, 0).Col(0), sub.Col(1));
         var g = K.Columns("*, auto", K.V(2, title, line).Col(0));
-        if (it.Status is { Word.Length: > 0 } s)
+        if (it.Status is { Word.Length: > 0 } s && !CourseKit.IsPlainToDo(s))
         {
             var chip = CourseKit.StatusChip(s.Word, s.Kind);
             chip.Margin = new Thickness(10, 0, 0, 0);
