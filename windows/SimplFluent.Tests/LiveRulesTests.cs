@@ -43,6 +43,7 @@ public class LiveRulesTests
         Assert.Equal(60, LiveRules.AgeFor("today", 60));
         Assert.Equal(600, LiveRules.AgeFor("modules", 600));
         Assert.Equal(600, LiveRules.AgeFor("coursesProgress", 60));
+        Assert.Equal(600, LiveRules.AgeFor("externalTools", 60));
         Assert.Equal(50, LiveRules.AgeFor("coursesProgress", 5, every: 5));
         Assert.Equal(5, LiveRules.AgeFor("dashList", 5, every: 5));
     }

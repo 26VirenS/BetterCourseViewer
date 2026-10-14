@@ -572,7 +572,8 @@ their tests; the Mac's are the same):
   over. A place in a window of its own (`PlaceWindow`) is checked the same way, by its own window.
 - **What.** Each of the screen's loaders (`Screen.LiveReads`: what `Watch` and `Checked` registered, with something on
   screen and nothing on its way) asks its call again with the engine's `maxAge` — the screen's interval, a course
-  page's for `coursesProgress` wherever it shows — and `known`, the hash of the answer on screen (none yet after a
+  page's for what is made of every course's own data (`coursesProgress`, `externalTools`) wherever it shows — and
+  `known`, the hash of the answer on screen (none yet after a
   read: the answer's text is compared with the one shown instead); the pane's counts (`snapshot`) go with it. Never the
   arguments that write a preference (`dashList`'s `hideDone`, `todo`'s `group` and `showDone`), never the Dashboard's
   copies kept from its last visit (`kept: true`), and of the Dashboard's views only the one on show.

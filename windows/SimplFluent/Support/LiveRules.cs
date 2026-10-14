@@ -35,9 +35,10 @@ public static class LiveRules
         ["todo"] = new[] { "group", "showDone" },
     };
 
-    /// <summary>A call whose answer is made of each course's own work (its handed-in counts): checked at a course page's
-    /// age wherever it shows, so the Dashboard's cards and the Courses page do not read every course's work each minute.</summary>
-    private static readonly HashSet<string> CourseMade = new(StringComparer.Ordinal) { "coursesProgress" };
+    /// <summary>A call whose answer is made of each course's own data (its handed-in counts, its tools): checked at a
+    /// course page's age wherever it shows, so the Dashboard's cards, the Courses page and External Tools do not read
+    /// every course again each minute.</summary>
+    private static readonly HashSet<string> CourseMade = new(StringComparer.Ordinal) { "coursesProgress", "externalTools" };
 
     /// <summary>How often a screen checks, in seconds: <paramref name="every"/>, or ten times that for a course's page.</summary>
     public static double Interval(bool coursePage, double every = Every) => coursePage ? every * CourseTimes : every;
