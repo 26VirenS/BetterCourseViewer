@@ -336,27 +336,53 @@ struct DivisionCompactCounts: View {
     let counts: DivisionCounts
 
     var body: some View {
-        HStack(spacing: 8) {
-            tile("Chromosomes", counts.chromosomes, .chromosomes)
-            tile("Chromatids", counts.chromatids, .chromatids)
-            tile("Ploidy", counts.ploidy, .ploidy)
-            tile("DNA", counts.dna, .dna)
+        let items: [(String, String, DivCountRule)] = [("Chromosomes", counts.chromosomes, .chromosomes), ("Chromatids", counts.chromatids, .chromatids),
+                                                        ("Ploidy", counts.ploidy, .ploidy), ("DNA", counts.dna, .dna)]
+        // (four in a row where their names fit; else two rows of two, each name beside its value — in a narrow window
+        // "Chromosomes" and "Chromatids" were broken in the middle of the word)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                ForEach(items.indices, id: \.self) { i in tile(items[i].0, items[i].1, items[i].2, inline: false) }
+            }
+            Grid(horizontalSpacing: 8, verticalSpacing: 6) {
+                GridRow {
+                    tile(items[0].0, items[0].1, items[0].2, inline: true)
+                    tile(items[1].0, items[1].1, items[1].2, inline: true)
+                }
+                GridRow {
+                    tile(items[2].0, items[2].1, items[2].2, inline: true)
+                    tile(items[3].0, items[3].1, items[3].2, inline: true)
+                }
+            }
         }
     }
 
-    private func tile(_ label: String, _ value: String, _ rule: DivCountRule) -> some View {
+    @ViewBuilder
+    private func tile(_ label: String, _ value: String, _ rule: DivCountRule, inline: Bool) -> some View {
         let parts = DivCountRule.split(value)
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.sCaption2).foregroundStyle(.secondary)
-            Text(parts.main)
-                .font(.system(size: 15, weight: .semibold).monospacedDigit())
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
-                .contentTransition(.numericText())
+        let name = Text(label).font(.sCaption2).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+        let number = Text(parts.main)
+            .font(.system(size: inline ? 14 : 15, weight: .semibold).monospacedDigit())
+            .lineLimit(inline ? 1 : 2)
+            .minimumScaleFactor(0.8)
+            .contentTransition(.numericText())
+        Group {
+            if inline {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    name
+                    Spacer(minLength: 4)
+                    number
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    name
+                    number
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.vertical, inline ? 5 : 7)
         .background(Theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .help("\(value)\n\(rule.rule)")
         .accessibilityElement(children: .combine)

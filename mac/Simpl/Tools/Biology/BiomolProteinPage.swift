@@ -509,18 +509,16 @@ struct BiomolProteinPage: View {
                 let fresh = s.denatureIsFresh && !reduceMotion
                 let meshes = BiomolProteins.denatureMeshes(dark: dark)
                 BiomolSceneCard(title: denatured ? "Ubiquitin, denatured" : "Ubiquitin, folding back", subtitle: "The same 76 amino acids, the same peptide bonds",
-                                badge: "Random coil", key: "tertiary/den/\(denatured)/\(dark)", frameKey: "tertiary",
+                                badge: "Random coil", key: "tertiary/den/\(denatured)/\(dark)", frameKey: "tertiary/den",
                                 build: BioSceneBuild { BioSceneContent(items: [], labels: [], frame: meshes.frame) },
                                 extras: { BiomolNodes.morph(meshes.parts, from: denatured ? 0 : 1, to: denatured ? 1 : 0, animate: fresh) },
                                 accessibility: "3D model of ubiquitin unfolded into a random coil: its helix and strands are gone.")
             } else {
                 BiomolSceneCard(title: "Tertiary structure", subtitle: "Ubiquitin: one chain of 76 amino acids folded", badge: "PDB 1UBQ",
+                                // (framed on the folded protein itself: framed for its unfolded coil too, twice its
+                                // size, it sat small in the middle of the card; the coil, unfolding, is framed afresh)
                                 key: "tertiary/\(show.rawValue)/\(labels)/\(dark)", frameKey: "tertiary",
-                                build: BioSceneBuild {
-                                    let c = BiomolProteins.tertiary(dark: dark, show: show, labels: labels)
-                                    let all = BiomolProteins.denatureMeshes(dark: dark).frame
-                                    return BioSceneContent(items: c.items, labels: c.labels, frame: all)
-                                },
+                                build: BioSceneBuild { BiomolProteins.tertiary(dark: dark, show: show, labels: labels) },
                                 accessibility: "3D model of ubiquitin: a ribbon with one α-helix and a five-stranded β-sheet, side chains as spheres coloured by class\(show == .all ? "" : ", \(show.label.lowercased()) shown").")
             }
         case .quaternary:
@@ -685,19 +683,24 @@ struct BiomolBeads: View {
                     ForEach(0..<n, id: \.self) { i in
                         let aa = sequence[i]
                         let cls = BioAminoAcids.byOne[aa]?.group ?? .nonpolar
-                        VStack(spacing: 2) {
-                            Text(String(aa))
-                                .font(.system(size: 15, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.white)
-                                .frame(width: bead, height: bead)
-                                .background(Circle().fill(cls.color))
-                            if (i + 1) % 5 == 0 || i == 0 {
-                                Text("\(i + 1)").font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
-                            }
+                        Text(String(aa))
+                            .font(.system(size: 15, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .frame(width: bead, height: bead)
+                            .background(Circle().fill(cls.color))
+                            .position(points[i])
+                            .help("\(BioAminoAcids.byOne[aa]?.name ?? String(aa)) \(i + 1)")
+                            .accessibilityLabel("\(BioAminoAcids.byOne[aa]?.name ?? String(aa)) \(i + 1)")
+                        if (i + 1) % 5 == 0 || i == 0 {
+                            // (its number under it; beside it, on the outside, where the row turns down to the next — the
+                            // bond to the bead under it ran through the number)
+                            let turn = i % perRow == perRow - 1 && i < n - 1
+                            let outward: CGFloat = (i / perRow) % 2 == 0 ? 1 : -1
+                            Text("\(i + 1)").font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
+                                .position(turn ? CGPoint(x: points[i].x + outward * (bead / 2 + 10), y: points[i].y)
+                                               : CGPoint(x: points[i].x, y: points[i].y + bead / 2 + 8))
+                                .accessibilityHidden(true)
                         }
-                        .position(x: points[i].x, y: points[i].y + ((i + 1) % 5 == 0 || i == 0 ? 7 : 0))
-                        .help("\(BioAminoAcids.byOne[aa]?.name ?? String(aa)) \(i + 1)")
-                        .accessibilityLabel("\(BioAminoAcids.byOne[aa]?.name ?? String(aa)) \(i + 1)")
                     }
                     if n > 0 {
                         Text("N-terminus").font(.sCaption.weight(.semibold)).foregroundStyle(.secondary)
@@ -706,8 +709,10 @@ struct BiomolBeads: View {
                             .position(x: points[n - 1].x, y: points[n - 1].y + bead / 2 + 22)
                     }
                     if n > 1 {
+                        // (over the second bond where there is one: over the first, it ran into "N-terminus")
+                        let a = n > 2 ? 1 : 0
                         Text("peptide bond").font(.system(size: 10)).foregroundStyle(BiomolParts.bondHighlight.color)
-                            .position(x: (points[0].x + points[1].x) / 2, y: points[0].y - bead / 2 - 2)
+                            .position(x: (points[a].x + points[a + 1].x) / 2, y: points[a].y - bead / 2 - 4)
                     }
                 }
                 .frame(width: g.size.width, height: top + CGFloat(rows) * (bead + rowGap) + 30, alignment: .topLeading)

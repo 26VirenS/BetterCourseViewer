@@ -486,13 +486,15 @@ private struct BioLabFieldRow: View {
 
     /// The unknown: the answer in place of a field, in the accent.
     private var answerBox: some View {
+        // (as wide as its number needs, at least a field's width: held to the field's width, a power of ten —
+        // "8.0 × 10⁻⁵" — was shrunk until it could hardly be read)
         Text(answer?.text ?? "—")
             .font(.sCallout.weight(.semibold).monospacedDigit())
             .foregroundStyle(Theme.accent)
             .lineLimit(1)
-            .minimumScaleFactor(0.6)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 7)
-            .frame(width: boxWidth, alignment: .trailing)
+            .frame(minWidth: boxWidth, alignment: .trailing)
             .padding(.vertical, 4)
             .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .help("Worked out from the other fields; choose its unit beside it")

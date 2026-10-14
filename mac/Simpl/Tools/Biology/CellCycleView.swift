@@ -32,7 +32,7 @@ struct CellCyclePage: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.horizontal, 12)
                 CyclinChart()
-                    .frame(height: 150)
+                    .frame(height: 124)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
             }
@@ -144,11 +144,12 @@ struct CellCycleWheel: View {
         return p
     }
 
-    /// Where each gate's button sits (the two near the top spread apart so both can be pressed).
+    /// Where each gate's button sits (the two near the top spread apart so both can be pressed, and M's name fits between
+    /// them).
     static func buttonAngle(_ id: String) -> Double {
         switch id {
-        case "g2m": return 330
-        case "spindle": return 22
+        case "g2m": return 310
+        case "spindle": return 42
         default: return 172.5
         }
     }
@@ -157,7 +158,9 @@ struct CellCycleWheel: View {
         GeometryReader { geo in
             let size = geo.size
             let c = CGPoint(x: size.width / 2, y: size.height / 2)
-            let r = max(min(size.width, size.height) * 0.36, 60)
+            // (the ring small enough that the gates' buttons and M's name outside it stay inside the view: in a short
+            // window they ran up into the heading)
+            let r = max(min(min(size.width, size.height) * 0.36, size.height / 2 - 56), 48)
             let inner = r * 0.66
             let g0 = CellCycleWheel.point(c, 75, r * 1.42)
             ZStack {
@@ -211,7 +214,8 @@ struct CellCycleWheel: View {
                         Text("\(Int(a.phase.hours)) h").font(.sCaption.monospacedDigit())
                     }
                     .foregroundStyle(thin ? Color.primary : Color.white)
-                    .position(thin ? CellCycleWheel.point(c, mid - 14, r + 40) : CellCycleWheel.point(c, mid, (r + inner) / 2))
+                    // (M's name straight above its arc, between the two gates' buttons — beside it, G2/M's covered it)
+                    .position(thin ? CellCycleWheel.point(c, mid, r + 34) : CellCycleWheel.point(c, mid, (r + inner) / 2))
                     .allowsHitTesting(false)
                 }
                 Text("Interphase · 23 h")
@@ -220,10 +224,15 @@ struct CellCycleWheel: View {
                     .position(CellCycleWheel.point(c, 250, r + 66))
                     .allowsHitTesting(false)
                 Text("G0").font(.system(size: 15, weight: .bold)).position(g0).allowsHitTesting(false)
+                // (held inside the ring's hole, on two lines if need be: wider, it ran into G1's name)
                 VStack(spacing: 2) {
                     Text(cancer ? "Checkpoints failing" : "One cell cycle").font(.sHeadline).foregroundStyle(cancer ? Color.red : Color.primary)
                     Text(cancer ? "The cell keeps dividing" : "G1 → S → G2 → M").font(.sCaption).foregroundStyle(.secondary)
                 }
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                .frame(width: max(inner * 2 - 16, 40))
                 .position(c)
                 .allowsHitTesting(false)
                 ForEach(DivisionModel.checkpoints, id: \.id) { cp in

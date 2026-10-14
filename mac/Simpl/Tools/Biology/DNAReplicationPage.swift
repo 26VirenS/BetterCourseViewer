@@ -54,7 +54,8 @@ struct DNAReplicationPage: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Replication fork, \(BioStepTiming.caption(steps.index, of: steps.steps)). \(current?.text ?? "")")
             }
-            .frame(minHeight: 420)
+            // (the card takes the room the controls leave it: at 420 at least, the controls ran out over the page under it)
+            .frame(minHeight: 320)
             .card(radius: 20)
             BioStepControls(controller: steps, groups: groups)
         }
@@ -165,7 +166,9 @@ enum DNAForkDrawing {
     }
 
     static func drawFrame(_ ctx: inout GraphicsContext, size: CGSize, f: DNAForkFrame, dark: Bool) {
-        let mainH = size.height * 0.70
+        // (the fork above, and 140 points under it for the close-up's two rows and its words — in a short card they were
+        // drawn over each other)
+        let mainH = max(min(size.height * 0.70, size.height - 140), size.height * 0.5)
         let x0: CGFloat = 46, x1 = max(size.width - 46, 100)
         let yc = mainH * 0.5 + 4
         let g0: CGFloat = 8, gap: CGFloat = 16
@@ -416,7 +419,7 @@ enum DNAForkDrawing {
         let k = DNAReplication.closeUpMade
         let tile: CGFloat = 22, step: CGFloat = 27
         let width = step * CGFloat(made.count) + 120
-        let box = CGRect(x: (size.width - width) / 2, y: top + 4, width: width, height: max(size.height - top - 10, 90))
+        let box = CGRect(x: (size.width - width) / 2, y: top + 4, width: width, height: max(size.height - top - 10, 128))
         ctx.drawLayer { layer in
             layer.opacity = opacity
             layer.fill(Path(roundedRect: box, cornerRadius: 12), with: .color(Color.primary.opacity(0.06)))
@@ -459,7 +462,7 @@ enum DNAForkDrawing {
                        at: CGPoint(x: left + CGFloat(template.count) * step + 10, y: yTemplate))
             layer.draw(Text("New strand, built 5′→3′ · template, read 3′→5′ · A pairs with T, G with C")
                         .font(.system(size: 10.5)).foregroundColor(.secondary),
-                       at: CGPoint(x: box.midX, y: min(yTemplate + 26, box.maxY - 8)))
+                       at: CGPoint(x: box.midX, y: yTemplate + 26))
         }
     }
 }

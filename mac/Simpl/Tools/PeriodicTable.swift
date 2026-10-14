@@ -733,8 +733,11 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // (1.3.78) the drawing as tall as the window shows, up to 640: at three quarters of a short
+                        // window's height a biology tool's step-through was squeezed until its parts ran into each other,
+                        // and its controls were pushed out over the columns under it
                         centre
-                            .frame(height: max(460, min(640, g.size.height * 0.75)))
+                            .frame(height: max(460, min(640, g.size.height)))
                         HStack(alignment: .top, spacing: 18) {
                             left.frame(maxWidth: .infinity, alignment: .topLeading)
                             right.frame(maxWidth: .infinity, alignment: .topLeading)
