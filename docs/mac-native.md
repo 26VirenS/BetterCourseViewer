@@ -673,7 +673,9 @@ search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas add
 touroffer`, `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
 and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, "Still signing in…" after a moment),
 `-SimplPreviewFail YES` (with `-SimplPickerConfirm YES`: "Is this your school?" with a preview that could not load),
-`-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
+`-SimplCalView week|list` (the Calendar opened on that view), `-SimplWhatIf YES` (a course's grades with What-If on,
+nothing typed), `-SimplAttach <file>` (with `-SimplOpen compose`: New Message with that file attached, uploaded to the
+mock), `-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
 Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away).
 
 ## Releasing
