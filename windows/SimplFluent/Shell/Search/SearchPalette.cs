@@ -510,6 +510,7 @@ public sealed partial class SearchPalette : IDisposable
             case PaletteDo.Back: engine.GoBack(); break;
             case PaletteDo.Forward: engine.GoForward(); break;
             case PaletteDo.Browser: Engine.Engine.OpenExternally(engine.BaseUrl); break;
+            case PaletteDo.Tool: Screens.ToolsScreen.OpenTool(engine, a.Text); break;
             case PaletteDo.Copy:
                 try { Clipboard.SetText(a.Text); } catch { /* the clipboard busy with another app */ }
                 break;

@@ -7,7 +7,7 @@ namespace Simpl.Shell;
 public enum PaletteDo
 {
     Go, Open, Work, Search, Fill, NewTask, AddTask, NewMessage, Refresh, ReloadPage, Settings, WhatsNew, Setup, Tour, Look,
-    Back, Forward, Browser, Copy, Nothing,
+    Back, Forward, Browser, Copy, Tool, Nothing,
 }
 
 /// <summary>
@@ -30,6 +30,8 @@ public sealed record PaletteAction(PaletteDo Do, Place? To = null, string Text =
     /// <summary>"light", "dark" or "system" (Settings ▸ Appearance's choice).</summary>
     public static PaletteAction Look(string look) => new(PaletteDo.Look, Text: look);
     public static PaletteAction Copy(string text) => new(PaletteDo.Copy, Text: text);
+    /// <summary>A tool opened in its popup over where you are, by its key ("lewis").</summary>
+    public static PaletteAction Tool(string key) => new(PaletteDo.Tool, Text: key);
 
     /// <summary>Picked, it does something (not a hint, nor "Looking…").</summary>
     public bool Acts => Do != PaletteDo.Nothing;
@@ -140,6 +142,7 @@ internal sealed class PaletteCommand
             c.Add(C("group", ["team"], "Open a group", "One of your groups", SymbolRegular.PeopleTeam24, takes: "‹group›", lists: PaletteLists.Groups));
         }
         c.Add(C("tools", ["tool", "widgets", "timer", "calculator"], "Tools", "Timer, calculator, flashcards and more", SymbolRegular.Toolbox24, PaletteAction.Go(Place.Tools), "Ctrl+7"));
+        c.AddRange(ChemistryTools());
         c.Add(C("external", ["external tools", "lti", "apps"], "External tools", "Every tool your courses use", SymbolRegular.PuzzlePiece24, PaletteAction.Go(Place.ExternalTools)));
         c.Add(C("due", ["upcoming", "soon", "week"], "Due", "What is due: today, tomorrow, this week, or by name", SymbolRegular.Clock24,
             takes: "‹when or name›", lists: PaletteLists.Due));
@@ -167,6 +170,25 @@ internal sealed class PaletteCommand
         c.Add(C("browser", ["web", "site", "canvas", "brightspace"], $"Open {lms} in browser", "The school’s own site", SymbolRegular.Globe24, PaletteAction.Of(PaletteDo.Browser)));
         c.Add(C("help", ["?", "commands"], "Commands", "Every command", SymbolRegular.AppsList24, lists: PaletteLists.Commands));
         return c;
+    }
+
+    /// <summary>
+    /// The Chemistry section's four, each opened in its popup by its name or a word a student would type for it ("periodic",
+    /// "lewis", "vsepr", "orbitals"): the tools split out of the Periodic Table in 0.3.2, findable from anywhere as the one
+    /// tool was from its tile. Their names, lines and symbols are their tiles' (Tools/Chemistry/ChemTools.cs).
+    /// </summary>
+    internal static IEnumerable<PaletteCommand> ChemistryTools()
+    {
+        (string Key, string Name, string[] Aliases)[] words =
+        {
+            ("ptable", "periodic", ["periodic table", "ptable", "elements", "element"]),
+            ("lewis", "lewis", ["lewis structures", "lewis structure", "dot structure", "electron dot"]),
+            ("molecule", "molecule", ["molecules", "molecule builder", "vsepr", "3d molecule"]),
+            ("atom", "orbitals", ["atoms", "atom", "orbital", "electron cloud", "shells"]),
+        };
+        foreach (var (key, name, aliases) in words)
+            if (Simpl.Tools.ChemTools.Kind(key) is { } kind)
+                yield return C(name, aliases, kind.Name, kind.Note.TrimEnd('.'), kind.Symbol, PaletteAction.Tool(key));
     }
 
     /// <summary>The commands a typed name could mean, best first.</summary>
