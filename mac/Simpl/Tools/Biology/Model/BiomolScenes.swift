@@ -48,6 +48,9 @@ struct BiomolMark: Equatable, Sendable {
     var hex: String?
     /// Its size (Å).
     var size = 0.42
+    /// (1.3.79) The radius of the atom at `pos` it belongs to (a charge): the mark then sits on the atom's upper right
+    /// edge as the camera sees it, as a charge is written — nil: at `pos` itself.
+    var atomRadius: Double?
 }
 
 /// A short motion (§4.4 Animate dehydration, the sugar's hydrolysis): groups of items, each moved from one offset to
@@ -128,16 +131,15 @@ enum BiomolScenes {
         return pts.min { BioV.distance($0, c) < BioV.distance($1, c) }
     }
 
-    /// The charge marks of a form ("+" blue, "−" red), each just outside its atom, away from the molecule's centre.
+    /// The charge marks of a form ("+" blue, "−" red), each on its atom's upper right edge as the camera sees it.
+    /// (1.3.79: placed 0.42 Å out from the atom, away from the molecule's centre, a mark stood among the –NH₃⁺'s
+    /// hydrogens or in the air beside its atom, whichever way the molecule was turned.)
     static func chargeMarks(_ m: BioMoleculeModel, charges: [String: Int], look: BiomolLook, chem: BiomolChem) -> [BiomolMark] {
         guard !charges.isEmpty else { return [] }
-        let centre = m.bounds.centre
         return m.atoms.compactMap { a in
             guard let q = charges[a.name], q != 0 else { return nil }
-            let out = BioV.unit(a.pos - centre)
-            let r = radius(a.element, look: look, chem: chem)
-            return BiomolMark(pos: a.pos + (BioV.length(out) > 0 ? out : BioVec(0, 1, 0)) * (r + 0.42), text: q > 0 ? "+" : "−",
-                              hex: (q > 0 ? BioPalette.basic : BioPalette.acidic).hex(dark: look.dark), size: 0.62)
+            return BiomolMark(pos: a.pos, text: q > 0 ? "+" : "−", hex: (q > 0 ? BioPalette.basic : BioPalette.acidic).hex(dark: look.dark),
+                              size: 0.62, atomRadius: radius(a.element, look: look, chem: chem))
         }
     }
 
@@ -296,16 +298,13 @@ enum BiomolScenes {
         return out
     }
 
-    /// Those charges as marks just outside their atoms (away from their residue's CA), leaving out hidden residues.
+    /// Those charges as marks on their atoms (as `chargeMarks` places them), leaving out hidden residues.
     static func peptideMarks(_ p: BiomolPeptide, look: BiomolLook, chem: BiomolChem, hidden: Set<Int> = []) -> [BiomolMark] {
         peptideCharges(p).compactMap { c in
             let a = p.atoms[c.atom]
             guard !hidden.contains(a.residue) else { return nil }
-            let ca = p.atoms[p.backbone[a.residue].ca].pos
-            var out = BioV.unit(a.pos - ca)
-            if BioV.length(out) == 0 { out = BioVec(0, 1, 0) }
-            return BiomolMark(pos: a.pos + out * (radius(a.element, look: look, chem: chem) + 0.42), text: c.charge > 0 ? "+" : "−",
-                              hex: (c.charge > 0 ? BioPalette.basic : BioPalette.acidic).hex(dark: look.dark), size: 0.62)
+            return BiomolMark(pos: a.pos, text: c.charge > 0 ? "+" : "−", hex: (c.charge > 0 ? BioPalette.basic : BioPalette.acidic).hex(dark: look.dark),
+                              size: 0.62, atomRadius: radius(a.element, look: look, chem: chem))
         }
     }
 

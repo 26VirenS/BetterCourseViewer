@@ -811,20 +811,32 @@ struct PTNarrowReader<Content: View>: View {
     var body: some View { content(narrow) }
 }
 
-/// (1.3.52) The Lewis maker's and the molecule builder's layout (and the biology tools'): on a wide window, the controls,
-/// the drawing and the facts side by side; on a narrower one, the drawing across the top and the controls and facts side
-/// by side under it — (tools-24) for the Lewis maker and the molecule builder (`shortDrawing`) the drawing about half the
-/// height there, their controls in its card's top row, so what is under it is in sight too; for a biology tool's
-/// step-through as tall as the window shows, up to 640, its parts never squeezed into each other.
+/// (1.3.52) The Lewis maker's and the molecule builder's layout (and the biology tools'), in three widths, the controls
+/// and the facts in sight in each (1.3.79):
+/// - wide (1,100 points of room or more): the controls, the drawing and the facts side by side;
+/// - middling (700 or more): the drawing, and beside it one column, the controls over the facts, each with its own
+///   scroller (`PTSideColumn`). Before, anything under 1,100 put the drawing across the top as tall as the window showed:
+///   in a window 920 points wide with the sidebar out, DNA & RNA's helix filled the page and its controls and facts
+///   were all below it, with nothing saying so;
+/// - narrow (under 700): the drawing across the top, short enough that the tops of the controls and the facts show
+///   under it (side by side, or one over the other under 520), and the page scrolls to them — (tools-24) for the Lewis
+///   maker and the molecule builder (`shortDrawing`) about half the height, their controls in its card's top row.
 struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
     var shortDrawing = false
     @ViewBuilder var left: Left
     @ViewBuilder var centre: Centre
     @ViewBuilder var right: Right
+    /// The least height the drawing says it can be drawn in, laid out narrow (`PTDrawingMinKey`: a 3D view's card
+    /// says 300); nil, 450 — a 2D step-through's own parts need about that.
+    @State private var drawingMin: CGFloat?
+
+    /// The narrowest room the three columns sit side by side in, and the narrowest the drawing keeps a column beside it in.
+    static var wide: CGFloat { 1100 }
+    static var middling: CGFloat { 700 }
 
     var body: some View {
         GeometryReader { g in
-            if g.size.width >= 1100 {
+            if g.size.width >= Self.wide {
                 // (1.3.58) each side column's content held to the column's width, less room for its scroller, so
                 // nothing runs under the centre or under the scroll bar
                 HStack(alignment: .top, spacing: 18) {
@@ -839,17 +851,31 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
                     }
                     .frame(width: 316, alignment: .leading)
                 }
+            } else if g.size.width >= Self.middling {
+                HStack(alignment: .top, spacing: 18) {
+                    centre
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    PTSideColumn(height: g.size.height) { left } facts: { right }
+                        .frame(width: 316, alignment: .leading)
+                }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        // (1.3.78) the drawing as tall as the window shows, up to 640: at three quarters of a short
-                        // window's height a biology tool's step-through was squeezed until its parts ran into each other,
-                        // and its controls were pushed out over the columns under it
+                        // (1.3.79) the drawing short enough that the columns' tops show under it, the page scrolling to
+                        // the rest: as tall as the window (1.3.78), it hid them
                         centre
-                            .frame(height: shortDrawing ? max(360, min(560, g.size.height * 0.58)) : max(460, min(640, g.size.height)))
-                        HStack(alignment: .top, spacing: 18) {
-                            left.frame(maxWidth: .infinity, alignment: .topLeading)
-                            right.frame(maxWidth: .infinity, alignment: .topLeading)
+                            .frame(height: Self.drawingHeight(g.size.height, short: shortDrawing, least: drawingMin ?? 450))
+                            .onPreferenceChange(PTDrawingMinKey.self) { drawingMin = $0 }
+                        if g.size.width >= 520 {
+                            HStack(alignment: .top, spacing: 18) {
+                                left.frame(maxWidth: .infinity, alignment: .topLeading)
+                                right.frame(maxWidth: .infinity, alignment: .topLeading)
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 18) {
+                                left.frame(maxWidth: .infinity, alignment: .topLeading)
+                                right.frame(maxWidth: .infinity, alignment: .topLeading)
+                            }
                         }
                     }
                     .padding(.bottom, 24)
@@ -862,6 +888,99 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
         .frame(maxWidth: 1480 + 80)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    /// A narrow layout's drawing: the room less 170 points for the tops of the columns under it, never under `least`
+    /// (a 3D view 300, a biology tool's 2D drawing 450); or (`short`: the Lewis maker's and the molecule builder's) 58%
+    /// of the room, never under 260 — at most 560.
+    static func drawingHeight(_ room: CGFloat, short: Bool, least: CGFloat) -> CGFloat {
+        short ? min(560, max(260, room * 0.58)) : min(560, max(least, room - 170))
+    }
+}
+
+/// (1.3.79) The least height a drawing in `PTWorkLayout`'s centre can be laid out in, narrow: a 3D view's card says 300
+/// (its model is framed to whatever room it has); a 2D drawing says nothing and is given 450, its parts placed for about
+/// that (a replication fork with its close-up under it, a tRNA's cloverleaf).
+struct PTDrawingMinKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        if let n = nextValue() { value = max(value ?? 0, n) }
+    }
+}
+
+/// (1.3.79) A middling window's one column beside the drawing: the controls over the facts, each in its own scroller,
+/// a hairline between. While both fit, each is as tall as it is; when they do not, the shorter keeps its height and the
+/// other scrolls in the rest, or, both long, the facts have at least half — so the top of each is always in sight, and
+/// a card that comes as a part is picked (a cell's part, a base pair) shows at once, not under a long list of controls.
+struct PTSideColumn<Controls: View, Facts: View>: View {
+    let height: CGFloat
+    @ViewBuilder var controls: Controls
+    @ViewBuilder var facts: Facts
+    @State private var controlsHeight: CGFloat = 0
+    @State private var factsHeight: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The room between the two: the hairline and its margins.
+    private static var gap: CGFloat { 17 }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                controls
+                    .frame(width: 300, alignment: .topLeading)
+                    .padding(.bottom, 12)
+                    .background {
+                        GeometryReader { h in Color.clear.preference(key: PTControlsHeightKey.self, value: h.size.height) }
+                    }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: Self.controlsRoom(height, controls: controlsHeight, facts: factsHeight))
+            .onPreferenceChange(PTControlsHeightKey.self) { h in settle(controls: true, h) }
+            Divider()
+                .padding(.vertical, 8)
+                .padding(.trailing, 16)
+            ScrollView {
+                facts
+                    .frame(width: 300, alignment: .topLeading)
+                    .padding(.bottom, 20)
+                    .background {
+                        GeometryReader { h in Color.clear.preference(key: PTFactsHeightKey.self, value: h.size.height) }
+                    }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .onPreferenceChange(PTFactsHeightKey.self) { h in settle(controls: false, h) }
+        }
+        .frame(height: height, alignment: .top)
+    }
+
+    /// A part's measured height kept, when it changes by more than half a point: at once the first time, else moving
+    /// the hairline gently.
+    private func settle(controls: Bool, _ h: CGFloat) {
+        let old = controls ? controlsHeight : factsHeight
+        guard abs(h - old) > 0.5 else { return }
+        let apply = {
+            if controls { controlsHeight = h } else { factsHeight = h }
+        }
+        if old == 0 || reduceMotion { apply() } else { withAnimation(Motion.gentle) { apply() } }
+    }
+
+    /// The controls' scroller's height in a column `room` tall: their own height while both fit; when not, the larger
+    /// of half the room and what the facts leave — but never more than the controls need. Not yet measured: half.
+    static func controlsRoom(_ room: CGFloat, controls c: CGFloat, facts f: CGFloat) -> CGFloat {
+        let usable = max(room - gap, 0)
+        guard c > 0 else { return (usable / 2).rounded() }
+        return max(0, min(c, max(usable - f, usable / 2))).rounded()
+    }
+}
+
+private struct PTControlsHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+private struct PTFactsHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// (1.3.54) The Periodic Table's search, kept here so the tool's header can hold its field (left of the pin).

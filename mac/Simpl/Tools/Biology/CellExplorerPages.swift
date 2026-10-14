@@ -258,7 +258,9 @@ struct CEMembranePage: View {
                              labelBottom: CEScaleBar.room)
                 CEScaleBar(pointsPerUnit: scale, unit: "nm", preferred: [5, 10, 20], others: [1, 2, 50]).padding(14).allowsHitTesting(false)
                 VStack {
-                    if let h = hovered.flatMap({ CEMembranePage.partID($0) }).flatMap({ CEMembrane.part($0) }) {
+                    // (1.3.79) the hovered part's name only while the labels are off: with them on, its label is lit
+                    // already, and the name at the top said it a second time
+                    if !labels, let h = hovered.flatMap({ CEMembranePage.partID($0) }).flatMap({ CEMembrane.part($0) }) {
                         Text(h.name)
                             .font(.system(size: 12, weight: .semibold))
                             .padding(.horizontal, 10)

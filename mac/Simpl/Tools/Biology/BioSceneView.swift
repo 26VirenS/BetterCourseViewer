@@ -4,8 +4,9 @@ import SceneKit
 import SwiftUI
 
 // The biology toolkit's 3D view (spec §3.4, §3.5, §9): a SceneKit view with the molecule builder's lights, a clear
-// ground, and an orbit camera (drag to turn, scroll or pinch to zoom; framing the content's ball with a 40° field of
-// view at 1.15·R/sin 20°; double-click empty space to reset, an object to zoom to it); a scene made off the main
+// ground, and an orbit camera (drag to turn, scroll or pinch to zoom; (1.3.79) the model framed with a 40° field of view
+// to fill 84% of its room — the height, or the width beside the label columns — on its first frame, on Reset view and
+// on a new size; double-click empty space to reset, an object to zoom to it); a scene made off the main
 // thread from values (BioSceneContent) and batched one geometry per material; a click picking an object by its id, a
 // hover outlining it (the pointer a hand); the selected object glowing and the rest dimmed to 35%; labels with leader
 // lines in 2D over it; arrow keys turning it 15° a press, + and − zooming, Escape letting go. Auto-turn is off unless
@@ -28,12 +29,13 @@ enum BioSceneMaking {
     private static var making: [String: (serial: Int, task: Task<BioSceneContent, Never>)] = [:]
     private static var serial = 0
 
-    /// The scene for `key`: the one already being made, or one made now off the main thread.
+    /// The scene for `key`: the one already being made, or one made now off the main thread — its ball and outline
+    /// worked out there too (`measured()`).
     static func content(_ key: String, _ build: BioSceneBuild) async -> BioSceneContent {
         if let on = making[key] { return await on.task.value }
         serial += 1
         let mine = serial
-        let task = Task.detached(priority: .userInitiated) { build.make() }
+        let task = Task.detached(priority: .userInitiated) { build.make().measured() }
         making[key] = (mine, task)
         let made = await task.value
         if making[key]?.serial == mine { making[key] = nil }
@@ -51,10 +53,14 @@ struct BioZoomRequest: Equatable {
 @MainActor
 final class BioSceneLive: ObservableObject {
     @Published var labels: [BioLabelPlacement] = []
-    /// Labels left out (more than 14 eligible): "+N more".
+    /// Labels left out (more than the columns hold): "+N more".
     @Published var more = 0
     /// The object under the pointer (its id), if any.
     @Published var hovered: String?
+    /// (1.3.79) The hover is a label's (the pointer over its capsule), not an object's in the scene: let go when that
+    /// label moves or goes — a label laid out under a resting pointer, then moved away from it, kept its hover (and its
+    /// part's tooltip) until the pointer moved.
+    var hoverFromLabel = false
     /// A scene is being made (shown after a moment).
     @Published var building = false
 }
@@ -140,6 +146,8 @@ struct BioSceneCard<Bar: View, Stage: View>: View {
                 .padding(12)
         }
         .card(radius: 20)
+        // (1.3.79) laid out narrow, the card can be as short as 300 points: its model is framed to the room it has
+        .preference(key: PTDrawingMinKey.self, value: 300)
     }
 }
 
@@ -217,11 +225,21 @@ struct BioLabelsOverlay: View {
                         .padding(.horizontal, 10)
                         .frame(width: f.width, height: f.height)
                         .background(.regularMaterial, in: Capsule())
+                        // (1.3.79) a hovered label's edge a little stronger, in its own grey: in the accent, a label
+                        // under a resting pointer read as a part selected
                         .overlay(Capsule().strokeBorder(live.hovered.map { BioSceneContent.matches($0, l.id) || BioSceneContent.matches(l.id, $0) } == true
-                                                        ? Theme.accent : Color.primary.opacity(0.12), lineWidth: 1))
+                                                        ? Color.primary.opacity(0.45) : Color.primary.opacity(0.12), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .onHover { inside in live.hovered = inside ? l.id : (live.hovered == l.id ? nil : live.hovered) }
+                .onHover { inside in
+                    if inside {
+                        live.hoverFromLabel = true
+                        live.hovered = l.id
+                    } else if live.hovered == l.id {
+                        live.hoverFromLabel = false
+                        live.hovered = nil
+                    }
+                }
                 .position(x: f.x + f.width / 2, y: l.y)
                 .transition(.opacity)
                 .help(l.text)
@@ -252,15 +270,21 @@ final class BioSCNView: SCNView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// (1.3.79) A new size: the camera framed for it, unless the model has been turned or zoomed since it was framed.
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        coordinator?.resized()
+    }
+
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         coordinator?.handled()
         super.mouseDown(with: event)
     }
-    override func mouseDragged(with event: NSEvent) { coordinator?.handled(); super.mouseDragged(with: event) }
-    override func rightMouseDragged(with event: NSEvent) { coordinator?.handled(); super.rightMouseDragged(with: event) }
-    override func scrollWheel(with event: NSEvent) { coordinator?.handled(); super.scrollWheel(with: event) }
-    override func magnify(with event: NSEvent) { coordinator?.handled(); super.magnify(with: event) }
+    override func mouseDragged(with event: NSEvent) { coordinator?.moved(); super.mouseDragged(with: event) }
+    override func rightMouseDragged(with event: NSEvent) { coordinator?.moved(); super.rightMouseDragged(with: event) }
+    override func scrollWheel(with event: NSEvent) { coordinator?.moved(); super.scrollWheel(with: event) }
+    override func magnify(with event: NSEvent) { coordinator?.moved(); super.magnify(with: event) }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -398,6 +422,14 @@ final class BioSceneCoordinator: NSObject {
     private var hovered: String?
     private var framedKey: String??
     private var framing = BioSphere(centre: BioVec(0, 0, 0), radius: 1)
+    /// (1.3.79) The scene's outline (BioSceneContent.outline()): what the camera frames and the labels sit beside.
+    private var outlinePoints: [BioVec] = []
+    /// The camera has been turned, zoomed or moved since it was last framed: a new size then leaves it be.
+    private var touched = false
+    /// The view's size when the camera was last framed.
+    private var framedSize = CGSize.zero
+    /// The label hovered and where it was when its hover began (a label that moves from under the pointer lets go).
+    private var labelHoverAt: (id: String, x: Double, y: Double)?
     private var resetSeen = 0
     private var zoomSeen: BioZoomRequest?
     private var timer: Timer?
@@ -449,6 +481,7 @@ final class BioSceneCoordinator: NSObject {
             Task { [weak self] in
                 self?.live.labels = []
                 self?.live.more = 0
+                self?.letGoOfMovedLabel([])
             }
         }
     }
@@ -484,7 +517,8 @@ final class BioSceneCoordinator: NSObject {
         builtKey = key
         live.building = false
         content = made
-        framing = made.framing
+        framing = made.shape?.framing ?? made.framing
+        outlinePoints = made.shape?.outline ?? []
         rayVisible = [:]
         raysDone = false
         lastSignature = []
@@ -492,14 +526,45 @@ final class BioSceneCoordinator: NSObject {
         if let extras = node("extras") {
             extras.childNodes.forEach { $0.removeFromParentNode() }
             for n in config?.extras?() ?? [] { extras.addChildNode(n) }
+            // (1.3.79) the texts beside the model (a helix's measurements) in its outline too: framed with it, and the
+            // labels' columns clear of them
+            let corners = extrasCorners(extras)
+            if !corners.isEmpty { outlinePoints = BioSceneContent.extremes(of: outlinePoints + corners) }
         }
         // (the camera frames the first scene, and a scene whose frame key is new)
         let fk = config?.frameKey
         if framedKey == nil || (fk != nil && framedKey != .some(fk)) {
+            if framedKey == nil {
+                // (1.3.79) a Reset view or Zoom to asked for before this view was made is not this view's to play: the
+                // Biomolecule Builder's Reset is shared by its pages, and a page opened after one was pressed framed its
+                // molecule, then slid the camera to frame it again as the page came
+                resetSeen = config?.reset ?? 0
+                zoomSeen = config?.zoom
+            }
             framedKey = .some(fk)
             frameCamera(framing, animated: false)
         }
+        // (a new scene starts with nothing hovered: what the pointer was over may no longer be there)
+        live.hoverFromLabel = false
+        labelHoverAt = nil
         hover(id: nil)
+    }
+
+    /// The corners of the extras' drawn parts (their texts' and meshes' boxes) in the scene's own space — as they stand
+    /// before the camera has turned their billboards, facing it as it frames them.
+    private func extrasCorners(_ holder: SCNNode) -> [BioVec] {
+        var out: [BioVec] = []
+        holder.enumerateChildNodes { n, _ in
+            guard n.geometry != nil else { return }
+            let (lo, hi) = n.boundingBox
+            for x in [lo.x, hi.x] {
+                for y in [lo.y, hi.y] {
+                    let p = n.convertPosition(SCNVector3(x, y, (lo.z + hi.z) / 2), to: holder)
+                    out.append(BioVec(Double(p.x), Double(p.y), Double(p.z)))
+                }
+            }
+        }
+        return out
     }
 
     /// The batches made again without the selected objects, which are drawn on their own, glowing; the rest dimmed.
@@ -532,10 +597,13 @@ final class BioSceneCoordinator: NSObject {
 
     // MARK: Camera
 
-    /// The camera framing a ball: 40° field of view, at 1.15·R / sin 20° from its centre, looking along −z.
+    /// The camera framing the model: 40° field of view (up and down), looking along −z at the ball's centre, as far
+    /// away as `frameDistance` says.
     private func frameCamera(_ s: BioSphere, animated: Bool) {
         guard let v = view, let cam = v.pointOfView else { return }
-        let d = 1.15 * max(s.radius, 1e-3) / sin(20 * Double.pi / 180)
+        let d = frameDistance(s)
+        touched = false
+        framedSize = v.bounds.size
         let c = SIMD3<Float>(Float(s.centre.x), Float(s.centre.y), Float(s.centre.z))
         cam.camera?.zNear = max(0.001, d * 0.01)
         cam.camera?.zFar = d * 20
@@ -549,6 +617,56 @@ final class BioSceneCoordinator: NSObject {
         SCNTransaction.commit()
         v.defaultCameraController.target = SCNVector3(CGFloat(s.centre.x), CGFloat(s.centre.y), CGFloat(s.centre.z))
         lastSignature = []
+    }
+
+    /// The tangent of the half-angles the model may fill, across and up and down: 84% of the view's height, and 84% of
+    /// the width left beside the label columns (each the widest label and 40 points; the model keeps 55% of the width
+    /// at least) — `labels` false: of the whole width.
+    private func fillLimits(labels: Bool) -> (across: Double, up: Double) {
+        let tanV = tan(20 * Double.pi / 180), fill = 0.84
+        let size = view?.bounds.size ?? .zero
+        let w = Double(size.width), h = Double(size.height)
+        guard w > 1, h > 1 else { return (fill * tanV, fill * tanV) }
+        var room = w
+        if labels, config?.showLabels == true, let texts = content?.labels.map(\.text), !texts.isEmpty {
+            let widest = texts.map { BioLabelWidth.of($0) }.max() ?? 0
+            room = max(w - 2 * (widest + 40), w * 0.55)
+        }
+        return (fill * tanV * room / h, fill * tanV)
+    }
+
+    /// (1.3.79) How far from the ball's centre the camera stands for the model to fill its room (`fillLimits`): worked
+    /// out from the model's outline, each point at its own depth, and — where the tool asked for a ball of its own (a
+    /// cell, as far apart as it is exploded) — no nearer than that ball needs; the ball alone while the model turns by
+    /// itself (its outline turns with it). Before, the ball was framed to 85% of the height whatever the width: a narrow
+    /// card cut a wide model short at its sides, and a helix, framed by the ball round its length, stood thin in the
+    /// middle of a wide card.
+    private func frameDistance(_ s: BioSphere) -> Double {
+        let limit = fillLimits(labels: true)
+        let r = max(s.radius, 1e-3)
+        let ball = r / sin(atan(min(limit.across, limit.up)))
+        guard !(config?.turning ?? false), !outlinePoints.isEmpty else { return ball }
+        var d = 0.0
+        for p in outlinePoints {
+            let q = p - s.centre
+            d = max(d, q.z + abs(q.x) / limit.across, q.z + abs(q.y) / limit.up, q.z + r * 0.05)
+        }
+        return content?.frame != nil ? max(d, ball) : d
+    }
+
+    /// (1.3.79) The view's new size: the camera framed for it at once, if nothing has moved it since it was last framed
+    /// — a first show's scene can come before its view has its size, and a window can be made wider or narrower.
+    func resized() {
+        guard content != nil, !touched, let v = view else { return }
+        let s = v.bounds.size
+        guard abs(s.width - framedSize.width) > 1 || abs(s.height - framedSize.height) > 1 else { return }
+        frameCamera(framing, animated: false)
+    }
+
+    /// The camera moved by hand (dragged, scrolled, pinched, a key): a new size no longer frames it afresh.
+    func moved() {
+        touched = true
+        handled()
     }
 
     /// The camera brought to an object (its items' ball, a little room round it).
@@ -565,7 +683,10 @@ final class BioSceneCoordinator: NSObject {
         // (the object's centre where the turn has taken it)
         let w = turn.simdConvertPosition(SIMD3<Float>(Float(s.centre.x), Float(s.centre.y), Float(s.centre.z)), to: nil)
         guard let v = view, let cam = v.pointOfView else { return }
-        let d = Float(1.15 * max(s.radius * 1.3, 1e-3) / sin(20 * Double.pi / 180))
+        // (its ball and a little room filling the view's height or width, whichever is less)
+        let limit = fillLimits(labels: false)
+        let d = Float(max(s.radius * 1.3, 1e-3) / sin(atan(min(limit.across, limit.up))))
+        touched = true
         SCNTransaction.begin()
         SCNTransaction.animationDuration = (config?.reduceMotion ?? false) ? 0 : 0.5
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -578,7 +699,7 @@ final class BioSceneCoordinator: NSObject {
     /// The model turned by the arrow keys: 15° a press about the camera's up (← →) or right (↑ ↓) axis.
     func turn(by degrees: Float, vertical: Bool) {
         guard let turn = node("turn"), let cam = view?.pointOfView else { return }
-        handled()
+        moved()
         let axis = vertical ? cam.simdWorldRight : cam.simdWorldUp
         SCNTransaction.begin()
         SCNTransaction.animationDuration = (config?.reduceMotion ?? false) ? 0 : 0.25
@@ -589,7 +710,7 @@ final class BioSceneCoordinator: NSObject {
     /// + and −: the camera closer or further by a step.
     func zoom(by factor: Float) {
         guard let v = view, let cam = v.pointOfView else { return }
-        handled()
+        moved()
         let t = v.defaultCameraController.target
         let target = SIMD3<Float>(Float(t.x), Float(t.y), Float(t.z))
         let offset = cam.simdPosition - target
@@ -687,13 +808,16 @@ final class BioSceneCoordinator: NSObject {
     }
 
     /// The object under the pointer in the scene: told to the view (which outlines it, as it does an object whose
-    /// label is hovered).
+    /// label is hovered) — not while the pointer is on a label, whose hover is its own.
     private func hover(id: String?) {
-        guard id != live.hovered else { return }
+        guard id != live.hovered, !live.hoverFromLabel else { return }
         live.hovered = id
     }
 
-    /// The hovered object outlined (an inverted hull in the accent colour) and the pointer a hand over it.
+    /// The hovered object outlined (an inverted hull in the accent colour) and the pointer a hand over it. (1.3.79) Only
+    /// its opaque pieces: a hull shows as an outline only round something solid in front of it, and round a membrane or
+    /// a cut face — translucent, drawn without depth — it was a solid shell of the accent colour behind everything
+    /// inside the cell.
     private func outline(_ id: String?) {
         guard id != hovered else { return }
         hovered = id
@@ -701,8 +825,8 @@ final class BioSceneCoordinator: NSObject {
         guard let holder = node("hover") else { return }
         holder.childNodes.forEach { $0.removeFromParentNode() }
         guard let id, let content else { return }
-        let items = content.items(matching: id)
-        guard items.reduce(0, { $0 + $1.mesh.triangleCount }) < 200_000 else { return }
+        let items = content.items(matching: id).filter { !$0.material.isTranslucent }
+        guard !items.isEmpty, items.reduce(0, { $0 + $1.mesh.triangleCount }) < 200_000 else { return }
         let push = Float(framing.radius * 0.006)
         let m = SCNMaterial()
         m.lightingModel = .constant
@@ -734,12 +858,12 @@ final class BioSceneCoordinator: NSObject {
     /// For a tool's scale bar: how many points one scene unit spans at the framed ball's centre (a ruler one unit long
     /// along the camera's right, projected), told when it changes by more than half a percent.
     private func tickScale() {
-        guard let report = config?.scale, content != nil, let v = view, let cam = v.pointOfView, let turn = node("turn") else { return }
+        guard let report = config?.scale, content != nil, let v = view, let cam = v.pointOfView, let turn = node("turn"),
+              let project = BioProjector(view: v, camera: cam) else { return }
         let c3 = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(framing.centre.x), Float(framing.centre.y), Float(framing.centre.z)), to: nil)
         let e3 = c3 + cam.presentation.simdWorldRight
-        let pc = v.projectPoint(SCNVector3(CGFloat(c3.x), CGFloat(c3.y), CGFloat(c3.z)))
-        let pe = v.projectPoint(SCNVector3(CGFloat(e3.x), CGFloat(e3.y), CGFloat(e3.z)))
-        let s = hypot(Double(pe.x - pc.x), Double(pe.y - pc.y))
+        let pc = project.point(c3), pe = project.point(e3)
+        let s = hypot(pe.x - pc.x, pe.y - pc.y)
         guard s.isFinite, s > 0, abs(s - lastScale) > lastScale * 0.005 else { return }
         lastScale = s
         report(s)
@@ -751,63 +875,121 @@ final class BioSceneCoordinator: NSObject {
         resume?.cancel()
     }
 
-    /// Each tick: if the camera or the model moved (or the scene is new), the anchors projected and the labels laid
-    /// out; once it has been still for 150 ms, what hides each anchor is tested with a ray.
+    /// Each tick: while the camera, the model or the view's size is changing — and (1.3.79) for a second after, so a
+    /// layout made as SceneKit settles (a camera's move, a first frame, a new size) is never the last word — the anchors
+    /// projected and the labels laid out; once it has been still for 150 ms, what hides each anchor is tested with a
+    /// ray. The signature is of the camera as drawn (its presentation): a framing's half-second move changed only the
+    /// camera's target at its start, and its labels stayed where the move began, their leaders ending in empty space.
     private func tickLabels() {
         guard let v = view, let cam = v.pointOfView, let turn = node("turn"), let content, config?.showLabels == true else { return }
         guard !content.labels.isEmpty else {
             if !live.labels.isEmpty { live.labels = []; live.more = 0 }
+            letGoOfMovedLabel([])
             return
         }
-        let pov = cam.simdWorldTransform, tt = turn.presentation.simdWorldTransform
+        guard let project = BioProjector(view: v, camera: cam) else { return }
+        let pov = cam.presentation.simdWorldTransform, tt = turn.presentation.simdWorldTransform
         let columns: [SIMD4<Float>] = [pov.columns.0, pov.columns.1, pov.columns.2, pov.columns.3,
                                        tt.columns.0, tt.columns.1, tt.columns.2, tt.columns.3]
         var sig: [Float] = columns.flatMap { [$0.x, $0.y, $0.z, $0.w] }
         sig.append(Float(v.bounds.width))
         sig.append(Float(v.bounds.height))
-        let moved = sig != lastSignature
-        if moved {
+        let now = Date()
+        if sig != lastSignature {
             lastSignature = sig
-            stillSince = Date()
+            stillSince = now
             raysDone = false
         }
-        let still = Date().timeIntervalSince(stillSince) > 0.15
-        if !moved && (raysDone || !still) { return }
-        let h = Double(v.bounds.height)
-        // (SwiftUI's y runs down; the view's, up — unless it is flipped)
-        func screenY(_ y: CGFloat) -> Double { v.isFlipped ? Double(y) : h - Double(y) }
+        let quiet = now.timeIntervalSince(stillSince)
+        let still = quiet > 0.15
+        if raysDone && quiet > 1.0 { return }
+        let h = project.height, w = project.width
         let eye = cam.presentation.simdWorldPosition
+        let testRays = still && !raysDone
         var inputs: [BioLabelInput] = []
         for l in content.labels {
-            let w = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(l.anchor.x), Float(l.anchor.y), Float(l.anchor.z)), to: nil)
-            let p = v.projectPoint(SCNVector3(CGFloat(w.x), CGFloat(w.y), CGFloat(w.z)))
-            var visible = p.z > 0 && p.z < 1
+            let a = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(l.anchor.x), Float(l.anchor.y), Float(l.anchor.z)), to: nil)
+            let p = project.point(a)
+            var visible = p.inFront
             if visible, let nrm = l.normal {
                 let wn = turn.presentation.simdConvertVector(SIMD3<Float>(Float(nrm.x), Float(nrm.y), Float(nrm.z)), to: nil)
-                visible = simd_dot(wn, eye - w) > 0
+                visible = simd_dot(wn, eye - a) > 0
             } else if visible {
-                if still {
-                    let hit = object(at: CGPoint(x: p.x, y: p.y))
-                    let dist = simd_distance(eye, w)
+                if testRays {
+                    // (the hit test takes the view's own points: y up, unless the view is flipped)
+                    let hit = object(at: CGPoint(x: p.x, y: v.isFlipped ? p.y : h - p.y))
+                    let dist = simd_distance(eye, a)
                     let ok = hit.map { BioSceneContent.matches($0.id, l.id) || BioSceneContent.matches(l.id, $0.id) || $0.distance >= dist * 0.98 } ?? true
                     rayVisible[l.id] = ok
                 }
                 visible = rayVisible[l.id] ?? true
             }
-            inputs.append(BioLabelInput(id: l.id, text: l.text, x: Double(p.x), y: screenY(p.y), visible: visible, area: l.area,
-                                        width: BioLabelWidth.of(l.text)))
+            inputs.append(BioLabelInput(id: l.id, text: l.text, x: p.x, y: p.y, visible: visible, area: l.area, width: BioLabelWidth.of(l.text)))
         }
-        if still { raysDone = true }
-        // (the model's circle on the screen: its framing ball's centre and edge, projected)
+        if testRays { raysDone = true }
+        // (the model's circle on the screen: its framing ball's centre and edge, projected; and its outline's leftmost
+        // and rightmost points, the columns' edges beside them — inside the circle)
         let c3 = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(framing.centre.x), Float(framing.centre.y), Float(framing.centre.z)), to: nil)
         let e3 = c3 + cam.presentation.simdWorldRight * Float(framing.radius)
-        let pc = v.projectPoint(SCNVector3(CGFloat(c3.x), CGFloat(c3.y), CGFloat(c3.z)))
-        let pe = v.projectPoint(SCNVector3(CGFloat(e3.x), CGFloat(e3.y), CGFloat(e3.z)))
-        let r = hypot(Double(pe.x - pc.x), Double(pe.y - pc.y))
+        let pc = project.point(c3), pe = project.point(e3)
+        let r = hypot(pe.x - pc.x, pe.y - pc.y)
+        var extent: (left: Double, right: Double)?
+        if !outlinePoints.isEmpty {
+            let xs = outlinePoints.map { o in project.point(turn.presentation.simdConvertPosition(SIMD3<Float>(Float(o.x), Float(o.y), Float(o.z)), to: nil)) }
+                .filter { $0.inFront }.map { $0.x }
+            if let lo = xs.min(), let hi = xs.max() { extent = (left: max(lo, pc.x - r), right: min(hi, pc.x + r)) }
+        }
         // (the columns end above any room the tool keeps clear at the bottom: its scale bar's)
-        let out = BioLabelLayout.layout(inputs, cx: Double(pc.x), cy: screenY(pc.y), r: min(r, Double(v.bounds.width) * 0.32),
-                                        width: Double(v.bounds.width), height: max(h - Double(config?.labelBottom ?? 0), h * 0.6))
+        let out = BioLabelLayout.layout(inputs, cx: pc.x, cy: pc.y, r: min(r, w * 0.32), width: w,
+                                        height: max(h - Double(config?.labelBottom ?? 0), h * 0.6), extent: extent)
         if out.placed != live.labels { live.labels = out.placed }
         if out.more != live.more { live.more = out.more }
+        letGoOfMovedLabel(out.placed)
+    }
+
+    /// (1.3.79) A label's hover let go once that label has moved more than 6 points from where its hover began, or is
+    /// gone: the pointer is no longer over it, though no pointer moved to say so.
+    private func letGoOfMovedLabel(_ placed: [BioLabelPlacement]) {
+        guard live.hoverFromLabel, let id = live.hovered else { labelHoverAt = nil; return }
+        let release = {
+            self.labelHoverAt = nil
+            self.live.hoverFromLabel = false
+            self.live.hovered = nil
+        }
+        guard let now = placed.first(where: { $0.id == id }) else { release(); return }
+        if let at = labelHoverAt, at.id == id {
+            if abs(now.edgeX - at.x) > 6 || abs(now.y - at.y) > 6 { release() }
+        } else {
+            labelHoverAt = (id: id, x: now.edgeX, y: now.y)
+        }
+    }
+}
+
+/// (1.3.79) Where scene points fall on a SceneKit view, in the view's points — x right, y down, as the labels' overlay
+/// draws — worked out from the camera's projection for the view's size in points and the camera as drawn. The labels
+/// were placed by SceneKit's projectPoint, read as the view's points with y turned over by hand: on the owner's Mac
+/// their leader lines ended in empty space and the labels sat in the card's top corners and at its edges, which the
+/// CI's pictures (a 1× screen) never showed. Worked out here from the camera itself, the projection is in the very
+/// points the overlay draws in, on any screen.
+struct BioProjector {
+    private let matrix: simd_float4x4
+    let width: Double
+    let height: Double
+
+    @MainActor
+    init?(view v: SCNView, camera cam: SCNNode) {
+        guard let camera = cam.camera, v.bounds.width >= 1, v.bounds.height >= 1 else { return nil }
+        let projection = simd_float4x4(camera.projectionTransform(withViewportSize: v.bounds.size))
+        matrix = projection * cam.presentation.simdWorldTransform.inverse
+        width = Double(v.bounds.width)
+        height = Double(v.bounds.height)
+    }
+
+    /// A point in the scene's world on the view: x right and y down from the top left corner (points), and whether it
+    /// is in front of the camera.
+    func point(_ p: SIMD3<Float>) -> (x: Double, y: Double, inFront: Bool) {
+        let c = matrix * SIMD4<Float>(p, 1)
+        guard c.w > 1e-6 else { return (width / 2, height / 2, false) }
+        return ((Double(c.x / c.w) + 1) / 2 * width, (1 - Double(c.y / c.w)) / 2 * height, true)
     }
 }

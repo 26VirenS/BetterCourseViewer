@@ -309,13 +309,18 @@ struct CEBuilder {
 
     // MARK: The cell's shells
 
-    /// One of the cell's own shells (§5.1.5 Membranes and walls), cut by the octant with the cut faces lighter.
+    /// One of the cell's own shells (§5.1.5 Membranes and walls), cut by the octant with the cut faces lighter. (1.3.79)
+    /// A translucent shell's two faces each take the part of its translucency that makes, the two together, the part's
+    /// own (1 − √(1 − α) each): every point of the cell is seen through both, and at α each, a plasma membrane at 0.30
+    /// veiled every organelle at 0.51 — the whole cell one gold tint, the parts' colours lost under it.
     mutating func cellShell(_ part: String, outer: @escaping (BioVec) -> Double, inner: @escaping (BioVec) -> Double,
                             rings: Int, segments: Int, order: Int, darkOuter: Bool = false, capAlpha: Double = 1) {
         let sh = CERecipes.shell(outer: outer, inner: inner, cut: cut, rings: rings, segments: segments)
+        let alpha = parts[part]?.alpha ?? 1
+        let face: Double? = alpha < 0.999 ? 1 - (1 - alpha).squareRoot() : nil
         var s = CEShape()
-        s.add(sh.outer, darkOuter ? .dark : .body, roughness: darkOuter ? 0.7 : 0.25, order: order)
-        s.add(sh.inner, roughness: darkOuter ? 0.6 : 0.25, order: order)
+        s.add(sh.outer, darkOuter ? .dark : .body, alpha: face, roughness: darkOuter ? 0.7 : 0.25, order: order)
+        s.add(sh.inner, alpha: face, roughness: darkOuter ? 0.6 : 0.25, order: order)
         s.add(sh.caps, .cap, alpha: capAlpha, roughness: 0.6, order: order)
         if darkOuter {
             // (the wall's outer face only a little darker)

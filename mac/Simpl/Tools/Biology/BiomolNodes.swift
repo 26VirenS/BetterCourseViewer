@@ -27,7 +27,8 @@ enum BiomolNodes {
         }
     }
 
-    /// Short texts in the scene (charges), each facing the camera, drawn over what is near them.
+    /// Short texts in the scene (charges), each facing the camera, drawn over what is near them — (1.3.79) a charge on
+    /// its atom's upper right edge, a little in front of it, however the molecule is turned.
     static func marks(_ marks: [BiomolMark]) -> [SCNNode] {
         marks.map { m in
             let text = SCNText(string: m.text, extrusionDepth: 0)
@@ -42,6 +43,11 @@ enum BiomolNodes {
             n.pivot = SCNMatrix4MakeTranslation((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, 0)
             n.scale = SCNVector3(CGFloat(m.size), CGFloat(m.size), CGFloat(m.size))
             n.renderingOrder = 12
+            if let r = m.atomRadius {
+                // (in the holder's frame, which faces the camera: x right, y up, z toward the camera)
+                let edge = CGFloat(r * 0.72 + m.size * 0.15)
+                n.position = SCNVector3(edge, edge, CGFloat(r + 0.3))
+            }
             let holder = SCNNode()
             holder.addChildNode(n)
             holder.constraints = [SCNBillboardConstraint()]
