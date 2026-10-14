@@ -38,12 +38,12 @@ public static class Scenes
     /// <summary>A photo's ink: the paper lifted a shade (INK_LIFT).</summary>
     public static Color PhotoInk => K.Mix(Paper, Appearance.Dark ? Colors.White : Colors.Black, Appearance.Dark ? 0.1 : 0.07);
 
-    /// <summary>The picture a place shows now and how it is inked, or null.</summary>
+    /// <summary>The picture a place shows now and how it is inked, or null: its photo; else the drawing picked for it, or
+    /// the worn theme's (Appearance.SceneFor).</summary>
     public static (ImageSource Mask, bool Scene)? Of(string slot)
     {
         if (Appearance.PhotoKind(slot) == "photo" && Appearance.Photo(slot) is { } file && InkOf(file) is { } ink) return (ink, false);
-        var theme = Appearance.ReadyThemes.FirstOrDefault(r => r.Name == Appearance.ThemeName);
-        if (theme.Scene is not { } scene || Appearance.PhotoKind(slot) == "none") return null;
+        if (Appearance.SceneFor(slot) is not { } scene || Appearance.PhotoKind(slot) == "none") return null;
         var i = Array.IndexOf(Cards, slot);
         var name = slot == "side" ? $"Theme{scene}Side" : $"Theme{scene}Card{Math.Max(0, i)}";
         return Load(name) is { } img ? (img, true) : null;
@@ -70,15 +70,16 @@ public static class Scenes
 
     /// <summary>
     /// The picture a place shows, filling it (put it first in a Grid, under what is written there): its ink pinned at
-    /// the place's foot — a counter's at its bottom right, the pane's at its bottom middle — zoomed as set, and frosted.
+    /// the place's foot — a counter's at its bottom right, the pane's at its bottom middle — zoomed and moved as set (or
+    /// as <paramref name="pan"/> says, while it is being dragged in Settings' preview), and frosted.
     /// </summary>
-    public static FrameworkElement? Backdrop(string slot, bool frost = true)
+    public static FrameworkElement? Backdrop(string slot, bool frost = true, (double X, double Y)? pan = null)
     {
         if (Of(slot) is not { } pic) return null;
         var side = slot == "side";
         var zoom = Math.Clamp(Appearance.Zoom(slot), 0.5, 3);
         var g = new Grid { IsHitTestVisible = false, ClipToBounds = true };
-        g.Children.Add(Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1));
+        g.Children.Add(Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot)));
         if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = K.Brush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });
         return g;
     }
@@ -99,11 +100,15 @@ public static class Scenes
     /// is inked once into a picture of its own, drawn as it is — not the ink through an opacity mask, a layer of its
     /// own drawn again on every frame (on the processor, where WPF draws without the graphics card).
     /// </summary>
-    private static Rectangle Drawn(ImageSource mask, Color ink, AlignmentX x, double zoom = 1, double originX = 1)
+    private static Rectangle Drawn(ImageSource mask, Color ink, AlignmentX x, double zoom = 1, double originX = 1, (double X, double Y) pan = default)
     {
         var inked = Inked(mask, ink);
         var brush = new ImageBrush(inked ?? mask) { Stretch = Stretch.UniformToFill, AlignmentX = x, AlignmentY = AlignmentY.Bottom };
-        if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, originX, 1);
+        // (zoomed from where it is pinned, then moved by a share of the place: the brush's own relative units)
+        var moved = Math.Abs(pan.X) > 0.001 || Math.Abs(pan.Y) > 0.001;
+        if (Math.Abs(zoom - 1) > 0.001 && moved) brush.RelativeTransform = new TransformGroup { Children = { new ScaleTransform(zoom, zoom, originX, 1), new TranslateTransform(pan.X, pan.Y) } };
+        else if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, originX, 1);
+        else if (moved) brush.RelativeTransform = new TranslateTransform(pan.X, pan.Y);
         // (were the inking to fail: the ink through the mask, as before)
         return inked != null
             ? new Rectangle { Fill = brush, IsHitTestVisible = false }
