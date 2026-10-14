@@ -816,10 +816,13 @@ final class GXPainter {
 
     private func gutterLabels(_ c: inout GraphicsContext) {
         let gx = GXPainter.gutter - 2
+        // (a name and its second line take about 27.5 points; when the lanes are squeezed closer than the 26 points
+        // between the two strands, the names shrink with them, so the coding strand's never runs into the template's)
+        let k = max(0.7, min(1, (GXPainter.y2 - GXPainter.y1) * sy / 27.5))
         func label(_ title: String, _ sub: String?, _ yy: CGFloat, alpha: Double = 1) {
             guard alpha > 0.01 else { return }
-            text(&c, title, CGPoint(x: gx, y: sub == nil ? yy : yy - 7), size: 11.5, weight: .semibold, colour: .primary, anchor: .trailing, alpha: alpha * 0.85)
-            if let sub { text(&c, sub, CGPoint(x: gx, y: yy + 7), size: 10.5, weight: .medium, colour: .secondary, anchor: .trailing, alpha: alpha) }
+            text(&c, title, CGPoint(x: gx, y: sub == nil ? yy : yy - 7 * k), size: 11.5 * k, weight: .semibold, colour: .primary, anchor: .trailing, alpha: alpha * 0.85)
+            if let sub { text(&c, sub, CGPoint(x: gx, y: yy + 7 * k), size: 10.5 * k, weight: .medium, colour: .secondary, anchor: .trailing, alpha: alpha) }
         }
         label("Whole gene", nil, y(GXPainter.yOverview))
         label("Coding (sense) strand", "5′→3′", y(GXPainter.y1))
