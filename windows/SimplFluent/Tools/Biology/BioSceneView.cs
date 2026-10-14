@@ -46,6 +46,8 @@ public sealed class BioSceneView : Grid
     // (what is drawn: the scene, its batches by model, and what each model's vertices belong to)
     private BioSceneContent? content;
     private BioSphere framing = new(BioVec.Zero, 1);
+    /// <summary>The content's box in its own space (least and greatest x, y, z), for the labels' room round the model.</summary>
+    private (BioVec Min, BioVec Max)? extent;
     private List<(BioMaterial Material, int Order, BioMeshBatch Batch, MeshGeometry3D Mesh)> batches = new();
     private readonly Dictionary<GeometryModel3D, (BioMeshBatch? Batch, string? Id, bool Translucent)> pickMap = new();
     private List<(BioBillboard Board, TranslateTransform3D Move)> boards = new();
@@ -214,7 +216,7 @@ public sealed class BioSceneView : Grid
         Task.Run(() =>
         {
             var made = build();
-            return (Made: made, Parts: BioWpf.Batches(made.Items), Frame: made.Framing);
+            return (Made: made, Parts: BioWpf.Batches(made.Items), Frame: made.Framing, Extent: Extent(made));
         }).ContinueWith(t => Dispatcher.BeginInvoke(() =>
         {
             spinnerTimer.Stop();
@@ -225,6 +227,7 @@ public sealed class BioSceneView : Grid
                 buildingKey = null;
                 builtKey = key;
                 spinnerHost.Content = null;
+                extent = t.Result.Extent;
                 Apply(t.Result.Made, t.Result.Parts, t.Result.Frame, frameKey);
             }
             finally { Shot.Ended(); }
@@ -736,8 +739,44 @@ public sealed class BioSceneView : Grid
         // (the model's circle on the view: its framing ball's centre and edge, projected)
         var c = Project(framing.Centre);
         var r = ActualHeight / (2 * Tan20) * framing.Radius / Math.Max(distance, 1e-6);
-        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight);
+        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox());
         DrawLabels(placed, more);
+    }
+
+    /// <summary>The content's box (least and greatest x, y, z over every item's points), or null for an empty scene.</summary>
+    private static (BioVec Min, BioVec Max)? Extent(BioSceneContent c)
+    {
+        float x0 = float.MaxValue, y0 = float.MaxValue, z0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue, z1 = float.MinValue;
+        foreach (var it in c.Items)
+            foreach (var q in it.Mesh.Positions)
+            {
+                if (q.X < x0) x0 = q.X;
+                if (q.Y < y0) y0 = q.Y;
+                if (q.Z < z0) z0 = q.Z;
+                if (q.X > x1) x1 = q.X;
+                if (q.Y > y1) y1 = q.Y;
+                if (q.Z > z1) z1 = q.Z;
+            }
+        return x0 > x1 ? null : (new BioVec(x0, y0, z0), new BioVec(x1, y1, z1));
+    }
+
+    /// <summary>The model's box on the view: its eight corners where the camera and the turn put them (null while one is
+    /// behind the camera).</summary>
+    private BioLabelBox? ModelBox()
+    {
+        if (extent is not { } e) return null;
+        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
+        for (var i = 0; i < 8; i++)
+        {
+            var corner = new BioVec((i & 1) == 0 ? e.Min.X : e.Max.X, (i & 2) == 0 ? e.Min.Y : e.Max.Y, (i & 4) == 0 ? e.Min.Z : e.Max.Z);
+            var (x, y, front, _) = Project(corner);
+            if (!front) return null;
+            x0 = Math.Min(x0, x);
+            y0 = Math.Min(y0, y);
+            x1 = Math.Max(x1, x);
+            y1 = Math.Max(y1, y);
+        }
+        return new BioLabelBox(Math.Max(x0, 0), Math.Max(y0, 0), Math.Min(x1, ActualWidth), Math.Min(y1, ActualHeight));
     }
 
     private void ClearLabels()
@@ -756,8 +795,7 @@ public sealed class BioSceneView : Grid
             foreach (var l in placed)
             {
                 g.BeginFigure(new Point(l.AnchorX, l.AnchorY), false, false);
-                g.LineTo(new Point(l.ElbowX, l.Y), true, true);
-                g.LineTo(new Point(l.LeaderX, l.Y), true, true);
+                foreach (var (x, y) in l.Leader) g.LineTo(new Point(x, y), true, true);
                 // (the dot at the anchor)
                 g.BeginFigure(new Point(l.AnchorX - 1.5, l.AnchorY), true, true);
                 g.ArcTo(new Point(l.AnchorX + 1.5, l.AnchorY), new Size(1.5, 1.5), 0, false, SweepDirection.Clockwise, true, true);

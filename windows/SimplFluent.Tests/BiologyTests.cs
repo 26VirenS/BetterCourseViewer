@@ -425,6 +425,32 @@ public class BiologyTests
         Assert.True(packed.Min(p => p.Y) >= 25 - 1e-9);
     }
 
+    [Fact]
+    public void ALabelThatWouldHideItsAnchorGoesAboveOrBelowTheModel()
+    {
+        // (a narrow view: a long label moved in from its column lands on its own anchor)
+        var inputs = new List<BioLabelInput>
+        {
+            new("a", "A long label on the upper left", 150, 220, Width: 220),
+            new("b", "Below", 400, 340, Width: 60),
+            new("c", "Short", 330, 300, Width: 60),
+        };
+        var box = new BioLabelBox(120, 200, 420, 360);
+        var (placed, _) = BioLabelLayout.Layout(inputs, 270, 280, 150, 545, 520, box);
+        var a = placed.Single(p => p.Id == "a");
+        // (moved to a row just above the model, over its anchor, its leader straight up to its lower edge)
+        Assert.Equal(200 - 6 - 9, a.Y, 6);
+        Assert.True(a.Frame.X <= 150 && a.Frame.X + a.Frame.Width >= 150);
+        Assert.Equal(new[] { (150.0, a.Y + 9) }, a.Leader);
+        // (a short label beside the model stays in its column, its leader to the elbow and along)
+        var c = placed.Single(p => p.Id == "c");
+        Assert.Null(c.EdgeY);
+        Assert.Equal(2, c.Leader.Length);
+        // (without the model's box the layout is the Mac's)
+        var (plain, _) = BioLabelLayout.Layout(inputs, 270, 280, 150, 545, 520);
+        Assert.All(plain, p => Assert.Null(p.EdgeY));
+    }
+
     // ---- the step-through (§3.6) ----
 
     [Fact]
