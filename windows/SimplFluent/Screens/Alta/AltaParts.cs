@@ -73,12 +73,10 @@ internal static class AltaParts
         return v;
     }
 
+    /// <summary>The objectives as tiles (how many are mastered is said once, under the mastery bar).</summary>
     private static FrameworkElement ObjectivesCard(List<AltaObjective> list, Dictionary<string, double> was)
     {
-        var mastered = list.Count(o => o.Mastered);
-        var head = K.Columns("*, auto",
-            K.Text("Objectives", Ty.BodyStrong).Col(0),
-            K.Text($"{mastered} of {list.Count}", Ty.Caption, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Bottom).Col(1));
+        var head = K.Text("Objectives", Ty.BodyStrong);
         FrameworkElement body;
         if (list.Count == 0) body = new Grid { MinHeight = 32, Children = { K.Spinner(16) } };
         else
@@ -152,9 +150,10 @@ internal static class AltaParts
     // ---- (1.3.59) the start screen ----
 
     /// <summary>
-    /// The assignment's start screen: a card with its name, its details (due, status, grade) and its note, a large Start
-    /// (named as Alta names it — Start, Continue, Resume) and Review Instruction; under it a card of its objectives by
-    /// topic, each topic's estimate beside it and each objective's mastery as a small ring.
+    /// The assignment's start screen, saying what the header and the rail do not: a card with its status and grade, its
+    /// note (the extra credit for finishing early), a large Start (named as Alta names it — Start, Continue, Resume) and
+    /// Review instruction; under it what the work covers — each topic with Alta's estimate of its questions and its
+    /// objectives by name. The name and the due date are the header's; each objective's mastery is the rail's.
     /// </summary>
     public static FrameworkElement StartScreen(AltaCover cover, bool going, Action start, Action review)
     {
@@ -175,14 +174,13 @@ internal static class AltaParts
 
     private static FrameworkElement StartHeader(AltaCover cover, bool going, Action start, Action review)
     {
-        var kicker = K.Text("ASSIGNMENT", Ty.Caption, B.Text2).Strong();
-        var name = K.Wrapped(string.IsNullOrEmpty(cover.Name) ? "Knewton Alta" : cover.Name, Ty.Title);
-        name.TextTrimming = TextTrimming.None;
-        var v = K.V(16, K.V(6, kicker, name));
-        if (cover.Details.Count > 0)
+        var v = K.V(16);
+        // (its status and grade: its due date is the header's, already)
+        var shown = cover.Details.Where(d => !d.Label.Contains("due", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (shown.Count > 0)
         {
             var details = new WrapPanel { Orientation = Orientation.Horizontal };
-            foreach (var d in cover.Details)
+            foreach (var d in shown)
             {
                 var col = K.V(3, K.Text(d.Label.ToUpperInvariant(), Ty.Caption, B.Text2).Strong(), K.Wrapped(d.Value, Ty.BodyStrong));
                 if (!string.IsNullOrEmpty(d.Sub)) col.Children.Add(K.Wrapped(d.Sub!, Ty.Caption, B.Text2));
@@ -211,7 +209,7 @@ internal static class AltaParts
         var row = K.H(12, go);
         if (cover.Review)
         {
-            var r = K.Button("Review Instruction", review, icon: SymbolRegular.Book24);
+            var r = K.Button("Review instruction", review, icon: SymbolRegular.Book24);
             r.MinHeight = 40;
             r.ToolTip = "Alta’s instruction for these objectives";
             row.Children.Add(r);
@@ -221,12 +219,11 @@ internal static class AltaParts
         return K.Card(v, new Thickness(24));
     }
 
+    /// <summary>What the work covers: each topic with Alta's estimate of its questions, and its objectives by name (their
+    /// mastery is the rail's, beside it).</summary>
     private static FrameworkElement StartObjectives(AltaCover cover)
     {
-        var count = cover.Topics.Sum(t => t.Objectives.Count);
-        var v = K.V(14, K.Columns("*, auto", K.Text("Objectives", Ty.Subtitle).Col(0), K.Text($"{count} to master", Ty.Body, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Bottom).Col(1)));
-        var accent = AltaLook.Accent;
-        var green = K.Tone("green");
+        var v = K.V(14, K.Text("What it covers", Ty.Subtitle));
         for (var k = 0; k < cover.Topics.Count; k++)
         {
             var t = cover.Topics[k];
@@ -241,13 +238,9 @@ internal static class AltaParts
             }
             topic.Children.Add(head);
             foreach (var o in t.Objectives)
-            {
-                var m = o.Mastery ?? 0;
-                var ring = K.Ring(Math.Max(0.001, Math.Min(m, 1)), m >= 0.999 ? green : accent, 18, 3);
-                var row = K.Columns("auto, *, auto", ring.Margin(0, 1, 12, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), K.Wrapped(o.Name, Ty.Body).Col(1));
-                if (o.Mastery is { } pm) row.Children.Add(K.Text($"{Percent(pm)}%", Ty.Caption, B.Text2).Margin(8, 2, 0, 0).Col(2));
-                topic.Children.Add(row);
-            }
+                topic.Children.Add(K.Columns("auto, *",
+                    K.Icon(SymbolRegular.Target24, 14, B.Text2).Margin(0, 2, 10, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0),
+                    K.Wrapped(o.Name, Ty.Body, B.Text2).Col(1)));
             v.Children.Add(topic);
         }
         return K.Card(v, new Thickness(22));

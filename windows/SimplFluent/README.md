@@ -498,7 +498,10 @@ internal static class CalculatorRegistration
 ```
 
 The whole tool opens over the window (`ToolPopup`), from its tile on the Tools page, a pin's flyout or a command
-alike; the quick version is the pin's flyout. `ToolContext` hands it the engine, what
+alike; the quick version is the pin's flyout. The pins sit in the header of a popup that covers the title bar too (a
+quiz, Knewton Alta, Macmillan: `PinBar(engine, inPopup: true)`), their flyouts over it; from there the whole tool opens
+in a window of its own beside it (`ToolsCenter.Float`, `ToolWindow`), since a sheet over the window would wait behind
+the popup. `ToolContext` hands it the engine, what
 was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` for the flyout. `ToolKit` has the page, two
 columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
 

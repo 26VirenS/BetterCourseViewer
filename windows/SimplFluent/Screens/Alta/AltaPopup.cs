@@ -36,6 +36,7 @@ internal sealed class AltaPopupView
     private static readonly HashSet<string> CancelWords = new() { "close", "cancel", "got it", "ok", "okay", "dismiss", "no thanks", "not now", "done" };
 
     private readonly Window over;
+    private readonly Engine.Engine engine;
     private readonly AltaSession session;
     private readonly Grid root = new();
     private readonly ColumnDefinition railColumn = new() { Width = new GridLength(240) };
@@ -53,6 +54,9 @@ internal sealed class AltaPopupView
     private readonly Dictionary<string, double> drawn = new();
     private Sheet? sheet;
     private string railSig = "", startSig = "", footerSig = "", stateSig = "";
+    /// <summary>(2.99.33) The Canvas assignment's due line ("Due Oct 12 at 11:59 PM"), once read: the header's, in place of
+    /// the publisher's own words for it.</summary>
+    private string? dueLine;
     private int logsCount = -1, dialogShown = -1;
     private bool going, saving, closing, closed;
     private DispatcherTimer? goingBack;
@@ -61,13 +65,14 @@ internal sealed class AltaPopupView
     public AltaPopupView(Engine.Engine engine, AltaLaunch launch, Window over)
     {
         this.over = over;
+        this.engine = engine;
         session = new AltaSession(engine, launch, over);
         root.Bg(B.Solid);
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         tileSlot.Content = Tile(32);
         title.Text = launch.Title;
-        root.Children.Add(AltaLook.Header(tileSlot, title, subtitle, logsSlot, Close, "Close — your progress is kept by Alta").Row(0));
+        root.Children.Add(AltaLook.Header(engine, tileSlot, title, subtitle, logsSlot, Close, "Close — your progress is kept by Alta").Row(0));
 
         // the rail, and Alta's page in its frame (the popup's own in its place while it loads, and its buttons under it)
         var body = new Grid();
@@ -110,6 +115,15 @@ internal sealed class AltaPopupView
         root.Loaded += loaded;
         Update();
         Dialogs.Show(sheet, over);
+        ReadDue();
+    }
+
+    /// <summary>When it is due, from the Canvas assignment (the same words as its page and every list), for the header.</summary>
+    private async void ReadDue()
+    {
+        if (await AltaLook.Assignment(engine, session.Launch) is not { } a || closed) return;
+        dueLine = a.DueLine ?? "";
+        Update();
     }
 
     /// <summary>Close (the button, Escape): the page goes first — nothing of the app's can fade a web view out — then the popup.</summary>
@@ -196,20 +210,20 @@ internal sealed class AltaPopupView
         if (show) Motion.FadeIn(e, Motion.Medium);
     }
 
+    /// <summary>"Knewton Alta · Due Oct 12 at 11:59 PM": the Canvas assignment's due line; until it is read (or where it
+    /// cannot be), Alta's own due time written the same way — the publisher's words for it ("Monday, Oct 12 11:59pm PDT")
+    /// only as the last resort.</summary>
     private string Subtitle()
     {
         var s = session;
         var parts = new List<string> { "Knewton Alta" };
-        if ((s.Report?.Due ?? s.Overview?.Due) is { } due)
+        if (dueLine is { Length: > 0 } line) parts.Add(line);
+        else if (dueLine == null && (s.Report?.Due ?? s.Overview?.Due) is { } due)
         {
-            try
-            {
-                var d = DateTimeOffset.FromUnixTimeMilliseconds((long)due).LocalDateTime;
-                parts.Add($"Due {d.ToString("MMM d, yyyy", CultureInfo.CurrentCulture)} at {d.ToString("t", CultureInfo.CurrentCulture)}");
-            }
+            try { parts.Add(AltaLook.DueText(DateTimeOffset.FromUnixTimeMilliseconds((long)due).LocalDateTime)); }
             catch { }
         }
-        else if (s.Overview?.DueText is { Length: > 0 } words) parts.Add("Due " + words);
+        else if (dueLine == null && s.Overview?.DueText is { Length: > 0 } words) parts.Add("Due " + words);
         if ((s.Report?.Current.Source ?? "").ToUpperInvariant() == "PRACTICE") parts.Add("Practice");
         return string.Join(" · ", parts);
     }
@@ -310,7 +324,7 @@ internal sealed class AltaPopupView
         foreach (var p in pics)
         {
             var id = p.Id;
-            var b = K.Button(pics.Count > 1 ? $"Graph {id + 1}" : "Open Graph", () => _ = session.OpenPic(id), icon: SymbolRegular.ArrowMaximize24);
+            var b = K.Button(pics.Count > 1 ? $"Graph {id + 1}" : "Open graph", () => _ = session.OpenPic(id), icon: SymbolRegular.ArrowMaximize24);
             b.ToolTip = "Open the graph large, in a window you can move";
             left.Children.Add(b);
         }
@@ -376,7 +390,7 @@ internal sealed class AltaPopupView
         }
         else if (d.Text.Length > 0) body.Children.Add(AltaLook.Selectable(d.Text));
         var choices = new List<AltaLook.Choice>();
-        if (cancel < 0) choices.Add(new("Show in Alta’s Page", session.DialogDismissed));
+        if (cancel < 0) choices.Add(new("Show in Alta’s page", session.DialogDismissed));
         for (var i = 0; i < d.Buttons.Count; i++)
         {
             var n = i;
@@ -393,7 +407,7 @@ internal sealed class AltaPopupView
         if (n == logsCount) return;
         logsCount = n;
         if (n == 0) { logsSlot.Content = null; return; }
-        var b = K.Button($"Error Logs ({n})", ShowLogs, icon: SymbolRegular.Warning24);
+        var b = K.Button($"Error logs ({n})", ShowLogs, icon: SymbolRegular.Warning24);
         b.ToolTip = "Alta’s page was not recognised, so it is shown as it is: see why";
         logsSlot.Content = b;
         Motion.FadeIn(b);
@@ -405,14 +419,14 @@ internal sealed class AltaPopupView
         var text = AltaLook.Selectable(session.ErrorLogText, 11, new FontFamily("Cascadia Mono, Consolas"));
         var box = new Border { Child = new ScrollViewer { Content = text, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, Height = 280, Padding = new Thickness(8), CornerRadius = new CornerRadius(8) }.Bg(B.Subtle);
         var body = K.V(12,
-            AltaLook.DialogTitle("Error Logs"),
+            AltaLook.DialogTitle("Error logs"),
             K.Wrapped("Alta’s page was not recognised, so it is shown as it is. Send these (with the page code) to get it recognised.", Ty.Caption, B.Text2),
             box);
         var choices = new List<AltaLook.Choice>
         {
             new("Clear", () => { session.ClearErrorLogs(); HideLayer(); }),
             new("Copy", () => { try { Clipboard.SetText(session.ErrorLogText); } catch { } }),
-            new("Save with Page Code", () => { HideLayer(); SaveCode(true); }, Accent: true, Enabled: !saving),
+            new("Save with page code", () => { HideLayer(); SaveCode(true); }, Accent: true, Enabled: !saving),
         };
         layer.Show("logs", AltaLook.Dialog(body, choices, 480, 480), HideLayer, null);
         Update();

@@ -15,8 +15,9 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// (Mac 1.3.66) A Macmillan Learning assignment (Achieve, Sapling, LaunchPad) in a popup over the window, as an Alta one
-/// opens (the Mac's MacmillanScreen): the assignment's name and Close across the top; below, Macmillan's page as it
-/// draws it, on white, the student working on it there — the popup's Loading while it opens, or why it could not.
+/// opens (the Mac's MacmillanScreen): across the top the Canvas assignment's name over "Macmillan Learning · Due Oct 12 at
+/// 11:59 PM" (as Alta's header has it), the pinned tools and Close; below, Macmillan's page as it draws it, on white, the
+/// student working on it there — the popup's Loading while it opens, or why it could not.
 /// </summary>
 public static class MacmillanPopup
 {
@@ -33,6 +34,7 @@ internal sealed class MacmillanPopupView
     private readonly Grid root = new();
     private readonly WebView2 web = new() { Visibility = Visibility.Hidden, DefaultBackgroundColor = System.Drawing.Color.White };
     private readonly Border stateSlot = new();
+    private readonly TextBlock title, subtitle;
     private Sheet? sheet;
     /// <summary>The page still opening (the launch through Canvas): a spinner in its place meanwhile.</summary>
     private bool opening = true;
@@ -49,7 +51,9 @@ internal sealed class MacmillanPopupView
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         var tile = K.IconTile(SymbolRegular.Library24, K.Tone("red"), 32);
-        root.Children.Add(AltaLook.Header(tile, K.Text(launch.Title, Ty.Subtitle), K.Text("Macmillan Learning", Ty.Body, B.Text2), null, Close, "Close — your work is kept by Macmillan").Row(0));
+        title = K.Text(launch.Title, Ty.Subtitle);
+        subtitle = K.Text("Macmillan Learning", Ty.Body, B.Text2);
+        root.Children.Add(AltaLook.Header(engine, tile, title, subtitle, null, Close, "Close — your work is kept by Macmillan").Row(0));
         // (the page on white, edge to edge under the header, as Macmillan draws it — clear of the popup's rounded foot;
         // the popup's own ground in its place while it opens)
         stateSlot.Bg(B.Solid);
@@ -77,6 +81,16 @@ internal sealed class MacmillanPopupView
         root.Loaded += loaded;
         Draw();
         Dialogs.Show(sheet, over);
+        Name();
+    }
+
+    /// <summary>The header from the Canvas assignment: its name (opened from a tool's row, the popup had the tool's), and
+    /// when it is due beside "Macmillan Learning".</summary>
+    private async void Name()
+    {
+        if (await AltaLook.Assignment(engine, launch) is not { } a || closed) return;
+        if (a.Title is { Length: > 0 } name) title.Text = name;
+        if (a.DueLine is { Length: > 0 } due) subtitle.Text = $"Macmillan Learning · {due}";
     }
 
     private void Draw()

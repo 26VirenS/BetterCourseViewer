@@ -277,7 +277,8 @@ internal sealed class QuizSheet
     {
         var words = K.V(2, title, subtitle);
         words.VerticalAlignment = VerticalAlignment.Center;
-        var trailing = K.H(8, clockPill, instructionsButton, moreButton, closeButton);
+        // (the tools pinned to the title bar, here too: the popup covers the title bar while it is up)
+        var trailing = K.H(8, new Simpl.Tools.PinBar(Engine, inPopup: true), clockPill, instructionsButton, moreButton, closeButton);
         trailing.VerticalAlignment = VerticalAlignment.Center;
         back.VerticalAlignment = VerticalAlignment.Center;
         back.Margin = new Thickness(0, 0, 8, 0);
