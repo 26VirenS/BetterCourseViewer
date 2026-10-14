@@ -105,7 +105,7 @@ public sealed partial class SearchPalette
             if (list.Count == 0)
             {
                 var help = new PaletteItem("help", "/help", SymbolRegular.AppsList24, PaletteAction.Fill("/")) { Sub = "Every command" };
-                return ([new PaletteSection("No Command by That Name", [help, SearchRow(t.Name)])], null);
+                return ([new PaletteSection("No command by that name", [help, SearchRow(t.Name)])], null);
             }
             return ([new PaletteSection("Commands", list.Select(c => c.SlashRow).ToList())], null);
         }
@@ -154,7 +154,7 @@ public sealed partial class SearchPalette
                 var items = new List<PaletteItem>();
                 if (arg.Length > 0)
                     items.Add(new PaletteItem("task.add", $"Add “{arg}” to To Do", SymbolRegular.AddCircle24, PaletteAction.AddTask(arg)) { Sub = "A task for today", Trailing = "Enter", Filled = true });
-                items.Add(new PaletteItem("task.new", "New Task…", SymbolRegular.Compose24, PaletteAction.Of(PaletteDo.NewTask)) { Sub = "With a day, a course, a priority and a repeat", Trailing = "Ctrl+N" });
+                items.Add(new PaletteItem("task.new", "New task…", SymbolRegular.Compose24, PaletteAction.Of(PaletteDo.NewTask)) { Sub = "With a day, a course, a priority and a repeat", Trailing = "Ctrl+N" });
                 return (One(cmd.Title, items.ToArray()), null);
             }
             case PaletteLists.Commands:
@@ -192,6 +192,11 @@ public sealed partial class SearchPalette
 
     private static string CodeOf(CourseRow c) => string.IsNullOrEmpty(c.Code) ? c.Name ?? "" : c.Code;
 
+    /// <summary>A course's second line: its other name only when it says something the pane's name does not, else its
+    /// term and teacher ("Fall 2026 · Yue Lei") — never the same course named again.</summary>
+    private static string? SecondLine(CourseRow c) =>
+        !string.IsNullOrEmpty(c.AltName) ? c.AltName : !string.IsNullOrEmpty(c.Detail) ? c.Detail : null;
+
     /// <summary>The courses whose code or name holds the words, the codes that start with them first.</summary>
     private static List<CourseRow> CoursesFor(string q, Engine.Engine engine)
     {
@@ -210,7 +215,7 @@ public sealed partial class SearchPalette
         if (found.Count > 0)
             return found.Take(limit).Select(c => new PaletteItem($"c.{c.Id}", CodeOf(c), SymbolRegular.Book24, PaletteAction.Go(Place.Home($"courses/{c.Id}")))
             {
-                Sub = c.Name == CodeOf(c) ? null : c.Name, Color = c.Color, Square = true,
+                Sub = SecondLine(c), Color = c.Color, Square = true,
                 Trailing = (c.Unread ?? 0) > 0 ? $"{c.Unread} new" : null,
             }).ToList();
         return SectionItems(q, engine, limit);
@@ -235,7 +240,7 @@ public sealed partial class SearchPalette
                 if (!s.Kind.ToLowerInvariant().StartsWith(last, StringComparison.Ordinal) && !s.Label.ToLowerInvariant().StartsWith(last, StringComparison.Ordinal)) continue;
                 outList.Add(new PaletteItem($"s.{ctx}.{s.Kind}", $"{s.Label} — {CodeOf(c)}", Glyph.Section(s.Kind), PaletteAction.Go(Place.Section(ctx, s.Kind)))
                 {
-                    Sub = c.Name, Color = c.Color,
+                    Sub = SecondLine(c), Color = c.Color,
                 });
             }
         }
@@ -252,18 +257,19 @@ public sealed partial class SearchPalette
         }).ToList();
     }
 
-    /// <summary>/grades: the overview (with the GPA once read) and each course's grade — the courses' own scores at once,
-    /// the Grades screen's (with the letter) once they are in.</summary>
+    /// <summary>/grades: the overview (its GPA once, at its end, as the engine writes it) and each course's grade — the
+    /// courses' own scores at once, the Grades screen's (with the letter, and how much is graded) once they are in. Each
+    /// course is named as the pane names it; the line under it says something new.</summary>
     private List<PaletteItem> GradeItems(string q)
     {
         var items = new List<PaletteItem>();
         var data = gradesCache?.Data;
         if (q.Length == 0)
         {
-            var gpa = data?.Gpa is { } g ? g.ToString("0.00", CultureInfo.InvariantCulture) : null;
-            items.Add(new PaletteItem("grades.all", "Grades Overview", SymbolRegular.DataBarVertical24, PaletteAction.Go(Place.Grades))
+            var gpa = data?.GpaText is { Length: > 0 } gt && gt != "–" ? gt : data?.GpaText == null && data?.Gpa is { } g ? Math.Round((decimal)g, 2, MidpointRounding.AwayFromZero).ToString("0.00", CultureInfo.InvariantCulture) : null;
+            items.Add(new PaletteItem("grades.all", "Grades overview", SymbolRegular.DataBarVertical24, PaletteAction.Go(Place.Grades))
             {
-                Sub = gpa != null ? $"GPA {gpa} · every course" : "Every course, and your GPA", Trailing = gpa,
+                Sub = gpa != null ? "Every course, and your GPA" : "Every course", Trailing = gpa != null ? $"GPA {gpa}" : null,
             });
         }
         if (data != null)
@@ -274,7 +280,7 @@ public sealed partial class SearchPalette
                 var score = string.Join(" · ", new[] { r.PctText, r.Letter ?? "" }.Where(x => x.Length > 0));
                 items.Add(new PaletteItem($"grade.{r.Id}", r.Code, SymbolRegular.DataBarVertical24, PaletteAction.Go(Place.Section($"courses/{r.Id}", "grades")))
                 {
-                    Sub = $"Grades in {r.Name ?? r.Code}", Color = r.Color, Trailing = score, Filled = true,
+                    Sub = !string.IsNullOrEmpty(r.GradedText) ? $"Grades · {r.GradedText}" : !string.IsNullOrEmpty(r.AltName) ? $"Grades · {r.AltName}" : "Grades", Color = r.Color, Trailing = score, Filled = true,
                 });
             }
         }
@@ -283,7 +289,7 @@ public sealed partial class SearchPalette
             foreach (var c in CoursesFor(q, engine))
                 items.Add(new PaletteItem($"grade.{c.Id}", CodeOf(c), SymbolRegular.DataBarVertical24, PaletteAction.Go(Place.Section($"courses/{c.Id}", "grades")))
                 {
-                    Sub = $"Grades in {c.Name ?? CodeOf(c)}", Color = c.Color, Trailing = c.ScoreText, Filled = true,
+                    Sub = !string.IsNullOrEmpty(c.AltName) ? $"Grades · {c.AltName}" : "Grades", Color = c.Color, Trailing = c.ScoreText, Filled = true,
                 });
         }
         if (items.Count == 0) items.Add(Hint("No course by that name", SymbolRegular.DataBarVertical24));

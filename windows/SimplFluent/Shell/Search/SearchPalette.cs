@@ -22,8 +22,9 @@ namespace Simpl.Shell;
 /// letter goes in — a sum worked out, the commands whose names it starts, your courses (and a course's section: "bio
 /// files"), your groups, and Search for the words. "/" (or ">") lists every command the box knows, narrowing as its name
 /// is typed; a command that takes something (/course, /grades, /due, /file …) lists what it can be once a space follows
-/// its name. A suggestion picked — clicked, or ↑ ↓ and Enter — runs; Enter on words alone searches everything, as
-/// before, and words typed are searched as they go (two letters or more). Ctrl+K opens the box on "/".
+/// its name. A suggestion picked — clicked, or ↑ ↓ and Enter — runs; Enter on words alone searches everything (on a sum,
+/// copies its answer). Typing never moves the page: the full search runs only on Enter or Search for, so a quick answer
+/// or a jump to a course leaves the student where they were. Ctrl+K opens the box on "/".
 /// </summary>
 public sealed partial class SearchPalette : IDisposable
 {
@@ -43,8 +44,6 @@ public sealed partial class SearchPalette : IDisposable
     private List<PaletteSection> sections = new();
     private string? chosen;
     private bool commandMode;
-    /// <summary>The box's text set here (a suggestion run, a command filled in): nothing is searched for it.</summary>
-    private bool quiet;
     /// <summary>The screenshot suite's list, shown whether or not the box holds the keyboard.</summary>
     private bool forced;
     private int seq;
@@ -128,13 +127,8 @@ public sealed partial class SearchPalette : IDisposable
     {
         var raw = box.Text;
         if (engine.Query != raw) engine.Query = raw;
+        // (the suggestions only: the page stays as it is until Enter or Search for asks for the full search)
         Update(raw);
-        if (quiet || !(box.IsKeyboardFocusWithin || forced)) return;
-        // (words typed are searched as they go, the results in the window; a command's list is in the suggestions)
-        var t = raw.Trim();
-        if (IsCommand(t)) return;
-        if (t.Length >= 2) engine.Search(t);
-        else if (t.Length == 0 && engine.Nav.Current.Place.Kind == PlaceKind.Search) engine.GoBack();
     }
 
     private void OnKey(object sender, KeyEventArgs e)
@@ -291,7 +285,8 @@ public sealed partial class SearchPalette : IDisposable
         }
         sections = outList;
         var acting = outList.SelectMany(s => s.Items).Where(i => i.Action.Acts).Select(i => i.Id).ToList();
-        if (!(keepChoice && chosen != null && acting.Contains(chosen))) chosen = commandMode ? acting.FirstOrDefault() : null;
+        // (a sum's answer is what Enter takes — copied — never a search that finds nothing)
+        if (!(keepChoice && chosen != null && acting.Contains(chosen))) chosen = commandMode ? acting.FirstOrDefault() : acting.Contains("answer") ? "answer" : null;
         Render(fresh: !keepChoice);
     }
 
@@ -313,12 +308,20 @@ public sealed partial class SearchPalette : IDisposable
         if (fresh) scroller.ScrollToTop();
     }
 
-    /// <summary>A suggestion (Windows 11's list item): its symbol — or a course's square — what it is over the line after
-    /// it, a shortcut or a score at its end; the one chosen filled, with the accent's pill at its left.</summary>
+    /// <summary>A suggestion (Windows 11's list item): its symbol — or a course's square — what it is (a command's name
+    /// with what it takes after it as grey placeholders) over the line after it, a shortcut or a score at its end; the one
+    /// chosen filled, with the accent's pill at its left.</summary>
     private FrameworkElement Row(PaletteItem it)
     {
         var grid = K.Columns("auto, *, auto", Symbol(it).Col(0));
-        var words = K.V(0, K.Text(it.Title, Ty.Body, it.Action.Acts ? B.Text : B.Text2));
+        var name = K.Text(it.Title, Ty.Body, it.Action.Acts ? B.Text : B.Text2);
+        if (it.Args is { Length: > 0 } args)
+        {
+            var placeholders = new System.Windows.Documents.Run("  " + args);
+            placeholders.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, B.Text3);
+            name.Inlines.Add(placeholders);
+        }
+        var words = K.V(0, name);
         if (it.Sub is { Length: > 0 } sub) words.Children.Add(K.Text(sub, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         grid.Children.Add(words.Margin(12, 0, 0, 0).Col(1));
@@ -338,7 +341,8 @@ public sealed partial class SearchPalette : IDisposable
         b.MinHeight = 40;
         b.Margin = new Thickness(4, 0, 4, 0);
         b.ToolTip = it.Title.Length > 48 ? it.Title : null;
-        System.Windows.Automation.AutomationProperties.SetName(b, it.Sub is { Length: > 0 } s2 ? $"{it.Title}, {s2}" : it.Title);
+        var said = it.Args is { Length: > 0 } a2 ? $"{it.Title} {a2.Replace('‹', ' ').Replace('›', ' ').Trim()}" : it.Title;
+        System.Windows.Automation.AutomationProperties.SetName(b, it.Sub is { Length: > 0 } s2 ? $"{said}, {s2}" : said);
         rows.Add((item, b, pill));
         return b;
     }
@@ -547,13 +551,8 @@ public sealed partial class SearchPalette : IDisposable
 
     private void SetText(string text)
     {
-        quiet = true;
-        try
-        {
-            box.Text = text;
-            box.CaretIndex = text.Length;
-        }
-        finally { quiet = false; }
+        box.Text = text;
+        box.CaretIndex = text.Length;
     }
 
     private void FocusBox()
