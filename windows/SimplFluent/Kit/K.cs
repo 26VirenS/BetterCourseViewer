@@ -366,12 +366,15 @@ public static class K
         return g;
     }
 
-    /// <summary>A ring of a colour round a value (a course's score): the track faint, the arc as far as the fraction.</summary>
-    public static FrameworkElement Ring(double? fraction, Color color, double size, double thickness = 4, UIElement? inside = null)
+    /// <summary>A ring of a colour round a value (a course's score): the track faint, the arc as far as the fraction.
+    /// <paramref name="tinted"/> draws the track in the ring's own colour, faint (as the Mac's rings are), where the
+    /// theme's neutral track would all but vanish on a light card.</summary>
+    public static FrameworkElement Ring(double? fraction, Color color, double size, double thickness = 4, UIElement? inside = null, bool tinted = false)
     {
         var g = new Grid { Width = size, Height = size };
         var track = new Ellipse { StrokeThickness = thickness, Margin = new Thickness(0) };
-        track.SetResourceReference(Shape.StrokeProperty, B.Subtle3);
+        if (tinted) track.Stroke = Brush(WithAlpha(color, Support.Appearance.Dark ? 0.24 : 0.18));
+        else track.SetResourceReference(Shape.StrokeProperty, B.Subtle3);
         g.Children.Add(track);
         if (fraction is { } f && f > 0)
             g.Children.Add(new Path

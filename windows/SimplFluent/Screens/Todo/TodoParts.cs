@@ -56,7 +56,7 @@ internal static class TodoWords
             0 => "Today",
             1 => "Tomorrow",
             -1 => "Yesterday",
-            _ => Math.Abs(apart) < 7 ? date.ToString("ddd", CultureInfo.CurrentCulture) : date.ToString("MMM d", CultureInfo.CurrentCulture),
+            _ => Math.Abs(apart) < 7 ? date.ToString("ddd", CultureInfo.InvariantCulture) : date.ToString(date.Year == DateTime.Today.Year ? "MMM d" : "MMM d, yyyy", CultureInfo.InvariantCulture),
         };
         return Text(row.Time) is { } time ? $"{day} {time}" : day;
     }
@@ -68,9 +68,9 @@ internal static class TodoWords
         if (apart == 0) return "Today";
         if (apart == 1) return "Tomorrow";
         if (apart == -1) return "Yesterday";
-        if (apart > 0 && apart < 7) return date.ToString("dddd", CultureInfo.CurrentCulture);
-        if (date.Year == DateTime.Today.Year) return date.ToString("MMM d", CultureInfo.CurrentCulture);
-        return date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture);
+        if (apart > 0 && apart < 7) return date.ToString("dddd", CultureInfo.InvariantCulture);
+        if (date.Year == DateTime.Today.Year) return date.ToString("MMM d", CultureInfo.InvariantCulture);
+        return date.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
     }
 
     /// <summary>"Due today at 11:59 PM", "Saturday at 3:00 PM", "Due Oct 16 at 11:59 PM", "Tomorrow, all day".</summary>

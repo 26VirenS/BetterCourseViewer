@@ -49,7 +49,7 @@ public sealed partial class TodoScreen : Screen
 
     public override string Title => "To Do";
 
-    /// <summary>What is open across how many courses, and how much of it is done (the Mac's heading line and window subtitle).</summary>
+    /// <summary>What is open across how many courses (the Mac's heading line and window subtitle).</summary>
     public override string? Subtitle => subtitle;
 
     /// <summary>The list and the side column scroll on their own.</summary>
@@ -90,7 +90,8 @@ public sealed partial class TodoScreen : Screen
     protected override FrameworkElement Build()
     {
         var d = data.Data;
-        var sub = d == null ? null : string.Join(" · ", new[] { TodoWords.Text(d.Sub), $"{d.Done} of {d.Total} done" }.Where(s => s != null));
+        // (what is open across how many courses; how much is done is the progress card's to say, once)
+        var sub = d == null ? null : TodoWords.Text(d.Sub);
         if (sub != subtitle) { subtitle = sub; HeaderChange(); }
         if (d == null) return K.LoadState(data.Error, () => data.Reload(engine, "todo"));
 
@@ -237,6 +238,15 @@ public sealed partial class TodoScreen : Screen
             {
                 d.Done = Math.Clamp(d.Done + (row.Done ? 1 : -1), 0, d.Total);
                 d.Pct = d.Total > 0 ? (int)Math.Round((double)d.Done / d.Total * 100, MidpointRounding.AwayFromZero) : 0;
+                // (the progress card's words with it, as the page writes them, until it says so itself)
+                d.Left = Math.Max(0, d.Total - d.Done);
+                d.LeftText = $"{d.Left} left";
+                d.DoneText = $"{d.Done} of {d.Total} done";
+                if (d.Overdue is int late && TodoWords.Date(row.Date) is { } due && due < DateTime.Now)
+                {
+                    d.Overdue = Math.Max(0, late + (row.Done ? -1 : 1));
+                    d.OverdueText = d.Overdue > 0 ? $"{d.Overdue} overdue" : "";
+                }
             }
             break;
         }

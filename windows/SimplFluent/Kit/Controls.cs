@@ -106,11 +106,17 @@ public sealed class CheckCircle : Button
         hint.Opacity = 0;
         ring.SetResourceReference(Shape.StrokeProperty, B.StrongStroke);
         fill.Fill = new SolidColorBrush(Color.FromRgb(0x2f, 0xa8, 0x4f));
-        var g = new Grid { Children = { fill, ring, hint, tick } };
+        // (the ring in a box of its own size: the button's style centres its content, which would otherwise be only as
+        //  tall as the tick's symbol and squash the circle into a flat oval)
+        var g = new Grid { Width = size, Height = size, Children = { fill, ring, hint, tick } };
         Content = g;
         SetResourceReference(StyleProperty, "SubtleButton");
         K.SetCorner(this, new CornerRadius(size / 2));
         Padding = new Thickness(0);
+        MinWidth = 0;
+        MinHeight = 0;
+        HorizontalContentAlignment = HorizontalAlignment.Center;
+        VerticalContentAlignment = VerticalAlignment.Center;
         Cursor = Cursors.Hand;
         ToolTip = label;
         System.Windows.Automation.AutomationProperties.SetName(this, label);

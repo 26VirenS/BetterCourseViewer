@@ -29,18 +29,27 @@ public sealed partial class TodoScreen
         return K.Card(content, new Thickness(18));
     }
 
-    /// <summary>How much is done: a ring, the share, and how many of how many.</summary>
+    /// <summary>
+    /// How much is done, as the Mac has it: the ring (its track the ring's own green, faint — the theme's grey all but
+    /// vanished on a light card), and beside it what the student opens To Do to see — what is left ("17 left"), or, when
+    /// there is any, what is late, in red ("1 overdue") — with how many of how many are done under it. The share stays
+    /// the ring's alone: a percentage says little early in the week.
+    /// </summary>
     private static FrameworkElement Progress(TodoData d)
     {
-        var ring = K.Ring(d.Pct / 100.0, Green, 64, 8);
-        var pct = K.Text($"{d.Pct}%", Ty.Count);
-        var done = K.Text($"{d.Done} of {d.Total} done", Ty.Body, B.Text2);
-        TodoWords.Tabular(pct);
+        var ring = K.Ring(d.Pct / 100.0, Green, 64, 8, tinted: true);
+        var left = d.Left ?? Math.Max(0, d.Total - d.Done);
+        var overdue = TodoWords.Text(d.OverdueText);
+        var big = K.Text(overdue ?? TodoWords.Text(d.LeftText) ?? $"{left} left", Ty.Count);
+        if (overdue != null) big.Foreground = K.Brush(K.Darkened(K.Tone("red")));
+        var doneLine = TodoWords.Text(d.DoneText) ?? $"{d.Done} of {d.Total} done";
+        var done = K.Text(doneLine, Ty.Body, B.Text2);
+        TodoWords.Tabular(big);
         TodoWords.Tabular(done);
-        var words = K.V(2, pct, done);
+        var words = K.V(2, big, done);
         words.VerticalAlignment = VerticalAlignment.Center;
         var row = K.H(16, ring, words);
-        AutomationProperties.SetName(row, $"{d.Pct}% done: {d.Done} of {d.Total}");
+        AutomationProperties.SetName(row, overdue != null ? $"{overdue}, {TodoWords.Text(d.LeftText) ?? $"{left} left"}, {doneLine}" : $"{TodoWords.Text(d.LeftText) ?? $"{left} left"}, {doneLine}");
         return row;
     }
 
@@ -77,7 +86,8 @@ public sealed partial class TodoScreen
     // ---- the side column ----
 
     /// <summary>The week at a glance beside the list (the Mac's overview): the progress, the grouping, what is left day by
-    /// day, by course and by priority, and New task — one card, its parts between hairlines.</summary>
+    /// day, by course and by priority — one card, its parts between hairlines. New task is the title's alone, at any
+    /// width: one copy of it on the page.</summary>
     private FrameworkElement Overview(TodoData d)
     {
         var open = d.Sections.SelectMany(s => s.Rows).Where(r => !r.Done).ToList();
@@ -96,11 +106,6 @@ public sealed partial class TodoScreen
                 v.Children.Add(levels);
             }
         }
-        v.Children.Add(K.Divider());
-        var add = K.Button("New task", () => engine.AskNewTask(), accent: true, icon: SymbolRegular.Add24);
-        add.HorizontalAlignment = HorizontalAlignment.Stretch;
-        add.ToolTip = "A task of your own";
-        v.Children.Add(add);
         return K.Card(v, new Thickness(20));
     }
 
@@ -136,17 +141,17 @@ public sealed partial class TodoScreen
         {
             bars.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var day = today.AddDays(k);
-            var count = K.Text(perDay[k] > 0 ? perDay[k].ToString(CultureInfo.CurrentCulture) : "", Ty.Caption, B.Text2).Strong().Center();
+            var count = K.Text(perDay[k] > 0 ? perDay[k].ToString(CultureInfo.InvariantCulture) : "", Ty.Caption, B.Text2).Strong().Center();
             var bar = new Border { Height = Math.Max(4, (double)perDay[k] / most * 46), CornerRadius = new CornerRadius(3) }.Bg(B.Accent);
             if (k > 0) bar.Opacity = 0.35;
-            var shortest = CultureInfo.CurrentCulture.DateTimeFormat.GetShortestDayName(day.DayOfWeek);
+            var shortest = CultureInfo.InvariantCulture.DateTimeFormat.GetShortestDayName(day.DayOfWeek);
             var letter = K.Text(shortest.Length > 0 ? shortest[..1] : "", Ty.Caption, k == 0 ? B.Text : B.Text2).Center();
             if (k == 0) letter.FontWeight = FontWeights.Bold;
             var col = K.V(4, count, bar, letter);
             col.VerticalAlignment = VerticalAlignment.Bottom;
             col.Margin = new Thickness(4, 0, 4, 0);
             col.Background = Brushes.Transparent;
-            var spoken = $"{day.ToString("dddd", CultureInfo.CurrentCulture)}, {perDay[k]} to do";
+            var spoken = $"{day.ToString("dddd", CultureInfo.InvariantCulture)}, {perDay[k]} to do";
             col.ToolTip = spoken;
             AutomationProperties.SetName(col, spoken);
             bars.Children.Add(col.Col(k));
@@ -173,7 +178,7 @@ public sealed partial class TodoScreen
         foreach (var name in names.OrderByDescending(n => counts[n]))
         {
             var color = K.Hex(colors[name]);
-            var count = K.Text(counts[name].ToString(CultureInfo.CurrentCulture), Ty.BodyStrong);
+            var count = K.Text(counts[name].ToString(CultureInfo.InvariantCulture), Ty.BodyStrong);
             TodoWords.Tabular(count);
             var top = K.Columns("auto, *, auto", K.Dot(color, 9).Col(0), K.Text(name, Ty.Body).Margin(8, 0, 6, 0).Col(1), count.Col(2));
             var line = K.V(4, top, K.Bar((double)counts[name] / most, color, 5));
