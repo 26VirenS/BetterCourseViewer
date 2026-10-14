@@ -603,6 +603,52 @@ try {
     && et.rows.find((t) => t.name === 'Pearson')?.courses.map((c) => c.items.map((i) => i.title).join()).join() === 'Mastering Physics'
     && ka.provider === 'knewton' && rp.provider === null && rp.icon === null,
     `external tools by provider: Macmillan's week-titled assignments, its module item and its tab one tool, Macmillan Learning (${JSON.stringify(et.rows?.map((t) => [t.name, t.provider, t.host, t.kinds.join('+'), t.instances]))}, ${JSON.stringify(macChem?.items?.map((i) => i.title))})`);
+  // More from Canvas: what the school added to Canvas's own nav (the page's #menu — History, an account tool with its
+  // icon, Help), for the Mac's and Windows's sidebars, as the web's sidebar shows it (extras.js)
+  const mfc = await nc('moreFromCanvas');
+  const mfcTool = mfc.items?.find((i) => i.kind === 'tool');
+  const mfcOf = (k) => mfc.items?.find((i) => i.kind === k);
+  check(!mfc.error && mfc.title === 'More from Canvas' && mfc.from === 'page' && mfc.items.map((i) => `${i.kind}:${i.label}`).join() === 'history:History,tool:My Materials,help:Help'
+    && mfcOf('history').open === 'history' && !mfcOf('history').external && mfcOf('help').open === 'help' && mfc.items.every((i) => i.id && i.note)
+    && mfcTool.open === 'tool' && mfcTool.external && mfcTool.href === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation` && mfcTool.url === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless`
+    && mfcTool.icon === `${BASE}/images/tool-icon.svg` && /^data:image\/png;base64,.{200,}/.test(mfcTool.iconData || '') && mfcTool.tile === '#0b2b52',
+  `More from Canvas: History, the school's tool (its icon drawn as a PNG, on its nav's colour; opened on Canvas's launch page, borderless) and Help, in the nav's order: ${JSON.stringify(mfc.items?.map((i) => ({ ...i, iconData: i.iconData?.slice(0, 30) })))}`);
+  // a tool whose icon Canvas draws inline (its settings give an SVG path, not a picture): the drawing, in the nav's colour
+  await sp.evaluate(() => {
+    const img = document.querySelector('#menu img');
+    self.__toolImg = img;
+    img.insertAdjacentHTML('afterend', '<svg class="ic-icon-svg ic-icon-svg--lti" style="fill:rgb(255, 255, 255)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 4 60 32 32 60 4 32z"/></svg>');
+    img.remove();
+  });
+  const mfcSvg = (await nc('moreFromCanvas')).items?.find((i) => i.kind === 'tool');
+  await sp.evaluate(() => { const svg = document.querySelector('#menu svg.ic-icon-svg--lti'); svg.replaceWith(self.__toolImg); });
+  const svgText = decodeURIComponent(String(mfcSvg?.icon || '').replace(/^data:image\/svg\+xml;utf8,/, ''));
+  check(/^data:image\/svg\+xml;utf8,/.test(mfcSvg?.icon || '') && /fill="rgb\(255, 255, 255\)"/.test(svgText) && /width="64"/.test(svgText) && /^data:image\/png;base64,.{200,}/.test(mfcSvg?.iconData || ''),
+    `a tool's inline icon comes as its drawing, in the nav's colour, and as a PNG: ${svgText.slice(0, 160)}`);
+  // a page without the menu: the last one seen (written down by extras.js), and nothing at all without one — no section
+  await sp.evaluate(() => { const m = document.getElementById('menu'); self.__menuAt = [m, m.parentNode, m.nextSibling]; m.remove(); });
+  let mfcSaved = null;
+  await eventually(async () => (mfcSaved = await nc('moreFromCanvas')).from === 'saved', 6000);
+  const navKept = await sp.evaluate(() => self.BCV.store.pref('globalNav', null));
+  await sp.evaluate(() => self.BCV.store.setPref('globalNav', null));
+  const mfcNone = await nc('moreFromCanvas');
+  await sp.evaluate(([kept]) => { const [m, p, n] = self.__menuAt; p.insertBefore(m, n); return self.BCV.store.setPref('globalNav', kept); }, [navKept]);
+  check(mfcSaved.from === 'saved' && mfcSaved.items.map((i) => i.label).join() === 'History,My Materials,Help' && mfcSaved.items.find((i) => i.kind === 'tool')?.url === mfcTool?.url
+    && mfcNone.from === 'none' && mfcNone.items.length === 0 && (await nc('moreFromCanvas')).from === 'page',
+  `on a page without the menu, the last one seen; with none seen, no items (the apps show no section): ${JSON.stringify({ saved: [mfcSaved?.from, mfcSaved?.items?.length], none: [mfcNone.from, mfcNone.items?.length] })}`);
+  // History and Help as the apps' popups: the web's sheets' rows, each course named as the sidebar names it
+  const mh = await nc('moreHistory');
+  const c101 = (await nc('courses')).rows?.find((r) => r.id === '101');
+  check(!mh.error && mh.title === 'History' && mh.note === 'What you opened lately, as Canvas recorded it.' && mh.empty === 'Nothing visited yet.'
+    && mh.rows.map((r) => r.title).join('|') === 'Composition of Functions|Lec06-PreQuiz|Week 2 Post Class Assignment: GC articles'
+    && mh.rows[0].url === `${BASE}/courses/101/assignments/1002` && mh.rows[1].url === `${BASE}/courses/101/quizzes/9011` && mh.rows.every((r) => r.open === 'place' && r.id && r.when && r.whenText)
+    && mh.rows.map((r) => r.kind).join() === 'assignment,quiz,assignment' && mh.rows[0].course === c101?.code && mh.rows[0].color === c101?.color
+    && mh.rows[0].sub === `${c101?.code} · Assignment · ${mh.rows[0].whenText}` && mh.rows[1].category === 'Quiz',
+  `History: Canvas's recently-visited list, each row where it leads (the app's own screen for it) and its course by the sidebar's name: ${JSON.stringify(mh.rows?.map((r) => [r.title, r.sub, r.url, r.open]))}`);
+  const mhp = await nc('moreHelp');
+  check(!mhp.error && mhp.title === 'Help' && mhp.rows.map((r) => r.title).join('|') === 'Search the Canvas Guides|IT Help Desk' && mhp.rows[1].sub === 'Campus technology support'
+    && mhp.rows.every((r) => r.open === 'browser' && /^https:\/\//.test(r.url)) && /Reporting a problem uses Canvas's own form/.test(mhp.foot) && mhp.note === 'Your school\'s help links, as Canvas lists them.',
+  `Help: the school's help links (another site's, for the app's own browser), Canvas's own form left to Canvas: ${JSON.stringify(mhp.rows?.map((r) => [r.title, r.url, r.open]))}`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

@@ -4,7 +4,8 @@
  * (#menu), so it is read from the page and shown under our own navigation: tools and links
  * open Canvas's page for them (the shell stays over it), History and Help open as sheets
  * drawn from the same lists Canvas's trays read. The last menu seen is kept for pages that
- * do not carry one. */
+ * do not carry one. The Mac and Windows apps show the same items and lists in their own sidebar
+ * and popups, asked of their engine page (native-app.js moreFromCanvas, moreHistory, moreHelp). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -16,6 +17,25 @@
   const OURS = new Set(['dashboard', 'courses', 'groups', 'calendar', 'conversations', 'profile']);
   const ICONS = { assignment: IC.doc, quiz: IC.bolt, discussion: IC.disc, announcement: IC.bell, document: IC.page, page: IC.page, module: IC.modules, folder: IC.folder, 'calendar-month': IC.cal, home: IC.book, syllabus: IC.page, grades: IC.chart, group: IC.people, user: IC.people };
   let memo = null; // the last menu seen (from this page, else from the preference)
+
+  /** A tool's icon Canvas draws inline (a tool whose settings give an SVG path rather than a picture's address, or
+   *  Canvas's own mark for a tool with neither) as an address an <img> can show: the drawing alone, in the colour
+   *  Canvas's nav gives it (its stylesheet colours it, and the copy has no stylesheet). null without one. */
+  function inlineIcon(li) {
+    const svg = li.querySelector('svg');
+    if (!svg) return null;
+    try {
+      const copy = svg.cloneNode(true);
+      copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      if (!copy.getAttribute('width')) copy.setAttribute('width', '64');
+      if (!copy.getAttribute('height')) copy.setAttribute('height', '64');
+      const fill = getComputedStyle(svg).fill;
+      if (!copy.getAttribute('fill')) copy.setAttribute('fill', fill && fill !== 'none' && !/^url/.test(fill) ? fill : '#fff');
+      return `data:image/svg+xml;utf8,${encodeURIComponent(new XMLSerializer().serializeToString(copy))}`;
+    } catch {
+      return null;
+    }
+  }
 
   /** The page's #menu as items we do not already draw. */
   function parseMenu() {
@@ -30,7 +50,7 @@
       if (OURS.has(id)) continue;
       if (id === 'history') items.push({ kind: 'history', label: label || 'History' });
       else if (id === 'help') items.push({ kind: 'help', label: label || 'Help' });
-      else if (href && href !== '#' && /external_tools/.test(href)) items.push({ kind: 'tool', label: label || 'Tool', href, icon: img?.getAttribute('src') || null });
+      else if (href && href !== '#' && /external_tools/.test(href)) items.push({ kind: 'tool', label: label || 'Tool', href, icon: img?.getAttribute('src') || inlineIcon(li) });
       else if (href && href !== '#' && label) items.push({ kind: 'link', label, href });
     }
     return items;
@@ -140,41 +160,70 @@
     }
   };
 
-  /** History: Canvas's own recently-visited list, as the History tray shows it. */
-  async function historySheet(app) {
-    let list;
-    try {
-      list = await store.history();
-    } catch (e) {
-      U.toast(`History could not be loaded: ${e.message}`, { error: true });
-      return;
-    }
-    const rows = (list || []).map((it) => ({
-      icon: ICONS[String(it.asset_icon || '').replace(/^icon-/, '')] || IC.page,
-      title: it.asset_name || 'Untitled',
-      sub: [it.context_name, it.asset_readable_category, it.visited_at ? U.fmtRecent(it.visited_at) : null].filter(Boolean).join(' · '),
-      onSelect: () => app.go(pathOf(it.visited_url)),
-    }));
-    sheet({ label: 'History', title: 'History', note: 'What you opened lately, as Canvas recorded it.', rows, empty: 'Nothing visited yet.' });
+  // ---- the lists the sheets show (and the apps' popups: native-app.js moreHistory, moreHelp) --------------------------
+  /** History: Canvas's own recently-visited list, as the History tray shows it — each visit's kind (Canvas's icon name
+   *  for it: "assignment", "quiz"…), title, course, category, time and address. A list Canvas refuses throws. */
+  async function historyList() {
+    const list = await store.history();
+    return {
+      title: 'History',
+      note: 'What you opened lately, as Canvas recorded it.',
+      empty: 'Nothing visited yet.',
+      rows: (list || []).map((it) => {
+        const kind = String(it.asset_icon || '').replace(/^icon-/, '');
+        return {
+          kind,
+          icon: ICONS[kind] || IC.page,
+          title: it.asset_name || 'Untitled',
+          sub: [it.context_name, it.asset_readable_category, it.visited_at ? U.fmtRecent(it.visited_at) : null].filter(Boolean).join(' · '),
+          course: it.context_name || '',
+          category: it.asset_readable_category || '',
+          at: it.visited_at || null,
+          url: it.visited_url || '/',
+        };
+      }),
+    };
   }
 
-  /** Help: the school's help links (the Help tray reads the same list). Entries that need Canvas's own form (report a problem) are left out. */
-  async function helpSheet(app) {
+  /** Help: the school's help links (the Help tray reads the same list). Entries that need Canvas's own form (report a
+   *  problem) are left out, and said in the foot; with none at all, Canvas's own guide for students. */
+  async function helpList() {
     let links = [];
     try {
       links = (await store.helpLinks()) || [];
     } catch {
       links = [];
     }
-    const rows = links.filter((l) => l.url && !String(l.url).startsWith('#')).map((l) => ({
-      icon: IC.external,
-      title: l.text || l.url,
-      sub: l.subtext || '',
-      onSelect: () => app.go(l.url),
-    }));
-    if (!rows.length) rows.push({ icon: IC.external, title: 'Canvas Student Guide', sub: 'community.canvaslms.com', onSelect: () => app.go('https://community.canvaslms.com/t5/Student-Guide/tkb-p/student') });
-    sheet({ label: 'Help', title: 'Help', note: 'Your school\'s help links, as Canvas lists them.', rows, empty: 'No help links.', foot: links.some((l) => String(l.url || '').startsWith('#')) ? 'Reporting a problem uses Canvas\'s own form: open the page in stock Canvas and choose Help.' : '' });
+    const rows = links.filter((l) => l.url && !String(l.url).startsWith('#')).map((l) => ({ title: l.text || l.url, sub: l.subtext || '', url: String(l.url) }));
+    if (!rows.length) rows.push({ title: 'Canvas Student Guide', sub: 'community.canvaslms.com', url: 'https://community.canvaslms.com/t5/Student-Guide/tkb-p/student' });
+    return {
+      title: 'Help',
+      note: 'Your school\'s help links, as Canvas lists them.',
+      empty: 'No help links.',
+      foot: links.some((l) => String(l.url || '').startsWith('#')) ? 'Reporting a problem uses Canvas\'s own form: open the page in stock Canvas and choose Help.' : '',
+      rows,
+    };
   }
 
-  BCV.extras = { items, prime, sideGroup, phoneRows, historySheet, helpSheet, parseMenu };
+  /** History as a sheet. */
+  async function historySheet(app) {
+    let d;
+    try {
+      d = await historyList();
+    } catch (e) {
+      U.toast(`History could not be loaded: ${e.message}`, { error: true });
+      return;
+    }
+    const rows = d.rows.map((r) => ({ icon: r.icon, title: r.title, sub: r.sub, onSelect: () => app.go(pathOf(r.url)) }));
+    sheet({ label: d.title, title: d.title, note: d.note, rows, empty: d.empty });
+  }
+
+  /** Help as a sheet. */
+  async function helpSheet(app) {
+    const d = await helpList();
+    const rows = d.rows.map((r) => ({ icon: IC.external, title: r.title, sub: r.sub, onSelect: () => app.go(r.url) }));
+    sheet({ label: d.title, title: d.title, note: d.note, rows, empty: d.empty, foot: d.foot });
+  }
+
+  BCV.extras = { items, prime, sideGroup, phoneRows, historySheet, helpSheet, historyList, helpList, parseMenu };
 })();

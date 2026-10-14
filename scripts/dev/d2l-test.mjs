@@ -578,6 +578,27 @@ try {
   const pp = await nc('people', { ctx: 'courses/31001' });
   const names = pp.sections?.flatMap((x) => x.rows.map((r) => r.name)) || [];
   check(!pp.error && names.some((n) => /Avery Quinn/.test(n)) && pp.sections.length >= 2, `People: the classlist, by role: ${JSON.stringify(pp.sections?.map((x) => `${x.title}:${x.rows.length}`))}`);
+  // More from Brightspace (the apps' sidebar section): what its navbar offers that the apps do not draw themselves — on
+  // the mock's bare navbar nothing (no section); on one with links of its own, those (a home, a calendar, the email the
+  // apps draw left out)
+  const mfb0 = await nc('moreFromCanvas');
+  await ap.evaluate(() => {
+    const w = document.createElement('div');
+    w.className = 'd2l-navigation-s-main-wrapper';
+    w.id = 'simpl-test-navbar';
+    w.innerHTML = '<div class="d2l-navigation-s-item"><a class="d2l-navigation-s-link" href="/d2l/home/6606">My Home</a></div>'
+      + '<div class="d2l-navigation-s-item"><a class="d2l-navigation-s-link" href="/d2l/le/calendar/6606">Calendar</a></div>'
+      + '<div class="d2l-navigation-s-item"><a class="d2l-navigation-s-link" href="/d2l/le/discovery/view/home/6606">Discover</a></div>'
+      + '<div class="d2l-navigation-s-item"><d2l-dropdown class="d2l-navigation-s-group"><d2l-dropdown-menu><d2l-menu label="Resources">'
+      + '<d2l-menu-item-link text="Library" href="https://library.example.edu/"></d2l-menu-item-link><d2l-menu-item-link text="Student Email" href="/d2l/lms/email/frame.d2l?ou=6606"></d2l-menu-item-link>'
+      + '</d2l-menu></d2l-dropdown-menu></d2l-dropdown></div>';
+    (document.querySelector('d2l-navigation') || document.body).append(w);
+  });
+  const mfb = await nc('moreFromCanvas');
+  await ap.evaluate(() => document.getElementById('simpl-test-navbar')?.remove());
+  check(!mfb0.error && mfb0.items.length === 0 && mfb0.from === 'none' && mfb.title === 'More from Brightspace' && mfb.from === 'page'
+    && mfb.items.map((i) => `${i.label}→${i.url}`).join('|') === `Discover→${BASE}/d2l/le/discovery/view/home/6606|Library→https://library.example.edu/` && mfb.items.every((i) => i.kind === 'link' && i.open === 'browser' && i.external),
+  `More from Brightspace: nothing on a bare navbar; the navbar's own links, less what the apps draw, on one with them: ${JSON.stringify({ bare: mfb0.items?.length, items: mfb.items?.map((i) => [i.label, i.url, i.note]) })}`);
   check(!appErrors.length, `no page errors in the app${appErrors.length ? `: ${appErrors.slice(0, 3).join(' | ')}` : ''}`);
 } catch (e) {
   console.error('crashed:', e?.stack || e);

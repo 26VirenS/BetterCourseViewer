@@ -1580,6 +1580,10 @@ window.mockDialog = function () { var d = document.createElement('div'); d.class
       res.writeHead(200, { 'content-type': 'image/svg+xml' });
       return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#f4f1e8"/><path d="M14 40h70M14 58h96M14 76h58" stroke="#2d6cdf" stroke-width="5" stroke-linecap="round"/><circle cx="96" cy="94" r="16" fill="none" stroke="#e5484d" stroke-width="5"/></svg>');
     }
+    if (path === '/images/tool-icon.svg') { // the school's own tool's icon in Canvas's nav (My Materials): white, drawn for the dark nav as a tool's icon is
+      res.writeHead(200, { 'content-type': 'image/svg+xml' });
+      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><g fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"><path d="M8 12h12v40H8zM23 18h12v34H23z"/><path d="M38 21l11-3 9 33-11 3z"/></g></svg>');
+    }
     if (path.startsWith('/files/') && !path.endsWith('/file_preview')) { // a file's bytes, as its content type says (an attachment, the way Canvas's download URL serves them)
       const fid = path.split('/')[2];
       const f = Object.values(files).flat().find((x) => x.id === fid);
