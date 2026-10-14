@@ -93,6 +93,8 @@ public sealed partial class AssignmentScreen : Screen
     // (no line under the title: the course is named by the chip under it — its way back — and, opened from the course,
     // by the breadcrumb; a long name wraps to a second line rather than being cut)
     public override int TitleLines => 2;
+    /// <summary>The course's colour before the title, as every course page wears it (the Mac's heading square).</summary>
+    public override Color? TitleColor => Appearance.Hex(model.Data?.Color) ?? CourseKit.ContextColor(engine, $"courses/{course}");
     public override bool Scrolls => false;
 
     public override void Refresh()

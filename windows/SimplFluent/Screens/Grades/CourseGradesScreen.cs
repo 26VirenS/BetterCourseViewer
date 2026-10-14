@@ -72,6 +72,9 @@ public sealed class CourseGradesScreen : Screen
 
     public override bool Scrolls => false;
 
+    /// <summary>The course's colour before the title, as every course page wears it (the Mac's heading square).</summary>
+    public override Color? TitleColor => Appearance.Hex(grades.Data?.Color) ?? CourseKit.ContextColor(engine, $"courses/{courseId}");
+
     /// <summary>The section's name as the course's own tabs give it (Grades, unless the course calls it otherwise).</summary>
     public override string Title =>
         engine.Sections.TryGetValue($"courses/{courseId}", out var list) && list.FirstOrDefault(s => s.Kind == "grades") is { } s ? s.Label : "Grades";

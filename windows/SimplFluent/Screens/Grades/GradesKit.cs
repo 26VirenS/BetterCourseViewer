@@ -292,7 +292,7 @@ internal static class GradesKit
             if (hovered != null && parts.FirstOrDefault(p => p.Id == hovered) is { } g)
             {
                 var name = K.Text(g.Name, Ty.Caption).Strong();
-                var what = K.Text($"{Share(g.Weight ?? 0)} of grade · {(g.Graded == true ? g.Value ?? "—" : "nothing graded yet")}", Ty.Caption, B.Text2);
+                var what = K.Text($"{Share(g.Weight ?? 0)} of grade · {(g.Graded == true ? g.Value ?? "–" : "nothing graded yet")}", Ty.Caption, B.Text2);
                 return K.H(6, K.Dot(ColorOf(g), 7), name, what);
             }
             return parts.Any(p => p.Graded != true) ? K.Text("Dashed: nothing graded there yet.", Ty.Caption, B.Text3) : null;
