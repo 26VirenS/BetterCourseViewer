@@ -31,7 +31,9 @@ public sealed class SignInCard : Grid
     private readonly Wpf.Ui.Controls.Button go;
     private readonly FrameworkElement fields;
     private string? shownError;
-    private bool autoDone;
+    // (once a run, not once a card: the card is made anew after each try, and a wrong password typed again every 1.8 s
+    //  left the picture to catch "Logging you in" now and then)
+    private static bool autoDone;
 
     /// <summary>The line under the fields while nothing has gone wrong: the details go into the school's own page, and
     /// "Stay logged in?" (after) says the rest.</summary>
@@ -146,7 +148,8 @@ public sealed class SignInCard : Grid
         pass.Password = "";
     }
 
-    /// <summary>The screenshot suite's sign-in (--sign-in user:pass): typed into the card a moment after it comes, and sent.</summary>
+    /// <summary>The screenshot suite's sign-in (--sign-in user:pass): typed into the card a moment after it first comes, and
+    /// sent, once.</summary>
     private async void AutoSignIn()
     {
         if (autoDone || Launch.Get("sign-in") is not { } creds) return;
