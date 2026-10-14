@@ -385,8 +385,11 @@ final class FloatingPopups {
     /// and one put up while it was folded away lay over it when it came out.
     func sidebarMoved(shown: Bool) {
         sidebarShown = shown
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            self?.windowResized()
+        // (and again once it has surely finished sliding: placed while it was still on its way in, a popup lay over it)
+        for delay in [0.6, 1.6] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.windowResized()
+            }
         }
     }
 
@@ -395,11 +398,32 @@ final class FloatingPopups {
     /// The screen's side of a window, on the screen: under its toolbar, past its sidebar while that is out (`sidebar`).
     static func area(of window: NSWindow, sidebar: Bool = true) -> NSRect {
         var r = window.convertToScreen(window.contentLayoutRect)
-        if sidebar, let side = TourFrames.shared.rect(.sidebar, in: window), side.maxX > 40, side.maxX < r.width * 0.5 {
-            r.origin.x += side.maxX
-            r.size.width -= side.maxX
+        if sidebar, let edge = sidebarEdge(in: window), edge > 40, edge < r.width * 0.5 {
+            r.origin.x += edge
+            r.size.width -= edge
         }
         return r
+    }
+
+    /// (1.3.79) Where a window's sidebar ends, across its content: as its view says it stands (TourFrames), else from the
+    /// split view the window's columns are in — a tool's popup put up as the window opened, before the sidebar's view had
+    /// said where it is, lay over the sidebar.
+    private static func sidebarEdge(in window: NSWindow) -> CGFloat? {
+        if let side = TourFrames.shared.rect(.sidebar, in: window), side.maxX > 40 { return side.maxX }
+        // (the outermost split view across the window: its first pane, unless folded away)
+        var queue: [NSView] = window.contentView.map { [$0] } ?? []
+        var i = 0
+        while i < queue.count {
+            let v = queue[i]
+            i += 1
+            if let split = v as? NSSplitView, split.isVertical, split.arrangedSubviews.count >= 2 {
+                let first = split.arrangedSubviews[0]
+                guard !split.isSubviewCollapsed(first), !first.isHidden else { return nil }
+                return first.convert(first.bounds, to: nil).maxX
+            }
+            queue.append(contentsOf: v.subviews)
+        }
+        return nil
     }
 
     /// Where a large popup opens over a window: the screen's side of it less the margin all round (no wider or taller
@@ -558,6 +582,10 @@ final class PopupPanel: NSPanel {
             f = FloatingPopups.largeFrame(over: over, moved: moved, sidebar: owner?.sidebarShown ?? true)
             model.size = f.size
             f = moved == .zero ? FloatingPopups.within(f, on: over.screen) : FloatingPopups.kept(f, on: over.screen)
+            if OpenClock.verbose, f != frame {
+                NSLog("[Simpl] popup %@: %.0f × %.0f, %.0f in from the window (sidebar %@)", popupKey, f.width, f.height,
+                      f.minX - over.frame.minX, (owner?.sidebarShown ?? true) ? "out" : "away")
+            }
         case .fitted:
             let s = size ?? frame.size
             if placed {

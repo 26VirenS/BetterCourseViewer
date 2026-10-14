@@ -43,7 +43,8 @@ shoot() {
   local slot
   slot="$(take_slot)"
   local settle=YES
-  case " $* " in *PickerConfirm*|*" tool:"*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*) settle=NO ;; esac
+  # (What's New comes up once the page is loaded and the app is quiet: a settled picture caught it on its way in, faint)
+  case " $* " in *PickerConfirm*|*" tool:"*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
