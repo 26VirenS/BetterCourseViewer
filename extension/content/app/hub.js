@@ -185,27 +185,107 @@
     }
     return out;
   };
-  // The tool behind an assignment, by its own name: the publisher the launch address belongs to when
-  // it is one the table knows, else the words before the colon or dash in the assignment's name
-  // ("Knewton Alta: Unit 2" → Knewton Alta) unless they only say which unit or week it is. So the
-  // tool is listed as a tool, once per course, as well as each assignment that opens it.
-  const BRANDS = [
-    [/knewton/, 'Knewton Alta'], [/mastering/, 'Mastering'], [/mylab|pearson/, 'Pearson MyLab'], [/webassign/, 'WebAssign'], [/cengage/, 'Cengage'], [/mheducation|mcgraw/, 'McGraw Hill Connect'], [/aleks/, 'ALEKS'],
-    [/wiley/, 'WileyPLUS'], [/macmillan/, 'Macmillan Achieve'], [/zybooks/, 'zyBooks'], [/gradescope/, 'Gradescope'], [/turnitin/, 'Turnitin'], [/tophat/, 'Top Hat'], [/perusall/, 'Perusall'], [/packback/, 'Packback'],
-    [/edfinity/, 'Edfinity'], [/myopenmath/, 'MyOpenMath'], [/webwork/, 'WeBWorK'], [/hawkes/, 'Hawkes'], [/lumenlearning|ohm\./, 'Lumen OHM'], [/vitalsource/, 'VitalSource'], [/playposit/, 'PlayPosit'], [/panopto/, 'Panopto'],
-    [/kaltura/, 'Kaltura'], [/zoom\.us/, 'Zoom'], [/crowdmark/, 'Crowdmark'], [/expertta/, 'Expert TA'], [/labster/, 'Labster'], [/voicethread/, 'VoiceThread'], [/piazza/, 'Piazza'], [/edstem|edunity/, 'Ed'], [/achieve3000|achieve\./, 'Achieve'],
+  // (Mac 1.3.79, Windows 0.3.1) A tool is its provider: every assignment, module item and course tab that opens Macmillan
+  // Learning is one tool, "Macmillan Learning", however each is titled ("W2", "W7 Homework"). The providers the app
+  // knows, by the host of the launch address, and by the words a course tab's label or an item's title names one by when
+  // its address is not one of them (Canvas's own launch route, a publisher's address on a host of its own): [id, name,
+  // icon — a word of icons.js, for a row's or a card's symbol —, its hosts, its names]. The first that fits is taken, so
+  // the narrower come before the wider.
+  const PROVIDERS = [
+    ['macmillan', 'Macmillan Learning', 'book', /bfwpub|macmillan|sapling|launchpad\.|hayden-?mcneil/, /macmillan(?: learning)?|achieve(?! ?3000)|sapling(?: learning)?|launchpad/],
+    ['knewton', 'Knewton Alta', 'book', /knewton/, /knewton(?: alta)?|alta$/],
+    ['pearson', 'Pearson', 'book', /pearson|mylab|mastering|mathxl/, /pearson|mylab|mastering|mathxl|revel/],
+    ['aleks', 'ALEKS', 'book', /aleks/, /aleks/],
+    ['mcgrawhill', 'McGraw Hill Connect', 'book', /mheducation|mcgraw|mhcampus/, /mc ?graw(?:[- ]hill)?(?: connect)?|connect$|smartbook/],
+    ['webassign', 'WebAssign', 'book', /webassign/, /webassign/],
+    ['cengage', 'Cengage', 'book', /cengage|mindtap/, /cengage|mindtap/],
+    ['wiley', 'WileyPLUS', 'book', /wiley/, /wiley ?plus|wiley/],
+    ['zybooks', 'zyBooks', 'book', /zybooks|zyante/, /zy ?books?/],
+    ['achieve3000', 'Achieve3000', 'book', /achieve3000/, /achieve ?3000/],
+    ['norton', 'W. W. Norton', 'book', /wwnorton/, /(?:w\.? ?w\.? )?norton|inquizitive/],
+    ['sage', 'Sage Vantage', 'book', /sagepub/, /sage vantage|sage$/],
+    ['vitalsource', 'VitalSource', 'book', /vitalsource|vstbridge/, /vital ?source|bookshelf$/],
+    ['redshelf', 'RedShelf', 'book', /redshelf/, /red ?shelf/],
+    ['edfinity', 'Edfinity', 'book', /edfinity/, /edfinity/],
+    ['myopenmath', 'MyOpenMath', 'book', /myopenmath/, /my ?open ?math/],
+    ['webwork', 'WeBWorK', 'book', /webwork/, /webwork/],
+    ['hawkes', 'Hawkes Learning', 'book', /hawkes/, /hawkes(?: learning)?/],
+    ['lumen', 'Lumen OHM', 'book', /lumenlearning|(?:^|\.)ohm\./, /lumen(?: ohm)?/],
+    ['expertta', 'Expert TA', 'book', /expertta/, /expert ?ta/],
+    ['labster', 'Labster', 'tool', /labster/, /labster/],
+    ['tophat', 'Top Hat', 'chart', /tophat|top-hat/, /top ?hat/],
+    ['iclicker', 'iClicker', 'chart', /iclicker|reef-education/, /i ?clicker/],
+    ['polleverywhere', 'Poll Everywhere', 'chart', /polleverywhere/, /poll ?everywhere/],
+    ['perusall', 'Perusall', 'reader', /perusall/, /perusall/],
+    ['hypothesis', 'Hypothesis', 'reader', /hypothes\.is/, /hypothes\.?is/],
+    ['gradescope', 'Gradescope', 'check', /gradescope/, /gradescope/],
+    ['crowdmark', 'Crowdmark', 'check', /crowdmark/, /crowdmark/],
+    ['turnitin', 'Turnitin', 'doc', /turnitin/, /turnitin/],
+    ['newquizzes', 'New Quizzes', 'check', /quiz-lti|quiz-api/, /new quizzes/],
+    ['studio', 'Canvas Studio', 'video', /instructuremedia/, /canvas studio|studio$/],
+    ['panopto', 'Panopto', 'video', /panopto/, /panopto/],
+    ['yuja', 'YuJa', 'video', /yuja/, /yuja/],
+    ['kaltura', 'Kaltura', 'video', /kaltura/, /kaltura|my media$/],
+    ['echo360', 'Echo360', 'video', /echo360/, /echo ?360/],
+    ['mediasite', 'Mediasite', 'video', /mediasite|sonicfoundry/, /mediasite/],
+    ['playposit', 'PlayPosit', 'video', /playposit/, /playposit/],
+    ['edpuzzle', 'Edpuzzle', 'video', /edpuzzle/, /edpuzzle/],
+    ['voicethread', 'VoiceThread', 'video', /voicethread/, /voice ?thread/],
+    ['linkedin', 'LinkedIn Learning', 'video', /linkedin|lynda\./, /linkedin(?: learning)?/],
+    ['zoom', 'Zoom', 'video', /zoom\.us|zoomgov/, /zoom/],
+    ['teams', 'Microsoft Teams', 'video', /teams\.microsoft|teams\.live/, /microsoft teams|teams$/],
+    ['onedrive', 'Microsoft OneDrive', 'folder', /onedrive|sharepoint|1drv\./, /(?:microsoft )?onedrive/],
+    ['microsoft', 'Microsoft 365', 'doc', /microsoft|office\.com|office365/, /microsoft(?: 365)?|office 365/],
+    ['googleassignments', 'Google Assignments', 'doc', /assignments\.google/, /google assignments/],
+    ['googledrive', 'Google Drive', 'folder', /(?:drive|docs)\.google|googleusercontent/, /google (?:drive|docs)/],
+    ['piazza', 'Piazza', 'disc', /piazza/, /piazza/],
+    ['ed', 'Ed Discussion', 'disc', /edstem|edunity/, /ed discussion|edstem/],
+    ['packback', 'Packback', 'disc', /packback/, /packback/],
+    ['h5p', 'H5P', 'slides', /h5p/, /h5p/],
+    ['padlet', 'Padlet', 'slides', /padlet/, /padlet/],
+    ['nearpod', 'Nearpod', 'slides', /nearpod/, /nearpod/],
+    ['respondus', 'Respondus', 'lock', /respondus/, /respondus|lockdown browser/],
+    ['proctorio', 'Proctorio', 'lock', /proctorio/, /proctorio/],
+    ['honorlock', 'Honorlock', 'lock', /honorlock/, /honorlock/],
   ];
-  const UNIT_WORD = /^(unit|week|wk|chapter|ch|chap|lesson|lecture|lec|module|mod|section|sec|part|day|hw|homework|assignment|quiz|test|exam|lab|midterm|final|project|problem|set|topic|reading|discussion|activity|worksheet|practice|review|extra|bonus|credit|\d+)$/i;
-  function toolNameOf(a) {
+  // (a tab's label names a provider when it begins with one of its names, "Panopto Recordings"; an item's title when its
+  // words before a colon or dash — or the whole title — are one of its names and a word more at most, "Knewton Alta: Unit 2"
+  // or "Mastering Physics", never a title that merely begins with one, "Zoom recording reflection". A name that is a
+  // word of everyday speech, "Connect", "Studio", counts only alone: "Connect with us" is no publisher's.)
+  const LABELLED = PROVIDERS.map((p) => new RegExp(`^(?:${p[4].source})(?![\\w])`, 'i'));
+  const TITLED = PROVIDERS.map((p) => new RegExp(`^(?:${p[4].source})(?:\\s+\\S+)?$`, 'i'));
+  const SECOND_LEVEL = /^(?:co|com|ac|edu|gov|org|net|ne|or|go|gob|sch|ltd|plc)$/;
+  // A site by the name a person would say it: its registered domain, "lmslink.bfwpub.com" → "bfwpub.com", "x.foo.co.uk" → "foo.co.uk".
+  const siteOf = (host) => {
+    const parts = String(host || '').toLowerCase().replace(/^www\./, '').split('.').filter(Boolean);
+    if (parts.length <= 2 || /^\d+$/.test(parts[parts.length - 1])) return parts.join('.');
+    const keep = parts[parts.length - 1].length === 2 && SECOND_LEVEL.test(parts[parts.length - 2]) ? 3 : 2;
+    return parts.slice(-keep).join('.');
+  };
+  const known = (p, by, host) => ({ id: p[0], name: p[1], icon: p[2], host, by });
+  /** The provider of a tool: by the host of its launch address (`url`) when the table knows it (`by` "host"); else by
+   *  the label of a course's tab (`label`) or an item's title (`title`) that names one ("name"); else, for an address of
+   *  a site the table does not know, by that site ("site": "bfwpub.com"). Never by the words of a title alone — "W2" and
+   *  "W7 Homework" are each a place the tool is used, not a tool. Null when nothing says (no address of its own). `host`
+   *  is the launch address's host, for the line under the tool's name. */
+  function providerOf({ url = '', title = '', label = '' } = {}) {
     let host = '';
-    try { host = new URL(a?.external_tool_tag_attributes?.url || '').host.toLowerCase(); } catch { host = ''; }
-    const brand = host ? BRANDS.find(([re]) => re.test(host)) : null;
-    if (brand) return brand[1];
-    const m = /^([^:–—]{2,40}?)\s*(?::|\s[–—-])\s+\S/.exec(String(a?.name || ''));
-    if (!m) return null;
-    const words = m[1].trim().split(/\s+/);
-    return words.length <= 3 && !words.every((w) => UNIT_WORD.test(w)) ? m[1].trim() : null;
+    try { const u = new URL(String(url || '')); host = /^https?:$/.test(u.protocol) && u.host !== location.host ? u.hostname.toLowerCase().replace(/^www\./, '') : ''; } catch { host = ''; }
+    const byHost = host ? PROVIDERS.find((p) => p[3].test(host)) : null;
+    if (byHost) return known(byHost, 'host', host);
+    const said = String(label || '').trim();
+    let k = said ? LABELLED.findIndex((re) => re.test(said)) : -1;
+    if (k < 0 && title) {
+      const m = /^([^:–—]{2,40}?)\s*(?::|\s[–—-])\s+\S/.exec(String(title));
+      const lead = (m ? m[1] : String(title)).trim();
+      k = TITLED.findIndex((re) => re.test(lead));
+    }
+    if (k >= 0) return known(PROVIDERS[k], 'name', host);
+    return host ? { id: `site:${siteOf(host)}`, name: siteOf(host), icon: null, host, by: 'site' } : null;
   }
+  // The tool behind an assignment, by its provider's name: so the tool is listed as a tool, once per course, as well as
+  // each assignment that opens it.
+  const toolNameOf = (a) => providerOf({ url: a?.external_tool_tag_attributes?.url, title: a?.name })?.name || null;
   async function toolItems(q, cs, lane, limit = PER) {
     const out = [];
     const seen = new Set();
@@ -219,27 +299,28 @@
     for (const { t, c } of tabLists.flat()) {
       const href = (() => { try { return new URL(t.html_url || t.full_url || '', location.origin).pathname; } catch { return ''; } })();
       if (!href) continue;
-      tabNames.add(`${c.id}|${norm(t.label)}`);
+      tabNames.add(`${c.id}|${norm(providerOf({ label: t.label })?.name || t.label)}`); // (a tab "Achieve" is Macmillan Learning's)
       if (!hit(`${t.label} ${nameOf(c)}`, q)) continue;
       add({ icon: IC.external, title: t.label, sub: `${nameOf(c)} · Campus tool`, tint: c.color || null, course: c, run: (from) => BCV.exttool?.openLink({ title: t.label, href, from }), external: true }, `${t.label}|${href}`);
     }
-    // the tool itself, once per course, opened through the assignment nearest its due date with nothing handed in
+    // the tool itself — its provider — once per course, opened through the assignment nearest its due date with nothing
+    // handed in
     const named = new Map();
     const stand = (a) => { const at = a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null; const now = Date.now(); return [a.submission?.submitted_at ? 1 : 0, at === null ? Infinity : at < now ? now - at + 365 * 864e5 : at - now]; };
     for (const { a, c } of aLists.flat()) {
       if (!isToolAssignment(a)) continue;
-      const name = toolNameOf(a);
-      if (!name || tabNames.has(`${c.id}|${norm(name)}`)) continue; // (a tool the course's own nav lists is listed there)
-      const key = `${c.id}|${norm(name)}`;
+      const p = providerOf({ url: a.external_tool_tag_attributes?.url, title: a.name });
+      if (!p || tabNames.has(`${c.id}|${norm(p.name)}`)) continue; // (a tool the course's own nav lists is listed there)
+      const key = `${c.id}|${norm(p.name)}`;
       const cur = named.get(key);
       const [d1, t1] = stand(a);
-      if (!cur || d1 < cur.stand[0] || (d1 === cur.stand[0] && t1 < cur.stand[1])) named.set(key, { name, c, a, stand: [d1, t1] });
+      if (!cur || d1 < cur.stand[0] || (d1 === cur.stand[0] && t1 < cur.stand[1])) named.set(key, { name: p.name, icon: p.icon, c, a, stand: [d1, t1] });
     }
-    for (const { name, c, a } of named.values()) {
+    for (const { name, icon, c, a } of named.values()) {
       if (!hit(`${name} ${nameOf(c)}`, q)) continue;
       const open = (from) => launchTool(a, c.id, from);
       add({
-        icon: IC.external, title: name, sub: `${nameOf(c)} · Tool · via ${a.name}`, tint: c.color || null, course: c, at: a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null, done: !!a.submission?.submitted_at, run: open, external: true, assignment: a, tool: true,
+        icon: (icon && IC[icon]) || IC.external, title: name, sub: `${nameOf(c)} · Tool · via ${a.name}`, tint: c.color || null, course: c, at: a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null, done: !!a.submission?.submitted_at, run: open, external: true, assignment: a, tool: true,
         actions: [{ label: 'Open tool', icon: IC.external, run: open }, { label: 'Assignment', icon: IC.doc, run: () => app().go(`/courses/${c.id}/assignments/${a.id}`) }],
       }, `t:${c.id}:${norm(name)}`);
     }
@@ -883,5 +964,5 @@
     return [];
   }
 
-  BCV.hub = { COMMANDS, matchCommands, parse, byName, quickAnswers, actionsFor, submitPopover, downloadFile, convertFile, viewFile, dueItems, parseWhen, launchTool, understand, resolve, readingLabel, toolNameOf };
+  BCV.hub = { COMMANDS, matchCommands, parse, byName, quickAnswers, actionsFor, submitPopover, downloadFile, convertFile, viewFile, dueItems, parseWhen, launchTool, understand, resolve, readingLabel, toolNameOf, providerOf };
 })();

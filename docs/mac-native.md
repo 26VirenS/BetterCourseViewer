@@ -258,6 +258,18 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool with its site, where it is found, and a button for each course it is in, opening it there (by its tab, else an
   assignment, else a module item; Knewton Alta and Macmillan in their own popups). A filter on the page narrows them
   (not a toolbar search field: the window's toolbar has the app's own, and a second one crashed it).
+  (1.3.79) A tool is its provider (hub.js `providerOf`, its `PROVIDERS` table: a provider's id, name, icon word, hosts
+  and names): every assignment, module item and tab that opens Macmillan Learning — lmslink.bfwpub.com, Achieve, Sapling
+  — is one card, "Macmillan Learning", each place under its own title ("W2: Atoms and Elements", "W7 Homework") in its
+  list; before, a title's words before its colon named a tool of their own ("W2", "W2 HW", "W7 Homework"…, a card each).
+  A provider is found by its launch address's host; else, where Canvas gives the tool's id (a tab's own, an assignment's
+  or a module item's `content_id`), by what the same tool's other places say — so a tab the school named "Course
+  Materials" joins Macmillan's card; else by a tab's label or an item's title that is a provider's name ("Achieve",
+  "Knewton Alta: Unit 2", "Mastering Physics"); else by its site ("bfwpub.com"); a tab that names none by its label.
+  Never by the words of a title alone. Each row carries `provider` (the table's id) and `icon` (a word of icons.js:
+  book, video, disc…), both null for a provider the table does not know; the Mac and Windows screens draw its letter as
+  before. The mock's CHEM course has Macmillan's week-titled assignments, a module item and a "Course Materials" tab of
+  the same tool.
   (1.3.68) Alta: a large picture or canvas (at least 140 × 100) counts as a graph too, and in dark mode each graph sits on
   a white card of its own (drawn in dark ink for a white page, its ground clear, it was lost on dark glass). A question
   is shown once Alta has finished drawing it — nothing changed on the page for 350 ms, no maths or answer box still
