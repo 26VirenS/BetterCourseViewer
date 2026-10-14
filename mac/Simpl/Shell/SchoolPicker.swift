@@ -87,16 +87,10 @@ struct SchoolPicker: View {
                     .foregroundStyle(.secondary)
             }
             field
+            // (onboarding-14) nothing about the sign-in card here: the card says what it needs to when it comes
             if !trimmed.isEmpty {
                 results
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-            } else {
-                Text("If your school’s sign-in page has a username and password, Simpl shows its own sign-in card for it, and can keep you logged in on this Mac if you choose.")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity)
             }
             manual
         }
@@ -150,8 +144,9 @@ struct SchoolPicker: View {
                     if let typed = SchoolSearch.addressLike(query) {
                         row(id: "open:" + typed, title: "Open \(typed)", sub: "The address as typed", symbol: "arrow.up.right.circle") { pickTyped(typed) }
                     }
+                    // (onboarding-10) one row an address: the other names it is listed under, beside it
                     ForEach(search.results) { s in
-                        row(id: s.id, title: s.name, sub: s.domain, symbol: "building.columns") { pick(s) }
+                        row(id: s.id, title: s.name, sub: s.detail, symbol: "building.columns") { pick(s) }
                     }
                     if search.asking && search.results.isEmpty {
                         HStack(spacing: 8) {
@@ -207,6 +202,7 @@ struct SchoolPicker: View {
         .buttonStyle(.plain)
         .onHover { inside in if inside { chosen = id } }
         .id(id)
+        .help(sub)
         .accessibilityHint("Opens \(sub)")
     }
 
@@ -261,8 +257,9 @@ struct SchoolPicker: View {
         confirming = school
     }
 
-    /// Yes: the school opened, and its sign-in as always.
+    /// Yes: the school opened, and its sign-in as always — (onboarding-13) the sign-in card naming it as it was chosen.
     private func open(_ school: SchoolSearch.School) {
+        if let host = AppSession.normalizeHost(school.domain) { SchoolNames.remember(school.name, for: host) }
         if !session.setHost(school.domain) {
             confirming = nil
             invalid = true
@@ -276,5 +273,23 @@ struct SchoolPicker: View {
             try? await Task.sleep(nanoseconds: 120_000_000)
             fieldFocused = true
         }
+    }
+}
+
+/// (onboarding-13) The name of the school chosen for an address, as the search listed it — kept on this Mac, so the
+/// sign-in card can say "Sign in to University of California Merced" rather than only the sign-in page's host. An
+/// address typed by hand has none; nor does one chosen before this was kept (the card then says "your school").
+enum SchoolNames {
+    private static func key(_ host: String) -> String { "schoolName:\(host.lowercased())" }
+
+    static func remember(_ name: String, for host: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, n.caseInsensitiveCompare(host) != .orderedSame else { return }
+        UserDefaults.standard.set(n, forKey: key(host))
+    }
+
+    static func name(for host: String?) -> String? {
+        guard let host, !host.isEmpty else { return nil }
+        return UserDefaults.standard.string(forKey: key(host)).flatMap { $0.isEmpty ? nil : $0 }
     }
 }

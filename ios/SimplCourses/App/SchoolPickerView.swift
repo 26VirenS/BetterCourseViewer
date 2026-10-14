@@ -38,7 +38,7 @@ struct SchoolPickerView: View {
                             Button { pick(s.domain) } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(s.name).foregroundStyle(.primary)
-                                    Text(s.domain).font(.footnote).foregroundStyle(.secondary)
+                                    Text(s.detail).font(.footnote).foregroundStyle(.secondary) // (its address, and the other names it goes by)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
@@ -98,7 +98,26 @@ final class SchoolSearch: ObservableObject {
     struct School: Identifiable, Hashable {
         let name: String
         let domain: String
-        var id: String { "\(name)|\(domain)" }
+        /// (onboarding-10) The other names listed at the same address that matched as well ("State Center SCCCD" beside
+        /// "State Center Community College District"): one row an address, not one a listing.
+        var also: [String] = []
+        var id: String { domain.lowercased() }
+
+        /// "also: State Center SCCCD" — two names at most, then "+N"; "" when there are none.
+        var alsoLine: String {
+            guard !also.isEmpty else { return "" }
+            return "also: " + also.prefix(2).joined(separator: ", ") + (also.count > 2 ? " +\(also.count - 2)" : "")
+        }
+
+        /// Its address, and the other names it goes by: "scccd.instructure.com · also: State Center SCCCD".
+        var detail: String { alsoLine.isEmpty ? domain : "\(domain) · \(alsoLine)" }
+
+        /// Another listing at this address: its name kept under this one's, once.
+        mutating func merge(_ other: String) {
+            guard other.caseInsensitiveCompare(name) != .orderedSame,
+                  !also.contains(where: { $0.caseInsensitiveCompare(other) == .orderedSame }) else { return }
+            also.append(other)
+        }
     }
     private struct Entry { let school: School; let folded: String; let words: [Substring] }
     private struct Listing: Decodable { let schools: [[String]] }
@@ -138,7 +157,8 @@ final class SchoolSearch: ObservableObject {
         if !last.isEmpty { find(last) }
     }
 
-    /// The listings matching every word typed, best first: a name that starts with it, then a word that does, then the rest.
+    /// The listings matching every word typed, best first: a name that starts with it, then a word that does, then the rest
+    /// — (onboarding-10) one row an address, under its best-matching name.
     func find(_ raw: String) {
         last = raw
         pending?.cancel()
@@ -152,7 +172,7 @@ final class SchoolSearch: ObservableObject {
             score += q.filter { t in e.words.contains { $0.hasPrefix(t) } }.count * 2
             scored.append((score, e.school))
         }
-        results = Array(scored.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1.name.localizedCaseInsensitiveCompare($1.1.name) == .orderedAscending }.prefix(60).map(\.1))
+        results = Array(SchoolSearch.merged(scored).prefix(60))
         #if os(iOS)
         // the app's own test school (Web/TestSchool.swift), first, for "simpl test" or "test.simpl" — and then nothing is
         // asked of the network: no school out there is the one being looked for
@@ -175,12 +195,53 @@ final class SchoolSearch: ObservableObject {
             if lookup { more = await SchoolSearch.lookup(raw) }
             let own = await brightspace
             guard !Task.isCancelled, let self, self.last == raw else { return }
-            var seen = Set(self.results.map(\.id))
-            // (a Brightspace at the very name typed is the school's own: first)
-            self.results.insert(contentsOf: own.filter { seen.insert($0.id).inserted }, at: 0)
-            for s in more where !seen.contains(s.id) { seen.insert(s.id); self.results.append(s) }
+            // (a Brightspace at the very name typed is the school's own: first; one at an address already listed, and
+            // a lookup's, merge into that address's row — onboarding-10)
+            var fresh: [School] = []
+            for s in own {
+                if let i = self.results.firstIndex(where: { $0.id == s.id }) {
+                    self.results[i].merge(s.name)
+                } else if let i = fresh.firstIndex(where: { $0.id == s.id }) {
+                    fresh[i].merge(s.name)
+                } else {
+                    fresh.append(s)
+                }
+            }
+            self.results.insert(contentsOf: fresh, at: 0)
+            for s in more {
+                if let i = self.results.firstIndex(where: { $0.id == s.id }) {
+                    self.results[i].merge(s.name)
+                } else {
+                    self.results.append(s)
+                }
+            }
             self.asking = false
         }
+    }
+
+    /// (onboarding-10) Scored listings as one row an address: titled by its best-scoring name (a tie: the shorter, then
+    /// the first in the alphabet), the others that matched under it; best first, then by name.
+    nonisolated static func merged(_ scored: [(Int, School)]) -> [School] {
+        var order: [String] = []
+        var groups: [String: [(Int, School)]] = [:]
+        for item in scored {
+            let id = item.1.id
+            if groups[id] == nil { order.append(id) }
+            groups[id, default: []].append(item)
+        }
+        let rows: [(Int, School)] = order.compactMap { id in
+            guard let list = groups[id] else { return nil }
+            let ranked = list.sorted { a, b in
+                if a.0 != b.0 { return a.0 > b.0 }
+                if a.1.name.count != b.1.name.count { return a.1.name.count < b.1.name.count }
+                return a.1.name.localizedCaseInsensitiveCompare(b.1.name) == .orderedAscending
+            }
+            guard let best = ranked.first else { return nil }
+            var row = best.1
+            for other in ranked.dropFirst() { row.merge(other.1.name) }
+            return (best.0, row)
+        }
+        return rows.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1.name.localizedCaseInsensitiveCompare($1.1.name) == .orderedAscending }.map(\.1)
     }
 
     /// (1.7) A school's Brightspace is most often at <its name>.brightspace.com: the name typed, run together (and its
