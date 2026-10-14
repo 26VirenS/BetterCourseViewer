@@ -1337,7 +1337,8 @@ public sealed class ToolFloat : FluentWindow
         var content = K.V(14, head, body);
         content.Margin = new Thickness(16, 0, 16, 16);
         Content = K.Rows("auto, auto", bar.Row(0), content.Row(1));
-        // (where it was left; the first time, at the window's top right, under the pins)
+        // (where it was left; the first time, at the window's top right, under the pins and clear of a popup's heading —
+        //  its Close and its own pins stay in sight)
         var place = "float-" + kind.Key;
         var first = Prefs.String($"window:{place}") == null;
         Placement.Restore(this, place, Width, 400, 200, 120);
@@ -1348,7 +1349,7 @@ public sealed class ToolFloat : FluentWindow
         {
             WindowStartupLocation = WindowStartupLocation.Manual;
             Left = o.Left + Math.Max(0, o.ActualWidth - Width - 24);
-            Top = o.Top + 56;
+            Top = o.Top + 112;
         }
         LocationChanged += (_, _) => Placement.Save(this, place);
         Closed += (_, _) => Open.Remove(key);

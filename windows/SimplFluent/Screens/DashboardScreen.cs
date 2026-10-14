@@ -405,15 +405,22 @@ public sealed partial class DashboardScreen : Screen
                 // (never cut in the middle of a word: as many of its parts — "announcements · 2 courses" is two — as fit
                 //  whole, "announcements" alone where both do not; none where not even the first does, the tooltip and
                 //  what a screen reader says then the whole of it)
+                //  (the room is the row's less the number's, not the line's own width: a line of words wider than its room
+                //  is laid out at its whole width and clipped, so its own width would always say it fits)
                 var parts = n.Note!.Split(" · ");
                 var widths = Enumerable.Range(1, parts.Length).Select(k => WordsWidth(string.Join(" · ", parts.Take(k)), Ty.Caption)).ToArray();
-                noteT.SizeChanged += (_, e) =>
+                var row = line;
+                void Fit()
                 {
+                    var room = row.ActualWidth - count.ActualWidth - RowGap;
                     var fit = 0;
-                    while (fit < parts.Length && widths[fit] <= e.NewSize.Width + 0.5) fit++;
-                    noteT.Text = fit == 0 ? "" : string.Join(" · ", parts.Take(fit));
+                    while (fit < parts.Length && widths[fit] <= room + 0.5) fit++;
+                    var words = fit == 0 ? "" : string.Join(" · ", parts.Take(fit));
+                    if (noteT.Text != words) noteT.Text = words;
                     noteT.Visibility = fit == 0 ? Visibility.Hidden : Visibility.Visible;
-                };
+                }
+                row.SizeChanged += (_, _) => Fit();
+                count.SizeChanged += (_, _) => Fit();
                 line.Children.Add(noteT);
             }
         }

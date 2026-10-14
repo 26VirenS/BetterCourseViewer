@@ -49,7 +49,8 @@ public sealed partial class AppShell : Grid, IDisposable
     private readonly SearchPalette palette;
     private readonly Grid header = new();
     private readonly ContentControl titleHost = new() { Focusable = false };
-    private readonly ContentControl commandsHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
+    // (a little room between the title and the first command, so a long title never runs into "Previous")
+    private readonly ContentControl commandsHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
     private readonly Border toast = new();
     private readonly TextBlock toastText;
     private readonly TranslateTransform toastShift = new();
@@ -703,9 +704,21 @@ public sealed partial class AppShell : Grid, IDisposable
     /// commands at its right line up with the content's right edge, not the window's.</summary>
     private void HeaderWidth()
     {
+        // (a width, not a greatest width: a heading held to the left is otherwise only as wide as its words, and the
+        //  commands would follow the title rather than end where the content does)
         var w = current?.HeaderWidth;
-        header.MaxWidth = w is { } x && x > 0 ? x : double.PositiveInfinity;
-        header.HorizontalAlignment = w != null ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        header.MaxWidth = double.PositiveInfinity;
+        if (w is { } x && x > 0)
+        {
+            var room = page.ActualWidth - header.Margin.Left - header.Margin.Right;
+            header.Width = room > 0 ? Math.Min(x, room) : x;
+            header.HorizontalAlignment = HorizontalAlignment.Left;
+        }
+        else
+        {
+            header.Width = double.NaN;
+            header.HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
     }
 
     /// <summary>The room under a page that scrolls with the shell.</summary>

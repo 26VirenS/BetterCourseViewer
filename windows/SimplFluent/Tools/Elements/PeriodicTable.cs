@@ -182,6 +182,9 @@ internal sealed class PTGrid : Panel
 
     public double Cell { get; private set; } = 40;
     public double Gap => compact ? 2 : 4;
+    /// <summary>Whether the table was last sized by the width it was given rather than its height (taller would not
+    /// make it larger).</summary>
+    public bool ByWidth { get; private set; }
 
     public PTGrid(bool compact)
     {
@@ -293,6 +296,7 @@ internal sealed class PTGrid : Panel
         if (double.IsInfinity(w) && double.IsInfinity(h)) { fw = 18 * 40 + 17 * Gap; fh = fw / Ratio; }
         else if (double.IsInfinity(h) || h * Ratio >= w) { fw = w; fh = w / Ratio; }
         else { fh = h; fw = h * Ratio; }
+        ByWidth = !double.IsInfinity(w) && (double.IsInfinity(h) || h * Ratio >= w);
         var cell = Math.Max(8, Math.Min((fw - 17 * Gap) / 18, (fh - 8 * Gap) / (9 + GapRow)));
         if (Math.Abs(cell - Cell) > 0.01)
         {
@@ -507,8 +511,9 @@ internal sealed class PeriodicTableTool : Grid
             //  extent against what it shows, measured, not added up from its parts — so it ends filling the page exactly,
             //  whatever else the page holds; a table held by its width, not its height, is left as it is)
             var spare = view - tablePage.ExtentHeight;
-            if (Math.Abs(spare) <= 2) return;
-            if (spare > 0 && grid.ActualHeight < grid.MaxHeight - 2) return;
+            // (held by its width, with room under it: taller would not make it larger — and a table still being laid
+            //  out, its height not yet the one asked, is looked at again once it is, below)
+            if (Math.Abs(spare) <= 2 || (spare > 0 && grid.ByWidth)) { fitAgain = 0; return; }
             h = grid.ActualHeight + spare - 1;
         }
         else
@@ -520,8 +525,24 @@ internal sealed class PeriodicTableTool : Grid
             h = view - others;
         }
         h = Math.Max(least, h);
-        if (double.IsInfinity(grid.MaxHeight) || Math.Abs(grid.MaxHeight - h) > 1) grid.MaxHeight = h;
+        if (double.IsInfinity(grid.MaxHeight) || Math.Abs(grid.MaxHeight - h) > 1)
+        {
+            grid.MaxHeight = h;
+            // (and looked at again once the page has settled: a change in the middle of a layout — the key or the
+            //  colourings growing a scroll bar, the window taking its size — can leave the page's extent behind, and no
+            //  later change would bring the table back to its room)
+            if (fitAgain < 6)
+            {
+                fitAgain++;
+                Dispatcher.BeginInvoke(() => FitTable(), DispatcherPriority.ContextIdle);
+            }
+        }
+        else fitAgain = 0;
     }
+
+    /// <summary>How many times running the table has been looked at again after a change (a few at most, so a page that
+    /// never settles cannot keep it busy).</summary>
+    private int fitAgain;
 
     private static void Hand(Action a)
     {

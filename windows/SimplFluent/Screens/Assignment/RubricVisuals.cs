@@ -513,17 +513,7 @@ internal sealed class RubricRingBack : Button
                 Arc(dc, c, r, mid, mid + (model.Starts[k] + gap / 2 + one - mid) * fill, tone, lw);
             }
             dc.Pop();
-            var ink = new Pen((TryFindResource(B.Text) as Brush) ?? Brushes.White, 2.2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
-            ink.Freeze();
-            var dx = -1.5 * fill;
-            var geo = new StreamGeometry();
-            using (var g = geo.Open())
-            {
-                g.BeginFigure(new Point(c.X + 1.6 + dx, c.Y - 5), false, false);
-                g.PolyLineTo(new[] { new Point(c.X - 3.4 + dx, c.Y), new Point(c.X + 1.6 + dx, c.Y + 5) }, true, true);
-            }
-            geo.Freeze();
-            dc.DrawGeometry(null, ink, geo);
+            // (no "‹" in its middle: a picture only, it must not look like a second way back beside "‹ Ring")
         }
 
         /// <summary>An arc between two angles clockwise from twelve o'clock (anticlockwise when to is before from).</summary>

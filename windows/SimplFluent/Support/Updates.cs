@@ -392,11 +392,21 @@ public static class Updates
         if (Launch.Get("update-test-sha") is { Length: > 0 } given) sha = given;
         else using (var f = File.OpenRead(file)) sha = Convert.ToHexString(SHA256.HashData(f));
         var notes = "An update played through (--update-test)." + (Launch.Flag("update-test-critical") ? "\n" + CriticalMark : "");
-        return new List<Release>
+        var page = "https://github.com/26VirenS/BetterCourseViewer/releases";
+        var list = new List<Release>
         {
-            new($"windows-fluent-v{run:000}", run, $"v{run:000}", false, DateTime.UtcNow, info.Length,
-                "https://github.com/26VirenS/BetterCourseViewer/releases", notes, new Asset(file, info.Length, sha)),
+            new($"windows-fluent-v{run:000}", run, $"v{run:000}", false, DateTime.UtcNow, info.Length, page, notes, new Asset(file, info.Length, sha)),
         };
+        // (--update-test-earlier: this version and one before it as well, so Settings ▸ Updates ▸ Earlier versions has
+        //  rows to show — their dates, sizes and Install…)
+        if (Launch.Flag("update-test-earlier"))
+            for (var back = 0; back <= 1 && CurrentRun - back > 0; back++)
+            {
+                var r = CurrentRun - back;
+                list.Add(new($"windows-fluent-v{r:000}", r, $"v{r:000}", false, DateTime.UtcNow.AddDays(-3 - 4 * back), info.Length, page,
+                    "An earlier version played through (--update-test-earlier).", new Asset(file, info.Length, sha)));
+            }
+        return list;
     }
 
     /// <summary>A version's page, in the browser: its download is there.</summary>

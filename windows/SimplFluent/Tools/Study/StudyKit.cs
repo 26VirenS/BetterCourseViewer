@@ -110,10 +110,12 @@ internal static class StudyKit
         };
     }
 
-    /// <summary>Words in capitals over a part (the Mac's tracked small caps: "MLA 9 · WORKS CITED", "TERM").</summary>
+    /// <summary>A small strong label over a part (the Mac's tracked small caps; on Windows in sentence case, as every
+    /// label is: "MLA 9 · works cited", "Term").</summary>
     public static TextBlock Caps(string text, string brush = B.Text2, double size = 12)
     {
-        var t = K.Text(text.ToUpperInvariant(), Ty.Caption, brush).Strong();
+        var words = text.Length == 0 ? text : char.ToUpper(text[0], System.Globalization.CultureInfo.CurrentCulture) + text[1..];
+        var t = K.Text(words, Ty.Caption, brush).Strong();
         t.FontSize = size;
         return t;
     }

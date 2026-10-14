@@ -152,7 +152,8 @@ next run number is found at once, its installer that file (its SHA-256 the file'
 mismatch), downloaded into the profile's `Update\` and checked, held and put in as above: the file is run as the
 installer, so give it a Simpl-Setup.exe. `--update-test-installed` acts as a copy the installer put here,
 `--update-test-critical` as a Critical Update, `--update-test-hold quiz` holds as an open quiz would (for Settings'
-pictures), `--update-test-close <s>` closes what is open over the window after that long, and `--update-test-tray`
+pictures), `--update-test-earlier yes` lists this version and the one before it under Earlier versions (their dates,
+sizes and Install…), `--update-test-close <s>` closes what is open over the window after that long, and `--update-test-tray`
 closes the window to the notification area a moment after it opens. With `--shot` nothing is ever run: the notice of
 an update going in stays for the picture. CI pictures Settings ▸ Updates (`settings-updates-waiting`, `-dark`, `-zip`)
 and the notice (`update-waiting-quiz`, `update-critical-quiz`, `update-restarting`) this way, with the build's own

@@ -125,7 +125,10 @@ public sealed class PlaceWindow : FluentWindow, ISheetWindow
         };
     }
 
-    private double ContentWidth => Math.Max(200, page.ActualWidth - (scroller != null ? 80 : 0));
+    /// <summary>The width a screen is given, as the main window gives it: the page's less its two 40 margins — a screen
+    /// that scrolls on its own (an assignment) puts those margins in itself, and given the whole page would run 80 past
+    /// the window's edge.</summary>
+    private double ContentWidth => Math.Max(200, page.ActualWidth - 80);
 
     private void Widths()
     {

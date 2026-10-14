@@ -118,13 +118,13 @@ public sealed class SignInCard : Grid
         note.Inlines.Clear();
         if (error != null)
         {
-            var icon = K.Icon(SymbolRegular.ErrorCircle24, 14, B.Critical, filled: true);
-            icon.Margin = new Thickness(0, 0, 6, -2);
-            // (the symbol in the line's own red, light or dark: a resource set on it inside the line's words never
-            //  resolves there, and it fell back to black)
-            icon.SetBinding(System.Windows.Controls.Control.ForegroundProperty, new System.Windows.Data.Binding(nameof(TextBlock.Foreground)) { Source = note });
-            note.Inlines.Add(new System.Windows.Documents.InlineUIContainer(icon) { BaselineAlignment = BaselineAlignment.Center });
-            note.Inlines.Add(new System.Windows.Documents.Run(error));
+            // (the symbol a letter of Windows' icon font, so it is in the line's own red, light or dark, as its words are:
+            //  a symbol control set inside the line's words never took the line's colour, and was drawn black)
+            note.Inlines.Add(new System.Windows.Documents.Run("")
+            {
+                FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"), FontSize = 13, BaselineAlignment = BaselineAlignment.Center,
+            });
+            note.Inlines.Add(new System.Windows.Documents.Run(" " + error));
             note.Fg(B.Critical);
             if (error != shownError) { Motion.Shake(fields); pass.Password = ""; pass.Focus(); }
         }
