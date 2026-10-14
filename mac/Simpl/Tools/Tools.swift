@@ -251,7 +251,9 @@ final class ToolsCenter: ObservableObject {
     /// A tool opened whole — (1.3.79) from its tile on the Tools page, its pin, a hand-off from another tool, a launch —
     /// with any files or details for it: in its popup over the window it was asked for in (`engine`; else the one its
     /// popup is already over, else the main window's), the screen under it staying as it was, and usable. A tool already
-    /// open is switched in place, in the same popup; over another window, that popup closes first.
+    /// open is switched in place, in the same popup; over another window, that popup closes first. (1.3.80) The popup
+    /// spans the window, over the sidebar, at the size the student last gave this tool by the popup's edges, if any
+    /// (kept under `tool.<key>`).
     func popUp(_ k: ToolKind, engine: Engine? = nil, files: [URL] = [], info: [String: String] = [:]) {
         handoff = files
         handoffTool = files.isEmpty ? nil : k
@@ -260,7 +262,8 @@ final class ToolsCenter: ObservableObject {
         if let was = popupEngine, was !== host { was.popups.close(Self.popupKey) }
         withAnimation(Motion.gentle) { popup = k }
         popupEngine = host
-        host.popups.present(Self.popupKey, title: k.name, layout: .large, onClose: { [weak self] in self?.popupClosed() }) {
+        host.popups.present(Self.popupKey, title: k.name, layout: .large, sizeKey: "tool.\(k.rawValue)",
+                            onClose: { [weak self] in self?.popupClosed() }) {
             ToolPopup()
         }
     }

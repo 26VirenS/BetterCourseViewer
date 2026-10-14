@@ -765,12 +765,21 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   × from closing a hand-in or a message on its way, or a message with something written, whose Cancel asks first).
   Dragged by its head (`popupHeader()`; a strip along the top edge of every popup too) it moves, past the window if
   wanted. It comes in a little smaller and faded on a short ease-out (0.22 s; a fade alone under Reduce Motion) and goes
-  the same way. Three sizes (`PopupLayout`): *large* — the screen's side of the window (under the toolbar, past the
-  sidebar while it is out) less 20 points all round, at most 1480 × 1040, sized again as the window is (`\.popupSize`
-  tells what it shows), a large one over another a step down and along; *fitted* — as large as what it shows asks, as
-  a sheet was, centred across the screen's side a little above its middle, its top and middle kept as it grows; *at* a
-  point (a counter's list over its tile in 1.3.79; unused since 1.3.80, when the list grows out of its tile in the page
-  again). A `.floatingPopup(key, title:, item:/isPresented:)` modifier puts one up
+  the same way. Three sizes (`PopupLayout`): *large* — (1.3.80) the window's whole content, under the toolbar and over
+  the sidebar (out or not), less 20 points all round (`FloatingPopups.largeRoom`), at most 1480 × 1040 unless the
+  student makes it larger, sized again as the window is (`\.popupSize` tells what it shows), a large one over another
+  a step down and along (and that much smaller, so it ends inside the window) — dragged by its head it moves, and its
+  edges and corners resize it (a resize whose button comes up unseen ends at the next placing; `PopupEdges`: a band 5
+  points wide inside each edge, 16 along each side of a corner, the frame-resize cursor over it; at least 480 × 340,
+  at most the room and the screen), what it shows laid out at the new size as it goes; the size picked is kept in the
+  app's settings by size key (`PopupSizes`, `SimplPopupSizes`: a tool's own, `tool.<key>`; else the popup's key up to
+  a colon — `alta`, `macmillan`, `feedback`, `rubric`), a side left as large as the room would have it kept as filling
+  it, and used the next time it opens — and as another tool is switched in — within the window's room, so a smaller
+  window shrinks it and a larger one gives the size back; a popup moved aside keeps how far it was moved. 1.3.79 kept
+  it clear of the sidebar while the sidebar was out (a tool had 740 points of a window 970 wide); *fitted* — as large
+  as what it shows asks, as a sheet was, centred across the screen's side a little above its middle, its top and
+  middle kept as it grows; *at* a point (a counter's list over its tile in 1.3.79; unused since 1.3.80, when the list
+  grows out of its tile in the page again). A `.floatingPopup(key, title:, item:/isPresented:)` modifier puts one up
   as `.sheet` did. What each popup is now: a **tool opened whole** — from its tile on the Tools page, its pin's popover
   or floating panel (its name, or what it hands on), the pin's Open, a hand-off from another tool (`BioTools.open`) or
   `-SimplTool` — a large popup over the window (`ToolsCenter.popUp`, `ToolPopup`; one at a time, another switched in
@@ -786,11 +795,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   a popup has its card in a popup of its own over it, just under the row (or over
   it). A popup's SwiftUI view sits in a plain view of the popup's own, never as its window's content view (which sized
   the window to what it showed, and a tool asking for more room the more it had grew it until AppKit stopped the app),
-  and a large popup is placed again once the sidebar is shown or hidden (the window says whether it is out:
-  `FloatingPopups.sidebarMoved`, as a folded sidebar's view is still found where it stood — and again a second on, once
-  the sidebar has surely finished sliding) and again over its first seconds; until the sidebar's view says where it
-  ends (only some seconds after the window opens) it is taken to end where it last did, at first its usual width (a
-  tool's popup put up as the window opened lay over the sidebar). A fitted
+  and a large popup is placed again over its first seconds, as the window settles (until it is dragged or resized); a
+  fitted popup is centred clear of the sidebar while it is out (the window says whether it is:
+  `FloatingPopups.sidebarMoved`, as a folded sidebar's view is still found where it stood; until the sidebar's view says
+  where it ends it is taken to end where it last did, at first its usual width). A fitted
   popup is measured as what it shows appears and as it changes (a measure handed up as a SwiftUI preference never
   reached a popup whose view is not its window's content view: Hand In, New Task, New Message and Why these gametes?
   stayed at the size they were guessed at, cut off at their sides); one that draws its own glass — a work's card —
@@ -799,7 +807,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Alta's own pop-ups (a sheet on its popup alone). Still blocking, by design: a quiz being taken (a sheet: its timer and
   its integrity), the first run's setup, the sign-in, the tour, the Mac's confirmations and file choosers. An update
   never installs itself while a popup is up (`Updater.quiet`). The pictures: `light-35p…`/`dark-35p…` a tool's popup
-  (the Periodic Table, Cell Explorer, Flashcards) over the Tools page at 1024 and at the narrow size.
+  (the Periodic Table, Cell Explorer, DNA & RNA (`35s`), Flashcards) over the Tools page at 1024 and at the narrow
+  size, and `light-35t-popup-dna-kept-size` DNA & RNA reopened at a size it was left at (`-SimplPopupSize
+  tool.dna=760x520`: a launch's own sizes, `key=WxH` joined by commas, never kept). In a picture's run (or with the
+  Developer menu unlocked) the console says where each large popup went (`[Simpl] popup tool: 984 × 668, 20 in from
+  the window (sidebar out)`) and each size kept (`resized to … kept for tool.dna`).
 - **The Chemistry section (1.3.80).** The Periodic Table is split into four tools under a *Chemistry* heading on the
   Tools page, just before Biology and built as its section is (`Tools/Chemistry/ChemTools.swift`: `ChemTools.kinds`,
   `info` — names, lines, symbols and a palette of their own — and `ChemToolsSection`, which `-SimplToolsScroll
