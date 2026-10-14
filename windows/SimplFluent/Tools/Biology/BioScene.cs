@@ -99,7 +99,8 @@ public sealed record BioBillboard(Model3D Model, BioVec Anchor, double Lift = 0,
 /// (a strand's "3′", a carbon's "2′"): what it says, the point, how tall it is in the scene's units (drawn 11–17 px
 /// whatever the zoom), and — for an atom's number — the atom's centre and radius, so it is set just outside the atom's
 /// disc on the screen whichever way the model is turned. A charge's sign (<paramref name="Charge"/>, in its own colour)
-/// sits on its atom's disc's edge at the upper right, as a charge is written (N⁺, O⁻), 18–26 px, over the labels too.</summary>
+/// is drawn in a disc of the ground 16–22 across, edged in that colour (<see cref="BioChargeBadge"/>), on its atom's
+/// edge at the upper right, as a charge is written (N⁺, O⁻), over the labels too.</summary>
 public sealed record BioMark(string Text, BioVec Anchor, double Size, BioVec? Atom = null, double AtomRadius = 0, Color? Colour = null, bool Charge = false);
 
 /// <summary>Billboards as the molecule builder draws its labels.</summary>

@@ -61,7 +61,7 @@ public sealed class BioSceneView : Grid
     private bool framedOnce;
     private Func<IEnumerable<BioBillboard>>? extras;
     private Func<IEnumerable<BioMark>>? markSource;
-    private List<(BioMark Mark, TextBlock View)> marks = new();
+    private List<(BioMark Mark, FrameworkElement View)> marks = new();
 
     // (the camera: what it looks at, how far it is; the model's turn)
     private Point3D target;
@@ -488,41 +488,51 @@ public sealed class BioSceneView : Grid
         Wake();
     }
 
-    /// <summary>The marks' words for a new scene (in the page's text colour, or a charge's own), each with a halo of the
-    /// ground round it, so it reads over atoms.</summary>
+    /// <summary>The marks for a new scene: words in the page's text colour, each with a halo of the ground round it, so
+    /// it reads over atoms; a charge's sign in a small disc of the ground, edged in its colour (a bare blue + on the blue
+    /// amino group, or a red − on the carboxyl's red, could not be seen).</summary>
     private void MakeMarks()
     {
         markLayer.Children.Clear();
         chargeLayer.Children.Clear();
-        marks = new List<(BioMark, TextBlock)>();
+        marks = new List<(BioMark, FrameworkElement)>();
         var ground = Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Colors.White;
         foreach (var m in markSource?.Invoke() ?? Array.Empty<BioMark>())
         {
+            if (m.Charge)
+            {
+                var badge = new BioChargeBadge(m.Text == "+", m.Colour ?? (Appearance.Dark ? Colors.White : Colors.Black), ground);
+                chargeLayer.Children.Add(badge);
+                marks.Add((m, badge));
+                continue;
+            }
             var t = new TextBlock { Text = m.Text, FontWeight = FontWeights.Bold, IsHitTestVisible = false };
             if (m.Colour is { } colour) t.Foreground = new SolidColorBrush(colour);
             else t.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
             t.Effect = new System.Windows.Media.Effects.DropShadowEffect { ShadowDepth = 0, BlurRadius = 5, Opacity = 1, Color = ground };
-            (m.Charge ? chargeLayer : markLayer).Children.Add(t);
+            markLayer.Children.Add(t);
             marks.Add((m, t));
         }
     }
 
-    /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them (a charge's sign
-    /// 18–26), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end on, away
-    /// from the model's centre); a charge's sign on the disc's edge at the upper right, as N⁺ is written.</summary>
+    /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them (a charge's disc
+    /// 16–22 across), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end
+    /// on, away from the model's centre); a charge's disc on the atom's edge at the upper right, as N⁺ is written.</summary>
     private void PlaceMarks()
     {
         if (marks.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
         var f = ActualHeight / (2 * Tan20);
         var c = Project(framing.Centre);
-        foreach (var (m, t) in marks)
+        foreach (var (m, v) in marks)
         {
             var (x, y, front, dist) = Project(m.Anchor);
-            t.Visibility = front ? Visibility.Visible : Visibility.Collapsed;
+            v.Visibility = front ? Visibility.Visible : Visibility.Collapsed;
             if (!front) continue;
-            t.FontSize = m.Charge ? Math.Clamp(1.6 * m.Size * f / Math.Max(dist, 1e-6), 18, 26) : Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 11, 17);
-            t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var (w, h) = (t.DesiredSize.Width, t.DesiredSize.Height);
+            var size = m.Size * f / Math.Max(dist, 1e-6);
+            if (v is BioChargeBadge badge) badge.Diameter = Math.Clamp(1.6 * size, 16, 22);
+            else if (v is TextBlock t) t.FontSize = Math.Clamp(size, 11, 17);
+            v.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var (w, h) = (v.DesiredSize.Width, v.DesiredSize.Height);
             if (m.Atom is { } atom && Project(atom) is { InFront: true } a)
             {
                 double dx = x - a.X, dy = y - a.Y;
@@ -530,13 +540,13 @@ public sealed class BioSceneView : Grid
                 else if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (a.X - c.X, a.Y - c.Y);
                 var len = Math.Sqrt(dx * dx + dy * dy);
                 if (len < 1) (dx, dy, len) = (1, 0, 1);
-                // (a sign's glyph is about a third of its line: set so it just overlaps the disc's edge, a superscript)
+                // (a charge's disc a little over the atom's edge, as a superscript sits; a number clear of it)
                 var disc = m.AtomRadius * f / Math.Max(a.Distance, 1e-6);
-                var reach = m.Charge ? disc + 0.3 * t.FontSize : disc + Math.Max(w, h) / 2 + 1;
+                var reach = m.Charge ? disc + 0.2 * w : disc + Math.Max(w, h) / 2 + 1;
                 (x, y) = (a.X + dx / len * reach, a.Y + dy / len * reach);
             }
-            Canvas.SetLeft(t, x - w / 2);
-            Canvas.SetTop(t, y - h / 2);
+            Canvas.SetLeft(v, x - w / 2);
+            Canvas.SetTop(v, y - h / 2);
         }
     }
 
@@ -1120,5 +1130,50 @@ public static class BioSceneCard
         reset.ToolTip = "Put the camera back (or double-click empty space)";
         row.Children.Add(reset);
         return row;
+    }
+}
+
+/// <summary>A charge's sign over a 3D view: a disc of the ground edged in the sign's colour, the + or − drawn in it as
+/// strokes (centred exactly, as a font's glyph is not), so it reads over an atom of its own colour.</summary>
+internal sealed class BioChargeBadge : FrameworkElement
+{
+    private readonly bool plus;
+    private readonly Brush colour, ground;
+    private double diameter = 18;
+
+    public BioChargeBadge(bool plus, Color colour, Color ground)
+    {
+        this.plus = plus;
+        this.colour = new SolidColorBrush(colour);
+        this.colour.Freeze();
+        this.ground = new SolidColorBrush(ground);
+        this.ground.Freeze();
+        IsHitTestVisible = false;
+    }
+
+    /// <summary>Its width and height.</summary>
+    public double Diameter
+    {
+        get => diameter;
+        set
+        {
+            if (Math.Abs(value - diameter) < 0.01) return;
+            diameter = value;
+            InvalidateMeasure();
+            InvalidateVisual();
+        }
+    }
+
+    protected override Size MeasureOverride(Size available) => new(diameter, diameter);
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var r = diameter / 2;
+        var centre = new Point(r, r);
+        dc.DrawEllipse(ground, new Pen(colour, 1.5), centre, r - 0.75, r - 0.75);
+        var stroke = new Pen(colour, Math.Max(2, diameter * 0.13)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        var arm = diameter * 0.26;
+        dc.DrawLine(stroke, new Point(r - arm, r), new Point(r + arm, r));
+        if (plus) dc.DrawLine(stroke, new Point(r, r - arm), new Point(r, r + arm));
     }
 }
