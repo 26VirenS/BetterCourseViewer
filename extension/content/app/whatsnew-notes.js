@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.33', date: '2026-10-14', notes: [
+      { kind: 'improved', title: 'Screens open at once', body: 'Pages are read ahead, so most open with no wait.', icon: P.sparkle },
+      { kind: 'improved', title: 'Smoother page changes', body: 'One smooth move from one screen to the next.', icon: P.arrows },
+    ] },
     { version: '2.99.32', date: '2026-10-12', notes: [
       { kind: 'improved', title: 'Smoother exits', body: 'Sets, pins, dropdowns and widgets leave, not vanish.', icon: P.arrows },
       { kind: 'improved', title: 'Sections slide open', body: 'Idle courses, quiz options and scales slide, not jump.', icon: P.layers },
