@@ -860,8 +860,8 @@ final class BioSceneCoordinator: NSObject {
     private func tickScale() {
         guard let report = config?.scale, content != nil, let v = view, let cam = v.pointOfView, let turn = node("turn"),
               let project = BioProjector(view: v, camera: cam) else { return }
-        let c3 = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(framing.centre.x), Float(framing.centre.y), Float(framing.centre.z)), to: nil)
-        let e3 = c3 + cam.presentation.simdWorldRight
+        let c3 = BioDrawn(turn.presentation.simdWorldTransform).point(framing.centre)
+        let e3 = c3 + BioDrawn(cam.presentation.simdWorldTransform).right
         let pc = project.point(c3), pe = project.point(e3)
         let s = hypot(pe.x - pc.x, pe.y - pc.y)
         guard s.isFinite, s > 0, abs(s - lastScale) > lastScale * 0.005 else { return }
@@ -888,7 +888,10 @@ final class BioSceneCoordinator: NSObject {
             return
         }
         guard let project = BioProjector(view: v, camera: cam) else { return }
+        // (1.3.80) the camera and the model as drawn read once a tick, and every point placed by them here (a
+        // presentation node read for each anchor and outline point waited on SceneKit's drawing each time)
         let pov = cam.presentation.simdWorldTransform, tt = turn.presentation.simdWorldTransform
+        let model = BioDrawn(tt), camera = BioDrawn(pov)
         let columns: [SIMD4<Float>] = [pov.columns.0, pov.columns.1, pov.columns.2, pov.columns.3,
                                        tt.columns.0, tt.columns.1, tt.columns.2, tt.columns.3]
         var sig: [Float] = columns.flatMap { [$0.x, $0.y, $0.z, $0.w] }
@@ -904,15 +907,15 @@ final class BioSceneCoordinator: NSObject {
         let still = quiet > 0.15
         if raysDone && quiet > 1.0 { return }
         let h = project.height, w = project.width
-        let eye = cam.presentation.simdWorldPosition
+        let eye = camera.origin
         let testRays = still && !raysDone
         var inputs: [BioLabelInput] = []
         for l in content.labels {
-            let a = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(l.anchor.x), Float(l.anchor.y), Float(l.anchor.z)), to: nil)
+            let a = model.point(l.anchor)
             let p = project.point(a)
             var visible = p.inFront
             if visible, let nrm = l.normal {
-                let wn = turn.presentation.simdConvertVector(SIMD3<Float>(Float(nrm.x), Float(nrm.y), Float(nrm.z)), to: nil)
+                let wn = model.vector(nrm)
                 visible = simd_dot(wn, eye - a) > 0
             } else if visible {
                 if testRays {
@@ -929,13 +932,13 @@ final class BioSceneCoordinator: NSObject {
         if testRays { raysDone = true }
         // (the model's circle on the screen: its framing ball's centre and edge, projected; and its outline's leftmost
         // and rightmost points, the columns' edges beside them — inside the circle)
-        let c3 = turn.presentation.simdConvertPosition(SIMD3<Float>(Float(framing.centre.x), Float(framing.centre.y), Float(framing.centre.z)), to: nil)
-        let e3 = c3 + cam.presentation.simdWorldRight * Float(framing.radius)
+        let c3 = model.point(framing.centre)
+        let e3 = c3 + camera.right * Float(framing.radius)
         let pc = project.point(c3), pe = project.point(e3)
         let r = hypot(pe.x - pc.x, pe.y - pc.y)
         var extent: (left: Double, right: Double)?
         if !outlinePoints.isEmpty {
-            let xs = outlinePoints.map { o in project.point(turn.presentation.simdConvertPosition(SIMD3<Float>(Float(o.x), Float(o.y), Float(o.z)), to: nil)) }
+            let xs = outlinePoints.map { project.point(model.point($0)) }
                 .filter { $0.inFront }.map { $0.x }
             if let lo = xs.min(), let hi = xs.max() { extent = (left: max(lo, pc.x - r), right: min(hi, pc.x + r)) }
         }
@@ -963,6 +966,30 @@ final class BioSceneCoordinator: NSObject {
             labelHoverAt = (id: id, x: now.edgeX, y: now.y)
         }
     }
+}
+
+/// (1.3.80) A node as drawn (its presentation's world transform, read once): the scene's points and directions in its
+/// space placed in the world's, its origin and its unit right — as SceneKit's simdConvertPosition, simdConvertVector,
+/// simdWorldPosition and simdWorldRight would, without reading the presentation again for each.
+struct BioDrawn {
+    let transform: simd_float4x4
+
+    init(_ transform: simd_float4x4) { self.transform = transform }
+
+    func point(_ p: SIMD3<Float>) -> SIMD3<Float> {
+        let w = transform * SIMD4<Float>(p, 1)
+        return SIMD3<Float>(w.x, w.y, w.z)
+    }
+
+    func point(_ p: BioVec) -> SIMD3<Float> { point(SIMD3<Float>(Float(p.x), Float(p.y), Float(p.z))) }
+
+    func vector(_ v: BioVec) -> SIMD3<Float> {
+        let w = transform * SIMD4<Float>(Float(v.x), Float(v.y), Float(v.z), 0)
+        return SIMD3<Float>(w.x, w.y, w.z)
+    }
+
+    var origin: SIMD3<Float> { SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z) }
+    var right: SIMD3<Float> { simd_normalize(SIMD3<Float>(transform.columns.0.x, transform.columns.0.y, transform.columns.0.z)) }
 }
 
 /// (1.3.79) Where scene points fall on a SceneKit view, in the view's points — x right, y down, as the labels' overlay
