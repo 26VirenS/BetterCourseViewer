@@ -631,6 +631,7 @@ shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
 shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
 shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
 shoot light-70d-more-tool 30 -SimplOpen more:tool # (More from Canvas: My Materials in the tool window)
+MODE=dark shoot dark-70d-more-tool 30 -SimplOpen more:tool # (1.3.80: the app dark, the school's tool page light)
 SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
 SIZE=940x820 shoot light-40-narrow-dashboard 14
 SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades

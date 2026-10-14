@@ -110,11 +110,34 @@ extension Engine {
         }
     }
 
-    /// History or Help in a popup over the window, never blocking it (Shell/FloatingPopup.swift): read afresh each time.
+    /// History or Help in a popup over the window, never blocking it (Shell/FloatingPopup.swift): read afresh each time,
+    /// and read before it comes up, so it is whole from its first frame — as the web's sheet and the Windows app's popup
+    /// are — never growing from a spinner to its rows. Pressed again while it is up, it comes to the front as it is;
+    /// pressed again while it is being read, once is enough.
     func openMore(_ list: MoreList) {
-        popups.present(Engine.morePopup, title: list.title) {
-            MorePopup(list: list)
-                .id(list) // (the other list shown afresh in the same popup, never with this one's rows)
+        if MoreReads.showing == list, popups.isOpen(Engine.morePopup) {
+            popups.raise(Engine.morePopup)
+            return
+        }
+        guard MoreReads.reading.insert(list).inserted else { return }
+        Task {
+            let read: MoreListData?
+            let failure: String?
+            do {
+                read = try await call(list.call, as: MoreListData.self)
+                failure = nil
+            } catch {
+                read = nil
+                failure = error.localizedDescription // (the popup says so, with Try Again)
+            }
+            MoreReads.reading.remove(list)
+            MoreReads.showing = list
+            MoreReads.shown += 1
+            let shown = MoreReads.shown
+            popups.present(Engine.morePopup, title: list.title, onClose: { MoreReads.showing = nil }) {
+                MorePopup(list: list, read: read, failure: failure)
+                    .id(shown) // (each time what was just read, never what the popup held before)
+            }
         }
     }
 
@@ -127,6 +150,17 @@ extension Engine {
             openBrowser(u, title: row.title)
         }
     }
+}
+
+/// History's and Help's popup as it stands: which list it shows, and which are being read for it.
+@MainActor
+enum MoreReads {
+    /// The list the popup shows while it is up (nil once it is closed).
+    static var showing: MoreList?
+    /// The lists being read for the popup, about to come up.
+    static var reading: Set<MoreList> = []
+    /// How many times the popup has been shown: each time's content is new to SwiftUI, its state its own.
+    static var shown = 0
 }
 
 // MARK: - The sidebar's section
@@ -260,13 +294,21 @@ enum MoreIcons {
 
 /// History or Help in its popup: its title and line, the rows — each with its glyph, its two lines and where it leads
 /// (a chevron for a screen here, the external mark for another site) — and the foot the engine sends. Read afresh each
-/// time it opens (Canvas's list changes as the student moves); a row picked closes the popup and opens where it leads.
+/// time it opens (Canvas's list changes as the student moves), before it comes up (`Engine.openMore`); a row picked
+/// closes the popup and opens where it leads.
 struct MorePopup: View {
     let list: MoreList
     @EnvironmentObject private var engine: Engine
     @Environment(\.popup) private var popup
     @State private var data: MoreListData?
     @State private var error: String?
+
+    /// `read`: the list as it was just read; else `failure`, why it could not be (shown with Try Again).
+    init(list: MoreList, read: MoreListData?, failure: String?) {
+        self.list = list
+        _data = State(initialValue: read)
+        _error = State(initialValue: read == nil ? failure ?? "\(list.title) could not be loaded." : nil)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -284,7 +326,6 @@ struct MorePopup: View {
             }
         }
         .frame(width: 440)
-        .task { await load() }
     }
 
     private var head: some View {
@@ -321,6 +362,7 @@ struct MorePopup: View {
                         ForEach(data.rows) { row in
                             RowLink { pick(row) } label: { line(row) }
                                 .help(row.open == "place" ? row.title : "Opens \(host(row.url))")
+                                .contextMenu { menu(row) }
                         }
                     }
                     .padding(8)
@@ -398,6 +440,20 @@ struct MorePopup: View {
         engine.openMore(row)
     }
 
+    /// A row's menu, as the app's other rows of the school's pages have it (and the Windows app's History and Help).
+    @ViewBuilder
+    private func menu(_ row: MoreListRow) -> some View {
+        Button("Open") { pick(row) }
+        if row.open == "place" {
+            Button("Open in \(engine.lmsName)") {
+                popup.close()
+                engine.openWebScreen(row.url, title: row.title)
+            }
+        }
+        Button("Copy Link") { copyToPasteboard(row.url) }
+    }
+
+    /// Try Again: the list read afresh, in the popup as it is.
     private func load() async {
         error = nil
         do {

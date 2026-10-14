@@ -452,11 +452,14 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Help open one popup over the window, never blocking it (FloatingPopup.swift; the other opened takes its place),
   listing the rows the web's sheets list, read afresh each time (`moreHistory`: Canvas's recently viewed, each with its
   glyph in its course's colour, its course, kind and when; `moreHelp`: the school's help links, and a foot when Report
-  a Problem was left out, as it needs Canvas's form); a row picked closes it and opens an address of the school's as
-  any is (its screen here, else Canvas's page) and another site in the app's browser window. A tool opens in the tool
-  window on Canvas's launch page for it, borderless (light, as tool pages open); a link opens its page in the app's
-  browser window. The screenshot suite's `70` pictures: the section (`-SimplSidebarScroll more` scrolls the sidebar to
-  it), History, Help, and My Materials in the tool window.
+  a Problem was left out, as it needs Canvas's form) — read before the popup comes up, so it is whole from its first
+  frame, as the web's sheet and the Windows app's popup are (an error: the popup says it, with Try Again); pressed
+  again while it is up, it comes to the front as it is. A row picked closes it and opens an address of the school's as
+  any is (its screen here, else Canvas's page) and another site in the app's browser window; its menu has Open, Open in
+  Canvas (the school's own) and Copy Link. A tool opens in the tool window on Canvas's launch page for it, borderless
+  (light, as tool pages open, the app light or dark); a link opens its page in the app's browser window. The screenshot
+  suite's `70` pictures: the section (`-SimplSidebarScroll more` scrolls the sidebar to it), History, Help, and My
+  Materials in the tool window (in light and, in the full set, in dark: its page light).
   (1.3.68) Alta: a large picture or canvas (at least 140 × 100) counts as a graph too, and in dark mode each graph sits on
   a white card of its own (drawn in dark ink for a white page, its ground clear, it was lost on dark glass). A question
   is shown once Alta has finished drawing it — nothing changed on the page for 350 ms, no maths or answer box still
