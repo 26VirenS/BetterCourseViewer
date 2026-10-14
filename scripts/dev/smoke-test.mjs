@@ -5329,13 +5329,17 @@ try {
   } // the look off and on
 
   if (on('canvas banners')) {
-  // ---- Canvas's own banners (its flash messages): never drawn or read out over Simpl; an error comes up as Simpl's toast ----
+  // ---- Canvas's own banners (its flash messages): never drawn or read out over Simpl; what matters comes up as Simpl's toast ----
   console.log('canvas banners');
-  // (?mockflash=1: the mock's page arrives with an error in Canvas's jQuery holder, and its planner's alert is put up through
-  // InstUI's holder 1.2 s after it loads — mock-canvas.mjs flashScript.) Every frame from the page's first, in its own world:
-  // any banner of Canvas's on screen, and every toast of Simpl's with its words.
+  // (?mockflash=1: the mock's page arrives with Canvas's "Oops! The last request didn't work out." in its jQuery holder, and its
+  // planner's alert is put up through InstUI's holder 1.2 s after it loads — mock-canvas.mjs flashScript. ?flashok=1: a notice
+  // of Canvas's put up as the page's DOM is in, before Simpl is — a save's "updated", as a Rails flash arrives.) Every frame
+  // from the page's first, in its own world: any banner of Canvas's on screen, and every toast of Simpl's with its words.
   await page.addInitScript(() => {
-    if (!/[?&]mockflash=1\b/.test(location.search)) return;
+    if (!/[?&](?:mockflash|flashok)=1\b/.test(location.search)) return;
+    if (/[?&]flashok=1\b/.test(location.search)) {
+      document.addEventListener('DOMContentLoaded', () => document.getElementById('flash_message_holder')?.insertAdjacentHTML('beforeend', '<li class="ic-flash-success"><div class="ic-flash__icon" aria-hidden="true"><i class="icon-check"></i></div>User was successfully updated.<button type="button" class="Button Button--icon-action close_link" aria-label="Close"><i class="icon-x" aria-hidden="true"></i></button></li>'));
+    }
     const seen = (window.__flashSeen = []);
     const toasts = (window.__toastsSeen = []);
     const t0 = performance.now();
@@ -5347,12 +5351,16 @@ try {
         const words = t.querySelector('.bcv-toast__text')?.textContent || '';
         if (!(t.__said ||= []).includes(words)) { t.__said.push(words); toasts.push({ words, error: t.classList.contains('bcv-toast--error'), code: t.dataset.code || null, role: t.getAttribute('role') }); }
       }
-      if (performance.now() - t0 < 9000) requestAnimationFrame(look);
+      if (performance.now() - t0 < 15000) requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
   });
   const ERR = "Oops! The last request didn't work out.";
   const PLAN = 'Nothing planned today. Selecting most recent item.';
+  const DENIED = 'You are not authorized to perform that action.';
+  const GRANTED = 'Notification permission granted.';
+  const SIGNED_OUT = 'You are not currently logged in, possibly due to a long period of inactivity.';
+  const SAVED = 'User was successfully updated.';
   const flashState = () => page.evaluate(() => ({
     seen: window.__flashSeen || null,
     toasts: window.__toastsSeen || null,
@@ -5363,23 +5371,56 @@ try {
   }));
   // (the planner's alert in: its holder made, and a moment for it to be drawn into its box and dealt with)
   const plannerIn = async () => { await page.waitForFunction(() => !!document.getElementById('flashalert_message_holder'), null, { timeout: 10000 }); await page.waitForTimeout(500); };
+  // one of Canvas's jQuery banners put up now, the way $.flashError and $.flashMessage put one up: its kind's class, its words, its Close
+  const putUp = async (kind, words) => {
+    await page.evaluate(([k, w]) => document.getElementById('flash_message_holder').insertAdjacentHTML('beforeend', `<li class="ic-flash-${k}"><div class="ic-flash__icon" aria-hidden="true"><i class="icon-warning"></i></div>${w}<button type="button" class="Button Button--icon-action close_link" aria-label="Close"><i class="icon-x" aria-hidden="true"></i></button></li>`), [kind, words]);
+    await page.waitForTimeout(400);
+  };
+  const said = (st, words) => (st.toasts || []).filter((t) => t.words === words);
   // Simpl's Dashboard, over Canvas's own (whose planner says "Nothing planned today" as it lands)
   await page.goto(`${BASE}/?mockflash=1`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 15000 });
   await plannerIn();
   const fd = await flashState();
-  const errSaid = (fd.toasts || []).filter((t) => t.words === ERR);
   check(!!fd.seen && fd.seen.length === 0 && fd.left.length === 0 && fd.holders.every((d) => d === 'none'),
     `Canvas's banners never draw over Simpl's Dashboard, not for a frame — the planner's "Nothing planned today" and the error alike — and are taken off the page; its holders and its live region stay hidden (nothing read out): ${JSON.stringify({ seen: fd.seen, left: fd.left, holders: fd.holders })}`);
-  check(errSaid.length === 1 && errSaid[0].error && errSaid[0].code === 'SC-X-APP' && errSaid[0].role === 'status' && !(fd.toasts || []).some((t) => t.words.includes('Nothing planned')),
-    `Canvas's error comes up once as Simpl's own toast — red, with its code, announced as a status — and the planner's talk is dropped: ${JSON.stringify(fd.toasts)}`);
-  // a page Canvas draws inside the shell: the same — no banner over the shell, the error passed on, the loading talk dropped
+  check(said(fd, ERR).length === 0 && !(fd.toasts || []).some((t) => t.words.includes('Nothing planned')),
+    `over Simpl's Dashboard, Canvas's talk about its hidden page is dropped: the planner's, and the failed request of its own ("Oops! The last request didn't work out.", which the student never made): ${JSON.stringify(fd.toasts)}`);
+  // what matters, put up later: something not allowed (red, coded, said at once by a screen reader), a success that names a
+  // permission (no error: dropped), and being signed out (Canvas's "Login" link left off; Canvas asked whether the session is gone)
+  const askedSession = [];
+  const onSessionAsk = (r) => { if (new URL(r.url()).pathname === '/api/v1/users/self') askedSession.push(r.url()); };
+  await putUp('error', DENIED);
+  await putUp('success', GRANTED);
+  page.on('request', onSessionAsk);
+  await putUp('error', `${SIGNED_OUT}<br/><a href="/login" id="inactivity_login_link" target="_new">Login</a>`);
+  await eventually(async () => askedSession.length > 0, 3000);
+  page.off('request', onSessionAsk);
+  const fl = await flashState();
+  const denied = said(fl, DENIED);
+  const out = said(fl, SIGNED_OUT);
+  check(denied.length === 1 && denied[0].error && denied[0].code === 'SC-X-403' && denied[0].role === 'alert' && !(fl.toasts || []).some((t) => t.words.includes(GRANTED)),
+    `a banner that matters, put up later, comes up once as Simpl's toast — red, with its code, said at once as an alert — and a success that names a permission is no error, and dropped: ${JSON.stringify(fl.toasts)}`);
+  check(out.length === 1 && out[0].error && out[0].code === 'SC-X-401' && out[0].role === 'alert' && askedSession.length > 0,
+    `being signed out comes up in Canvas's words with a space where its line broke and without its "Login" link, and Canvas is asked whether the session is gone: ${JSON.stringify({ toasts: fl.toasts, asked: askedSession.length })}`);
+  check(fl.seen.length === 0 && fl.left.length === 0, `the banners put up later never draw either, and are taken off the page: ${JSON.stringify({ seen: fl.seen, left: fl.left })}`);
+  // a page Canvas draws inside the shell: no banner over the shell, the error passed on (the student is working in that page, so
+  // its failed request is theirs), the loading talk dropped — the error already up as the page arrived, before Simpl knew the page
   await page.goto(`${BASE}/profile?mockflash=1`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
   await plannerIn();
   const fp = await flashState();
-  check(!!fp.seen && fp.seen.length === 0 && fp.left.length === 0 && (fp.toasts || []).filter((t) => t.words === ERR && t.error).length === 1 && !(fp.toasts || []).some((t) => t.words.includes('Nothing planned')),
-    `on a page Canvas draws inside the shell, no banner over the shell either: the error comes up as Simpl's toast, the planner's talk does not: ${JSON.stringify({ seen: fp.seen, left: fp.left, toasts: fp.toasts })}`);
+  const errSaid = said(fp, ERR);
+  check(!!fp.seen && fp.seen.length === 0 && fp.left.length === 0 && errSaid.length === 1 && errSaid[0].error && errSaid[0].code === 'SC-X-APP' && errSaid[0].role === 'alert' && !(fp.toasts || []).some((t) => t.words.includes('Nothing planned')),
+    `on a page Canvas draws inside the shell, no banner over the shell either: the error up as the page arrived comes up once as Simpl's red toast, the planner's talk does not: ${JSON.stringify({ seen: fp.seen, left: fp.left, toasts: fp.toasts })}`);
+  // and a notice there that is no error, up before Simpl was (a save's "updated"): passed on once, as a plain toast
+  await page.goto(`${BASE}/profile?flashok=1`);
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  const fo = await flashState();
+  const ok = said(fo, SAVED);
+  check(!!fo.seen && fo.seen.length === 0 && fo.left.length === 0 && ok.length === 1 && !ok[0].error && ok[0].role === 'status',
+    `on a page Canvas draws inside the shell, Canvas's notice up as the page arrived comes up once as a plain toast, never as Canvas's banner: ${JSON.stringify({ seen: fo.seen, left: fo.left, toasts: fo.toasts })}`);
   // Canvas's own page, the shell not up (the look off): its banners are Canvas's, exactly as Canvas has them
   await setSettings({ appearance: { skin: false } });
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 8000 });

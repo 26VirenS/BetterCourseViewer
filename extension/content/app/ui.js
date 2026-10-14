@@ -235,7 +235,10 @@
   }
 
   let toastTimer = null;
-  function toast(str, { error = false, ms = 2600, code = null, err = null } = {}) {
+  /** A note that floats down from the top for a moment. `alert`: a screen reader says it at once, as an alert, rather
+   *  than when it is next free (a status) — for what the student did not ask for and must hear, such as an error
+   *  Canvas's own page put up (app.js, relayFlash). */
+  function toast(str, { error = false, ms = 2600, code = null, err = null, alert = false } = {}) {
     // (a toast already up — not on its way out — takes the new words where it stands, with a small nudge to say they
     // changed; it is not torn down for another to drop in from the top. One on its way out finishes leaving.)
     const live = [...document.querySelectorAll('.bcv-toast')].find((x) => !x.classList.contains('is-closing') && !x.classList.contains('bcv-sprung'));
@@ -250,10 +253,11 @@
     let t = live;
     if (t) {
       t.className = `bcv-toast ${error ? 'bcv-toast--error' : ''}`;
+      t.setAttribute('role', alert ? 'alert' : 'status');
       t.replaceChildren(...parts);
       delete t.dataset.code;
       if (!reducedMotion() && !t.getAnimations().some((a) => a.playState === 'running')) t.animate([{ transform: 'scale(.97)' }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.23,1,.32,1)' });
-    } else t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, parts, { role: 'status' });
+    } else t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, parts, { role: alert ? 'alert' : 'status' });
     // an error says its code (lib/errors.js) after its words — drawn from data-code, and kept for a report — and stays a little longer to be read
     const c = error ? code || BCV.errors?.codeFor?.(err) : null;
     if (c) { t.dataset.code = c; BCV.errors.note(c); ms = Math.max(ms, 4200); }
