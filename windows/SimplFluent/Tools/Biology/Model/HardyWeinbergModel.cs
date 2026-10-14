@@ -654,14 +654,15 @@ public static class HardyWeinbergModel
         Tell();
     }
 
-    /// <summary>A run finished: kept if it was for the settings as they are now.</summary>
-    public static void Finished(HWSimParams s, List<HWPopulation> pops)
+    /// <summary>A run finished: kept if it was for the settings as they are now. <paramref name="tell"/> false: the caller
+    /// tells the views itself, straight after (a run worked out at once, as the settings changed).</summary>
+    public static void Finished(HWSimParams s, List<HWPopulation> pops, bool tell = true)
     {
         if (s != Sim) return;
         RunFor = s;
         Populations = pops;
         if (Hovered is { } h && h > s.Generations) Hovered = null;
-        Tell();
+        if (tell) Tell();
     }
 
     public static void SetHovered(int? g)

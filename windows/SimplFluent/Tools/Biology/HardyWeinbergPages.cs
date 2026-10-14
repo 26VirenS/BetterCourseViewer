@@ -150,13 +150,18 @@ internal sealed class HWTestPage : HWPageBase
 
 // ---- Simulate ----
 
-/// <summary>The simulation run off the UI thread when its settings change: after they rest 120 ms (a slider being
-/// dragged), the newest settings winning; a picture waits for it (Shot).</summary>
+/// <summary>The simulation run when its settings change. An infinite population is one population worked out from the
+/// equations — well under a millisecond, even for 200 generations — so it is run at once: the page drawn next shows it,
+/// with nothing to wait for. Finite ones (up to ten populations of up to 10,000, drawn by chance) run off the UI thread
+/// after the settings rest 120 ms (a slider being dragged), the newest settings winning; a picture waits for them (Shot).
+/// A run's start, end or cancelling goes in the log, and the Simulate page asks for a run whenever it comes on screen
+/// without one (<see cref="Ensure"/>).</summary>
 internal static class HWRunner
 {
     private static bool hooked;
     private static DispatcherTimer? wait;
     private static CancellationTokenSource? running;
+    private static DateTime lastQuickLog;
 
     public static void Hook()
     {
@@ -165,10 +170,10 @@ internal static class HWRunner
         HardyWeinbergModel.SimChanged += Schedule;
     }
 
-    /// <summary>A run for the settings as they are, if there is none yet.</summary>
+    /// <summary>A run for the settings as they are, if there is none yet, none going and none waiting.</summary>
     public static void Ensure()
     {
-        if (HardyWeinbergModel.Running && running == null && wait?.IsEnabled != true) Go();
+        if (HardyWeinbergModel.Running && running == null && wait?.IsEnabled != true) Go(tell: true);
     }
 
     /// <summary>A run waiting for the settings to rest, which a picture waits for as it waits for a run (on a slow start the
@@ -178,15 +183,27 @@ internal static class HWRunner
     private static void Schedule()
     {
         Shot.Moved();
-        running?.Cancel();
-        running = null;
+        if (running != null)
+        {
+            running.Cancel();
+            running = null;
+            Log.Write("popgen run: cancelled, the settings changed");
+        }
+        if (HardyWeinbergModel.Sim.Size == null)
+        {
+            // (the model tells the views as soon as this returns, so the result is in when they draw)
+            wait?.Stop();
+            if (pending) { pending = false; Shot.Ended(); }
+            Go(tell: false);
+            return;
+        }
         if (wait == null)
         {
             wait = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
             wait.Tick += (_, _) =>
             {
                 wait.Stop();
-                Go();
+                Go(tell: true);
                 if (pending) { pending = false; Shot.Ended(); }
             };
         }
@@ -195,22 +212,46 @@ internal static class HWRunner
         wait.Start();
     }
 
-    private static void Go()
+    private static void Go(bool tell)
     {
         running?.Cancel();
+        running = null;
         var s = HardyWeinbergModel.Sim;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        if (s.Size == null)
+        {
+            var pops = HWSimulation.Run(s);
+            // (a line a second at most: a slider being dragged runs it at every step)
+            if (DateTime.UtcNow - lastQuickLog > TimeSpan.FromSeconds(1))
+            {
+                lastQuickLog = DateTime.UtcNow;
+                Log.Write($"popgen run: {Describe(s)}, worked out at once in {clock.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} ms");
+            }
+            HardyWeinbergModel.Finished(s, pops, tell);
+            return;
+        }
         var token = new CancellationTokenSource();
         running = token;
         var ui = Dispatcher.CurrentDispatcher;
+        Log.Write($"popgen run: started, {Describe(s)}");
         Shot.Began();
         Task.Run(() => HWSimulation.Run(s, () => token.IsCancellationRequested)).ContinueWith(t => ui.BeginInvoke(() =>
         {
             Shot.Ended();
             if (ReferenceEquals(running, token)) running = null;
-            if (!token.IsCancellationRequested && t.Status == TaskStatus.RanToCompletion) HardyWeinbergModel.Finished(s, t.Result);
+            if (!token.IsCancellationRequested && t.Status == TaskStatus.RanToCompletion)
+            {
+                Log.Write($"popgen run: finished in {clock.ElapsedMilliseconds} ms, {ToolKit.Plural(t.Result.Count, "population")}");
+                HardyWeinbergModel.Finished(s, t.Result);
+            }
             else if (t.Exception is { } e) Log.Write("popgen simulation: " + e.InnerException?.Message);
+            else Log.Write($"popgen run: let go after {clock.ElapsedMilliseconds} ms, newer settings came");
         }), TaskScheduler.Default);
     }
+
+    private static string Describe(HWSimParams s) =>
+        (s.Size is { } n ? $"N = {n.ToString("N0", CultureInfo.InvariantCulture)}, {ToolKit.Plural(s.Replicates, "population")}" : "infinite")
+        + $", {s.Generations} generations";
 }
 
 /// <summary>
@@ -345,10 +386,14 @@ internal sealed class HWSimulatePage : HWPageBase
     private readonly ContentControl bars = CrossKit.Host();
     private readonly ContentControl right = CrossKit.Host();
     private bool syncing;
+    private string? said;
 
     private static HWSimParams S => HardyWeinbergModel.Sim;
 
     private static void Change(Func<HWSimParams, HWSimParams> edit) => HardyWeinbergModel.SetSim(edit(S));
+
+    /// <summary>On screen without a run for the settings as they are (none finished, none going): one is started.</summary>
+    protected override void Shown() => HWRunner.Ensure();
 
     public HWSimulatePage()
     {
@@ -507,6 +552,14 @@ internal sealed class HWSimulatePage : HWPageBase
         AutomationProperties.SetName(chart, $"p over {shownRun.Generations} generations for {ToolKit.Plural(pops.Count, "population")}. {readout.Text}");
         bars.Content = Bars(pops);
         right.Content = Side(pops, shownRun);
+        // (what the chart shows, in the log when it changes on screen: the pictures' checks read it — windows-fluent.yml)
+        var says = HardyWeinbergModel.Running ? "no run yet, one going"
+            : $"{ToolKit.Plural(pops.Count, "population")} to generation {(pops.Count == 0 ? 0 : pops.Max(p => p.Generations.Count - 1))} of {shownRun.Generations}";
+        if (says != said && IsVisible)
+        {
+            said = says;
+            Log.Write("popgen simulate: shows " + says);
+        }
     }
 
     private static string Readout(List<HWPopulation> pops)

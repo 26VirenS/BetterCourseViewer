@@ -163,7 +163,9 @@ P, Phenotype, Dies, Carrier; `Phenotypes` (born); `GenotypicRatio(Text)`, `BornG
 - **Hardy–Weinberg** (`HardyWeinbergTool.cs`, `HardyWeinbergPages.cs`; `Model/HardyWeinbergModel.cs`):
   `HardyWeinberg.Calculate(given, value)` / `Calculate(counts)` (each step as text), `.Test(counts, df)` (df 1 by
   default), `HWSimulation.Step/Run` in §5.4.3's order — replicate r, from 0, draws from SplitMix64 seed S + r, 2N
-  `Uniform() < p₃` draws a generation — so a seed gives the Mac's populations; run off the UI thread by `HWRunner`.
+  `Uniform() < p₃` draws a generation — so a seed gives the Mac's populations; run by `HWRunner`: an infinite
+  population at once, as its settings change (well under a millisecond), finite ones off the UI thread; each run's
+  start, end or cancelling in the log, and the Simulate page asks for a run whenever it comes on screen without one.
   `HWFormat.Fixed` writes numbers as printf's `%.Nf` does, rounded half-up as every bio tool rounds (Numbers, below), so
   the working reads as on the Mac. Hand-offs:
   `["given"] = "q2", ["value"] = "0.16"`, `["counts"] = "50,30,20"`.
@@ -232,7 +234,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
 Keep the controller in your model: `var steps = new BioStepController(new[] { new BioStep(0, "Initiation", "…", Group:
 1), … })`. Put `new BioStepControls(steps, new Dictionary<int, string> { [1] = "Interphase", … })` under the scene (the
 explanation above a capsule of ⏮ ◀ ▶/⏸ ▶ ⏭, the dots, "Step 4 of 12 · Elongation", the speed menu — under a narrow
-scene the dots give way to a shorter bar of progress, then to nothing, so the caption reads whole; it takes ← →
+scene the dots give way to a shorter bar of progress, then to nothing, then the caption goes onto two lines, broken
+after a " · ", so it reads whole; it takes ← →
 Space Home End 1–9 when it has the focus) and `BioStepKeys.Attach(scene, steps)` on the scene (Space Home End 1–9 there:
 a 3D view keeps its own ← → ↑ ↓ for turning; on a 2D drawing ← → step too). Draw with
 `var anim = new BioStepAnimator(steps, phase => Draw(phase))` (`Loaded += (_, _) => anim.Start(); Unloaded += (_, _) =>
@@ -247,7 +250,9 @@ anim.Stop();`): `phase.From`, `phase.To`, `phase.T` (eased; 600 ms at 1×; back 
 `.Maternal`, `.HBond` … are `BioHexPair`s (`Light`, `Dark`, `HexFor(dark)`): `.ToColor()` (as the app is drawn now),
 `.ToColor(dark)`, `.ToBrush()`; `BioColors.Base(char)`, `.AminoAcid(char)`, `.Of(BioAAClass)`, `.Tool(key)`,
 `.Hex(color)`. Never colour alone: show the letter or a `BioUI.Legend`. Pieces: `BioUI.Work(left, centre, right)` (the
-chemistry builders' three columns), `BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
+chemistry builders' three columns from 1100 wide; narrower — the Tools page beside the navigation pane, on a 1366
+window — the scene across the top as tall as the page shows, 460 to 640, as the Mac's, and the two columns under it),
+`BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
 `BioUI.FactRow(label, text, tint)`, `BioUI.Facts(rows)`, `BioUI.Legend(items)`, `BioUI.SequenceText`, `BioQuickOpen`,
 `BioToolPlaceholder`.
 
@@ -407,4 +412,6 @@ still passes.
 `-photosynthesis`, `-atoms`. An argument with a space in it (a cross typed `AaBb x AaBb`) is put in quotes by the
 workflow's `Shot`. A pin's flyout opened by `--pin-open` stays open (`ToolHost.cs`): three copies of Simpl start at once
 in CI, and another's window coming forward closed it before its picture. A picture waits for Hardy–Weinberg's
-simulation from the moment it is asked for, not only once it runs (`HWRunner`).
+simulation from the moment it is asked for, not only once it runs (`HWRunner`), and the workflow fails
+`bio-popgen-lethal` and `-simulate` unless the Simulate page's last "popgen simulate: shows …" line before the picture
+is the finished run.

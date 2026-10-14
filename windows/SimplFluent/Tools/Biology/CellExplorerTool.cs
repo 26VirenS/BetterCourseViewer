@@ -342,8 +342,10 @@ internal sealed class CellScaleBar : Grid
         var stack = K.V(0, words, bar);
         stack.VerticalAlignment = VerticalAlignment.Bottom;
         badge.VerticalAlignment = VerticalAlignment.Bottom;
+        // (on a solid plate, as the labels are: the card's own fill is nearly clear in dark mode, and a bacterium's fimbriae
+        //  ran across "1 µm" and "Not to scale")
         var plate = K.Card(K.H(0, stack, badge), new Thickness(10, 6, 10, 7), 9);
-        plate.Opacity = 0.94;
+        plate.Bg(B.Solid);
         Children.Add(plate);
         Loaded += (_, _) => Watch();
         Unloaded += (_, _) => { if (camera != null) camera.Changed -= OnCamera; camera = null; };
