@@ -396,7 +396,6 @@ struct PeriodicTableTool: View {
                 tour(0)
             }
             // (tools-29) the heading's one Back says "‹ Table" while an element is open, and closes it
-            .onChange(of: open?.number) { _, _ in nav.elementOpen = open != nil }
             .onChange(of: nav.closeAsked) { _, _ in close() }
             // (1.3.64) an element picked from the search's results: opened
             .onChange(of: search.pickedCount) { _, _ in openPicked() }
@@ -409,6 +408,9 @@ struct PeriodicTableTool: View {
                     PTElementPage(element: e, close: close, go: { n in
                         if let next = PeriodicTable.byNumber(n) { withAnimation(Motion.gentle) { open = next } }
                     })
+                    // (tools-29: the heading's Back says "‹ Table" while it is here)
+                    .onAppear { nav.elementPageCame() }
+                    .onDisappear { nav.elementPageWent() }
                     .transition(.asymmetric(insertion: .scale(scale: 0.06, anchor: anchor).combined(with: .opacity),
                                             removal: .scale(scale: 0.06, anchor: anchor).combined(with: .opacity)))
                     .zIndex(1)
@@ -482,7 +484,6 @@ struct PeriodicTableTool: View {
         if let text = ToolsCenter.shared.takeInfo("molecule"), molecule.load(handOff: text) { nav.page = .molecules }
         let n = d.integer(forKey: "SimplPTElement")
         if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
-        nav.elementOpen = open != nil
         // (the tour: its step for the screenshot suite, -SimplPTTour 5; else, tools-3, offered on the first opening
         // — -SimplPTTourOffer YES for the suite's picture of it — and not while the suite pictures the tool (1.3.76:
         // nor an element's view, -SimplPTModel, which its page reads))
@@ -498,7 +499,6 @@ struct PeriodicTableTool: View {
     }
 
     private func disappeared() {
-        nav.elementOpen = false
         // (tools-3: the tool left mid-tour — the tour closed with it, and seen)
         if tourStep != nil { endTour() }
     }
@@ -877,8 +877,13 @@ final class PTNav: ObservableObject {
     static let shared = PTNav()
     @Published var page: PeriodicTableTool.Page = .table
     @Published var tourAsked = 0
-    /// (tools-29) An element's own page is open: the heading's one Back then says "‹ Table" and closes it.
-    @Published var elementOpen = false
+    /// (tools-29) An element's own page is open: the heading's one Back then says "‹ Table" and closes it. Counted from
+    /// the element pages on screen — each says when it comes and goes — so a table drawn afresh (the tool's view made
+    /// again, its old one going after the new one came) can never leave the heading saying "‹ Tools" over an element.
+    @Published private(set) var elementPages = 0
+    var elementOpen: Bool { elementPages > 0 }
+    func elementPageCame() { elementPages += 1 }
+    func elementPageWent() { elementPages = max(0, elementPages - 1) }
     /// Raised by that Back: the table closes the element.
     @Published private(set) var closeAsked = 0
 

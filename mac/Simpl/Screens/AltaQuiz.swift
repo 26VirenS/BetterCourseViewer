@@ -75,13 +75,15 @@ struct AltaQuizScreen: View {
         HStack(spacing: 14) {
             IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.report?.name ?? session.overview?.name ?? coverName ?? session.launch.title)
+                Text(title)
                     .font(.sTitle3)
                     .lineLimit(1)
-                Text(subtitle)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
@@ -153,10 +155,16 @@ struct AltaQuizScreen: View {
     /// (1.3.78) "Knewton Alta · Due Oct 12 at 11:59 PM": the Canvas assignment's due line, as every screen writes a date;
     /// Alta's own date written the same way when Canvas gives none; Alta's own words only when there is nothing else.
     private var subtitle: String {
-        var parts = ["Knewton Alta"]
+        // (the publisher's name once: not under a title that is only that name, as while its page is still opening)
+        var parts = title.caseInsensitiveCompare("Knewton Alta") == .orderedSame ? [] : ["Knewton Alta"]
         if let due = headerDue { parts.append(due) }
         if (session.report?.current.source ?? "").uppercased() == "PRACTICE" { parts.append("Practice") }
         return parts.joined(separator: " · ")
+    }
+
+    /// The assignment's name across the top: Alta's own once read, else the cover's, else what the launch called it.
+    private var title: String {
+        session.report?.name ?? session.overview?.name ?? coverName ?? session.launch.title
     }
 
     /// (1.3.78) The cover's name for the assignment: the bar's title on the start screen, which no longer says it again.

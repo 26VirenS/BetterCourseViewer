@@ -211,7 +211,7 @@ struct AssignmentView: View {
         VStack(alignment: .leading, spacing: 32) {
             if !d.html.isEmpty {
                 PageSection(title: "Instructions") {
-                    RichText(html: d.html, size: 15)
+                    RichText(html: d.html, size: 15, placeholder: true) // (its words at once, natively, while the page draws them)
                         .padding(.horizontal, 22)
                         .padding(.vertical, 18)
                         .frame(maxWidth: .infinity, alignment: .leading)

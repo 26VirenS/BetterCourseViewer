@@ -27,8 +27,11 @@ struct LoginLayer: View {
                 LoggingInView(showPage: { assist.showPage() }, restart: { assist.restart() })
                     .transition(.opacity)
             case .capture(let host, let error):
-                LoginForm(assist: assist, host: host, error: error)
-                    .transition(.opacity)
+                // (not under the suite's "Logging you in": its focused field's ring showed through the cover)
+                if !LoginLayer.shotLoggingIn {
+                    LoginForm(assist: assist, host: host, error: error)
+                        .transition(.opacity)
+                }
             }
             // (the screenshot suite: -SimplShowLoggingIn YES puts "Logging you in" over the window for the run, its
             // "Still signing in…" offer coming after a moment as it does; its buttons do nothing)

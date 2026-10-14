@@ -254,6 +254,7 @@ struct DashCourseCard: View {
                         .lineLimit(1)
                         .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
                         .help(course.code)
+                        .layoutPriority(1) // (the name first; the badges take what is left)
                     Spacer(minLength: 4)
                     badges
                 }
@@ -263,24 +264,42 @@ struct DashCourseCard: View {
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous))
     }
 
+    /// What wants attention, in words where the band has room for them beside the course's whole name; else each by its
+    /// symbol and number ("2 due today" as a clock and 2), the words in its tooltip — never the name cut to "F26-MA…".
     private var badges: some View {
+        ViewThatFits(in: .horizontal) {
+            badgeRow(compact: false)
+            badgeRow(compact: true)
+        }
+    }
+
+    private func badgeRow(compact: Bool) -> some View {
         HStack(spacing: 6) {
             if let n = course.dueToday, n > 0 {
                 // (home-1) in the accent, as the Due today counter: red is for late work only. Ringed in white, so it
                 // reads on a band of the same colour.
-                Text("\(n) due today")
-                    .font(.sCaption.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Theme.accent, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.7), lineWidth: 1))
-                    .fixedSize()
+                let said = "\(n) due today"
+                Group {
+                    if compact {
+                        Label("\(n)", systemImage: "clock.fill")
+                    } else {
+                        Text(said)
+                    }
+                }
+                .font(.sCaption.weight(.bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Theme.accent, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.7), lineWidth: 1))
+                .fixedSize()
+                .help(said)
+                .accessibilityLabel(said)
             }
             if let n = course.unread, n > 0 {
                 // (home-24) what the number is, on the pill itself: "2 new", named in full when the pointer rests on it
                 let label = PreviewFormat.text(course.unreadLabel) ?? "\(n) unread \(n == 1 ? "announcement" : "announcements")"
-                Label(PreviewFormat.text(course.unreadText) ?? "\(n) new", systemImage: "megaphone.fill")
+                Label(compact ? "\(n)" : (PreviewFormat.text(course.unreadText) ?? "\(n) new"), systemImage: "megaphone.fill")
                     .font(.sCaption.weight(.bold))
                     .foregroundStyle(color)
                     .padding(.horizontal, 8)

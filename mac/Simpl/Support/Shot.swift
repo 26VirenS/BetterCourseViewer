@@ -74,11 +74,19 @@ enum Shot {
 
     /// The window to picture: this app's frontmost (Settings, a tool's window), else the main window; with its sheets.
     /// (1.3.1: by the app's own order, not the key window — the suite runs several copies at once, and only one is key.)
+    /// (1.3.78) Never a window that belongs to another — the search field's suggestions, a child window — nor one only a
+    /// strip tall: the suggestions open in front of the window they belong to, and were pictured alone.
     private static func target() -> NSWindow? {
-        if let front = NSApp.orderedWindows.first(where: { $0.isVisible && !($0 is NSPanel) && $0.frame.width > 300 }) {
+        if let front = NSApp.orderedWindows.first(where: { $0.isVisible && !($0 is NSPanel) && $0.parent == nil && $0.frame.width > 300 && $0.frame.height > 200 }) {
             return front.sheetParent ?? front
         }
         return mainWindow()
+    }
+
+    /// (1.3.78) What is in front of the window and over it without being its own child or sheet — the search field's
+    /// suggestions — pictured with it.
+    private static func above(_ w: NSWindow) -> [NSWindow] {
+        NSApp.orderedWindows.prefix(while: { $0 !== w }).filter { $0.isVisible && $0.alphaValue > 0.01 && $0.frame.intersects(w.frame) }
     }
 
     private static func take(_ file: String) {
@@ -100,6 +108,9 @@ enum Shot {
         var parts = [w] + w.sheets + (w.attachedSheet.map { [$0] } ?? []) + (w.childWindows ?? []).filter(\.isVisible)
         parts += NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.intersects(w.frame) }
         parts += NSApp.windows.filter { $0 is ToolFloatPanel && $0.isVisible } // (1.3.73: a quick panel pulled out, floating)
+        // (1.3.78: the search field's suggestions, in front and over it — after the rest, so they are laid on top)
+        let front = above(w).reversed().filter { s in !parts.contains(where: { $0 === s }) }
+        parts += front
         var seen = Set<Int>()
         parts = parts.filter { seen.insert($0.windowNumber).inserted }
         var rect = w.frame

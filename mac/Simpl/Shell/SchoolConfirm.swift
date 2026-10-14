@@ -151,7 +151,11 @@ struct LoginPreview: NSViewRepresentable {
             set(.loading)
             // (the screenshot suite: -SimplPreviewFail YES — a preview that could not be loaded, without waiting for one)
             if UserDefaults.standard.bool(forKey: "SimplPreviewFail") {
-                set(.failed)
+                // (a moment later: set while the view is being made, the change was lost and the tile kept its spinner)
+                Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    self?.set(.failed)
+                }
                 return
             }
             guard let url = URL(string: "https://\(host)/") else { set(.failed); return }

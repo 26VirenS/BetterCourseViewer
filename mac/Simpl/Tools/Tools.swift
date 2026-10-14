@@ -175,10 +175,13 @@ final class ToolsCenter: ObservableObject {
         // tool opened a file, as a drop on its pin does — the annotator's page, Split's pages)
         if let t = LaunchOpen.take("", key: "SimplTool"), let k = ToolKind(rawValue: t) { open = k }
         if let k = open, let path = LaunchOpen.take("", key: "SimplToolFile"), !path.isEmpty {
-            handoff = [URL(fileURLWithPath: path)]
-            handoffTool = k
+            launchFile = (k, URL(fileURLWithPath: path))
         }
     }
+
+    /// The screenshot suite's file for the tool its launch opened: handed to that tool each time it is drawn afresh (the
+    /// window's screens are made again as the app's answers come in, and a file taken once was gone by then).
+    private var launchFile: (kind: ToolKind, url: URL)?
 
     func isPinned(_ k: ToolKind) -> Bool { pinned.contains(k) }
 
@@ -268,6 +271,7 @@ final class ToolsCenter: ObservableObject {
 
     /// The files handed to a tool, taken once.
     func takeFiles(for k: ToolKind) -> [URL] {
+        if handoff.isEmpty, let f = launchFile, f.kind == k { return [f.url] }
         guard handoffTool == k, !handoff.isEmpty else { return [] }
         let files = handoff
         handoff = []

@@ -84,12 +84,14 @@ struct CalendarView: View {
         .toolbar { toolbarItems }
         .onAppear(perform: seed)
         .task(id: engine.dataVersion) {
+            // (the screenshot suite: -SimplCalView week|list opens on that view, once, in place of the one kept — the kept
+            // one then not read at all, so a read still on its way when the task starts again cannot undo it)
+            let asked = LaunchOpen.take("", key: "SimplCalView").flatMap { Self.modes.contains($0) ? $0 : nil }
             if !modeRead {
                 modeRead = true
-                if let v = try? await engine.read("calView", as: OK.self).view, Self.modes.contains(v) { mode = v }
+                if asked == nil, let v = try? await engine.read("calView", as: OK.self).view, Self.modes.contains(v) { mode = v }
             }
-            // (the screenshot suite: -SimplCalView week|list opens on that view, once)
-            if let v = LaunchOpen.take("", key: "SimplCalView"), Self.modes.contains(v) { mode = v }
+            if let asked { mode = asked }
             await load(animated: false)
         }
     }
@@ -897,12 +899,17 @@ private struct CalendarChip: View {
                     .foregroundStyle(.red)
                     .frame(width: 8)
             }
-            Text(event.title)
-                .strikethrough(event.isStruck && !missing, color: .secondary)
-                .foregroundStyle(grey ? Color.secondary : (missing ? Color.red : Color.primary))
-                .lineLimit(lines)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.leading, missing ? 0 : 7)
+            // (a name on two lines only where each of its words fits a line: a word wider than the day — "Composition" —
+            // was broken in the middle, "Compositio / n"; such a name keeps to one line, cut at its end)
+            ViewThatFits(in: .horizontal) {
+                if lines > 1 {
+                    title(lines: lines)
+                        .frame(idealWidth: CalendarChip.longestWord(event.title), alignment: .leading)
+                }
+                title(lines: 1)
+            }
+            .foregroundStyle(grey ? Color.secondary : (missing ? Color.red : Color.primary))
+            .padding(.leading, missing ? 0 : 7)
                 .overlay(alignment: .leading) {
                     if !missing {
                         Capsule()
@@ -917,6 +924,22 @@ private struct CalendarChip: View {
         .padding(.vertical, 1)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityHidden(true)
+    }
+
+    private func title(lines: Int) -> some View {
+        Text(event.title)
+            .strikethrough(event.isStruck && event.missing != true, color: .secondary)
+            .lineLimit(lines)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The width of a name's widest word at the chip's size (12 points, as `.sCaption`), and a point to spare.
+    static func longestWord(_ title: String) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 12)
+        let widest = title.split(whereSeparator: { $0 == " " || $0 == "\n" })
+            .map { (String($0) as NSString).size(withAttributes: [.font: font]).width }
+            .max() ?? 0
+        return ceil(widest) + 1
     }
 }
 
