@@ -4609,7 +4609,7 @@ try {
   const modRows = await findRows('/open mastering');
   const [modTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await modTab.waitForLoadState('domcontentloaded').catch(() => {});
-  check(modRows.length === 1 && modRows[0].t === 'Mastering Physics' && modRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module tool' && modTab.url() === `${BASE}/courses/102/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://tool.example.com/mastering')}&bcv=tool`, `and a tool placed in a module: ${JSON.stringify(modRows)} → ${modTab.url()}`);
+  check(modRows.length === 1 && modRows[0].t === 'Mastering Physics' && modRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module tool' && modTab.url() === `${BASE}/courses/102/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://session.masteringphysics.com/lti/launch')}&bcv=tool`, `and a tool placed in a module: ${JSON.stringify(modRows)} → ${modTab.url()}`);
   await modTab.close().catch(() => {});
   const waRows = await findRows('/open webassign');
   const [waTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);

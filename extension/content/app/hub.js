@@ -247,6 +247,8 @@
     ['respondus', 'Respondus', 'lock', /respondus/, /respondus|lockdown browser/],
     ['proctorio', 'Proctorio', 'lock', /proctorio/, /proctorio/],
     ['honorlock', 'Honorlock', 'lock', /honorlock/, /honorlock/],
+    ['rollcall', 'Roll Call Attendance', 'check', /rollcall\.instructure/, /roll ?call(?: attendance)?/],
+    ['commons', 'Canvas Commons', 'folder', /lor\.instructure/, /canvas commons|commons$/],
   ];
   // (a tab's label names a provider when it begins with one of its names, "Panopto Recordings"; an item's title when its
   // words before a colon or dash — or the whole title — are one of its names and a word more at most, "Knewton Alta: Unit 2"
@@ -255,33 +257,75 @@
   const LABELLED = PROVIDERS.map((p) => new RegExp(`^(?:${p[4].source})(?![\\w])`, 'i'));
   const TITLED = PROVIDERS.map((p) => new RegExp(`^(?:${p[4].source})(?:\\s+\\S+)?$`, 'i'));
   const SECOND_LEVEL = /^(?:co|com|ac|edu|gov|org|net|ne|or|go|gob|sch|ltd|plc)$/;
-  // A site by the name a person would say it: its registered domain, "lmslink.bfwpub.com" → "bfwpub.com", "x.foo.co.uk" → "foo.co.uk".
+  // (a host on a service many unrelated tools share — Heroku, Amazon's, Azure's, Instructure's own — is no one
+  // provider's site: such a tool is its whole host, "foo-lti.herokuapp.com", never "herokuapp.com")
+  const SHARED = /(?:^|\.)(?:herokuapp\.com|amazonaws\.com|cloudfront\.net|azurewebsites\.net|azureedge\.net|appspot\.com|firebaseapp\.com|web\.app|github\.io|netlify\.app|vercel\.app|onrender\.com|pages\.dev|workers\.dev|instructure\.com)$/;
+  // A site by the name a person would say it: its registered domain, "lmslink.bfwpub.com" → "bfwpub.com", "x.foo.co.uk" →
+  // "foo.co.uk", a US school district's "lti.lausd.k12.ca.us" → "lausd.k12.ca.us".
   const siteOf = (host) => {
     const parts = String(host || '').toLowerCase().replace(/^www\./, '').split('.').filter(Boolean);
-    if (parts.length <= 2 || /^\d+$/.test(parts[parts.length - 1])) return parts.join('.');
-    const keep = parts[parts.length - 1].length === 2 && SECOND_LEVEL.test(parts[parts.length - 2]) ? 3 : 2;
+    if (parts.length <= 2 || /^\d+$/.test(parts[parts.length - 1]) || SHARED.test(parts.join('.'))) return parts.join('.');
+    const [tld, second, third] = [parts[parts.length - 1], parts[parts.length - 2], parts[parts.length - 3]];
+    const keep = tld === 'us' && second.length === 2 ? (/^(?:k12|cc|tec|lib)$/.test(third) ? 4 : 3) : tld.length === 2 && SECOND_LEVEL.test(second) ? 3 : 2;
     return parts.slice(-keep).join('.');
+  };
+  // Canvas's own launch of a tool, on the school's Canvas or any other name it answers to ("school.instructure.com"):
+  // /courses/1/external_tools/31, …/external_tools/retrieve?url=…, /api/v1/courses/1/external_tools/sessionless_launch?id=31.
+  // It is no provider's address: the provider is the one of the address it hands on (`url=`), else the tool's (its id).
+  const CANVAS_LAUNCH = /^\/(?:api\/v1\/)?(?:courses|accounts)\/\d+\/external_tools\/(\d+|retrieve|sessionless_launch)\/?$/i;
+  /** A tool's id as Canvas gives it: a whole number from 1 up (a module's tool Canvas could not match to one it has
+   *  installed comes with 0, which is no tool's), else null. */
+  const toolIdOf = (v) => (/^[1-9]\d*$/.test(String(v ?? '')) ? String(v) : null);
+  /** Canvas's own launch route for a tool (`url`): the tool's id it names (`tool`, or null) and the address it hands on
+   *  (`url`, or ''); null for any other address. */
+  function canvasLaunch(url) {
+    let u = null;
+    try { u = new URL(String(url || ''), location.origin); } catch { return null; }
+    const m = /^https?:$/.test(u.protocol) ? CANVAS_LAUNCH.exec(u.pathname) : null;
+    return m ? { tool: toolIdOf(/^\d+$/.test(m[1]) ? m[1] : u.searchParams.get('id')), url: u.searchParams.get('url') || '' } : null;
+  }
+  /** The tool's id an assignment opens: its `content_id` when Canvas says it is a tool's, else the id its launch address
+   *  names on Canvas's own route; null when neither says. */
+  const assignmentToolOf = (a) => {
+    const attrs = a?.external_tool_tag_attributes || {};
+    return (!attrs.content_type || attrs.content_type === 'ContextExternalTool' ? toolIdOf(attrs.content_id) : null) || canvasLaunch(attrs.url)?.tool || null;
   };
   const known = (p, by, host) => ({ id: p[0], name: p[1], icon: p[2], host, by });
   /** The provider of a tool: by the host of its launch address (`url`) when the table knows it (`by` "host"); else by
    *  the label of a course's tab (`label`) or an item's title (`title`) that names one ("name"); else, for an address of
-   *  a site the table does not know, by that site ("site": "bfwpub.com"). Never by the words of a title alone — "W2" and
-   *  "W7 Homework" are each a place the tool is used, not a tool. Null when nothing says (no address of its own). `host`
-   *  is the launch address's host, for the line under the tool's name. */
-  function providerOf({ url = '', title = '', label = '' } = {}) {
+   *  a site the table does not know, by that site ("site": `name` and `site` "bfwpub.com", `id` its whole host — two
+   *  tools of one site are two tools; siteNames says which keep the site's name). Never by the words of a title alone —
+   *  "W2" and "W7 Homework" are each a place the tool is used, not a tool. Null when nothing says (no address of its own,
+   *  or Canvas's own launch route handing on none). `host` is the launch address's host, for the line under the name. */
+  function providerOf({ url = '', title = '', label = '' } = {}, depth = 0) {
+    const via = canvasLaunch(url);
+    if (via && via.url && depth < 2) return providerOf({ url: via.url, title, label }, depth + 1); // (the address Canvas hands on)
     let host = '';
-    try { const u = new URL(String(url || '')); host = /^https?:$/.test(u.protocol) && u.host !== location.host ? u.hostname.toLowerCase().replace(/^www\./, '') : ''; } catch { host = ''; }
+    try { const u = new URL(String(url || '')); host = !via && /^https?:$/.test(u.protocol) && u.host !== location.host ? u.hostname.toLowerCase().replace(/^www\./, '') : ''; } catch { host = ''; }
     const byHost = host ? PROVIDERS.find((p) => p[3].test(host)) : null;
     if (byHost) return known(byHost, 'host', host);
     const said = String(label || '').trim();
     let k = said ? LABELLED.findIndex((re) => re.test(said)) : -1;
     if (k < 0 && title) {
+      // (an item on a site of its own names a provider only in front of a colon or a dash, "Knewton Alta: Unit 2" — its
+      // site says more than a title that merely begins with a name, "Pearson Correlation" on stats.example.org)
       const m = /^([^:–—]{2,40}?)\s*(?::|\s[–—-])\s+\S/.exec(String(title));
-      const lead = (m ? m[1] : String(title)).trim();
-      k = TITLED.findIndex((re) => re.test(lead));
+      if (m || !host) k = TITLED.findIndex((re) => re.test((m ? m[1] : String(title)).trim()));
     }
     if (k >= 0) return known(PROVIDERS[k], 'name', host);
-    return host ? { id: `site:${siteOf(host)}`, name: siteOf(host), icon: null, host, by: 'site' } : null;
+    return host ? { id: `site:${host}`, name: siteOf(host), site: siteOf(host), icon: null, host, by: 'site' } : null;
+  }
+  /** The name each site a list of providers has (each `{ id, site, host }` of providerOf's "site"), once all of an
+   *  answer's are found: its site's ("bfwpub.com") when no other host of that site is among them, else its whole host
+   *  ("jupyter.school.edu" and "library.school.edu", two tools of one school, each by its own). */
+  function siteNames(ps) {
+    const ids = new Map();
+    for (const p of ps) {
+      if (p?.by !== 'site') continue;
+      if (!ids.has(p.site)) ids.set(p.site, new Set());
+      ids.get(p.site).add(p.id);
+    }
+    return (p) => (p?.by === 'site' && ids.get(p.site)?.size > 1 ? p.host : p?.name);
   }
   // The tool behind an assignment, by its provider's name: so the tool is listed as a tool, once per course, as well as
   // each assignment that opens it.
@@ -296,33 +340,39 @@
       eachCourse(cs, lane, (c) => store().modules(c.id).then((mods) => (mods || []).flatMap((m) => (m.items || []).filter((it) => it.type === 'ExternalTool' || it.type === 'ExternalUrl').map((it) => ({ it, m, c }))))),
     ]);
     const tabNames = new Set();
+    const tabTools = new Set();
     for (const { t, c } of tabLists.flat()) {
       const href = (() => { try { return new URL(t.html_url || t.full_url || '', location.origin).pathname; } catch { return ''; } })();
       if (!href) continue;
       tabNames.add(`${c.id}|${norm(providerOf({ label: t.label })?.name || t.label)}`); // (a tab "Achieve" is Macmillan Learning's)
+      const tool = toolIdOf(/^context_external_tool_(\d+)$/.exec(String(t.id || ''))?.[1]);
+      if (tool) tabTools.add(`${c.id}|${tool}`); // (and a tab the school named "Course Materials" is the tool its id says)
       if (!hit(`${t.label} ${nameOf(c)}`, q)) continue;
       add({ icon: IC.external, title: t.label, sub: `${nameOf(c)} · Campus tool`, tint: c.color || null, course: c, run: (from) => BCV.exttool?.openLink({ title: t.label, href, from }), external: true }, `${t.label}|${href}`);
     }
     // the tool itself — its provider — once per course, opened through the assignment nearest its due date with nothing
-    // handed in
+    // handed in; not in a course whose own nav lists it, by its name or by the tool's id any of its assignments carries
     const named = new Map();
+    const tabbed = new Set();
     const stand = (a) => { const at = a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null; const now = Date.now(); return [a.submission?.submitted_at ? 1 : 0, at === null ? Infinity : at < now ? now - at + 365 * 864e5 : at - now]; };
-    for (const { a, c } of aLists.flat()) {
-      if (!isToolAssignment(a)) continue;
-      const p = providerOf({ url: a.external_tool_tag_attributes?.url, title: a.name });
-      if (!p || tabNames.has(`${c.id}|${norm(p.name)}`)) continue; // (a tool the course's own nav lists is listed there)
-      const key = `${c.id}|${norm(p.name)}`;
+    const tooled = aLists.flat().filter(({ a }) => isToolAssignment(a)).map(({ a, c }) => ({ a, c, p: providerOf({ url: a.external_tool_tag_attributes?.url, title: a.name }) })).filter((x) => x.p);
+    const nameFor = siteNames(tooled.map((x) => x.p));
+    for (const { a, c, p } of tooled) {
+      const name = nameFor(p);
+      const key = `${c.id}|${p.id}`;
+      const tool = assignmentToolOf(a);
+      if (tabNames.has(`${c.id}|${norm(name)}`) || (tool && tabTools.has(`${c.id}|${tool}`))) { tabbed.add(key); continue; }
       const cur = named.get(key);
       const [d1, t1] = stand(a);
-      if (!cur || d1 < cur.stand[0] || (d1 === cur.stand[0] && t1 < cur.stand[1])) named.set(key, { name: p.name, icon: p.icon, c, a, stand: [d1, t1] });
+      if (!cur || d1 < cur.stand[0] || (d1 === cur.stand[0] && t1 < cur.stand[1])) named.set(key, { name, icon: p.icon, c, a, stand: [d1, t1] });
     }
-    for (const { name, icon, c, a } of named.values()) {
-      if (!hit(`${name} ${nameOf(c)}`, q)) continue;
+    for (const [key, { name, icon, c, a }] of named) {
+      if (tabbed.has(key) || !hit(`${name} ${nameOf(c)}`, q)) continue;
       const open = (from) => launchTool(a, c.id, from);
       add({
         icon: (icon && IC[icon]) || IC.external, title: name, sub: `${nameOf(c)} · Tool · via ${a.name}`, tint: c.color || null, course: c, at: a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null, done: !!a.submission?.submitted_at, run: open, external: true, assignment: a, tool: true,
         actions: [{ label: 'Open tool', icon: IC.external, run: open }, { label: 'Assignment', icon: IC.doc, run: () => app().go(`/courses/${c.id}/assignments/${a.id}`) }],
-      }, `t:${c.id}:${norm(name)}`);
+      }, `t:${key}`);
     }
     for (const { a, c } of aLists.flat()) {
       const s = a.submission || {};
@@ -964,5 +1014,5 @@
     return [];
   }
 
-  BCV.hub = { COMMANDS, matchCommands, parse, byName, quickAnswers, actionsFor, submitPopover, downloadFile, convertFile, viewFile, dueItems, parseWhen, launchTool, understand, resolve, readingLabel, toolNameOf, providerOf };
+  BCV.hub = { COMMANDS, matchCommands, parse, byName, quickAnswers, actionsFor, submitPopover, downloadFile, convertFile, viewFile, dueItems, parseWhen, launchTool, understand, resolve, readingLabel, toolNameOf, providerOf, siteNames, toolIdOf, canvasLaunch };
 })();

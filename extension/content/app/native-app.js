@@ -2691,20 +2691,26 @@
   // its site ("bfwpub.com"); a course's tab whose label names none by that label. Where Canvas gives the tool's id (a
   // tab's own; an assignment's or a module item's content_id), a tab the school called something else, or an item whose
   // address says nothing, goes with the provider the same tool's other places name.
+  // (Mac 1.3.79, Windows 0.3.1) Canvas's own launch route ("/courses/1/external_tools/retrieve?url=…", on the school's
+  // Canvas or school.instructure.com) is the tool of the address it hands on, else of the id it names; a tool's id is a
+  // whole number from 1 (a module's tool with id 0 is one Canvas could not match, no tool's); an unknown provider is its
+  // whole host, named by its site only while no other host of that site is among the tools ("jupyter.school.edu" and
+  // "library.school.edu" are two tools).
   async function externalTools() {
     const all = await store.courses().catch(() => null);
     if (!all) return { error: 'Your courses could not be loaded.' };
     const cs = all.filter((c) => c.state === 'current');
-    try { await BCV.lazy?.load?.('hub'); } catch { /* not loaded: tools named by their sites */ }
+    try { await BCV.lazy?.load?.('hub'); } catch { /* not loaded: tools named by their hosts */ }
     const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const hostOf = (u) => { try { return new URL(u, location.origin).hostname.replace(/^www\./, ''); } catch { return ''; } };
     const providerOf = (o) => {
       const p = BCV.hub?.providerOf?.(o);
       if (p !== undefined) return p;
-      const host = hostOf(o.url || ''); // (the hub not loaded: by its site alone)
-      return host && host !== location.hostname ? { id: `site:${host}`, name: host, icon: null, host, by: 'site' } : null;
+      const host = hostOf(o.url || ''); // (the hub not loaded: by its host alone)
+      return host && host !== location.hostname ? { id: `site:${host}`, name: host, site: host, icon: null, host, by: 'site' } : null;
     };
-    const toolIdOf = (v) => (v === null || v === undefined || v === '' ? null : String(v));
+    const toolIdOf = (v) => (/^[1-9]\d*$/.test(String(v ?? '')) ? String(v) : null);
+    const launchToolOf = (u) => BCV.hub?.canvasLaunch?.(u)?.tool || null; // (the id Canvas's own launch route names)
     const now = new Date();
     // (2.99.33) an item's title without the tool's own name in front ("Knewton Alta: Unit 2" under Knewton Alta is "Unit 2"),
     // the one trimming every app uses
@@ -2716,10 +2722,11 @@
       return m ? m[1].trim() : t;
     };
     const tools = new Map();
+    // (a tool is kept by its provider's id, an unknown provider's being its whole host; a tab nothing else names, by its label)
     const note = (p, c, open, kind, item) => {
-      const key = norm(p.name);
+      const key = p.by === 'tab' ? (norm(p.name) && `tab:${norm(p.name)}`) : p.id;
       if (!key) return;
-      const t = tools.get(key) || { id: key, name: p.name, provider: p.by === 'host' || p.by === 'name' ? p.id : null, icon: p.icon || null, host: '', kinds: [], courses: new Map(), assignments: 0 };
+      const t = tools.get(key) || { id: key, p, name: p.name, provider: p.by === 'host' || p.by === 'name' ? p.id : null, icon: p.icon || null, host: '', kinds: [], courses: new Map(), assignments: 0 };
       if (!t.host && p.host && p.host !== location.hostname) t.host = p.host;
       if (!t.kinds.includes(kind)) t.kinds.push(kind);
       if (kind === 'Assignments') t.assignments += 1;
@@ -2748,18 +2755,23 @@
       tooled.sort((x, y) => { const [a1, b1] = rank(x), [a2, b2] = rank(y); return a1 - a2 || b1 - b2; });
       const assigned = tooled.map((a) => {
         const attrs = a.external_tool_tag_attributes || {};
-        return { a, tool: !attrs.content_type || attrs.content_type === 'ContextExternalTool' ? toolIdOf(attrs.content_id) : null, p: providerOf({ url: attrs.url || '', title: a.name || '' }) };
+        const tool = (!attrs.content_type || attrs.content_type === 'ContextExternalTool' ? toolIdOf(attrs.content_id) : null) || launchToolOf(attrs.url);
+        return { a, tool, p: providerOf({ url: attrs.url || '', title: a.name || '' }) };
       });
       const placed = (mods || []).flatMap((m) => (m.items || []).filter((it) => it.type === 'ExternalTool')
-        .map((it) => ({ m, it, tool: toolIdOf(it.content_id), p: providerOf({ url: it.external_url || '', title: it.title || '' }) })));
+        .map((it) => ({ m, it, tool: toolIdOf(it.content_id) || launchToolOf(it.external_url), p: providerOf({ url: it.external_url || '', title: it.title || '' }) })));
       return { c, tabbed, assigned, placed };
     }));
-    // a tool's id, to the provider its places name: by their launch addresses first, then by a tab's label, then a tab's
-    // own label for a tool nothing else names
+    // a tool's id, to the provider its places name: a known launch address first, then a tab's label that names one, then
+    // an item's title that names one, then an unknown launch address's site, and a tab's own label for a tool nothing
+    // else names — so an unknown publisher's tab the school called "Course Materials" is that publisher's
     const byTool = new Map();
     const claim = (tool, p) => { if (tool && p && !byTool.has(tool)) byTool.set(tool, p); };
-    for (const f of found) for (const x of [...f.assigned, ...f.placed]) if (x.p?.by === 'host') claim(x.tool, x.p);
+    const places = found.flatMap((f) => [...f.assigned, ...f.placed]);
+    for (const x of places) if (x.p?.by === 'host') claim(x.tool, x.p);
     for (const f of found) for (const x of f.tabbed) if (x.p) claim(x.tool, x.p);
+    for (const x of places) if (x.p?.by === 'name') claim(x.tool, x.p);
+    for (const x of places) if (x.p?.by === 'site') claim(x.tool, x.p);
     for (const f of found) for (const x of f.tabbed) claim(x.tool, { id: null, name: x.t.label || 'Tool', icon: null, host: '', by: 'tab' });
     // an item's provider: its address's, else its tool's, else what its title or its site says
     const itemProvider = (x) => (x.p?.by === 'host' ? x.p : (x.tool && byTool.get(x.tool)) || x.p);
@@ -2784,12 +2796,15 @@
         note(p, c, { moduleItem: String(x.it.id) }, 'Modules', item);
       }
     }
+    // (an unknown provider by its site, "bfwpub.com", unless another tool here is of the same site: then by its host)
+    const nameFor = BCV.hub?.siteNames?.([...tools.values()].map((t) => t.p)) || ((p) => p.name);
     const rows = [...tools.values()].map((t) => {
       const courses = [...t.courses.values()].sort((a, b) => a.name.localeCompare(b.name));
       const items = courses.flatMap((c) => c.items.map((i) => ({ ...i, course: c.name })));
       const next = items.filter((i) => i.upcoming).sort((a, b) => U.parse(a.due) - U.parse(b.due))[0] || null;
+      const name = nameFor(t.p) || t.name;
       return {
-        id: t.id, name: t.name, provider: t.provider, icon: t.icon, host: t.host === t.name ? '' : t.host, kinds: t.kinds, assignments: t.assignments,
+        id: t.id, name, provider: t.provider, icon: t.icon, host: t.host === name ? '' : t.host, kinds: t.kinds, assignments: t.assignments,
         instances: items.length, next: next ? { title: next.title, short: next.short, sub: next.sub, course: next.course } : null, courses,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));

@@ -603,6 +603,59 @@ try {
     && et.rows.find((t) => t.name === 'Pearson')?.courses.map((c) => c.items.map((i) => i.title).join()).join() === 'Mastering Physics'
     && ka.provider === 'knewton' && rp.provider === null && rp.icon === null,
     `external tools by provider: Macmillan's week-titled assignments, its module item and its tab one tool, Macmillan Learning (${JSON.stringify(et.rows?.map((t) => [t.name, t.provider, t.host, t.kinds.join('+'), t.instances]))}, ${JSON.stringify(macChem?.items?.map((i) => i.title))})`);
+  // (Mac 1.3.79, Windows 0.3.1) and with harder Canvas data in CHEM: a launch on Canvas's own route is the tool of the
+  // address it hands on or of the id it names; a module's tool with id 0 (one Canvas could not match) joins nobody; two
+  // tools of one school are two tools, each by its own host; a title on a site of its own names nothing but before a
+  // colon; an unknown publisher's tab the school named "Course Materials" is that publisher's, and a tab named after
+  // nothing whose tool's items say "Achieve: …" is Macmillan Learning's
+  {
+    const hardCtx = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await hardCtx.addInitScript(nativeStub);
+    await hardCtx.addInitScript(shellScript);
+    const due = (d) => new Date(Date.now() + d * 864e5).toISOString();
+    const asg = (id, name, url, extra = {}) => ({ id, name, due_at: due(30), points_possible: 10, published: true, submission_types: ['external_tool'], html_url: `/courses/106/assignments/${id}`, course_id: 106, external_tool_tag_attributes: { url, new_tab: false, ...extra }, submission: { workflow_state: 'unsubmitted' }, has_submitted_submissions: false });
+    const byId = (n) => ({ content_type: 'ContextExternalTool', content_id: n });
+    const hard = {
+      assignments: [
+        asg('7001', 'W2: Atoms', 'https://lmslink.bfwpub.com/lms/launch?i=1', byId(31)),
+        asg('7002', 'Quiz 5', `${BASE}/courses/106/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://lmslink.bfwpub.com/lms/q5')}`),
+        asg('7003', 'Week 9: Review', 'https://school.instructure.com/courses/106/external_tools/31'),
+        asg('7004', 'Lab 1: Notebook', 'https://jupyter.school.edu/lti', byId(40)),
+        asg('7005', 'Reserves: Week 1', 'https://library.school.edu/lti', byId(41)),
+        asg('7006', 'Pearson Correlation', 'https://stats.example.org/lti'),
+        asg('7007', 'Unit 1: Reading', 'https://lti.newpub.com/launch?u=1', byId(50)),
+        asg('7008', 'Achieve: Chapter 3', `${BASE}/courses/106/external_tools/45`, byId(45)),
+        asg('7009', 'Week 4 problems', `${BASE}/api/v1/courses/106/external_tools/sessionless_launch?id=45`),
+      ],
+      modules: [{ id: 'm9', name: 'Week 3', state: 'unlocked', position: 1, items: [
+        { id: 'j1', type: 'ExternalTool', content_id: 0, title: 'Class board', external_url: 'https://board.unknown-tool.org/x', html_url: '/courses/106/modules/items/j1' },
+        { id: 'j2', type: 'ExternalTool', content_id: 0, title: 'Week 5 activity', external_url: '', html_url: '/courses/106/modules/items/j2' },
+        { id: 'j3', type: 'ExternalTool', content_id: 50, title: 'Unit 2: Reading', external_url: '', html_url: '/courses/106/modules/items/j3' },
+      ] }],
+      tabs: [[31, 'Macmillan'], [50, 'Course Materials'], [45, 'Homework Hub']].map(([n, label], i) => ({ id: `context_external_tool_${n}`, label, html_url: `/courses/106/external_tools/${n}`, type: 'external', position: 20 + i, visibility: 'public' })),
+    };
+    await hardCtx.route(/\/api\/v1\/courses\/106\/(assignments|modules|tabs)(\?|$)/, async (route) => {
+      const what = /\/courses\/106\/(\w+)/.exec(new URL(route.request().url()).pathname)[1];
+      if (what !== 'tabs') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(hard[what]) });
+      const own = JSON.parse((await (await route.fetch()).text()).replace(/^while\(1\);/, '')).filter((t) => !String(t.id).startsWith('context_external_tool_') || t.id === 'context_external_tool_9');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([...own, ...hard.tabs]) });
+    });
+    const hp = await hardCtx.newPage();
+    await hp.goto(`${BASE}/`);
+    await hp.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !!self.BCVNative, null, { timeout: 25000 });
+    const het = await hp.evaluate(() => self.BCVNative.call('externalTools', {}));
+    await hardCtx.close();
+    const placesOf = (name) => het.rows?.find((t) => t.name === name)?.courses.filter((c) => c.id === '106').flatMap((c) => c.items.map((i) => i.title)).join(' | ');
+    const tabOf = (name) => het.rows?.find((t) => t.name === name)?.courses.find((c) => c.id === '106')?.open.tool || null;
+    const all106 = (het.rows || []).flatMap((t) => t.courses.filter((c) => c.id === '106').flatMap((c) => c.items.map((i) => i.title)));
+    check(!het.error && placesOf('Macmillan Learning') === 'W2: Atoms | Quiz 5 | Week 9: Review | Achieve: Chapter 3 | Week 4 problems'
+      && tabOf('Macmillan Learning') === '31' && placesOf('jupyter.school.edu') === 'Lab 1: Notebook' && placesOf('library.school.edu') === 'Reserves: Week 1'
+      && placesOf('example.org') === 'Pearson Correlation' && placesOf('unknown-tool.org') === 'Class board' && !all106.includes('Week 5 activity')
+      && placesOf('newpub.com') === 'Unit 1: Reading | Unit 2: Reading' && tabOf('newpub.com') === '50'
+      && !het.rows.some((t) => ['Course Materials', 'Homework Hub', 'school.edu', 'instructure.com', 'canvas.test', 'localhost'].includes(t.name))
+      && het.rows.find((t) => t.name === 'Pearson')?.courses.every((c) => c.id !== '106'),
+      `external tools with harder Canvas data: ${JSON.stringify(het.rows?.map((t) => [t.name, t.host, t.courses.find((c) => c.id === '106')?.open, placesOf(t.name)]))}`);
+  }
   // More from Canvas: what the school added to Canvas's own nav (the page's #menu — History, an account tool with its
   // icon, Help), for the Mac's and Windows's sidebars, as the web's sidebar shows it (extras.js)
   const mfc = await nc('moreFromCanvas');
