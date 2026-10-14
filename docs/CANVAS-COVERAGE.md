@@ -40,13 +40,14 @@ requirement, the account menu's e-mail and pronouns, and every row's status word
 | Coming Up (dashboard sidebar) | Partial | Due today / this week / tomorrow counters cover it |
 | All Courses (favourites, terms, past/future enrollments) | **Drawn** | |
 | Groups list | **Drawn** | |
-| Calendar: week/month/agenda, course/group/personal calendars | **Drawn** | Ten-calendar limit enforced; handed-in work struck through, missing work marked, points and place on rows |
+| Calendar: week/month/agenda, course/group/personal calendars | **Drawn** | Ten-calendar limit enforced; handed-in (or excused) work struck through, anything over greyed, missing work marked, points and place on rows |
 | Calendar: Scheduler / Find appointment (reserve, cancel) | **Drawn** | Group sign-ups open Canvas's page |
 | Calendar: create/edit personal events, planner notes on the grid, undated list, iCal feed, `?event_id=` deep links | Missing | |
 | To Do (planner) with personal tasks | **Drawn** | An Overdue group two weeks back, then today onward; rows say Missing / Late / Excused / Feedback / New (planner `submissions` flags, `new_activity`) |
 | To Do: edit a task, task notes | Missing | No PUT for planner notes |
 | Inbox: inbox/unread/starred/sent/archived, course filter, reader, reply, compose with recipient search | **Drawn** | Rows: course, message count, attachment mark, time; reader: attachments, voice/video notes, forwarded messages; recipients say the course you share. First 50 conversations only (no paging) |
-| Inbox: archive/unarchive, delete, mark unread, forward, attachments and media on compose/reply, bulk actions, address book browsing | Missing | |
+| Inbox: files attached to a new message or a reply | **Drawn** (Mac) | Uploaded to the student's conversation-attachments folder as they are picked (`messageUpload`), sent by id (`attachments`); 50 MB a file |
+| Inbox: archive/unarchive, delete, mark unread, forward, recorded media on compose/reply, bulk actions, address book browsing | Missing | |
 | Notifications (Canvas has no page; Simpl's own feed) | **Drawn** | Overdue (two weeks back), Due soon, Graded (posted only), Feedback, Messages, Discussions, Announcements, System (with its category) |
 | History | **Drawn** (sheet) | |
 | Help menu | **Drawn** (sheet) | Report a problem is Canvas's form |

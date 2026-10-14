@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - New Message
 
@@ -6,7 +7,9 @@ import SwiftUI
 /// arrow keys and Return choose, Escape puts it away — and each one a token that can be taken out again), the course it
 /// is about (optional — it narrows the people found to those in it), a subject and the message, each a line of its own
 /// with a hairline under it and no boxes; Cancel and Send in glass at the foot. ⌘Return sends; Escape cancels, asking
-/// first when something is written.
+/// first when something is written. (planning-18) Attach (the paperclip at the foot, or a file dropped on the sheet)
+/// sends files with it, shown as chips over the foot; (planning-33) the sheet fits a window 680 points tall, the message
+/// box giving way first.
 struct ComposeSheet: View {
     private let to: [Recipient]
     private let context: String?
@@ -26,6 +29,10 @@ struct ComposeSheet: View {
     @State private var sending = false
     @State private var error: String?
     @State private var confirmDiscard = false
+    /// The files going with it, and the file chooser's being up.
+    @StateObject private var files = MessageAttachments()
+    @State private var attaching = false
+    @State private var dropping = false
     @FocusState private var focus: ComposeFocus?
 
     init(to: [Recipient] = [], context: String? = nil, sent: @escaping () -> Void = {}) {
@@ -47,13 +54,43 @@ struct ComposeSheet: View {
             fields
                 .zIndex(1) // (the people found float over the message under them)
             messageEditor
+            MessageAttachmentChips(files: files)
+                .padding(.horizontal, ComposeMetrics.side)
+                .padding(.bottom, 12)
             Divider()
             footer
         }
-        .frame(minWidth: 620, idealWidth: 720, minHeight: 540, idealHeight: 660)
+        // (planning-33: under a window's toolbar there are about 630 points; the message box shrinks first)
+        .frame(minWidth: 620, idealWidth: 720, minHeight: 420, idealHeight: 560)
+        .overlay {
+            if dropping {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Theme.accent, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .padding(8)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            let picked = urls.filter { $0.isFileURL }
+            guard !picked.isEmpty, !sending else { return false }
+            files.add(picked, engine: engine)
+            return true
+        } isTargeted: { on in
+            withAnimation(Motion.snappy) { dropping = on }
+        }
+        .fileImporter(isPresented: $attaching, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { files.add(urls, engine: engine) }
+        }
         .defaultFocus($focus, firstFocus)
         .interactiveDismissDisabled(sending)
         .task { await loadContexts() }
+        .onAppear {
+            // (the screenshot suite: -SimplAttach <file> attaches that file as the sheet comes up)
+            if let path = LaunchOpen.take("", key: "SimplAttach"), !path.isEmpty {
+                files.add([URL(fileURLWithPath: path)], engine: engine)
+            }
+        }
         .task(id: "\(query)|\(course ?? "")") { await search() }
         .confirmationDialog("Discard this message?", isPresented: $confirmDiscard) {
             Button("Discard", role: .destructive) { dismiss() }
@@ -273,9 +310,19 @@ struct ComposeSheet: View {
             .accessibilityLabel("Message")
     }
 
-    /// Cancel and Send in glass at the sheet's foot; while it goes, a word that it is going; why it did not, if not.
+    /// Attach at the start of the sheet's foot, Cancel and Send in glass at its end; while it goes, a word that it is
+    /// going; why it did not, if not.
     private var footer: some View {
         HStack(spacing: 12) {
+            Button {
+                attaching = true
+            } label: {
+                Label("Attach", systemImage: "paperclip")
+            }
+            .glassButton()
+            .controlSize(.large)
+            .disabled(sending)
+            .help("Attach files to this message")
             status
             Spacer(minLength: 12)
             GlassGroup(spacing: 6) {
@@ -311,6 +358,11 @@ struct ComposeSheet: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
+        } else if files.uploading {
+            Text("Uploading files…")
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+                .transition(.opacity)
         } else if let error {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .font(.sCallout)
@@ -322,8 +374,11 @@ struct ComposeSheet: View {
 
     private var firstFocus: ComposeFocus { to.isEmpty ? .to : .subject }
 
+    /// Someone to send it to and words to send, and (planning-18) every file picked up in Canvas (one that could not go
+    /// up is taken out first: its chip says why).
     private var canSend: Bool {
         !sending && !people.isEmpty && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !files.uploading && !files.failed
     }
 
     /// The people found and not yet added: the first six.
@@ -400,7 +455,7 @@ struct ComposeSheet: View {
     }
 
     private func cancel() {
-        if message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && files.items.isEmpty {
             dismiss()
         } else {
             confirmDiscard = true
@@ -413,6 +468,7 @@ struct ComposeSheet: View {
         withAnimation(Motion.snappy) { error = nil }
         var args: [String: Any] = ["recipients": people.map(\.id), "subject": subject, "body": message]
         if let course { args["context"] = course }
+        if !files.ids.isEmpty { args["attachments"] = files.ids }
         let payload = args
         Task {
             do {

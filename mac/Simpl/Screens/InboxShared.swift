@@ -1,8 +1,10 @@
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 
 // What the Inbox's screens share (InboxView, InboxConversation, InboxCompose): the replies begun and the mailboxes and
-// conversations as last read, a person's round picture, the lines of chips that wrap, and a message's live links.
+// conversations as last read, a person's round picture, the lines of chips that wrap, a message's live links, and
+// (1.3.78) the files going with a new message or a reply.
 
 /// (1.2) What the Inbox keeps while the app is open: a reply begun in a conversation (kept while others are read, while
 /// the window goes elsewhere, and when the conversation is opened on a screen of its own), and each mailbox and
@@ -170,4 +172,156 @@ func inboxLinkedText(_ text: String) -> AttributedString {
         out[range].link = url
     }
     return out
+}
+
+// MARK: - Files with a message
+
+/// (planning-18) A file going with a new message or a reply: picked (Attach, or dropped on New Message), then uploaded
+/// at once to the student's own "conversation attachments" folder in Canvas (`messageUpload`), as Canvas's own Inbox
+/// does; the message carries its id. Shown as a chip above Send while it goes up and once it is there.
+struct MessageAttachment: Identifiable, Equatable {
+    let id = UUID()
+    let name: String
+    var sizeText: String
+    /// Canvas's id for it, once uploaded.
+    var fileId: String?
+    /// Why it could not be uploaded.
+    var failed: String?
+
+    var uploading: Bool { fileId == nil && failed == nil }
+}
+
+/// What `messageUpload` answers.
+private struct MessageUploaded: Decodable {
+    let id: String
+    let name: String?
+    let sizeText: String?
+}
+
+/// The files going with one message: each uploaded as it is picked; Send waits until every one is up, and takes the
+/// ids of those that are.
+@MainActor
+final class MessageAttachments: ObservableObject {
+    @Published private(set) var items: [MessageAttachment] = []
+
+    /// The largest file sent (as a hand-in's): a larger one is sent from Canvas's own Inbox.
+    static let limit = 50 * 1024 * 1024
+
+    /// A file still on its way up.
+    var uploading: Bool { items.contains { $0.uploading } }
+    /// A file that could not go up (taken out before the message is sent).
+    var failed: Bool { items.contains { $0.failed != nil } }
+    /// Canvas's ids of the files that are up.
+    var ids: [String] { items.compactMap { $0.fileId } }
+
+    /// Files picked or dropped: each read, then uploaded.
+    func add(_ urls: [URL], engine: Engine) {
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let name = url.lastPathComponent
+            guard !items.contains(where: { $0.name == name && $0.failed == nil }) else { continue } // (picked twice)
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            var item = MessageAttachment(name: name, sizeText: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+            if size > Self.limit {
+                item.failed = "Larger than 50 MB: send it from \(engine.lmsName)’s own Inbox."
+                withAnimation(Motion.snappy) { items.append(item) }
+                continue
+            }
+            guard let data = try? Data(contentsOf: url) else {
+                item.failed = "This file could not be read."
+                withAnimation(Motion.snappy) { items.append(item) }
+                continue
+            }
+            let type = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            withAnimation(Motion.snappy) { items.append(item) }
+            upload(item.id, name: name, type: type, data: data, engine: engine)
+        }
+    }
+
+    /// A file taken out (one already uploaded stays in the student's files in Canvas, as Canvas's own Inbox leaves it).
+    func remove(_ id: UUID) {
+        withAnimation(Motion.snappy) { items.removeAll { $0.id == id } }
+    }
+
+    /// Every file let go (the message sent).
+    func clear() {
+        items = []
+    }
+
+    private func upload(_ id: UUID, name: String, type: String, data: Data, engine: Engine) {
+        let args: [String: Any] = ["name": name, "type": type, "data": data.base64EncodedString()]
+        Task {
+            do {
+                let up = try await engine.call("messageUpload", args, as: MessageUploaded.self)
+                update(id) {
+                    $0.fileId = up.id
+                    if let s = up.sizeText, !s.isEmpty { $0.sizeText = s }
+                }
+            } catch {
+                let why = error.localizedDescription
+                update(id) { $0.failed = why }
+            }
+        }
+    }
+
+    private func update(_ id: UUID, _ change: (inout MessageAttachment) -> Void) {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return } // (taken out while it went up)
+        withAnimation(Motion.snappy) { change(&items[i]) }
+    }
+}
+
+/// The files going with a message, as chips in lines that wrap: each with its name and size, a spinner while it goes
+/// up (a red mark, and why under the pointer, if it could not), and × to take it out.
+struct MessageAttachmentChips: View {
+    @ObservedObject var files: MessageAttachments
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if !files.items.isEmpty {
+            InboxFlow(spacing: 6) {
+                ForEach(files.items) { f in chip(f) }
+            }
+            .transition(.opacity)
+        }
+    }
+
+    private func chip(_ f: MessageAttachment) -> some View {
+        HStack(spacing: 6) {
+            Group {
+                if f.uploading {
+                    ProgressView().controlSize(.mini)
+                } else if f.failed != nil {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                } else {
+                    Image(systemName: "paperclip").foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 14)
+            Text(f.name)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: 220, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
+            Text(f.sizeText)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            Button {
+                files.remove(f.id)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Remove \(f.name)")
+            .accessibilityLabel("Remove \(f.name)")
+        }
+        .font(.sCallout)
+        .padding(.leading, 9)
+        .padding(.trailing, 6)
+        .padding(.vertical, 5)
+        .background((f.failed == nil ? Theme.accent : Color.red).opacity(0.12), in: Capsule())
+        .help(f.failed ?? (f.uploading ? "Uploading \(f.name)…" : f.name))
+        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.scale(scale: 0.95).combined(with: .opacity))
+    }
 }
