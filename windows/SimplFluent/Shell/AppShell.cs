@@ -775,6 +775,8 @@ public sealed partial class AppShell : Grid, IDisposable
         if (palette.Escape()) return true;
         if (paneOpen) { ClosePane(); return true; }
         if (WorkPreview.IsOpen) { WorkPreview.Close(); return true; }
+        // (a counter's panel stays over another place opened under it, above that place's page: Escape folds it first)
+        if (current is not DashboardScreen && placeScreens.Values.OfType<DashboardScreen>().FirstOrDefault()?.Escape() == true) return true;
         return current?.Escape() == true;
     }
 

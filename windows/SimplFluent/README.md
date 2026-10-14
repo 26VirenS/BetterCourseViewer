@@ -610,9 +610,13 @@ Calendar's `CalendarPeek`). The card reads the work's details as it opens — th
 plain lines, up to five — Mark done ticks it, a double-click or a Ctrl-click opens the work whole, and Close, Escape or
 its row pressed again folds it back into its row. It takes nothing from the window: nothing behind it is dimmed, a click
 elsewhere does what it does and leaves it up, and it stays over whatever place is opened under it until it is closed;
-its heading moves it (`Kit/Drag.cs`). A counter's panel on the Dashboard is the same: drawn in the shell's overlay over
-the page (`WorkPreview.Layer`), it stays over another place opened meanwhile, its heading moves it (its tile then shows
-again), and ×, Escape or its tile close it.
+its heading moves it (`Kit/Drag.cs`: only once the pointer has gone Windows' drag distance — a click there is not a
+move). A counter's panel on the Dashboard is the same: drawn in the shell's overlay over the page (`WorkPreview.Layer`),
+under any quick look, it stays over another place opened meanwhile, its heading moves it (its tile then shows again),
+and ×, a click on its heading (as 0.2.9's), Escape — from any place — or its tile close it. Until it is moved it stays
+on its tile as 0.2.9's did on the page itself: as the page scrolls or is laid out again it goes with the tile, cut under
+the page's header where the tile has scrolled up there (`DashboardScreen.Follow`; `--sheet next --open sheetscroll`
+scrolls the page under it, for the `dashboard-counter-scrolled` picture).
 
 The card is 0.2.9's: as wide as the row it grows out of and a little more, from 300 (a month's narrow chip) to 420 (a
 list's row), never wider than the page. It says where the work stands once: a graded piece's score and letter as one
@@ -623,7 +627,9 @@ once, on its clock line ("Due today at 11:59 PM", "Was due Oct 13"), never again
 
 A counter's panel (`DashboardScreen.PanelContent`) is 0.2.9's too: the counter's symbol, name and number with the
 engine's line beside it, and its list — each row a bar of its course's colour, its title and the engine's one line about
-it (`sub`), a chevron to its quick look (or Dismiss, in Overdue) — scrolling past about five rows, nothing under it.
+it (`sub`) with the kind of work after its course as 0.2.9's read ("F26-MATH 021 20 · Quiz · 10 pts · due 11:59 PM":
+the engine gives the kind on its own now, `kind`), a chevron to its quick look (or Dismiss, in Overdue) — scrolling past
+about five rows, nothing under it.
 
 ## Files with a message
 

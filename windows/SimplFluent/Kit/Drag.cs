@@ -37,25 +37,28 @@ public static class Drag
     private static DependencyObject? Parent(DependencyObject d) =>
         d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
 
+    /// <summary>A card on a canvas moved by its top <paramref name="band"/> (its heading), as below.</summary>
+    public static void ByHeading(FrameworkElement card, double band, Action? moved = null, Action? clicked = null) =>
+        ByHeading(card, () => band, moved, clicked);
+
     /// <summary>
-    /// A card on a canvas moved by its top <paramref name="band"/> (its heading): it follows the pointer from a press there
-    /// until it is let go, its heading kept inside the canvas; <paramref name="moved"/> is told once it has been moved.
+    /// A card on a canvas moved by its heading, the top <paramref name="band"/> of it as it is at the press (a heading that
+    /// grows with what it says): it takes hold of the card only once the pointer has gone Windows' drag distance from the
+    /// press, then follows it until it is let go, its heading kept inside the canvas. <paramref name="moved"/> is told once
+    /// it has been moved; a press let go before that is a click, not a move — <paramref name="clicked"/> is told, and the
+    /// card has not been touched (a card still growing out of its row goes on growing).
     /// </summary>
-    public static void ByHeading(FrameworkElement card, double band, Action? moved = null)
+    public static void ByHeading(FrameworkElement card, Func<double> band, Action? moved = null, Action? clicked = null)
     {
         Point? from = null;
+        var shifted = false;
         var at = new Point();
         card.PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (card.Parent is not Canvas || e.ClickCount > 1 || e.OriginalSource is not DependencyObject source) return;
-            if (e.GetPosition(card).Y > band || OnControl(source)) return;
-            // (where it is now, whatever was moving it: its growing out of its row stopped where it has got to)
-            at = new Point(Canvas.GetLeft(card), Canvas.GetTop(card));
-            card.BeginAnimation(Canvas.LeftProperty, null);
-            card.BeginAnimation(Canvas.TopProperty, null);
-            Canvas.SetLeft(card, at.X);
-            Canvas.SetTop(card, at.Y);
-            from = e.GetPosition((Canvas)card.Parent);
+            if (card.Parent is not Canvas canvas || e.ClickCount > 1 || e.OriginalSource is not DependencyObject source) return;
+            if (e.GetPosition(card).Y > band() || OnControl(source)) return;
+            from = e.GetPosition(canvas);
+            shifted = false;
             card.CaptureMouse();
             e.Handled = true;
         };
@@ -63,21 +66,37 @@ public static class Drag
         {
             if (from is not { } f || card.Parent is not Canvas canvas || e.LeftButton != MouseButtonState.Pressed) return;
             var p = e.GetPosition(canvas);
+            e.Handled = true;
+            if (!shifted)
+            {
+                if (Math.Abs(p.X - f.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(p.Y - f.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+                shifted = true;
+                // (where it is now, whatever was moving it: its growing out of its row stopped where it has got to)
+                at = new Point(Canvas.GetLeft(card), Canvas.GetTop(card));
+                card.BeginAnimation(Canvas.LeftProperty, null);
+                card.BeginAnimation(Canvas.TopProperty, null);
+                Canvas.SetLeft(card, at.X);
+                Canvas.SetTop(card, at.Y);
+            }
             const double keep = 80;
             var x = Math.Clamp(at.X + p.X - f.X, keep - card.ActualWidth, Math.Max(keep - card.ActualWidth, canvas.ActualWidth - keep));
-            var y = Math.Clamp(at.Y + p.Y - f.Y, 0, Math.Max(0, canvas.ActualHeight - band));
+            var y = Math.Clamp(at.Y + p.Y - f.Y, 0, Math.Max(0, canvas.ActualHeight - band()));
             Canvas.SetLeft(card, x);
             Canvas.SetTop(card, y);
-            e.Handled = true;
         };
-        void Let(object? sender, EventArgs e)
+        // (let go: a move if it went the drag distance, else a click — unless the hold was lost some other way, to another
+        //  window)
+        void Let(bool click)
         {
             if (from == null) return;
+            var was = shifted;
             from = null;
+            shifted = false;
             if (card.IsMouseCaptured) card.ReleaseMouseCapture();
-            moved?.Invoke();
+            if (was) moved?.Invoke();
+            else if (click) clicked?.Invoke();
         }
-        card.PreviewMouseLeftButtonUp += (s, e) => { if (from != null) { Let(s, e); e.Handled = true; } };
-        card.LostMouseCapture += Let;
+        card.PreviewMouseLeftButtonUp += (_, e) => { if (from != null) { Let(click: true); e.Handled = true; } };
+        card.LostMouseCapture += (_, _) => Let(click: false);
     }
 }

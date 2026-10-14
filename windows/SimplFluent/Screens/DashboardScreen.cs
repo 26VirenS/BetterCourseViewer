@@ -177,8 +177,9 @@ public sealed partial class DashboardScreen : Screen
         overlay = new Canvas { ClipToBounds = false };
         root.Children.Add(page);
         root.Children.Add(overlay);
-        // (a panel already up — over the page, or over another place — is kept, its list read again)
-        if (openKey != null) root.Loaded += (_, _) => { if (frame == null) ShowPanel(animate: !sheetAsked); else PanelData(); };
+        // (a panel already up — over the page, or over another place — is kept, its list read again; one still on its tile
+        //  goes where the page built again has put the tile)
+        if (openKey != null) root.Loaded += (_, _) => { if (frame == null) ShowPanel(animate: !sheetAsked); else { Follow(); PanelData(); } };
         return root;
     }
 
@@ -585,9 +586,10 @@ public sealed partial class DashboardScreen : Screen
     }
 
     // ---- the panel a counter grows into (the Mac's DashCounterPanel: 440 wide; here a Windows 11 flyout surface) ----
-    // (it takes nothing from the window round it and stays until it is closed — its ×, Escape, its tile again — over
-    //  whatever place is opened meanwhile: it is drawn in the shell's overlay over the page, WorkPreview.Layer, and its
-    //  heading moves it)
+    // (it takes nothing from the window round it and stays until it is closed — its ×, a click on its heading, Escape, its
+    //  tile again — over whatever place is opened meanwhile: it is drawn in the shell's overlay over the page,
+    //  WorkPreview.Layer, under any quick look; it goes with its tile as the page scrolls, as 0.2.9's did on the page
+    //  itself, and its heading moves it)
 
     private string? openKey;
     private bool sheetAsked;
@@ -606,7 +608,15 @@ public sealed partial class DashboardScreen : Screen
     /// the shell has one.</summary>
     private Canvas? Layer => WorkPreview.Layer ?? overlay;
     private FrameworkElement? panelContent;
+    /// <summary>The panel's heading (its symbol, name and number, and the line beside them): a press there moves the panel,
+    /// a click folds it back.</summary>
+    private FrameworkElement? panelHead;
     private Rect panelRect;
+    /// <summary>The page's scroller, listened to while the panel is up.</summary>
+    private ScrollViewer? pageScroller;
+    /// <summary>The screenshot suite's --open sheetscroll (with --sheet): the page under the open panel scrolled a little,
+    /// once, for a picture of the panel going with its tile.</summary>
+    private static bool sheetScrolled;
 
     private void SetOpen(string? key)
     {
@@ -656,17 +666,13 @@ public sealed partial class DashboardScreen : Screen
         if (c == null) { openKey = null; return; }
         if (frame != null) (frame.Parent as Panel)?.Children.Remove(frame);
         panelMoved = false;
-        var w = Math.Min(440, pageRect.Width);
-        // placed by where its tile sits across the row: the first tile's panel from its left edge, the last one's from
-        // its right, one between them centred on it in step — kept on the page (the Mac's, 1.3.16)
-        var along = pageRect.Width > tile.Width ? Math.Clamp((tile.X - pageRect.X) / (pageRect.Width - tile.Width), 0, 1) : 0;
-        var x = Math.Clamp(tile.X + (tile.Width - w) * along, pageRect.X, Math.Max(pageRect.X, pageRect.Right - w));
+        var w = PanelSpot(tile, pageRect, 0).Width;
         panelContent = PanelContent(c, key, w);
         panelContent.Width = w - 2;
         panelContent.Measure(new Size(w - 2, double.PositiveInfinity));
         var h = Math.Max(tile.Height, panelContent.DesiredSize.Height + 2);
-        panelRect = new Rect(x, tile.Y, w, h);
-        frame = new Border
+        panelRect = PanelSpot(tile, pageRect, h);
+        var f = frame = new Border
         {
             CornerRadius = new CornerRadius(8), ClipToBounds = true,
             Child = new Grid { Children = { Wash(TileColor(c, Count(c).Value)), new Canvas { Children = { panelContent } } } },
@@ -674,15 +680,24 @@ public sealed partial class DashboardScreen : Screen
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
         Shell.Tour.Mark(frame, Shell.TourSpot.CounterPanel);
-        // (its heading moves it — its tile then shows again; Escape inside it closes it, wherever it is)
-        Drag.ByHeading(frame, 56, () =>
+        // (its heading moves it — its tile then shows again, and it is whole wherever it goes; a click there folds it
+        //  back, as 0.2.9's did; Escape inside it closes it, wherever it is)
+        Drag.ByHeading(f, () => panelHead is { IsLoaded: true } hd && f.IsAncestorOf(hd) ? hd.TranslatePoint(new Point(0, hd.ActualHeight), f).Y : 56, moved: () =>
         {
             panelMoved = true;
+            f.Clip = null;
             if (openKey != null && tiles.TryGetValue(openKey, out var t2) && t2.Opacity < 1) { t2.Opacity = 1; Motion.FadeIn(t2, Motion.Fast); }
-        });
+        }, clicked: () => { if (ReferenceEquals(frame, f)) SetOpen(null); });
         frame.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; SetOpen(null); } };
-        layer.Children.Add(frame);
+        // (under a quick look already up — one opened from Coming up stays over the panel, as it was over 0.2.9's, and
+        //  the shell's Escape folds the one on top first)
+        layer.Children.Insert(0, frame);
         if (tiles.TryGetValue(key, out var t)) t.Opacity = 0;
+        // (it goes with its tile as the page scrolls: a tile scrolled part way under the page's header opens it cut there)
+        WatchScroll(on: true);
+        ClipToPage(layer);
+        // (the screenshot suite: --open sheetscroll scrolls the page under the panel a little, once it is up)
+        if (!sheetScrolled && Launch.Get("open") == "sheetscroll") { sheetScrolled = true; ScrollForPicture(); }
         if (!animate || !Motion.On)
         {
             PlaceAt(frame, panelRect);
@@ -698,6 +713,107 @@ public sealed partial class DashboardScreen : Screen
         Motion.FromTo(frame, FrameworkElement.HeightProperty, tile.Height, panelRect.Height, Motion.Slow + 67, Motion.Decelerate);
         Motion.FadeIn(panelContent, Motion.Medium, 90);
         Shot.Moved();
+    }
+
+    /// <summary>
+    /// Where the panel sits for its tile, <paramref name="h"/> tall: 440 wide (or the page's width), level with the tile's
+    /// top, and placed by where its tile sits across the row — the first tile's panel from its left edge, the last one's
+    /// from its right, one between them centred on it in step — kept on the page (the Mac's, 1.3.16).
+    /// </summary>
+    private static Rect PanelSpot(Rect tile, Rect pageRect, double h)
+    {
+        var w = Math.Min(440, pageRect.Width);
+        var along = pageRect.Width > tile.Width ? Math.Clamp((tile.X - pageRect.X) / (pageRect.Width - tile.Width), 0, 1) : 0;
+        var x = Math.Clamp(tile.X + (tile.Width - w) * along, pageRect.X, Math.Max(pageRect.X, pageRect.Right - w));
+        return new Rect(x, tile.Y, w, h);
+    }
+
+    /// <summary>
+    /// The panel kept on its tile, as 0.2.9's was on the page itself: as the page scrolls, or is laid out again (the
+    /// window resized, the counters put in other rows), it goes where its tile has gone — until its heading has moved it
+    /// away, or another place is shown under it (it then stays where it is). True when its width changed (its words are
+    /// then laid out again).
+    /// </summary>
+    private bool Follow(bool evenMoving = false)
+    {
+        if (frame == null || panelMoved || openKey == null || Layer is not { } layer) return false;
+        // (the page still sliding into place — back from another place — has its tile where it will not stay: once it rests)
+        if (!evenMoving && PageMoving()) { FollowWhenStill(); return false; }
+        var tile = TileRect(openKey);
+        var pageRect = PageRect(layer);
+        if (tile.IsEmpty || pageRect.IsEmpty) return false;
+        var to = PanelSpot(tile, pageRect, panelRect.Height);
+        // (only what has changed is set: a panel still rising out of its tile goes on rising where nothing has)
+        if (Math.Abs(to.X - panelRect.X) > 0.5) { frame.BeginAnimation(Canvas.LeftProperty, null); Canvas.SetLeft(frame, to.X); }
+        if (Math.Abs(to.Y - panelRect.Y) > 0.5) { frame.BeginAnimation(Canvas.TopProperty, null); Canvas.SetTop(frame, to.Y); }
+        var resized = Math.Abs(to.Width - panelRect.Width) > 0.5;
+        if (resized) { frame.BeginAnimation(FrameworkElement.WidthProperty, null); frame.Width = to.Width; }
+        panelRect = to;
+        ClipToPage(layer);
+        return resized;
+    }
+
+    /// <summary>Whether the page is still moving into place: the shell slides a page in on a translation of one of its
+    /// parents (AppShellPages.Switch), which comes to rest at none.</summary>
+    private bool PageMoving()
+    {
+        for (DependencyObject? p = root; p != null; p = VisualTreeHelper.GetParent(p))
+            if (p is UIElement { RenderTransform: TranslateTransform t } && (Math.Abs(t.X) > 0.5 || Math.Abs(t.Y) > 0.5)) return true;
+        return false;
+    }
+
+    private bool followWaiting;
+
+    /// <summary>The panel to its tile once the page has come to rest (a page's move takes about a fifth of a second; it
+    /// waits no more than about half a second).</summary>
+    private async void FollowWhenStill()
+    {
+        if (followWaiting) return;
+        followWaiting = true;
+        for (var i = 0; i < 12 && PageMoving(); i++) await Task.Delay(50);
+        followWaiting = false;
+        if (Follow(evenMoving: true)) PanelData();
+    }
+
+    /// <summary>The panel on its tile cut where the page's scroller cuts the page — under the page's header, as 0.2.9's
+    /// went, its tile scrolled up there; whole once its heading has moved it.</summary>
+    private void ClipToPage(Canvas layer)
+    {
+        if (frame == null) return;
+        var cut = 0.0;
+        if (!panelMoved && pageScroller is { IsVisible: true } s)
+        {
+            try { cut = s.TranslatePoint(new Point(0, 0), layer).Y - panelRect.Y; }
+            catch (InvalidOperationException) { }
+        }
+        frame.Clip = cut > 0.5 ? new RectangleGeometry(new Rect(-10000, cut, 20000, 20000)) : null;
+    }
+
+    /// <summary>The page's scroller listened to while the panel is up (<paramref name="on"/>), let go once it closes.</summary>
+    private void WatchScroll(bool on)
+    {
+        ScrollViewer? s = null;
+        if (on) for (DependencyObject? p = root; p != null; p = VisualTreeHelper.GetParent(p)) if (p is ScrollViewer sv) { s = sv; break; }
+        if (ReferenceEquals(s, pageScroller)) return;
+        if (pageScroller != null) pageScroller.ScrollChanged -= PageScrolled;
+        pageScroller = s;
+        if (s != null) s.ScrollChanged += PageScrolled;
+    }
+
+    /// <summary>The page scrolled, or its scroller was resized: the panel on its tile goes with it.</summary>
+    private void PageScrolled(object sender, ScrollChangedEventArgs e)
+    {
+        // (the page's own scroller: a list scrolling inside the page tells it too)
+        if (!ReferenceEquals(e.OriginalSource, pageScroller)) return;
+        if (Follow()) PanelData();
+    }
+
+    /// <summary>--open sheetscroll: the page scrolled 72 down a moment after the panel is up — its tile part way under the
+    /// page's header, the panel with it.</summary>
+    private async void ScrollForPicture()
+    {
+        await Task.Delay(3000);
+        pageScroller?.ScrollToVerticalOffset(72);
     }
 
     private static void PlaceAt(FrameworkElement e, Rect r)
@@ -717,7 +833,9 @@ public sealed partial class DashboardScreen : Screen
         var moved = panelMoved;
         frame = null;
         panelContent = null;
+        panelHead = null;
         panelMoved = false;
+        WatchScroll(on: false);
         if (f == null) { if (tiles.TryGetValue(key, out var t0)) t0.Opacity = 1; return; }
         var tile = TileRect(key);
         void Done()
@@ -769,7 +887,9 @@ public sealed partial class DashboardScreen : Screen
         var countRow = K.Columns("auto, *", count.Col(0));
         if (!string.IsNullOrEmpty(line)) countRow.Children.Add(K.Wrapped(line!, Ty.Body, B.Text2, 2).Margin(14, 0, 0, 6).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1));
         var head = K.V(4, titleRow, countRow);
-        head.Background = Brushes.Transparent; // (its heading takes hold of the panel to move it: Kit/Drag.cs)
+        // (its heading takes hold of the panel to move it, and a click on it folds the panel back: Kit/Drag.cs)
+        head.Background = Brushes.Transparent;
+        panelHead = head;
 
         // (the list under the header, scrolling past about five rows, and nothing under it: the panel as 0.2.9 had it)
         FrameworkElement body;
@@ -791,8 +911,8 @@ public sealed partial class DashboardScreen : Screen
 
     /// <summary>
     /// A section of the panel: its title, its rows as 0.2.9 drew them — a bar of the course's colour, the title, and under
-    /// it the engine's one line about it ("F26-MATH 021 20 · 10 pts · due 11:59 PM") — each with a chevron to its quick
-    /// look, or Dismiss.
+    /// it the engine's one line about it with the kind of work in it ("F26-MATH 021 20 · Quiz · 10 pts · due 11:59 PM") —
+    /// each with a chevron to its quick look, or Dismiss.
     /// </summary>
     private FrameworkElement Section(string key, SheetSection s)
     {
@@ -804,7 +924,7 @@ public sealed partial class DashboardScreen : Screen
             var rq = row.Quiet == true;
             var bar = new Border { Width = 4, CornerRadius = new CornerRadius(2), Background = K.Brush(K.WithAlpha(K.Hex(row.Color), rq ? 0.5 : 1)), Margin = new Thickness(0, 2, 12, 2) };
             var words = K.V(1, K.Wrapped(row.Title, Ty.Body, rq ? B.Text2 : B.Text, 2));
-            if (!string.IsNullOrEmpty(row.Sub)) words.Children.Add(K.Text(row.Sub!, Ty.Caption, B.Text2));
+            if (RowLine(key, row) is { Length: > 0 } line) words.Children.Add(K.Text(line, Ty.Caption, B.Text2));
             var g = K.Columns("auto, *, auto", bar.Col(0), words.Col(1));
             var clearable = row.Clearable == true && row.Key != null;
             if (clearable)
@@ -842,6 +962,22 @@ public sealed partial class DashboardScreen : Screen
             else v.Children.Add(g.Margin(8, 7, 8, 7));
         }
         return v;
+    }
+
+    /// <summary>
+    /// A row's line as 0.2.9's panel read it: the engine's line (`sub`) with the kind of work after its course ("F26-MATH 021
+    /// 20 · Quiz · 10 pts · due 11:59 PM", or after its "—") — the engine (2.99.33) gives the kind on its own now, for
+    /// the apps that lay it out in a column of its own. Announcements, every row of one kind, keep their line as it is.
+    /// </summary>
+    private static string? RowLine(string key, SheetRow row)
+    {
+        var sub = row.Sub;
+        if (key == "unread" || string.IsNullOrWhiteSpace(row.Kind) || string.IsNullOrEmpty(sub)) return sub;
+        var parts = sub.Split(" · ").ToList();
+        if (parts.Contains(row.Kind!)) return sub;
+        var afterCourse = parts[0] == "—" || (!string.IsNullOrEmpty(row.Course) && parts[0] == row.Course);
+        parts.Insert(afterCourse ? 1 : 0, row.Kind!);
+        return string.Join(" · ", parts);
     }
 
     /// <summary>Dismissed from Overdue: the row goes at once, the tile's number with it; the school told, the list read again.</summary>
