@@ -425,6 +425,23 @@ struct ToolHeader: View {
     @ObservedObject private var tools = ToolsCenter.shared
 
     var body: some View {
+        // (1.3.78) a biology tool with pages: its pages' names, and its pin's words, only where the header has room for
+        // them beside the tool's whole name; else their symbols alone — so the header is never wider than the window
+        // (a wider one widened the whole tool under it, cut off at both sides)
+        if kind.isBiology && BioTools.pages(kind).count > 1 {
+            ViewThatFits(in: .horizontal) {
+                row(pages: false, pinWords: true)
+                row(pages: true, pinWords: true)
+                row(pages: true, pinWords: false)
+            }
+        } else {
+            // (1.3.62) the Periodic Table's header full of its own controls: its pin a symbol alone
+            row(pages: nil, pinWords: kind != .ptable)
+        }
+    }
+
+    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit).
+    private func row(pages squished: Bool?, pinWords: Bool) -> some View {
         HStack(alignment: .center, spacing: 14) {
             if let done {
                 Button("Done", action: done)
@@ -461,14 +478,13 @@ struct ToolHeader: View {
             Spacer(minLength: 12)
             // (1.3.54) the Periodic Table's search, left of its pin; (1.3.78) a biology tool's pages
             if kind == .ptable { PTHeaderControls() }
-            if kind.isBiology { BioHeaderControls(kind: kind) }
+            if kind.isBiology { BioHeaderControls(kind: kind, squished: squished) }
             Button {
                 tools.togglePin(kind)
             } label: {
                 Label(tools.isPinned(kind) ? "Pinned" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.fill" : "pin")
                     .font(.sCallout.weight(.medium))
-                    // (1.3.62) the Periodic Table's header full of its own controls: its pin a symbol alone
-                    .labelStyle(SquishLabel(squished: kind == .ptable))
+                    .labelStyle(SquishLabel(squished: !pinWords))
             }
             .glassButton(prominent: tools.isPinned(kind))
             .tint(kind.color)

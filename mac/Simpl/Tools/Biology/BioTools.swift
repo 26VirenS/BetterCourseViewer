@@ -220,17 +220,22 @@ enum BioPrefs {
 }
 
 /// A biology tool's pages in its header, left of its pin (the Periodic Table's PTHeaderControls): their names where
-/// the header has room, else their symbols.
+/// the header has room, else their symbols — as the header decides (`squished`), or as they fit (nil).
 struct BioHeaderControls: View {
     let kind: ToolKind
+    var squished: Bool? = nil
     @ObservedObject private var nav = BioNav.shared
 
     var body: some View {
         let pages = BioTools.pages(kind)
         if pages.count > 1 {
-            ViewThatFits(in: .horizontal) {
-                row(pages, squished: false)
-                row(pages, squished: true)
+            if let squished {
+                row(pages, squished: squished)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    row(pages, squished: false)
+                    row(pages, squished: true)
+                }
             }
         }
     }
