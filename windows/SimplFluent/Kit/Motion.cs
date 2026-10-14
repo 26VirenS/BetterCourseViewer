@@ -44,8 +44,9 @@ public sealed class Bezier : IEasingFunction
 /// <summary>
 /// Windows 11's motion (WinUI's timing): things arriving decelerate into place ("fast out, slow in"), things leaving
 /// accelerate away, and moves on screen take the standard point-to-point curve. Durations are Windows' own: 83, 167,
-/// 250, 333 ms. Under Windows' "Animation effects" off, everything arrives at once — and so where WPF draws without
-/// the graphics card (Fx: render tier 0).
+/// 250, 333 ms. Under Windows' "Animation effects" off, everything arrives at once (but for what fades where it stands,
+/// <see cref="Fade"/>: a Dashboard counter's panel) — and so where WPF draws without the graphics card (Fx: render
+/// tier 0).
 /// </summary>
 public static class Motion
 {
@@ -70,7 +71,30 @@ public static class Motion
     /// draw motion smoothly (Fx).</summary>
     public static bool On => SystemParameters.ClientAreaAnimation && Fx.Motion && Support.Launch.Get("shot") == null;
 
+    /// <summary>
+    /// Whether something may still fade in or out where it stands: with motion <see cref="On"/>, and with Windows'
+    /// Animation effects off too (the gentler motion the Mac's Reduce Motion keeps: nothing moves or grows, it only
+    /// appears or goes) — where this PC draws motion smoothly (Fx), and never in a picture.
+    /// </summary>
+    public static bool Fades => Fx.Motion && Support.Launch.Get("shot") == null;
+
     public static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(ms));
+
+    /// <summary>A fade from one opacity to another that stays where <see cref="On"/> is off, as long as <see cref="Fades"/>:
+    /// decelerating in, accelerating away.</summary>
+    public static void Fade(UIElement e, double from, double to, double ms, Action? done = null)
+    {
+        if (!Fades)
+        {
+            e.BeginAnimation(UIElement.OpacityProperty, null);
+            e.Opacity = to;
+            done?.Invoke();
+            return;
+        }
+        var a = new DoubleAnimation(from, to, Ms(ms)) { EasingFunction = to >= from ? Decelerate : Accelerate, FillBehavior = FillBehavior.HoldEnd };
+        if (done != null) a.Completed += (_, _) => done();
+        e.BeginAnimation(UIElement.OpacityProperty, a);
+    }
 
     /// <summary>A property animated to a value from where it is now.</summary>
     public static void To(IAnimatable target, DependencyProperty dp, double to, double ms, IEasingFunction? ease = null, double delayMs = 0, Action? done = null)

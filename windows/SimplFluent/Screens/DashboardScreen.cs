@@ -129,7 +129,7 @@ public sealed partial class DashboardScreen : Screen
     private string? lastTitle, lastSubtitle;
 
     protected override bool LayoutChanges(double before, double now) =>
-        CounterLayout(before, WindowWidth) != CounterLayout(now, WindowWidth) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760) || CardCols(before) != CardCols(now)
+        CounterLayout(before) != CounterLayout(now) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760) || CardCols(before) != CardCols(now)
         || Math.Abs(RailWidth(before) - RailWidth(now)) >= 24;
 
     /// <summary>The widest the view beside the rail grows: a row's title and its due time stay within a glance of each
@@ -140,8 +140,6 @@ public sealed partial class DashboardScreen : Screen
     /// its widest, never under 340 nor over 720.</summary>
     private static double RailWidth(double page) => Math.Clamp(Math.Max(Math.Round(page * 0.3), Math.Round(page - 28 - MainMost)), 340, 720);
 
-    protected override bool WindowLayoutChanges(double before, double now) => CounterLayout(Width, before) != CounterLayout(Width, now);
-
     protected override FrameworkElement Build()
     {
         var d = today.Data;
@@ -150,7 +148,7 @@ public sealed partial class DashboardScreen : Screen
         var width = Math.Max(320, Width);
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         var look = (Appearance.Dark, Appearance.Accent, Appearance.ThemeName);
-        var layout = CounterLayout(width, WindowWidth);
+        var layout = CounterLayout(width);
         page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, TodayUpdating, CountsUpdating, overdueAdjust, openKey, layout, look }, () => Counters(d, layout)));
         var two = width >= 900;
         var railW = RailWidth(width);
@@ -217,20 +215,18 @@ public sealed partial class DashboardScreen : Screen
 
     private static readonly string[] Order = { "today", "tomorrow", "next", "overdue", "unread", "graded" };
 
-    /// <summary>Each counter's colour. Red means late, and only Overdue wears it: Due today is Windows' blue, whatever the
-    /// theme's accent (a theme's pink or red would read as late too).</summary>
+    /// <summary>
+    /// Each counter's colour — the one its symbol wears, washed across its card and the panel it grows into: Due today
+    /// blue, Tomorrow orange, Next 7 days green, Overdue red, Unread orange, Graded purple. Red is Overdue's alone: Due
+    /// today is Windows' blue whatever the theme's accent (a theme's pink or red would read as late), and Overdue says
+    /// late work in full — its number red, its card the alert's — only while something is overdue.
+    /// </summary>
     private static Color CounterColor(string key) => key switch
     {
         "today" => Color.FromRgb(0x00, 0x78, 0xd4), "next" => Color.FromRgb(0x2f, 0xa8, 0x4f), "unread" => Color.FromRgb(0xf7, 0x8c, 0x1a),
         "overdue" => Color.FromRgb(0xe8, 0x4a, 0x3f), "tomorrow" => Color.FromRgb(0xf2, 0xa1, 0x00), "graded" => Color.FromRgb(0x6b, 0x5c, 0xe0),
         _ => Appearance.Accent,
     };
-
-    /// <summary>The colour a counter's tile and its panel wear: the counter's own, except that Overdue wears its red only
-    /// while something is overdue — with nothing in it, or while it is still counted, a quiet grey — so red on the
-    /// Dashboard always means late work.</summary>
-    private static Color TileColor(Counter c, int? value) =>
-        c.Tone == "red" && (value ?? 0) <= 0 ? Color.FromRgb(0x8a, 0x8a, 0x8a) : CounterColor(c.Key);
 
     /// <summary>What a counter counts, in full: its panel's title until the panel's own comes.</summary>
     private static string FullName(string key, string label) => key switch
@@ -256,50 +252,30 @@ public sealed partial class DashboardScreen : Screen
         };
     }
 
-    /// <summary>A window this wide or wider shows the six counters in one row of square tiles, however wide the page
-    /// beside the navigation pane is (1024 is the pictures' usual window, the page beside the pane 640 of it).</summary>
-    private const double OneRowFrom = 1024;
-
-    /// <summary>A square tile's padding, its symbol's size and the room between the symbol and its name.</summary>
-    private const double SquarePad = 12, SquareSymbol = 24, SquareGap = 8;
-
-    /// <summary>The narrowest square tiles' padding at their sides (the Mac's too): on a 1024 window the longest name,
-    /// Next 7 days, has room at its own size in them only so — at 12 it was shrunk a little to fit.</summary>
-    private const double SquarePadTight = 10;
-
-    /// <summary>The room between the narrowest square tiles (12 between the others): on a 1024 window it makes each of
-    /// them 100 wide rather than 97, and so nearer as tall as it is wide.</summary>
-    private const double SquareGapTight = 8;
-
-    /// <summary>The tallest a square tile grows: as tall as it is wide on a window up to about 1650 wide; on a wider one (a
-    /// 1080p window's tiles are about 246 wide) it stops here, square enough, where a tile as tall as wide would only add
-    /// empty colour under its words and push the work under the counters further down.</summary>
-    private const double SquareMost = 200;
-
     /// <summary>
-    /// How the counters are laid out for a page and a window this wide: on a window 1024 wide or wider, one row of six
-    /// square tiles — told by the window, so a page that narrows as the pane or the rail takes room never puts them back
-    /// in two rows — and whether each of those tiles has room for its symbol beside its name at its top (else the name
-    /// has the top to itself and the symbol goes beside the number); on a narrower window, three to a row, or two on the
-    /// narrowest page. And which names the row wears, decided once for all six: the full ones ("Announcements", "Graded
-    /// this week") where every one of them fits as its tile draws it, else the short ones every tile fits ("Unread",
-    /// "Graded"), whose lines then say the rest — never a name cut.
+    /// How the counters are laid out on a page this wide (0.2.9's and the Mac's 1.3.77, cards as tall as their words): six
+    /// to a row where six cards each have room for their symbol beside their name (the short names: a page about 870
+    /// wide, a 1280 window's), else three to a row, or two on a page under 520. And which names the counters wear,
+    /// decided once for all six: the full ones ("Announcements", "Graded this week") where every one of them fits beside
+    /// its symbol, else the short ones ("Unread", "Graded"), whose lines then say the rest — never a name cut.
     /// </summary>
-    private (int Cols, bool Roomy, bool Full) CounterLayout(double page, double window)
+    private (int Cols, bool Full) CounterLayout(double page)
     {
-        if (window < OneRowFrom)
-        {
-            var cols = page >= 520 ? 3 : 2;
-            // (a tall tile: its symbol, 28, and 10 after it beside its name, inside 14 at each side and its edge)
-            var tile = (Math.Max(320, page) - (cols - 1) * 12) / cols - 2;
-            return (cols, false, tile - 2 * 14 - 28 - 10 >= WidestLabel(full: true) + 2);
-        }
-        var words = (Math.Max(320, page) - 5 * 12) / 6 - 2 - 2 * SquarePad;
-        var roomy = words >= SquareSymbol + SquareGap + WidestLabel(full: false) + 2;
-        // (the narrowest tiles stand SquareGapTight apart and keep their words SquarePadTight in from their sides, so they
-        //  have that much more room)
-        var room = roomy ? words - SquareSymbol - SquareGap : (Math.Max(320, page) - 5 * SquareGapTight) / 6 - 2 - 2 * SquarePadTight;
-        return (6, roomy, room >= WidestLabel(full: true) + 2);
+        page = Math.Max(320, page);
+        var cols = NameRoom(page, 6) >= WidestLabel(full: false) + 2 ? 6 : page >= 520 ? 3 : 2;
+        return (cols, NameRoom(page, cols) >= WidestLabel(full: true) + 2);
+    }
+
+    /// <summary>A card's padding, its symbol's size and the room between the symbol and its name: 0.2.9's three or two to
+    /// a row, a little tighter six to a row.</summary>
+    private static (double Pad, double Symbol, double Gap) CardSizes(int cols) => cols == 6 ? (12, 24, 8) : (14, 28, 10);
+
+    /// <summary>The room a card has for its name beside its symbol, <paramref name="cols"/> to a row on a page this wide
+    /// (12 between the cards, a card's edge 1 at each side).</summary>
+    private static double NameRoom(double page, int cols)
+    {
+        var (pad, symbol, gap) = CardSizes(cols);
+        return (page - (cols - 1) * 12) / cols - 2 - 2 * pad - symbol - gap;
     }
 
     /// <summary>A counter's name in the wording its row wears.</summary>
@@ -326,17 +302,17 @@ public sealed partial class DashboardScreen : Screen
             new Typeface(face, FontStyles.Normal, weight, FontStretches.Normal), size, Brushes.Black, 1).WidthIncludingTrailingWhitespace;
     }
 
-    private FrameworkElement Counters(Today d, (int Cols, bool Roomy, bool Full) layout)
+    private FrameworkElement Counters(Today d, (int Cols, bool Full) layout)
     {
         var cols = layout.Cols;
         var items = d.Counters.OrderBy(c => Array.IndexOf(Order, c.Key) is var i && i < 0 ? 99 : i).ToList();
-        var gap = cols == 6 && !layout.Roomy ? SquareGapTight : 12;
         var grid = new Grid();
         for (var c = 0; c < cols; c++)
         {
-            if (c > 0) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(gap) });
+            if (c > 0) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         }
+        // (each row as tall as its tallest card's words, every card in it as tall as that)
         var rows = (items.Count + cols - 1) / cols;
         for (var r = 0; r < rows; r++)
         {
@@ -347,13 +323,13 @@ public sealed partial class DashboardScreen : Screen
         for (var k = 0; k < items.Count; k++)
         {
             var c = items[k];
-            var tile = cols == 6 ? SquareTile(c, layout.Roomy, layout.Full) : Tile(c, layout.Full);
+            var tile = Tile(c, cols, layout.Full);
             Grid.SetColumn(tile, (k % cols) * 2);
             Grid.SetRow(tile, (k / cols) * 2);
             grid.Children.Add(tile);
             tiles[c.Key] = tile;
             if (c.Key == "next") Shell.Tour.Mark(tile, Shell.TourSpot.CounterNext);
-            if (openKey == c.Key && !panelMoved) tile.Opacity = 0;
+            if (openKey == c.Key) tile.Opacity = 0;
         }
         Shell.Tour.Mark(grid, Shell.TourSpot.Counters);
         return grid;
@@ -376,101 +352,57 @@ public sealed partial class DashboardScreen : Screen
     /// </summary>
     private static Color AlertRed => Appearance.Dark ? Color.FromRgb(0xff, 0x5a, 0x4f) : Color.FromRgb(0xc4, 0x2b, 0x1c);
 
-    /// <summary>A counter's tile three to a row (two on the narrowest page): its symbol and name, its number, the line
-    /// under it in whole words.</summary>
-    private Button Tile(Counter c, bool full)
+    /// <summary>
+    /// A counter's card (0.2.9's, the Mac's 1.3.77): its symbol and name at the top, its number under them, and the line
+    /// about the count under that, whole on up to two lines or left out — as tall as that and no taller (the cards of a
+    /// row as tall as its tallest), its colour washed across it. <paramref name="cols"/> to a row.
+    /// </summary>
+    private Button Tile(Counter c, int cols, bool full)
     {
+        var (pad, size, gap) = CardSizes(cols);
         var n = Count(c, full);
         var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
-        var color = TileColor(c, n.Value);
+        var color = CounterColor(c.Key);
         var label = K.Text(NameOf(c, full), Ty.Body, B.Text2);
-        var head = K.Columns("auto, *", K.IconTile(Glyph.Counter(c.Key), color, 28).Col(0), label.Margin(10, 0, 0, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1));
+        label.TextTrimming = TextTrimming.None;
+        // (a name wider than its room — were there ever one, a school's own name for a counter — shrunk to fit rather
+        //  than cut)
+        var name = new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(gap, 0, 0, 0) };
+        var head = K.Columns("auto, *", K.IconTile(Glyph.Counter(c.Key), color, size).Col(0), name.Col(1));
         var count = Number(n, alert);
-        count.Margin = new Thickness(0, 10, 0, 0);
+        count.Margin = new Thickness(0, cols == 6 ? 8 : 10, 0, 0);
         var content = K.V(0, head, count, new NoteLines(n.Note));
-        content.Margin = new Thickness(14, 14, 14, 12);
-        return TileButton(c, content, n, alert, color, square: false);
+        content.Margin = new Thickness(pad, pad, pad, pad - 2);
+        return TileButton(c, content, n, alert, color);
     }
 
     /// <summary>
-    /// A counter's tile in one row of six: square — as tall as it is wide, never shorter than its words need nor taller
-    /// than <see cref="SquareMost"/> — and laid out as the tile always was, so each counter reads as a card of its own
-    /// colour: its symbol and name at the top, its number under them, the line about the count under that in whole words
-    /// on up to two lines, and the rest of the square its colour (or its theme's picture, pinned at its foot). Where the
-    /// symbol and the name do not fit side by side (the narrowest tiles, on a window not much over 1024), the name has
-    /// the top to itself and the symbol leads the number.
+    /// A counter's card round its words: its colour washed across it, inside it, with a faint edge of the colour — over
+    /// its theme's picture too, which still shows through — opening its panel when pressed, what it counts with its number
+    /// (and the line about it, whole, wherever the card had no room for it) its tooltip and what a screen reader says.
+    /// Overdue with something in it wears the alert on its own face instead — a solid red tint ringed in red, over any
+    /// picture or theme — so late work is never only a tint.
     /// </summary>
-    private Button SquareTile(Counter c, bool roomy, bool full)
-    {
-        var n = Count(c, full);
-        var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
-        var color = TileColor(c, n.Value);
-        var symbol = K.IconTile(Glyph.Counter(c.Key), color, SquareSymbol);
-        var label = K.Text(NameOf(c, full), Ty.Body, B.Text2);
-        label.TextTrimming = TextTrimming.None;
-        // (a name wider than its room, were there ever one, shrunk to fit rather than cut; a number likewise)
-        var name = new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        var count = Number(n, alert);
-        count.TextTrimming = TextTrimming.None;
-        FrameworkElement head, line;
-        if (roomy)
-        {
-            head = K.Columns("auto, *", symbol.Col(0), name.Margin(SquareGap, 0, 0, 0).Col(1));
-            line = count;
-        }
-        else
-        {
-            head = name;
-            // (the number a size smaller here, beside the symbol rather than under it, so the tile — its name, its number
-            //  and two lines about it — is about as tall as it is wide: 100 by 106 on a 1024 window)
-            count.FontSize = 28;
-            count.LineHeight = 32;
-            var number = new Viewbox { Child = count, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(SquareGap, 0, 0, 0) };
-            line = K.Columns("auto, *", symbol.Col(0), number.Col(1));
-        }
-        line.Margin = new Thickness(0, roomy ? 8 : 4, 0, 0);
-        var content = K.V(0, head, line, new NoteLines(n.Note));
-        content.Margin = roomy ? new Thickness(SquarePad, SquarePad, SquarePad, 10) : new Thickness(SquarePadTight, 8, SquarePadTight, 8);
-        return TileButton(c, content, n, alert, color, square: true);
-    }
-
-    /// <summary>A counter's tile round its words: its colour washed across it (or its theme's picture), opening its panel
-    /// when pressed, what it counts with its number — and the line about it, whole, wherever the tile had no room for
-    /// it — its tooltip and what a screen reader says. Overdue with something in it wears the alert on its own face — a
-    /// solid red tint ringed in red, over any wash, picture or theme — so it never looks like a tile with nothing in it.</summary>
-    private Button TileButton(Counter c, FrameworkElement content, (int? Value, string? Note, bool Kept) n, bool alert, Color color, bool square)
+    private Button TileButton(Counter c, FrameworkElement content, (int? Value, string? Note, bool Kept) n, bool alert, Color color)
     {
         // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
         var face = new Grid();
         if (Scenes.Backdrop(c.Key) is { } scene)
         {
             face.Children.Add(scene);
-            // (the scene kept faint behind the name and the number, whole only in the tile's empty corner)
+            // (the scene kept faint behind the name and the number, whole only in the card's empty corner)
             if (!alert) face.Children.Add(Scenes.WordsVeil());
         }
-        else if (!alert) face.Children.Add(Wash(color));
-        if (alert) face.Children.Add(AlertFace());
+        face.Children.Add(alert ? AlertFace() : Wash(color));
         face.Children.Add(content);
         face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
-        var b = K.CardButton(square ? new Square { Child = face, Most = SquareMost } : face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
+        var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
+        b.BorderBrush = new SolidColorBrush(K.WithAlpha(color, Appearance.Dark ? 0.34 : 0.3));
         var spoken = Spoken(c.Key, c.Label, n.Value);
         b.ToolTip = string.IsNullOrEmpty(n.Note) ? spoken : $"{spoken}\n{n.Note}";
         System.Windows.Automation.AutomationProperties.SetName(b, spoken);
         if (!string.IsNullOrEmpty(n.Note)) System.Windows.Automation.AutomationProperties.SetHelpText(b, n.Note);
         return b;
-    }
-
-    /// <summary>A square tile's face: as tall as it is wide, up to its most, and never shorter than what it holds needs.</summary>
-    private sealed class Square : Decorator
-    {
-        public double Most { get; init; } = double.PositiveInfinity;
-
-        protected override Size MeasureOverride(Size available)
-        {
-            var held = base.MeasureOverride(available);
-            var side = double.IsInfinity(available.Width) ? 0 : Math.Min(available.Width, Most);
-            return new Size(held.Width, Math.Max(held.Height, side));
-        }
     }
 
     /// <summary>
@@ -547,13 +479,22 @@ public sealed partial class DashboardScreen : Screen
         return f;
     }
 
-    /// <summary>A counter's colour washed across its card (Windows 11's tinted cards): strongest at its symbol's corner,
-    /// fading towards the far one — the panel it grows into wears the same.</summary>
-    private static Border Wash(Color c) => new()
+    /// <summary>
+    /// A counter's colour washed across its card (Windows 11's tinted cards), drawn inside it: across the whole card, a
+    /// little stronger at its symbol's corner, so each card reads as its colour at a glance — lighter in light, where a
+    /// colour on white reads strong, so the number and the words over it stay easy to read. The panel it grows into
+    /// (<paramref name="card"/> false) wears it as before, strongest at its symbol's corner and fading towards the far
+    /// one, over a list.
+    /// </summary>
+    private static Border Wash(Color c, bool card = true)
     {
-        Background = new LinearGradientBrush(K.WithAlpha(c, 0.24), K.WithAlpha(c, 0.05), new Point(0, 0), new Point(1, 1)),
-        CornerRadius = new CornerRadius(7), IsHitTestVisible = false,
-    };
+        var (near, far) = !card ? (0.24, 0.05) : Appearance.Dark ? (0.26, 0.14) : (0.18, 0.08);
+        return new Border
+        {
+            Background = new LinearGradientBrush(K.WithAlpha(c, near), K.WithAlpha(c, far), new Point(0, 0), new Point(1, 1)),
+            CornerRadius = new CornerRadius(7), IsHitTestVisible = false,
+        };
+    }
 
     /// <summary>
     /// A counter's number, the line that goes with the name its row wears (the short name's, or the full one's), and
@@ -586,10 +527,11 @@ public sealed partial class DashboardScreen : Screen
     }
 
     // ---- the panel a counter grows into (the Mac's DashCounterPanel: 440 wide; here a Windows 11 flyout surface) ----
-    // (it takes nothing from the window round it and stays until it is closed — its ×, a click on its heading, Escape, its
-    //  tile again — over whatever place is opened meanwhile: it is drawn in the shell's overlay over the page,
-    //  WorkPreview.Layer, under any quick look; it goes with its tile as the page scrolls, as 0.2.9's did on the page
-    //  itself, and its heading moves it)
+    // (0.2.9's, as the Mac's 1.3.77: pressed, a counter's card grows in place into its panel over the page, and the panel
+    //  folds back into the card as it closes — its ×, a click on its heading, Escape, the card again, or a press anywhere
+    //  else, which still does what it does, so the panel never holds the window. It is drawn in the shell's overlay over
+    //  the page, WorkPreview.Layer, under any quick look, and goes with its card as the page scrolls; nothing under it
+    //  moves, and it goes with the page when another place is opened)
 
     private string? openKey;
     private bool sheetAsked;
@@ -600,18 +542,22 @@ public sealed partial class DashboardScreen : Screen
     private FrameworkElement? sheetPreviewRow;
     private Action? sheetPreviewPress;
     private Border? frame;
-    /// <summary>The panel moved away from its tile by its heading: the tile shows again, and the panel fades away when it
-    /// is closed rather than folding into it.</summary>
-    private bool panelMoved;
+    /// <summary>Panels folding back into their cards, still drawn: put away at once with the page.</summary>
+    private readonly List<Border> folding = new();
 
     /// <summary>Where the panel is drawn: over the page, above every place (the shell's overlay); this page's own until
     /// the shell has one.</summary>
     private Canvas? Layer => WorkPreview.Layer ?? overlay;
     private FrameworkElement? panelContent;
-    /// <summary>The panel's heading (its symbol, name and number, and the line beside them): a press there moves the panel,
-    /// a click folds it back.</summary>
-    private FrameworkElement? panelHead;
     private Rect panelRect;
+
+    /// <summary>How long a card takes to grow into its panel (Windows' decelerate curve), and when — and for how long —
+    /// the panel's words fade in as it grows.</summary>
+    private const double GrowMs = Motion.Slow + 67, WordsAfterMs = 90, WordsMs = Motion.Medium;
+
+    /// <summary>The screenshot suite's --open sheetmorph (with --sheet): the panel drawn as it is a quarter of the way
+    /// through growing out of its card, for a picture of the grow (pictures are taken with motion off).</summary>
+    private static bool MorphPicture => Launch.Get("open") == "sheetmorph";
     /// <summary>The page's scroller, listened to while the panel is up.</summary>
     private ScrollViewer? pageScroller;
     /// <summary>The screenshot suite's --open sheetscroll (with --sheet): the page under the open panel scrolled a little,
@@ -636,6 +582,33 @@ public sealed partial class DashboardScreen : Screen
         if (openKey == null) return false;
         SetOpen(null);
         return true;
+    }
+
+    /// <summary>A press anywhere outside the open panel — the page round it, another card, the pane, the header, the title
+    /// bar — folds it back into its card, and the press still does what it does (another card opens its own). A press on
+    /// the panel, on a quick look over it (both in its layer) or on its own card (whose click folds it) leaves it.</summary>
+    public override void Pressed(MouseButtonEventArgs e)
+    {
+        if (openKey == null || frame == null || e.ChangedButton != MouseButton.Left) return;
+        if (e.OriginalSource is DependencyObject o && Layer is { } layer && Drag.Within(o, layer)) return;
+        if (tiles.TryGetValue(openKey, out var t) && t.IsMouseOver) return;
+        SetOpen(null);
+    }
+
+    /// <summary>Gone from view (another place, or a page over this one): an open panel goes with the page — put away at
+    /// once, its card as it was.</summary>
+    public override void Hide()
+    {
+        base.Hide();
+        var f = frame;
+        openKey = null;
+        frame = null;
+        panelContent = null;
+        WatchScroll(on: false);
+        if (f != null) folding.Add(f);
+        foreach (var x in folding) { x.BeginAnimation(UIElement.OpacityProperty, null); (x.Parent as Panel)?.Children.Remove(x); }
+        folding.Clear();
+        foreach (var t in tiles.Values) { t.BeginAnimation(UIElement.OpacityProperty, null); t.Opacity = 1; }
     }
 
     /// <summary>A counter's tile where the panel is drawn (nothing while the page is not shown).</summary>
@@ -665,54 +638,71 @@ public sealed partial class DashboardScreen : Screen
         var c = d?.Counters.FirstOrDefault(k => k.Key == key);
         if (c == null) { openKey = null; return; }
         if (frame != null) (frame.Parent as Panel)?.Children.Remove(frame);
-        panelMoved = false;
         var w = PanelSpot(tile, pageRect, 0).Width;
         panelContent = PanelContent(c, key, w);
         panelContent.Width = w - 2;
         panelContent.Measure(new Size(w - 2, double.PositiveInfinity));
         var h = Math.Max(tile.Height, panelContent.DesiredSize.Height + 2);
         panelRect = PanelSpot(tile, pageRect, h);
-        var f = frame = new Border
+        frame = new Border
         {
             CornerRadius = new CornerRadius(8), ClipToBounds = true,
-            Child = new Grid { Children = { Wash(TileColor(c, Count(c).Value)), new Canvas { Children = { panelContent } } } },
+            Child = new Grid { Children = { Wash(CounterColor(key), card: false), new Canvas { Children = { panelContent } } } },
             Effect = K.Shadow(32, 10, 0.22), SnapsToDevicePixels = true,
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
         Shell.Tour.Mark(frame, Shell.TourSpot.CounterPanel);
-        // (its heading moves it — its tile then shows again, and it is whole wherever it goes; a click there folds it
-        //  back, as 0.2.9's did; Escape inside it closes it, wherever it is)
-        Drag.ByHeading(f, () => panelHead is { IsLoaded: true } hd && f.IsAncestorOf(hd) ? hd.TranslatePoint(new Point(0, hd.ActualHeight), f).Y : 56, moved: () =>
-        {
-            panelMoved = true;
-            f.Clip = null;
-            if (openKey != null && tiles.TryGetValue(openKey, out var t2) && t2.Opacity < 1) { t2.Opacity = 1; Motion.FadeIn(t2, Motion.Fast); }
-        }, clicked: () => { if (ReferenceEquals(frame, f)) SetOpen(null); });
         frame.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; SetOpen(null); } };
         // (under a quick look already up — one opened from Coming up stays over the panel, as it was over 0.2.9's, and
         //  the shell's Escape folds the one on top first)
         layer.Children.Insert(0, frame);
-        if (tiles.TryGetValue(key, out var t)) t.Opacity = 0;
+        if (tiles.TryGetValue(key, out var t)) { t.BeginAnimation(UIElement.OpacityProperty, null); t.Opacity = 0; }
         // (it goes with its tile as the page scrolls: a tile scrolled part way under the page's header opens it cut there)
         WatchScroll(on: true);
         ClipToPage(layer);
         // (the screenshot suite: --open sheetscroll scrolls the page under the panel a little, once it is up)
         if (!sheetScrolled && Launch.Get("open") == "sheetscroll") { sheetScrolled = true; ScrollForPicture(); }
-        if (!animate || !Motion.On)
+        if (MorphPicture) { CatchGrowing(); return; }
+        if (!animate || !Motion.Fades)
         {
             PlaceAt(frame, panelRect);
             return;
         }
-        // the panel rises out of its card: the surface grows from the card's place and size to its own, its words
-        // fading in as it opens (Windows' decelerate curve)
+        if (!Motion.On)
+        {
+            // (Windows' Animation effects off: nothing grows — the panel fades in where it opens, over its card, which
+            //  goes once it is in)
+            PlaceAt(frame, panelRect);
+            var f = frame;
+            if (t != null) t.Opacity = 1;
+            Motion.Fade(f, 0, 1, Motion.Normal, () => { if (ReferenceEquals(frame, f) && tiles.TryGetValue(key, out var t1)) t1.Opacity = 0; });
+            return;
+        }
+        // the card grows in place into its panel: the surface grows from the card's place and size to its own, its words
+        // fading in as it opens (Windows' decelerate curve) — 0.2.9's
         PlaceAt(frame, tile);
         panelContent.Opacity = 0;
-        Motion.FromTo(frame, Canvas.LeftProperty, tile.X, panelRect.X, Motion.Slow + 67, Motion.Decelerate);
-        Motion.FromTo(frame, Canvas.TopProperty, tile.Y, panelRect.Y, Motion.Slow + 67, Motion.Decelerate);
-        Motion.FromTo(frame, FrameworkElement.WidthProperty, tile.Width, panelRect.Width, Motion.Slow + 67, Motion.Decelerate);
-        Motion.FromTo(frame, FrameworkElement.HeightProperty, tile.Height, panelRect.Height, Motion.Slow + 67, Motion.Decelerate);
-        Motion.FadeIn(panelContent, Motion.Medium, 90);
+        Motion.FromTo(frame, Canvas.LeftProperty, tile.X, panelRect.X, GrowMs, Motion.Decelerate);
+        Motion.FromTo(frame, Canvas.TopProperty, tile.Y, panelRect.Y, GrowMs, Motion.Decelerate);
+        Motion.FromTo(frame, FrameworkElement.WidthProperty, tile.Width, panelRect.Width, GrowMs, Motion.Decelerate);
+        Motion.FromTo(frame, FrameworkElement.HeightProperty, tile.Height, panelRect.Height, GrowMs, Motion.Decelerate);
+        Motion.FadeIn(panelContent, WordsMs, WordsAfterMs);
         Shot.Moved();
+    }
+
+    /// <summary>--open sheetmorph: the panel as it is a quarter of the way through growing out of its card — its surface
+    /// where the grow has taken it by then, its words as far faded in — drawn still, for a picture. Drawn again each time
+    /// the panel is laid out (its list come, the page settled).</summary>
+    private void CatchGrowing()
+    {
+        if (frame == null || panelContent == null || openKey == null) return;
+        var tile = TileRect(openKey);
+        if (tile.IsEmpty) return;
+        const double at = GrowMs / 4;
+        var p = Motion.Decelerate.Ease(at / GrowMs);
+        double Step(double from, double to) => from + (to - from) * p;
+        PlaceAt(frame, new Rect(Step(tile.X, panelRect.X), Step(tile.Y, panelRect.Y), Step(tile.Width, panelRect.Width), Step(tile.Height, panelRect.Height)));
+        panelContent.Opacity = Motion.Decelerate.Ease(Math.Clamp((at - WordsAfterMs) / WordsMs, 0, 1));
     }
 
     /// <summary>
@@ -730,14 +720,12 @@ public sealed partial class DashboardScreen : Screen
 
     /// <summary>
     /// The panel kept on its tile, as 0.2.9's was on the page itself: as the page scrolls, or is laid out again (the
-    /// window resized, the counters put in other rows), it goes where its tile has gone — until its heading has moved it
-    /// away, or another place is shown under it (it then stays where it is). True when its width changed (its words are
-    /// then laid out again).
+    /// window resized, the counters put in other rows), it goes where its tile has gone. True when its width changed (its
+    /// words are then laid out again).
     /// </summary>
     private bool Follow(bool evenMoving = false)
     {
-        // (not while its heading is held: it is the pointer's to move then)
-        if (frame == null || panelMoved || frame.IsMouseCaptured || openKey == null || Layer is not { } layer) return false;
+        if (frame == null || openKey == null || Layer is not { } layer) return false;
         // (the page still sliding into place — back from another place — has its tile where it will not stay: once it rests)
         if (!evenMoving && PageMoving()) { FollowWhenStill(); return false; }
         var tile = TileRect(openKey);
@@ -751,6 +739,7 @@ public sealed partial class DashboardScreen : Screen
         if (resized) { frame.BeginAnimation(FrameworkElement.WidthProperty, null); frame.Width = to.Width; }
         panelRect = to;
         ClipToPage(layer);
+        if (MorphPicture) CatchGrowing();
         return resized;
     }
 
@@ -777,12 +766,12 @@ public sealed partial class DashboardScreen : Screen
     }
 
     /// <summary>The panel on its tile cut where the page's scroller cuts the page — under the page's header, as 0.2.9's
-    /// went, its tile scrolled up there; whole once its heading has moved it.</summary>
+    /// went, its tile scrolled up there.</summary>
     private void ClipToPage(Canvas layer)
     {
         if (frame == null) return;
         var cut = 0.0;
-        if (!panelMoved && pageScroller is { IsVisible: true } s)
+        if (pageScroller is { IsVisible: true } s)
         {
             try { cut = s.TranslatePoint(new Point(0, 0), layer).Y - panelRect.Y; }
             catch (InvalidOperationException) { }
@@ -826,27 +815,34 @@ public sealed partial class DashboardScreen : Screen
         e.Height = r.Height;
     }
 
-    /// <summary>Folded back into its tile: the surface shrinks to the card's place, its words fading first, then the card shows again.</summary>
+    /// <summary>Folded back into its card (0.2.9's): the surface shrinks to the card's place and size, its words fading
+    /// first, then the card shows again. With Windows' Animation effects off nothing shrinks: the panel fades where it
+    /// is, and its card fades back in under it.</summary>
     private void ClosePanel(string key)
     {
         var f = frame;
         var content = panelContent;
-        var moved = panelMoved;
         frame = null;
         panelContent = null;
-        panelHead = null;
-        panelMoved = false;
         WatchScroll(on: false);
-        if (f == null) { if (tiles.TryGetValue(key, out var t0)) t0.Opacity = 1; return; }
+        if (f == null) { if (tiles.TryGetValue(key, out var t0)) { t0.BeginAnimation(UIElement.OpacityProperty, null); t0.Opacity = 1; } return; }
         var tile = TileRect(key);
+        folding.Add(f);
         void Done()
         {
+            // (put away already, with the page)
+            if (!folding.Remove(f)) return;
             (f.Parent as Panel)?.Children.Remove(f);
-            if (tiles.TryGetValue(key, out var t) && t.Opacity < 1) { t.Opacity = 1; Motion.FadeIn(t, Motion.Fast); }
+            if (tiles.TryGetValue(key, out var t) && t.Opacity < 1) Motion.Fade(t, 0, 1, Motion.Fast);
         }
-        // (moved away from its tile, or its tile not shown — another place open under it: it fades where it is)
-        if (Motion.On && (moved || tile.IsEmpty)) { Motion.FadeOut(f, Done, Motion.Fast); return; }
-        if (!Motion.On || tile.IsEmpty) { Done(); return; }
+        if (!Motion.Fades) { Done(); return; }
+        if (!Motion.On || tile.IsEmpty)
+        {
+            // (nothing shrinks: its card shows again under it as it fades where it is)
+            if (tiles.TryGetValue(key, out var t1)) { t1.BeginAnimation(UIElement.OpacityProperty, null); t1.Opacity = 1; }
+            Motion.Fade(f, f.Opacity, 0, Motion.Fast, Done);
+            return;
+        }
         if (content != null) Motion.FadeOut(content, () => { }, Motion.Fast);
         var from = new Rect(Canvas.GetLeft(f), Canvas.GetTop(f), f.ActualWidth, f.ActualHeight);
         Motion.FromTo(f, Canvas.LeftProperty, from.X, tile.X, Motion.Medium, Motion.Standard);
@@ -868,6 +864,7 @@ public sealed partial class DashboardScreen : Screen
         var h = Math.Max(TileRect(openKey).Height, content.DesiredSize.Height + 2);
         Motion.To(frame, FrameworkElement.HeightProperty, h, Motion.Medium, Motion.Decelerate);
         panelRect.Height = h;
+        if (MorphPicture) CatchGrowing();
         Shot.Moved();
     }
 
@@ -876,7 +873,7 @@ public sealed partial class DashboardScreen : Screen
         var data = sheet.Data;
         var n = Count(c, full: true);
         var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
-        var color = TileColor(c, n.Value);
+        var color = CounterColor(key);
         var close = K.IconButton(SymbolRegular.Dismiss24, () => SetOpen(null), "Close (Esc)", 14, 32);
         var titleRow = K.Columns("auto, *, auto",
             K.IconTile(Glyph.Counter(key), color, 28).Col(0),
@@ -888,9 +885,16 @@ public sealed partial class DashboardScreen : Screen
         var countRow = K.Columns("auto, *", count.Col(0));
         if (!string.IsNullOrEmpty(line)) countRow.Children.Add(K.Wrapped(line!, Ty.Body, B.Text2, 2).Margin(14, 0, 0, 6).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1));
         var head = K.V(4, titleRow, countRow);
-        // (its heading takes hold of the panel to move it, and a click on it folds the panel back: Kit/Drag.cs)
+        // (a click on its heading folds it back too, as 0.2.9's did — a click begun there: not the second of a double-click
+        //  on its card, landing on the panel growing over it)
         head.Background = Brushes.Transparent;
-        panelHead = head;
+        var pressed = false;
+        head.MouseLeftButtonDown += (_, e) => pressed = e.ClickCount == 1;
+        head.MouseLeftButtonUp += (_, e) =>
+        {
+            if (pressed && (e.OriginalSource is not DependencyObject o || !Drag.Within(o, close))) SetOpen(null);
+            pressed = false;
+        };
 
         // (the list under the header, scrolling past about five rows, and nothing under it: the panel as 0.2.9 had it)
         FrameworkElement body;

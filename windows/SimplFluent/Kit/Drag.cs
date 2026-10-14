@@ -10,8 +10,9 @@ namespace Simpl.Kit;
 
 /// <summary>
 /// What moves a popup by its heading: a press there that is not on a control (a button, a field, a list, a slider, a
-/// link, a page) takes hold of it. The popups floating in windows of their own (Shell/FloatPopup.cs) and the cards
-/// floating on the page — the quick look and a counter's panel, which grow out of their rows — share it.
+/// link, a page) takes hold of it. The popups floating in windows of their own (Shell/FloatPopup.cs) and the quick look
+/// floating on the page, which grows out of its row, share it. (A Dashboard counter's panel is not moved: it grows in
+/// place out of its card and folds back into it.)
 /// </summary>
 public static class Drag
 {

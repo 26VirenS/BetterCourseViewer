@@ -440,13 +440,17 @@ public sealed class TodoScreen : Screen
   commands at the title's right, a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
   `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
-  `WindowLayoutChanges` for its thresholds: the Dashboard's six counters sit in one row of square tiles on a window 1024
-  wide or wider (each as tall as it is wide up to 200, about a 1650 window's, never shorter than its words: the symbol
-  and name at the top — the name alone there on the narrowest tiles, the symbol then beside a number a size smaller
-  and the tiles 8 apart rather than 12, so a 1024 window's are 100 wide by 106 tall — the number,
-  and the line about it whole on up to two lines, its parts on lines of their own, or left out, the tooltip saying
-  it), and three to a row (two on the narrowest page) on a narrower one. Each tile wears its counter's colour washed
-  across it; Overdue's red only while something is overdue (a quiet grey with nothing in it), Due today Windows' blue.
+  `WindowLayoutChanges` for its thresholds. The Dashboard's six counters are cards as tall as their words (0.2.9's, the
+  Mac's 1.3.77), never square: the symbol and name at the top, the number, and the line about it whole on up to two
+  lines — its parts on lines of their own — or left out, the tooltip saying it; the cards of a row as tall as its
+  tallest. Six to a row where six cards each have room for their symbol beside their name (a page about 870 wide, a
+  1280 window's; their symbol 24 and their padding 12 there, 28 and 14 otherwise), else three to a row, two on a page
+  under 520 (`DashboardScreen.CounterLayout`); the full names where every card has room for them, else the short ones.
+  Each card wears its counter's colour — the one its symbol wears: Due today Windows' blue, Tomorrow orange, Next 7
+  days green, Overdue red, Unread orange, Graded purple — washed across the whole card inside it, with a faint edge of
+  the colour (a little stronger in dark, lighter in light, so the number and its words stay easy to read; over a
+  theme's picture too, which shows through). Overdue with something in it wears the alert's own face instead (a solid
+  red tint ringed in red) and its number in red.
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
   light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`). In the
   light theme `B.Text2` and `B.Text3` are solid greys (#5F5F5F, #707070; `Appearance.ReadableText`): Fluent's
@@ -617,12 +621,18 @@ plain lines, up to five — Mark done ticks it, a double-click or a Ctrl-click o
 its row pressed again folds it back into its row. It takes nothing from the window: nothing behind it is dimmed, a click
 elsewhere does what it does and leaves it up, and it stays over whatever place is opened under it until it is closed;
 its heading moves it (`Kit/Drag.cs`: only once the pointer has gone Windows' drag distance — a click there is not a
-move). A counter's panel on the Dashboard is the same: drawn in the shell's overlay over the page (`WorkPreview.Layer`),
-under any quick look, it stays over another place opened meanwhile, its heading moves it (its tile then shows again),
-and ×, a click on its heading (as 0.2.9's), Escape — from any place — or its tile close it. Until it is moved it stays
-on its tile as 0.2.9's did on the page itself: as the page scrolls or is laid out again it goes with the tile, cut under
-the page's header where the tile has scrolled up there (`DashboardScreen.Follow`; `--sheet next --open sheetscroll`
-scrolls the page under it, for the `dashboard-counter-scrolled` picture).
+move). A counter's panel on the Dashboard is 0.2.9's, as the Mac's 1.3.77: pressed, the counter's card grows in place
+into its panel over the page (its place and size to the panel's, 400 ms on Windows' decelerate curve, the panel's words
+fading in from 90 ms) and folds back into the card as it closes (250 ms, the words fading first, then the card shows
+again) — with ×, a click on its heading, Escape, the card again, or a press anywhere else, which still does what it
+does (another card opens its own), so it never holds the window. It is drawn in the shell's overlay over the page
+(`WorkPreview.Layer`), under any quick look (a press there leaves it up), is not moved by its heading, and goes with the
+page when another place is opened. It stays on its card: as the page scrolls or is laid out again it goes with the
+card, cut under the page's header where the card has scrolled up there (`DashboardScreen.Follow`; `--sheet next
+--open sheetscroll` scrolls the page under it, for the `dashboard-counter-scrolled` picture). With Windows' Animation
+effects off nothing grows: the panel fades in where it opens, over its card, and fades away as it closes
+(`Motion.Fade`). `--sheet <key> --open sheetmorph` draws it as it is a quarter of the way through growing, for the
+`dashboard-counter-morph` pictures.
 
 The card is 0.2.9's: as wide as the row it grows out of and a little more, from 300 (a month's narrow chip) to 420 (a
 list's row), never wider than the page. It says where the work stands once: a graded piece's score and letter as one
@@ -762,8 +772,8 @@ What each is now: a tool opened whole (its `ToolPopup`; the Periodic Table's bui
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
 review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
 Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups. The quick look and
-a counter's panel stay cards on the page that grow out of their rows, taking nothing from the window either (The quick
-look, above). Pinned tools' flyouts and their pulled-out windows, menus and the search's suggestions are as they were.
+a counter's panel stay cards on the page that grow out of their rows and cards, taking nothing from the window either
+(The quick look, above). Pinned tools' flyouts and their pulled-out windows, menus and the search's suggestions are as they were.
 Staying sheets over the window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first
 setup, the sign-in's "Stay logged in?", the tour (its own veil), and the questions that must be answered first (Sign
 out?, Delete this task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo.
