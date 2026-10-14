@@ -2,11 +2,12 @@ import AppKit
 import SwiftUI
 
 // (1.3.73) A pin's quick panel pulled out of its popover into a small window of its own, as the web's quick panels come
-// out of their tray: dragged by the grip along its foot, it floats over everything — a quiz or an Alta assignment's
-// popup too — where it is put, stays open, and wears the two lights a Mac window does: red puts it back (Escape too),
-// green opens the whole tool. The panel never takes the app's activation (a nonactivating panel), so what is under it
-// carries on as it was; it hides with the app when another app comes to the front. The pins themselves come to a
-// popup's own bar (PopupPins), since the window's toolbar is under the sheet.
+// out of their tray: (tools-20) by the popover's Pop Out button, or dragged by the grip along its foot. It floats over
+// everything — a quiz or an Alta assignment's popup too — where it is put, and stays open; its head is the popover's:
+// the tool's name (a press opens the whole tool) and, at its top left as a Mac panel has it, a plain ✕ that puts it back
+// (Escape too). The panel never takes the app's activation (a nonactivating panel), so what is under it carries on as it
+// was; it hides with the app when another app comes to the front. The pins themselves come to a popup's own bar
+// (PopupPins), since the window's toolbar is under the sheet.
 
 /// The panels out, by tool.
 @MainActor
@@ -33,7 +34,23 @@ final class ToolFloats: ObservableObject {
         if let mouse { follow(panel, grab: NSPoint(x: mouse.x - origin.x, y: mouse.y - origin.y)) }
     }
 
-    /// Back into the tray (the red light, Escape): the panel put away.
+    /// (tools-20) Out by the popover's Pop Out button: put where the popover was (the window under the pointer that
+    /// pressed it), and left there.
+    func popOut(_ kind: ToolKind, engine: Engine) {
+        let mouse = NSEvent.mouseLocation
+        let popover = NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.contains(mouse) }
+        let topLeft: NSPoint
+        if let f = popover?.frame {
+            topLeft = NSPoint(x: f.minX, y: f.maxY)
+        } else if let w = engine.hostView.window {
+            topLeft = NSPoint(x: w.frame.maxX - kind.popoverWidth - 48, y: w.frame.maxY - 112)
+        } else {
+            topLeft = NSPoint(x: mouse.x - kind.popoverWidth / 2, y: mouse.y)
+        }
+        pullOut(kind, engine: engine, topLeft: topLeft, mouse: nil)
+    }
+
+    /// Back into the tray (its ✕, Escape): the panel put away.
     func dock(_ kind: ToolKind) {
         guard let panel = panels[kind] else { return }
         panel.orderOut(nil)
@@ -110,7 +127,8 @@ final class ToolFloatPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { ToolFloats.shared.dock(kind) }
 }
 
-/// What a pulled-out panel shows: the lights and the tool's name at its head, its pin, and its quick use (the popover's).
+/// What a pulled-out panel shows: (tools-20) its ✕ and the tool's name at its head, as the popover's — no window lights,
+/// whose green would have opened another view instead of zooming — and its quick use (the popover's).
 struct ToolFloatView: View {
     let kind: ToolKind
     let engine: Engine
@@ -120,17 +138,10 @@ struct ToolFloatView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                QuickLights(name: kind.shortName, dock: { floats.dock(kind) }, full: { openFull() })
+                QuickClose { floats.dock(kind) }
+                IconTile(symbol: kind.symbol, color: kind.color, size: 28)
+                QuickPanelName(kind: kind) { openFull() }
                 Spacer(minLength: 8)
-                Button {
-                    tools.togglePin(kind)
-                } label: {
-                    Image(systemName: tools.isPinned(kind) ? "pin.slash" : "pin")
-                        .frame(width: 26, height: 26)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-                .help(tools.isPinned(kind) ? "Unpin from the toolbar" : "Pin to the toolbar")
             }
             PinnedToolQuick(kind: kind) { info, files in openFull(info: info, files: files) }
             GripBar()
@@ -149,38 +160,26 @@ struct ToolFloatView: View {
     }
 }
 
-/// The two lights a Mac window wears (the web's quickName): red puts the panel back in the tray, green opens the tool
-/// whole; the tool's name beside them. Their marks show while the pointer is over them.
-struct QuickLights: View {
-    let name: String
-    let dock: () -> Void
-    let full: () -> Void
+/// (tools-20) A floating panel's close: a plain ✕ in a small circle at its top left, as a Mac panel's (a HUD's) is — it
+/// puts the panel back in the tray. Brighter under the pointer.
+struct QuickClose: View {
+    let action: () -> Void
     @State private var hover = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            light(Color(red: 1, green: 0.37, blue: 0.34), symbol: "xmark", help: "Put it back", action: dock)
-            light(Color(red: 0.16, green: 0.78, blue: 0.25), symbol: "arrow.up.left.and.arrow.down.right", help: "Open \(name)", action: full)
-            Text(name)
-                .font(.sHeadline)
-                .padding(.leading, 4)
-        }
-        .onHover { hover = $0 }
-    }
-
-    private func light(_ color: Color, symbol: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            ZStack {
-                Circle().fill(color)
-                Image(systemName: symbol)
-                    .font(.system(size: 6.5, weight: .black))
-                    .foregroundStyle(.black.opacity(hover ? 0.55 : 0))
-            }
-            .frame(width: 12, height: 12)
-            .contentShape(Circle())
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(Color.primary.opacity(hover ? 0.16 : 0.08)))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .onHover { hover = $0 }
+        .animation(Motion.hover, value: hover)
+        .help("Close (Esc). The pin opens it again.")
+        .accessibilityLabel("Close")
     }
 }
 
@@ -209,7 +208,7 @@ struct PullOutGrip: View {
 
     var body: some View {
         GripBar()
-            .help("Drag to pull this out")
+            .help("Drag to pull this out into a window of its own (or press Pop Out)")
             .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .global).onChanged { _ in
                 guard !pulled else { return }
                 pulled = true
@@ -225,21 +224,28 @@ struct PullOutGrip: View {
 
 /// The tools pinned to the toolbar, on a popup's own bar (a quiz, an Alta or a Macmillan assignment): the window's
 /// toolbar is under the sheet, so its pins come here — each opens its quick panel over the popup, and pulled out they
-/// float over it.
+/// float over it. (tools-6) As in the toolbar: three at most, past that two and the Tools pull-down.
 struct PopupPins: View {
     @EnvironmentObject private var engine: Engine
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
 
     var body: some View {
-        let pins = tools.toolbarPins(timerActive: focus.active)
-        if !pins.isEmpty {
+        let pins = tools.toolbarSplit(timerActive: focus.active)
+        if !pins.shown.isEmpty {
             GlassGroup(spacing: 8) {
                 HStack(spacing: 8) {
-                    ForEach(pins) { kind in
+                    ForEach(pins.shown) { kind in
                         PinnedToolButton(kind: kind, engine: engine)
                             .labelStyle(.iconOnly)
                             .glassButton()
+                    }
+                    if !pins.more.isEmpty {
+                        MorePinsMenu(kinds: pins.more, engine: engine)
+                            .labelStyle(.iconOnly)
+                            .menuStyle(.button)
+                            .glassButton()
+                            .fixedSize()
                     }
                 }
             }

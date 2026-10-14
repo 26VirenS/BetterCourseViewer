@@ -4,7 +4,8 @@ import SwiftUI
 /// (1.3.51) An element's own page, grown out of its square in the table: its tile, name and kinds; its atom in 3D (or
 /// its orbitals' shapes, or — 1.3.76 — its electron cloud) to turn; its facts; how it compares with every element; its
 /// successive ionization energies; its electrons, shell by shell and orbital by orbital; where it sits in the table; its
-/// neighbours; and its story. ← and → step through the elements; Back returns to the table.
+/// neighbours; and its story. ← and → step through the elements; (tools-29) the tool's heading has the one Back, "‹ Table"
+/// (⌘[), that returns to the table.
 struct PTElementPage: View {
     let element: PTElement
     let close: () -> Void
@@ -114,13 +115,10 @@ struct PTElementPage: View {
 
     // MARK: The top
 
+    /// The element before and after, at the page's top right. (tools-29) No Back of its own here: the tool's heading's
+    /// "‹ Table" is the one way back, so two look-alike chevron buttons no longer sit one over the other.
     private var header: some View {
         HStack {
-            Button(action: close) { Label("Table", systemImage: "chevron.left") }
-                .glassButton()
-                .controlSize(.large)
-                .keyboardShortcut("[", modifiers: .command)
-                .help("Back to the table (⌘[)")
             Spacer()
             GlassGroup(spacing: 6) {
                 HStack(spacing: 6) {
@@ -191,12 +189,24 @@ struct PTElementPage: View {
                 .labelsHidden()
                 .frame(width: 220)
                 Spacer()
-                // (wrapped, against the right edge, where the card is narrow)
-                Text("Drag to turn · scroll to zoom").font(.sCaption).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
             }
             Atom3DView(element: e, model: model, subshell: subshell, focus: cloudFocus, dark: scheme == .dark)
                 .frame(height: 330)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                // (tools-14) how to move it, on one line at the view's foot, as the molecule builder has it — no longer
+                // squeezed into three lines beside Atom, Orbitals and Cloud
+                .overlay(alignment: .bottom) {
+                    Text("Drag to turn · scroll to zoom")
+                        .font(.sCaption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 8)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 .accessibilityElement()
                 .accessibilityLabel(modelLabel)
                 .accessibilityHint("Drag to turn, scroll to zoom")
@@ -460,24 +470,32 @@ struct PTElementPage: View {
         .card(radius: 14)
     }
 
+    /// (tools-12) Each bar is the element's rank — the share of the elements with a known value that it is above — so it
+    /// shows what the words beside it say ("above 59%"); it used to show the value's place between the lowest and the
+    /// highest, a different measure. In the colour the table gives the element in that view.
     private var compare: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Compared with every element")
             ForEach([PTColouring.electronegativity, .radius, .ionization, .affinity, .melting, .boiling, .density]) { c in
+                let rank = PTRank.percentile(c, e)
                 HStack(spacing: 14) {
                     Text(c.label).font(.sCallout).frame(width: 150, alignment: .leading)
                     GeometryReader { g in
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.primary.opacity(0.08))
-                            if let f = c.fraction(e) {
-                                Capsule().fill(PTColouring.ramp(f)).frame(width: max(6, g.size.width * f))
+                            if let r = rank {
+                                Capsule().fill(c.color(e)).frame(width: max(6, g.size.width * r))
                             }
                         }
                     }
                     .frame(height: 7)
+                    .help(rank.map { "Above \(Int(($0 * 100).rounded()))% of the elements with a known \(c.label.lowercased())" } ?? "Not known")
                     Text(compareText(c)).font(.sCaption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 200, alignment: .trailing)
                 }
             }
+            Text("Each bar: the share of the elements with a known value that this one is above.")
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .card(radius: 20)

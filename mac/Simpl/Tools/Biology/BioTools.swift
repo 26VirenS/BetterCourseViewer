@@ -262,20 +262,20 @@ struct BioHeaderControls: View {
 
 // MARK: - The Tools page's section, a tool's screen, a pin's quick version
 
-/// The Tools page's "Biology" section: its heading and the ten tiles (spec §3.2 item 4).
+/// The Tools page's "Biology" section: its heading and the ten tiles (spec §3.2 item 4) — (tools-32) headed and laid out
+/// as the page's other sections (Tools.swift ToolGroupSection).
 struct BioToolsSection: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Biology")
-                    .font(.sTitle2)
+                    .font(.sTitle3)
                     .accessibilityAddTraits(.isHeader)
                 Text("Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            .padding(.top, 14)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
                 ForEach(BioTools.kinds) { k in ToolTile(kind: k) }
             }
         }

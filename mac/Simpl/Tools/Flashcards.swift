@@ -291,7 +291,12 @@ struct FlashcardsTool: View {
         .animation(Motion.gentle, value: viewKey)
         .onAppear {
             if let id = ToolsCenter.shared.takeInfo("deck"), store.deck(id) != nil { view = .page(id) }
+            ToolsCenter.shared.quietHeading(.fc, view.deck != nil)
         }
+        // (tools-30) inside a set, the tool's line under its name ("Make a set. Flip, learn, test, match.") makes way:
+        // the bar below names the set and the way back, and the question wants the room
+        .onChange(of: viewKey) { _, _ in ToolsCenter.shared.quietHeading(.fc, view.deck != nil) }
+        .onDisappear { ToolsCenter.shared.quietHeading(.fc, false) }
     }
 
     private var viewKey: String {
@@ -350,14 +355,14 @@ struct FlashcardsTool: View {
         }
     }
 
+    /// (tools-30) Studying, the bar names the way of studying alone — the set's name is on the Back beside it.
     private func barTitle(_ d: FCDeck) -> String {
-        let name = d.name.isEmpty ? "Untitled set" : d.name
         switch view {
-        case .cards: return "\(name) · Flashcards"
-        case .learn: return "\(name) · Learn"
-        case .test: return "\(name) · Test"
-        case .match: return "\(name) · Match"
-        default: return name
+        case .cards: return "Flashcards"
+        case .learn: return "Learn"
+        case .test: return "Test"
+        case .match: return "Match"
+        default: return d.name.isEmpty ? "Untitled set" : d.name
         }
     }
 
@@ -398,8 +403,7 @@ private struct FCSetsView: View {
                 } label: {
                     Label("Create a Set", systemImage: "plus").font(.sCallout.weight(.semibold))
                 }
-                .glassButton(prominent: true)
-                .tint(ToolKind.fc.color)
+                .glassButton(prominent: true, tint: ToolKind.fc.color)
                 .controlSize(.large)
                 Button {
                     importCSV()
@@ -731,8 +735,7 @@ private struct FCEditView: View {
                     } label: {
                         Text("Done").font(.sCallout.weight(.semibold)).frame(minWidth: 80)
                     }
-                    .glassButton(prominent: true)
-                    .tint(ToolKind.fc.color)
+                    .glassButton(prominent: true, tint: ToolKind.fc.color)
                     .controlSize(.large)
                 }
             }
@@ -801,8 +804,7 @@ private struct FCEditView: View {
                 } label: {
                     Text("Add These Cards").font(.sCallout.weight(.semibold))
                 }
-                .glassButton(prominent: true)
-                .tint(ToolKind.fc.color)
+                .glassButton(prominent: true, tint: ToolKind.fc.color)
                 .disabled(found.isEmpty)
                 Text(toolPlural(found.count, "card")).font(.sCallout).foregroundStyle(.secondary)
             }
@@ -957,16 +959,14 @@ private struct FCRoundView: View {
                 } label: {
                     Label("Still Learning", systemImage: "xmark").font(.sHeadline).frame(minWidth: 150)
                 }
-                .glassButton(prominent: true)
-                .tint(.orange)
+                .glassButton(prominent: true, tint: Color.orange)
                 .controlSize(.extraLarge)
                 Button {
                     mark(c, know: true)
                 } label: {
                     Label("Know", systemImage: "checkmark").font(.sHeadline).frame(minWidth: 150)
                 }
-                .glassButton(prominent: true)
-                .tint(.green)
+                .glassButton(prominent: true, tint: Color.green)
                 .controlSize(.extraLarge)
                 Text("\(know.count)").font(.sTitle3.monospacedDigit()).foregroundStyle(.green)
                 Spacer()
@@ -1030,12 +1030,10 @@ private struct FCRoundView: View {
             HStack(spacing: 10) {
                 if !learning.isEmpty {
                     Button("Keep Reviewing \(toolPlural(learning.count, "Term"))") { begin(d, ids: learning) }
-                        .glassButton(prominent: true)
-                        .tint(ToolKind.fc.color)
+                        .glassButton(prominent: true, tint: ToolKind.fc.color)
                 }
                 Button("Restart Flashcards") { begin(d, ids: nil) }
-                    .glassButton(prominent: learning.isEmpty)
-                    .tint(ToolKind.fc.color)
+                    .glassButton(prominent: learning.isEmpty, tint: learning.isEmpty ? ToolKind.fc.color : nil)
                 Button("Back to Set", action: back)
                     .glassButton()
             }
@@ -1212,8 +1210,7 @@ private struct FCLearnView: View {
                 }
                 if let d = store.deck(deckID), let next = current(d) { prepare(d, next) }
             }
-            .glassButton(prominent: true)
-            .tint(Color(hex: "#5856d6"))
+            .glassButton(prominent: true, tint: Color(hex: "#5856d6"))
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
         }
@@ -1274,8 +1271,7 @@ private struct FCLearnView: View {
                     }
                     if let d = store.deck(deckID) { queue = learnQueue(d) }
                 }
-                .glassButton(prominent: true)
-                .tint(Color(hex: "#5856d6"))
+                .glassButton(prominent: true, tint: Color(hex: "#5856d6"))
                 Button("Back to Set", action: back).glassButton()
             }
             .controlSize(.large)
@@ -1316,13 +1312,11 @@ private struct FCTestView: View {
             HStack(spacing: 10) {
                 if marked {
                     Button("New Test") { make() }
-                        .glassButton(prominent: true)
-                        .tint(.orange)
+                        .glassButton(prominent: true, tint: Color.orange)
                     Button("Back to Set", action: back).glassButton()
                 } else {
                     Button("Check Answers") { withAnimation(Motion.gentle) { marked = true } }
-                        .glassButton(prominent: true)
-                        .tint(.orange)
+                        .glassButton(prominent: true, tint: Color.orange)
                         .disabled(questions.isEmpty)
                 }
             }
@@ -1467,8 +1461,7 @@ private struct FCMatchView: View {
                             Button("Play Again") {
                                 withAnimation(Motion.gentle) { make() }
                             }
-                            .glassButton(prominent: true)
-                            .tint(.green)
+                            .glassButton(prominent: true, tint: Color.green)
                             Button("Back to Set", action: back).glassButton()
                         }
                         .controlSize(.large)

@@ -430,8 +430,7 @@ struct FileConverterTool: View {
                                     .font(.sCallout.weight(target == t.key ? .semibold : .regular))
                                     .frame(maxWidth: .infinity)
                             }
-                            .glassButton(prominent: target == t.key)
-                            .tint(ToolKind.conv.color)
+                            .glassButton(prominent: target == t.key, tint: target == t.key ? ToolKind.conv.color : nil)
                             .controlSize(.large)
                         }
                     }
@@ -454,8 +453,7 @@ struct FileConverterTool: View {
                     .font(.sHeadline)
                     .frame(maxWidth: .infinity)
             }
-            .glassButton(prominent: true)
-            .tint(ToolKind.conv.color)
+            .glassButton(prominent: true, tint: ToolKind.conv.color)
             .controlSize(.extraLarge)
             .disabled(busy || target.isEmpty || !targets.contains { $0.key == target })
             Text(files.count == 1 && !splitsPages ? "You choose where it is saved." : "You choose a folder; each result is saved there.")

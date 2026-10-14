@@ -149,6 +149,12 @@ struct PTGrid: View {
             let cell = max(8, min(byWidth, byHeight))
             let origin = geo.frame(in: .named("ptRoot")).origin
             ZStack(alignment: .topLeading) {
+                // (tools-3) the top three rows and the space between them, where the element under the pointer shows:
+                // what the tour's first step lights, its card under it rather than over the table
+                Color.clear
+                    .frame(width: max(0, 18 * (cell + gap) - gap), height: max(0, 3 * (cell + gap) - gap))
+                    .allowsHitTesting(false)
+                    .tourTarget(compact ? nil : "ptTop")
                 if let e = shown {
                     PTCornerCard(element: e, cell: cell, colouring: colouring)
                         .frame(width: 10 * (cell + gap) - gap, height: 3 * (cell + gap) - gap)
@@ -218,8 +224,11 @@ private struct PTCell: View, Equatable {
         // (a property's scale is drawn solid, its words white; a kind's colour washed, as before)
         let solid = colouring != .category
         let shape = RoundedRectangle(cornerRadius: max(2, cell * 0.14), style: .continuous)
+        // (tools-11) coloured by a property on a scale, a square too small for three lines shows the value — what the
+        // view is about — in place of the number, rather than the symbol alone
+        let valueFirst = colouring.scaled && !compact && cell >= 26 && cell < 48
         VStack(spacing: 0) {
-            if !compact && cell >= 34 {
+            if !compact && cell >= 34 && !valueFirst {
                 Text("\(element.number)")
                     .font(.system(size: cell * 0.19, weight: .medium).monospacedDigit())
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -227,7 +236,13 @@ private struct PTCell: View, Equatable {
             }
             Text(element.symbol)
                 .font(.system(size: cell * (compact ? 0.48 : 0.36), weight: .bold))
-            if !compact && cell >= 48 {
+            if valueFirst {
+                Text(colouring.text(element))
+                    .font(.system(size: max(7, cell * 0.22), weight: .medium).monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .opacity(0.9)
+            } else if !compact && cell >= 48 {
                 Text(colouring == .category ? element.name : colouring.text(element))
                     .font(.system(size: cell * 0.14).monospacedDigit())
                     .lineLimit(1)
@@ -319,7 +334,10 @@ struct PeriodicTableTool: View {
         case table, lewis, molecules
         var id: String { rawValue }
         var label: String { self == .table ? "Table" : (self == .lewis ? "Lewis structures" : "Molecule builder") }
-        var symbol: String { self == .table ? "square.grid.3x3" : (self == .lewis ? "circle.grid.cross" : "atom") }
+        /// (tools-4) The heading while the page shows.
+        var title: String { self == .table ? "Periodic table" : label }
+        /// (tools-4) The 3D builder's is its own, not the atom the Periodic Table's tile wears.
+        var symbol: String { self == .table ? "square.grid.3x3" : (self == .lewis ? "circle.grid.cross" : "rotate.3d") }
     }
 
     /// (1.3.62) which page is shown, chosen in the tool's header
@@ -332,13 +350,17 @@ struct PeriodicTableTool: View {
     @State private var category: String?
     @State private var colouring: PTColouring = .category
     @StateObject private var molecule = MoleculeModel()
-    /// (1.3.59) The tour: seen once, on the first opening; the step shown, if it is on.
+    /// (1.3.59) The tour: seen once; the step shown, if it is on. (tools-3) Offered the first time the table opens, not
+    /// started; skipped, closed or declined, it counts as seen.
     @AppStorage("simpl.ptTourSeen") private var tourSeen = false
     @State private var tourStep: Int?
-    @State private var tourStuck = false
+    @State private var offerTour = false
+    /// A step gone back to: it waits for Next rather than moving on by itself (what it asks may be done already).
+    @State private var tourHold: Int?
     /// (1.3.64) the step's thing done: its card says so for a moment before the next comes
     @State private var tourDone = false
     @ObservedObject private var tourWord = PTTour.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var matches: Set<Int>? {
         let q = search.query.trimmingCharacters(in: .whitespaces)
@@ -370,11 +392,23 @@ struct PeriodicTableTool: View {
                 }
             }
             .frame(width: root.size.width, height: root.size.height, alignment: .top)
+            // (tools-3) the tour offered, the first time: a small card at the tool's foot
+            .overlay(alignment: .bottom) {
+                if offerTour && tourStep == nil {
+                    PTTourOffer(take: {
+                        withAnimation(Motion.gentle) { offerTour = false }
+                        tour(0)
+                    }, later: declineTour)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                    .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             // (1.3.61) the guided tour: the tool dimmed, the step's control lit, its card beside it
             .overlay(alignment: .topLeading) {
                 if let i = tourStep {
-                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size, stuck: tourStuck && !tourDone,
-                                  done: tourDone, next: { nextTour(i) })
+                    PTTourOverlay(step: i, origin: root.frame(in: .global).origin, size: root.size, done: tourDone,
+                                  next: { nextTour(i) }, back: { tour(i - 1, hold: true) }, skip: endTour)
                         .transition(.opacity)
                 }
             }
@@ -385,7 +419,13 @@ struct PeriodicTableTool: View {
         .onChange(of: nav.page) { _, _ in
             if open != nil { withAnimation(Motion.gentle) { open = nil } }
         }
-        .onChange(of: nav.tourAsked) { _, _ in tour(0) }
+        .onChange(of: nav.tourAsked) { _, _ in
+            withAnimation(Motion.gentle) { offerTour = false }
+            tour(0)
+        }
+        // (tools-29) the heading's one Back says "‹ Table" while an element is open, and closes it
+        .onChange(of: open?.number) { _, _ in nav.elementOpen = open != nil }
+        .onChange(of: nav.closeAsked) { _, _ in close() }
         // (1.3.64) an element picked from the search's results: opened
         .onChange(of: search.pickedCount) { _, _ in
             guard let n = search.picked, let e = PeriodicTable.byNumber(n) else { return }
@@ -420,26 +460,42 @@ struct PeriodicTableTool: View {
             if let text = ToolsCenter.shared.takeInfo("molecule"), molecule.load(handOff: text) { nav.page = .molecules }
             let n = d.integer(forKey: "SimplPTElement")
             if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
-            // (the tour: its step for the screenshot suite, -SimplPTTour 5; else on the first opening, and not while
-            // the suite pictures the tool — 1.3.76: nor an element's view, -SimplPTModel, which its page reads)
+            nav.elementOpen = open != nil
+            // (the tour: its step for the screenshot suite, -SimplPTTour 5; else, tools-3, offered on the first opening
+            // — -SimplPTTourOffer YES for the suite's picture of it — and not while the suite pictures the tool (1.3.76:
+            // nor an element's view, -SimplPTModel, which its page reads))
             let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset", "SimplPTModel"].contains { d.object(forKey: $0) != nil }
             if d.object(forKey: "SimplPTTour") != nil {
                 tour(min(max(d.integer(forKey: "SimplPTTour"), 0), PTTourStep.all.count - 1))
-            } else if !tourSeen && !shot {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { tour(0) }
+            } else if d.bool(forKey: "SimplPTTourOffer") || (!tourSeen && !shot) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    guard tourStep == nil else { return }
+                    withAnimation(Motion.gentle) { offerTour = true }
+                }
             }
         }
+        .onDisappear {
+            nav.elementOpen = false
+            // (tools-3: the tool left mid-tour — the tour closed with it, and seen)
+            if tourStep != nil { endTour() }
+        }
+    }
+
+    /// (tools-3) The offered tour turned down: not offered again (the heading's Tour runs it any time).
+    private func declineTour() {
+        tourSeen = true
+        withAnimation(Motion.gentle) { offerTour = false }
     }
 
     /// The tour at a step: the tool set to what the step needs (the page its control is on, an element's page, a
     /// preset), and nothing yet done for it.
-    private func tour(_ i: Int) {
+    private func tour(_ i: Int, hold: Bool = false) {
         guard PTTourStep.all.indices.contains(i) else { return }
+        tourHold = hold ? i : nil
         let s = PTTourStep.all[i]
         PTTour.shared.active = true
         PTTourFrames.shared.wake()
         PTTour.shared.clearEvent()
-        tourStuck = false
         tourDone = false
         withAnimation(Motion.gentle) {
             tourStep = i
@@ -450,7 +506,7 @@ struct PeriodicTableTool: View {
             }
             if let n = s.element, let e = PeriodicTable.byNumber(n) {
                 if open == nil { anchor = .center; open = e }
-            } else if ["ptGrid", "ptColours"].contains(s.target) {
+            } else if ["ptGrid", "ptTop", "ptCarbon", "ptColours"].contains(s.target) {
                 open = nil
                 nav.page = .table
             } else if s.target.hasPrefix("lewis") {
@@ -467,16 +523,13 @@ struct PeriodicTableTool: View {
         // (Draw asked for from the quick way: the quick way's water first)
         if s.target == "lewisWay" { PTTour.shared.showLewis("H₂O") }
         if let l = s.lewis { PTTour.shared.showLewis(l) }
-        // (a step left undone a while: a Next, to go on without it)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
-            if tourStep == i { withAnimation(Motion.gentle) { tourStuck = true } }
-        }
+        // (tools-3: no wait for a Next — every card has one, the step's thing a suggestion)
         checkTour()
     }
 
     /// The step's thing done: on to the next, or the tour ended after the last.
     private func checkTour() {
-        guard let i = tourStep, PTTourStep.all.indices.contains(i) else { return }
+        guard let i = tourStep, PTTourStep.all.indices.contains(i), tourHold != i else { return }
         let done: Bool
         switch PTTourStep.all[i].act {
         case .hover: done = hovered != nil
@@ -499,7 +552,8 @@ struct PeriodicTableTool: View {
         if i + 1 < PTTourStep.all.count { tour(i + 1) } else { endTour() }
     }
 
-    /// The tour over (its last step done): not again on its own; the tool left as it is.
+    /// The tour over — its last step done, or (tools-3) left with Skip Tour, its ✕ or Escape: seen either way, so not
+    /// again on its own; the tool left as it is.
     private func endTour() {
         tourSeen = true
         PTTour.shared.active = false
@@ -539,7 +593,8 @@ struct PeriodicTableTool: View {
     private var top: some View {
         HStack(alignment: .center, spacing: 16) {
             if colouring == .category {
-                ScrollView(.horizontal, showsIndicators: false) {
+                // (tools-14) a row cut off at the window's edge fades there, with a chevron that scrolls it on
+                ChipScroller {
                     GlassGroup(spacing: 6) {
                         HStack(spacing: 6) {
                             ForEach(PTCategory.all) { c in legendChip(c) }
@@ -592,7 +647,7 @@ struct PeriodicTableTool: View {
 
     /// (1.3.54) What the table is coloured by, as glass buttons (the one chosen prominent).
     private var colourBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ChipScroller {
             GlassGroup(spacing: 6) {
                 HStack(spacing: 6) {
                     ForEach(PTColouring.allCases) { c in
@@ -612,7 +667,7 @@ struct PeriodicTableTool: View {
     }
 
     /// The table with its trend arrows — (1.3.54) always, for a property with a simple trend: across the top, the trend
-    /// across a period; down the side, the trend in a group.
+    /// across a period; down the side, the trend in a group. (tools-11) The side's gutter kept slim, for the squares' room.
     @ViewBuilder
     private func trendWrap<G: View>(@ViewBuilder _ grid: () -> G) -> some View {
         if let t = colouring.trend {
@@ -625,9 +680,9 @@ struct PeriodicTableTool: View {
                     if t.across > 0 { Image(systemName: "arrow.right").font(.system(size: 13, weight: .bold)) }
                 }
                 .foregroundStyle(Color.yellow)
-                .padding(.leading, 30)
+                .padding(.leading, 24)
                 grid()
-                    .padding(.leading, 30)
+                    .padding(.leading, 24)
                     .overlay(alignment: .leading) {
                         VStack(spacing: 4) {
                             if t.up > 0 { Image(systemName: "arrow.up").font(.system(size: 13, weight: .bold)) }
@@ -666,31 +721,34 @@ struct PeriodicTableTool: View {
     }
 }
 
-/// The table's pin, opened: the whole table, small, with a search that lights the matches and a line naming the element
-/// under the pointer (or the first match). (1.3.51) The element under the pointer shows in the table's empty top; a
-/// press opens the whole table on its page.
+/// The table's pin, opened: the whole table, small, with a search that lights the matches. (1.3.51) The element under
+/// the pointer — (tools-34) or, while a search is typed, the first match, the one Return opens — shows in the table's
+/// empty top, and nowhere else (its facts used to be said twice, in a line beside the search as well); a press opens the
+/// whole table on its page.
 struct PeriodicTableCompact: View {
     var openFull: ([String: String]) -> Void
     @State private var query = ""
     @State private var over: PTElement?
 
+    private var typed: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
     private var found: [PTElement] { PeriodicTable.find(query) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 TextField("Find an element", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .font(.sCallout)
-                    .frame(width: 160)
+                    .frame(maxWidth: 220)
                     .onSubmit { if let e = found.first { openFull(["element": String(e.number)]) } }
-                Text(line)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                if typed && found.isEmpty {
+                    Text("No element")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
             }
-            PTGrid(shown: over, matches: query.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Set(found.map(\.number)), category: nil, compact: true,
+            PTGrid(shown: over ?? (typed ? found.first : nil), matches: typed ? Set(found.map(\.number)) : nil, category: nil, compact: true,
                    pick: { e, _ in openFull(["element": String(e.number)]) }, hover: { e in over = e })
         }
         // (the screenshot suite: -SimplPinElement 25 shows that element's card)
@@ -699,15 +757,33 @@ struct PeriodicTableCompact: View {
             if n > 0, over == nil { over = PeriodicTable.byNumber(n) }
         }
     }
+}
 
-    private var line: String {
-        if let e = over ?? found.first { return e.line }
-        return query.trimmingCharacters(in: .whitespaces).isEmpty ? "" : "No element"
+/// (tools-24) Whether the Lewis maker or the molecule builder is laid out narrow (the drawing across the top): their
+/// drawing cards then carry the controls a student reaches for first — the preset, Quick or Draw — in their own heading,
+/// in sight however far the page is scrolled down.
+private struct PTNarrowKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var ptNarrow: Bool {
+        get { self[PTNarrowKey.self] }
+        set { self[PTNarrowKey.self] = newValue }
     }
 }
 
+/// Reads whether the builder is laid out narrow, for the part of it built inside (`PTWorkLayout` sets it).
+struct PTNarrowReader<Content: View>: View {
+    @Environment(\.ptNarrow) private var narrow
+    @ViewBuilder var content: (Bool) -> Content
+
+    var body: some View { content(narrow) }
+}
+
 /// (1.3.52) The Lewis maker's and the molecule builder's layout: on a wide window, the controls, the drawing and the facts
-/// side by side; on a narrower one, the drawing across the top and the controls and facts side by side under it.
+/// side by side; on a narrower one, the drawing across the top and the controls and facts side by side under it —
+/// (tools-24) the drawing about half the height there, so what is under it is in sight too.
 struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
     @ViewBuilder var left: Left
     @ViewBuilder var centre: Centre
@@ -734,7 +810,7 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         centre
-                            .frame(height: max(460, min(640, g.size.height * 0.75)))
+                            .frame(height: max(360, min(560, g.size.height * 0.58)))
                         HStack(alignment: .top, spacing: 18) {
                             left.frame(maxWidth: .infinity, alignment: .topLeading)
                             right.frame(maxWidth: .infinity, alignment: .topLeading)
@@ -742,6 +818,7 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
                     }
                     .padding(.bottom, 24)
                 }
+                .environment(\.ptNarrow, true)
             }
         }
         .padding(.horizontal, 40)
@@ -767,17 +844,24 @@ final class PTSearch: ObservableObject {
     }
 }
 
-/// The search field in the Periodic Table's header.
 /// (1.3.62) Which page of the full Periodic Table is shown — chosen in the tool's header — and the tour asked for there.
 final class PTNav: ObservableObject {
     static let shared = PTNav()
     @Published var page: PeriodicTableTool.Page = .table
     @Published var tourAsked = 0
+    /// (tools-29) An element's own page is open: the heading's one Back then says "‹ Table" and closes it.
+    @Published var elementOpen = false
+    /// Raised by that Back: the table closes the element.
+    @Published private(set) var closeAsked = 0
+
+    func closeElement() { closeAsked += 1 }
 }
 
-/// (1.3.62) The Periodic Table's controls in the tool's header: its pages (Table, Lewis structures, Molecule builder),
-/// Tour, and search — a glass button that opens into a search field, the pages drawing in to their symbols to make room.
-struct PTHeaderControls: View {
+/// (tools-4) The Periodic Table's second row, under its heading: its pages — Table, Lewis structures, Molecule builder —
+/// in words, as a segmented control (they used to draw in to look-alike symbols in the heading where it ran short of
+/// room), and beside them the search — (1.3.54) a glass button that opens into a field — and Tour, which draws in to its
+/// symbol while the field is open.
+struct PTPageBar: View {
     @ObservedObject private var nav = PTNav.shared
     @ObservedObject private var search = PTSearch.shared
     @State private var searching = false
@@ -788,13 +872,26 @@ struct PTHeaderControls: View {
     private var results: [PTElement] { Array(PeriodicTable.find(search.query).prefix(7)) }
 
     var body: some View {
-        HStack(spacing: 8) {
-            // (their words where the header has room — and the search is shut — else their symbols)
-            ViewThatFits(in: .horizontal) {
-                pages(squished: searching)
-                pages(squished: true)
+        HStack(spacing: 10) {
+            Picker("Page", selection: Binding(get: { nav.page }, set: { p in withAnimation(Motion.gentle) { nav.page = p } })) {
+                ForEach(PeriodicTableTool.Page.allCases) { p in
+                    Text(p.label).tag(p)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.large)
+            .fixedSize()
+            .help("The periodic table, the Lewis structure maker, or the 3D molecule builder")
+            .tourTarget("ptPages")
+            Spacer(minLength: 8)
             searchControl.tourTarget("ptSearch")
+            Button { nav.tourAsked += 1 } label: {
+                Label("Tour", systemImage: "questionmark.circle").labelStyle(SquishLabel(squished: searching))
+            }
+            .glassButton()
+            .controlSize(.large)
+            .help("A short tour of the table and its builders")
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: searching)
         .onChange(of: focused) { _, f in
@@ -809,33 +906,6 @@ struct PTHeaderControls: View {
         }
     }
 
-    private func pages(squished: Bool) -> some View {
-        HStack(spacing: 8) {
-            GlassGroup(spacing: 6) {
-                HStack(spacing: 6) {
-                    ForEach(PeriodicTableTool.Page.allCases) { p in
-                        Button {
-                            withAnimation(Motion.gentle) { nav.page = p }
-                        } label: {
-                            Label(p.label, systemImage: p.symbol).labelStyle(SquishLabel(squished: squished))
-                        }
-                        .glassButton(prominent: nav.page == p)
-                        .controlSize(.large)
-                        .help(p == .table ? "The periodic table" : (p == .lewis ? "Draw a molecule's Lewis structure" : "Build a molecule and turn it in 3D"))
-                        .tourTarget(p == .lewis ? "ptPageLewis" : (p == .molecules ? "ptPageMolecules" : nil))
-                    }
-                }
-            }
-            Button { nav.tourAsked += 1 } label: {
-                Label("Tour", systemImage: "questionmark.circle").labelStyle(SquishLabel(squished: squished))
-            }
-            .glassButton()
-            .controlSize(.large)
-            .help("A short tour of the table and its builders")
-        }
-        .fixedSize()
-    }
-
     @ViewBuilder
     private var searchControl: some View {
         if searching {
@@ -845,7 +915,7 @@ struct PTHeaderControls: View {
                     .textFieldStyle(.plain)
                     .font(.sBody)
                     .focused($focused)
-                    .frame(width: 210)
+                    .frame(minWidth: 120, idealWidth: 210, maxWidth: 210)
                     .onSubmit {
                         let r = results
                         if r.indices.contains(lit) { choose(r[lit]) } else { search.submitted += 1 }
@@ -937,6 +1007,89 @@ struct PTHeaderControls: View {
         search.query = ""
         focused = false
         searching = false
+    }
+}
+
+/// (tools-14) A row of chips that scrolls sideways when it is wider than its place: an edge it runs past fades out, with a
+/// chevron there that scrolls the row on (or back) — so a row cut at the window's edge never looks as if it simply ends
+/// mid-word.
+struct ChipScroller<Content: View>: View {
+    @ViewBuilder var content: Content
+    @State private var room: CGFloat = 0
+    @State private var wide: CGFloat = 0
+    /// The row's left edge in the scroller (0 at the start, negative once scrolled on).
+    @State private var offset: CGFloat = 0
+    @State private var space = UUID()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var overflows: Bool { wide > room + 1 }
+    private var atStart: Bool { offset > -2 }
+    private var atEnd: Bool { offset <= room - wide + 2 }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: 0, height: 1).id("start")
+                    content
+                    Color.clear.frame(width: 0, height: 1).id("end")
+                }
+                .background {
+                    GeometryReader { g in
+                        let f = g.frame(in: .named(space))
+                        Color.clear
+                            .onAppear { wide = f.width; offset = f.minX }
+                            .onChange(of: f) { _, n in
+                                wide = n.width
+                                offset = n.minX
+                            }
+                    }
+                }
+            }
+            .coordinateSpace(name: space)
+            .mask {
+                // (each edge's fade always there, clear or solid: the change is a colour's, not a frame's)
+                HStack(spacing: 0) {
+                    LinearGradient(colors: [overflows && !atStart ? Color.clear : Color.black, Color.black], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 40)
+                    Rectangle()
+                    LinearGradient(colors: [Color.black, overflows && !atEnd ? Color.clear : Color.black], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 40)
+                }
+            }
+            .overlay(alignment: .leading) {
+                if overflows && !atStart { chevron("chevron.left", help: "Scroll back") { scroll(proxy, to: "start", anchor: .leading) } }
+            }
+            .overlay(alignment: .trailing) {
+                if overflows && !atEnd { chevron("chevron.right", help: "Scroll for more") { scroll(proxy, to: "end", anchor: .trailing) } }
+            }
+            .animation(Motion.hover, value: atStart)
+            .animation(Motion.hover, value: atEnd)
+        }
+        .background {
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { room = g.size.width }
+                    .onChange(of: g.size.width) { _, w in room = w }
+            }
+        }
+    }
+
+    private func chevron(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .bold))
+                .frame(width: 26, height: 26)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glass(Circle(), interactive: true)
+        .help(help)
+        .transition(.opacity)
+    }
+
+    private func scroll(_ proxy: ScrollViewProxy, to id: String, anchor: UnitPoint) {
+        if reduceMotion { proxy.scrollTo(id, anchor: anchor) } else { withAnimation(Motion.gentle) { proxy.scrollTo(id, anchor: anchor) } }
     }
 }
 

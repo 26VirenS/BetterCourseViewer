@@ -55,12 +55,16 @@ extension View {
         }
     }
 
-    /// A button drawn in glass (macOS 26), prominent in the accent if asked; bordered before.
+    /// A button drawn in glass (macOS 26), prominent in the accent if asked; bordered before. (tools-25) `tint` colours
+    /// it instead of the accent: a `.tint` put on the button from outside never showed, as the accent set here is nearer
+    /// the button and wins.
     @ViewBuilder
-    func glassButton(prominent: Bool = false) -> some View {
+    func glassButton(prominent: Bool = false, tint: Color? = nil) -> some View {
         if #available(macOS 26.0, *) {
             // (1.3: the window's tint is the theme's accent — a prominent button wears it; a plain glass one stays clear)
-            if prominent { self.buttonStyle(.glassProminent).tint(Theme.accent) } else { self.buttonStyle(.glass).tint(nil) }
+            if prominent { self.buttonStyle(.glassProminent).tint(tint ?? Theme.accent) } else { self.buttonStyle(.glass).tint(tint) }
+        } else if let tint {
+            if prominent { self.buttonStyle(.borderedProminent).tint(tint) } else { self.buttonStyle(.bordered).tint(tint) }
         } else {
             if prominent { self.buttonStyle(.borderedProminent) } else { self.buttonStyle(.bordered) }
         }

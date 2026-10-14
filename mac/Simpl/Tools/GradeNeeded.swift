@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// A piece of work not yet graded and its share of the final grade (native-app.js gradeNeeded).
+/// A piece of work not yet graded and its share of the final grade (native-app.js gradeNeeded). (2.99.33) The engine
+/// says it in words too: `worthText` "28.5% of your grade", `label` "Midterm 2 · 28.5% of your grade" (the picker's),
+/// `groupText` "Midterms are 57% of the grade" / "20 of the course’s 122 points" (its note's).
 struct NeedPiece: Decodable, Identifiable, Hashable {
     var id: String
     var name: String
@@ -11,6 +13,9 @@ struct NeedPiece: Decodable, Identifiable, Hashable {
     var groupPts: Double?
     var total: Double?
     var due: String?
+    var worthText: String?
+    var label: String?
+    var groupText: String?
 }
 
 /// A course's score now and the work still to come (native-app.js gradeNeeded).
@@ -58,7 +63,14 @@ enum NeedMath {
         return scale[0]
     }
 
-    static func r1(_ v: Double) -> Double { (v * 10).rounded() / 10 }
+    /// To one decimal, half up on the decimal value (4.35 → 4.4), as every figure in Simpl is — the double's own
+    /// rounding reads 4.35, held as 4.3499…, as 4.3.
+    static func r1(_ v: Double) -> Double {
+        guard v.isFinite else { return v }
+        let half = NSDecimalNumberHandler(roundingMode: .plain, scale: 1, raiseOnExactness: false, raiseOnOverflow: false,
+                                          raiseOnUnderflow: false, raiseOnDivideByZero: false)
+        return NSDecimalNumber(value: v).rounding(accordingToBehavior: half).doubleValue
+    }
 
     /// "88", "88.5".
     static func text(_ v: Double) -> String {
@@ -103,10 +115,18 @@ struct GradeNeededTool: View {
 
     var body: some View {
         ToolPage {
-            ToolColumns(sideWidth: 420, breakpoint: 980) {
-                inputs
-            } side: {
-                results
+            // (tools-9) side by side on a wide window; one over the other on a narrower one with the answer first — the
+            // number the tool is for no longer the last thing on the page, under everything that makes it
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 28) {
+                    inputs.frame(minWidth: 532, idealWidth: 532, maxWidth: .infinity, alignment: .topLeading)
+                    results.frame(width: 420, alignment: .topLeading)
+                }
+                VStack(alignment: .leading, spacing: 26) {
+                    answerCard
+                    inputs
+                    PageSection(title: "Every letter") { letters }
+                }
             }
         }
         .task { start() }
@@ -141,8 +161,9 @@ struct GradeNeededTool: View {
                 PageSection(title: "What is left") {
                     VStack(alignment: .leading, spacing: 10) {
                         if chosen != nil {
+                            // (tools-23: "Midterm 2 · 28.5% of your grade" — the share said for what it is)
                             Picker("What is left", selection: Binding(get: { piece }, set: { choosePiece($0) })) {
-                                ForEach(pieces) { p in Text("\(p.name) · \(NeedMath.text(p.worth))%").tag(p.id) }
+                                ForEach(pieces) { p in Text(PreviewFormat.text(p.label) ?? "\(p.name) · \(NeedMath.text(p.worth))% of your grade").tag(p.id) }
                                 if !pieces.isEmpty { Divider() }
                                 Text("Something else…").tag("custom")
                             }
@@ -180,10 +201,16 @@ struct GradeNeededTool: View {
             if let w = worthValue, w <= 0 || w > 100 {
                 ToolNote(text: "The work left has to be worth something between 0 and 100% of the grade.")
             }
-            Text("Assumes the rest of your work stays at your grade now. \(lms) counts graded work only, so this is the mark on that one piece with everything else as it is.")
-                .font(.sFootnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // (tools-9) the long note one press away, not in the way of the answer
+            DisclosureGroup("How This Works") {
+                Text("Assumes the rest of your work stays at your grade now. \(lms) counts graded work only, so this is the mark on that one piece with everything else as it is.")
+                    .font(.sFootnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 6)
+            }
+            .font(.sCallout)
         }
     }
 
@@ -196,10 +223,12 @@ struct GradeNeededTool: View {
     private var pieceHint: String {
         if let p = pickedPiece {
             let pts = toolPlural(Int((p.pts ?? 0).rounded()), "point")
+            // (tools-23) the engine's words for the group: "Midterms are 57% of the grade" (is/are as the name takes it)
             if data?.weighted == true {
-                return "\(p.group ?? "Its group") is \(NeedMath.text(p.groupWeight ?? 0))% of the grade\(data?.own == true ? " (your own weights)" : ""); this is \(pts) of the group’s \(NeedMath.text(p.groupPts ?? 0))."
+                let group = PreviewFormat.text(p.groupText) ?? "\(p.group ?? "Its group") is \(NeedMath.text(p.groupWeight ?? 0))% of the grade"
+                return "\(group)\(data?.own == true ? " (your own weights)" : ""); this is \(pts) of the group’s \(NeedMath.text(p.groupPts ?? 0))."
             }
-            return "\(pts) of the course’s \(NeedMath.text(p.total ?? 0))."
+            return PreviewFormat.text(p.groupText).map { "This is \($0)." } ?? "\(pts) of the course’s \(NeedMath.text(p.total ?? 0))."
         }
         if loading { return "Reading the assignments…" }
         if chosen != nil && data != nil && pieces.isEmpty { return "Nothing left ungraded that \(lms) knows of. Type what the work is worth." }
@@ -397,10 +426,12 @@ struct GradeNeededCompact: View {
     var body: some View {
         let r = NeedMath.needed(NeedMath.number(now), NeedMath.number(worth), NeedMath.number(goal))
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                field("Now", $now)
-                field("Left", $worth)
-                field("Goal", $goal)
+            // (tools-23) each number named for what it is, with its unit: "Still to come" is a share of the grade, not a
+            // count of assignments
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                field("Grade now", $now, prompt: "88", unit: "%")
+                field("Still to come", $worth, prompt: "25", unit: "% of grade")
+                field("Goal", $goal, prompt: "90", unit: "%")
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(big(r))
@@ -416,12 +447,19 @@ struct GradeNeededCompact: View {
         .onSubmit { openFull(["now": now, "worth": worth, "goal": goal]) }
     }
 
-    private func field(_ label: String, _ text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.sCaption.weight(.semibold)).foregroundStyle(.secondary)
-            TextField(label == "Now" ? "88" : label == "Left" ? "25" : "90", text: text)
+    private func field(_ label: String, _ text: Binding<String>, prompt: String, unit: String) -> some View {
+        GridRow {
+            Text(label)
+                .font(.sCallout.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField(prompt, text: text)
                 .textFieldStyle(.roundedBorder)
                 .font(.sBody)
+                .frame(width: 72)
+                .accessibilityLabel("\(label), \(unit == "%" ? "percent" : "percent of the grade")")
+            Text(unit)
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -435,7 +473,7 @@ struct GradeNeededCompact: View {
     }
 
     private func sub(_ r: NeedMath.Answer?) -> String {
-        guard let r else { return "Your grade now, what is left, the grade you want." }
+        guard let r else { return "Your grade now, the share still to come, and your goal." }
         switch r.kind {
         case .ok: return "on everything still to come"
         case .over: return "not even full marks would get there"

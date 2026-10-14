@@ -406,52 +406,69 @@ struct MoleculeBuilder: View {
 
     var body: some View {
         PTWorkLayout {
-            controls
+            PTNarrowReader { narrow in controls(narrow: narrow) }
         } centre: {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(model.formula.isEmpty ? "Empty" : model.formula).font(.system(size: 22, weight: .bold))
-                    if !model.title.isEmpty && model.title != model.formula {
-                        Text(model.title).font(.sCallout).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    // (1.3.59) turning by itself, on or off, at the viewer's top right
-                    Button {
-                        withAnimation(Motion.snappy) { model.autoRotate.toggle() }
-                    } label: {
-                        Label(model.autoRotate ? "Turning" : "Still", systemImage: model.autoRotate ? "rotate.3d" : "pause")
-                            .font(.sCallout.weight(.medium))
-                    }
-                    .glassButton(prominent: model.autoRotate)
-                    .help(model.autoRotate ? "Stop the model turning by itself" : "Let the model turn by itself")
-                }
-                .padding(16)
-                MoleculeSceneView(model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Text("Drag to turn · scroll to zoom · click an atom to select it")
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(12)
-            }
-            .card(radius: 20)
-            .tourTarget("molViewer")
+            PTNarrowReader { narrow in viewer(narrow: narrow) }
         } right: {
             facts
         }
+    }
+
+    /// The model in its card: its formula and name, (tools-24) the preset menu beside them when laid out narrow, turning
+    /// by itself on or off, and the 3D view.
+    private func viewer(narrow: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Text(model.formula.isEmpty ? "Empty" : model.formula).font(.system(size: 22, weight: .bold))
+                if !model.title.isEmpty && model.title != model.formula && !narrow {
+                    Text(model.title).font(.sCallout).foregroundStyle(.secondary)
+                }
+                if narrow {
+                    presetMenu.frame(maxWidth: 240)
+                }
+                Spacer()
+                // (1.3.59) turning by itself, on or off, at the viewer's top right — (tools-31) the button says what a
+                // press does (Stop Turning, Turn), not the state it is in ("Turning", "Still")
+                Button {
+                    withAnimation(Motion.snappy) { model.autoRotate.toggle() }
+                } label: {
+                    Label(model.autoRotate ? "Stop Turning" : "Turn", systemImage: model.autoRotate ? "pause" : "rotate.3d")
+                        .font(.sCallout.weight(.medium))
+                }
+                .glassButton()
+                .help(model.autoRotate ? "Stop the model turning by itself" : "Let the model turn slowly by itself")
+            }
+            .padding(16)
+            MoleculeSceneView(model: model)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text("Drag to turn · scroll to zoom · click an atom to select it")
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(12)
+        }
+        .card(radius: 20)
+        .tourTarget("molViewer")
     }
 
     private func heading(_ t: String) -> some View {
         Text(t.uppercased()).font(.system(size: 11.5, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
     }
 
-    private var controls: some View {
+    private var presetMenu: some View {
+        PresetMenu(sections: MoleculeModel.presetSections,
+                   selected: MoleculeModel.presets.contains(model.title) ? model.title : nil) { name in
+            withAnimation(Motion.snappy) { model.loadPreset(name) }
+        }
+    }
+
+    /// The controls' column; `narrow`: the preset is in the model's heading instead (tools-24).
+    private func controls(narrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Group {
-            heading("Preset")
-            PresetMenu(sections: MoleculeModel.presetSections,
-                       selected: MoleculeModel.presets.contains(model.title) ? model.title : nil) { name in
-                withAnimation(Motion.snappy) { model.loadPreset(name) }
+            if !narrow {
+                heading("Preset")
+                presetMenu
             }
             heading("Add atom")
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {

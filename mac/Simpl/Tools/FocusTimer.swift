@@ -1,6 +1,18 @@
 import SwiftUI
 import UserNotifications
 
+/// (tools-25) The one second hand every running-timer label reads — the toolbar's pin, the dial, the pin's panel, the
+/// timer's tile — so they never show two different seconds side by side (each used to tick on a timeline of its own).
+/// It moves once a second while a session runs, on the second the time left changes; apart from FocusTimer, so a tick
+/// redraws only what shows the time, not every view that watches the timer.
+@MainActor
+final class FocusClock: ObservableObject {
+    static let shared = FocusClock()
+    @Published private(set) var now = Date()
+
+    func tick(_ date: Date = Date()) { now = date }
+}
+
 /// The day a count of sessions belongs to ("2026-10-08").
 private func focusToday() -> String {
     let f = DateFormatter()
@@ -133,16 +145,28 @@ final class FocusTimer: ObservableObject {
 
     var doneToday: Int { rec.day == focusToday() ? rec.done : 0 }
 
+    /// (tools-26) The focus sessions finished today, said so it never seems to disagree with "Session 1 of 4" beside it:
+    /// "none finished today", "2 finished today".
+    var finishedLine: String { doneToday == 0 ? "none finished today" : "\(doneToday) finished today" }
+
     /// "25:00", "4:07".
     static func clock(_ seconds: Int) -> String {
         let s = max(0, seconds)
         return "\(s / 60):" + String(format: "%02d", s % 60)
     }
 
-    /// When a running phase ends, in the Mac's own time format.
+    /// "7:17 PM", as every time in Simpl is written.
+    private static let timeFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    /// When a running phase ends: "Ends 7:17 PM".
     var endsText: String? {
         guard let e = rec.endAt, running else { return nil }
-        return "Ends " + e.formatted(date: .omitted, time: .shortened)
+        return "Ends " + FocusTimer.timeFormat.string(from: e)
     }
 
     // MARK: - Moving it
@@ -234,27 +258,38 @@ final class FocusTimer: ObservableObject {
     private func commit() {
         if let data = try? JSONEncoder().encode(rec) { UserDefaults.standard.set(data, forKey: FocusTimer.key) }
         armTicker()
+        FocusClock.shared.tick()
     }
 
-    /// Once a second while a session runs: a phase that ran out is settled (nothing is drawn from here — what shows the
-    /// time redraws itself on its own timeline).
+    /// The end the ticker was set for (a new end — a start, a skip, a phase settled — sets it again, in step).
+    private var tickerEnd: Date?
+
+    /// Once a second while a session runs: a phase that ran out is settled, and (tools-25) the shared second hand moves
+    /// — on the very moment the time left changes, so every label turns over together.
     private func armTicker() {
-        if rec.endAt != nil {
-            guard ticker == nil else { return }
-            let t = Timer(timeInterval: 1, repeats: true) { _ in
-                Task { @MainActor in FocusTimer.shared.tick() }
-            }
-            t.tolerance = 0.2
-            RunLoop.main.add(t, forMode: .common)
-            ticker = t
-        } else {
+        guard let end = rec.endAt else {
             ticker?.invalidate()
             ticker = nil
+            tickerEnd = nil
+            return
         }
+        guard ticker == nil || tickerEnd != end else { return }
+        ticker?.invalidate()
+        // (the next whole second of the time left, and a hair after it, so the count has turned when it is read)
+        let left = end.timeIntervalSinceNow
+        let first = Date().addingTimeInterval(max(0, left - floor(left)) + 0.02)
+        let t = Timer(fire: first, interval: 1, repeats: true) { _ in
+            Task { @MainActor in FocusTimer.shared.tick() }
+        }
+        t.tolerance = 0.05
+        RunLoop.main.add(t, forMode: .common)
+        ticker = t
+        tickerEnd = end
     }
 
     private func tick() {
         settleIfDue()
+        FocusClock.shared.tick()
     }
 
     // MARK: - Notifications
@@ -351,20 +386,21 @@ struct FocusPhasePicker: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .controlSize(.large)
+        .tint(timer.rec.phase.color) // (tools-25: the chosen phase in its colour, where the Mac draws a segment's tint)
     }
 }
 
-/// The dial: a ring of what is left, the time in its middle, the phase over it and when it ends under it.
+/// The dial: a ring of what is left, the time in its middle and when it ends under it — (tools-26) the phase named once,
+/// by the picker over it, not again inside the ring. (tools-25) It reads the shared second hand.
 struct FocusDial: View {
     var size: CGFloat = 340
     @ObservedObject private var timer = FocusTimer.shared
+    @ObservedObject private var clock = FocusClock.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            dial(now: ctx.date)
-        }
-        .frame(width: size, height: size)
+        dial(now: clock.now)
+            .frame(width: size, height: size)
     }
 
     private func dial(now: Date) -> some View {
@@ -378,10 +414,6 @@ struct FocusDial: View {
                 .rotationEffect(.degrees(-90))
                 .animation(reduceMotion ? nil : Animation.linear(duration: 1), value: timer.remaining(at: now))
             VStack(spacing: 6) {
-                Text(timer.rec.phase.name.uppercased())
-                    .font(.system(size: size * 0.045, weight: .semibold))
-                    .tracking(1)
-                    .foregroundStyle(color)
                 Text(FocusTimer.clock(timer.remaining(at: now)))
                     .font(.system(size: size * 0.22, weight: .semibold, design: .rounded).monospacedDigit())
                     .contentTransition(.numericText(countsDown: true))
@@ -414,8 +446,8 @@ struct FocusControls: View {
                         .font(large ? .sHeadline : .sCallout.weight(.semibold))
                         .frame(minWidth: large ? 150 : 96)
                 }
-                .glassButton(prominent: true)
-                .tint(timer.rec.phase.color)
+                // (tools-25) in the phase's colour — orange for focus, green for a break — as the ring is
+                .glassButton(prominent: true, tint: timer.rec.phase.color)
                 .controlSize(large ? .extraLarge : .large)
                 if timer.active {
                     Button {
@@ -457,7 +489,7 @@ struct FocusSettings: View {
                 .padding(.vertical, 4)
                 .card()
             }
-            PageSection(title: "Today", trailing: toolPlural(timer.doneToday, "session")) {
+            PageSection(title: "Today", trailing: timer.doneToday == 0 ? "None finished" : "\(timer.doneToday) finished") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
                         ForEach(0..<4, id: \.self) { i in
@@ -497,25 +529,25 @@ struct FocusSettings: View {
 /// The timer's pin, opened: the phase, the time large, its controls, and the minutes when nothing is going.
 struct FocusTimerCompact: View {
     @ObservedObject private var timer = FocusTimer.shared
+    @ObservedObject private var clock = FocusClock.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             FocusPhasePicker()
-            TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(FocusTimer.clock(timer.remaining(at: ctx.date)))
-                            .font(.system(size: 46, weight: .semibold, design: .rounded).monospacedDigit())
-                            .foregroundStyle(timer.active ? timer.rec.phase.color : Color.primary)
-                            .contentTransition(.numericText(countsDown: true))
-                        Spacer()
-                        Text(timer.endsText ?? (timer.paused ? "Paused" : ""))
-                            .font(.sCallout)
-                            .foregroundStyle(.secondary)
-                    }
-                    ProgressView(value: timer.fraction(at: ctx.date))
-                        .tint(timer.rec.phase.color)
+            // (tools-25: the shared second hand, so this and the toolbar's pin say the same time)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(FocusTimer.clock(timer.remaining(at: clock.now)))
+                        .font(.system(size: 46, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(timer.active ? timer.rec.phase.color : Color.primary)
+                        .contentTransition(.numericText(countsDown: true))
+                    Spacer()
+                    Text(timer.endsText ?? (timer.paused ? "Paused" : ""))
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
                 }
+                ProgressView(value: timer.fraction(at: clock.now))
+                    .tint(timer.rec.phase.color)
             }
             FocusControls()
             if !timer.active {
@@ -523,7 +555,8 @@ struct FocusTimerCompact: View {
                     Text("\(timer.rec.phase.name): \(timer.minutes(timer.rec.phase)) minutes").font(.sCallout)
                 }
             }
-            Text("\(toolPlural(timer.doneToday, "session")) today · \(timer.cycleLine)")
+            // (tools-26) "Session 1 of 4 · none finished today": the session under way, then what is done
+            Text("\(timer.cycleLine) · \(timer.finishedLine)")
                 .font(.sFootnote)
                 .foregroundStyle(.secondary)
         }
