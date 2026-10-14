@@ -227,7 +227,7 @@ struct DashboardView: View {
                                      onCleared: cleared)
                     // (1.2.9: the shape that moves is the panel itself, sized to the tile on its way in and out — the
                     // size it rests at is the frame round it — so it grows out of its tile and folds back into it)
-                    .dashMorph(key, in: morph, enabled: !reduceMotion)
+                    .dashMorph(key, in: morph, enabled: grows)
                     .frame(width: w, height: panelHeight > 0 ? panelHeight : max(tile.height, 160), alignment: .topLeading)
                     .tourSpot(.counterPanel)
                     .background { PreviewProbe(anchor: panelAt(key)).allowsHitTesting(false) }
@@ -280,7 +280,7 @@ struct DashboardView: View {
         let name = full ? (c.fullLabel ?? c.label) : c.label
         let line = full ? fullNote(c) : note(c)
         Group {
-            if open == c.key && !reduceMotion {
+            if open == c.key && grows {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
                                 width: tile, tip: fullNote(c)) {}
                     .hidden()
@@ -289,7 +289,7 @@ struct DashboardView: View {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
                                 width: tile, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
-                    .dashMorph(c.key, in: morph, enabled: !reduceMotion)
+                    .dashMorph(c.key, in: morph, enabled: grows)
                     .transition(.opacity)
             }
         }
@@ -365,21 +365,28 @@ struct DashboardView: View {
         withAnimation(morphMotion) { open = key }
         if key != nil { MacTour.shared.did(.counterOpened) } // (the tour's "The cards open")
         watchClicks(key != nil)
+        if OpenClock.verbose {
+            let how = DashMorphHold.asked.map { "grows, held \($0.fraction) of the way" } ?? (grows ? "grows" : "fades in (Reduce Motion)")
+            NSLog("[Simpl] counter: %@", key.map { "\($0) \(how)" } ?? "folded back")
+        }
     }
 
+    /// A tile grows into its panel and folds back into it — but not under Reduce Motion, where the panel fades in over
+    /// its tile; (the screenshot suite's picture of it part-way, `-SimplMorphHold`) always, so the grow is pictured on a
+    /// Mac that reduces motion too.
+    private var grows: Bool { !reduceMotion || DashMorphHold.asked != nil }
+
     /// How a tile grows into its panel and folds back: the house's gentle spring, as 1.3.77 had it; under Reduce Motion a
-    /// short fade, nothing growing. (The screenshot suite: `-SimplMorphHold 0.5` holds it half-way, DashMorphHold.)
+    /// short fade. (The screenshot suite: `-SimplMorphHold 0.5` holds it half-way, DashMorphHold.)
     private var morphMotion: Animation {
-        if reduceMotion { return .easeInOut(duration: 0.18) }
         if let hold = DashMorphHold.asked { return Animation(hold) }
-        return Motion.gentle
+        return reduceMotion ? .easeInOut(duration: 0.18) : Motion.gentle
     }
 
     /// How the open panel takes the height of what it shows, as that is measured: on the same spring (held with the grow
     /// in the screenshot suite's picture of it part-way, so the panel's height stays part-way too).
     private var heightMotion: Animation {
-        if !reduceMotion, let hold = DashMorphHold.asked { return Animation(hold) }
-        return Motion.gentle
+        DashMorphHold.asked.map { Animation($0) } ?? Motion.gentle
     }
 
     /// (1.3.62) While a counter is open, a click anywhere in the app but its panel — the sidebar, the toolbar, the page —

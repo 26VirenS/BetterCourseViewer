@@ -190,7 +190,7 @@ struct DashCounterTile: View {
                 if alert {
                     shape.strokeBorder(DashCounterLook.alert.opacity(0.55), lineWidth: 1.5)
                 } else {
-                    shape.strokeBorder(DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.32 : 0.26), lineWidth: 1)
+                    shape.strokeBorder(DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.26 : 0.22), lineWidth: 1)
                 }
             }
         }

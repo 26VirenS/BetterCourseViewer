@@ -804,7 +804,9 @@ nothing typed), `-SimplAttach <file>` (with `-SimplOpen compose`: New Message wi
 mock), `-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
 Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away), `-SimplMorphHold <share>`
 (with `-SimplSheet <counter>`: the counter's tile grows that share of the way into its panel, 0.5 half-way, and stays
-there — the real grow, stopped, so a picture shows it under way; `DashMorphHold`).
+there — the real grow, stopped, so a picture shows it under way, even where the Mac reduces motion; `DashMorphHold`).
+In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next grows`, or `fades in (Reduce
+Motion)`).
 
 ## Releasing
 
