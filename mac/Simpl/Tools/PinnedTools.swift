@@ -17,6 +17,8 @@ struct PinnedToolButton: View {
     @ObservedObject private var focus = FocusTimer.shared
     @ObservedObject private var floats = ToolFloats.shared
     @State private var shown = false
+    /// (the screenshot suite) The launch's -SimplPinOpen has opened this pin's popover.
+    @State private var launchOpened = false
 
     private var live: Bool { kind == .pomo && focus.active }
 
@@ -50,11 +52,18 @@ struct PinnedToolButton: View {
             if d.string(forKey: "SimplPinOpen") == kind.rawValue {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 shown = true
+                launchOpened = true
             } else if d.string(forKey: "SimplPinFloat") == kind.rawValue {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 guard let w = engine.hostView.window, !floats.isOut(kind) else { return }
                 floats.pullOut(kind, engine: engine, topLeft: NSPoint(x: w.frame.maxX - kind.popoverWidth - 48, y: w.frame.maxY - 112), mouse: nil)
             }
+        }
+        // (and open again as the app comes back to the front: a popover closes when its app is put behind another, and
+        // the suite runs several copies of the app at once — Hardy–Weinberg's and the lab's were pictured closed)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard launchOpened, !shown, UserDefaults.standard.string(forKey: "SimplPinOpen") == kind.rawValue else { return }
+            shown = true
         }
     }
 
