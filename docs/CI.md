@@ -52,9 +52,10 @@ branch's place in its concurrency group and on `mac-shots` or `ios-shots`).
   (`--bio-check`), and its log must end with `bio-check summary n/n OK`.
 - **Live checks** (Windows): the `live-dashboard-*` pictures run the Dashboard against a mock school of their own with
   `--live-every 5` and `--live-change done|task|grade:25`; their logs must show a check that found nothing before the
-  change (`live: dashboard unchanged · n reads`), one after it that showed only what changed (a counter's number and
-  a row of Coming up; a row added; one course's card), no build of the page from then on (`live: dashboard built`), and
-  a check that found nothing again. `live-course` (a course's home, `--live-every 3`) must be checked once or twice in
+  change (`live: dashboard unchanged · n reads`) and built nothing (no `live: dashboard built` after the first check),
+  one after it that showed only what changed (a counter's number and a row of Coming up; a row added; one course's
+  card — never a whole part: `counters`, `main`, `rail`, `today`, `page`), no build of the page from then on, and a
+  check that found nothing again. `live-course` (a course's home, `--live-every 3`) must be checked once or twice in
   its minute, not every three seconds: a course's page every ten intervals. The lines are printed with each check's
   reads (the windows-fluent workflow, Pictures).
 - The checks that were already there stay as they were: the Mac's project as the generator writes it and its What's

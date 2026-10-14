@@ -441,9 +441,9 @@ jobs:
           # (0.3.2: an element's atom, orbitals and cloud, and the Lewis maker and the molecule builder, are tools of their
           #  own — Atoms & Orbitals, Lewis Structures, Molecule Builder — opened in a launch's state: --tool-state names
           #  the element, the view and the subshell, or the molecule)
-          Shot 'atom-orbitals' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'C:orbitals'))
-          Shot 'atom-cloud' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'C:cloud'))
-          Shot 'atom-cloud-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Fe:cloud:3d'))
+          Shot 'atom-orbitals' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'C:orbitals'))
+          Shot 'atom-cloud' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'C:cloud'))
+          Shot 'atom-cloud-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'Fe:cloud:3d'))
           Shot 'ptable-tour' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '1'))
           Shot 'lewis-no3' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'lewis', '--tool-state', 'NO3-'))
           Shot 'molecule-ethanol' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'molecule', '--tool-state', 'Ethanol'))
@@ -649,7 +649,7 @@ jobs:
           Shot 'courses-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'courses'))
           Shot 'section-modules-one' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'section:courses/101:modules'))
           # the Tools page at two sizes; the periodic table's tour offered and at its second step; Lewis Structures and
-          # the Molecule Builder on a 1024 window (their controls in the drawing's heading)
+          # the Molecule Builder on a 1024 window (the drawing beside one column, the controls over the facts)
           Shot 'tools-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools'))
           Shot 'tools-1366' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools'))
           Shot 'ptable-offer' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-offer'))
@@ -686,8 +686,9 @@ jobs:
           }
           # (at the end, so the pictures before keep their parts) More from Canvas: what the mock school added to Canvas's
           # own navigation — History, My Materials with its own icon, Help — in the pane under Simpl's places (light at
-          # 1366, dark in a 1024's compact pane); History and Help in their popups over the window; My Materials opened
-          # in the window for tools, on Canvas's launch page for it (checked below)
+          # 1366, dark at 1024); History and Help in their popups over the window; My Materials opened in the window for
+          # tools, on Canvas's borderless launch page for it (its address checked below: the mock draws its page whole
+          # whatever it is asked)
           Shot 'more-pane' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'more'))
           Shot 'more-pane-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'more'))
           Shot 'more-history' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'more:history'))
@@ -718,7 +719,7 @@ jobs:
           # below); a popup opened at a size the student gave it (--popup-size); Knewton Alta over a tool's popup, a step
           # down and along; a submission's feedback and the rubric, large popups too
           foreach ($t in @(@('dna', @('--tool', 'dna')), @('cell', @('--tool', 'cell')), @('biomol', @('--tool', 'biomol')),
-                           @('atom', @('--tool', 'atom', '--tool-state', 'Fe:atom')), @('molecule', @('--tool', 'molecule', '--tool-state', 'Ethanol')))) {
+                           @('atom', @('--tool', 'atoms', '--tool-state', 'Fe:atom')), @('molecule', @('--tool', 'molecule', '--tool-state', 'Ethanol')))) {
             foreach ($size in @(@('1366', '1366x778'), @('1024', '1024x681'), @('780', '780x683'))) {
               Shot "wide-$($t[0])-$($size[0])" $size[1] 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--pane-open') + $t[1])
               Shot "wide-$($t[0])-$($size[0])-dark" $size[1] 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--pane-open') + $t[1])
@@ -775,7 +776,8 @@ jobs:
           # (the Chemistry section, at the end so the pictures before keep their parts) the Tools page scrolled to it, light
           # and dark; Lewis Structures, the Molecule Builder and Atoms & Orbitals opened plainly over the Tools page (the
           # Periodic Table's own is 'ptable'), Lewis Structures and Atoms & Orbitals in dark too, Atoms & Orbitals on a
-          # 1024 window and a narrow one as well (the element, the view and the facts in sight); and Atoms & Orbitals
+          # 1024 window and a narrow one as well (the element and the view in the model's heading, the model held to the
+          # page so its parts and its electrons begin in sight under it); and Atoms & Orbitals
           # opened from an element's facts page — its See it in 3D pressed, the Periodic Table's popup turned into it for
           # that element (checked below)
           Shot 'tools-chemistry' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tools-scroll', 'chemistry'))
@@ -783,10 +785,10 @@ jobs:
           Shot 'chem-lewis' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'lewis'))
           Shot 'chem-lewis-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'lewis', '--tool-state', 'O3'))
           Shot 'chem-molecule' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'molecule'))
-          Shot 'chem-atom' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom'))
-          Shot 'chem-atom-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Cu:orbitals:3d'))
-          Shot 'chem-atom-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Na:cloud'))
-          Shot 'chem-atom-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'O'))
+          Shot 'chem-atom' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atoms'))
+          Shot 'chem-atom-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'Cu:orbitals:3d'))
+          Shot 'chem-atom-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'Na:cloud'))
+          Shot 'chem-atom-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'O'))
           Shot 'chem-atom-from-element' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe', '--ptable-atoms'))
           # (the Dashboard's counters again, at the end so the pictures before keep their parts) Overdue with nothing late
           # (--overdue-none: the mock always has something late) in its own red wash beside the others', light and dark;
@@ -799,6 +801,16 @@ jobs:
           # sized larger than a later, smaller window: held to that window's room, 748 by 603 on a 780 window (checked below)
           Shot 'wide-dna-least' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'dna', '--popup-size', '480x340'))
           Shot 'wide-cell-kept-small' '780x683' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'cell', '--popup-size', '1300x700'))
+          # (the wave's reviews, at the end so the pictures before keep their parts) Atoms & Orbitals on the smallest window
+          # Simpl allows (720 by 520: the model held to the page, its parts and electrons beginning in sight under it);
+          # Lewis Structures on a 780 window with NO3-'s resonance structures (the drawing over the rest, its preset and way
+          # in its heading); the search box's chemistry command; the Periodic Table's tour at its last step (See it in 3D);
+          # More from Canvas in a narrow window's pane
+          Shot 'chem-atom-smallest' '720x520' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atoms', '--tool-state', 'Fe'))
+          Shot 'chem-lewis-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'lewis', '--tool-state', 'NO3-'))
+          Shot 'palette-chemistry' '1366x778' 45 ($mock + @('--appearance', 'dark', '--open', 'palette:/lewis'))
+          Shot 'ptable-tour-5' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '5'))
+          Shot 'more-pane-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--pane-open', '--open', 'more'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -932,7 +944,7 @@ jobs:
           if ($script:mine -contains 'chem-atom-from-element') {
             $l = PhoneLog 'chem-atom-from-element'
             Write-Host "chem-atom-from-element: $((@($l -split "`n" | Where-Object { $_ -match 'tool popup|atoms: shows' }) -join ' | '))"
-            if (-not $l.Contains('tool popup changed to: atom') -or -not $l.Contains('atoms: shows Fe')) { Write-Host "::error::chem-atom-from-element: iron's facts page did not hand its element to Atoms & Orbitals (shots/profile-chem-atom-from-element.log)"; exit 1 }
+            if (-not $l.Contains('tool popup changed to: atoms') -or -not $l.Contains('atoms: shows Fe')) { Write-Host "::error::chem-atom-from-element: iron's facts page did not hand its element to Atoms & Orbitals (shots/profile-chem-atom-from-element.log)"; exit 1 }
           }
           # Cell Explorer opened under a still pointer: nothing pointed at before its picture (the 3D view writes "bio scene:
           # pointed at …" in a picture run when what is under the pointer changes)
@@ -965,7 +977,7 @@ jobs:
           # More from Canvas read from the mock's own menu, in its order, My Materials with the picture the page drew of its
           # icon; History's and Help's popups listing rows (Shell/MoreFromCanvas.cs writes "more from canvas: …" and "more
           # list: …" in a picture run)
-          foreach ($name in @('more-pane', 'more-pane-dark')) {
+          foreach ($name in @('more-pane', 'more-pane-dark', 'more-pane-narrow')) {
             if ($script:mine -notcontains $name) { continue }
             $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'more from canvas: (.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
             if ($said -notmatch '^History, My Materials \(picture\), Help ') { Write-Host "::error::${name}: More from Canvas was not History, My Materials with its picture, Help ('$said') (shots/profile-$name.log)"; exit 1 }
@@ -976,6 +988,13 @@ jobs:
             $said = @(Select-String -Path "shots/profile-$($list[0]).log" -Pattern "more list: $($list[1]) (\d+) rows" -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
             if (-not $said) { Write-Host "::error::$($list[0]): the $($list[1]) popup listed no rows (shots/profile-$($list[0]).log)"; exit 1 }
             Write-Host "$($list[0]): $said rows"
+          }
+          # My Materials opened in the window for tools on Canvas's borderless launch address (Shell/WebWindow.cs writes
+          # "web window: opens …" in a picture run)
+          if ($script:mine -contains 'more-tool') {
+            $opened = @(Select-String -Path 'shots/profile-more-tool.log' -Pattern 'web window: opens (\S+)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+            if ($opened -ne '/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless') { Write-Host "::error::more-tool: My Materials opened at '$opened', not its borderless launch address (shots/profile-more-tool.log)"; exit 1 }
+            Write-Host "more-tool: the window for tools opened $opened"
           }
           # the owner's wider tool popups: each tool's popup as wide as the window less its margins (48; 32 under 900 wide),
           # over the pane — its own log line, "large popup tool:<key> opens at <w>×<h>" (Shell/FloatPopup.cs, a development
@@ -1040,17 +1059,22 @@ jobs:
           foreach ($live in @(@('live-dashboard-done', @('counter:', 'list(~1)')), @('live-dashboard-task', @('list(+1')), @('live-dashboard-grade', @('card:')))) {
             $name = $live[0]
             if ($script:mine -notcontains $name) { continue }
-            $phase = 'before'; $quietBefore = 0; $quietAfter = 0; $built = 0; $updates = @()
+            $phase = 'before'; $quietBefore = 0; $quietAfter = 0; $built = 0; $builtBefore = 0; $updates = @()
             foreach ($l in @(Get-Content "shots/profile-$name.log" -ErrorAction SilentlyContinue)) {
               if ($l -match ' picture at ') { break }
               if ($l -match 'live: ') { Write-Host "${name}: $($l -replace '^\S+ ', '')" }
               if ($l -match 'live: the mock school changed: \w+ \(ok') { $phase = 'changed'; continue }
               if ($l -match 'live: dashboard unchanged') { if ($phase -eq 'before') { $quietBefore++ } elseif ($phase -eq 'updated') { $quietAfter++ }; continue }
               if ($l -match 'live: dashboard updated (.+) \S \S+ reads$') { if ($phase -ne 'before') { $updates += $Matches[1]; $phase = 'updated' }; continue }
-              if ($l -match 'live: dashboard built' -and $phase -ne 'before') { $built++ }
+              if ($l -match 'live: dashboard built') { if ($phase -ne 'before') { $built++ } elseif ($quietBefore -gt 0) { $builtBefore++ } }
             }
             $bad = @()
             if ($quietBefore -lt 1) { $bad += 'no check found nothing new before the mock changed' }
+            if ($builtBefore -gt 0) { $bad += "the page was built again $builtBefore times between the first check and the change (a check that found nothing builds nothing)" }
+            # (an update shows the parts that changed — never a whole part built again: the counters, the main view, the
+            #  rail, Today, the page)
+            $whole = @($updates | ForEach-Object { $_ -split ',' } | Where-Object { $_ -in @('counters', 'main', 'rail', 'today', 'page') })
+            if ($whole.Count -gt 0) { $bad += "an update built a whole part again ($($whole -join ', '))" }
             if ($phase -eq 'before') { $bad += 'the mock school was not changed' }
             if ($updates.Count -eq 0) { $bad += 'no check found the change' }
             foreach ($want in $live[1]) { if (-not (@($updates | Where-Object { $_.Contains($want) }).Count)) { $bad += "no update showed $want (it showed: $($updates -join ' | '))" } }
