@@ -639,7 +639,9 @@ public sealed class ToolPopup
 public sealed class ToolHeading : Grid
 {
     private readonly ToolsScreen.Kind kind;
-    private readonly StackPanel titleRow = new() { Orientation = Orientation.Horizontal };
+    /// <summary>The tool's name, and the page of its own after it — that page's name cut short with "…" where the popup is
+    /// too narrow for both, the tool's name (the way back) kept whole.</summary>
+    private readonly DockPanel titleRow = new() { LastChildFill = true };
     private readonly TextBlock note;
     private readonly FrameworkElement? extra;
     private readonly FrameworkElement tile, words, pin;
@@ -722,7 +724,10 @@ public sealed class ToolHeading : Grid
         }
         else titleRow.Children.Add(t);
         titleRow.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0));
-        titleRow.Children.Add(K.Text(name, Ty.Title));
+        var shown = K.Text(name, Ty.Title);
+        shown.TextTrimming = TextTrimming.CharacterEllipsis;
+        shown.ToolTip = name;
+        titleRow.Children.Add(shown);
         note.Visibility = Visibility.Collapsed;
     }
 
