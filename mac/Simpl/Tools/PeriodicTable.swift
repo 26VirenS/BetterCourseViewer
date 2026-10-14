@@ -367,7 +367,42 @@ struct PeriodicTableTool: View {
         return q.isEmpty ? nil : Set(PeriodicTable.find(q).map(\.number))
     }
 
+    // (the body in three parts — the stage, what it watches, and what the tool does as it appears — each type-checked on
+    // its own: as one expression the compiler could not check it in reasonable time)
     var body: some View {
+        watched
+            // (the tour's step, done: watched for in what the tool shows and what it is told)
+            .onChange(of: hovered?.number) { _, _ in checkTour() }
+            .onChange(of: colouring) { _, _ in checkTour() }
+            .onChange(of: open?.number) { _, _ in checkTour() }
+            .onChange(of: nav.page) { _, _ in checkTour() }
+            .onChange(of: search.query) { _, _ in checkTour() }
+            .onChange(of: tourWord.events) { _, _ in checkTour() }
+            .onChange(of: search.submitted) { _, _ in openFirstFound() }
+            .onAppear(perform: appeared)
+            .onDisappear(perform: disappeared)
+    }
+
+    /// The stage, and the header's asks it answers: a page chosen, the tour asked for, the element closed or picked.
+    private var watched: some View {
+        stage
+            // (1.3.54) the search, in the tool's header: Return opens the first element it finds
+            // (1.3.62) a page chosen in the header while an element is open: back from it to that page; Tour asked for there
+            .onChange(of: nav.page) { _, _ in
+                if open != nil { withAnimation(Motion.gentle) { open = nil } }
+            }
+            .onChange(of: nav.tourAsked) { _, _ in
+                withAnimation(Motion.gentle) { offerTour = false }
+                tour(0)
+            }
+            // (tools-29) the heading's one Back says "‹ Table" while an element is open, and closes it
+            .onChange(of: open?.number) { _, _ in nav.elementOpen = open != nil }
+            .onChange(of: nav.closeAsked) { _, _ in close() }
+            // (1.3.64) an element picked from the search's results: opened
+            .onChange(of: search.pickedCount) { _, _ in openPicked() }
+    }
+
+    private var stage: some View {
         GeometryReader { root in
             ZStack(alignment: .top) {
                 if let e = open {
@@ -414,71 +449,58 @@ struct PeriodicTableTool: View {
             }
         }
         .coordinateSpace(name: "ptRoot")
-        // (1.3.54) the search, in the tool's header: Return opens the first element it finds
-        // (1.3.62) a page chosen in the header while an element is open: back from it to that page; Tour asked for there
-        .onChange(of: nav.page) { _, _ in
-            if open != nil { withAnimation(Motion.gentle) { open = nil } }
-        }
-        .onChange(of: nav.tourAsked) { _, _ in
-            withAnimation(Motion.gentle) { offerTour = false }
-            tour(0)
-        }
-        // (tools-29) the heading's one Back says "‹ Table" while an element is open, and closes it
-        .onChange(of: open?.number) { _, _ in nav.elementOpen = open != nil }
-        .onChange(of: nav.closeAsked) { _, _ in close() }
-        // (1.3.64) an element picked from the search's results: opened
-        .onChange(of: search.pickedCount) { _, _ in
-            guard let n = search.picked, let e = PeriodicTable.byNumber(n) else { return }
-            search.query = ""
+    }
+
+    /// (1.3.64) An element picked from the search's results: opened.
+    private func openPicked() {
+        guard let n = search.picked, let e = PeriodicTable.byNumber(n) else { return }
+        search.query = ""
+        anchor = .center
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = e }
+    }
+
+    /// (1.3.54) Return in the search: the first element it finds, opened.
+    private func openFirstFound() {
+        guard let m = PeriodicTable.find(search.query).first else { return }
+        search.query = ""
+        anchor = .center
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = m }
+    }
+
+    /// The tool opened: an element or a molecule handed to it, the screenshot suite's asks, and the tour.
+    private func appeared() {
+        if let raw = ToolsCenter.shared.takeInfo("element"), let n = Int(raw), let e = PeriodicTable.byNumber(n) {
             anchor = .center
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = e }
+            open = e
         }
-        // (the tour's step, done: watched for in what the tool shows and what it is told)
-        .onChange(of: hovered?.number) { _, _ in checkTour() }
-        .onChange(of: colouring) { _, _ in checkTour() }
-        .onChange(of: open?.number) { _, _ in checkTour() }
-        .onChange(of: nav.page) { _, _ in checkTour() }
-        .onChange(of: search.query) { _, _ in checkTour() }
-        .onChange(of: tourWord.events) { _, _ in checkTour() }
-        .onChange(of: search.submitted) { _, _ in
-            guard let m = PeriodicTable.find(search.query).first else { return }
-            search.query = ""
-            anchor = .center
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { open = m }
-        }
-        .onAppear {
-            if let raw = ToolsCenter.shared.takeInfo("element"), let n = Int(raw), let e = PeriodicTable.byNumber(n) {
-                anchor = .center
-                open = e
-            }
-            // (the screenshot suite: -SimplPTColour, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
-            let d = UserDefaults.standard
-            if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
-            if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { nav.page = v }
-            if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
-            // (1.3.78) a molecule handed over by the Biomolecule Builder, shown in the molecule builder as it is
-            if let text = ToolsCenter.shared.takeInfo("molecule"), molecule.load(handOff: text) { nav.page = .molecules }
-            let n = d.integer(forKey: "SimplPTElement")
-            if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
-            nav.elementOpen = open != nil
-            // (the tour: its step for the screenshot suite, -SimplPTTour 5; else, tools-3, offered on the first opening
-            // — -SimplPTTourOffer YES for the suite's picture of it — and not while the suite pictures the tool (1.3.76:
-            // nor an element's view, -SimplPTModel, which its page reads))
-            let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset", "SimplPTModel"].contains { d.object(forKey: $0) != nil }
-            if d.object(forKey: "SimplPTTour") != nil {
-                tour(min(max(d.integer(forKey: "SimplPTTour"), 0), PTTourStep.all.count - 1))
-            } else if d.bool(forKey: "SimplPTTourOffer") || (!tourSeen && !shot) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    guard tourStep == nil else { return }
-                    withAnimation(Motion.gentle) { offerTour = true }
-                }
+        // (the screenshot suite: -SimplPTColour, -SimplPTPage, -SimplPTElement, -SimplPTMolecule)
+        let d = UserDefaults.standard
+        if let c = d.string(forKey: "SimplPTColour"), let v = PTColouring(rawValue: c) { colouring = v }
+        if let p = d.string(forKey: "SimplPTPage"), let v = Page(rawValue: p) { nav.page = v }
+        if let m = d.string(forKey: "SimplPTMolecule") { molecule.loadPreset(m) }
+        // (1.3.78) a molecule handed over by the Biomolecule Builder, shown in the molecule builder as it is
+        if let text = ToolsCenter.shared.takeInfo("molecule"), molecule.load(handOff: text) { nav.page = .molecules }
+        let n = d.integer(forKey: "SimplPTElement")
+        if n > 0, let e = PeriodicTable.byNumber(n) { open = e }
+        nav.elementOpen = open != nil
+        // (the tour: its step for the screenshot suite, -SimplPTTour 5; else, tools-3, offered on the first opening
+        // — -SimplPTTourOffer YES for the suite's picture of it — and not while the suite pictures the tool (1.3.76:
+        // nor an element's view, -SimplPTModel, which its page reads))
+        let shot = ["SimplPTColour", "SimplPTPage", "SimplPTMolecule", "SimplPTElement", "SimplLewisPreset", "SimplPTModel"].contains { d.object(forKey: $0) != nil }
+        if d.object(forKey: "SimplPTTour") != nil {
+            tour(min(max(d.integer(forKey: "SimplPTTour"), 0), PTTourStep.all.count - 1))
+        } else if d.bool(forKey: "SimplPTTourOffer") || (!tourSeen && !shot) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                guard tourStep == nil else { return }
+                withAnimation(Motion.gentle) { offerTour = true }
             }
         }
-        .onDisappear {
-            nav.elementOpen = false
-            // (tools-3: the tool left mid-tour — the tour closed with it, and seen)
-            if tourStep != nil { endTour() }
-        }
+    }
+
+    private func disappeared() {
+        nav.elementOpen = false
+        // (tools-3: the tool left mid-tour — the tour closed with it, and seen)
+        if tourStep != nil { endTour() }
     }
 
     /// (tools-3) The offered tour turned down: not offered again (the heading's Tour runs it any time).
