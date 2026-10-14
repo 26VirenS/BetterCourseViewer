@@ -9,6 +9,14 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.79", date: "2026-10-14", notes: [
+            ReleaseNote(kind: "improved", title: "Tools in popups", body: "Tools open over your work and never block the app."),
+            ReleaseNote(kind: "improved", title: "Biology tools, fixed", body: "Controls in sight, models full size, colours right away."),
+            ReleaseNote(kind: "improved", title: "Counters as before", body: "Square, coloured counters and the old panels are back."),
+            ReleaseNote(kind: "improved", title: "Every pin that fits", body: "The toolbar shows all your pinned tools that have room."),
+            ReleaseNote(kind: "fixed", title: "Panels you can move", body: "Pulled-out panels drag again; tool pages open light."),
+            ReleaseNote(kind: "fixed", title: "Tools by provider", body: "External tools grouped by their site, like Macmillan."),
+        ]),
         Release(version: "1.3.78", date: "2026-10-14", notes: [
             ReleaseNote(kind: "new", title: "A biology toolkit", body: "Ten new tools, from a 3D cell to genetic crosses."),
             ReleaseNote(kind: "new", title: "Send from Phone", body: "Scan a code to hand in photos; nothing leaves your Wi-Fi."),

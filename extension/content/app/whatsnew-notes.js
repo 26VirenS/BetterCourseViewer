@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.34', date: '2026-10-14', notes: [
+      { kind: 'fixed', title: 'No Canvas banners', body: "Canvas's own notices no longer cover Simpl.", icon: P.eye },
+      { kind: 'improved', title: 'Tools by provider', body: 'External tools grouped by their site, like Macmillan.', icon: P.layers },
+    ] },
     { version: '2.99.33', date: '2026-10-14', notes: [
       { kind: 'improved', title: 'Screens open at once', body: 'Pages are read ahead, so most open with no wait.', icon: P.sparkle },
       { kind: 'improved', title: 'Smoother page changes', body: 'One smooth move from one screen to the next.', icon: P.arrows },
