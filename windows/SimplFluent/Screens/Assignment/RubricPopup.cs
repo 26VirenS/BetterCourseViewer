@@ -753,6 +753,7 @@ internal sealed class RubricView : Grid
             }
             header.Visibility = Visibility.Visible;
             foot.Visibility = Visibility.Visible;
+            ShowBack(open);
             Arrive(stageBox);
             Focus();
         }
@@ -761,6 +762,7 @@ internal sealed class RubricView : Grid
     private void ShowGrid(bool animate)
     {
         Hover(-1);
+        ShowBack(false); // (the grid has no criterion open to go back from)
         if (gridPanel == null)
         {
             // (as tall as its rows, in the middle of the room: not a sheet left mostly blank under two criteria)

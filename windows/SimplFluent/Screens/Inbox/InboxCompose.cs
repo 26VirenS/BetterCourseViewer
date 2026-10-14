@@ -156,7 +156,9 @@ public sealed class ComposeSheet
         layers.AllowDrop = true;
         layers.PreviewDragOver += (_, e) =>
         {
-            e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) && !sending ? DragDropEffects.Copy : DragDropEffects.None;
+            // (files only: words dragged within a field are the field's own)
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+            e.Effects = sending ? DragDropEffects.None : DragDropEffects.Copy;
             e.Handled = true;
         };
         layers.PreviewDrop += (_, e) =>

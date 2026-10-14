@@ -206,7 +206,7 @@ public sealed class NotificationsScreen : Screen
         var words = K.V(3, title);
         if (!string.IsNullOrEmpty(n.Sub)) words.Children.Add(K.Wrapped(n.Sub!, Ty.Body, B.Text2, 3));
 
-        // at its end: the unread dot — or, under the pointer, Mark Read (Unread) and Clear
+        // at its end: the unread dot — or, under the pointer, Mark read (unread) and Clear
         var dot = new Ellipse { Width = 9, Height = 9, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 6, 4, 0) }.Bg(B.Accent);
         dot.Visibility = n.Read ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(dot, "Unread");
