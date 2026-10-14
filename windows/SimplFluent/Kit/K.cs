@@ -366,12 +366,15 @@ public static class K
         return g;
     }
 
-    /// <summary>A ring of a colour round a value (a course's score): the track faint, the arc as far as the fraction.</summary>
-    public static FrameworkElement Ring(double? fraction, Color color, double size, double thickness = 4, UIElement? inside = null)
+    /// <summary>A ring of a colour round a value (a course's score): the track faint, the arc as far as the fraction.
+    /// <paramref name="tinted"/> draws the track in the ring's own colour, faint (as the Mac's rings are), where the
+    /// theme's neutral track would all but vanish on a light card.</summary>
+    public static FrameworkElement Ring(double? fraction, Color color, double size, double thickness = 4, UIElement? inside = null, bool tinted = false)
     {
         var g = new Grid { Width = size, Height = size };
         var track = new Ellipse { StrokeThickness = thickness, Margin = new Thickness(0) };
-        track.SetResourceReference(Shape.StrokeProperty, B.Subtle3);
+        if (tinted) track.Stroke = Brush(WithAlpha(color, Support.Appearance.Dark ? 0.24 : 0.18));
+        else track.SetResourceReference(Shape.StrokeProperty, B.Subtle3);
         g.Children.Add(track);
         if (fraction is { } f && f > 0)
             g.Children.Add(new Path
@@ -515,6 +518,25 @@ public static class K
         (byte)(a.A + (b.A - a.A) * t), (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
 
     public static Color WithAlpha(Color c, double a) => Color.FromArgb((byte)(255 * Math.Clamp(a, 0, 1)), c.R, c.G, c.B);
+
+    /// <summary>The words to put on a colour of the student's choosing (a course card's band, the pane's letter squares):
+    /// white where white stands 3:1 against it — the least WCAG asks of large text — else near-black. Students pick
+    /// their courses' colours in Canvas, and many are light (the Mac's CourseCard.whiteReads, the same sums).</summary>
+    public static Color InkOn(Color c) => WhiteReads(c) ? Colors.White : Color.FromRgb(0x1c, 0x1c, 0x1e);
+
+    /// <summary>White words stand 3:1 against the colour.</summary>
+    public static bool WhiteReads(Color c) => 1.05 / (Luminance(c) + 0.05) >= 3;
+
+    /// <summary>A colour's relative luminance (WCAG's, in sRGB).</summary>
+    public static double Luminance(Color c)
+    {
+        static double Ch(byte v)
+        {
+            var s = v / 255.0;
+            return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * Ch(c.R) + 0.7152 * Ch(c.G) + 0.0722 * Ch(c.B);
+    }
 
     /// <summary>A flag's colour by its kind (the page's words: red, orange, green, blue, purple, gray).</summary>
     public static Color Tone(string? kind) => kind switch

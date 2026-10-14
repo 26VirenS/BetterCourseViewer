@@ -16,7 +16,7 @@ namespace Simpl.Screens;
 /// <summary>
 /// The pieces a course's screens share (the Mac's Rows.swift and Components.swift as the course screens use them): a
 /// section's heading over one card of rows, rows of work and of posts, the facts at a home's head, a quiet note where a
-/// list is empty, two columns on a wide page, and the menus — Open, Open in Canvas, Copy Link; Hand In or Feedback.
+/// list is empty, two columns on a wide page, and the menus — Open, Open in Canvas, Copy link; Hand in or See feedback.
 /// </summary>
 internal static class CourseKit
 {
@@ -36,7 +36,7 @@ internal static class CourseKit
     public static SymbolRegular Item(string? type) => type switch
     {
         "Assignment" or "assignment" => SymbolRegular.DocumentText24,
-        "Quiz" or "quiz" => SymbolRegular.TaskListLtr24,
+        "Quiz" or "quiz" => SymbolRegular.Quiz24, // (its own: the checklist is To Do's)
         "Discussion" or "discussion" or "discussion_topic" => SymbolRegular.ChatMultiple24,
         "Page" or "page" => SymbolRegular.DocumentOnePage24,
         "File" or "file" => SymbolRegular.Document24,
@@ -74,7 +74,7 @@ internal static class CourseKit
     public static string SectionTitle(Engine.Engine engine, string ctx, string kind, string fallback) =>
         engine.Sections.TryGetValue(ctx, out var list) && list.FirstOrDefault(s => s.Kind == kind) is { } s ? s.Label : fallback;
 
-    /// <summary>A section's own page on the school's site, for Open in Canvas and Copy Link.</summary>
+    /// <summary>A section's own page on the school's site, for Open in Canvas and Copy link.</summary>
     public static string? SectionUrl(Engine.Engine engine, string ctx, string kind) => engine.SchoolUrl(Place.Section(ctx, kind))?.ToString();
 
     /// <summary>The id in a context: "courses/101" → "101".</summary>
@@ -82,6 +82,38 @@ internal static class CourseKit
 
     /// <summary>A word with each part capitalised (Swift's capitalized), for a section with no name of its own.</summary>
     public static string Capitalized(string s) => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.Replace('_', ' '));
+
+    /// <summary>A course's or a group's own colour, as the pane has it (its square), for the mark before a page's title;
+    /// null for a context the pane does not list.</summary>
+    public static Color? ContextColor(Engine.Engine engine, string ctx)
+    {
+        var id = IdOf(ctx);
+        string? hex = ctx.StartsWith("courses/", StringComparison.Ordinal) ? engine.Courses.FirstOrDefault(c => c.Id == id)?.Color
+            : ctx.StartsWith("groups/", StringComparison.Ordinal) ? engine.Groups.FirstOrDefault(g => g.Id == id)?.Color
+            : null;
+        return Support.Appearance.Hex(hex);
+    }
+
+    // ---- names ----
+
+    /// <summary>Whether a course's other name says something none of the lines shown does — compared as the engine
+    /// compares names (its saysMore): case, spaces, dashes, underscores, dots and a term prefix ("F26-", "SP26 ",
+    /// "2026FA-") set aside, and a name that is part of one shown saying nothing new ("MATH-021-20" under
+    /// "F26-MATH 021 20").</summary>
+    public static bool SaysMore(string? name, params string?[] shown)
+    {
+        var key = NameKey(name);
+        return key.Length > 0 && !shown.Any(s => NameKey(s).Contains(key, StringComparison.Ordinal));
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex TermPrefix = new(
+        @"^(?:(?:F|S|W|U|FA|SP|SU|WI|SM|FL|SPR|FAL|SUM|WIN)\d{2,4}|\d{4}(?:FA|SP|SU|WI|F|S|U|W)?|\d{6})[-_\s:]+(?=\S)",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static readonly System.Text.RegularExpressions.Regex NameGaps = new(@"[\s\-_–—.]+", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>A name as names are compared: its term prefix off, lower case, no spaces, dashes, underscores or dots.</summary>
+    internal static string NameKey(string? s) => NameGaps.Replace(TermPrefix.Replace((s ?? "").Trim(), "").ToLowerInvariant(), "");
 
     // ---- surfaces ----
 
@@ -130,8 +162,14 @@ internal static class CourseKit
         return K.V(0, Heading.Section(title, trailing, accessory), card);
     }
 
-    /// <summary>The one card of a section's rows, with no heading of its own (the screen's title names them).</summary>
-    public static Border RowsCard(UIElement content) => K.Card(content, new Thickness(10));
+    /// <summary>The one card of a section's rows, with no heading of its own (the screen's title names them): it ends
+    /// after its last row, however tall the page is (a card running on, empty, to the window's foot read as more to come).</summary>
+    public static Border RowsCard(UIElement content)
+    {
+        var card = K.Card(content, new Thickness(10));
+        card.VerticalAlignment = VerticalAlignment.Top;
+        return card;
+    }
 
     /// <summary>What a section says when it has nothing in it: quiet and centred where its rows would be, no card round
     /// nothing (the Mac's EmptyCard).</summary>
@@ -143,7 +181,7 @@ internal static class CourseKit
         return v;
     }
 
-    /// <summary>A link-styled button at a section heading's end (All Announcements, All 12).</summary>
+    /// <summary>A link-styled button at a section heading's end (All announcements, All 12).</summary>
     public static FrameworkElement HeadLink(string text, Action click) => K.Link(text, click);
 
     // ---- rows ----
@@ -169,14 +207,29 @@ internal static class CourseKit
         return g;
     }
 
+    /// <summary>The mark at the end of what opens in a Simpl window of its own (a tool, another site): the one symbol for
+    /// it everywhere — a course's More, a module's tool, External Tools' course chips — and never the ↗ of a link that
+    /// leaves for the browser.</summary>
+    public static FrameworkElement OwnWindowMark(double size = 12, string brush = B.Text3)
+    {
+        var i = K.Icon(SymbolRegular.WindowNew20, size, brush).Tip("Opens in a window of its own");
+        System.Windows.Automation.AutomationProperties.SetName(i, "Opens in a window of its own");
+        return i;
+    }
+
     /// <summary>A status in words on a wash of its colour (Missing, Late, Graded, Submitted, Locked …).</summary>
     public static FrameworkElement StatusChip(string text, string? tone) => K.Chip(text, Tone(tone), strong: true);
 
     /// <summary>A piece of work in a list (the Mac's ARowView): its kind's symbol in the course's colour, its name, its
-    /// facts, where it stands.</summary>
+    /// facts, and where it stands only when that is news — Submitted, Missing, Late, a score, Excused. Plain work still to
+    /// do has no chip (the engine sends none since 2.99.33; a "Not submitted" from an answer kept from before is let go):
+    /// a column of the same grey pill hid the rows that do say something.</summary>
     public static FrameworkElement ARowView(ARow row, Color color) =>
         InfoRow(row.Title, row.Sub, Item(row.Kind ?? "assignment"), color,
-            row.Status is { Word.Length: > 0 } s ? StatusChip(s.Word, s.Kind) : null);
+            row.Status is { Word.Length: > 0 } s && !IsPlainToDo(s) ? StatusChip(s.Word, s.Kind) : null);
+
+    /// <summary>The state of work merely not handed in yet: nothing to flag in a list of work.</summary>
+    public static bool IsPlainToDo(Status s) => string.Equals(s.Word, "Not submitted", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A round picture or the initials of a person; a figure when there is no name (the Mac's PersonAvatar).</summary>
     public static FrameworkElement Avatar(string name, string? image, double size)
@@ -189,11 +242,13 @@ internal static class CourseKit
     }
 
     /// <summary>An announcement or a discussion in a list (the Mac's PostRowView): who posted it, when, its first lines,
-    /// its replies and how many are new.</summary>
+    /// its replies and how many are new. A Brightspace topic names its forum, not a person: "in Weekly Discussions", on
+    /// the discussion's symbol in the course's colour — never the forum's initials, as if someone called that wrote it.</summary>
     public static FrameworkElement PostRowView(PostRow row, Color color, int previewLines = 2)
     {
         var unread = row.Unread == true;
-        var avatar = Avatar(row.Author ?? "", row.Avatar, 34);
+        var forum = string.IsNullOrEmpty(row.Author) && row.Forum is { Length: > 0 } f ? $"in {f}" : null;
+        var avatar = forum != null ? K.IconTile(SymbolRegular.ChatMultiple24, color, 34) : Avatar(row.Author ?? "", row.Avatar, 34);
         avatar.VerticalAlignment = VerticalAlignment.Top;
         avatar.Margin = new Thickness(0, 2, 12, 0);
         var title = K.Wrapped(row.Title, Ty.Body, B.Text, 2);
@@ -206,7 +261,7 @@ internal static class CourseKit
             head = K.Columns("auto, *", dot.Col(0), title.Col(1));
         }
         var words = K.V(3, head);
-        var by = string.Join(" · ", new[] { row.Author, row.When }.Where(s => !string.IsNullOrEmpty(s)));
+        var by = string.Join(" · ", new[] { forum ?? row.Author, row.When }.Where(s => !string.IsNullOrEmpty(s)));
         if (by.Length > 0) words.Children.Add(K.Text(by, Ty.Caption, B.Text2));
         if (!string.IsNullOrEmpty(row.Preview)) words.Children.Add(K.Wrapped(row.Preview!, Ty.Caption, B.Text2, previewLines));
         if (row.Graded == true || (row.Replies ?? 0) > 0 || (row.UnreadCount ?? 0) > 0)
@@ -336,11 +391,11 @@ internal static class CourseKit
         if (string.IsNullOrEmpty(url)) return;
         items.Add(new Separator());
         items.Add(MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url!, title)));
-        items.Add(MenuEntry("Copy Link", SymbolRegular.Link24, () => CopyLink(engine, url)));
+        items.Add(MenuEntry("Copy link", SymbolRegular.Link24, () => CopyLink(engine, url)));
     });
 
-    /// <summary>The menu of a piece of work (the Mac's workMenu with WorkAction): open it; Hand In — Take Quiz, Reply,
-    /// Open for a quiz, a discussion, a tool — while it waits on you, See Feedback once it is handed in or graded; the
+    /// <summary>The menu of a piece of work (the Mac's workMenu with WorkAction): open it; Hand in — Take quiz, Reply,
+    /// Open for a quiz, a discussion, a tool — while it waits on you, See feedback once it is handed in or graded; the
     /// school's own page; its link.</summary>
     public static void WorkMenu(FrameworkElement e, Engine.Engine engine, ARow r) => Menu(e, items =>
     {
@@ -350,21 +405,21 @@ internal static class CourseKit
         var handedIn = k == "good" || word.StartsWith("Submitted", StringComparison.Ordinal);
         var open = k != "muted";
         items.Add(MenuEntry("Open", SymbolRegular.DocumentArrowRight24, () => engine.OpenWeb(r.Url, r.Title)));
-        if (handedIn) items.Add(MenuEntry("See Feedback", SymbolRegular.Comment24, () => engine.ActOn(r.Url, r.Title, true)));
+        if (handedIn) items.Add(MenuEntry("See feedback", SymbolRegular.Comment24, () => engine.ActOn(r.Url, r.Title, true)));
         else if (open)
         {
             var (label, icon) = (r.Kind ?? "").ToLowerInvariant() switch
             {
-                "quiz" => ("Take Quiz", SymbolRegular.TaskListLtr24),
+                "quiz" => ("Take quiz", SymbolRegular.Quiz24),
                 "discussion" or "discussion_topic" => ("Reply", SymbolRegular.Chat24),
                 "tool" => ("Open", SymbolRegular.PuzzlePiece24),
-                _ => ("Hand In", SymbolRegular.ArrowUpload24),
+                _ => ("Hand in", SymbolRegular.ArrowUpload24),
             };
             items.Add(MenuEntry(label, icon, () => engine.ActOn(r.Url, r.Title, false)));
         }
         items.Add(new Separator());
         items.Add(MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(r.Url, r.Title)));
-        items.Add(MenuEntry("Copy Link", SymbolRegular.Link24, () => CopyLink(engine, r.Url)));
+        items.Add(MenuEntry("Copy link", SymbolRegular.Link24, () => CopyLink(engine, r.Url)));
     });
 
     /// <summary>An address of the school's on the clipboard, whole.</summary>
@@ -375,7 +430,7 @@ internal static class CourseKit
     }
 
     /// <summary>The button beside a screen's title that opens the place on the school's own site, or copies its link
-    /// (the Mac's CanvasMenu, "More").</summary>
+    /// (the Mac's CanvasMenu, "More": Open in Canvas, Copy link).</summary>
     public static FrameworkElement MoreButton(Engine.Engine engine, Func<string?> url, Func<string> title)
     {
         Button b = null!;
@@ -384,7 +439,7 @@ internal static class CourseKit
             var u = url();
             var menu = new ContextMenu { PlacementTarget = b, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, MinWidth = 200 };
             menu.Items.Add(MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => { if (u != null) engine.OpenWebScreen(u, title()); }, u != null));
-            menu.Items.Add(MenuEntry("Copy Link", SymbolRegular.Link24, () => CopyLink(engine, u), u != null));
+            menu.Items.Add(MenuEntry("Copy link", SymbolRegular.Link24, () => CopyLink(engine, u), u != null));
             menu.IsOpen = true;
         }, "More");
         b.IsEnabled = url() != null;

@@ -142,7 +142,8 @@ public sealed class NavList : Grid
         FrameworkElement glyph;
         if (e.Square is { } sq)
         {
-            var letter = new TextBlock { Text = e.Letter ?? "", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = K.SmallFace };
+            // (its letter white only where white reads on the course's colour, else near-black: the course cards' rule)
+            var letter = new TextBlock { Text = e.Letter ?? "", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = K.Brush(K.InkOn(sq)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = K.SmallFace };
             glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(sq), Child = letter, VerticalAlignment = VerticalAlignment.Center };
         }
         else glyph = K.Icon(e.Icon, 16, e.Tint, filled: true);

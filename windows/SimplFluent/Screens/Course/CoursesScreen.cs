@@ -16,10 +16,12 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// All Courses (the Mac's CoursesView): every course, as the school's Courses screen has them — the ones in the
-/// navigation pane (chosen in the setup) first, then the rest — each a card in its colour with its code, its name, its
-/// score in a ring, its unread announcements, how much is handed in and, under a hairline, its sections a click away.
-/// All, Past and Future beside the title (Windows 11's SelectorBar, as the web's filter has them), with Choose Courses.
-/// A card's menu opens its sections, gives it a nickname (shown everywhere, Canvas too) or opens it on the school's site.
+/// navigation pane (chosen in the setup) first, then the rest — each a card in its colour with the pane's name for it,
+/// its term and teacher (or its other name, only when that says something new), its score in a ring, its unread
+/// announcements, how much is handed in and, under a hairline, its sections a click away, each named under its symbol.
+/// Current, Past and Future beside the title (Windows 11's SelectorBar, as the web's filter has them) — the line under
+/// the title saying what the one chosen shows — with Choose courses. A card's menu opens its sections, gives it a
+/// nickname (shown everywhere, Canvas too) or opens it on the school's site.
 /// </summary>
 public sealed class CoursesScreen : Screen
 {
@@ -27,15 +29,31 @@ public sealed class CoursesScreen : Screen
     private sealed class AllCoursesData
     {
         public string? Sub { get; set; }
+        /// <summary>(2.99.33) The line under the title for each filter: "Fall 2026" (the term alone when the sections
+        /// count the courses, else "Fall 2026 · 8 courses"), "2 past courses", "1 course to come" / "None yet".</summary>
+        public FilterLines? Subs { get; set; }
         public List<CourseRow> Current { get; set; } = new();
         public List<CourseRow>? Past { get; set; }
         public List<CourseRow>? Future { get; set; }
     }
 
-    private static readonly string[] Filters = { "All", "Past", "Future" };
-    private static readonly (string Kind, string Label)[] Links =
+    private sealed class FilterLines
     {
-        ("grades", "Grades"), ("assignments", "Assignments"), ("modules", "Modules"), ("files", "Files"), ("announcements", "Announcements"),
+        public string? Current { get; set; }
+        public string? Past { get; set; }
+        public string? Future { get; set; }
+    }
+
+    /// <summary>The filter's choices. The first is the current courses — all it ever showed, so it is named for them (its
+    /// saved value stays "all").</summary>
+    private static readonly string[] Filters = { "Current", "Past", "Future" };
+
+    /// <summary>The sections a card leads to: their names in full (its menu, the tooltips) and short enough for five side
+    /// by side under their symbols on the narrowest card — the Mac's words.</summary>
+    private static readonly (string Kind, string Label, string Short)[] Links =
+    {
+        ("grades", "Grades", "Grades"), ("assignments", "Assignments", "Work"), ("modules", "Modules", "Modules"),
+        ("files", "Files", "Files"), ("announcements", "Announcements", "News"),
     };
 
     private readonly Loader<AllCoursesData> data;
@@ -54,10 +72,19 @@ public sealed class CoursesScreen : Screen
     }
 
     public override string Title => "Courses";
-    /// <summary>The page's line, in Windows' words ("not in the navigation pane", where the Mac's says sidebar).</summary>
-    public override string? Subtitle => data.Data?.Sub?.Replace("sidebar", "navigation pane");
+    /// <summary>The page's line for what the filter shows — "2 past courses" under Past, never the current term's count —
+    /// in Windows' words ("navigation pane", where the Mac's says sidebar).</summary>
+    public override string? Subtitle
+    {
+        get
+        {
+            if (data.Data is not { } d) return null;
+            var line = filter switch { 1 => d.Subs?.Past, 2 => d.Subs?.Future, _ => d.Subs?.Current ?? d.Sub };
+            return line?.Replace("sidebar", "navigation pane");
+        }
+    }
 
-    /// <summary>All · Past · Future (the Mac's segmented picker) and Choose Courses, beside the title.</summary>
+    /// <summary>Current · Past · Future (the Mac's segmented picker) and Choose courses, beside the title.</summary>
     public override FrameworkElement? Commands
     {
         get
@@ -70,11 +97,23 @@ public sealed class CoursesScreen : Screen
                 Prefs.Set("coursesFilter", v switch { 1 => "past", 2 => "future", _ => "all" });
                 cardsEntered = false;
                 Render();
+                // (the line under the title follows the filter)
+                SubtitleChanged();
             };
-            var choose = K.Button("Choose Courses", engine.AskSetup, icon: SymbolRegular.TaskListSquareLtr24);
+            // (a symbol of its own — the pane it fills —, not the checklist To Do and the quizzes wear)
+            var choose = K.Button("Choose courses", engine.AskSetup, icon: SymbolRegular.PanelLeftText24);
             choose.ToolTip = "Choose the courses in the navigation pane";
             return commands = K.H(12, selector, choose);
         }
+    }
+
+    /// <summary>The header drawn again when the line under the title says something else (a new answer, another filter).</summary>
+    private void SubtitleChanged()
+    {
+        var now = Subtitle;
+        if (now == shownSub) return;
+        shownSub = now;
+        HeaderChange();
     }
 
     public override void Refresh()
@@ -90,7 +129,7 @@ public sealed class CoursesScreen : Screen
     protected override FrameworkElement Build()
     {
         if (data.Data is not { } d) return K.LoadState(data.Error, () => data.Reload(engine, "allCourses"));
-        if (d.Sub != shownSub) { shownSub = d.Sub; HeaderChange(); }
+        SubtitleChanged();
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         switch (filter)
         {
@@ -110,9 +149,9 @@ public sealed class CoursesScreen : Screen
                 else if (others.Count == 0 || chosen.Count == 0) page.Children.Add(CardGrid(d.Current));
                 else
                 {
-                    page.Children.Add(K.V(0, Heading.Section("In the Navigation Pane", chosen.Count.ToString(CultureInfo.CurrentCulture)), CardGrid(chosen)));
-                    var note = K.Wrapped("Courses you left out in the setup. Choose Courses puts them in the navigation pane.", Ty.Body, B.Text2);
-                    page.Children.Add(K.V(0, Heading.Section("Not in the Navigation Pane", others.Count.ToString(CultureInfo.CurrentCulture)), K.V(12, note, CardGrid(others))));
+                    page.Children.Add(K.V(0, Heading.Section("In the navigation pane", chosen.Count.ToString(CultureInfo.CurrentCulture)), CardGrid(chosen)));
+                    var note = K.Wrapped("Courses you left out in the setup. Choose courses puts them in the navigation pane.", Ty.Body, B.Text2);
+                    page.Children.Add(K.V(0, Heading.Section("Not in the navigation pane", others.Count.ToString(CultureInfo.CurrentCulture)), K.V(12, note, CardGrid(others))));
                 }
                 break;
             }
@@ -157,21 +196,24 @@ public sealed class CoursesScreen : Screen
         return grid;
     }
 
-    /// <summary>A course's card (the Mac's CourseCard): its colour with its code and its unread announcements, its name,
-    /// how much is handed in (a bar) and its score (a ring) — a click opens the course — and under a hairline its
-    /// sections, each a click away.</summary>
+    /// <summary>A course's card (the Mac's CourseCard): its colour with the pane's name for it and its unread
+    /// announcements; its term and teacher — or its other name, only when that says something new ("MATH-021-20" under
+    /// "F26-MATH 021 20" said the course twice) —, how much is handed in (a bar) and its score (a ring) — a click opens
+    /// the course — and under a hairline its sections, each a click away with its name under its symbol.</summary>
     private FrameworkElement Card(CourseRow c, CourseProgress? p)
     {
         var color = K.Hex(c.Color);
         var ctx = $"courses/{c.Id}";
 
-        // its colour, its code on it, its unread announcements at the corner
+        // its colour, its name on it — in white only where white reads 3:1 on the colour, else near-black (students
+        // pick their colours in Canvas, and many are light) —, its unread announcements at the corner
+        var ink = K.InkOn(color);
         var code = new TextBlock
         {
-            Text = c.Code, FontSize = 20, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = Brushes.White,
+            Text = c.Code, FontSize = 20, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = K.Brush(ink),
             TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 54, LineHeight = 26,
             LineStackingStrategy = LineStackingStrategy.BlockLineHeight, Margin = new Thickness(16, 14, 64, 12), VerticalAlignment = VerticalAlignment.Top,
-            Effect = K.TextShadow(),
+            Effect = ink == Colors.White ? K.TextShadow() : null,
         };
         var banner = new Grid
         {
@@ -181,42 +223,53 @@ public sealed class CoursesScreen : Screen
         banner.Children.Add(code);
         if (c.Unread is int n && n > 0)
         {
-            var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), FontSize = 12, FontWeight = FontWeights.Bold, Foreground = K.Brush(color), VerticalAlignment = VerticalAlignment.Center };
+            // (on the white pill, a light colour taken deeper so its count reads)
+            var onWhite = ink == Colors.White ? color : K.Mix(color, Colors.Black, 0.35);
+            var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), FontSize = 12, FontWeight = FontWeights.Bold, Foreground = K.Brush(onWhite), VerticalAlignment = VerticalAlignment.Center };
             var pill = new Border
             {
                 Background = Brushes.White, CornerRadius = new CornerRadius(11), Padding = new Thickness(9, 3, 9, 4),
-                Child = K.H(5, K.Icon(SymbolRegular.Megaphone24, 12, color, filled: true), count),
+                Child = K.H(5, K.Icon(SymbolRegular.Megaphone24, 12, onWhite, filled: true), count),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 13, 13, 0),
-                ToolTip = $"{n} unread {(n == 1 ? "announcement" : "announcements")}",
+                ToolTip = UnreadWords(c, n),
             };
+            System.Windows.Automation.AutomationProperties.SetName(pill, UnreadWords(c, n));
             banner.Children.Add(pill);
         }
 
-        // its name, how much is handed in (or its own name under a nickname); its score in a ring
-        var name = K.Wrapped(c.Name ?? c.Code, Ty.Body, B.Text, 2);
-        name.FontWeight = FontWeights.Medium;
-        var words = K.V(5, name);
+        // its other name when that says something new (a nickname's real name), else its term and teacher; how much is
+        // handed in; its score in a ring
+        var words = K.V(5);
+        if (SecondLine(c) is { Length: > 0 } second)
+        {
+            var line = K.Wrapped(second, Ty.Body, B.Text, 2);
+            line.FontWeight = FontWeights.Medium;
+            words.Children.Add(line);
+        }
         if (p is { Total: > 0 })
         {
             words.Children.Add(K.Text($"{p.Done} of {p.Total} handed in", Ty.Caption, B.Text2));
             words.Children.Add(HandedIn(p, color));
         }
-        else if (!string.IsNullOrEmpty(c.Nickname) && !string.IsNullOrEmpty(c.Original))
-            words.Children.Add(K.Text(c.Original!, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var score = K.Text(c.ScoreText, Ty.Caption, c.Score == null ? B.Text2 : B.Text).Strong().Center();
+        // ("–" with no score, and why in the ring's tooltip — "No grade yet", "Hidden by instructor" — on a track in the
+        //  course's own colour, as the Mac's ring has it)
+        var score = K.Text(c.ScoreText.Length > 0 ? c.ScoreText : "–", Ty.Caption, c.Score == null ? B.Text2 : B.Text).Strong().Center();
         score.VerticalAlignment = VerticalAlignment.Center;
-        var ring = K.Ring(c.Score is { } s ? s / 100 : null, color, 56, 5, score);
+        var ring = K.Ring(c.Score is { } s ? s / 100 : null, color, 56, 5, score, tinted: true);
+        if (c.Score == null && c.ScoreWhy is { Length: > 0 } why) ring.ToolTip = why;
         var facts = K.Columns("*, auto", words.Margin(0, 0, 14, 0).Col(0), ring.Col(1));
         facts.Margin = new Thickness(16, 14, 16, 14);
 
-        // its sections, each a click away
+        // its sections, each a click away, each named under its symbol (none to be learnt from a tooltip)
         var links = new UniformGrid { Rows = 1, Columns = Links.Length, Margin = new Thickness(8, 6, 8, 6) };
-        foreach (var (kind, label) in Links)
+        foreach (var (kind, label, shortName) in Links)
         {
             var k = kind;
-            var b = K.Subtle(K.Icon(Glyph.Section(kind), 16, K.Darkened(color)), () => engine.Go(Place.Section(ctx, k)), new Thickness(0), 4);
-            b.MinHeight = 36;
+            var caption = K.Text(shortName, Ty.Caption, B.Text2).Center();
+            caption.FontSize = 11;
+            var b = K.Subtle(K.V(3, K.Icon(Glyph.Section(kind), 16, K.Darkened(color)), caption), () => engine.Go(Place.Section(ctx, k)), new Thickness(0, 6, 0, 5), 4);
+            b.MinHeight = 46;
             b.HorizontalContentAlignment = HorizontalAlignment.Center;
             b.ToolTip = label;
             System.Windows.Automation.AutomationProperties.SetName(b, $"{c.Code} {label}");
@@ -229,13 +282,14 @@ public sealed class CoursesScreen : Screen
         card.VerticalAlignment = VerticalAlignment.Stretch;
         // (the banner's corners follow the card's)
         content.SizeChanged += (_, e) => content.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
-        card.ToolTip = c.Name ?? c.Code;
-        System.Windows.Automation.AutomationProperties.SetName(card, $"{c.Code}, {c.ScoreText}");
+        // (its name, and its other name when that says something new)
+        card.ToolTip = c.AltName is { Length: > 0 } alt ? $"{c.Code}\n{alt}" : c.Code;
+        System.Windows.Automation.AutomationProperties.SetName(card, $"{c.Code}, {(c.Score == null && c.ScoreWhy is { Length: > 0 } w ? w : c.ScoreText)}");
         CourseKit.Menu(card, items =>
         {
             items.Add(CourseKit.MenuEntry("Open", SymbolRegular.DocumentArrowRight24, () => engine.OpenWeb(c.Url, c.Code)));
             items.Add(new Separator());
-            foreach (var (kind, label) in Links)
+            foreach (var (kind, label, _) in Links)
             {
                 var k = kind;
                 items.Add(CourseKit.MenuEntry(label, Glyph.Section(kind), () => engine.Go(Place.Section(ctx, k))));
@@ -243,10 +297,25 @@ public sealed class CoursesScreen : Screen
             items.Add(new Separator());
             items.Add(CourseKit.MenuEntry("Nickname…", SymbolRegular.Rename24, () => Rename(c)));
             items.Add(CourseKit.MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(c.Url, c.Code)));
-            items.Add(CourseKit.MenuEntry("Copy Link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, c.Url)));
+            items.Add(CourseKit.MenuEntry("Copy link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, c.Url)));
         });
         return card;
     }
+
+    /// <summary>The line under a card's band: the course's other name when the engine says it differs (a nickname's real
+    /// name), else its term and first teacher ("Fall 2026 · Yue Lei"); an answer from before 2.99.33 has neither, and a
+    /// name that says nothing new beside the band is left out then too.</summary>
+    private static string SecondLine(CourseRow c)
+    {
+        if (c.AltName is { Length: > 0 } alt) return alt;
+        if (c.Detail is { Length: > 0 } detail) return detail;
+        if (c.AltName == null && c.Detail == null && CourseKit.SaysMore(c.Name, c.Code)) return c.Name!;
+        return "";
+    }
+
+    /// <summary>The unread announcements in words ("2 unread announcements"), for the badge's tooltip and a screen reader.</summary>
+    private static string UnreadWords(CourseRow c, int n) =>
+        c.UnreadLabel is { Length: > 0 } l ? l : $"{n} unread {(n == 1 ? "announcement" : "announcements")}";
 
     /// <summary>How much is handed in, as a bar in the course's colour on a wash of it.</summary>
     private static FrameworkElement HandedIn(CourseProgress p, Color color)
@@ -270,7 +339,7 @@ public sealed class CoursesScreen : Screen
         var note = K.Wrapped($"Shown instead of “{(string.IsNullOrEmpty(c.Original) ? c.Code : c.Original)}” everywhere, {where}.", Ty.Body, B.Text2);
         var s = new Sheet { Title = "Nickname", Body = K.V(14, note, box), Width = 440 };
         s.Add("Save", SheetButtonKind.Primary, () => Save(c, box.Text));
-        if (!string.IsNullOrEmpty(c.Nickname)) s.Add("Remove Nickname", SheetButtonKind.Secondary, () => Save(c, ""));
+        if (!string.IsNullOrEmpty(c.Nickname)) s.Add("Remove nickname", SheetButtonKind.Secondary, () => Save(c, ""));
         s.Add("Cancel", SheetButtonKind.Close);
         Dialogs.Show(s, Window.GetWindow(View));
     }
