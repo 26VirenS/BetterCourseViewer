@@ -47,6 +47,9 @@ final class MacmillanSession: ObservableObject {
         relay = r
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
         web.isInspectable = true
+        // (1.3.79) Macmillan's page in light whatever the app's appearance, as every tool's is (ToolDarkPage.look): made
+        // for light, it read badly in dark; the popup around it keeps the app's
+        ToolDarkPage.look(web, dark: false)
         r.session = self
         MacmillanSession.current = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in

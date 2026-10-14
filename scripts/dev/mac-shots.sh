@@ -360,6 +360,19 @@ ui_review() {
   MODE=light shoot light-23f-settings-notifications 12 -SimplOpen settings -SimplSettingsTab notifications
 }
 
+# (1.3.79) in both sets: five pins in the toolbar at 1024 points and narrow (every pin that fits shown, the rest in the
+# Tools pull-down: ToolbarFit) and on a popup's bar; the focus timer's panel pulled out, over the window in dark; and an
+# external tool's page light in Dark Mode — a tool window, an Alta and a Macmillan assignment
+pins_pages() {
+  MODE=light SIZE=1024x700 shoot light-45c-toolbar-five-pins 14 -SimplPinnedTools "calc,need,cite,graph,units"
+  MODE=light SIZE=780x700 shoot light-52b-narrow-five-pins 14 -SimplPinnedTools "calc,need,cite,graph,units"
+  MODE=light shoot light-21k-alta-five-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable,cite,units"
+  MODE=dark shoot dark-54g-pin-float-timer 16 -SimplPinnedTools "pomo,calc" -SimplPinFloat pomo
+  MODE=dark shoot dark-21h-tool-light-page 24 -SimplOpen tool:101:9
+  MODE=dark shoot dark-21i-alta-light-page 20 -SimplOpen alta:104:4003
+  MODE=dark shoot dark-21j-macmillan-light-page 26 -SimplOpen macmillan:104:4005
+}
+
 # (1.3.78) a discussion's post that never measured in its web view says so on the console (Components/RichText.swift,
 # in a picture's run only: its words are shown natively meanwhile); said here as a warning of the run
 richtext_check() {
@@ -489,6 +502,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   # (1.3.78) the PDF-only assignment waiting for the phone: Combine photos under the code before anything is sent
   shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
   ui_review
+  pins_pages # (1.3.79)
   bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
   wait
   walks
@@ -544,6 +558,7 @@ done
 bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
 ui_review # (1.3.78) the UI review's new states
+pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
 MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

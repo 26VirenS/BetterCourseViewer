@@ -217,18 +217,22 @@ final class ToolsCenter: ObservableObject {
         return pinned
     }
 
-    /// (tools-6) How many tools the toolbar holds: a screen's own buttons (the Dashboard's Cards, List and Activity, its
-    /// New Task) keep their room, where a fourth pin used to send them into the toolbar's » menu.
+    /// (tools-6) How many tools a toolbar holds before its room has been measured (ToolbarFit): three at most, past that
+    /// two and the Tools pull-down. (1.3.79) Once measured, every pin that fits.
     static let toolbarRoom = 3
 
-    /// (tools-6) The pins split between the toolbar and its Tools pull-down: all of them while they fit, else the first
-    /// two and the pull-down with the rest — or, while a session runs, the timer (its pin as wide as two, with its
-    /// minutes and seconds) and the pull-down with every other pin.
-    func toolbarSplit(timerActive: Bool) -> (shown: [ToolKind], more: [ToolKind]) {
+    /// (1.3.79) The pins split between a bar and its Tools pull-down: `fit` of them shown, the rest — from the end — in
+    /// the pull-down, a running timer the last to go (it is live on the bar: its minutes and seconds). tools-6 showed three
+    /// at most whatever the room; how many fit is measured now (ToolbarFit for a toolbar, PopupPins for a popup's bar),
+    /// so a screen's own buttons still never go into the toolbar's » menu for a pin.
+    func toolbarSplit(timerActive: Bool, fit: Int) -> (shown: [ToolKind], more: [ToolKind]) {
         let all = toolbarPins(timerActive: timerActive)
-        guard all.count > Self.toolbarRoom else { return (all, []) }
-        if timerActive { return ([.pomo], all.filter { $0 != .pomo }) }
-        return (Array(all.prefix(Self.toolbarRoom - 1)), Array(all.dropFirst(Self.toolbarRoom - 1)))
+        let k = min(max(fit, 0), all.count)
+        guard k < all.count else { return (all, []) }
+        let others = all.filter { !(timerActive && $0 == .pomo) }
+        var keep = Set(others.prefix(timerActive && k > 0 ? k - 1 : k))
+        if timerActive && k > 0 { keep.insert(.pomo) }
+        return (all.filter { keep.contains($0) }, all.filter { !keep.contains($0) })
     }
 
     /// (tools-30) A tool's heading with or without its line under the name.

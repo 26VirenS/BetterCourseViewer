@@ -833,8 +833,8 @@ struct AltaPic: Identifiable, Equatable {
 }
 
 /// (1.3.70) A question's graph, large, in a window of its own over the popup: moved and sized as the student likes,
-/// its colours dark or as Alta draws them (the same choice as the question's), and put away when the question is
-/// answered or gone, or the popup closed.
+/// its colours dark or as Alta draws them (the same choice as the question's) — (1.3.79) as Alta draws them, on white,
+/// the question being light — and put away when the question is answered or gone, or the popup closed.
 @MainActor
 final class AltaGraphWindow: NSObject, NSWindowDelegate {
     static let shared = AltaGraphWindow()
@@ -869,7 +869,9 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
         p.isMovableByWindowBackground = true
         p.isReleasedWhenClosed = false
         p.delegate = self
-        p.contentView = NSHostingView(rootView: AltaGraphView(model: model))
+        // (1.3.79) the graph as Alta draws it, on white, the question's page being light whatever the app's appearance
+        // (its window's bar keeps the app's)
+        p.contentView = NSHostingView(rootView: AltaGraphView(model: model).environment(\.colorScheme, .light))
         p.center()
         p.orderFront(nil)
         panel = p
@@ -979,7 +981,8 @@ final class AltaSession: ObservableObject {
     /// "unknown" / "none", when it is shown as it is.
     @Published private(set) var focusState = ""
     /// (1.3.50) Light or dark as the app is, told to the page: before each page (a script ahead of the page script) and
-    /// at once to the page shown; in dark mode the question's colours are turned over, for dark glass.
+    /// at once to the page shown; in dark mode the question's colours are turned over, for dark glass. (1.3.79) The popup
+    /// tells it light, always: Alta's page is shown light whatever the app's appearance.
     func appearance(dark: Bool) {
         let ucc = web.configuration.userContentController
         ucc.removeAllUserScripts()
@@ -1125,6 +1128,9 @@ final class AltaSession: ObservableObject {
         web = AltaWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
         web.isInspectable = true
         web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
+        // (1.3.79) Alta's page in light whatever the app's appearance (its own colour scheme, its fields), as every
+        // tool's is: AltaQuiz lays it on light glass
+        web.appearance = NSAppearance(named: .aqua)
         r.session = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
             let done = !w.isLoading && w.url != nil

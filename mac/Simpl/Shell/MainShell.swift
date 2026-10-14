@@ -9,6 +9,9 @@ struct MainShell: View {
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: Back and Forward follow the window's moves)
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
+    /// (1.3.79) How many pins the toolbar has room for, measured as it is laid out (Tools/PinnedTools.swift): the search
+    /// field gives its room first.
+    @StateObject private var fit = ToolbarFit(searching: true)
     /// (planning-6) While the rubric is up, everything under it rests — the toolbar's buttons and the search too.
     @ObservedObject private var rubric = RubricPopup.shared
     // (the screenshot suite: -SimplSidebar hidden opens the window with the sidebar folded away)
@@ -100,21 +103,27 @@ struct MainShell: View {
                 .help("Refresh (⌘R): everything read from \(engine.lmsName) again")
             }
             // (1.2) the tools pinned to the toolbar, on every screen: a press opens the tool's quick version in a popover;
-            // a running focus timer shows its minutes here (mac/Simpl/Tools/PinnedTools.swift). (tools-6) Three at most,
-            // past that two and a Tools pull-down with the rest, so the screen's own buttons keep their room.
+            // a running focus timer shows its minutes here (mac/Simpl/Tools/PinnedTools.swift). (tools-6) The pins past
+            // the toolbar's room in a Tools pull-down, so the screen's own buttons keep theirs — (1.3.79) every pin that
+            // fits shown, measured (ToolbarFit), not three at most whatever the room.
             if !tools.toolbarPins(timerActive: focus.active).isEmpty {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    ForEach(tools.toolbarSplit(timerActive: focus.active).shown) { kind in
+                    ForEach(fit.split(timerActive: focus.active).shown) { kind in
                         PinnedToolButton(kind: kind, engine: engine)
                             .disabled(touring)
+                            .toolbarFit(fit, .pin, kind)
                     }
-                    if !tools.toolbarSplit(timerActive: focus.active).more.isEmpty {
-                        MorePinsMenu(kinds: tools.toolbarSplit(timerActive: focus.active).more, engine: engine)
+                    if !fit.split(timerActive: focus.active).more.isEmpty {
+                        MorePinsMenu(kinds: fit.split(timerActive: focus.active).more, engine: engine)
                             .disabled(touring)
+                            .toolbarFit(fit, .more)
                     }
                 }
             }
         }
+        // (1.3.79) another screen (its own toolbar buttons) or the sidebar shown or hidden: the pins' room measured afresh
+        .onChange(of: engine.nav.current) { _, _ in fit.reset() }
+        .onChange(of: columns) { _, _ in fit.reset() }
         // (planning-6) the rubric ring is modal: while it is up, the window under it — the toolbar's buttons, the
         // screen's own Previous and Next, the search — rests, and only its × and Ring / Grid answer. It is laid over all
         // of it, outside what rests (Screens/RubricPopup.swift, which puts the window's title away meanwhile).

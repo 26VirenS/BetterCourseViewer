@@ -537,10 +537,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Periodic table), *Files* (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
   Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
   `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
-  Toolbar*); the window's toolbar no longer adds a second. The toolbar holds three tools at most: past that, two and a
-  *Tools* pull-down with the rest (`ToolsCenter.toolbarSplit`, `MorePinsMenu`; while a session runs, the timer — its
-  pin as wide as two — and the pull-down), so a screen's own buttons keep their room — the same in a tool window and on
-  a popup's bar (`PopupPins`). A tool picked in the pull-down opens its quick version in a popover under it.
+  Toolbar*); the window's toolbar no longer adds a second. The pins past the toolbar's room go into a *Tools*
+  pull-down (`ToolsCenter.toolbarSplit`, `MorePinsMenu`), so a screen's own buttons keep their room — the same in a
+  tool window and on a popup's bar (`PopupPins`); 1.3.78 held three at most whatever the room, 1.3.79 measures it (see
+  below). A tool picked in the pull-down opens its quick version in a popover under it.
   A pin's popover and its floating panel are headed by the tool's tile name with a › that opens the whole tool (the one
   way to; *Unpin* is in the pin's own menu, not a button beside the name), and the popover has *Pop Out*, which takes
   the quick panel out into its floating window (`ToolFloats.popOut`); the floating panel has a plain ✕ at its top left
@@ -574,6 +574,31 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tooltip. *Flashcards*: studying, the bar reads "‹ Cell Biology  Learn" and the tool's line under its name makes way.
   For pictures, `-SimplTool <key> -SimplToolFile <path>` hands the tool opened a file as a drop on its pin does (a PDF:
   the annotator's page; Merge & split opens it in Split).
+
+- **Pins, pulled-out panels and tools' pages (1.3.79).** *Every pin that fits*: the toolbar shows as many pins as it
+  has room for and only the rest go into the *Tools* pull-down, from the end (a running timer last), measured as the
+  toolbar is laid out and again as the window is resized, the sidebar shown or hidden or another screen comes up
+  (`ToolbarFit`, an unseen `ToolbarFitProbe` in each pin and in the pull-down). In the main window (and a window more)
+  the search field gives its room first: the pins are as many as leave it 140 points (`ToolbarFit.searchRoom`, its
+  prompt whole) — the toolbar narrows the field as items are added, so its width says what is left; once the toolbar
+  folds it into a button, or puts a pin or the pull-down into its » menu, a pin folds, one at a time, and that count is
+  held as the most for that width until the window is a pin's room wider. A tool window (no search field) shows a pin
+  more while nothing — no pin, not the Dark Page moon — has gone into the » menu. Back, Forward, Refresh and the title
+  come before the pins and never make way for one. Until the pins have been measured, three at most, as in 1.3.78. A
+  popup's bar shows every pin that fits beside the popup's name (240 points kept for it: `PopupPins`, a `ViewThatFits`
+  of all the pins, then one fewer and the pull-down, and so on — never fewer than 1.3.78 showed there). *A pulled-out
+  panel moves*: by its ground, its head (the
+  tool's tile, the room beside the name, and the name itself — a press that does not move opens the whole tool, as
+  before) and its grip (`PanelMover`: AppKit's "movable by its background" never moved it, every press landing on the
+  SwiftUI hosting view), kept on the screen (its head at least), and it comes out again where it was last put
+  (`SimplToolFloatPlaces`, a top-left corner per tool; a grip drag that pulls a panel out puts it there too). *Tools'
+  pages light*: an external tool's page is shown light whatever the app's appearance — the tool window's web view
+  (its appearance light, so the page's colour scheme, its fields and the ground under it are light: `ToolDarkPage.look`),
+  Macmillan's, and Alta's page with its glass panels, graphs and buttons (`AltaQuiz`: the page's region in a light
+  environment over a light ground; the page is told light, so its question is never turned over; the graph window on
+  white). The tool window's Dark Page moon (Dark Mode only) is off until turned on, and turned on it draws the page
+  dark as before; Canvas's own viewer in the feedback popup keeps Dark Page on by default. The popups' bars and rails
+  and the tool window's toolbar keep the app's appearance.
 
 - **Fast and fluid (1.3.78).** A screen shows its whole content at once whenever this session has already read what
   it shows, and the window moves the same way however it is moved:

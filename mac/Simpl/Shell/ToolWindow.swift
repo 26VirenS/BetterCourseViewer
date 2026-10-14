@@ -18,8 +18,11 @@ struct ToolWindow: View {
     @StateObject private var browser = ToolBrowser()
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
-    /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it off).
-    @AppStorage(ToolDarkPage.key) private var darkPage = true
+    /// (1.3.79) How many pins the toolbar has room for (Tools/PinnedTools.swift).
+    @StateObject private var fit = ToolbarFit(searching: false)
+    /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it on and off).
+    /// (1.3.79) Off until the moon turns it on: a tool's page is made for light, and in dark it was hard to read.
+    @AppStorage(ToolDarkPage.key) private var darkPage = false
     /// The window's own appearance: the moon shows only in Dark Mode, where it does something.
     @Environment(\.colorScheme) private var scheme
     @State private var url: URL?
@@ -38,7 +41,7 @@ struct ToolWindow: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let url {
-                ToolWebView(url: url, browser: browser)
+                ToolWebView(url: url, browser: browser, externalTool: true)
                     .transition(.opacity)
             } else if let error {
                 ContentUnavailableView {
@@ -99,16 +102,20 @@ struct ToolWindow: View {
                     .help("More")
                 }
             }
-            // (1.2.16) the tools pinned in the main window, here too — (tools-6) three at most, the rest in the Tools pull-down
+            // (1.2.16) the tools pinned in the main window, here too — (tools-6) the rest in the Tools pull-down, (1.3.79)
+            // only those past the toolbar's room (ToolbarFit: no search field here, so as many as put nothing into the
+            // toolbar's » menu)
             if let engine = model.engine, !tools.toolbarPins(timerActive: focus.active).isEmpty {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    ForEach(tools.toolbarSplit(timerActive: focus.active).shown) { kind in
+                    ForEach(fit.split(timerActive: focus.active).shown) { kind in
                         PinnedToolButton(kind: kind, engine: engine)
                             .environmentObject(engine)
+                            .toolbarFit(fit, .pin, kind)
                     }
-                    if !tools.toolbarSplit(timerActive: focus.active).more.isEmpty {
-                        MorePinsMenu(kinds: tools.toolbarSplit(timerActive: focus.active).more, engine: engine)
+                    if !fit.split(timerActive: focus.active).more.isEmpty {
+                        MorePinsMenu(kinds: fit.split(timerActive: focus.active).more, engine: engine)
                             .environmentObject(engine)
+                            .toolbarFit(fit, .more)
                     }
                 }
             }
@@ -119,6 +126,7 @@ struct ToolWindow: View {
                     Toggle(isOn: $darkPage) { Label("Dark Page", systemImage: darkPage ? "moon.fill" : "moon") }
                         .toggleStyle(.button)
                         .help(darkPage ? "Light pages are drawn dark in Dark Mode. Click to show them as they are." : "Draw light pages dark in Dark Mode")
+                        .toolbarFit(fit, .own) // (1.3.79: never pushed into the » menu by a pin)
                 }
             }
         }
@@ -163,12 +171,27 @@ private struct LoadingLine: View {
 
 /// (1.2.16) A tool's page in Dark Mode: a page with no dark look of its own (a light background, no dark colour scheme)
 /// is drawn dark — its colours turned round, its pictures and video kept as they are; a page that is dark already, or
-/// says it has a dark scheme, is left alone. The moon in the tool window's toolbar turns it off (kept for every tool).
+/// says it has a dark scheme, is left alone. The moon in the tool window's toolbar turns it on and off (kept for every
+/// tool). (1.3.79) Off until the moon turns it on: a tool's page is shown light whatever the app's appearance (`look`)
+/// — third-party pages are made for light; Canvas's own viewer in the feedback popup keeps it on, as before.
 enum ToolDarkPage {
     static let key = "SimplToolDarkPage"
 
-    static var script: WKUserScript {
-        let on = UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    /// Whether it is on: as the moon was last left, else `fallback` (off for a tool's page, on for Canvas's viewer).
+    static func isOn(fallback: Bool) -> Bool {
+        UserDefaults.standard.object(forKey: key) as? Bool ?? fallback
+    }
+
+    /// (1.3.79) A tool's page light — the web view's own appearance light, so the page's colour scheme is light too, and
+    /// its form controls, its scroll bars and the ground under the page — unless Dark Page is on, when it is the
+    /// window's (the app's) and the page is drawn dark by the script. The window around it keeps the app's appearance.
+    static func look(_ view: WKWebView, dark: Bool) {
+        view.appearance = dark ? nil : NSAppearance(named: .aqua)
+        view.underPageBackgroundColor = dark ? nil : NSColor.white
+    }
+
+    static func script(fallback: Bool) -> WKUserScript {
+        let on = isOn(fallback: fallback)
         let js = """
         (function () {
           if (window.__simplDarkApply) return;
@@ -200,8 +223,10 @@ enum ToolDarkPage {
         return WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: true)
     }
 
-    /// The moon turned: the page showing follows at once (the next pages read the setting as they load).
+    /// The moon turned: the page showing follows at once (the next pages read the setting as they load) — (1.3.79) its
+    /// appearance too: the window's while on (the script then draws it dark), light while off.
     static func set(_ on: Bool, in view: WKWebView?) {
+        if let view { look(view, dark: on) }
         view?.evaluateJavaScript("window.__simplDark = \(on ? "true" : "false"); var s = document.getElementById('simpl-dark-page'); if (s && !window.__simplDark) s.remove(); window.__simplDarkApply && window.__simplDarkApply();", completionHandler: nil)
     }
 }
@@ -245,6 +270,9 @@ struct ToolWebView: NSViewRepresentable {
     var scripts: [WKUserScript] = []
     /// (1.3.17) What the page's scripts may tell the app, by name (an Alta assignment's report).
     var messages: [String: WKScriptMessageHandler] = [:]
+    /// (1.3.79) A tool's page (the tool window's), not Canvas's own: light whatever the app's appearance, until the moon
+    /// turns Dark Page on (ToolDarkPage.look).
+    var externalTool = false
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -254,10 +282,11 @@ struct ToolWebView: NSViewRepresentable {
         config.websiteDataStore = .default()
         config.mediaTypesRequiringUserActionForPlayback = []
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
-        config.userContentController.addUserScript(ToolDarkPage.script)
+        config.userContentController.addUserScript(ToolDarkPage.script(fallback: !externalTool))
         for script in scripts { config.userContentController.addUserScript(script) }
         for (name, handler) in messages { config.userContentController.add(handler, name: name) }
         let v = WKWebView(frame: .zero, configuration: config)
+        if externalTool { ToolDarkPage.look(v, dark: ToolDarkPage.isOn(fallback: false)) }
         v.allowsBackForwardNavigationGestures = true
         v.allowsMagnification = true
         v.navigationDelegate = context.coordinator
