@@ -21,8 +21,10 @@ namespace Simpl.Support;
 /// Simpl's to say: in simpl.log, and through <see cref="Asking"/> to whatever shows meanwhile (the "Logging you in"
 /// cover). An app without a package of its own can have that prompt open behind its window: each request looks for
 /// it (its window's class, "Credential Dialog Xaml Host") three times 150 ms apart, then once more 600 ms on, and
-/// brings it forward. One request at a time. A development run (the mock, a demo, a picture) never asks Windows Hello
-/// anything: --hello-state locked|none says what its Settings shows instead (the screenshot suite's pictures of each).
+/// brings it forward. One request at a time, and none asks more than it must: locking signs once, after making the key
+/// only where there is none (two prompts at most, one where it is there); unlocking signs once, and LoginVault asks for
+/// that at most once a run. A development run (the mock, a demo, a picture) never asks Windows Hello anything:
+/// --hello-state locked|none says what its Settings shows instead (the screenshot suite's pictures of each).
 /// </summary>
 public static class Hello
 {
@@ -90,11 +92,17 @@ public static class Hello
     }
 
     /// <summary>
-    /// A new key made — one there by that name replaced — and the challenge signed by it twice: Windows Hello asks (at
-    /// making the key, and at signing unless Windows lets the answer just given stand). The same signature both times:
-    /// its SHA-256, the key to seal with (Success; zeroed by the caller). Different: this PC's Windows Hello cannot give
-    /// the same key back, so it is not used (Unusable) and the key just made is deleted; likewise when signing is
-    /// cancelled or fails after the key was made.
+    /// The key to seal a password with, for locking it: the challenge signed once by Simpl's key in Windows Hello —
+    /// Windows Hello asks — and that signature's SHA-256 (Success; zeroed by the caller). Simpl's key already there (a
+    /// sign-in saved again, its password having changed; one locked again): it signs, one prompt. None there (the first
+    /// time, or since the sign-in was forgotten, which deletes it), or one that will not sign: a key made, one there by
+    /// that name replaced (RequestCreateAsync asks), then the challenge signed by it at once, while what was just shown
+    /// is fresh (Windows asks again unless it lets that answer stand) — two at most, the least KeyCredentialManager
+    /// allows: making a key gives no signature, and no request both makes one and signs. Signed once, not twice to
+    /// compare: a Windows Hello key's signatures (RSA, PKCS#1 v1.5) are the same each time, and should a PC's ever not
+    /// be, the first unlock tells, as the password will not open with what it gives — LoginVault then forgets the
+    /// sign-in, says so in the log, and the next "Stay logged in?" keeps it again. A key made here that did not sign
+    /// (cancelled, or it could not) is deleted.
     /// </summary>
     public static async Task<(HelloResult Result, byte[]? Key)> CreateAsync(byte[] challenge, string reason)
     {
@@ -107,28 +115,24 @@ public static class Hello
         {
             (result, var key) = await Task.Run(async () =>
             {
+                // Simpl's key, if Windows Hello has it (nothing shown): it signs, the one prompt
+                try
+                {
+                    var found = await KeyCredentialManager.OpenAsync(KeyName);
+                    if (found.Status == KeyCredentialStatus.Success)
+                    {
+                        var (r, k) = await SealKey(found.Credential, challenge);
+                        if (r is HelloResult.Success or HelloResult.Canceled) return (r, k);
+                    }
+                }
+                catch (Exception e) { Log.Write($"hello: its key could not be used ({e.GetType().Name}): one is made"); }
+                // (none there, or it would not sign — gone meanwhile, broken by a Windows Hello reset: one made in its place)
                 var made = await Prompt(() => KeyCredentialManager.RequestCreateAsync(KeyName, KeyCredentialCreationOption.ReplaceExisting));
                 // (nothing found while making one is Windows Hello not set up after all: it could not, not a key gone)
                 if (made.Status != KeyCredentialStatus.Success) return (made.Status == KeyCredentialStatus.NotFound ? HelloResult.Failed : Outcome(made.Status), (byte[]?)null);
-                byte[]? first = null, second = null;
-                try
-                {
-                    (var one, first) = await Sign(made.Credential, challenge);
-                    if (one != HelloResult.Success) { await Delete(); return (one, null); }
-                    (var two, second) = await Sign(made.Credential, challenge);
-                    if (two != HelloResult.Success) { await Delete(); return (two, null); }
-                    if (!LoginRecord.SameSignature(first, second))
-                    {
-                        await Delete();
-                        return (HelloResult.Unusable, null);
-                    }
-                    return (HelloResult.Success, LoginRecord.KeyFrom(first));
-                }
-                finally
-                {
-                    if (first != null) CryptographicOperations.ZeroMemory(first);
-                    if (second != null) CryptographicOperations.ZeroMemory(second);
-                }
+                var (signed, sealKey) = await SealKey(made.Credential, challenge);
+                if (signed != HelloResult.Success) await Delete();
+                return (signed, sealKey);
             });
             return (result, key);
         }
@@ -162,10 +166,7 @@ public static class Hello
                 var found = await KeyCredentialManager.OpenAsync(KeyName);
                 if (found.Status != KeyCredentialStatus.Success) return (Outcome(found.Status), (byte[]?)null);
                 Ask(reason);
-                var (r, signature) = await Sign(found.Credential, challenge);
-                if (signature == null) return (r, null);
-                try { return (r, LoginRecord.KeyFrom(signature)); }
-                finally { CryptographicOperations.ZeroMemory(signature); }
+                return await SealKey(found.Credential, challenge);
             });
             return (result, key);
         }
@@ -192,15 +193,17 @@ public static class Hello
         catch { /* (none there — what Windows says most often here — or Windows Hello not set up: nothing to delete) */ }
     }
 
-    /// <summary>The challenge signed (Windows Hello asks): its signature's bytes, out of Windows' buffer.</summary>
-    private static async Task<(HelloResult, byte[]?)> Sign(KeyCredential credential, byte[] challenge)
+    /// <summary>The challenge signed (Windows Hello asks: one prompt) and the key its signature gives (LoginRecord.KeyFrom:
+    /// its SHA-256), the signature zeroed in Windows' buffer and out of it.</summary>
+    private static async Task<(HelloResult, byte[]?)> SealKey(KeyCredential credential, byte[] challenge)
     {
         var signed = await Prompt(() => credential.RequestSignAsync(CryptographicBuffer.CreateFromByteArray(challenge)));
         if (signed.Status != KeyCredentialStatus.Success) return (Outcome(signed.Status), null);
         if (signed.Result is not { Length: > 0 } result) return (HelloResult.Failed, null); // (done, but nothing signed)
-        CryptographicBuffer.CopyToByteArray(result, out var bytes);
+        CryptographicBuffer.CopyToByteArray(result, out var signature);
         Wipe(result);
-        return (HelloResult.Success, bytes);
+        try { return (HelloResult.Success, LoginRecord.KeyFrom(signature)); }
+        finally { CryptographicOperations.ZeroMemory(signature); }
     }
 
     /// <summary>A request that may show Windows Hello's prompt: Windows told any process may come forward (the prompt's
@@ -259,7 +262,6 @@ public static class Hello
         HelloResult.Success => "done",
         HelloResult.Canceled => "cancelled",
         HelloResult.Gone => "its key is not there",
-        HelloResult.Unusable => "its signatures differ on this PC, so it is not used",
         _ => "Windows could not",
     };
 

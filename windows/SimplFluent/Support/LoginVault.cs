@@ -19,12 +19,19 @@ public sealed record SavedLogin(string Host, string User, DateTime SavedAt, bool
 /// sign-in know there is a saved sign-in and whose, without asking anything; the password is opened only when Simpl is
 /// about to type it into the school's sign-in page, and Windows asks first.
 /// <para/>
-/// Saved on a PC without Windows Hello (or where it would not lock it: its prompt cancelled, its signatures not the
-/// same twice, an error), the password stays in the vault, as Simpl 0.2.7 kept every one, and Settings says so. One
-/// kept so — 0.2.7's, or one saved before Windows Hello was set up — is locked with Windows Hello at its next use, just
-/// after Simpl has signed in with it (one prompt; cancelled, not asked again: Settings' Lock with Windows Hello does it).
-/// Windows Hello's key gone (Windows Hello reset, its PIN removed): what it locked can never be opened, so the saved
-/// sign-in is forgotten, said in one line of the log, and the next "Stay logged in?" keeps it again.
+/// Saved on a PC without Windows Hello (or where it would not lock it: its prompt cancelled, an error), the password
+/// stays in the vault, as Simpl 0.2.7 kept every one, and Settings says so. One kept so — 0.2.7's, or one saved before
+/// Windows Hello was set up — is locked with Windows Hello at its next use, just after Simpl has signed in with it
+/// (cancelled, not asked again: Settings' Lock with Windows Hello does it). Windows Hello's key gone (Windows Hello
+/// reset, its PIN removed), or giving back a key the password does not open with: what it locked can never be opened,
+/// so the saved sign-in is forgotten, said in one line of the log, and the next "Stay logged in?" keeps it again.
+/// <para/>
+/// Windows Hello is asked for the password at most once a run (UnlockGate): however many ask at once, one prompt, and
+/// every one of them given its answer. What it gives — or the password just typed at "Stay logged in?", or just locked
+/// as it was used — is held for the rest of the run, encrypted for this process alone (RunSecret), and let go when the
+/// sign-in is kept anew or forgotten, signed out, everything erased, the school refuses the password, or Settings locks
+/// it. Its prompt cancelled, it is not asked again by itself this run until the student asks: Start Over, signing in by
+/// hand, Settings.
 /// <para/>
 /// login.bin is held in memory only as sealed, and opened each time it is asked for. The browser underneath never sees
 /// it: WebView2's own password saving and autofill are off (Engine). A development run (the mock, a demo, a picture)
@@ -45,6 +52,11 @@ public static class LoginVault
     private static SavedLogin? memory;
     private static string? memoryPass;
     private static bool sampled;
+    /// <summary>The saved password's one unlock this run, for the whole app (UnlockGate): Windows Hello asked once however
+    /// many ask, what it gives held for the rest of the run, a cancelled prompt not asked again by itself.</summary>
+    private static readonly UnlockGate Once = new(OpenWithHello);
+    /// <summary>The lock under way (Settings', or one as the sign-in is used): asked for again meanwhile, it is awaited.</summary>
+    private static Task<HelloResult>? locking;
     /// <summary>login.bin's bytes, sealed, once read (null: none kept).</summary>
     private static byte[]? kept;
     private static bool read;
@@ -72,42 +84,82 @@ public static class LoginVault
         return Record(out _) is { } r ? new SavedLogin(r.Host, r.User, r.SavedAt, r.LockedWithHello) : null;
     }
 
+    /// <summary>Windows Hello is being asked for the saved password now (one request for the whole app).</summary>
+    public static bool Unlocking => Once.Asking;
+
+    /// <summary>Windows Hello's prompt for the saved password was cancelled this run (or Windows could not): the sign-in
+    /// page is not filled by itself, and Windows Hello not asked, until the student asks (<see cref="AskAgain"/>).</summary>
+    public static bool HeldBack => !Launch.IsDevelopment && Once.HeldBack;
+
+    /// <summary>The student did something that asks for the saved sign-in (Start Over, signing in by hand, Settings):
+    /// after a cancelled prompt, Windows Hello may be asked again.</summary>
+    public static void AskAgain() => Once.AskAgain();
+
+    /// <summary>The school refused the saved password (a wrong or changed one): what this run held of it let go.</summary>
+    public static void Refused()
+    {
+        if (!Once.Holds) return;
+        Once.Wipe();
+        Log.Write("sign-in: the password held for this run let go (the school did not take it)");
+    }
+
     /// <summary>
-    /// The saved sign-in's password, for the sign-in page about to be filled: one locked with Windows Hello asks for it
-    /// (<paramref name="reason"/> says why: the log, and the "Logging you in" cover meanwhile); one in the vault, at once.
-    /// Null when there is none, or the prompt was cancelled or failed (kept, and asked again next time) — or Windows
-    /// Hello's key is gone, when it is forgotten (<see cref="Load"/> then says none).
+    /// The saved sign-in's password, for the sign-in page about to be filled. One in the vault: at once. One locked with
+    /// Windows Hello: held already this run, at once; else Windows Hello asks (<paramref name="reason"/> says why: the
+    /// log, and the "Logging you in" cover meanwhile) — once for however many ask at once, every one given its answer —
+    /// and what it gives is held for the rest of the run. Null when there is none, or the prompt was cancelled or failed
+    /// (kept, and not asked again by itself this run: <see cref="HeldBack"/>) — or Windows Hello's key is gone, or gives
+    /// a key the password does not open with, when it is forgotten (<see cref="Load"/> then says none).
     /// </summary>
     public static async Task<string?> UnlockAsync(string reason)
     {
         if (Launch.IsDevelopment) return memoryPass;
-        var r = Record(out var at);
+        var r = Record(out _);
         if (r == null) return null;
         if (!r.LockedWithHello) return r.Pass;
+        var held = Once.Holds;
+        var pass = await Once.OpenAsync(reason);
+        if (held && pass != null) Log.Write("sign-in: opened without asking Windows Hello again (held since it answered this run)");
+        return pass;
+    }
+
+    /// <summary>
+    /// Windows Hello asked to open the saved password (the gate's one prompt): its key signs the record's challenge, and
+    /// the password opens with that signature's key. This is also where a PC whose Windows Hello could not give the same
+    /// key back would show (Hello.CreateAsync signs once and leaves that to here): the password does not open, so the
+    /// sign-in is forgotten, said in the log, and the next "Stay logged in?" keeps it again — as when its key is gone.
+    /// </summary>
+    private static async Task<UnlockGate.Answer> OpenWithHello(string reason)
+    {
+        var r = Record(out var at);
+        if (r == null) return new(null, false);
+        if (!r.LockedWithHello) return new(r.Pass, false); // (kept anew in the vault meanwhile: nothing to ask)
         var (result, key) = await Hello.SignAsync(r.ChallengeBytes!, reason);
         try
         {
             switch (LoginRecord.AfterUnlock(result))
             {
                 case UnlockStep.Open:
-                    if (key == null) return null;
-                    if (r.OpenPass(key) is { } pass) return pass;
+                    if (key == null) return new(null, true);
+                    if (r.OpenPass(key) is { } pass) return new(pass, false);
                     Forget(at, "Windows Hello's key now is not the one it was locked with");
-                    return null;
+                    return new(null, false);
                 case UnlockStep.Forget:
                     Forget(at, "its Windows Hello key is gone (Windows Hello reset, or its PIN removed)");
-                    return null;
+                    return new(null, false);
                 default:
-                    return null;
+                    Log.Write("sign-in: kept, not opened; Windows Hello is not asked again by itself this run (Start Over or signing in asks again)");
+                    return new(null, true);
             }
         }
         finally { if (key != null) CryptographicOperations.ZeroMemory(key); }
     }
 
     /// <summary>
-    /// "Stay Logged In": kept, its password locked with Windows Hello where it is set up (Windows Hello asks); else — no
-    /// Windows Hello, its prompt cancelled, or it could not — kept in the vault, saying why. False only when it could
-    /// not be written at all. Never throws.
+    /// "Stay Logged In": kept, its password locked with Windows Hello where it is set up (Windows Hello asks:
+    /// Hello.CreateAsync) and held for the rest of the run, so it is not asked for again; else — no Windows Hello, its
+    /// prompt cancelled, or it could not — kept in the vault, saying why. False only when it could not be written at
+    /// all. Never throws.
     /// </summary>
     public static async Task<bool> SaveAsync(string host, string user, string pass)
     {
@@ -148,6 +200,9 @@ public static class LoginVault
             read = true;
             ok = Keep(record);
             if (ok) ForgetOld();
+            // (the password was just typed: held for this run, so Windows Hello is not asked for it again)
+            if (ok && record.LockedWithHello) Once.Hold(pass);
+            else Once.AskAgain();
         }
         if (ok) Log.Write(record.LockedWithHello ? "sign-in: kept, locked with Windows Hello" : $"sign-in: kept in the vault{(record.Hello is { } why ? $" ({why}: not locked with Windows Hello)" : "")}");
         Changed?.Invoke();
@@ -155,12 +210,54 @@ public static class LoginVault
     }
 
     /// <summary>
-    /// The saved sign-in, kept in the vault, locked with Windows Hello now (Windows Hello asks): Settings' Lock with
-    /// Windows Hello, or <see cref="LockAtUseAsync"/>. Cancelled or refused, it stays in the vault, saying why.
+    /// The saved sign-in, kept in the vault, locked with Windows Hello now (Windows Hello asks: Hello.CreateAsync):
+    /// Settings' Lock with Windows Hello. Cancelled or refused, it stays in the vault, saying why. The student asked, so
+    /// nothing is held back any more; and nothing is held for the run after it either: the next sign-in asks Windows
+    /// Hello, as one who has just locked it expects.
     /// </summary>
-    public static async Task<HelloResult> LockAsync(string reason)
+    public static Task<HelloResult> LockAsync(string reason) => LockOnce(reason, hold: false);
+
+    /// <summary>
+    /// Simpl has just signed in with the saved sign-in: one kept in the vault alone — by Simpl 0.2.7, or while Windows
+    /// Hello was not set up — is locked with Windows Hello now, where it is, and its password (just used) held for the
+    /// rest of the run, so locking it is the run's only prompt. Never one whose lock was cancelled or could not be made,
+    /// and never one with no saved sign-in to lock.
+    /// </summary>
+    public static async Task LockAtUseAsync()
+    {
+        if (Launch.IsDevelopment || Record(out _) is not { } r || r.LockedWithHello || r.Hello != null) return;
+        if (!r.LockAtUse(await Hello.CheckAsync())) return;
+        await LockOnce(LockReason, hold: true);
+    }
+
+    /// <summary>One lock at a time for the whole app: asked for while one is under way, that one is awaited (its prompt
+    /// the only one).</summary>
+    private static Task<HelloResult> LockOnce(string reason, bool hold)
+    {
+        TaskCompletionSource<HelloResult> done;
+        lock (Gate)
+        {
+            if (locking != null) return locking;
+            done = new TaskCompletionSource<HelloResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            locking = done.Task;
+        }
+        _ = Run();
+        return done.Task;
+
+        async Task Run()
+        {
+            var result = HelloResult.Failed;
+            try { result = await Lock(reason, hold); }
+            catch (Exception e) { Log.Write($"sign-in: locking: {e.GetType().Name}: {e.Message.Trim()}"); }
+            lock (Gate) locking = null;
+            done.SetResult(result);
+        }
+    }
+
+    private static async Task<HelloResult> Lock(string reason, bool hold)
     {
         if (Launch.IsDevelopment) return HelloResult.Failed;
+        if (!hold) Once.AskAgain();
         var r = Record(out var at);
         if (r == null || r.Pass == null) return r?.LockedWithHello == true ? HelloResult.Success : HelloResult.Failed;
         if (!await Hello.CheckAsync()) return HelloResult.Failed;
@@ -179,6 +276,8 @@ public static class LoginVault
         {
             // (kept anew or forgotten while Windows Hello asked: that stands)
             ok = at == version && Keep(next);
+            // (locked as it was used: the password just used held for this run, so Windows Hello is not asked for it)
+            if (ok && hold && next.LockedWithHello) Once.Hold(r.Pass);
         }
         if (!ok) return HelloResult.Failed;
         if (result == HelloResult.Success) Log.Write("sign-in: locked with Windows Hello");
@@ -186,27 +285,18 @@ public static class LoginVault
         return result;
     }
 
-    /// <summary>
-    /// Simpl has just signed in with the saved sign-in: one kept in the vault alone — by Simpl 0.2.7, or while Windows
-    /// Hello was not set up — is locked with Windows Hello now, where it is (one prompt). Never one whose lock was
-    /// cancelled or could not be made, and never one with no saved sign-in to lock.
-    /// </summary>
-    public static async Task LockAtUseAsync()
-    {
-        if (Launch.IsDevelopment || Record(out _) is not { } r || r.LockedWithHello || r.Hello != null) return;
-        if (!r.LockAtUse(await Hello.CheckAsync())) return;
-        await LockAsync(LockReason);
-    }
-
     /// <summary>Forgotten (Forget, Sign out): login.bin deleted and Windows Hello's key with it — that in the background.</summary>
     public static void Clear() => _ = ClearAsync();
 
-    /// <summary>Forgotten, and Windows Hello's key deleted (awaited: Reset Everything and Uninstall's erase).</summary>
+    /// <summary>Forgotten, and Windows Hello's key deleted (awaited: Reset Everything and Uninstall's erase); what this run
+    /// held of the password let go, and nothing held back.</summary>
     public static Task ClearAsync()
     {
         memory = null;
         memoryPass = null;
         sampled = true;
+        Once.Wipe();
+        Once.AskAgain();
         if (Launch.IsDevelopment)
         {
             Changed?.Invoke();
@@ -232,12 +322,13 @@ public static class LoginVault
         Changed?.Invoke();
     }
 
-    /// <summary>(Under Gate.) login.bin deleted.</summary>
+    /// <summary>(Under Gate.) login.bin deleted, and what this run held of its password let go.</summary>
     private static void Remove()
     {
         read = true;
         kept = null;
         version++;
+        Once.Wipe();
         try { File.Delete(AppPaths.Login); } catch (Exception e) { Log.Write("sign-in: login.bin could not be deleted: " + e.Message); }
         try { File.Delete(AppPaths.Login + ".tmp"); } catch { }
     }
@@ -307,7 +398,8 @@ public static class LoginVault
         catch (Exception e) { Log.Write("sign-in: login.bin could not be read: " + e.Message); }
     }
 
-    /// <summary>(Under Gate.) Sealed into login.bin, and held as sealed.</summary>
+    /// <summary>(Under Gate.) Sealed into login.bin, and held as sealed; what this run held of the password before let go
+    /// (the caller holds the new one, where it should be held).</summary>
     private static bool Keep(LoginRecord record)
     {
         var plain = record.ToJson();
@@ -315,6 +407,7 @@ public static class LoginVault
         {
             kept = Vault.Write(AppPaths.Login, plain, Purpose);
             version++;
+            Once.Wipe();
             return true;
         }
         catch (Exception e)

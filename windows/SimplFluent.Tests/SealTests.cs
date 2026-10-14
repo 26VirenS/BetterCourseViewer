@@ -89,6 +89,8 @@ public class SealTests
         var back = LoginRecord.Parse(json)!;
         Assert.Equal(challenge, back.ChallengeBytes);
         Assert.Equal("correct horse", back.OpenPass(key));
+        // (another signature — as one Windows Hello gave back different would be: it does not open, and LoginVault
+        //  forgets the sign-in, so locking it signs once and leaves the check to the first unlock)
         Assert.Null(back.OpenPass(LoginRecord.KeyFrom(Encoding.UTF8.GetBytes("another signature"))));
         // (bound to its host and username: moved to another, it no longer opens)
         back.User = "someone-else";
@@ -102,9 +104,6 @@ public class SealTests
         Assert.Null(LoginRecord.Parse("{\"host\":\"canvas.example.edu\",\"user\":\"jdoe\"}"u8)); // (no password, not locked)
         Assert.Null(LoginRecord.Parse("{\"host\":\"\",\"user\":\"jdoe\",\"pass\":\"x\"}"u8));
         Assert.Null(LoginRecord.Parse("{\"host\":\"h\",\"user\":\"u\",\"lock\":\"hello\",\"challenge\":\"AAAA\",\"sealed\":\"AAAA\"}"u8));
-        Assert.True(LoginRecord.SameSignature(new byte[] { 1, 2, 3 }, new byte[] { 1, 2, 3 }));
-        Assert.False(LoginRecord.SameSignature(new byte[] { 1, 2, 3 }, new byte[] { 1, 2, 4 }));
-        Assert.False(LoginRecord.SameSignature(Array.Empty<byte>(), Array.Empty<byte>()));
     }
 
     [Theory]

@@ -14,7 +14,8 @@ commit (or the run named by `from_run`) as it is, in about a minute. Keep change
 own: GitHub lets a workflow tag a commit only if the commit itself leaves the workflows alone.
 
 Beside the build, the models' unit tests (`windows/SimplFluent.Tests`, xUnit: the chemistry, the calculator, the
-vault's and the saved sign-in's seals, the bridge's JSON — `dotnet test windows/SimplFluent.Tests` on Windows; they
+vault's and the saved sign-in's seals, when Windows Hello is asked for the saved password and how the run holds it,
+the bridge's JSON — `dotnet test windows/SimplFluent.Tests` on Windows; they
 build anywhere with `-p:EnableWindowsTargeting=true`) and the compiler's warnings against the ones already known
 (`scripts/dev/baselines/windows-warnings.txt`: a new one fails). After the pictures, every picture each part was to
 take is checked to be there and to show something, and every Simpl's log (with the page's own errors, which a
@@ -212,25 +213,38 @@ key in this PC's TPM — and opened with nothing to unlock as Simpl starts. The 
   — so Settings and the sign-in know there is one, and whose, without a prompt. Where Windows Hello is set up (a PIN at
   least: `KeyCredentialManager.IsSupportedAsync`), **Stay Logged In** has Windows make a key for Simpl in this user's
   Windows Hello container (`KeyCredentialManager.RequestCreateAsync`, `SimplCourses.Simpl.SignIn`, a `--profile`'s
-  its own; in the TPM where there is one, never exportable), which signs only after the face, fingerprint or PIN. It
-  signs 32 random bytes kept in the record (the challenge) twice: the same signature both times (RSA PKCS#1 v1.5 is),
-  its SHA-256 is the AES-256-GCM key the password is sealed with, bound to the host and username; only that sealed
-  password is kept. When the school's sign-in page comes up, Simpl finds the key (`OpenAsync`), asks it to sign the
-  challenge (`RequestSignAsync`: Windows asks, under "Logging you in", which says so), opens the password with the
-  key, fills it in and sends it; the key, the signature and the bytes they passed through are zeroed after.
-  (KeePassXC's Windows Hello quick unlock works the same way.) Windows' prompt can open behind the window of an app
-  without a package: Simpl looks for it (`Credential Dialog Xaml Host`) three times 150 ms apart and once more 600 ms
-  on, and brings it forward.
-  - **No Windows Hello** (no PIN set up), Windows refusing, or two signatures that differ: the password stays in the
-    vault, as 0.2.7 kept it. Settings ▸ General says so, with how to set Windows Hello up and a button to Windows'
-    Sign-in options; Settings ▸ General's **Lock with Windows Hello** locks it once Windows Hello is there.
+  its own; in the TPM where there is one, never exportable; one already there from an earlier save is used instead,
+  `OpenAsync`), which signs only after the face, fingerprint or PIN. It signs 32 random bytes kept in the record (the
+  challenge) once — RSA PKCS#1 v1.5 gives the same signature every time, and were a PC's ever to differ, the first
+  unlock could not open the password and the sign-in would be forgotten (below) — and that signature's SHA-256 is the
+  AES-256-GCM key the password is sealed with, bound to the host and username; only that sealed password is kept. So
+  saving asks at most twice — making the key, then signing (no request of KeyCredentialManager's does both; Windows may
+  let the second stand) — and once where Simpl's key is already there. When the school's sign-in page comes up, Simpl
+  finds the key (`OpenAsync`), asks it to sign the challenge (`RequestSignAsync`: Windows asks, under "Logging you in",
+  which says so), opens the password with the key, fills it in and sends it; the key, the signature and the bytes they
+  passed through are zeroed after. (KeePassXC's Windows Hello quick unlock works the same way.) Windows' prompt can
+  open behind the window of an app without a package: Simpl looks for it (`Credential Dialog Xaml Host`) three times
+  150 ms apart and once more 600 ms on, and brings it forward.
+  - **Once a run** (`Support/UnlockGate.cs`, `Support/RunSecret.cs`): Windows Hello is asked for the password at most
+    once per run of Simpl, however many ask at once — one request for the whole app, every sign-in waiting on it given
+    its answer. What it gives (or the password just typed at Stay Logged In, or just locked at its use) is held for the
+    rest of the run: its bytes in an array the garbage collector never moves, encrypted there for Simpl's process alone
+    (`CryptProtectMemory`, `SAME_PROCESS`), opened only for the moment it is typed in; and zeroed when the sign-in is
+    kept anew or forgotten, on Sign out and Reset Everything, when the school refuses it (a changed password), and
+    when Settings locks it. simpl.log says when a sign-in used it (`sign-in: opened without asking Windows Hello
+    again`), never the password.
+  - **No Windows Hello** (no PIN set up), or Windows refusing: the password stays in the vault, as 0.2.7 kept it.
+    Settings ▸ General says so, with how to set Windows Hello up and a button to Windows' Sign-in options; Settings ▸
+    General's **Lock with Windows Hello** locks it once Windows Hello is there.
   - **Cancelled**: at Stay Logged In, kept in the vault, not locked (Lock with Windows Hello does it later); at the
-    sign-in page, nothing is filled — the school's page shows, to sign in by hand.
-  - **Windows Hello's key gone** (Windows Hello reset, the PIN removed): what it locked can never be opened, so the
-    saved sign-in is forgotten — one line in simpl.log — Simpl's card comes up with the username in it, and the next
-    Stay Logged In keeps it again.
+    sign-in page, nothing is filled — the school's page shows, to sign in by hand — and Windows Hello is not asked
+    again by itself that run, until Start Over, a sign-in by hand (Simpl's card or the school's page) or Settings.
+  - **Windows Hello's key gone** (Windows Hello reset, the PIN removed), or giving a key the password does not open
+    with: what it locked can never be opened, so the saved sign-in is forgotten — one line in simpl.log — Simpl's card
+    comes up with the username in it, and the next Stay Logged In keeps it again.
   - **From 0.2.7** (the password in the vault only), on a PC with Windows Hello: locked at its next use, just after
-    Simpl has signed in with it (one prompt, "Lock your saved sign-in with Windows Hello"); cancelled, not asked again.
+    Simpl has signed in with it ("Lock your saved sign-in with Windows Hello": as Stay Logged In asks, and nothing more
+    that run); cancelled, not asked again.
   - **Forget, Sign out, Reset Everything and Uninstall's erase** delete Windows Hello's key too (`DeleteAsync`).
 - **Not encrypted, on purpose**: simpl.log (for a bug report; no password or username is written to it, the
   screenshot suite's `--sign-in` included); what the student saves where they choose (exports, CSVs, converted files);
@@ -256,9 +270,11 @@ installed, can still ask the TPM and DPAPI to unwrap the vault's key just as Sim
 grade history and the sign-in's username without a sound. Windows Hello is what stops it from silently unlocking the
 sign-in's password: that needs Windows Hello's key to sign, and Windows asks the student first, on screen. The limit,
 honestly: what Simpl reads, something able to look inside Simpl while it runs can read too — an administrator (or
-malware with an administrator's rights) debugging a running Simpl sees the password the moment Simpl has unlocked it
-to type it in, as it sees anything else Simpl has open. Windows Hello guards the sign-in from other programs, not from
-a PC that is already compromised. Nothing else is behind a prompt, by design: Simpl opens with nothing to unlock.
+malware with an administrator's rights) debugging a running Simpl can read the password once Simpl has unlocked it,
+as it can anything else Simpl has open: held for the rest of the run, it is encrypted for Simpl's process alone, which
+keeps it out of a memory dump and the page file but not from code running inside Simpl. Windows Hello guards the
+sign-in from other programs, not from a PC that is already compromised. Nothing else is behind a prompt, by design:
+Simpl opens with nothing to unlock.
 
 A development run (the mock, a demo, a picture) keeps the sign-in in memory only and never asks Windows Hello
 anything — CI's runners have none. `--hello-state locked` or `--hello-state none` (a development run only) shows
