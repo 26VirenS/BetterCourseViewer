@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// What changed in Simpl for Mac (1.3.3: its own notes, Support/MacWhatsNew.swift), after an update (or from Help ▸ What's New): each version's notes with their kind's symbol —
-/// new, better, fixed — under the app's mark, and Continue.
+/// new, better, fixed — under the app's mark, and Continue. (home-36) The version said once: under the title for a
+/// single version, else at the head of each version's notes, with its day as every date is written ("Oct 13").
 struct WhatsNewSheet: View {
     let data: WhatsNewData
     /// The sheet is up (What's New after an update is marked seen only then).
@@ -18,8 +19,11 @@ struct WhatsNewSheet: View {
                 Text("What’s New in Simpl for Mac")
                     .font(.system(size: 24, weight: .bold))
                     .tracking(-0.3)
-                if let v = data.version ?? data.releases.first?.version {
-                    Text("Version \(v)").font(.sCallout).foregroundStyle(.secondary)
+                if data.releases.count <= 1, let v = data.version ?? data.releases.first?.version {
+                    let day = data.releases.first.flatMap(WhatsNewSheet.day)
+                    Text(day.map { "Version \(v) · \($0)" } ?? "Version \(v)")
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(.top, 28)
@@ -29,7 +33,7 @@ struct WhatsNewSheet: View {
                     ForEach(data.releases) { release in
                         VStack(alignment: .leading, spacing: 10) {
                             if data.releases.count > 1 {
-                                CardHeading(text: "Version \(release.version)", trailing: release.date)
+                                CardHeading(text: "Version \(release.version)", trailing: WhatsNewSheet.day(release))
                             }
                             ForEach(release.notes, id: \.self) { note in
                                 HStack(alignment: .top, spacing: 12) {
@@ -63,6 +67,22 @@ struct WhatsNewSheet: View {
         .frame(width: 500, height: 560)
         .background(PageGround())
         .onAppear { onShown?() }
+    }
+
+    /// (home-36) A release's day as every date is written: the engine's words where it sends them, else its ISO day as
+    /// "Oct 13" ("Oct 13, 2025" from another year).
+    static func day(_ release: Release) -> String? {
+        if let t = release.dateText, !t.isEmpty { return t }
+        guard let iso = release.date, !iso.isEmpty else { return nil }
+        let parse = DateFormatter()
+        parse.locale = Locale(identifier: "en_US_POSIX")
+        parse.dateFormat = "yyyy-MM-dd"
+        guard let d = parse.date(from: String(iso.prefix(10))) else { return iso }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        let thisYear = Calendar.current.component(.year, from: d) == Calendar.current.component(.year, from: Date())
+        out.dateFormat = thisYear ? "MMM d" : "MMM d, yyyy"
+        return out.string(from: d)
     }
 
     private func icon(_ kind: String) -> String {
