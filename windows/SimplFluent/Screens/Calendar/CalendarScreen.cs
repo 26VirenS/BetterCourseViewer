@@ -503,7 +503,7 @@ public sealed partial class CalendarScreen : Screen
 
     /// <summary>How many weeks a month touches, counted from the first day of the week it starts in: five or six (four for
     /// a February that starts on the week's first day). A row of the next month's days alone is never drawn.</summary>
-    private static int WeekCount(DateTime month)
+    internal static int WeekCount(DateTime month)
     {
         var first = FirstOfWeek(month);
         var days = (int)(month.AddMonths(1) - first).TotalDays;
