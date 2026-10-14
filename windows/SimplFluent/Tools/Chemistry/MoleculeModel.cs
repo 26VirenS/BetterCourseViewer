@@ -70,8 +70,49 @@ internal sealed class MoleculeModel
 {
     private static MoleculeModel? shared;
 
-    /// <summary>The builder's molecule (water at first).</summary>
-    public static MoleculeModel Shared => shared ??= new MoleculeModel();
+    /// <summary>The builder's molecule: the one it was left with and how it was shown, kept on this PC (ChemPrefs
+    /// <c>molecule.saved</c>, <c>.style</c>, <c>.lonePairs</c>, <c>.labels</c> — the Mac's), else water; kept again as it
+    /// changes.</summary>
+    public static MoleculeModel Shared => shared ??= Kept();
+
+    private sealed record SavedAtom(int Id, string Symbol, double X, double Y, double Z, int? Lone);
+    private sealed record SavedBond(int Id, int A, int B, int Order);
+    private sealed record Saved(string Title, List<SavedAtom> Atoms, List<SavedBond> Bonds);
+
+    private static MoleculeModel Kept()
+    {
+        var m = new MoleculeModel(empty: true);
+        try
+        {
+            if (ChemPrefs.String("molecule", "saved") is { Length: > 0 } text && System.Text.Json.JsonSerializer.Deserialize<Saved>(text) is { Atoms.Count: > 0 } s)
+            {
+                m.Title = s.Title;
+                m.Atoms = s.Atoms.Select(a => new MBAtom { Id = a.Id, Symbol = a.Symbol, Pos = new Vector3D(a.X, a.Y, a.Z), Lone = a.Lone }).ToList();
+                m.Bonds = s.Bonds.Select(b => new MBBond { Id = b.Id, A = b.A, B = b.B, Order = b.Order }).ToList();
+                m.nextId = Math.Max(m.Atoms.Max(a => a.Id), m.Bonds.Select(b => b.Id).DefaultIfEmpty(0).Max()) + 1;
+                m.selected = m.Atoms[0].Id;
+                m.Relax();
+                m.Framing++;
+            }
+        }
+        catch (Exception e) { Support.Log.Write("molecule: the kept molecule could not be read: " + e.Message); }
+        if (m.Atoms.Count == 0) m.LoadPreset("Water");
+        if (Enum.TryParse<MBStyle>(ChemPrefs.String("molecule", "style"), out var style)) m.style = style;
+        m.showLonePairs = ChemPrefs.Bool("molecule", "lonePairs", true);
+        m.showLabels = ChemPrefs.Bool("molecule", "labels", true);
+        m.Changed += m.Keep;
+        return m;
+    }
+
+    private void Keep()
+    {
+        var s = new Saved(Title, Atoms.Select(a => new SavedAtom(a.Id, a.Symbol, Math.Round(a.Pos.X, 3), Math.Round(a.Pos.Y, 3), Math.Round(a.Pos.Z, 3), a.Lone)).ToList(),
+            Bonds.Select(b => new SavedBond(b.Id, b.A, b.B, b.Order)).ToList());
+        ChemPrefs.Set("molecule", "saved", System.Text.Json.JsonSerializer.Serialize(s));
+        ChemPrefs.Set("molecule", "style", style.ToString());
+        ChemPrefs.Set("molecule", "lonePairs", showLonePairs);
+        ChemPrefs.Set("molecule", "labels", showLabels);
+    }
 
     public static string StyleLabel(MBStyle s) => s switch { MBStyle.BallStick => "Ball & stick", MBStyle.SpaceFill => "Space filling", _ => "Sticks" };
 

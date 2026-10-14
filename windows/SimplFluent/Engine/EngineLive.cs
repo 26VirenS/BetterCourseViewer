@@ -22,14 +22,20 @@ public sealed partial class Engine
 
     private PaneRead Pane => pane ??= new PaneRead(this);
 
+    /// <summary>The student is at the window whose screen is being checked (it is the one in front, the PC unlocked, its
+    /// display on): set by the live check as each check begins. Only then may a check mark something read on Canvas — an
+    /// open conversation's new message, a discussion's new reply.</summary>
+    public bool LiveSeen { get; set; }
+
     /// <summary>
     /// A call asked again for a live check: <paramref name="args"/> are the screen's own (those that write a preference
     /// left out), with <paramref name="maxAge"/> (seconds) and <paramref name="known"/>, the hash of the answer on screen
-    /// (none yet: ''). The answer's envelope read off the window's thread; a call that failed is a failed answer.
+    /// (none yet: ''), and whether the student is there (<see cref="LiveSeen"/>). The answer's envelope read off the
+    /// window's thread; a call that failed is a failed answer.
     /// </summary>
     public async Task<LiveAnswer> CheckCall(string name, JsonObject args, double maxAge, string? known)
     {
-        var a = LiveRules.CheckArgs(name, args, maxAge, known);
+        var a = LiveRules.CheckArgs(name, args, maxAge, known, LiveSeen);
         string text;
         try { text = await CallText(name, a); }
         catch (Exception e) { return LiveAnswer.Failed(e.Message); }

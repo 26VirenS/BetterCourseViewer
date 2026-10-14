@@ -202,8 +202,9 @@ internal sealed class InboxThreadView
 
     public FrameworkElement View => outer;
 
-    /// <summary>The conversation as the live check reads it again (the thread draws what changed as an answer, keeping
-    /// the reply being written: a reply in the box holds the check anyway).</summary>
+    /// <summary>The conversation as the live check reads it again: the thread draws what changed as an answer does,
+    /// keeping the reply being written (the keyboard in the reply's box holds the check while it is there; left, what is
+    /// written survives the redraw). A check marks a new message read only while the student is at the window.</summary>
     internal ILiveRead Live => model;
     public ConversationData? Data => model.Data;
 

@@ -18,12 +18,13 @@ internal enum LTool { Draw, Move, Erase }
 /// <summary>
 /// The Lewis maker's state (the Mac's LewisMaker @State): the molecule, the way it is made, the element and tool, what is
 /// selected and which structure is shown, the ranking, and the quick way's own choices — one for the app, so the molecule
-/// is still there when the maker opens again. <see cref="Changed"/> asks the views to show it again;
-/// <see cref="Moved"/> only the drawing (an atom being dragged).
+/// is still there when the maker opens again, and kept on this PC for next time (ChemPrefs <c>lewis.draft</c>, written as
+/// it changes: the Mac's). <see cref="Changed"/> asks the views to show it again; <see cref="Moved"/> only the drawing
+/// (an atom being dragged).
 /// </summary>
 internal sealed class LewisState
 {
-    public static LewisState Shared { get; } = new();
+    public static LewisState Shared { get; } = Kept();
 
     public static readonly string[] Outers = { "H", "O", "N", "C", "F", "Cl", "Br", "I", "S" };
 
@@ -49,6 +50,49 @@ internal sealed class LewisState
 
     public void Change() => Changed?.Invoke();
     public void Move() => Moved?.Invoke();
+
+    // ---- kept for next time ----
+
+    private sealed record DraftAtom(int Id, string Symbol, double X, double Y);
+    private sealed record DraftBond(int Id, int A, int B, int Order);
+    private sealed record Draft(string Way, string Mode, string Central, Dictionary<string, int> Counts, int Charge, string? Preset,
+        List<DraftAtom> Atoms, List<DraftBond> Bonds, bool Manual, int NextId);
+
+    /// <summary>The maker as it was left (its molecule, its way, its quick choices, its ranking), else water.</summary>
+    private static LewisState Kept()
+    {
+        var s = new LewisState();
+        try
+        {
+            if (ChemPrefs.String("lewis", "draft") is { Length: > 0 } text && System.Text.Json.JsonSerializer.Deserialize<Draft>(text) is { } d && d.Atoms.Count > 0)
+            {
+                s.Way = Enum.TryParse<LWay>(d.Way, out var w) ? w : LWay.Quick;
+                s.Mode = Enum.TryParse<LewisSolver.Mode>(d.Mode, out var m) ? m : LewisSolver.Mode.Formal;
+                s.Central = d.Central;
+                s.Counts = new Dictionary<string, int>(d.Counts);
+                s.Charge = d.Charge;
+                s.Preset = d.Preset;
+                s.Graph = new LGraph
+                {
+                    Atoms = d.Atoms.Select(a => new LAtom { Id = a.Id, Symbol = a.Symbol, Pos = new Point(a.X, a.Y) }).ToList(),
+                    Bonds = d.Bonds.Select(b => new LBond { Id = b.Id, A = b.A, B = b.B, Order = b.Order }).ToList(),
+                    Charge = d.Charge, Manual = d.Manual, NextId = d.NextId,
+                };
+            }
+        }
+        catch (Exception e) { Support.Log.Write("lewis: the kept molecule could not be read: " + e.Message); }
+        // (written as it changes — never mid-drag, which only moves the drawing)
+        s.Changed += s.Keep;
+        return s;
+    }
+
+    private void Keep()
+    {
+        var d = new Draft(Way.ToString(), Mode.ToString(), Central, Counts, Graph.Charge, Preset,
+            Graph.Atoms.Select(a => new DraftAtom(a.Id, a.Symbol, Math.Round(a.Pos.X, 1), Math.Round(a.Pos.Y, 1))).ToList(),
+            Graph.Bonds.Select(b => new DraftBond(b.Id, b.A, b.B, b.Order)).ToList(), Graph.Manual, Graph.NextId);
+        ChemPrefs.Set("lewis", "draft", System.Text.Json.JsonSerializer.Serialize(d));
+    }
 
     /// <summary>The drawing changed by hand: no longer a preset, and a quick molecule becomes a drawing.</summary>
     public void Edited()

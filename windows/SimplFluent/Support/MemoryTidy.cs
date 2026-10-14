@@ -10,7 +10,7 @@ namespace Simpl.Support;
 /// Simpl giving memory back when it is not being used. Left alone a moment — nothing pressed or typed in its window for
 /// ten seconds, nothing asked of the page, a good deal made and thrown away since last time — .NET is asked to collect
 /// and hand its free memory back to Windows (once a minute at most; a fraction of a second, while nobody is using it).
-/// Minimized or in the notification area for twenty seconds: the same, then the web view's page is asked to keep to
+/// Minimized or in the notification area for twenty seconds (or the PC locked, its display off): the same, then the web view's page is asked to keep to
 /// little memory (WebView2 hands its own back) and Windows takes the pages Simpl is not using out of RAM (its working
 /// set) — never sooner, so a window brought straight back has everything where it was; brought back later, the few
 /// pages it draws with come back from Windows' own standby memory, not the disk. Back in view, the page is asked for its
@@ -47,12 +47,14 @@ public static class MemoryTidy
         };
         w.StateChanged += (_, _) => Moved();
         w.IsVisibleChanged += (_, _) => Moved();
+        Presence.Changed += Moved;
         var timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(5) };
         timer.Tick += (_, _) => Tick();
         timer.Start();
     }
 
-    private static bool Away => window is not { IsVisible: true } w || w.WindowState == WindowState.Minimized;
+    /// <summary>Minimized, in the notification area, or nobody at it (the PC locked, the display off: Presence).</summary>
+    private static bool Away => window is not { IsVisible: true } w || w.WindowState == WindowState.Minimized || Presence.Away;
 
     /// <summary>Minimized, hidden or back: back in view, the page has its pace at once.</summary>
     private static void Moved()

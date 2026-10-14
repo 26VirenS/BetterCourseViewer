@@ -65,11 +65,27 @@ public static class PTSearch
 }
 
 /// <summary>What the table is coloured by and the kind it lights, kept while its views come and go (a pin's sheet, a
-/// visit elsewhere).</summary>
+/// visit elsewhere) — the colouring on this PC for next time too (ChemPrefs <c>ptable.colour</c>, as the Mac keeps it) —
+/// and the element last opened on its page (<c>ptable.element</c>, its number: Atoms &amp; Orbitals opens on it until it
+/// has shown one of its own).</summary>
 internal static class PTState
 {
-    public static PTColouring Colouring = PTColouring.Category;
+    private static PTColouring? colouring;
+
+    public static PTColouring Colouring
+    {
+        get => colouring ??= PTColourings.Parse(ChemPrefs.String("ptable", "colour")) ?? PTColouring.Category;
+        set
+        {
+            colouring = value;
+            ChemPrefs.Set("ptable", "colour", value.ToString().ToLowerInvariant());
+        }
+    }
+
     public static string? Category;
+
+    /// <summary>An element's page opened: kept as the last.</summary>
+    public static void Opened(PTElement e) => ChemPrefs.Set("ptable", "element", e.Number.ToString(System.Globalization.CultureInfo.InvariantCulture));
 }
 
 /// <summary>The small pieces the Periodic Table's views are drawn with.</summary>

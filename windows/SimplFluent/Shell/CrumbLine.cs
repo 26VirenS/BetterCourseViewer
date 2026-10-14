@@ -10,7 +10,7 @@ namespace Simpl.Shell;
 
 /// <summary>
 /// The page's title as a breadcrumb on one line, as Windows 11's BreadcrumbBar keeps it: the steps that lead back
-/// ("Tools ›", "Periodic table ›") and the page's own title last. When they do not all fit beside the page's commands,
+/// ("Courses ›", "MATH 021 ›") and the page's own title last. When they do not all fit beside the page's commands,
 /// the leading steps fold into "…" (a menu of them) one by one, from the first, so the line never breaks after a "›"
 /// and leaves the title alone on a line of its own; a title still too long for what is left is cut (or, a title that
 /// may wrap, wrapped in its own room). A course's square, when there is one, comes first and always shows.

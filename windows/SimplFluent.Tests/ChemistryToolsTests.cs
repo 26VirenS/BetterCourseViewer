@@ -18,7 +18,7 @@ public class ChemistryToolsTests
     [Fact]
     public void TheChemistrySectionHasItsFourInOrder()
     {
-        Assert.Equal(new[] { "ptable", "lewis", "molecule", "atom" }, ChemTools.Kinds.Select(k => k.Key));
+        Assert.Equal(new[] { "ptable", "lewis", "molecule", "atoms" }, ChemTools.Kinds.Select(k => k.Key));
         Assert.Equal(new[] { "Periodic Table", "Lewis Structures", "Molecule Builder", "Atoms & Orbitals" }, ChemTools.Kinds.Select(k => k.Name));
         Assert.All(ChemTools.Kinds, k => Assert.False(string.IsNullOrWhiteSpace(k.Note)));
     }
@@ -31,7 +31,7 @@ public class ChemistryToolsTests
         Assert.Equal(new[] { "calc", "graph", "units" }, ToolsScreen.Groups.First(g => g.Title == "Math & science").Keys);
         Assert.Equal(ToolsScreen.Kinds.Length, ToolsScreen.Kinds.Select(k => k.Key).Distinct().Count());
         foreach (var k in ChemTools.Kinds) Assert.Same(k, ToolsCenter.KindOf(k.Key));
-        Assert.True(ChemTools.IsChemistry("ptable"));
+        Assert.NotNull(ChemTools.Kind("ptable"));
         Assert.False(BioTools.IsBiology("ptable"));
     }
 
@@ -42,14 +42,29 @@ public class ChemistryToolsTests
         var chemistry = ChemTools.Kinds.Select(k => k.Hex.ToLowerInvariant()).ToList();
         Assert.Equal(4, chemistry.Distinct().Count());
         Assert.DoesNotContain(chemistry, biology.Contains);
+        // (no chemistry tool wears a biology tool's symbol: the Periodic Table's grid read as the Biomolecule Builder's
+        //  cube a few rows below)
+        Assert.DoesNotContain(ChemTools.Kinds, c => BioTools.Kinds.Any(b => b.Symbol == c.Symbol));
+    }
+
+    [Fact]
+    public void BothAppsTheSame()
+    {
+        // (the Mac's ChemTools.swift: its keys, lines, colours and short names)
+        Assert.Equal(new[] { "#e5484d", "#0ea5c6", "#3faa4b", "#b452e0" }, ChemTools.Kinds.Select(k => k.Hex.ToLowerInvariant()));
+        Assert.Equal("Bonds, lone pairs, formal charges and resonance.", ChemTools.Kind("lewis")!.Note);
+        Assert.Equal("Build molecules in 3D, shaped by VSEPR.", ChemTools.Kind("molecule")!.Note);
+        Assert.Equal(new[] { "Elements", "Lewis", "Molecules", "Atoms" }, ChemTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
     }
 
     [Theory]
     [InlineData("periodic", "ptable")]
     [InlineData("lewis", "lewis")]
     [InlineData("vsepr", "molecule")]
-    [InlineData("orbitals", "atom")]
-    [InlineData("electron cloud", "atom")]
+    [InlineData("orbitals", "atoms")]
+    [InlineData("electron cloud", "atoms")]
+    [InlineData("resonance", "lewis")]
+    [InlineData("bohr", "atoms")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.ChemistryTools().ToList(), typed);

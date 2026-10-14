@@ -311,8 +311,62 @@ public abstract class Screen
     /// </summary>
     public virtual string LiveApplied(IReadOnlyList<ILiveRead> changed)
     {
-        if (changed.Any(builds.Contains)) RenderSoon();
+        if (changed.Any(builds.Contains))
+        {
+            KeepFocus();
+            RenderSoon();
+        }
         return string.Join(",", changed.Select(c => c.Call));
+    }
+
+    /// <summary>
+    /// The keyboard's place kept through a build a live check asked for: the element that had it (a row, a button, a
+    /// link) found again in the new build by its kind and its name — the same one of that name, counted from the top —
+    /// and given the keyboard back once it is drawn, unless the student has put it somewhere else meanwhile. Built again
+    /// whole (To Do, Notifications, Grades …), a screen threw the keyboard, and Narrator with it, out to the window.
+    /// </summary>
+    private void KeepFocus()
+    {
+        if (!host.IsKeyboardFocusWithin || System.Windows.Input.Keyboard.FocusedElement is not FrameworkElement had || FocusName(had) is not { } name) return;
+        var nth = Focusables(host).Where(e => FocusName(e) == name).TakeWhile(e => !ReferenceEquals(e, had)).Count();
+        // (only the build this asked for: one long after — the screen left meanwhile — takes nothing back)
+        var until = Environment.TickCount64 + 3000;
+        void Back()
+        {
+            Built -= Back;
+            if (Environment.TickCount64 > until) return;
+            host.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+            {
+                // (moved by the student meanwhile — anywhere but the window itself, or still on what had it: left there)
+                var now = System.Windows.Input.Keyboard.FocusedElement;
+                if (now != null && now is not Window && !ReferenceEquals(now, had) && now is UIElement { IsVisible: true }) return;
+                var same = Focusables(host).Where(e => FocusName(e) == name).ToList();
+                if (same.Count > 0) same[Math.Min(nth, same.Count - 1)].Focus();
+            });
+        }
+        Built += Back;
+    }
+
+    /// <summary>What an element that can have the keyboard is known by from one build to the next: its kind and the name
+    /// Narrator reads (else its words, else its tooltip); null for one with none.</summary>
+    private static string? FocusName(FrameworkElement e)
+    {
+        var name = System.Windows.Automation.AutomationProperties.GetName(e);
+        if (string.IsNullOrEmpty(name)) name = (e as ContentControl)?.Content as string ?? e.ToolTip as string;
+        return string.IsNullOrEmpty(name) ? null : $"{e.GetType().Name}:{name}";
+    }
+
+    /// <summary>The elements under <paramref name="root"/> that can have the keyboard now, top to bottom.</summary>
+    private static IEnumerable<FrameworkElement> Focusables(DependencyObject root)
+    {
+        var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is FrameworkElement { Focusable: true, IsVisible: true, IsEnabled: true } f) yield return f;
+            if (child is UIElement { IsVisible: false }) continue;
+            foreach (var inner in Focusables(child)) yield return inner;
+        }
     }
 
     /// <summary>A part's own loaders, for the live check (a course part's), each building the screen again when it changes.</summary>

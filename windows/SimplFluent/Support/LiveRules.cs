@@ -59,15 +59,19 @@ public static class LiveRules
     }
 
     /// <summary>The arguments a check asks with: the screen's own (a copy), less any that write a preference, with the
-    /// maxAge (seconds) and the hash of the answer on screen ('' when it is not known yet).</summary>
-    public static JsonObject CheckArgs(string call, JsonObject screen, double maxAge, string? known)
+    /// maxAge (seconds) and the hash of the answer on screen ('' when it is not known yet) — and <c>seen</c> while the
+    /// student is at the window (<paramref name="seen"/>): only then does a check of an open conversation or discussion
+    /// mark what came in it read on Canvas. Without it a check never marks anything read.</summary>
+    public static JsonObject CheckArgs(string call, JsonObject screen, double maxAge, string? known, bool seen = false)
     {
         var a = (JsonObject)screen.DeepClone();
         if (Writes.TryGetValue(call, out var drop)) foreach (var k in drop) a.Remove(k);
         a.Remove("maxAge");
         a.Remove("known");
+        a.Remove("seen");
         a["maxAge"] = maxAge;
         a["known"] = known ?? "";
+        if (seen) a["seen"] = true;
         return a;
     }
 

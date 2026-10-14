@@ -1,4 +1,5 @@
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -15,11 +16,14 @@ namespace Simpl.Shell;
 /// shows again once that is a minute old — a course's page once it is ten minutes old — with the engine's maxAge, the
 /// pane's counts beside it; an answer the same as the one on screen changes nothing (no build, no flicker, the scroll and
 /// the keyboard where they were), a new one is shown in place (the Dashboard's parts, one by one). Nothing while the
-/// window is minimized or in the notification area (memory given back there stays given back), offline, or while the
-/// page is not ready; back after more than a minute away, at once. It waits while the student is busy with something it
-/// would disturb (<see cref="Held"/>): a quiz, an Alta or Macmillan assignment, typing, What-If, Hand In, a dialog, a
-/// menu, the tour, a drag, a counter's panel or a quick look — and what it found waits with it. One line in simpl.log a
-/// check: "live: dashboard unchanged · 0 reads", "live: dashboard updated counter:today,list(~1) · 7 reads".
+/// window is minimized or in the notification area (memory given back there stays given back), the PC is locked or its
+/// display off (<see cref="Presence"/>), offline, or while the page is not ready; back after more than a minute away, at
+/// once. It waits while the student is busy with something it would disturb (<see cref="Held"/>): a quiz, an Alta or
+/// Macmillan assignment, typing, What-If, Hand In, a dialog, a popup, a menu, the tour, a drag, a counter's panel or a
+/// quick look — and what it found waits with it. One check at a time for the whole app (a place in a window of its own
+/// checks its own screen; the main window, the pane's counts too). A check marks nothing read on Canvas unless the
+/// student is at the window (<see cref="Engine.Engine.LiveSeen"/>). One line in simpl.log a check: "live: dashboard
+/// unchanged · 0 reads", "live: dashboard updated counter:today,list(~1) · 7 reads".
 /// <see cref="LiveClock"/> keeps the timing (Support/LiveRules.cs, tested on its own).
 /// </summary>
 internal sealed class LiveCheck : IDisposable
@@ -37,6 +41,9 @@ internal sealed class LiveCheck : IDisposable
 
     private static long lastKey;
     private static bool offline, listening;
+    /// <summary>A check under way in any window: one at a time for the whole app (with a place in a window of its own,
+    /// two ran at once, and both read the pane's counts).</summary>
+    private static bool polling;
 
     private readonly Engine.Engine engine;
     /// <summary>The window whose screen it checks: the main one, or a place in a window of its own (PlaceWindow).</summary>
@@ -53,7 +60,7 @@ internal sealed class LiveCheck : IDisposable
     private bool foundOk;
     /// <summary>What held the last check, said once in the log while it holds.</summary>
     private string? heldBy;
-    private bool disposed, polling;
+    private bool disposed;
 
     public LiveCheck(Engine.Engine engine, Window window, Func<Screen?> current, bool main)
     {
@@ -67,15 +74,21 @@ internal sealed class LiveCheck : IDisposable
         Listen();
         window.IsVisibleChanged += Moved;
         window.StateChanged += Moved;
+        Presence.Changed += PresenceChanged;
         Moved(null, EventArgs.Empty);
         if (!main) return;
         if (Says) Log.Write($"live: on, every {Every:0.#} s (a course's page every {LiveRules.Interval(true, Every):0.#} s)");
         ChangeLater();
     }
 
-    /// <summary>The window out of sight (minimized, in the notification area): the timer stops — not a tick until it is
-    /// back, when it looks at once.</summary>
-    private bool Away => !window.IsVisible || window.WindowState == WindowState.Minimized;
+    /// <summary>The window out of sight (minimized, in the notification area) or nobody at it (the PC locked, the display
+    /// off): the timer stops — not a tick until it is back, when it looks at once.</summary>
+    private bool Away => !window.IsVisible || window.WindowState == WindowState.Minimized || Presence.Away;
+
+    private void PresenceChanged() => Moved(null, EventArgs.Empty);
+
+    /// <summary>One of Simpl's windows is the one in front (the main one, a place's, a popup).</summary>
+    private static bool InFront => Application.Current?.Windows.OfType<Window>().Any(w => w.IsActive) == true;
 
     private void Moved(object? sender, EventArgs e)
     {
@@ -137,7 +150,7 @@ internal sealed class LiveCheck : IDisposable
         var interval = s == null || reads.Count == 0 ? 0 : LiveRules.Interval(s.CoursePage, Every);
         var pane = engine.PaneCounts;
         var oldest = reads.Select(r => r.FreshAt).DefaultIfEmpty(0).Min();
-        if (pane.CanCheck) oldest = Math.Min(oldest, pane.FreshAt);
+        if (main && pane.CanCheck) oldest = Math.Min(oldest, pane.FreshAt);
         var unready = !engine.Ready || engine.Phase != Phase.Native || engine.Login.Covers || engine.Refreshing;
         string? why = null;
         var step = clock.Step(now, interval, oldest, Away, offline || unready, () => (why = Held(s)) != null);
@@ -166,7 +179,11 @@ internal sealed class LiveCheck : IDisposable
         {
             var before = await engine.Reads();
             var all = reads.ToList();
-            if (engine.PaneCounts.CanCheck) all.Add(engine.PaneCounts);
+            // (the pane's counts by the main window's check alone: a place's window has no pane)
+            if (main && engine.PaneCounts.CanCheck) all.Add(engine.PaneCounts);
+            // (whether the student is at the window as the checks are asked — one of Simpl's windows in front, the PC
+            //  unlocked, the display on: only then may a check mark an open conversation's or discussion's news read)
+            engine.LiveSeen = !Presence.Away && InFront;
             var results = await Task.WhenAll(all.Select(r => r.Check(engine, LiveRules.AgeFor(r.Call ?? "", interval, Every))));
             var after = await engine.Reads();
             var cost = before >= 0 && after >= before ? $"{after - before} reads" : "? reads";
@@ -241,21 +258,31 @@ internal sealed class LiveCheck : IDisposable
     /// <summary>
     /// Why a check waits now, or null: a quiz, an Alta or Macmillan assignment open; the student typing (the keyboard in a
     /// box, or a key in the last five seconds); the screen's own (What-If, a counter's panel, a reply); Hand In or Send
-    /// from Phone; a sheet, a dialog, a menu or the tour; a drag; a quick look.
+    /// from Phone; a sheet, a dialog, a popup, a menu or the tour; a drag; a quick look.
     /// </summary>
     private string? Held(Screen? s)
     {
         if (Updates.Holds("quiz")) return "a quiz";
         if (Updates.Holds("Knewton Alta") || Updates.Holds("Macmillan Learning")) return "an assignment's popup";
-        if (Keyboard.FocusedElement is FrameworkElement { IsVisible: true } focused && focused is TextBoxBase or System.Windows.Controls.PasswordBox or HwndHost) return "typing";
-        if (LiveRules.Typing(Environment.TickCount64, lastKey)) return "typing";
+        var now = Environment.TickCount64;
+        if (Keyboard.FocusedElement is FrameworkElement { IsVisible: true } focused)
+        {
+            // (the keyboard in a box is typing — but the pane's search box only while keys go into it: a click on the page
+            //  left the keyboard there, and every check waited until something else took it)
+            if (focused is TextBoxBase or System.Windows.Controls.PasswordBox && SearchPalette.Shared?.Holds(focused) != true) return "typing";
+            // (a web view — the Graph tool's Desmos — only while it is used: its keys never reach the window's own, so
+            //  Windows' last input says, Simpl in front; clicked once and left, it held the Dashboard behind it)
+            if (focused is HwndHost && InFront && LiveRules.Typing(now, LastInput(now))) return "typing";
+        }
+        if (LiveRules.Typing(now, lastKey)) return "typing";
         if (s?.LiveHold is { } own) return own;
         if (HandInSheet.Open) return "Hand In";
-        // (a dialog over this window or the main one; a popup floating over the main window — a tool's is not one: it is
-        //  used beside the page, and may stay open all day)
+        // (a dialog over this window or the main one; a popup floating over either — but not a tool's, used beside the
+        //  page and open all day, nor one only there to be read, What's New, History or Help: those that hold an update)
         var home = Application.Current?.MainWindow as MainWindow;
         if (window is ISheetWindow { Sheets.IsOpen: true } || home?.Sheets.IsOpen == true) return "a dialog";
-        if (home != null && FloatPopup.Over(home).Any(p => !p.Sheet.Large)) return "a popup";
+        var floating = home == null || ReferenceEquals(home, window) ? FloatPopup.Over(window) : FloatPopup.Over(window).Concat(FloatPopup.Over(home));
+        if (floating.Any(p => !p.Sheet.Beside && p.Sheet.HoldsUpdates)) return "a popup";
         if (home?.Touring == true) return "the tour";
         if (UpdateWatch.MenuOpen()) return "a menu";
         if (Mouse.LeftButton == MouseButtonState.Pressed || Mouse.Captured != null) return "a drag";
@@ -285,11 +312,30 @@ internal sealed class LiveCheck : IDisposable
         catch (Exception e) { Log.Write("live: the mock school could not be changed: " + e.Message); }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
+    [DllImport("user32.dll")] private static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
+
+    /// <summary>When Windows last had a key or a click from the student, on Environment.TickCount64's clock (0: unknown).</summary>
+    private static long LastInput(long now)
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref info)) return 0;
+        // (Windows' own tick is 32 bits: how long ago, taken from now)
+        return now - unchecked((uint)Environment.TickCount - info.dwTime);
+    }
+
     public void Dispose()
     {
         disposed = true;
         timer.Stop();
         window.IsVisibleChanged -= Moved;
         window.StateChanged -= Moved;
+        Presence.Changed -= PresenceChanged;
     }
 }

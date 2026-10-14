@@ -184,13 +184,19 @@ public sealed partial class SearchPalette : IDisposable
         if (!box.IsVisible) Close();
     }
 
-    /// <summary>A press anywhere in the window but the box (or the list): the list closes (the box keeps what it holds).</summary>
+    /// <summary>A press anywhere in the window but the box (or the list): the list closes and the box lets go of the
+    /// keyboard (it keeps what it holds) — left in the box after a click on the page, the keyboard held the live check
+    /// as if the student were typing.</summary>
     private void OnWindowMouse(object sender, MouseButtonEventArgs e)
     {
-        if (!popup.IsOpen) return;
+        if (!popup.IsOpen && !box.IsKeyboardFocusWithin) return;
         if (e.OriginalSource is DependencyObject d && (Within(box, d) || Within(popup.Child, d))) return;
-        Close();
+        LetGo();
     }
+
+    /// <summary>The keyboard is in the pane's search box (<paramref name="focused"/> is it, or in it): a live check waits
+    /// for it only while keys go into it.</summary>
+    public bool Holds(DependencyObject focused) => Within(box, focused);
 
     private void OnWindowMoved(object? sender, EventArgs e)
     {

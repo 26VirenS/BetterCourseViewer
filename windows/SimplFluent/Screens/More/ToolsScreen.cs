@@ -196,7 +196,7 @@ public sealed class ToolsScreen : Screen
         }
         // (the chemistry tools' four, then the biology toolkit's ten, each under a heading of their own, as the Mac's Tools
         //  page has them — the chemistry's four in full rows, as a section's four above)
-        var chemistry = Heading("Chemistry", "Every element and its trends, Lewis structures, molecules in 3D, and atoms with their orbitals.");
+        var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules in 3D, and each element’s atom and orbitals.");
         page.Children.Add(chemistry);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.ChemTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = true });
         var biology = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");

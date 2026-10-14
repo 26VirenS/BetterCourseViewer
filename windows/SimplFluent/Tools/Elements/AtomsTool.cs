@@ -18,27 +18,28 @@ namespace Simpl.Tools;
 internal static class AtomsToolRegistration
 {
     [System.Runtime.CompilerServices.ModuleInitializer]
-    internal static void Register() => ToolRegistry.Register("atom", c => new AtomsTool(c), c => new BioQuickOpen(c));
+    internal static void Register() => ToolRegistry.Register("atoms", c => new AtomsTool(c), c => new AtomsQuick(c));
 }
 #pragma warning restore CA2255
 
 /// <summary>
 /// What Atoms &amp; Orbitals shows, kept while its view comes and goes: the element and the view — remembered on this PC
-/// for next time (Prefs <c>SimplChem.atom.element</c>, a symbol; <c>SimplChem.atom.view</c>: atom, orbitals or cloud) —
-/// and, for that element, the subshell picked for its orbitals and the one picked for its cloud.
+/// for next time (ChemPrefs <c>SimplChem.atoms.element</c>, its number; <c>SimplChem.atoms.view</c>: atom, orbitals or
+/// cloud — the Mac's keys) — and, for that element, the subshell picked for its orbitals and the one picked for its cloud.
 /// </summary>
 internal static class AtomState
 {
-    private const string ElementKey = "SimplChem.atom.element", ViewKey = "SimplChem.atom.view";
-
-    /// <summary>The element shown: the one last shown, else carbon.</summary>
+    /// <summary>The element shown: the one it showed last, else the one last opened in the Periodic Table, else carbon
+    /// (as the Mac's).</summary>
     public static PTElement Element
     {
-        get => PeriodicTable.Named(Prefs.String(ElementKey)) ?? PeriodicTable.ByNumber(6) ?? PeriodicTable.Elements[0];
+        get => PeriodicTable.Named(ChemPrefs.String("atoms", "element")) ?? PeriodicTable.Named(ChemPrefs.String("ptable", "element"))
+            ?? PeriodicTable.ByNumber(6) ?? PeriodicTable.Elements[0];
         set
         {
-            if (string.Equals(Prefs.String(ElementKey), value.Symbol, StringComparison.Ordinal)) return;
-            Prefs.Set(ElementKey, value.Symbol);
+            var number = value.Number.ToString(CultureInfo.InvariantCulture);
+            if (string.Equals(ChemPrefs.String("atoms", "element"), number, StringComparison.Ordinal)) return;
+            ChemPrefs.Set("atoms", "element", number);
             // (another element: its own outer subshell, and all of its cloud)
             Subshell = null;
             CloudFocus = null;
@@ -48,8 +49,8 @@ internal static class AtomState
     /// <summary>The view shown: the one last shown, else the atom.</summary>
     public static PTModel View
     {
-        get => Parse(Prefs.String(ViewKey)) ?? PTModel.Atom;
-        set => Prefs.Set(ViewKey, value.ToString().ToLowerInvariant());
+        get => Parse(ChemPrefs.String("atoms", "view")) ?? PTModel.Atom;
+        set => ChemPrefs.Set("atoms", "view", value.ToString().ToLowerInvariant());
     }
 
     /// <summary>The Orbitals view's subshell ("3d"; null: the outer one being filled).</summary>
@@ -67,7 +68,7 @@ internal static class AtomState
         _ => null,
     };
 
-    /// <summary>A launch's state (--tool atom --tool-state Fe:cloud:3d) set, its parts in any order: an element by its
+    /// <summary>A launch's state (--tool atoms --tool-state Fe:cloud:3d) set, its parts in any order: an element by its
     /// symbol, name or number, a view, and a subshell for the view ("all": the whole cloud).</summary>
     public static void Apply(string? state)
     {
@@ -127,9 +128,9 @@ internal sealed class AtomsTool : Grid
     public AtomsTool(ToolContext c)
     {
         ctx = c;
-        // (what the launch asked — --tool atom --tool-state Fe:cloud:3d — then what it was handed: an element page's See
+        // (what the launch asked — --tool atoms --tool-state Fe:cloud:3d — then what it was handed: an element page's See
         //  it in 3D, its element; else the element and the view it last showed)
-        AtomState.Apply(ChemTools.LaunchState("atom"));
+        AtomState.Apply(ChemTools.LaunchState("atoms"));
         if (PeriodicTable.Named(c.TakeInfo("element")) is { } handed) AtomState.Element = handed;
         e = AtomState.Element;
 
@@ -173,16 +174,21 @@ internal sealed class AtomsTool : Grid
         after = PTKit.Choice("The element after", false, () => Step(1), SymbolRegular.ChevronRight24, squished: true);
         after.ToolTip = "The element after (→)";
         pickNote = K.Wrapped("", Ty.Caption, B.Text2);
+        // (Narrator reads it as it changes — what Enter would show, nothing matching, the element stepped to)
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(pickNote, System.Windows.Automation.AutomationLiveSetting.Polite);
         picker = K.V(6, K.Columns("auto, *, auto", before.Col(0), field.Margin(6, 0, 6, 0).Col(1), after.Col(2)), pickNote);
 
         var hint = K.Text("Drag to turn · scroll to zoom", Ty.Caption, B.Text2);
         hint.HorizontalAlignment = HorizontalAlignment.Center;
         hint.Margin = new Thickness(12);
-        atom.MinHeight = 200;
+        // (the model given what the card leaves it: on the smallest window the card is held to the page, its heading over
+        //  a model still large enough to turn — the hint giving way first)
+        atom.MinHeight = 100;
         headRow.Margin = new Thickness(16, 0, 16, 12);
         controls.Children.Add(choose);
         controls.Children.Add(parts);
         var card = K.Card(K.Rows("auto, *, auto", K.V(0, title, headRow).Row(0), atom.Row(1), hint.Row(2)), new Thickness(0));
+        card.SizeChanged += (_, _) => hint.Visibility = card.ActualHeight < 330 ? Visibility.Collapsed : Visibility.Visible;
         // (one over the other: the element and the view in the model's own heading, in view with it — and the card given
         //  room for them over a model still large enough to turn)
         layout = new ChemLayout(controls, card, facts) { Floor = 460 };
@@ -190,6 +196,11 @@ internal sealed class AtomsTool : Grid
         Children.Add(layout);
 
         PreviewKeyDown += OnKey;
+        // (the keyboard kept in the tool, as an element's page keeps it: given to it as it opens when nothing in it has it,
+        //  and when the model is pressed — so ← and → step through the elements)
+        Focusable = true;
+        FocusVisualStyle = null;
+        PreviewMouseDown += (_, a) => { if (!IsKeyboardFocusWithin && a.OriginalSource is not TextBoxBase) Focus(); };
         // (light and dark: the cloud's dots and the legends' colours follow — and a change made while the tool was away
         //  is caught up when it comes back)
         Loaded += (_, _) =>
@@ -197,6 +208,7 @@ internal sealed class AtomsTool : Grid
             Appearance.Changed -= OnAppearance;
             Appearance.Changed += OnAppearance;
             if (shownDark != Appearance.Dark || shownAccent != Appearance.Accent) Refresh();
+            Dispatcher.BeginInvoke(() => { if (!IsKeyboardFocusWithin) Focus(); }, System.Windows.Threading.DispatcherPriority.Input);
         };
         Unloaded += (_, _) => Appearance.Changed -= OnAppearance;
         Refresh();
@@ -221,7 +233,9 @@ internal sealed class AtomsTool : Grid
 
     private void OnKey(object sender, KeyEventArgs a)
     {
-        if (a.OriginalSource is TextBoxBase || (Keyboard.Modifiers & ModifierKeys.Control) != 0) return;
+        // (in the element's field only while it is empty: with something typed in it, the arrows move its caret)
+        if ((a.OriginalSource is TextBoxBase box && !ReferenceEquals(box, field)) || (Keyboard.Modifiers & ModifierKeys.Control) != 0) return;
+        if (ReferenceEquals(a.OriginalSource, field) && field.Text.Length > 0) return;
         if (a.Key == Key.Left) { Step(-1); a.Handled = true; }
         else if (a.Key == Key.Right) { Step(1); a.Handled = true; }
     }
@@ -270,9 +284,14 @@ internal sealed class AtomsTool : Grid
     private void Note()
     {
         var q = field.Text.Trim();
-        pickNote.Text = q.Length == 0 ? $"{e.Number} of {PeriodicTable.Elements.Count} · ← and → step through the elements"
+        var text = q.Length == 0 ? $"{e.Number} of {PeriodicTable.Elements.Count} · ← and → step through the elements"
             : PeriodicTable.Find(q).FirstOrDefault() is { } found ? $"Enter shows {found.Name} ({found.Number})"
             : $"No element matches “{q}”";
+        if (text == pickNote.Text) return;
+        pickNote.Text = text;
+        // (said aloud: with nothing typed, the element stepped to)
+        System.Windows.Automation.AutomationProperties.SetName(pickNote, q.Length == 0 ? $"{e.Name}, {e.Number} of {PeriodicTable.Elements.Count}" : text);
+        if (UIElementAutomationPeer.FromElement(pickNote) is { } peer) peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     // ---- the element and the view, and the model's heading ----
@@ -352,15 +371,19 @@ internal sealed class AtomsTool : Grid
                 content = K.H(5, new Ellipse { Width = 7, Height = 7, Fill = new SolidColorBrush(TypeColor(type)), VerticalAlignment = VerticalAlignment.Center }, t);
             var pill = new Border { Child = content, Padding = new Thickness(9, 3, 9, 4), CornerRadius = new CornerRadius(11) };
             if (on) pill.Background = new SolidColorBrush(K.WithAlpha(Appearance.Accent, 0.25)); else pill.Bg(B.Subtle);
-            var b = K.Subtle(pill, () =>
+            System.Windows.Controls.Button b = null!;
+            b = K.Subtle(pill, () =>
             {
                 // (the chosen one again: nothing to do)
                 if (on) return;
+                var had = b.IsKeyboardFocusWithin;
                 pick();
                 Refresh();
+                if (had) FocusChip(name);
             }, new Thickness(0), 11);
             b.Margin = new Thickness(0, 0, 6, 6);
             b.ToolTip = tip;
+            b.Tag = name;
             System.Windows.Automation.AutomationProperties.SetName(b, on ? $"{name}, selected" : name);
             return b;
         }
@@ -457,9 +480,18 @@ internal sealed class AtomsTool : Grid
             var pill = new Border { Child = t, Padding = new Thickness(9, 3, 9, 4), CornerRadius = new CornerRadius(11) };
             if (on) pill.Background = new SolidColorBrush(K.WithAlpha(Appearance.Accent, 0.25)); else pill.Bg(B.Subtle);
             var id = s.Id;
-            var b = K.Subtle(pill, () => { AtomState.Subshell = id; Refresh(); }, new Thickness(0), 11);
+            var tag = $"The {s.Name} orbitals";
+            System.Windows.Controls.Button b = null!;
+            b = K.Subtle(pill, () =>
+            {
+                var had = b.IsKeyboardFocusWithin;
+                AtomState.Subshell = id;
+                Refresh();
+                if (had) FocusChip(tag);
+            }, new Thickness(0), 11);
             b.Margin = new Thickness(0, 0, 6, 6);
             b.ToolTip = $"The {s.Name} orbitals";
+            b.Tag = tag;
             System.Windows.Automation.AutomationProperties.SetName(b, on ? $"The {s.Name} orbitals, shown" : $"The {s.Name} orbitals");
             chips.Children.Add(b);
         }
@@ -480,6 +512,20 @@ internal sealed class AtomsTool : Grid
         var note = K.Wrapped(sub.L == 3 ? "The f shapes are drawn simply. Blue and orange are the wave’s two signs." : "Each orbital holds two electrons; blue and orange are the wave’s two signs. A faint orbital is empty.", Ty.Caption, B.Text2);
         return K.V(10, chips, row, note);
     }
+
+    /// <summary>The keyboard given back to a subshell's chip — its row is drawn again as one is chosen, and the chip that
+    /// was pressed went with it (the keyboard thrown out to the window).</summary>
+    private void FocusChip(string tag) => Dispatcher.BeginInvoke(() =>
+    {
+        var stack = new Stack<DependencyObject>();
+        stack.Push(parts);
+        while (stack.Count > 0)
+        {
+            var d = stack.Pop();
+            if (d is System.Windows.Controls.Button { Tag: string t } chip && t == tag) { chip.Focus(); return; }
+            for (var i = VisualTreeHelper.GetChildrenCount(d) - 1; i >= 0; i--) stack.Push(VisualTreeHelper.GetChild(d, i));
+        }
+    }, System.Windows.Threading.DispatcherPriority.Input);
 
     // ---- the atom's parts ----
 
@@ -512,7 +558,7 @@ internal sealed class AtomsTool : Grid
             ("Atomic mass", $"{e.MassText} u", null),
         }));
         var open = ChemKit.Wide("Open in Periodic Table", () =>
-            ToolsCenter.HandTo(ctx, "ptable", new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) }), icon: SymbolRegular.Table24);
+            ToolsCenter.HandTo(ctx, "ptable", new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) }), icon: SymbolRegular.SlideGrid24);
         open.ToolTip = $"{e.Name}’s page in the Periodic Table: every fact, where it sits, its neighbours";
         facts.Children.Add(open);
     }
@@ -531,5 +577,53 @@ internal sealed class AtomsTool : Grid
             protected override bool IsControlElementCore() => true;
             protected override bool IsContentElementCore() => true;
         }
+    }
+}
+
+/// <summary>
+/// Atoms &amp; Orbitals in its pin's flyout (the Mac's AtomsOrbitalsCompact): its tile and its line, then an element
+/// typed by its symbol, name or number — the line under it saying what Enter opens, or that nothing matches — and Enter
+/// (or Open) opens the whole tool on it; with nothing typed, on the element it showed last.
+/// </summary>
+internal sealed class AtomsQuick : ContentControl
+{
+    public AtomsQuick(ToolContext c)
+    {
+        Focusable = false;
+        var kind = ToolsCenter.KindOf(c.Key);
+        var name = kind?.Name ?? "Atoms & Orbitals";
+        var words = K.V(3, K.Text(name, Ty.BodyStrong), K.Wrapped(kind?.Note ?? "", Ty.Body, B.Text2));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var top = K.Columns("auto, *", (kind != null ? K.IconTile(kind.Symbol, kind.Color, 40) : new Border()).Margin(0, 0, 12, 0).Col(0), words.Col(1));
+        var field = new TextBox { PlaceholderText = "Symbol, name or number", MinHeight = 32, ClearButtonEnabled = false };
+        field.ToolTip = "Type a symbol, a name or a number, then press Enter";
+        System.Windows.Automation.AutomationProperties.SetName(field, "An element to open, by its symbol, name or number");
+        var note = K.Wrapped("", Ty.Caption, B.Text2);
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(note, System.Windows.Automation.AutomationLiveSetting.Polite);
+        PTElement? Wanted()
+        {
+            var q = field.Text.Trim();
+            return q.Length == 0 ? AtomState.Element : PeriodicTable.Find(q).FirstOrDefault();
+        }
+        void Note()
+        {
+            note.Text = Wanted() is { } e ? $"Enter opens {e.Name} ({e.Number})" : $"No element matches “{field.Text.Trim()}”";
+            if (UIElementAutomationPeer.FromElement(note) is { } peer) peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        }
+        void Go()
+        {
+            if (Wanted() is not { } e) return;
+            c.OpenFull(new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) }, null);
+        }
+        field.TextChanged += (_, _) => Note();
+        field.PreviewKeyDown += (_, a) =>
+        {
+            if (a.Key != Key.Enter) return;
+            Go();
+            a.Handled = true;
+        };
+        var open = BioUI.OpenButton($"Open {name}", Go, $"Open {name} full size on this element (Enter)");
+        Note();
+        Content = K.V(12, top, K.V(6, field, note), open);
     }
 }

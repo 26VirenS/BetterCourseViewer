@@ -51,6 +51,49 @@ public class MoreFromCanvasTests
     }
 
     [Fact]
+    public void AToolOrALinkHasAMenuAndALongNameItsTooltip()
+    {
+        var nav = Json.Read<MoreNav>(Answer(null))!;
+        var rows = MoreFromCanvas.Entries(nav, _ => { }).ToList();
+        // (a tool or a link: Open and Copy link, as the Mac's sidebar; History and Help none)
+        Assert.NotNull(rows[2].Menu);
+        Assert.Null(rows[1].Menu);
+        Assert.Null(rows[3].Menu);
+        // (Copy link copies the nav's own address, not the borderless launch the window opens)
+        var tool = nav.Items[1];
+        Assert.Equal("https://school.test/accounts/1/external_tools/77?launch_type=global_navigation", MoreFromCanvas.Link(tool));
+        tool.Href = null;
+        Assert.Equal(tool.Url, MoreFromCanvas.Link(tool));
+        tool.Url = "/accounts/1/external_tools/77";
+        Assert.Null(MoreFromCanvas.Link(tool));
+        // (a name too long for its row says itself whole over what a press does)
+        nav.Items[1].Label = "The University Library's Course Reserves and Readings";
+        var longRow = MoreFromCanvas.Entries(nav, _ => { }).ToList()[2];
+        Assert.Equal("The University Library's Course Reserves and Readings\nOpens in its own window", longRow.Tip);
+    }
+
+    [Fact]
+    public void APressGoesWhereItsItemLeads()
+    {
+        var school = new Uri("https://school.test/");
+        Uri? Absolute(string? u) => string.IsNullOrEmpty(u) ? null : new Uri(school, u);
+        bool IsSchool(Uri u) => u.Host == school.Host;
+        var nav = Json.Read<MoreNav>(Answer(null))!;
+        // (History and Help: their popups)
+        Assert.Equal(MoreFromCanvas.Goes.List, MoreFromCanvas.Route(nav.Items[0], Absolute, IsSchool).Where);
+        Assert.Equal(MoreFromCanvas.Goes.List, MoreFromCanvas.Route(nav.Items[2], Absolute, IsSchool).Where);
+        // (a tool: the window for tools, on its borderless launch address)
+        Assert.Equal((MoreFromCanvas.Goes.Tool, "https://school.test/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless"),
+            MoreFromCanvas.Route(nav.Items[1], Absolute, IsSchool));
+        // (a link: the school's own page for it, or another site in the browser window)
+        var own = new MoreNavItem { Kind = "link", Open = "browser", Url = "/accounts/1/library" };
+        Assert.Equal((MoreFromCanvas.Goes.School, "https://school.test/accounts/1/library"), MoreFromCanvas.Route(own, Absolute, IsSchool));
+        var away = new MoreNavItem { Kind = "link", Open = "browser", Url = "https://library.example.org/reserves" };
+        Assert.Equal((MoreFromCanvas.Goes.Browser, "https://library.example.org/reserves"), MoreFromCanvas.Route(away, Absolute, IsSchool));
+        Assert.Equal(MoreFromCanvas.Goes.Nowhere, MoreFromCanvas.Route(new MoreNavItem { Kind = "tool", Open = "tool" }, Absolute, IsSchool).Where);
+    }
+
+    [Fact]
     public void NoSectionWhenTheSchoolAddsNothing()
     {
         Assert.False(MoreFromCanvas.Shown(null));

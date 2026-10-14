@@ -183,7 +183,7 @@ internal sealed class PTElementPage : Grid
     /// </summary>
     private FrameworkElement AtomsCard()
     {
-        var kind = ToolsCenter.KindOf("atom");
+        var kind = ToolsCenter.KindOf("atoms");
         var tile = kind != null ? K.IconTile(kind.Symbol, kind.Color, 44) : new Border();
         tile.VerticalAlignment = VerticalAlignment.Top;
         var words = K.V(3, K.Text("See it in 3D", Ty.BodyStrong),

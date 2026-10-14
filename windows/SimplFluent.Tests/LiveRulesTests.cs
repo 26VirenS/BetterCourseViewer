@@ -153,6 +153,9 @@ public class LiveRulesTests
         Assert.Equal("", todo["known"]!.GetValue<string>());
         // (a call whose arguments only read keeps them: a course's)
         Assert.Equal("courses/101", LiveRules.CheckArgs("modules", new JsonObject { ["ctx"] = "courses/101" }, 600, "h")["ctx"]!.GetValue<string>());
+        // (a check marks nothing read unless the student is at the window: seen only then, never the screen's own)
+        Assert.False(LiveRules.CheckArgs("conversation", new JsonObject { ["id"] = "c1", ["seen"] = true }, 60, "h").ContainsKey("seen"));
+        Assert.True(LiveRules.CheckArgs("conversation", new JsonObject { ["id"] = "c1" }, 60, "h", seen: true)["seen"]!.GetValue<bool>());
     }
 
     // ---- what is answered ----

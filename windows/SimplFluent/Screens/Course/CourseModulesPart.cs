@@ -253,7 +253,12 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
         Render();
         if (await engine.Act("markDone", new { ctx, module = m.Id, item = it.Id, done }))
         {
-            try { model.Data = await engine.Call<ModulesData>("modules", new { ctx }); } catch { /* as it was */ }
+            try
+            {
+                var (d, text) = await engine.CallWithText<ModulesData>("modules", new { ctx });
+                model.Take(d, text);
+            }
+            catch { /* as it was */ }
         }
         marking.Remove(it.Id);
         Render();

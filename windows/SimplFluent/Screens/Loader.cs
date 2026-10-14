@@ -38,6 +38,15 @@ public sealed class Loader<T> : ILiveRead where T : class
             Kept = false;
         }
     }
+    /// <summary>An answer the screen asked for itself (To Do regrouped, a module's item ticked) taken as what it shows,
+    /// with the text it came as: the next live check compares with it and changes nothing when it is the same (set as
+    /// <see cref="Data"/>, the text was not known, and the next check took the same answer as new and built again).</summary>
+    public void Take(T value, string answer)
+    {
+        Data = value;
+        text = answer;
+    }
+
     /// <summary>What it has is the answer kept from last time: the page's own is not in yet (the Dashboard draws its counts
     /// dimmed meanwhile, saying it is updating).</summary>
     public bool Kept { get; private set; }

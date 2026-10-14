@@ -175,6 +175,8 @@ public sealed class WebWindow : FluentWindow
             }
             start ??= await Launch();
             if (start == null) throw new InvalidOperationException("Simpl could not find where this tool opens.");
+            // (in a picture run, where it opens: CI checks a school's tool opens on its borderless launch address)
+            if (Shot.Asked) Log.Write($"web window: opens {start.PathAndQuery}");
             state.Content = null;
             web.Visibility = Visibility.Visible;
             web.CoreWebView2.Navigate(start.ToString());

@@ -36,6 +36,8 @@ public sealed class NavEntry
     public List<NavEntry>? Children;
     public bool Expanded;
     public Action<bool>? Toggle;
+    /// <summary>Its right-click menu's items, made as it opens (More from Canvas's tools and links: Open, Copy link).</summary>
+    public Action<ItemCollection>? Menu;
     /// <summary>A heading over entries (Courses, Groups), not a place.</summary>
     public bool Header;
     public bool Separator;
@@ -139,7 +141,10 @@ public sealed class NavList : Grid
         }
         if (e.Header)
         {
-            items.Children.Add(K.Text(e.Title, Ty.BodyStrong).Margin(16, 14, 16, 4));
+            // (a heading for Narrator too: Courses, Groups, More from Canvas)
+            var head = K.Text(e.Title, Ty.BodyStrong);
+            System.Windows.Automation.AutomationProperties.SetHeadingLevel(head, System.Windows.Automation.AutomationHeadingLevel.Level2);
+            items.Children.Add(head.Margin(16, 14, 16, 4));
             return;
         }
         var row = Row(e, depth);
@@ -203,7 +208,8 @@ public sealed class NavList : Grid
         b.Margin = new Thickness(4, 0, 4, 0);
         b.ToolTip = e.Tip ?? (e.Title.Length > 26 ? e.Title : e.Badge > 0 ? e.BadgeLabel : null);
         System.Windows.Automation.AutomationProperties.SetName(b, e.Badge > 0 && e.BadgeLabel != null ? $"{e.Title}, {e.BadgeLabel}" : e.Title);
-        if (e.OpenApart is { } open)
+        if (e.Menu is { } fill) Screens.CourseKit.Menu(b, fill);
+        else if (e.OpenApart is { } open)
         {
             var menu = new ContextMenu();
             var item = new System.Windows.Controls.MenuItem { Header = "Open in new window", Icon = new SymbolIcon { Symbol = SymbolRegular.WindowNew24 }, InputGestureText = "Shift+click" };

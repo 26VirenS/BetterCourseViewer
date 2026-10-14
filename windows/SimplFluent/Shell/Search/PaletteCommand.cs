@@ -175,16 +175,17 @@ internal sealed class PaletteCommand
     /// <summary>
     /// The Chemistry section's four, each opened in its popup by its name or a word a student would type for it ("periodic",
     /// "lewis", "vsepr", "orbitals"): the tools split out of the Periodic Table in 0.3.2, findable from anywhere as the one
-    /// tool was from its tile. Their names, lines and symbols are their tiles' (Tools/Chemistry/ChemTools.cs).
+    /// tool was from its tile — by the Mac's names and words (SearchCommands.swift). Their titles, lines and symbols are
+    /// their tiles' (Tools/Chemistry/ChemTools.cs).
     /// </summary>
     internal static IEnumerable<PaletteCommand> ChemistryTools()
     {
         (string Key, string Name, string[] Aliases)[] words =
         {
-            ("ptable", "periodic", ["periodic table", "ptable", "elements", "element"]),
-            ("lewis", "lewis", ["lewis structures", "lewis structure", "dot structure", "electron dot"]),
+            ("ptable", "ptable", ["periodic", "periodic table", "elements", "element"]),
+            ("lewis", "lewis", ["lewis structures", "lewis structure", "dot structure", "resonance", "electron dot"]),
             ("molecule", "molecule", ["molecules", "molecule builder", "vsepr", "3d molecule"]),
-            ("atom", "orbitals", ["atoms", "atom", "orbital", "electron cloud", "shells"]),
+            ("atoms", "atom", ["atoms", "orbitals", "orbital", "electron cloud", "shells", "bohr"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ChemTools.Kind(key) is { } kind)

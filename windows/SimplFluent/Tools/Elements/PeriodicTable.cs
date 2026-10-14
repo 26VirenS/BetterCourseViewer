@@ -780,6 +780,7 @@ internal sealed class PeriodicTableTool : Grid
         anchor = from is { } p && ActualWidth > 0 ? new Point(Math.Clamp(p.X / size.Width, 0, 1), Math.Clamp(p.Y / size.Height, 0, 1)) : new Point(0.5, 0.5);
         var was = open;
         open = e;
+        PTState.Opened(e);
         if (page == null)
         {
             page = new PTElementPage(e, () => { CloseElement(true); CheckTour(); }, Go, OpenAtoms);
@@ -796,6 +797,7 @@ internal sealed class PeriodicTableTool : Grid
     {
         if (PeriodicTable.ByNumber(n) is not { } next || page == null) return;
         open = next;
+        PTState.Opened(next);
         page.Show(next);
         CheckTour();
     }
@@ -814,7 +816,7 @@ internal sealed class PeriodicTableTool : Grid
         PTTour.Did(PTTourEvent.Atoms);
         if (tourStep != null) EndTour();
         if (Shot.Asked) Log.Write($"ptable: {e.Symbol} handed to Atoms & Orbitals");
-        ToolsCenter.HandTo(ctx, "atom", new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) });
+        ToolsCenter.HandTo(ctx, "atoms", new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) });
     }
 
     /// <summary>What shows: an element's page over the table, grown out of its square (or shrunk back into it), else the

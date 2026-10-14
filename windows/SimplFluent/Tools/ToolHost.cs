@@ -32,9 +32,6 @@ public sealed class ToolContext
     public required string Key { get; init; }
     /// <summary>The quick version, in a pin's flyout or pulled out of it (the Mac's FocusTimerCompact, CalculatorCompact …).</summary>
     public bool Quick { get; init; }
-    /// <summary>Open on a page of the window's own rather than in a popup or a flyout. Never, now: a whole tool opens in a
-    /// popup over the window (ToolPopup).</summary>
-    public bool InPage { get; init; }
     /// <summary>The window it is in (for its dialogs): the tool's popup, a pin's window or Simpl's.</summary>
     public Window? Owner { get; init; }
 
@@ -168,11 +165,6 @@ public static class ToolsCenter
     {
         var engine = from.Engine;
         var owner = from.Owner;
-        if (from.InPage)
-        {
-            Application.Current?.Dispatcher.BeginInvoke(() => Show(key, engine, null, info), DispatcherPriority.Background);
-            return;
-        }
         from.Close();
         Application.Current?.Dispatcher.BeginInvoke(() => PopUp(key, engine, owner, null, info), DispatcherPriority.Background);
     }
@@ -204,7 +196,7 @@ public static class ToolsCenter
     {
         "cite" => "Cite", "pomo" => "Focus", "calc" => "Calculator", "graph" => "Graphing", "ptable" => "Elements",
         "need" => "Grade needed", "conv" => "Convert", "units" => "Units", "pdfx" => "Merge & split", "mark" => "Mark up",
-        "ocr" => "Image to text", "fc" => "Flashcards", "lewis" => "Lewis", "molecule" => "Molecules", "atom" => "Orbitals",
+        "ocr" => "Image to text", "fc" => "Flashcards", "lewis" => "Lewis", "molecule" => "Molecules", "atoms" => "Atoms",
         "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
         "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy", _ => key,
     };
@@ -564,7 +556,7 @@ public sealed class ToolPopup
     {
         this.key = key;
         this.engine = engine;
-        sheet = new Sheet { Floats = true, Large = true, Bare = true, OwnClose = true, Body = host, Name = ToolsCenter.KindOf(key)?.Name, SizeKey = SizeKeyOf(key) };
+        sheet = new Sheet { Floats = true, Large = true, Beside = true, Bare = true, OwnClose = true, Body = host, Name = ToolsCenter.KindOf(key)?.Name, SizeKey = SizeKeyOf(key) };
         sheet.Closed += () => Open.Remove(this);
     }
 
@@ -599,6 +591,12 @@ public sealed class ToolPopup
         foreach (var other in Open.Where(o => o != p && o.key == key).ToList()) other.sheet.Close();
         p.Make(key, fade: true);
         p.sheet.Window?.Activate();
+        // (the keyboard to the new tool's first control, as a popup opening gives it: the button pressed to hand over went
+        //  with the old tool, and the keys went nowhere — Tab starting again at the window)
+        p.host.Dispatcher.BeginInvoke(() =>
+        {
+            if (!p.host.IsKeyboardFocusWithin && p.host.Content is FrameworkElement g) SheetHost.FocusFirst(p.sheet, g);
+        }, DispatcherPriority.Input);
         if (Shot.Asked || Launch.IsDevelopment) Log.Write($"tool popup changed to: {key}");
         return true;
     }

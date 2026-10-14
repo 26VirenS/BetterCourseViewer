@@ -159,6 +159,8 @@ public sealed partial class DashboardScreen
         }
         var said = new List<string>();
         bool Has(ILiveRead r) => changed.Contains(r);
+        // (what the student is looking at kept where it is while rows come and go above it)
+        var anchor = ScrollAnchor.At(root);
         if (Title != lastTitle || Subtitle != lastSubtitle)
         {
             lastTitle = Title;
@@ -187,9 +189,86 @@ public sealed partial class DashboardScreen
         //  build — a resize, a tick — takes it as it is)
         foreach (var k in shownParts)
             if (parts.TryGetValue(k, out var p) && specs.TryGetValue(k, out var spec)) parts[k] = (spec.Inputs, p.Part);
+        if (said.Count > 0) anchor?.Hold();
         Shot.Moved();
         return said.Count == 0 ? "nothing on show" : string.Join(",", said);
     }
+
+    /// <summary>
+    /// What the student is looking at held still while a check changes the page above it — a row in or out over where the
+    /// page is scrolled to moved everything under it by its height: an element at the top of the view, found before the
+    /// change, and the page scrolled by however far it moves while the rows fold and unfold (well under a second; a turn
+    /// of the wheel or a key lets go at once). At the page's top nothing is held: a row coming in there is seen to come.
+    /// </summary>
+    private sealed class ScrollAnchor
+    {
+        private readonly ScrollViewer scroller;
+        private readonly UIElement mark;
+        private readonly double top;
+
+        private ScrollAnchor(ScrollViewer scroller, UIElement mark, double top)
+        {
+            this.scroller = scroller;
+            this.mark = mark;
+            this.top = top;
+        }
+
+        public static ScrollAnchor? At(FrameworkElement page)
+        {
+            ScrollViewer? s = null;
+            for (DependencyObject? p = page; p != null; p = VisualTreeHelper.GetParent(p)) if (p is ScrollViewer sv) { s = sv; break; }
+            if (s is not { IsVisible: true } || s.VerticalOffset < 1 || s.ViewportHeight < 1) return null;
+            // (the first thing of the page's at the view's top: a few places tried, across and down)
+            foreach (var y in new[] { 8.0, 48, 96 })
+                foreach (var x in new[] { 0.5, 0.25, 0.75 })
+                {
+                    if (s.InputHitTest(new Point(s.ViewportWidth * x, y)) is not UIElement hit || !page.IsAncestorOf(hit)) continue;
+                    return new ScrollAnchor(s, hit, hit.TranslatePoint(new Point(0, 0), s).Y);
+                }
+            return null;
+        }
+
+        public void Hold()
+        {
+            var until = Environment.TickCount64 + 800;
+            EventHandler? moved = null;
+            System.Windows.Input.MouseWheelEventHandler? wheel = null;
+            System.Windows.Input.KeyEventHandler? key = null;
+            void Done()
+            {
+                scroller.LayoutUpdated -= moved;
+                scroller.PreviewMouseWheel -= wheel;
+                scroller.PreviewKeyDown -= key;
+            }
+            moved = (_, _) =>
+            {
+                // (the time up, or what was held gone with its row: let go)
+                if (Environment.TickCount64 > until || PresentationSource.FromVisual(mark) == null || !scroller.IsAncestorOf(mark)) { Done(); return; }
+                var d = mark.TranslatePoint(new Point(0, 0), scroller).Y - top;
+                if (Math.Abs(d) >= 0.5) scroller.ScrollToVerticalOffset(scroller.VerticalOffset + d);
+            };
+            wheel = (_, _) => Done();
+            key = (_, _) => Done();
+            scroller.LayoutUpdated += moved;
+            scroller.PreviewMouseWheel += wheel;
+            scroller.PreviewKeyDown += key;
+        }
+    }
+
+    /// <summary>The keyboard given to what took the place of the element that had it (a row drawn again, a card replaced),
+    /// once it is drawn: replaced, it was lost to the window.</summary>
+    private static void Refocus(FrameworkElement fresh) => fresh.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+    {
+        if (fresh.Focusable && fresh.IsVisible) { fresh.Focus(); return; }
+        var stack = new Stack<DependencyObject>();
+        stack.Push(fresh);
+        while (stack.Count > 0)
+        {
+            var d = stack.Pop();
+            if (!ReferenceEquals(d, fresh) && d is UIElement { Focusable: true, IsVisible: true, IsEnabled: true } u) { u.Focus(); return; }
+            for (var i = VisualTreeHelper.GetChildrenCount(d) - 1; i >= 0; i--) stack.Push(VisualTreeHelper.GetChild(d, i));
+        }
+    });
 
     // ---- the counters ----
 
@@ -452,6 +531,7 @@ public sealed partial class DashboardScreen
     /// <summary>One element for another, in the same place in the same parent (its grid cell too).</summary>
     private static void Swap(FrameworkElement old, FrameworkElement fresh)
     {
+        if (old.IsKeyboardFocusWithin) Refocus(fresh);
         Grid.SetRow(fresh, Grid.GetRow(old));
         Grid.SetColumn(fresh, Grid.GetColumn(old));
         Grid.SetRowSpan(fresh, Grid.GetRowSpan(old));
@@ -482,12 +562,15 @@ public sealed partial class DashboardScreen
         var old = list.Rows.ToDictionary(r => r.Id, r => r.Row);
         var rows = new List<(string Id, string Look, FrameworkElement Row)>();
         var fresh = new List<FrameworkElement>();
+        FrameworkElement? focusTo = null;
         var ids = LiveRules.Unique(next.Select(n => (n.Id, n.Look)).ToList()).ToList();
         for (var k = 0; k < next.Count; k++)
         {
             var (id, change) = diff.Rows[k];
             var row = change == RowChange.Kept ? old[id] : next[k].Make();
             if (change == RowChange.Added) fresh.Add(row);
+            // (a row drawn again that had the keyboard: its new self has it)
+            if (change == RowChange.Changed && old[id].IsKeyboardFocusWithin) focusTo = row;
             rows.Add((id, ids[k].Look, row));
         }
         var gone = diff.Gone.Select(id => old[id]).Concat(diff.Gone.Where(list.Dividers.ContainsKey).Select(id => list.Dividers[id])).ToList();
@@ -510,6 +593,7 @@ public sealed partial class DashboardScreen
         {
             Reconcile(list.Panel, want);
             foreach (var f in fresh) Grow(f, list.Panel);
+            if (focusTo != null) Refocus(focusTo);
         });
         return diff;
     }

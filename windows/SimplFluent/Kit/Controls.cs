@@ -18,7 +18,7 @@ public sealed class SelectorBar : Grid
     private readonly Stack row = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
     private readonly Canvas overlay = new() { IsHitTestVisible = false };
     private readonly Border bar = new() { Height = 3, Width = 16, CornerRadius = new CornerRadius(1.5) };
-    private readonly List<(Button B, TextBlock T)> items = new();
+    private readonly List<(Button B, TextBlock T, string Name)> items = new();
     private int selected;
     private double? barAt;
 
@@ -35,8 +35,7 @@ public sealed class SelectorBar : Grid
             var t = K.Text(choices[i], Ty.Body);
             var b = K.Subtle(t, () => Select(n, true), new Thickness(12, 6, 12, 9));
             b.MinWidth = 44;
-            System.Windows.Automation.AutomationProperties.SetName(b, choices[i]);
-            items.Add((b, t));
+            items.Add((b, t, choices[i]));
             row.Children.Add(b);
         }
         Children.Add(row);
@@ -65,6 +64,8 @@ public sealed class SelectorBar : Grid
         {
             items[i].T.Fg(i == selected ? B.Text : B.Text2);
             items[i].T.FontWeight = i == selected ? FontWeights.SemiBold : FontWeights.Normal;
+            // (Narrator says which is chosen, as the bar under it shows)
+            System.Windows.Automation.AutomationProperties.SetName(items[i].B, i == selected ? $"{items[i].Name}, selected" : items[i].Name);
         }
     }
 

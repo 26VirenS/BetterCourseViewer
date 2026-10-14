@@ -166,8 +166,8 @@ public sealed partial class TodoScreen : Screen
         if (showDone is { } sd) args["showDone"] = sd;
         try
         {
-            var d = await engine.Call<TodoData>("todo", args);
-            if (ticket == regrouping) data.Data = d;
+            var (d, text) = await engine.CallWithText<TodoData>("todo", args);
+            if (ticket == regrouping) data.Take(d, text);
         }
         catch (Exception e) { Log.Write("todo regroup: " + e.Message); }
         if (ticket != regrouping) return; // (a later choice is on its way: it clears these)

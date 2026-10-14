@@ -105,11 +105,15 @@ internal sealed class ChemLayout : Grid
     /// tall as leaves 100 of the page for the columns' headings and first controls under it, from 240 to 560 (in a tool's
     /// popup on a 780 window, room for an animal cell's sixteen labels beside it; on the smallest window, 720 by
     /// 520, the 240 leaves the columns' headings in sight — at 180 the cell's view was 80 tall, its labels on its scale
-    /// bar).</summary>
-    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 100)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
+    /// bar). The chemistry tools' floor too gives way to the page, leaving it the same 100 (at least 240): Atoms &amp;
+    /// Orbitals' 460 was taller than its popup's whole page on the smallest window, its controls and facts out of sight
+    /// under it, and on a 780 window only their headings peeked in.</summary>
+    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 100))
+        : Math.Min(Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5)), Math.Max(240, page - 100));
 
-    /// <summary>The least the drawing is given over the rest (320): more while the drawing's card holds more than the
-    /// drawing — the Lewis maker's resonance structures under it, which left the structure itself a few lines tall.</summary>
+    /// <summary>The least the drawing is given over the rest (320) where the page has room for it: more while the drawing's
+    /// card holds more than the drawing — the Lewis maker's resonance structures under it, which left the structure itself
+    /// a few lines tall; Atoms &amp; Orbitals' element and view in its heading.</summary>
     public double Floor
     {
         get => floor;

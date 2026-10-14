@@ -115,6 +115,9 @@ public sealed class GradesScreen : Screen
 
     protected override bool LayoutChanges(double before, double now)
     {
+        // (the course beside the list checked only while there is room for it: narrowed, nothing shows it, and its grades
+        //  — a heavy read — were checked every minute all the same)
+        detail.Checks = now >= SplitAt;
         if (now >= SplitAt && before < SplitAt) EnsureDetail();
         return (before >= SplitAt) != (now >= SplitAt) || (before >= WideAt) != (now >= WideAt) || CardCols(before) != CardCols(now);
     }

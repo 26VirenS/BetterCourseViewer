@@ -57,9 +57,13 @@ public class Sheet
     public bool Bare { get; set; }
     /// <summary>Escape and a click outside do nothing (a step that must be answered).</summary>
     public bool Modal { get; set; }
-    /// <summary>An update waits while it is open (Support/Updates.cs): every sheet but one only there to be read when the
-    /// student likes (What's New), which would otherwise hold up every update for a Simpl kept in the notification area.</summary>
+    /// <summary>An update waits while it is open (Support/Updates.cs), and so does the live check: every sheet but those
+    /// only there to be read when the student likes (What's New, History, Help), which would otherwise hold up every
+    /// update for a Simpl kept in the notification area, and every check of the screen behind them.</summary>
     public bool HoldsUpdates { get; set; } = true;
+    /// <summary>Used beside the page, and open all day if the student likes (a tool's popup): the live check does not
+    /// wait for it as it waits for the other popups (Shell/LiveCheck.cs).</summary>
+    public bool Beside { get; set; }
 
     /// <summary>
     /// A popup that floats over the window without holding it (Shell/FloatPopup.cs): nothing dimmed, the pane, the title
@@ -293,6 +297,8 @@ public sealed class SheetHost : Grid
         {
             var title = K.Text(s.Title!, Ty.Subtitle, B.Text, TextWrapping.Wrap);
             title.TextTrimming = TextTrimming.None;
+            // (Narrator reads it as the popup's heading, as the Mac's sheet title is one)
+            System.Windows.Automation.AutomationProperties.SetHeadingLevel(title, System.Windows.Automation.AutomationHeadingLevel.Level1);
             if (close is FrameworkElement x && !s.Bare)
             {
                 x.Margin = new Thickness(12, -6, -10, 0);

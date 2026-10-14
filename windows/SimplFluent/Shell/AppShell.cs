@@ -220,6 +220,9 @@ public sealed partial class AppShell : Grid, IDisposable
             case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections) or nameof(Engine.Engine.Snapshot): BuildPane(); Header(); break;
             case nameof(Engine.Engine.DataVersion): current?.Refresh(); _ = LoadMore(); break;
             case nameof(Engine.Engine.Query): if (searchBox.Text != engine.Query && !searchBox.IsKeyboardFocusWithin) searchBox.Text = engine.Query; break;
+            // (signed out, or the page no longer the app's: History and Help go — the student's list never left over the
+            //  sign-in page, nor handed to whoever signs in next)
+            case nameof(Engine.Engine.Phase): if (engine.Phase != Phase.Native) MoreFromCanvas.CloseAll(); break;
         }
     }
 
@@ -410,7 +413,8 @@ public sealed partial class AppShell : Grid, IDisposable
     /// more:help, more:tool presses that item's row too, as a click does.</summary>
     private async void MoreAsked()
     {
-        if (disposed || narrow || !MoreFromCanvas.Shown(more) || Launch.Take("more") is not { } asked) return;
+        // (a narrow window's pane too, opened over the page for the picture by --pane-open)
+        if (disposed || (narrow && !Launch.Flag("pane-open")) || !MoreFromCanvas.Shown(more) || Launch.Take("more") is not { } asked) return;
         // (once the first screen is up and the pane has marked its row — which scrolls that row into sight —, as a
         //  student's press comes after; the section can be read before the first screen shows. And once WPF-UI's styles
         //  are in their one dictionary: put in place, they lay the pane out afresh at its top — on a slow runner that came
@@ -901,6 +905,8 @@ public sealed partial class AppShell : Grid, IDisposable
         disposed = true;
         prefetch.Stop();
         live.Dispose();
+        // (another school: History and Help go with the account they were read for)
+        MoreFromCanvas.CloseAll();
         palette.Dispose();
         engine.PropertyChanged -= OnEngine;
         engine.PrepareRequested -= OnPrepare;

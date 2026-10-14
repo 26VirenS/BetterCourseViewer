@@ -115,8 +115,8 @@ window's side of it, `Shell/UpdateWatch.cs`:
 - **When it goes in**: at once, unless something is open that an update must not cut off — then it waits, and goes in
   as soon as all of it is closed. What holds it: a quiz, a Knewton Alta or Macmillan assignment, a page of the school's
   in the window (each holds while it is open, the Mac's `UpdateHold`); any dialog over the window (the setup, Sign out?…)
-  or popup floating over it (Hand In, a message, a task, a tool opened whole… — all but What's New, which is only there
-  to be read), a dialog in Settings, a window of a page of the school's or a tool's (`WebWindow`), Alta's graph; Windows' own Open and Save
+  or popup floating over it (Hand In, a message, a task, a tool opened whole… — all but What's New, History and Help,
+  which are only there to be read), a dialog in Settings, a window of a page of the school's or a tool's (`WebWindow`), Alta's graph; Windows' own Open and Save
   dialogs; the tour; the sign-in while it is on screen; Simpl opening; and, for a moment, a menu or a flyout, the quick
   look, a file on its way. Besides, with Simpl in front it waits for half a minute without a key or a click (the
   student may be reading); behind other windows, five seconds. Going in, the notice at the top of the window says so
@@ -564,14 +564,20 @@ folders) is kept 10 minutes at most, as its modules, pages and files already wer
 A screen left open keeps up with the school by itself (`Shell/LiveCheck.cs`, its rules in `Support/LiveRules.cs` with
 their tests; the Mac's are the same):
 
-- **When.** While the window shows (visible, not minimized, not hidden in the notification area), the screen on show is
-  checked once what it shows is a minute old — a course's pages (its home, a section, a page, an assignment, a
-  discussion, its grades: `Screen.CoursePage`) once it is ten minutes old, as the engine keeps their data ten minutes
-  at most. Nothing while the window is out of sight (the memory given back there stays given back: the timer stops
-  too), offline, or while the page is not ready; back after more than a minute away, at once. A screen shown again with
-  what it shows a minute old is checked at once (the shell pokes the check as it shows one). One check at a time: one
-  due while the last still runs is skipped. A failure waits a minute, then two, four, five at most; a success starts
-  over. A place in a window of its own (`PlaceWindow`) is checked the same way, by its own window.
+- **When.** While the window shows (visible, not minimized, not hidden in the notification area) and someone can be
+  at it (the PC not locked, its display on: `Support/Presence.cs`), the screen on show is checked once what it shows is
+  a minute old — a course's pages (its home, a section, a page, an assignment, a discussion, its grades:
+  `Screen.CoursePage`) once it is ten minutes old, as the engine keeps their data ten minutes at most. Nothing while
+  the window is out of sight or nobody is at it (the memory given back then stays given back: the timer stops too, and
+  `MemoryTidy` gives memory back on a locked PC as on a minimized window), offline, or while the page is not ready;
+  back after more than a minute away, at once. A screen shown again with what it shows a minute old is checked at once
+  (the shell pokes the check as it shows one). One check at a time for the whole app: one due while another still runs
+  is skipped. A failure waits a minute, then two, four, five at most; a success starts over. A place in a window of its
+  own (`PlaceWindow`) is checked the same way, by its own window; the pane's counts only by the main window's.
+- **Read only.** A check writes nothing to the school unless the student is at the window (one of Simpl's windows in
+  front, the PC unlocked: `Engine.LiveSeen`, sent as `seen`): only then does a check of an open conversation mark a
+  new message read, or of an open discussion a new reply (the engine reads a conversation for a check with
+  `auto_mark_as_read=false`). A message that comes while nobody is looking stays unread, and the Inbox's badge says so.
 - **What.** Each of the screen's loaders (`Screen.LiveReads`: what `Watch` and `Checked` registered, with something on
   screen and nothing on its way) asks its call again with the engine's `maxAge` — the screen's interval, a course
   page's for what is made of every course's own data (`coursesProgress`, `externalTools`) wherever it shows — and
@@ -580,22 +586,30 @@ their tests; the Mac's are the same):
   arguments that write a preference (`dashList`'s `hideDone`, `todo`'s `group` and `showDone`), never the Dashboard's
   copies kept from its last visit (`kept: true`), and of the Dashboard's views only the one on show.
 - **Nothing new: nothing.** An answer the same as the one on screen changes nothing at all — no build, no flicker, the
-  scroll and the keyboard where they were; it only says when the screen's data was last the school's.
+  scroll and the keyboard where they were; it only says when the screen's data was last the school's. An answer the
+  screen asked for itself (To Do regrouped, a module's item ticked) is taken with its text (`Loader.Take`), so the next
+  check finds it the same.
 - **Something new: only that.** The loader takes the answer (`Loader.LastLive` while it tells its watchers) and the
-  screen shows it (`Screen.LiveApplied`): built again once, as for any answer, the scroll kept — or, on the Dashboard,
+  screen shows it (`Screen.LiveApplied`): built again once, as for any answer, the scroll kept and the keyboard given
+  back to the same row or button in the new build (found by its kind and its name) — or, on the Dashboard,
   part by part and never whole (`Screens/DashboardLive.cs`): a counter's number rolls to its new value (a short
   ease-out, 8 px; none under Animation effects off), its line and its tooltip with it, its face drawn again only when
   late work comes or goes; a course's card drawn again in its place; a row of a list (Today, a day of Coming up, the
   activity) drawn again where it was, a new one unfolding into its place, a gone one folding away before the rows under
   it close up (200 ms each), the rows that did not change untouched (by their ids: planner ids, course ids, stream ids);
   the rail's grades and week load drawn again on their own. A part whose shape changed (a counter more, a list emptied)
-  is built again alone, in its place. The kept Dashboard does not check while another place shows; shown again a
-  minute later, it checks at once.
+  is built again alone, in its place. A row or a card drawn again that had the keyboard gives it to its new self; a row
+  in or out above where the page is scrolled to leaves what the student is looking at where it was (the page scrolled
+  by as much). The kept Dashboard does not check while another place shows; shown again a minute later, it checks at
+  once. Grades checks the course beside its list only while there is room for it.
 - **Waits.** No check, and nothing it found shown, while: a quiz, an Alta or a Macmillan assignment is open; the student
-  is typing (the keyboard in a text box or a page, or a key in the last five seconds); What-If is on; Hand In (or Send
-  from Phone) is open; a dialog, a popup (a tool's is not one: it is used beside the page), a menu or the tour is up; a
-  drag (the mouse held) is under way; a counter's panel or a quick look is open; the screen has something of the
-  student's in it (`Busy`: a reply). It runs once they end.
+  is typing (the keyboard in a text box — the pane's search box only while keys go into it, and a click on the page
+  takes the keyboard out of it — or in a web view with a key or a click in the last five seconds, or a key in the last
+  five seconds anywhere); What-If is on; Hand In (or Send from Phone) is open; a dialog, a popup over this window or
+  the main one (not a tool's, `Sheet.Beside`: it is used beside the page; nor one that holds no update — What's New,
+  History, Help — only there to be read), a menu or the tour is up; a drag (the mouse held) is under way; a counter's
+  panel or a quick look is open; the screen has something of the student's in it (`Busy`: a reply). It runs once they
+  end.
 - **The log.** One line a check in simpl.log, never anything of the student's: `live: dashboard unchanged · 0 reads`,
   `live: dashboard updated counter:today,list(~1) · 7 reads` (the reads the page asked of the school meanwhile,
   `BCVNative.stats`), `live: todo waits (typing)`, `live: next try in 120 s`.
@@ -603,8 +617,10 @@ their tests; the Mac's are the same):
   says each screen's build in simpl.log (`live: dashboard built`), and turns the check on in a picture run (off
   otherwise: a picture is of what the screen showed); `--live-change done:25` (or `task`, `grade`; several with commas)
   has the engine change the mock school behind its back 25 s after the screens show. `--no-live` (a development run)
-  turns the check off. CI's `live-*` pictures check that a check before the change found nothing and built nothing,
-  that one after it showed only what changed, and that the next found nothing again (`.github/workflows/windows-fluent.yml`).
+  turns the check off. CI's `live-*` pictures check that a check before the change found nothing and built nothing
+  (no `built` line after the first check), that one after it showed only what changed (never a whole part: `counters`,
+  `main`, `rail`, `today`, `page`) and built nothing, and that the next found nothing again
+  (`.github/workflows/windows-fluent.yml`).
 
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
@@ -626,11 +642,16 @@ their tests; the Mac's are the same):
   dark nav; Simpl never fetches another site's picture itself — the puzzle piece instead), and a tool or a link the
   mark of a window of its own: a tool opens Canvas's launch page for it in the window for tools (light, as every
   outside page is), a link the school's page or another site's in Simpl's browser window. History and Help open
-  popups listing the extension's sheets' rows (`moreHistory`, `moreHelp`, read afresh each time, the popup shown whole
-  once they are in, as the extension's sheet is): History's with
-  what each was in its course's colour, Help's with Report a problem's word at the foot; a row opens where it leads
-  (the school's own as Simpl opens any, another site in Simpl's browser window) and the popup goes. No section when the
-  school adds nothing; on Brightspace, *More from Brightspace* with the navbar's links Simpl does not show already.
+  popups listing the extension's sheets' rows (`moreHistory`, read afresh each time with `maxAge` 1, and `moreHelp`, the
+  school's help links as the engine keeps them for an hour; the popup shown whole once they are in, as the extension's
+  sheet is), one at a time — the other pressed takes its place: History's with what each was in its course's colour,
+  Help's with Report a problem's word at the foot; a row opens where it leads (the school's own as Simpl opens any,
+  another site in Simpl's browser window) and the popup goes, its menu's Open in new window and Open in Canvas too
+  (Copy link on every row, another site's too). The rows' list is held to the window as it is sized. Both close when
+  the student signs out or changes school (`MoreFromCanvas.CloseAll`), a list still being read let go. A tool or a
+  link in the pane has a menu of its own (Open, Copy link); a name too long for its row says itself whole in its
+  tooltip. The section's heading and each popup's title are headings for Narrator. No section when the school adds
+  nothing; on Brightspace, *More from Brightspace* with the navbar's links Simpl does not show already.
   `--open more` brings it into sight for a picture; `--open more:history`, `more:help` and `more:tool` press that item.
   At the foot, Settings (Windows 11's place for it), then the account tile: name, email and the school,
   each said once. In a pane under 760 tall (a 1024×681 or 1366×768 window) the foot keeps compact so the courses keep
@@ -843,27 +864,38 @@ one-line note on each tile, three across from about 900 wide (a section's four i
 popup over the page. Windows' sentence case on every button and menu ("Pin to title bar", "Copy result", "Skip tour").
 `--tools-scroll chemistry` (or `biology`) opens the page scrolled to that section.
 
-The chemistry tools (`Tools/Chemistry/ChemTools.cs`, a "Chemistry" section of their own just before Biology, in a
-palette of their own) were one tool until 0.3.2, the Periodic Table with its Lewis structures and Molecule builder pages
-and its element pages' atom in 3D:
+The chemistry tools (`Tools/Chemistry/ChemTools.cs`, a "Chemistry" section of their own just before Biology) were one
+tool until 0.3.2, the Periodic Table with its Lewis structures and Molecule builder pages and its element pages' atom in
+3D. Both apps the same: the Mac's keys, names, lines, short names, search words and colours (red, cyan, green, violet);
+the Periodic Table's symbol a frame of element tiles (`SlideGrid24`: a table's grid read as the Biomolecule Builder's
+cube). What each keeps for next time is the Mac's too (`ChemPrefs`, `SimplChem.<tool>.<field>` in the preferences):
 
 - **Periodic Table** (`ptable`, its key kept, so a pin of it stays the Periodic Table; `Tools/Elements/PeriodicTable.cs`):
   the table, coloured by any property with its trends, the element under the pointer in its top, an element's own page
   (its electrons and every fact) and the table's tour (five steps, offered the first time; Tour beside the search
   takes it again). An element's page has **See it in 3D**, which hands it to Atoms & Orbitals in the same popup
-  (`--ptable-element Fe --ptable-atoms` presses it for a picture).
+  (`--ptable-element Fe --ptable-atoms` presses it for a picture). It keeps its colouring and the last element opened
+  (`ptable.colour`, `ptable.element`).
 - **Lewis Structures** (`lewis`, `Tools/Chemistry/LewisView.cs`): the Lewis maker — quick or drawn, presets, ions,
   resonance, formal charges and checks; **Open in Molecule Builder** hands the structure shown to the Molecule Builder.
-- **Molecule Builder** (`molecule`, `Tools/Chemistry/MoleculeView.cs`): the 3D builder with VSEPR shapes.
-- **Atoms & Orbitals** (`atom`, `Tools/Elements/AtomsTool.cs`): an element typed by its symbol, name or number (← and →
-  the one before or after) as its atom (shells), a subshell's orbitals or its electron cloud, with its electrons and
-  **Open in Periodic Table**; it remembers its element and view (`SimplChem.atom.element`, `SimplChem.atom.view`).
+  It keeps its molecule, its way and its ranking (`lewis.draft`).
+- **Molecule Builder** (`molecule`, `Tools/Chemistry/MoleculeView.cs`): the 3D builder with VSEPR shapes. It keeps its
+  molecule and how it is shown (`molecule.saved`, `.style`, `.lonePairs`, `.labels`).
+- **Atoms & Orbitals** (`atoms`, `Tools/Elements/AtomsTool.cs`): an element typed by its symbol, name or number (← and →
+  the one before or after — from the field while it is empty, or once the model is pressed; the tool takes the keyboard
+  as it opens and after a hand-off) as its atom (shells), a subshell's orbitals or its electron cloud, with its
+  electrons and **Open in Periodic Table**. It remembers its element and view (`atoms.element`, `atoms.view`) and opens,
+  until it has shown one, on the element last opened in the Periodic Table. The line under the field is read by
+  Narrator as it changes; a subshell's chip keeps the keyboard when it is chosen. Its pin's flyout takes an element and
+  Enter, opening the whole tool on it.
 
 The builders and Atoms & Orbitals share one layout (`ChemLayout`): the controls and the facts in sight at every size,
-the drawing's own heading holding what to show when the drawing is over the rest. A launch's `--tool-state` names what
-each opens on: `--tool lewis --tool-state NO3-`, `--tool molecule --tool-state Ethanol`, `--tool atom --tool-state
-Fe:cloud:3d` (the element, then atom, orbitals or cloud, then the subshell; `all` for the whole cloud). The search box
-opens each by its words (`/periodic`, `/lewis`, `/molecule` or `vsepr`, `/orbitals` or `electron cloud`).
+the drawing's own heading holding what to show when the drawing is over the rest, and the drawing held to the page less
+100 for the columns under it (on the smallest window too). A launch's `--tool-state` names what each opens on:
+`--tool lewis --tool-state NO3-`, `--tool molecule --tool-state Ethanol`, `--tool atoms --tool-state Fe:cloud:3d` (the
+element, then atom, orbitals or cloud, then the subshell; `all` for the whole cloud). The search box opens each by the
+Mac's words (`/ptable` or `periodic`, `/lewis` or `resonance`, `/molecule` or `vsepr`, `/atom` or `orbitals`, `electron
+cloud`, `bohr`). A tool handing over to another in its popup gives the other the keyboard (`ToolPopup.Change`).
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
