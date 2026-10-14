@@ -378,6 +378,8 @@ jobs:
           # (a tool used in assignments, its card pressed: the list of every place it is used, to choose the one to open)
           Shot 'external-tools-list' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'externaltools', '--tool-list', 'knewton'))
           Shot 'external-tools-list-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'externaltools', '--tool-list', 'knewton'))
+          # (0.3.1: CHEM's Macmillan assignments, titled by their week, its module item and its tab — one tool, Macmillan Learning)
+          Shot 'external-tools-list-macmillan' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'externaltools', '--tool-list', 'macmillan'))
           Shot 'tools' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--pin', 'calc,ptable,pomo'))
           Shot 'tools-pin' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable,pomo', '--pin-open', 'calc', '--calc-expr', '2^10'))
           Shot 'tool-open' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'calc', '--calc-expr', 'sin(30)+sqrt(16)='))
