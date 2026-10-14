@@ -40,6 +40,7 @@ mac/
     Engine/ReadAhead.swift      this session's answers in memory (AnswerMemo) and reading ahead of the student
     Shell/RootView.swift        the engine underneath, the window over it, sign-in, sheets, Quick Look
     Shell/MainShell.swift       the split view: the sidebar (places, courses and their sections, groups, the account)
+    Shell/MoreFromCanvas.swift  the sidebar's More from Canvas (the school's tools, History, Help) and its popups
     Shell/Commands.swift        the menu bar: New Task / New Message, Reload, the Go menu, Change School, What's New
     Shell/LoginLayer.swift      the sign-in card, "Logging you in", "Stay logged in?", Start Over
     Shell/SchoolPicker.swift    the first run: search for the school by name (↑ ↓ Return, as Spotlight)
@@ -438,6 +439,24 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   book, video, disc…), both null for a provider the table does not know; the app draws its letter as before. The mock's
   CHEM course has Macmillan's week-titled assignments, a module item and a "Course Materials" tab of the same tool; the
   screenshot suite's `light-36c-external-tools-macmillan` is their one card's list.
+  More from Canvas, the sidebar's last section (Shell/MoreFromCanvas.swift), as the web's sidebar has it: what the
+  school added to Canvas's own navigation that no API lists — an account's tools with a place in it ("My Materials",
+  a library, Studio), History, Help, sometimes a link — under the app's own places and the courses, in Canvas's order
+  (native-app.js `moreFromCanvas`: the page's `#menu`, else the last one seen; kept with the sidebar's other answers
+  for the next launch, read again with them). A school that adds nothing has no section; on Brightspace it is "More
+  from Brightspace", its navbar's links less what the app draws (none on the mock). History is a clock, Help a
+  question mark; a tool shows its own icon (the PNG the school's page drew of it, else Canvas's inline drawing — never
+  fetched here from another site) on a small rounded tile of the school's nav colour, as its icons are drawn for
+  Canvas's dark nav, else the external-link mark on that tile; a tool or a link has the external mark at the row's end,
+  and its tooltip says what a press does. A row is not a place to be chosen: a press does what it says. History and
+  Help open one popup over the window, never blocking it (FloatingPopup.swift; the other opened takes its place),
+  listing the rows the web's sheets list, read afresh each time (`moreHistory`: Canvas's recently viewed, each with its
+  glyph in its course's colour, its course, kind and when; `moreHelp`: the school's help links, and a foot when Report
+  a Problem was left out, as it needs Canvas's form); a row picked closes it and opens an address of the school's as
+  any is (its screen here, else Canvas's page) and another site in the app's browser window. A tool opens in the tool
+  window on Canvas's launch page for it, borderless (light, as tool pages open); a link opens its page in the app's
+  browser window. The screenshot suite's `70` pictures: the section (`-SimplSidebarScroll more` scrolls the sidebar to
+  it), History, Help, and My Materials in the tool window.
   (1.3.68) Alta: a large picture or canvas (at least 140 × 100) counts as a graph too, and in dark mode each graph sits on
   a white card of its own (drawn in dark ink for a white page, its ground clear, it was lost on dark glass). A question
   is shown once Alta has finished drawing it — nothing changed on the page for 350 ms, no maths or answer box still
@@ -786,8 +805,10 @@ Simpl.app/Contents/MacOS/Simpl -SimplBaseURL http://localhost:8800 -SimplDemo YE
 Launch arguments (each read once): `-SimplPlace dashboard|courses|todo|calendar|grades|notifications|inbox|groups|
 search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas address>`, `-SimplOpen quiz:<course>:<quiz>
 [:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin | tour[:<n>] |
-touroffer | preview[:counter]` (`preview`: the first row on screen opens its card; `preview:counter`, with `-SimplSheet
-<counter>`: the first row of that counter's panel), `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
+touroffer | preview[:counter] | more:history | more:help | more:tool` (`preview`: the first row on screen opens its
+card; `preview:counter`, with `-SimplSheet <counter>`: the first row of that counter's panel; the `more:` three: More
+from Canvas's popups, and its first tool's window), `-SimplSidebarScroll more` (the sidebar scrolled to More from
+Canvas), `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
 and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, "Still signing in…" after a moment),
 `-SimplPreviewFail YES` (with `-SimplPickerConfirm YES`: "Is this your school?" with a preview that could not load),
 `-SimplCalView week|list` (the Calendar opened on that view), `-SimplWhatIf YES` (a course's grades with What-If on,

@@ -357,6 +357,13 @@ struct Sidebar: View {
                         proxy.scrollTo(whereabouts.nav.current.place)
                     }
                     .onChange(of: whereabouts.nav.current.place) { _, p in proxy.scrollTo(p) }
+                    .task(id: "\(engine.more?.items.last?.id ?? "")|\(engine.courses.count)|\(engine.groups.count)") {
+                        // (the screenshot suite: -SimplSidebarScroll more — the list scrolled to its last section, once
+                        // that is in, and again as the rows above it change, for the section's picture)
+                        guard UserDefaults.standard.string(forKey: "SimplSidebarScroll") == "more", let last = engine.more?.items.last?.id else { return }
+                        try? await Task.sleep(nanoseconds: 600_000_000)
+                        proxy.scrollTo(last, anchor: .bottom)
+                    }
             }
             AccountBar()
         }
@@ -433,6 +440,11 @@ struct Sidebar: View {
                     }
                 }
             }
+            // what the school added to Canvas's own navigation — its tools, History, Help — under the app's own, as the
+            // web's sidebar has it; none when it adds nothing (Shell/MoreFromCanvas.swift)
+            if let more = engine.more, !more.items.isEmpty {
+                MoreSection(more: more)
+            }
         }
         .listStyle(.sidebar)
         .labelStyle(SidebarThemeLabel()) // (home-16) a colour worn: the row chosen's glyph in it, the words as the Mac's
@@ -440,6 +452,7 @@ struct Sidebar: View {
         .environment(\.sidebarRowSize, .large)
         .animation(Motion.gentle, value: open)
         .animation(Motion.gentle, value: engine.courses)
+        .animation(Motion.gentle, value: engine.more)
     }
 
     private var groupsRow: some View {

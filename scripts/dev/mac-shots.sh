@@ -61,7 +61,7 @@ shoot() {
   local settle=YES
   # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
   # settled picture caught it on its way in, faint, so its picture waits its whole time)
-  case " $* " in *PickerConfirm*|*" tool:"*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*) settle=NO ;; esac
+  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
@@ -442,6 +442,13 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-36c-external-tools-macmillan 12 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
+  # More from Canvas: the sidebar's last section (History, the school's My Materials on its own icon, Help), scrolled
+  # to; its History and Help popups over the window; My Materials in the tool window, on Canvas's launch page for it
+  shoot light-70-more-sidebar 12 -SimplSidebarScroll more
+  shoot light-70b-more-history 14 -SimplOpen more:history -SimplSidebarScroll more
+  shoot light-70c-more-help 14 -SimplOpen more:help -SimplSidebarScroll more
+  MODE=dark shoot dark-70b-more-history 14 -SimplOpen more:history -SimplSidebarScroll more
+  shoot light-70d-more-tool 30 -SimplOpen more:tool # (its whole wait: a page loading, after the sidebar's reads)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   shoot light-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a row of the panel's own)
@@ -594,6 +601,10 @@ for MODE in light dark; do
   shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
+  # More from Canvas: the sidebar's section, and its History and Help popups
+  shoot "$MODE-70-more-sidebar" 12 -SimplSidebarScroll more
+  shoot "$MODE-70b-more-history" 14 -SimplOpen more:history -SimplSidebarScroll more
+  shoot "$MODE-70c-more-help" 14 -SimplOpen more:help -SimplSidebarScroll more
 done
 bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
@@ -619,6 +630,7 @@ shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptab
 shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
 shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
 shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
+shoot light-70d-more-tool 30 -SimplOpen more:tool # (More from Canvas: My Materials in the tool window)
 SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
 SIZE=940x820 shoot light-40-narrow-dashboard 14
 SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
