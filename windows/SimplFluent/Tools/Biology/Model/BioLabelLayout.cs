@@ -6,22 +6,26 @@ namespace Simpl.Tools;
 // model narrower than its circle (the double helix) sit beside it, not flung to the view's edges; a label too wide for
 // the room between its column and the view's edge is moved in on its own (the Mac moves the whole column in for its
 // widest label, which in a narrow view here put the column's short labels over the model); in a column, labels follow
-// their anchors down and are pushed apart to 22; a column too long for the view is pushed up from the bottom. Each
-// leader runs anchor → elbow (12 short of the label, toward the model) → label. The two columns are kept even: while one
-// has three or more labels more than the other, its label nearest the model's middle (within the middle half) goes over
-// — an animal cell's parts lie mostly right of its centre, and its right column ran out of room ("+1 more") beside a left
-// one of four. A column holds as many as the view's height has room for; one with more than that gives its labels
-// nearest the model's middle (within the middle half) to the other while the other has room, and past that the objects
-// covering the most of the screen keep theirs; only those left over are counted ("+N more"). Device-independent pixels,
-// y down.
+// their anchors down and are pushed apart to 22; a column too long for the view is pushed up from the bottom; two
+// leaders in a column that cross swap places (an anchor deep in the model above one near its edge crossed it on its
+// way out). Each leader runs anchor → elbow (12 short of the label, toward the model) → label. The two columns are kept
+// even: while one has three or more labels more than the other, its label nearest the model's middle (within the middle
+// half) goes over — an animal cell's parts lie mostly right of its centre, and its right column ran out of room ("+1
+// more") beside a left one of four. A column holds as many as the view's height has room for; one with more than that
+// gives its labels nearest the model's middle to the other while the other has room — however far out they lie, as
+// the Mac does: held to the middle half, the cell's right column in a tool's popup on a 1024 window dropped Vesicles
+// beside a left one with room for two — and past that the objects covering the most of the screen keep theirs; only
+// those left over are counted ("+N more"). Device-independent pixels, y down.
 //
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
-// model's box on the view, a label that would hide its own anchor, or (beside a model narrower than 70% of the view)
-// reach more than 40 into the model's box (or over half its own width, for a short label), goes instead to a row just
-// above the model (an anchor in its upper half) or below it. A row's labels are packed side by side in their anchors'
-// order, each as near over its anchor as the others allow (a label already there slides aside for a new one), their
-// leaders straight up or down and never through a capsule in a row nearer the model; a label that fits no row (three
-// at most) stays in its column.
+// model's box on the view, a label that would hide its own anchor or another label's, or (beside a model narrower than
+// 70% of the view) reach more than Reach into the model's box (40, or 4 where the 3D view finds rows make the model
+// larger; over half its own width, for a short label), goes instead to a row just above the model (an anchor in its
+// upper half) or below it. A row's labels are packed side by side in their anchors' order, each as near over its anchor
+// as the others allow (a label already there slides aside for a new one) and clear of the leaders crossing the row on
+// their way to a column, their own leaders straight up or down and never through a capsule in a row nearer the model; a
+// label that fits no row (three at most) stays in its column. An anchor straight over or under its own column label is
+// led straight to the label's edge. The 3D view stands its camera back until no label lies on the model (Conflicts).
 
 /// <summary>A label to place: its object, its words, where its anchor projects (y down), whether it can be seen (not
 /// behind the camera or hidden by another object), how much of the screen its object covers (the larger keep their labels
@@ -30,7 +34,8 @@ public sealed record BioLabelInput(string Id, string Text, double X, double Y, b
 
 /// <summary>A placed label: its column (left: its capsule ends at EdgeX; right: it starts there), its capsule's edge nearest
 /// the model, its vertical centre, its width, and its leader (anchor → elbow → (LeaderX, Y)); a label in a row above or
-/// below the model starts at EdgeX, and its leader runs from the anchor straight to (ElbowX, EdgeY), its edge.</summary>
+/// below the model starts at EdgeX, and its leader runs from the anchor straight to (ElbowX, EdgeY), its edge — as does a
+/// column's label whose anchor lies straight over or under it.</summary>
 public sealed record BioLabelPlacement(string Id, string Text, bool Left, double EdgeX, double Y, double Width, double AnchorX, double AnchorY, double ElbowX, double? EdgeY = null)
 {
     /// <summary>The capsule's frame (x, y, width, height), y down.</summary>
@@ -60,13 +65,17 @@ public static class BioLabelLayout
     public const int MaxLabels = 14;
     /// <summary>Rows above (or below) the model a label may move to.</summary>
     public const int BandRows = 3;
+    /// <summary>How far a column's label may reach into a narrow model before it moves to a row (or half its width, for a
+    /// short label): the 3D view asks for 4 instead where moving every label off the model makes the model a sixth larger
+    /// or more (a peptide's four labels; never a cell's sixteen, whose leaders would cross it).</summary>
+    public const double Reach = 40;
 
     /// <summary>The labels placed round a model whose screen circle is centred at (cx, cy) with radius r, in a view w × h;
-    /// given the model's box, labels that would hide what they name move to rows above or below it; given a box to keep
-    /// clear (a scale bar over the view's corner), no label goes over it. Returns the placements and how many visible
-    /// labels were left out.</summary>
+    /// given the model's box, labels that would hide what they name, or reach more than <paramref name="reach"/> into a
+    /// narrow model, move to rows above or below it; given a box to keep clear (a scale bar over the view's corner), no
+    /// label goes over it. Returns the placements and how many visible labels were left out.</summary>
     public static (List<BioLabelPlacement> Placed, int More) Layout(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model = null,
-        BioLabelBox? keepClear = null)
+        BioLabelBox? keepClear = null, double reach = Reach)
     {
         var shown = inputs.Where(i => i.Visible).ToList();
         const double step = Height + Gap;
@@ -112,16 +121,16 @@ public static class BioLabelLayout
         // (a column holds what its height has room for, 22 apart inside its edges)
         int Holds(bool left, List<int> mine) => Math.Max(1, (int)Math.Floor((BottomOf(left, mine) - top) / step + 1e-9) + 1);
         List<int> Members(bool left) => Enumerable.Range(0, shown.Count).Where(i => onLeft[i] == left).ToList();
-        // (a column with more than it holds — the left one cut short by Cell Explorer's scale bar — gives its labels nearest
-        //  the model's middle, within the middle half, to the other while that has room, rather than counting them out)
+        // (a column with more than it holds — the left one cut short by Cell Explorer's scale bar, the right one of a cell
+        //  whose parts lie mostly right of its centre — gives its labels nearest the model's middle to the other while
+        //  that has room, rather than counting them out: a label shown with a longer leader, not one dropped)
         for (var guard = 0; guard < shown.Count; guard++)
         {
             List<int> ls = Members(true), rs = Members(false);
             bool leftOver = ls.Count > Holds(true, ls) && rs.Count < Holds(false, rs);
             bool rightOver = rs.Count > Holds(false, rs) && ls.Count < Holds(true, ls);
             if (!leftOver && !rightOver) break;
-            var k = (leftOver ? ls : rs).Where(i => Math.Abs(shown[i].X - cx) <= 0.5 * half)
-                .OrderBy(i => Math.Abs(shown[i].X - cx)).ThenBy(i => shown[i].Id, StringComparer.Ordinal).Select(i => (int?)i).FirstOrDefault();
+            var k = (leftOver ? ls : rs).OrderBy(i => Math.Abs(shown[i].X - cx)).ThenBy(i => shown[i].Id, StringComparer.Ordinal).Select(i => (int?)i).FirstOrDefault();
             if (k is not { } move) break;
             onLeft[move] = !leftOver;
         }
@@ -156,25 +165,79 @@ public static class BioLabelLayout
                     for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + step);
                 }
             }
+            double ElbowOf(BioLabelInput l)
+            {
+                var e = EdgeOf(l);
+                // (an anchor beyond the label's far edge — at the view's very edge — is led to that edge instead)
+                if (left && l.X < e - l.Width) return e - l.Width - Elbow;
+                if (!left && l.X > e + l.Width) return e + l.Width + Elbow;
+                return left ? e + Elbow : e - Elbow;
+            }
+            // (two leaders that cross swap places: in order of their anchors' heights, an anchor deep in the model above
+            //  one near its edge crossed it on the way out — the membrane's "Cytoplasm side" over "Phospholipid bilayer")
+            for (var pass = 0; pass < column.Count * column.Count; pass++)
+            {
+                var swapped = false;
+                for (var i = 0; i < column.Count && !swapped; i++)
+                    for (var j = i + 1; j < column.Count && !swapped; j++)
+                    {
+                        if (!Crossing(column[i].X, column[i].Y, ElbowOf(column[i]), ys[i], column[j].X, column[j].Y, ElbowOf(column[j]), ys[j])) continue;
+                        (ys[i], ys[j]) = (ys[j], ys[i]);
+                        swapped = true;
+                    }
+                if (!swapped) break;
+            }
             for (var k = 0; k < column.Count; k++)
             {
                 var l = column[k];
                 var e = EdgeOf(l);
-                var elbow = left ? e + Elbow : e - Elbow;
-                // (an anchor beyond the label's far edge — at the view's very edge — is led to that edge instead)
-                if (left && l.X < e - l.Width) elbow = e - l.Width - Elbow;
-                if (!left && l.X > e + l.Width) elbow = e + l.Width + Elbow;
-                out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, elbow));
+                var x0 = left ? e - l.Width : e;
+                // (an anchor straight over or under its own capsule — out past the model, in the column's way: the
+                //  bacterium's flagella — is led straight to the capsule's edge facing it, not round the capsule's end)
+                if (l.X >= x0 && l.X <= x0 + l.Width && Math.Abs(l.Y - ys[k]) > Height / 2)
+                    out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, Math.Clamp(l.X, x0 + 9, x0 + l.Width - 9),
+                        l.Y < ys[k] ? ys[k] - Height / 2 : ys[k] + Height / 2));
+                else out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, ElbowOf(l)));
             }
         }
-        if (model is { } box) IntoBands(out_, box, w, h, keepClear);
+        if (model is { } box) IntoBands(out_, box, w, h, keepClear, reach);
         return (out_, more);
     }
 
-    /// <summary>Each label that would hide its own anchor, or reach well into a narrow model, moved to a row just above the
-    /// model (an anchor in its upper half) or below it, as near over its anchor as the row allows (and never over the box
-    /// kept clear).</summary>
-    private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h, BioLabelBox? keepClear)
+    /// <summary>Whether two leaders' slanting runs (anchor → elbow) cross.</summary>
+    private static bool Crossing(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4)
+    {
+        static double Turn(double px, double py, double qx, double qy, double rx, double ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+        return Turn(x3, y3, x4, y4, x1, y1) * Turn(x3, y3, x4, y4, x2, y2) < 0 && Turn(x1, y1, x2, y2, x3, y3) * Turn(x1, y1, x2, y2, x4, y4) < 0;
+    }
+
+    /// <summary>Whether a label's capsule lies over another label's anchor: that one's leader then seems to end in it (the
+    /// bacterium's "Flagella", led into "Fimbriae (pili)").</summary>
+    private static bool CoversAnchor(BioLabelPlacement p, IReadOnlyList<BioLabelPlacement> placed)
+    {
+        var f = p.Frame;
+        return placed.Any(o => !ReferenceEquals(o, p) && o.AnchorX >= f.X - 2 && o.AnchorX <= f.X + f.Width + 2 && o.AnchorY >= f.Y - 2 && o.AnchorY <= f.Y + f.Height + 2);
+    }
+
+    /// <summary>How many placed labels lie on the model's box (more than 4 into it each way) or over another label's
+    /// anchor: the 3D view stands its camera back until there are none.</summary>
+    public static int Conflicts(IReadOnlyList<BioLabelPlacement> placed, BioLabelBox box)
+    {
+        var n = 0;
+        foreach (var p in placed)
+        {
+            var f = p.Frame;
+            var across = Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0);
+            var down = Math.Min(f.Y + f.Height, box.Y1) - Math.Max(f.Y, box.Y0);
+            if ((across > 4 && down > 4) || CoversAnchor(p, placed)) n++;
+        }
+        return n;
+    }
+
+    /// <summary>Each label that would hide its own anchor or another label's, or reach well into a narrow model, moved to a
+    /// row just above the model (an anchor in its upper half) or below it, as near over its anchor as the row allows (and
+    /// never over the box kept clear, or the leaders crossing the row to a column).</summary>
+    private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h, BioLabelBox? keepClear, double reach)
     {
         const double step = Height + Gap, space = 6;
         var narrow = box.X1 - box.X0 < 0.7 * w;
@@ -183,8 +246,8 @@ public static class BioLabelLayout
             var f = p.Frame;
             var onAnchor = p.AnchorX >= f.X - 4 && p.AnchorX <= f.X + f.Width + 4 && Math.Abs(p.AnchorY - p.Y) <= Height;
             var acrossModel = p.Y + Height / 2 >= box.Y0 && p.Y - Height / 2 <= box.Y1
-                && Math.Max(0, Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0)) > Math.Min(40, 0.5 * f.Width);
-            return onAnchor || (narrow && acrossModel);
+                && Math.Max(0, Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0)) > Math.Min(reach, 0.5 * f.Width);
+            return onAnchor || (narrow && acrossModel) || CoversAnchor(p, placed);
         }
         var moving = placed.Where(Hides).OrderBy(p => p.AnchorX).ThenBy(p => p.Id, StringComparer.Ordinal).ToList();
         if (moving.Count == 0) return;
@@ -201,6 +264,17 @@ public static class BioLabelLayout
                 .Select(p => (p.Frame.X - space, p.Frame.X + p.Frame.Width + space)).ToList();
             // (the box kept clear stands in a row that reaches it, as a capsule would)
             if (keepClear is { } kc && y + Height / 2 > kc.Y0 && y - Height / 2 < kc.Y1) list.Add((kc.X0 - space, kc.X1 + space));
+            // (and so does a column's leader where it crosses the row: the membrane's "Hydrophilic head (polar)", put in a
+            //  row below the slab, lay over the leaders to the left column's "Cytoplasm side" and "Peripheral protein")
+            double r0 = y - Height / 2, r1 = y + Height / 2;
+            foreach (var p in placed.Where(p => !moving.Contains(p)))
+            {
+                double ax = p.AnchorX, ay = p.AnchorY, ex = p.ElbowX, ey = p.EdgeY ?? p.Y;
+                if (Math.Max(ay, ey) < r0 || Math.Min(ay, ey) > r1) continue;
+                if (Math.Abs(ey - ay) < 1e-9) { list.Add((Math.Min(ax, ex) - space, Math.Max(ax, ex) + space)); continue; }
+                double XAt(double yy) => ax + (ex - ax) * (Math.Clamp(yy, Math.Min(ay, ey), Math.Max(ay, ey)) - ay) / (ey - ay);
+                list.Add((Math.Min(XAt(r0), XAt(r1)) - space, Math.Max(XAt(r0), XAt(r1)) + space));
+            }
             fixedIn[(above, k)] = list;
             return list;
         }

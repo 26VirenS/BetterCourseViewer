@@ -101,8 +101,10 @@ public sealed record BioBillboard(Model3D Model, BioVec Anchor, double Lift = 0,
 /// disc on the screen whichever way the model is turned. A charge's sign (<paramref name="Charge"/>, in its own colour)
 /// is drawn in a disc of the ground 16–22 across, edged in that colour (<see cref="BioChargeBadge"/>), on its atom's
 /// edge at the upper right, as a charge is written (N⁺, O⁻) — or the first other corner clear of the labels — over
-/// the labels.</summary>
-public sealed record BioMark(string Text, BioVec Anchor, double Size, BioVec? Atom = null, double AtomRadius = 0, Color? Colour = null, bool Charge = false);
+/// the labels. One that <paramref name="HidesBehind"/> is not shown while a part of the model lies in front of its atom
+/// (a peptide's many charges: the chain's far side would show its signs through it).</summary>
+public sealed record BioMark(string Text, BioVec Anchor, double Size, BioVec? Atom = null, double AtomRadius = 0, Color? Colour = null, bool Charge = false,
+    bool HidesBehind = false);
 
 /// <summary>Billboards as the molecule builder draws its labels.</summary>
 public static class BioBillboards

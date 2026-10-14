@@ -55,8 +55,10 @@ public readonly record struct BiomolLook(BioAtomStyle Style = BioAtomStyle.BallS
 /// turns.</param>
 /// <param name="Charge">A charge's sign on its atom (Pos the atom's centre): kept at the atom's upper right on the view, as
 /// a charge is written (N⁺, O⁻), however the model is turned.</param>
+/// <param name="HidesBehind">On top, but not shown while a part of the model lies in front of its atom (a peptide's
+/// charges, many along a chain).</param>
 public sealed record BiomolMark(BioVec Pos, string Text, string? Hex = null, double Size = 0.42, double Lift = 0,
-    bool OnTop = false, BioVec? Atom = null, double AtomRadius = 0, bool Charge = false);
+    bool OnTop = false, BioVec? Atom = null, double AtomRadius = 0, bool Charge = false, bool HidesBehind = false);
 
 /// <summary>A short motion (§4.4 Animate dehydration, the sugar's hydrolysis): groups of items, each moved from one offset
 /// to another and faded, after a delay; a <c>Pulse</c> flashes in and out (a new bond).</summary>
@@ -166,18 +168,18 @@ public static class BiomolScenes
         foreach (var a in m.Atoms)
         {
             if (!charges.TryGetValue(a.Name, out var q) || q == 0) continue;
-            out_.Add(Charge(a.Pos, q, Radius(a.Element, look, chem), look, 0.62, onTop: true));
+            out_.Add(Charge(a.Pos, q, Radius(a.Element, look, chem), look, 0.62));
         }
         return out_;
     }
 
-    /// <summary>A charge's sign on its atom. On top (one amino acid): over the whole molecule, just outside the atom's disc
-    /// at its upper right. In the scene (a peptide's many, which would show through the chain): at the atom's centre,
-    /// lifted past its near side and its own hydrogens (an H on it reaches 0.9 Å nearer in front, as the builder draws them,
-    /// and hid the NH₃⁺'s sign), set to its upper right on the view.</summary>
-    private static BiomolMark Charge(BioVec atom, int q, double radius, BiomolLook look, double size, bool onTop = false) =>
+    /// <summary>A charge's sign on its atom, over the whole molecule (the view's disc of the ground edged in the sign's
+    /// colour), just outside the atom's disc at its upper right or the first other corner clear of the labels. A peptide's
+    /// many are hidden while the chain lies in front of their atom (<paramref name="hides"/>); drawn in the scene instead,
+    /// they came out as 5–7 px pale signs on their blue atoms, and one sat under the C-terminus's label.</summary>
+    private static BiomolMark Charge(BioVec atom, int q, double radius, BiomolLook look, double size, bool hides = false) =>
         new(atom, q > 0 ? "+" : "−", (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), size, Lift: radius + 0.9,
-            OnTop: onTop, Atom: onTop ? atom : null, AtomRadius: radius, Charge: true);
+            OnTop: true, Atom: atom, AtomRadius: radius, Charge: true, HidesBehind: hides);
 
     // ---- amino acids (§4.4 Amino acids) ----
 
@@ -460,7 +462,7 @@ public static class BiomolScenes
             var (name, q) = p.Sequence[i] switch { 'K' => ("NZ", 1), 'R' => ("NH2", 1), 'D' => ("OD2", -1), 'E' => ("OE2", -1), _ => ("", 0) };
             if (q != 0 && p.AtomIndex(i, name) is { } k) charges.Add((k, q));
         }
-        return charges.Select(x => Charge(p.Atoms[x.Atom].Pos, x.Q, Radius(p.Atoms[x.Atom].Element, look, chem), look, 0.75)).ToList();
+        return charges.Select(x => Charge(p.Atoms[x.Atom].Pos, x.Q, Radius(p.Atoms[x.Atom].Element, look, chem), look, 0.75, hides: true)).ToList();
     }
 
     // ---- nucleotides and a strand (§4.4 Nucleic acids) ----

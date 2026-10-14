@@ -439,7 +439,8 @@ public static class CEMembrane
     }
 
     /// <summary>The twelve labels (§4.1.1), at points the camera sees: the cut faces for the bilayer, a head and the tails;
-    /// the proteins' tops; the sides in front of the near cut face.</summary>
+    /// the proteins' tops; the outside above the near cut face, and the cytoplasm's side on the lower leaflet's heads at
+    /// that face (out in front of it, below the patch, its leader ended in the open, on nothing).</summary>
     public static List<BioLabel3D> Labels()
     {
         var d = Display;
@@ -462,7 +463,7 @@ public static class CEMembrane
             L("part:glycoprotein", "Glycoprotein", new BioVec(g.X + 0.4, 5.6, g.Z + 0.2), 8),
             L("part:glycolipid", "Glycolipid", new BioVec(GlycolipidPlaces[3].X, HeadY + 2.0, GlycolipidPlaces[3].Z), 7),
             L("side:outside", "Extracellular side", new BioVec(-22, 6.5, Half + 1), 6),
-            L("side:inside", "Cytoplasm side", new BioVec(-22, -7.5, Half + 1), 6),
+            L("side:inside", "Cytoplasm side", new BioVec(-22, -HeadY, Half - 0.5), 6, new BioVec(0, -0.4, 1)),
         };
     }
 }

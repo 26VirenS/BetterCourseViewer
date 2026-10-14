@@ -44,8 +44,14 @@ public sealed class BioSceneView : Grid
     private readonly Path leaders = new() { StrokeThickness = 1, IsHitTestVisible = false, Opacity = 0.55 };
     private readonly ContentControl spinnerHost = new() { Focusable = false, IsHitTestVisible = false, Margin = new Thickness(14), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly Dictionary<string, FrameworkElement> labelViews = new();
-    // (where the labels' capsules are, for a charge's disc to keep off them)
+    // (where the labels' capsules are, for a charge's disc and a carbon's number to keep off them)
     private List<Rect> labelFrames = new();
+    // (the marks the model hides now — a peptide's charges at the chain's back — and when the view was last still for
+    //  their rays)
+    private readonly HashSet<FrameworkElement> covered = new();
+    private string markSignature = "";
+    private DateTime marksStillSince = DateTime.UtcNow;
+    private bool marksTested = true;
     private FrameworkElement? moreText;
     private string? moreWords;
 
@@ -194,7 +200,7 @@ public sealed class BioSceneView : Grid
     public Size LabelKeepClear
     {
         get => labelKeepClear;
-        set { if (labelKeepClear == value) return; labelKeepClear = value; labelSignature = ""; Wake(); }
+        set { if (labelKeepClear == value) return; labelKeepClear = value; labelSignature = ""; Refit(); Wake(); }
     }
     private Size labelKeepClear;
 
@@ -396,49 +402,114 @@ public sealed class BioSceneView : Grid
     private Quaternion fitTurn = Quaternion.Identity;
 
     /// <summary>
-    /// How far from its ball's centre the camera stands for the model, turned by <paramref name="q"/>, to fill 85% of its
-    /// room each way: the view, less a column for the labels at each side while they are shown. Measured on the model's
-    /// own boxes (<see cref="extents"/>), not its ball, so a long model (the helix) or a wide one (a cell) fills its view —
-    /// a ball's worth of room round a narrow helix left it small in a big empty card. Before the view has a size, or for an
-    /// empty scene: the ball at 1.15·R / sin 20°, as before.
+    /// How far from its ball's centre the camera stands for the model, turned by <paramref name="q"/>: as near as leaves
+    /// its labels off it. From the model filling 85% of the view each way — measured on its own boxes (<see
+    /// cref="extents"/>), not its ball, so a long helix or a wide cell fills its view — the camera stands back a step at a
+    /// time, the labels laid out at each step as they will be drawn (<see cref="LabelsOn"/>), until none lies on the
+    /// model's box or on another label's anchor: the room is what the labels placed there take — none at a side with no
+    /// column, a row's height for those moved above or below it. (A column's room kept at each side for the widest label,
+    /// whether or not a label sat there, held every model under half the view's width, and labels wider than that room
+    /// still landed on it.) Never past 2.5 times as far; with no step clear, the nearest with the fewest on it. Before the
+    /// view has a size, or for an empty scene: the ball at 1.15·R / sin 20°, as before.
     /// </summary>
     private double FitDistance(BioSphere s, Quaternion q)
     {
         var ball = 1.15 * Math.Max(s.Radius, 1e-3) / Math.Sin(20 * Math.PI / 180);
         if (ActualWidth < 40 || ActualHeight < 40 || extents.Count == 0) return ball;
         var f = ActualHeight / (2 * Tan20);
-        var room = Math.Max(ActualWidth - 2 * LabelRoom(), ActualWidth * 0.55);
-        double hw = 0.425 * room, hh = 0.425 * ActualHeight;
+        double hw = 0.425 * ActualWidth, hh = 0.425 * ActualHeight;
         var c = BioWpf.P(s.Centre);
         var m = Matrix3D.Identity;
         m.RotateAt(q, c);
-        // (a scene that names the ball to frame keeps to it: a bacterium's long flagella reach far past the cell its ball
-        //  holds, and fitting them all left the cell a speck)
-        var held = content?.Frame != null;
-        double Held(double v, double mid) => held ? Math.Clamp(v, mid - s.Radius, mid + s.Radius) : v;
+        var corners = Corners(s, m, c);
         double d = 0, front = double.MinValue;
-        foreach (var (lo, hi) in extents)
-            for (var i = 0; i < 8; i++)
-            {
-                var corner = new Point3D(Held((i & 1) == 0 ? lo.X : hi.X, s.Centre.X), Held((i & 2) == 0 ? lo.Y : hi.Y, s.Centre.Y), Held((i & 4) == 0 ? lo.Z : hi.Z, s.Centre.Z));
-                var p = m.Transform(corner) - c;
-                // (the camera at the centre and d out along +z: this corner is d − p.Z in front of it, and shows
-                //  |p.X|·f / (d − p.Z) from the view's middle)
-                d = Math.Max(d, p.Z + Math.Max(Math.Abs(p.X) * f / hw, Math.Abs(p.Y) * f / hh));
-                front = Math.Max(front, p.Z);
-            }
+        foreach (var p in corners)
+        {
+            // (the camera at the centre and d out along +z: this corner is d − p.Z in front of it, and shows |p.X|·f / (d −
+            //  p.Z) from the view's middle)
+            d = Math.Max(d, p.Z + Math.Max(Math.Abs(p.X) * f / hw, Math.Abs(p.Y) * f / hh));
+            front = Math.Max(front, p.Z);
+        }
         // (never inside the model)
         d = Math.Max(d, front + 0.05 * Math.Max(s.Radius, 1e-3));
-        return double.IsFinite(d) && d > 0 ? d : ball;
+        if (!double.IsFinite(d) || d <= 0) return ball;
+        fitReach = BioLabelLayout.Reach;
+        if (!showLabels || content is not { Labels.Count: > 0 }) return d;
+        double Search(double reach)
+        {
+            var (best, fewest) = (d, int.MaxValue);
+            for (var k = d; k <= 2.5 * d; k *= 1.04)
+            {
+                var on = LabelsOn(s, m, c, corners, k, f, reach);
+                if (on < fewest) (best, fewest) = (k, on);
+                if (on == 0) break;
+            }
+            return best;
+        }
+        // (twice: with a label a little over the model kept in its column, and with every label over it moved to a row
+        //  above or below — the rows taken only where they make the model a sixth larger or more, so a peptide's four
+        //  labels go above and below it and a cell's sixteen keep to their columns, their leaders uncrossed)
+        var columns = Search(BioLabelLayout.Reach);
+        var rows = Search(4);
+        if (rows > 0.85 * columns) return columns;
+        fitReach = 4;
+        return rows;
     }
 
-    /// <summary>The room each side of the model kept for a column of labels while they are shown: its widest label (up to
-    /// 170), the column's 24 from the model and the view's 16 inset.</summary>
-    private double LabelRoom()
+    /// <summary>How far a column's label may reach into a narrow model before it moves to a row, as the fit last chose it
+    /// (<see cref="BioLabelLayout.Reach"/>, or 4 where rows made the model larger): the labels are laid out with it.</summary>
+    private double fitReach = BioLabelLayout.Reach;
+
+    /// <summary>The corners of the content's boxes, turned by <paramref name="m"/>, from its ball's centre — a scene that
+    /// names the ball to frame kept to it (a bacterium's long flagella reach far past the cell its ball holds: fitting them
+    /// all left the cell a speck, and its labels had no room off them).</summary>
+    private List<Vector3D> Corners(BioSphere s, Matrix3D m, Point3D c)
     {
-        if (!showLabels || content is not { Labels.Count: > 0 } c) return 0;
-        return Math.Min(c.Labels.Max(l => LabelWidth(l.Text)), 170) + BioLabelLayout.ColumnOffset + BioLabelLayout.Inset;
+        var held = content?.Frame != null;
+        double Held(double v, double mid) => held ? Math.Clamp(v, mid - s.Radius, mid + s.Radius) : v;
+        var out_ = new List<Vector3D>(extents.Count * 8);
+        foreach (var (lo, hi) in extents)
+            for (var i = 0; i < 8; i++)
+                out_.Add(m.Transform(new Point3D(Held((i & 1) == 0 ? lo.X : hi.X, s.Centre.X), Held((i & 2) == 0 ? lo.Y : hi.Y, s.Centre.Y),
+                    Held((i & 4) == 0 ? lo.Z : hi.Z, s.Centre.Z))) - c);
+        return out_;
     }
+
+    /// <summary>How many labels would lie on the model (its box on the view) or on another label's anchor with the camera
+    /// <paramref name="d"/> from its ball's centre along +z: the labels laid out as <see cref="TickLabels"/> lays them —
+    /// the box kept clear too — each anchor seen unless its normal faces away or a ray has found it hidden.</summary>
+    private int LabelsOn(BioSphere s, Matrix3D m, Point3D c, List<Vector3D> corners, double d, double f, double reach)
+    {
+        double w = ActualWidth, h = ActualHeight, near = Math.Max(0.001, d * 0.01);
+        (double X, double Y, bool InFront) At(Vector3D p) => d - p.Z <= near ? (0, 0, false) : (w / 2 + p.X * f / (d - p.Z), h / 2 - p.Y * f / (d - p.Z), true);
+        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
+        foreach (var p in corners)
+        {
+            var a = At(p);
+            if (!a.InFront) return int.MaxValue;
+            x0 = Math.Min(x0, a.X);
+            y0 = Math.Min(y0, a.Y);
+            x1 = Math.Max(x1, a.X);
+            y1 = Math.Max(y1, a.Y);
+        }
+        var box = new BioLabelBox(Math.Max(x0, 0), Math.Max(y0, 0), Math.Min(x1, w), Math.Min(y1, h));
+        var eye = new Vector3D(0, 0, d);
+        var inputs = new List<BioLabelInput>();
+        foreach (var l in content!.Labels)
+        {
+            var p = m.Transform(BioWpf.P(l.Anchor)) - c;
+            var (x, y, visible) = At(p);
+            if (visible && !l.Always && l.Normal is { } nrm) visible = Vector3D.DotProduct(m.Transform(BioWpf.V(nrm)), eye - p) > 0;
+            else if (visible && !l.Always) visible = rayVisible.GetValueOrDefault(l.Id, true);
+            inputs.Add(new BioLabelInput(l.Id, l.Text, x, y, visible, l.Area, LabelWidth(l.Text)));
+        }
+        var (placed, _) = BioLabelLayout.Layout(inputs, w / 2, h / 2, Math.Min(f * s.Radius / d, w * 0.32), w, h, box, KeepClearBox(), reach);
+        return BioLabelLayout.Conflicts(placed, box);
+    }
+
+    /// <summary>The view's corner kept clear of labels, as a box on the view (none: null).</summary>
+    private BioLabelBox? KeepClearBox() => labelKeepClear.Width > 0 && labelKeepClear.Height > 0
+        ? new BioLabelBox(0, ActualHeight - labelKeepClear.Height, labelKeepClear.Width, ActualHeight) : null;
 
     /// <summary>The model kept filling its room as the view's size (or the labels' room) changes: the camera's distance
     /// scaled by how the fit has changed — the scene framed again if the student has not zoomed, a zoom of their own kept as
@@ -492,12 +563,16 @@ public sealed class BioSceneView : Grid
 
     /// <summary>The marks for a new scene: words in the page's text colour, each with a halo of the ground round it, so
     /// it reads over atoms; a charge's sign in a small disc of the ground, edged in its colour (a bare blue + on the blue
-    /// amino group, or a red − on the carboxyl's red, could not be seen).</summary>
+    /// amino group, or a red − on the carboxyl's red, could not be seen). A mark the model may hide waits hidden for its
+    /// first ray (<see cref="TickMarks"/>).</summary>
     private void MakeMarks()
     {
         markLayer.Children.Clear();
         chargeLayer.Children.Clear();
         marks = new List<(BioMark, FrameworkElement)>();
+        covered.Clear();
+        markSignature = "";
+        marksTested = false;
         var ground = Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Colors.White;
         foreach (var m in markSource?.Invoke() ?? Array.Empty<BioMark>())
         {
@@ -506,6 +581,7 @@ public sealed class BioSceneView : Grid
                 var badge = new BioChargeBadge(m.Text == "+", m.Colour ?? (Appearance.Dark ? Colors.White : Colors.Black), ground);
                 chargeLayer.Children.Add(badge);
                 marks.Add((m, badge));
+                if (m.HidesBehind) covered.Add(badge);
                 continue;
             }
             var t = new TextBlock { Text = m.Text, FontWeight = FontWeights.Bold, IsHitTestVisible = false };
@@ -514,13 +590,48 @@ public sealed class BioSceneView : Grid
             t.Effect = new System.Windows.Media.Effects.DropShadowEffect { ShadowDepth = 0, BlurRadius = 5, Opacity = 1, Color = ground };
             markLayer.Children.Add(t);
             marks.Add((m, t));
+            if (m.HidesBehind) covered.Add(t);
         }
+    }
+
+    /// <summary>Each frame: the marks the model may hide (a peptide's charges, drawn over it), each tested with a ray
+    /// through its atom once the view has been still for 150 ms — hidden while a part of the model lies in front of the
+    /// atom, so the chain's far side shows no signs through it.</summary>
+    private void TickMarks()
+    {
+        if (!marks.Any(m => m.Mark.HidesBehind)) { marksTested = true; return; }
+        var sig = $"{camera.Position}|{orientation}|{ActualWidth}x{ActualHeight}|{selection}|{dimOthers}|{worldGroup.Children.Count}";
+        if (sig != markSignature)
+        {
+            markSignature = sig;
+            marksStillSince = DateTime.UtcNow;
+            marksTested = false;
+            return;
+        }
+        if (marksTested || (DateTime.UtcNow - marksStillSince).TotalMilliseconds <= 150) return;
+        marksTested = true;
+        covered.Clear();
+        foreach (var (m, v) in marks)
+            if (m.HidesBehind && Covered(m.Atom ?? m.Anchor, m.AtomRadius)) covered.Add(v);
+        PlaceMarks();
+    }
+
+    /// <summary>Whether a part of the model lies in front of an atom where the view shows it: the ray through its centre
+    /// meets something nearer than its near side and its own hydrogens (1.2 Å past its radius: an H on it reaches 0.9 Å
+    /// nearer).</summary>
+    private bool Covered(BioVec atom, double radius)
+    {
+        var (x, y, front, dist) = Project(atom);
+        if (!front) return true;
+        return ObjectAt(new Point(x, y)) is { } hit && hit.Distance < dist - radius - 1.2;
     }
 
     /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them (a charge's disc
     /// 16–22 across), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end
-    /// on, away from the model's centre); a charge's disc on the atom's edge at the upper right, as N⁺ is written, or at
-    /// the first other corner clear of the labels (a label moved in over the model covered the carboxyl's).</summary>
+    /// on, away from the model's centre) — turned round the atom to the first place clear of the labels (the ring's "2"
+    /// lay half under "Glycosidic bond"); a charge's disc on the atom's edge at the upper right, as N⁺ is written, or at
+    /// the first other corner clear of the labels (a label moved in over the model covered the carboxyl's). A mark the
+    /// model hides (<see cref="covered"/>) is not shown.</summary>
     private void PlaceMarks()
     {
         if (marks.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
@@ -529,6 +640,7 @@ public sealed class BioSceneView : Grid
         foreach (var (m, v) in marks)
         {
             var (x, y, front, dist) = Project(m.Anchor);
+            front = front && !covered.Contains(v);
             v.Visibility = front ? Visibility.Visible : Visibility.Collapsed;
             if (!front) continue;
             var size = m.Size * f / Math.Max(dist, 1e-6);
@@ -556,9 +668,25 @@ public sealed class BioSceneView : Grid
                 if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (n.X - c.X, n.Y - c.Y);
                 var len = Math.Sqrt(dx * dx + dy * dy);
                 if (len < 1) (dx, dy, len) = (1, 0, 1);
-                // (a number clear of its atom's disc)
+                // (a number clear of its atom's disc — and turned round it, a twelfth of a turn at a time either way, to the
+                //  first place clear of the labels' capsules; none clear, where it was)
                 var reach = m.AtomRadius * f / Math.Max(n.Distance, 1e-6) + Math.Max(w, h) / 2 + 1;
-                (x, y) = (n.X + dx / len * reach, n.Y + dy / len * reach);
+                var (ux, uy) = (dx / len, dy / len);
+                (x, y) = (n.X + ux * reach, n.Y + uy * reach);
+                for (var k = 0; k <= 6; k++)
+                {
+                    var clear = false;
+                    foreach (var turnBy in k == 0 ? new[] { 0.0 } : new[] { k * Math.PI / 6, -k * Math.PI / 6 })
+                    {
+                        double rx = ux * Math.Cos(turnBy) - uy * Math.Sin(turnBy), ry = ux * Math.Sin(turnBy) + uy * Math.Cos(turnBy);
+                        var spot = new Rect(n.X + rx * reach - w / 2, n.Y + ry * reach - h / 2, w, h);
+                        if (labelFrames.Any(r => r.IntersectsWith(spot))) continue;
+                        (x, y) = (spot.X + w / 2, spot.Y + h / 2);
+                        clear = true;
+                        break;
+                    }
+                    if (clear) break;
+                }
             }
             Canvas.SetLeft(v, x - w / 2);
             Canvas.SetTop(v, y - h / 2);
@@ -615,10 +743,11 @@ public sealed class BioSceneView : Grid
             Place();
         }
         if (showLabels) TickLabels();
-        // (nothing moving and the labels settled: asleep until something changes)
+        TickMarks();
+        // (nothing moving, the labels settled and the marks tested: asleep until something changes)
         var turningOn = Turning && Motion.On;
         var labelsSettled = !showLabels || content == null || content.Labels.Count == 0 || raysDone;
-        if (move == null && !turningOn && labelsSettled && downAt == null) Sleep();
+        if (move == null && !turningOn && labelsSettled && marksTested && downAt == null) Sleep();
     }
 
     // ---- the pointer and the keys ----
@@ -934,9 +1063,7 @@ public sealed class BioSceneView : Grid
         // (the model's circle on the view: its framing ball's centre and edge, projected)
         var c = Project(framing.Centre);
         var r = ActualHeight / (2 * Tan20) * framing.Radius / Math.Max(distance, 1e-6);
-        var clear = labelKeepClear.Width > 0 && labelKeepClear.Height > 0
-            ? new BioLabelBox(0, ActualHeight - labelKeepClear.Height, labelKeepClear.Width, ActualHeight) : (BioLabelBox?)null;
-        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox(), clear);
+        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox(), KeepClearBox(), fitReach);
         DrawLabels(placed, more);
     }
 
@@ -966,18 +1093,24 @@ public sealed class BioSceneView : Grid
     }
 
     /// <summary>The model's box on the view: the corners of its boxes where the turn and the camera put them (as Project
-    /// does), their least and greatest x and y; null for an empty scene, or while a corner is behind the camera.</summary>
+    /// does), their least and greatest x and y — kept to the ball of a scene that names the ball to frame, as the camera
+    /// is (the bacterium's labels sit beside its cell, not out past its flagella); null for an empty scene, or while a
+    /// corner is behind the camera.</summary>
     private BioLabelBox? ModelBox()
     {
         if (extents.Count == 0) return null;
         var m = turn.Value;
         var eye = camera.Position;
         var f = ActualHeight / (2 * Tan20);
+        var s = framing;
+        var held = content?.Frame != null;
+        double Held(double v, double mid) => held ? Math.Clamp(v, mid - s.Radius, mid + s.Radius) : v;
         double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
         foreach (var (lo, hi) in extents)
             for (var i = 0; i < 8; i++)
             {
-                var w = m.Transform(new Point3D((i & 1) == 0 ? lo.X : hi.X, (i & 2) == 0 ? lo.Y : hi.Y, (i & 4) == 0 ? lo.Z : hi.Z));
+                var w = m.Transform(new Point3D(Held((i & 1) == 0 ? lo.X : hi.X, s.Centre.X), Held((i & 2) == 0 ? lo.Y : hi.Y, s.Centre.Y),
+                    Held((i & 4) == 0 ? lo.Z : hi.Z, s.Centre.Z)));
                 var v = w - eye;
                 var z = -v.Z;
                 if (z <= camera.NearPlaneDistance) return null;
@@ -1068,8 +1201,21 @@ public sealed class BioSceneView : Grid
                 moreWords = words;
                 labelLayer.Children.Add(moreText);
             }
-            Canvas.SetLeft(moreText, last.Frame.X + 6);
-            Canvas.SetTop(moreText, last.Y + 11);
+            // (under the lowest label — or, with no room under it, beside it toward the model: under a column that reached
+            //  the view's foot it was cut off, and a label was left out with nothing to say so)
+            moreText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var (mw, mh) = (moreText.DesiredSize.Width, moreText.DesiredSize.Height);
+            if (last.Y + 11 + mh <= ActualHeight)
+            {
+                Canvas.SetLeft(moreText, last.Frame.X + 6);
+                Canvas.SetTop(moreText, last.Y + 11);
+            }
+            else
+            {
+                var x = last.Left ? last.Frame.X + last.Frame.Width + 6 : last.Frame.X - 6 - mw;
+                Canvas.SetLeft(moreText, Math.Clamp(x, 0, Math.Max(0, ActualWidth - mw)));
+                Canvas.SetTop(moreText, last.Y - mh / 2);
+            }
         }
         else if (moreText != null)
         {
@@ -1077,8 +1223,8 @@ public sealed class BioSceneView : Grid
             moreText = null;
             moreWords = null;
         }
-        // (a charge's disc kept off the labels just placed)
-        if (marks.Any(m => m.Mark.Charge)) PlaceMarks();
+        // (a charge's disc and a carbon's number kept off the labels just placed)
+        if (marks.Any(m => m.Mark.Atom != null)) PlaceMarks();
     }
 
     /// <summary>A label: its words in a capsule of the card's colour, edged in the accent while its object is under the

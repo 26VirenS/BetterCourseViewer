@@ -213,10 +213,18 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
 - **The view:** `var scene = new BioSceneView("3D model of …")`, then `scene.Show(key, () => MakeScene(copies…),
   frameKey:, billboards:, marks:)`. The build runs off the UI thread — capture copies, never a view — and again only when `key`
   changes (put the page, the options and light or dark in it); asked again for the scene shown while another is being
-  made, it lets the other go. The camera frames the content on the first scene and when `frameKey` is new: 40°, as far
-  off as makes the model's own boxes (not its ball) fill 85% of its room each way — the view, less a column for the
-  labels at each side while they are shown — so a long helix or a wide cell fills its view; it keeps that share as the
-  view is resized (a zoom of the student's own kept as the same share of it); `ResetView()` frames it again;
+  made, it lets the other go. The camera frames the content on the first scene and when `frameKey` is new: 40°, from
+  the model's own boxes (not its ball) filling 85% of the view each way, so a long helix or a wide cell fills it, it
+  stands back a step at a time — the labels laid out at each step as they will be drawn — until none lies on the
+  model's box or on another label's anchor: the room is what the labels placed there take, none at a side with no
+  column, a row's height for those moved above or below (`BioLabelLayout.Conflicts`). It tries that twice, with a
+  label a little over the model kept in its column (`BioLabelLayout.Reach`, 40) and with every label over it moved to
+  a row, and takes the rows only where they make the model a sixth larger or more (a peptide's four labels go above
+  and below it; a cell's sixteen keep to their columns). 0.3.1's first fit kept a column's room at each side for the
+  widest label whether a label sat there or not, which held every model under half the view's width and still left
+  wider labels on it. A scene that names its ball (`Frame`) is fitted, and its labels' room measured, by that ball (a
+  bacterium's cell, not its flagella). It keeps that share as the view is resized (a zoom of the student's own kept as
+  the same share of it); `ResetView()` frames it again;
   `ZoomTo(id)` frames an object. Set
   `Selection` (the selection glows, the rest dims to 35%: `DimOthers`), `ShowLabels`, `Turning` (auto-turn, 30 s a turn;
   never with animations off), `PickSelects`, `Accessibility`; listen to `Picked`, `DoubleClicked`, `HoverChanged`, and
@@ -228,34 +236,38 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   drag turns, right-drag pans, the wheel zooms; ← → ↑ ↓ turn 15°, + − zoom, Escape deselects; double-click zooms to an
   object (or resets on empty space). Labels with leader lines (§3.5: two columns 22 apart, 24 out from the model's box
   on the view — beside the model, not at the view's edges — kept even, a column holding as many as the view's height
-  has room for, one with more giving its labels nearest the model's middle to the other while that has room, before
-  "+N more", 120 ms fades, pressable, hover outlines their object) come from `Labels`; give a
+  has room for, one with more giving its labels nearest the model's middle to the other while that has room, however
+  far out, before "+N more" (under the lowest label, or beside it where the view's foot leaves no room), two leaders in
+  a column that cross swapping places, an anchor straight over or under its own label led straight to its edge, 120 ms
+  fades, pressable, hover outlines their object) come from `Labels`; give a
   convex shell's label a `Normal`, else a ray
   decides what hides it; `Always` shows it whatever covers it (a strand's ends: both ends of both strands are always
   named). Cell Explorer's nucleus, cut open, is anchored on its envelope's ring at the cut face that turns most to the
   camera, with that face's normal (at the back of the envelope the nucleolus and the chromatin hid it). A label too wide for the room beside its column is moved in on its own (the Mac moves the whole
   column in for its widest, which in this app's narrower view put the short labels over the model), and an anchor past
   a label's far edge is led to that edge. Given the model's box on the view (its items' boxes, projected), a label
-  that would still hide its own anchor, or reach more than 40 into a model narrower than 70% of the view (over half its
-  width, for a short label), goes to a row just above the model (an anchor in its upper half) or below it; a row's
-  labels are packed side by side in their anchors' order, their leaders straight up or down and never through a capsule
-  in a row nearer the model; a label that fits no row stays in its column (and a row's label packed over it goes back to
-  its own). It draws frame by frame only while something moves. Keep a scene under 300k triangles (§3.4: Viewport3D
+  that would still hide its own anchor or another label's, or reach more than `Reach` into a model narrower than 70% of
+  the view (over half its width, for a short label), goes to a row just above the model (an anchor in its upper half)
+  or below it; a row's labels are packed side by side in their anchors' order, clear of the leaders crossing the row on
+  their way to a column, their leaders straight up or down and never through a capsule in a row nearer the model; a
+  label that fits no row stays in its column (and a row's label packed over it goes back to its own). It draws frame by frame only while something moves. Keep a scene under 300k triangles (§3.4: Viewport3D
   draws on one thread; icospheres for the many small spheres). `BioSceneCard.Make(bar, scene, hint)` and `BioSceneCard.Buttons(scene)` (Turn / Reset view) give the
   chemistry builder's card.
 - WPF side (`BioScene.cs`): `BioWpf.Mesh(mesh)` (frozen `MeshGeometry3D`), `BioWpf.Material(material, fade)`,
   `BioWpf.Batches(items)` (one mesh per material and order, with `BioMeshBatch.ObjectAtVertex/ObjectAtTriangle`),
   `BioWpf.P/V/B` conversions, `BioBillboards.Text(s, size, colour, glow)`, `BioBillboard(model, anchor, lift, id)`
-  (drawn in the scene, so the model can hide it), and `BioMark(text, anchor, size, atom, atomRadius, colour, charge)`:
-  a few letters in 2D over the whole model, 11–17 px, an atom's number set just outside its atom's disc (DNA & RNA's
+  (drawn in the scene, so the model can hide it), and `BioMark(text, anchor, size, atom, atomRadius, colour, charge,
+  hidesBehind)`: a few letters in 2D over the whole model, 11–17 px, an atom's number set just outside its atom's disc
+  and turned round it to the first place clear of the labels (DNA & RNA's
   "5′" and "3′" and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`; the Biomolecule Builder's ring
   and sugar carbons' numbers: `BiomolMark(…, OnTop: true)`, which `BiomolStage` hands the view as marks), or a charge's
   sign in a disc of the ground 16–22 across, edged in the sign's colour (`BioChargeBadge`: a bare blue + on the blue
   amino group could not be seen), on its atom's edge at the upper right — or the first other corner clear of the
   labels' capsules — over the labels (a label too wide for its room is moved in over the model, and hid the carboxyl's
   −) (a free amino acid's: drawn in the
-  scene, lysine's side-chain NH₃⁺ sign was hidden behind the carbon next to it; a peptide's many stay in the scene,
-  so the chain hides those at its back).
+  scene, lysine's side-chain NH₃⁺ sign was hidden behind the carbon next to it). One that `hidesBehind` (a peptide's
+  many charges) is tested with a ray through its atom once the view has been still for 150 ms, and hidden while a part
+  of the model lies in front of it, so the chain's far side shows no signs through it.
 
 ## Step-through (§3.6)
 
@@ -282,8 +294,10 @@ chemistry builders' layout, `ChemLayout`, decided on the width it is given — a
 by side from 1180 wide; from 840 — the popup on a 1280 or 1366 window — the drawing beside one column, the controls
 over the facts, each scrolling in its own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and
 45%); narrower — the popup on a 1024 window, or a narrow one — the drawing across the top, as tall as leaves 100 of the
-page for the two columns' headings and first controls under it (240 to 560: room beside an animal cell for its sixteen
-labels). The controls and the facts are always in
+page for the two columns' headings and first controls under it (180 to 560: room beside an animal cell for its sixteen
+labels; on the smallest window, 720 by 520, a floor of 240 left only the columns' first line in sight), the page's
+room at its sides inside its scroller, so the scroll bar runs down the page's edge, not down the 3D view beside Reset
+view. The controls and the facts are always in
 sight: 0.3.0 gave the drawing the whole page under 1180, and they sat out of sight below it. A scene's
 `LabelKeepClear` keeps its labels off a corner a page lays something over — Cell Explorer's scale bar),
 `BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
@@ -350,7 +364,8 @@ whole model, each just outside its atom (in the scene the H or O in front hid th
 at the atom's upper right on the view as a charge is written (N⁺, O⁻), whichever way the model is turned (set out from
 the molecule's centre in the scene, a sign sat beside a neighbouring H or out in the open): a free amino acid's over
 the whole model, just outside the atom's disc (in the scene, lysine's side-chain NH₃⁺ was hidden behind the carbon next
-to it), a peptide's in front of its atom in the scene (`BioBillboard`'s shift), so the chain hides those at its back.
+to it), a peptide's the same, hidden while the chain lies in front of their atom (drawn in the scene, they came out as
+5–7 px pale signs on their blue atoms, and the C-terminus's sat under its label).
 Haemoglobin's chains are each
 named at the residue nearest a third of the way along that the first view (down z) shows 12 Å clear of every heme, on
 the chain's near side, so no chain's leader ends on a heme. Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
@@ -369,7 +384,9 @@ Takes `sequence`, `protein` and `molecule`; sends `mutation` = `sickle` (page `m
 
 Pages `helix`, `nucleotides`, `sequence`, `replication`, `rna`. `Model/DNAToolModel.cs` (state, styles),
 `DnaHelix.cs` (right-handed B-DNA, 10.5 bp a turn, cartoon, atoms or space-filling; ends, grooves, measures,
-H-bonds, unzip), `DnaNucleotides.cs` (the nine nucleotides, the A·T/A·U and G·C pairs drawn flat), `DnaReplication.cs`
+H-bonds, unzip), `DnaNucleotides.cs` (the nine nucleotides, the A·T/A·U and G·C pairs drawn flat — never under 90% of
+their own size while the card's width allows, scrolling in the card when that is taller than its room: fitted to a
+tool's popup at 1366 their bond lengths and "to sugar" came out 7 px tall), `DnaReplication.cs`
 (the fork's nine steps, each naming its enzyme), `DnaRna.cs` (the mRNA strip, the tRNA cloverleaf and its L-shape in
 3D, ribosomes), `DnaChecks.cs`. Views: `DNATool.cs` (pages, launch, hand-off, `SimplBio.dna.<field>`), one file a
 page (`DNAHelixPage.cs` … `DNARnaPage.cs`). Launch, in the Mac's words with this app's first ones beside them:

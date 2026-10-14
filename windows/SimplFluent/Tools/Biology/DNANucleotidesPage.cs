@@ -18,6 +18,11 @@ internal sealed class DnaNucleotidesPage : Grid
 {
     private readonly BioSceneView scene = new("3D model of a nucleotide") { PickSelects = false };
     private readonly DnaPairsDrawing pairs = new();
+    // (the pairs drawn no smaller than they read, scrolling in the card when that is taller than its room)
+    private readonly ScrollViewer pairsScroll = new()
+    {
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false,
+    };
     private readonly ContentControl body = new() { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
     // (the nucleotide's name under its code: on one line with the view's switch it was cut short)
@@ -41,6 +46,8 @@ internal sealed class DnaNucleotidesPage : Grid
     {
         viewBar = new SelectorBar(new[] { "3D", "Base pairs (2D)" }, DNAToolModel.ShowPairs ? 1 : 0);
         viewBar.Changed += i => DNAToolModel.ShowPairs = i == 1;
+        pairsScroll.Content = pairs;
+        pairsScroll.SizeChanged += (_, e) => pairs.Room = e.NewSize;
         scene.Picked += Pick;
         title.TextTrimming = TextTrimming.CharacterEllipsis;
         // (the subtitle wraps to a second line rather than being cut short beside the view switch)
@@ -100,7 +107,7 @@ internal sealed class DnaNucleotidesPage : Grid
             subtitle.Text = DNAToolModel.PairWithUracil ? "A·U and G·C, drawn flat" : "A·T and G·C, drawn flat";
             foot.Text = "C1′ to C1′ is 10.9 Å in both pairs: a purine with a pyrimidine is always the same width";
             pairs.Uracil = DNAToolModel.PairWithUracil;
-            body.Content = pairs;
+            body.Content = pairsScroll;
             buttons.Content = null;
         }
         else
@@ -314,17 +321,50 @@ internal sealed class DnaPairsDrawing : DnaDrawing
             $"Base pairs drawn flat. {a.Name}: {a.HBonds.Count} hydrogen bonds ({Bonds(a)}). G·C: 3 hydrogen bonds ({Bonds(g)}). Purines A and G have two rings; pyrimidines have one.");
     }
 
-    /// <summary>The two pairs side by side where that draws them larger (a wide, short view: the Tools page beside the
-    /// navigation pane), else one over the other; each pair's panel 500 wide side by side, 640 one over the other.</summary>
-    private bool SideBySide => ActualWidth > 0 && ActualHeight > 0 && Math.Min(ActualWidth / 1000, ActualHeight / 350) > Math.Min(ActualWidth / 640, ActualHeight / 700);
+    private static readonly Size Wide = new(1000, 350), Tall = new(640, 700);
 
-    protected override Size Design => SideBySide ? new(1000, 350) : new(640, 700);
+    /// <summary>The least share of its own size it is drawn at, where its room's width allows: its bond lengths, "to sugar"
+    /// and the grooves' sides 11 there come out at 10 — fitted to a tool's popup at 1366 they came out at 7 and could not be
+    /// read — the scroller round it taking what is then taller than its room.</summary>
+    private const double LeastScale = 0.9;
+
+    /// <summary>The room it is shown in (its scroller's size): it is laid out for that, not for the height it is given.</summary>
+    public Size Room
+    {
+        get => room;
+        set
+        {
+            if (room == value) return;
+            room = value;
+            InvalidateMeasure();
+            InvalidateVisual();
+        }
+    }
+    private Size room;
+    private bool sideBySide;
+
+    /// <summary>The two pairs side by side where that draws them larger (a wide, short view: the Tools page beside the
+    /// navigation pane), else one over the other; each pair's panel 500 wide side by side, 640 one over the other — at its
+    /// room's width, as tall as that and never under <see cref="LeastScale"/> of its size while the width allows.</summary>
+    protected override Size MeasureOverride(Size available)
+    {
+        var w = double.IsInfinity(available.Width) ? room.Width : available.Width;
+        var h = room.Height > 0 ? room.Height : available.Height;
+        if (!(w > 0) || double.IsInfinity(w) || !(h > 0) || double.IsInfinity(h)) return base.MeasureOverride(available);
+        double Scale(Size d) => Math.Min(w / d.Width, Math.Max(Math.Min(w / d.Width, h / d.Height), LeastScale));
+        var side = Scale(Wide) > Scale(Tall);
+        if (side != sideBySide) { sideBySide = side; InvalidateVisual(); }
+        var design = side ? Wide : Tall;
+        return new Size(w, Math.Max(h, design.Height * Scale(design)));
+    }
+
+    protected override Size Design => sideBySide ? Wide : Tall;
 
     private const double Scale = 31;
 
     protected override void Draw(DrawingContext dc)
     {
-        var side = SideBySide;
+        var side = sideBySide;
         Panel(dc, DnaNucleotides.Pair2D(uracil ? "AU" : "AT"), 0, side ? 250 : 320);
         Panel(dc, DnaNucleotides.Pair2D("GC"), side ? 0 : 350, side ? 750 : 320);
     }

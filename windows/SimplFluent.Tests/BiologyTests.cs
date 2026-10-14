@@ -516,6 +516,49 @@ public class BiologyTests
         Assert.False(Math.Max(XAt(f.Y), XAt(f.Y + f.Height)) > f.X && Math.Min(XAt(f.Y), XAt(f.Y + f.Height)) < f.X + f.Width);
     }
 
+    [Fact]
+    public void LabelsAreNotDroppedCrossedOrLedIntoAnotherLabel()
+    {
+        // (a right column with more than it holds gives its labels nearest the middle to the left one while that has room,
+        //  however far out they lie: the cell's Vesicles was dropped beside a left column with room for two)
+        var bar = new BioLabelBox(0, 150, 200, 200);
+        var cell = Enumerable.Range(0, 10).Select(k => new BioLabelInput($"r{k}", $"Right {k}", k == 0 ? 480 : 560, 20 + 16 * k, Area: k, Width: 70))
+            .Append(new BioLabelInput("l0", "Left", 300, 60, Width: 60)).ToList();
+        var (all, dropped) = BioLabelLayout.Layout(cell, 400, 100, 150, 800, 200, keepClear: bar);
+        Assert.Equal((11, 0), (all.Count, dropped));
+        Assert.Contains(all, p => p.Left && p.Id == "r0");
+        Assert.All(all.Where(p => p.Left), p => Assert.True(p.Frame.Y + p.Frame.Height <= bar.Y0 + 1e-9));
+        // (two leaders in a column that would cross swap places: an anchor deep in the model above one near its edge)
+        var deep = new List<BioLabelInput>
+        {
+            new("a", "Top", 390, 100, Width: 60), new("b", "Deep", 300, 102, Width: 60), new("c", "Near", 250, 104, Width: 60),
+            new("d", "Right", 500, 100, Width: 60), new("e", "Right", 520, 300, Width: 60),
+        };
+        var (column, _) = BioLabelLayout.Layout(deep, 400, 300, 150, 800, 600);
+        static bool Cross(BioLabelPlacement p, BioLabelPlacement q)
+        {
+            static double Turn((double X, double Y) a, (double X, double Y) b, (double X, double Y) c) => (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+            (double, double) p0 = (p.AnchorX, p.AnchorY), p1 = p.Leader[0], q0 = (q.AnchorX, q.AnchorY), q1 = q.Leader[0];
+            return Turn(q0, q1, p0) * Turn(q0, q1, p1) < 0 && Turn(p0, p1, q0) * Turn(p0, p1, q1) < 0;
+        }
+        Assert.All(column, p => Assert.All(column.Where(q => q.Id != p.Id), q => Assert.False(Cross(p, q), $"{p.Id} crosses {q.Id}")));
+        Assert.True(column.Single(p => p.Id == "c").Y < column.Single(p => p.Id == "b").Y);
+        // (a label over another label's anchor goes to a row — the bacterium's "Fimbriae (pili)" over the flagella's — and
+        //  an anchor straight under its own capsule is led straight to its edge, not round its end)
+        var box = new BioLabelBox(300, 200, 500, 400);
+        var hairs = new List<BioLabelInput> { new("fim", "Fimbriae (pili)", 310, 300, Width: 120), new("fla", "Flagella", 200, 302, Width: 80) };
+        var (placed, _) = BioLabelLayout.Layout(hairs, 400, 300, 150, 800, 600, box);
+        var fim = placed.Single(p => p.Id == "fim");
+        var fla = placed.Single(p => p.Id == "fla");
+        Assert.NotNull(fim.EdgeY);
+        Assert.Equal(400 + 6 + 9, fim.Y, 6);
+        Assert.Equal(new[] { (205.0, fla.Y - 9) }, fla.Leader);
+        Assert.Equal(0, BioLabelLayout.Conflicts(placed, box));
+        // (and a label over the model counts against the camera's fit; one beside it does not)
+        Assert.Equal(1, BioLabelLayout.Conflicts(new[] { new BioLabelPlacement("x", "Over", true, 340, 300, 80, 320, 300, 352) }, box));
+        Assert.Equal(0, BioLabelLayout.Conflicts(new[] { new BioLabelPlacement("x", "Beside", true, 296, 300, 80, 320, 300, 308) }, box));
+    }
+
     // ---- the step-through (§3.6) ----
 
     [Fact]

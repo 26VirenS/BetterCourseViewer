@@ -111,9 +111,10 @@ internal sealed class ChemLayout : Grid
     public event Action? WideChanged;
 
     /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall, as
-    /// tall as leaves 100 of the page for the columns' headings and first controls under it, from 240 to 560 (in a tool's
-    /// popup on a 1024 or 780 window, room for an animal cell's sixteen labels beside it).</summary>
-    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 100)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
+    /// tall as leaves 100 of the page for the columns' headings and first controls under it, from 180 to 560 (in a tool's
+    /// popup on a 1024 or 780 window, room for an animal cell's sixteen labels beside it; on the smallest window, 720 by
+    /// 520, a floor of 240 left only the columns' first line in sight).</summary>
+    private double NarrowHeight(double page) => tall ? Math.Max(180, Math.Min(560, page - 100)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
 
     /// <summary>The least the drawing is given over the rest (320): more while the drawing's card holds more than the
     /// drawing — the Lewis maker's resonance structures under it, which left the structure itself a few lines tall.</summary>
@@ -172,10 +173,11 @@ internal sealed class ChemLayout : Grid
 
     /// <summary>
     /// Room round the page: side by side, all of it round the columns; one over the other, the sides' room inside the
-    /// scroller (its padding), so its scroll bar runs down the page's edge, not inside the drawing's card (the chemistry
-    /// pages; the biology tools' pages keep theirs as they are).
+    /// scroller (its padding), so its scroll bar runs down the page's edge, not inside the drawing's card — the biology
+    /// tools' pages too (kept outside it there, the bar ran down the 3D view beside Reset view, where a drag to turn the
+    /// model took hold of it).
     /// </summary>
-    private Thickness Edges(bool wide) => wide || tall ? new Thickness(40, 8, 40, 24) : new Thickness(0, 8, 0, 0);
+    private Thickness Edges(bool wide) => wide ? new Thickness(40, 8, 40, 24) : new Thickness(0, 8, 0, 0);
 
     private void Lay(Size size)
     {
@@ -189,7 +191,7 @@ internal sealed class ChemLayout : Grid
         var first = arranged == null;
         arranged = a;
         Margin = Edges(a != Arrangement.Stacked);
-        oneScroll.Padding = a != Arrangement.Stacked || tall ? new Thickness(0) : new Thickness(40, 0, 40, 0);
+        oneScroll.Padding = a != Arrangement.Stacked ? new Thickness(0) : new Thickness(40, 0, 40, 0);
         // (told after this layout pass, when the controls go from beside the drawing to under it or back: the builders
         //  move their preset and way into the drawing's heading, or back)
         if (first ? !Wide : Wide != wasWide) Dispatcher.BeginInvoke(() => WideChanged?.Invoke(), DispatcherPriority.Loaded);
