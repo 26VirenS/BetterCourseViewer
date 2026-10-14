@@ -55,9 +55,10 @@ or other resource in `mac/Simpl/`).
   each `init(openFull: ([String: String]) -> Void)` — call `openFull(["sequence": "AUG…"])` to open the whole tool with
   something. Width: gene 420, cross 400, biolab 380, popgen 360. The other six show `BioQuickOpen`.
 - **Pages:** list them in `static let pages` (`BioPage(id:title:symbol:help:)`); the header shows them
-  (`BioHeaderControls`, glass buttons). The heading (`ToolHeader`) takes the first of three that fits beside the
-  tool's whole name — the pages' names and "Pin to Toolbar"; the pages as symbols with the pin's words; symbols alone,
-  the name shortened — so it is never wider than the window (a wider one widened the whole tool under it). Read the page with
+  (`BioHeaderControls`, glass buttons). The heading (`ToolHeader`) takes the first of four that fits beside the
+  tool's whole name — the pages' names and "Pin to Toolbar"; the pages as symbols with the pin's words; symbols alone;
+  and in a narrow window the pages' symbols under the name, in place of its line, so the name is never cut short ("Cell
+  Explo…", "Bio La…") — and it is never wider than the window (a wider one widened the whole tool under it). Read the page with
   `@ObservedObject private var nav = BioNav.shared` and `nav.page(.cell)`; change it with `nav.set(.cell, "plant")`. It
   is remembered (`SimplBio.cell.page`).
 - **Prefs:** `BioPrefs.string/bool/set(.cell, "field", …)` → UserDefaults `SimplBio.<key>.<field>` (§3.2).
@@ -70,12 +71,20 @@ or other resource in `mac/Simpl/`).
 parts split at `:` (`plant:cutaway`, `helix:style=atoms:seq=ATGC`). A first part that is one of your page ids opens
 that page by itself. Read the rest with `state?.has("cutaway")` and `state?.value("style")`. The spec's flags read the
 same way: `-SimplBioSeq ATGC` is `value("Seq")`, `-SimplBioStep 4` is `value("Step")`, `-SimplBioPage <page>` picks
-the page. Apply it once, on first appear. `-SimplBioCheck YES` prints the self-check on the console
-(`bio-check <name> <value> <OK|FAIL>`, then `bio-check summary n/m OK`). `-SimplToolsScroll biology` scrolls the Tools
-page to the Biology section. The pictures are in `scripts/dev/mac-shots.sh` (see **Pictures** below):
-`bio both 57c-cell-plant 18 cell plant:select=chloroplast` opens a tool at 1440×920 in light and dark. A picture's
-launch keeps the tools' settings in a suite of its own that starts empty (`BioPrefs`), so one picture's choices never
-show in the next.
+the page. Make it part of the view's first state, not a change made on appear: in a store's `init` (DNA & RNA's
+`DNAStore`), in a page's `init` as `@State`/`@StateObject` initial values (the Cell Explorer's pages, Photosynthesis &
+Respiration's step-throughs), so every page made for the launch shows it from its first frame — applied once on
+appear, some of it never reached the pictures (the grooves, the unzip, a cell at true scale, a step-through's step).
+In the screenshot suite those tools also say on the console what the page shows of its launch
+(`[Simpl] bio launch: dna helix:grooves: style cartoon, grooves on, …`), and every scene says when it is made
+(`[Simpl] bio scene: <key> made in <ms> ms, <n> objects`). `-SimplBioCheck YES` prints the self-check on the console
+(`bio-check <name> <value> <OK|FAIL>`, each group's lines as it ends — the whole check takes about a minute in a debug
+build — then `bio-check summary n/m OK`). `-SimplToolsScroll biology` scrolls the Tools page to the Biology section.
+The pictures are in `scripts/dev/mac-shots.sh` (see **Pictures** below): `bio both 57c-cell-plant 40 cell
+plant:select=chloroplast` opens a tool at 1440×920 (the runner's screen holds it to 1024×683) in light and dark. A
+picture is taken once the app has settled, and a scene being made (`BioSceneView`) or a cell being built counts as not
+settled (`Shot.began()`/`ended()`), so the wait is only the longest a picture may take. A picture's launch keeps the
+tools' settings in a suite of its own that starts empty (`BioPrefs`), so one picture's choices never show in the next.
 
 ## Data (Model, any thread)
 
@@ -175,9 +184,11 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   `BioMoleculeScene.items(model, style:, hydrogens:, color:)` draws atoms (CPK, chemistry radii, UV spheres ≤ 300
   atoms, icospheres above) and bonds; `BioMoleculeScene.symbolNodes` the atom letters (as `extras`).
 - **The view:** `BioSceneView(key:, build: BioSceneBuild { … }, extras:, selection: $sel, showLabels:, turning:,
-  frameKey:, reset:, zoom: BioZoomRequest?, dimOthers:, accessibility:, onPick:, onDoubleClick:, onHover:, onScale:)`
+  frameKey:, reset:, zoom: BioZoomRequest?, dimOthers:, accessibility:, onPick:, onDoubleClick:, onHover:, onScale:,
+  labelBottom:)`
   (`onHover` tells the id under the pointer, for a tooltip; `onScale` the points one scene unit spans at the framed
-  ball's centre whenever the zoom changes it, for a scale bar). The build closure
+  ball's centre whenever the zoom changes it, for a scale bar; `labelBottom` the room the label columns leave clear
+  at the bottom, for that scale bar — `CEScaleBar.room`). The build closure
   runs off the main thread — capture copies, not your ObservableObject; it runs again only when `key` changes (put
   page, options and light/dark in it). The camera frames the content (40°, 1.15·R/sin 20°) on the first scene and when
   `frameKey` changes; `reset += 1` puts it back; `zoom` frames an object. Click picks (opaque first, through
@@ -186,7 +197,9 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   lines (§3.5: two columns, 22 pt apart, ≤ 14 with "+N more", 120 ms fades, pressable) come from `labels`; give a
   convex shell's label a `normal`, else a ray decides what hides it. Each label's capsule is its words measured at
   12 pt semibold plus its padding (`BioLabelWidth.of`; `BioLabelLayout.estimatedWidth` is only the model's guess), so
-  none is cut short. `BioSceneCard { bar } scene: { … }` and
+  none is cut short; two labels may name one object (a β-strand and the C-terminus in it) — the overlay tells them
+  apart by id and words. Frame a model on itself: a frame shared with a much larger state (ubiquitin with its unfolded
+  coil) left it small in the card. `BioSceneCard { bar } scene: { … }` and
   `BioSceneButtons(turning:reset:)` give the chemistry builder's card. Auto-turn is off by default and never under
   Reduce Motion.
 
@@ -197,7 +210,8 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
 for ← → Space Home End 1–9. Draw with
 `TimelineView(.animation(paused: !steps.moving)) { ctx in let ph = steps.phase(at: ctx.date) … }`: `ph.from`, `ph.to`,
 `ph.t` (eased; 600 ms at 1×, back plays in reverse) and `ph.crossfade` (Reduce Motion: fade both keyframes, 200 ms).
-`steps.go(to:)`, `next`, `back`, `play`, `pause`, `speed`, `setSteps`. VoiceOver hears each step.
+`steps.go(to:)`, `next`, `back`, `play`, `pause`, `speed`, `setSteps`; `BioStepController(steps:start:)` starts at a
+launch's step. VoiceOver hears each step.
 
 ## Colours and pieces (§3.8, §9)
 
@@ -205,7 +219,10 @@ for ← → Space Home End 1–9. Draw with
 `.maternal`, `.hBond` … are `BioHexPair`s: `.color` (SwiftUI, follows the appearance), `.nsColor(dark:)`,
 `.hex(dark:)` (for `BioMaterial`). `BioColor.base`, `BioColor.aminoAcid`. Never colour alone: show the letter or a
 `BioLegend`. Pieces: `BioHeading`, `BioCard(title:swatch:subtitle:) { BioFactRow(label:text:) … }`, `BioValueRow`,
-`BioLegend`, `BioSequenceText`, `PTWorkLayout { left } centre: { } right: { }` (the chemistry layout).
+`BioLegend`, `BioSequenceText`, `PTWorkLayout { left } centre: { } right: { }` (the chemistry layout: in a window
+narrower than 1,100 points the drawing goes across the top, as tall as the window shows (460–640), and the left and
+right columns side by side under it — so a page's centre must fit 460 points: give its cards flexible heights, not
+fixed minimums that add up to more).
 
 ## Numbers shown
 
