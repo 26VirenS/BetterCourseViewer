@@ -1230,16 +1230,18 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var critical = Updates.Critical && found != null;
         // (it goes in by itself: a Critical Update always; another while Install updates automatically is on, not paused)
         var byItself = Updates.InstallsHere && (critical || (Updates.InstallAutomatically && !Updates.Paused));
+        // (a beta says so, as Earlier versions' rows do: "Version v113 (beta) is available")
+        var name = found is { Beta: true } ? $"{found.Version} (beta)" : found?.Version;
         var v = Column(K.SectionHeader("Simpl for Windows", 0));
         var status = Updates.State switch
         {
             Updates.Mode.Checking => "Checking…",
             Updates.Mode.UpToDate => "You’re up to date",
-            Updates.Mode.Available => critical ? $"Critical update {found?.Version} is available" : $"Version {found?.Version} is available",
-            Updates.Mode.Downloading => $"Downloading version {found?.Version}…",
-            Updates.Mode.Ready when byItself => critical ? $"Critical update {found?.Version} is ready" : $"Version {found?.Version} is ready",
-            Updates.Mode.Ready => $"Version {found?.Version} is ready to install",
-            Updates.Mode.Installing => $"Installing version {found?.Version}…",
+            Updates.Mode.Available => critical ? $"Critical update {name} is available" : $"Version {name} is available",
+            Updates.Mode.Downloading => $"Downloading version {name}…",
+            Updates.Mode.Ready when byItself => critical ? $"Critical update {name} is ready" : $"Version {name} is ready",
+            Updates.Mode.Ready => $"Version {name} is ready to install",
+            Updates.Mode.Installing => $"Installing version {name}…",
             Updates.Mode.Failed => Updates.Message ?? "Could not check.",
             _ => dev ? "Updates are off in a development run." : "Not checked yet",
         };

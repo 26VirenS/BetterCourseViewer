@@ -8,11 +8,13 @@ Build (Windows, or Linux with the targeting pack): `dotnet build windows/SimplFl
 CI (`.github/workflows/windows-fluent.yml`) builds it once (the app, Simpl-Setup.exe and the zip, kept as `release`),
 then at the same time pictures it against the mock Canvas in eight parts, tries its installer and walks it for its
 timings (`windows-fluent-perf`); the parts come back together as `windows-fluent-shots`. A push takes about five
-minutes, and a newer push cancels the run before it (never a run that publishes). A preview (`windows-fluent-v<run>`) is published
-when a commit message carries `[preview]`, or by Run workflow, which publishes the green run already made for the
-commit (or the run named by `from_run`) as it is, in about a minute; Run workflow ▸ beta publishes it as a beta instead
-(`windows-fluent-beta-v<run>`: Updates ▸ Betas, below). Keep changes to the workflow in commits of their
-own: GitHub lets a workflow tag a commit only if the commit itself leaves the workflows alone.
+minutes, and a newer push cancels the run before it (never a run that publishes). A preview (`windows-fluent-v<run>`),
+which every installed Simpl takes, is published only by Run workflow with beta off: it publishes the green run already
+made for the commit (or the run named by `from_run`, its id) as it is, in about a minute; Run workflow ▸ beta
+publishes it as a beta instead (`windows-fluent-beta-v<run>`: Updates ▸ Betas, below), and Run workflow ▸ promote
+makes a beta the usual release. A commit whose subject line carries `[preview]` is published by its push, always as a
+beta. Keep changes to the workflow in commits of their own: GitHub lets a workflow tag a commit only if the commit
+itself leaves the workflows alone.
 
 Beside the build, the models' unit tests (`windows/SimplFluent.Tests`, xUnit: the chemistry, the calculator, the
 vault's and the saved sign-in's seals, when Windows Hello is asked for the saved password and how the run holds it,
@@ -78,8 +80,8 @@ Updates (`Support/Updates.cs`, below): a copy the installer put here — its uni
 runs from — downloads the new release's Simpl-Setup.exe to `%TEMP%\Simpl-Update\<tag>` and runs it with the arguments
 above as Simpl quits: by itself at a quiet moment, or when **Restart to Update** is pressed. A portable copy opens the
 release's page, as before. Every Windows 11-look build is published as a GitHub pre-release, so a **beta** is marked
-by "beta" in the release's title, not by that flag: with Get beta updates off (the default), the usual previews are
-offered. CI tries the installer on every build: it installs silently into a folder of its own,
+by its tag, `windows-fluent-beta-v<run>` (or "beta" in the release's title), not by that flag: with Get beta updates
+off (the default), the usual previews are offered. CI tries the installer on every build: it installs silently into a folder of its own,
 checks Simpl.exe, the Start menu shortcut (and its app id) and the Settings ▸ Apps entry, opens the installed Simpl
 against the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed); plays an
 update that comes by itself through the installed Simpl (below: held while a quiz is open, put in once it closes,
@@ -98,7 +100,8 @@ window's side of it, `Shell/UpdateWatch.cs`:
 
 - **When it looks**: at launch when the last look is over an hour old, then every hour (looked at every ten minutes and
   whenever Simpl comes to the front, so a PC asleep does not count its hours) — one request for GitHub's releases of
-  this repository, the usual releases' `windows-fluent-v<run>` and the betas' `windows-fluent-beta-v<run>`, compared
+  this repository (the first 100 it lists, compressed: the Mac's share the list; 0.3.0 and earlier read 40), the
+  usual releases' `windows-fluent-v<run>` and the betas' `windows-fluent-beta-v<run>`, compared
   by run number (`Support/UpdatesChoice.cs`: the newest newer than this copy that it may take — a beta only with Get
   beta updates on, Betas below). **Check for updates automatically** (on) turns it off. A development run (the mock,
   a demo, a picture) never looks.
@@ -123,7 +126,8 @@ window's side of it, `Shell/UpdateWatch.cs`:
   the student was: in front as it was; minimized, taking nothing from the app in front, when it was behind; in the
   notification area, out of sight, its engine running as ever, when it was there (`updates:resume`, used once, within
   half an hour).
-- **What the student sees**: Settings ▸ Updates says where it stands — found, downloading, "Version v132 is ready —
+- **What the student sees**: Settings ▸ Updates says where it stands — found ("Version v133 (beta) is available" for a
+  beta), downloading, "Version v132 is ready —
   Simpl updates when you close the quiz, and opens again where you were", installing — with Restart to update to put it
   in at once, whatever is open (the Mac's Update Now). The notice in the title bar's band (under it on a narrow window),
   over everything in the window, sheets too: "Simpl updates to v132 when you close the quiz." for a few seconds, once for
@@ -177,17 +181,27 @@ engine running.
 
 **Publishing a beta, and promoting it.** A version for testers only goes out as a beta, from the commit's green run:
 `gh workflow run windows-fluent.yml --ref claude/windows-liquid-glass -f preview=true -f reuse=true -f beta=true`
-(`-f from_run=<id>` for another green run; `-f critical=true` makes it a Critical Update for beta testers alone). It
-is a GitHub pre-release, `windows-fluent-beta-v<run>`, its notes RELEASE_NOTES.md's with a line first saying how to
-get it; the website's /download/windows (`scripts/publish-site.sh`, newest `windows-fluent-v<run>` with a
-Simpl-Setup.exe) stays on the newest usual release. **A tester gets the first beta** by downloading Simpl-Setup.exe
-from the newest `windows-fluent-beta-v…` release on GitHub and opening it (it installs over the Simpl there, settings
-and sign-in kept), then turning on **Settings ▸ Updates ▸ Get beta updates**, so each next beta comes by itself.
-**To promote a beta** to everyone, publish the same green run again with beta off:
-`gh workflow run windows-fluent.yml --ref claude/windows-liquid-glass -f preview=true -f reuse=true -f from_run=<the
-beta's run id>` (beta is off unless given). That makes `windows-fluent-v<run>` of the very same build: every copy
-older than it takes it, 0.3.0 too, and the testers already on that run stay as they are. RELEASE_NOTES.md is the
-notes either way: write it for the version being published before Run workflow.
+(`-f from_run=<id>` for another green run — its id, the long number in its link, not the v-number; `-f critical=true`
+makes it a Critical Update for beta testers alone). It is a GitHub pre-release, `windows-fluent-beta-v<run>`, titled
+with the version the commit's `SimplFluent.csproj` gives (bump it first), its notes RELEASE_NOTES.md's with a line
+first saying how to get it; the website's /download/windows (`scripts/publish-site.sh`, newest `windows-fluent-v<run>`
+with a Simpl-Setup.exe) stays on the newest usual release. A push whose commit's subject line carries `[preview]`
+publishes a beta too, never the usual release. **A tester gets the first beta** by downloading Simpl-Setup.exe from
+the newest `windows-fluent-beta-v…` release on GitHub and opening it (it installs over the Simpl there, settings and
+sign-in kept), then turning on **Settings ▸ Updates ▸ Get beta updates**, so each next beta comes by itself.
+**To promote a beta** to everyone, give its tag:
+`gh workflow run windows-fluent.yml --ref claude/windows-liquid-glass -f preview=true -f promote=windows-fluent-beta-v<run>`
+(beta off, no from_run). It downloads the Simpl-Setup.exe and zip that beta's release carries and publishes them as
+`windows-fluent-v<run>` at the commit the beta was made from — byte for byte what the testers had, however long ago its
+run was: every copy older than it takes it, 0.3.0 too, and the testers already on that run stay as they are. A tag
+that is not a beta's, or a beta missing either file, stops the run, as a `from_run` that is not this workflow's run
+does: neither ever builds the branch in its place. RELEASE_NOTES.md is the notes either way: write it for the version
+being published before Run workflow. Simpl 0.3.0 and earlier read only the first 40 releases GitHub lists (the Mac's
+and the extension's among them, in GitHub's own order, not quite that of publishing; 0.3.1 and later read 100): the
+workflow warns when a usual release it has published is not among them, and a newer commit's run published as the
+usual release then reaches those copies. **A bad beta**: deleting its release does not move the testers who have it —
+Simpl never goes back by itself. Publish a newer run with the fix (or the change reverted), as a beta or the usual
+release, and they take it; a tester can also go back by hand under Settings ▸ Updates ▸ Earlier versions ▸ Install….
 
 ## Signing
 

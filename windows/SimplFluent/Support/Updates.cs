@@ -192,7 +192,8 @@ public static partial class Updates
     /// updates automatically is on and updates are not paused.</summary>
     private static bool GoesInByItself => Critical || (InstallAutomatically && !Paused);
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    // (the list of releases, read once an hour, comes compressed: a tenth of its size or less)
+    private static readonly HttpClient Http = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All }) { Timeout = TimeSpan.FromSeconds(20) };
     // (the installer is tens of megabytes: a download has as long as it needs, so long as it keeps coming)
     private static readonly HttpClient Downloads = new() { Timeout = Timeout.InfiniteTimeSpan };
 
@@ -327,7 +328,10 @@ public static partial class Updates
         Proceed();
     }
 
-    /// <summary>The Windows versions published, newest first (an update played through: the one it plays, no network).</summary>
+    /// <summary>The Windows versions published, newest first (an update played through: the one it plays, no network).
+    /// The first hundred releases GitHub lists, the most it gives at once: the Mac's, the extension's and the Windows
+    /// betas share the list, a Mac beta every few minutes on a busy day, in GitHub's own order — not quite the order of
+    /// publishing — so the forty 0.3.0 and earlier read could leave a usual release out.</summary>
     public static async Task<List<Release>> Releases()
     {
         if (Testing)
@@ -336,7 +340,7 @@ public static partial class Updates
             Changed?.Invoke();
             return Known;
         }
-        using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=40");
+        using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=100");
         req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
         req.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
         using var res = await Http.SendAsync(req);
