@@ -396,7 +396,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). Since 2.99.33 the page also writes the figures, dates and course names it sends (`pctText`, `gpaText`, `goalLine`, `dueLine`, `altName`, `gradedText`…): show those strings as they come rather than formatting the numbers here, so Windows reads every grade, date and course exactly as the Mac does. |
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs and popups), `Drag` (a popup moved by its heading), `Glyph` (symbols for the school's things), `RichText` (Canvas's own HTML as Windows text), `Formula` (Canvas's formulas typeset from their TeX with WPF-Math, MIT, drawn in the text's colour; written out as plain maths where they cannot be), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`, what the school added to Canvas's own navigation `MoreFromCanvas`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
@@ -533,7 +533,20 @@ no picture of the one before it to move from: it arrives by its own entrance (th
 - **Pane** (`AppShell.BuildPane`, `NavPane`): the course open folds out its sections (as the Mac's sidebar does; the
   chevron folds out any other); a course's unread announcements are a badge like Notifications', its tooltip and screen
   reader saying what it counts ("2 unread announcements"); one Groups row opens the Groups page and its chevron lists
-  the groups. At the foot, Settings (Windows 11's place for it), then the account tile: name, email and the school,
+  the groups. Under them, *More from Canvas* (`Shell/MoreFromCanvas.cs`): what the school added to Canvas's own
+  navigation that no list of Canvas's gives — History (a clock), its tools for every course such as My Materials or
+  Studio, Help (a question mark), sometimes a link — as the extension's sidebar lists it, read by the engine from the
+  school's page (`moreFromCanvas`; the last menu seen when a page has none, kept with the answers so it shows at once).
+  A tool wears the school's own icon as the page drew it, on a square of Canvas's nav colour (the icon is made for that
+  dark nav; Simpl never fetches another site's picture itself — the puzzle piece instead), and a tool or a link the
+  mark of a window of its own: a tool opens Canvas's launch page for it in the window for tools (light, as every
+  outside page is), a link the school's page or another site's in Simpl's browser window. History and Help open
+  popups listing the extension's sheets' rows (`moreHistory`, `moreHelp`, read afresh each time): History's with
+  what each was in its course's colour, Help's with Report a problem's word at the foot; a row opens where it leads
+  (the school's own as Simpl opens any, another site in Simpl's browser window) and the popup goes. No section when the
+  school adds nothing; on Brightspace, *More from Brightspace* with the navbar's links Simpl does not show already.
+  `--open more` brings it into sight for a picture; `--open more:history`, `more:help` and `more:tool` press that item.
+  At the foot, Settings (Windows 11's place for it), then the account tile: name, email and the school,
   each said once. In a pane under 760 tall (a 1024×681 or 1366×768 window) the foot keeps compact so the courses keep
   their room: Settings is a gear beside the account tile, and the email and the school share one line. A theme's
   picture stays faint (15%) behind the rows and shows whole only in the room under them.
@@ -721,12 +734,12 @@ say. Each popup with something of the student's in it holds an update while it i
 What each is now: a tool opened whole (its `ToolPopup`; the Periodic Table's builders are its pages in it); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
 review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
-Grading scale; the Calendar's Calendars; a course's Nickname — popups. The quick look and a counter's panel stay cards
-on the page that grow out of their rows, taking nothing from the window either (The quick look, above). Pinned tools'
-flyouts and their pulled-out windows, menus and the search's suggestions are as they were. Staying sheets over the
-window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first setup, the sign-in's
-"Stay logged in?", the tour (its own veil), and the questions that must be answered first (Sign out?, Delete this
-task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo.
+Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups. The quick look and
+a counter's panel stay cards on the page that grow out of their rows, taking nothing from the window either (The quick
+look, above). Pinned tools' flyouts and their pulled-out windows, menus and the search's suggestions are as they were.
+Staying sheets over the window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first
+setup, the sign-in's "Stay logged in?", the tour (its own veil), and the questions that must be answered first (Sign
+out?, Delete this task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo.
 
 ## Icons
 

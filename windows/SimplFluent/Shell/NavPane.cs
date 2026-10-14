@@ -16,9 +16,15 @@ public sealed class NavEntry
     public string Title = "";
     public SymbolRegular Icon;
     public Color Tint;
-    /// <summary>A course's own colour: a rounded square with its first letter, in place of a symbol.</summary>
+    /// <summary>A course's own colour: a rounded square with its first letter, in place of a symbol. With no letter, the
+    /// square holds <see cref="Picture"/>, else the symbol (a tool of the school's own on the colour of Canvas's nav).</summary>
     public Color? Square;
     public string? Letter;
+    /// <summary>The school's own picture for it, on its <see cref="Square"/> (a tool's icon in Canvas's nav).</summary>
+    public ImageSource? Picture;
+    /// <summary>It opens in a Simpl window of its own (a tool, another site): the window's mark at the row's end, as a
+    /// course's More and External Tools have it.</summary>
+    public bool OwnWindow;
     public int Badge;
     /// <summary>What the count counts, in words ("2 unread announcements"): its tooltip, and what a screen reader says.</summary>
     public string? BadgeLabel;
@@ -114,6 +120,7 @@ public sealed class NavList : Grid
                 .Append(e.Key).Append('\u001f').Append(e.Title).Append('\u001f')
                 .Append((int)e.Icon).Append('\u001f').Append(e.Tint.ToString()).Append('\u001f')
                 .Append(e.Square?.ToString()).Append('\u001f').Append(e.Letter).Append('\u001f')
+                .Append(e.Picture?.GetHashCode()).Append(e.OwnWindow ? 'W' : '_').Append('\u001f')
                 .Append(e.Badge).Append('\u001f').Append(e.BadgeLabel).Append('\u001f').Append(e.Tip).Append('\u001f').Append(e.Folds).Append('\u001f').Append(e.Expanded ? '+' : '-').Append(e.Toggle != null ? 'T' : '_')
                 .Append(e.Hover != null ? 'h' : '_').Append('\u001f').Append(e.Spot?.ToString()).Append('\u001e');
             if (e.Expanded && e.Children != null)
@@ -151,8 +158,13 @@ public sealed class NavList : Grid
         if (e.Square is { } sq)
         {
             // (its letter white only where white reads on the course's colour, else near-black: the course cards' rule)
-            var letter = new TextBlock { Text = e.Letter ?? "", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = K.Brush(K.InkOn(sq)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = K.SmallFace };
-            glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(sq), Child = letter, VerticalAlignment = VerticalAlignment.Center };
+            FrameworkElement inside = e.Letter != null
+                ? new TextBlock { Text = e.Letter, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = K.Brush(K.InkOn(sq)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = K.SmallFace }
+                : e.Picture is { } picture ? Picture(picture)
+                : K.Icon(e.Icon, 12, K.InkOn(sq), filled: true);
+            inside.HorizontalAlignment = HorizontalAlignment.Center;
+            inside.VerticalAlignment = VerticalAlignment.Center;
+            glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(sq), Child = inside, VerticalAlignment = VerticalAlignment.Center };
         }
         else glyph = K.Icon(e.Icon, 16, e.Tint, filled: true);
         var title = K.Text(e.Title, Ty.Body);
@@ -169,6 +181,7 @@ public sealed class NavList : Grid
             badge.ToolTip = e.BadgeLabel;
             grid.Children.Add(badge.Col(2));
         }
+        if (e.OwnWindow) grid.Children.Add(Screens.CourseKit.OwnWindowMark(12, B.Text3).Col(2));
         if (e.Toggle != null)
         {
             var chev = K.Icon(e.Expanded ? SymbolRegular.ChevronUp20 : SymbolRegular.ChevronDown20, 12, B.Text2);
@@ -199,6 +212,14 @@ public sealed class NavList : Grid
             b.ContextMenu = menu;
         }
         return b;
+    }
+
+    /// <summary>The school's own picture on a row's square: 13 across, made smaller smoothly from the 64 it comes at.</summary>
+    private static FrameworkElement Picture(ImageSource source)
+    {
+        var image = new System.Windows.Controls.Image { Source = source, Width = 13, Height = 13, Stretch = Stretch.Uniform };
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+        return image;
     }
 
     /// <summary>

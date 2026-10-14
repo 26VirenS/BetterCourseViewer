@@ -19,10 +19,11 @@ namespace Simpl.Shell;
 /// <summary>
 /// The app once the school is ready (the Mac's MainShell), laid out as Windows 11's Settings app: the navigation pane at
 /// the left — the search box at its head; the places (Dashboard, To Do, Calendar, Grades, Notifications, Inbox, Tools,
-/// External Tools), the courses (the one open with its sections under it) and one Groups row that lists the groups; and
-/// at its foot Settings, then who is signed in, where and as whom (the Mac's account bar, with the account menu) — and
-/// the page at the right: its title (a breadcrumb once something is opened on it), its commands, and the screen. Below
-/// 880 wide the pane folds away behind the title bar's button, and Search moves up into the title bar.
+/// External Tools), the courses (the one open with its sections under it), one Groups row that lists the groups and what
+/// the school added to Canvas's own navigation (More from Canvas: History, its tools, Help); and at its foot Settings,
+/// then who is signed in, where and as whom (the Mac's account bar, with the account menu) — and the page at the right:
+/// its title (a breadcrumb once something is opened on it), its commands, and the screen. Below 880 wide the pane folds
+/// away behind the title bar's button, and Search moves up into the title bar.
 /// </summary>
 public sealed partial class AppShell : Grid, IDisposable
 {
@@ -76,6 +77,10 @@ public sealed partial class AppShell : Grid, IDisposable
     private (string? Name, string? Initials, string? Avatar, string? Email, string Host, string? Site)? accountDrawn;
     /// <summary>The header as last drawn: the screen, its breadcrumb's words and line under it, its commands.</summary>
     private (Screen Screen, string Words, FrameworkElement? Commands)? headerDrawn;
+    /// <summary>What the school added to Canvas's own navigation (More from Canvas), as last read: what was read last time
+    /// until the page says.</summary>
+    private MoreNav? more;
+    private bool disposed;
 
     public bool Narrow => narrow;
 
@@ -182,8 +187,10 @@ public sealed partial class AppShell : Grid, IDisposable
         Updates();
         Navigate();
         paneScene.Content = Scenes.Backdrop("side");
+        more = engine.Kept<MoreNav>("moreFromCanvas");
         BuildPane();
         _ = engine.LoadSidebar();
+        _ = LoadMore();
         prefetch.Start();
         // (the screenshot suite: --place-window section:courses/101:grades opens that place in a window of its own, over
         // the main one, once it is up)
@@ -208,7 +215,7 @@ public sealed partial class AppShell : Grid, IDisposable
         {
             case nameof(Engine.Engine.NavVersion): Navigate(); BuildPane(); break;
             case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections) or nameof(Engine.Engine.Snapshot): BuildPane(); Header(); break;
-            case nameof(Engine.Engine.DataVersion): current?.Refresh(); break;
+            case nameof(Engine.Engine.DataVersion): current?.Refresh(); _ = LoadMore(); break;
             case nameof(Engine.Engine.Query): if (searchBox.Text != engine.Query && !searchBox.IsKeyboardFocusWithin) searchBox.Text = engine.Query; break;
         }
     }
@@ -369,10 +376,41 @@ public sealed partial class AppShell : Grid, IDisposable
                 }).ToList(),
             });
         }
+        // (what the school added to Canvas's own navigation — History, its tools, Help —, under Simpl's own places as the
+        //  extension's sidebar has it; nothing when it adds nothing)
+        list.AddRange(MoreFromCanvas.Entries(more, it => { if (narrow) ClosePane(); MoreFromCanvas.Open(engine, it, window); }));
         foreach (var e in list) Apart(e);
         if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
         else nav.Show(list, SelectedKey(engine.Nav.Current.Place));
         foreach (var ctx in toRead) _ = engine.LoadSections(ctx);
+    }
+
+    /// <summary>More from Canvas read again, at start and whenever what the screens show may have changed (quick: the
+    /// page's menu is read as it is, a tool's picture drawn once); the pane's rows are built again only if what they show
+    /// changed.</summary>
+    private async Task LoadMore()
+    {
+        try
+        {
+            var read = await engine.Call<MoreNav>("moreFromCanvas");
+            if (disposed) return;
+            more = read;
+            BuildPane();
+            // (a picture run says what the section listed, for the screenshot suite's checks)
+            if (Shot.Asked) Log.Write($"more from canvas: {string.Join(", ", read.Items.Select(i => i.Label + (MoreFromCanvas.Picture(i) != null ? " (picture)" : "")))} ({read.From})");
+        }
+        catch { /* the section stays as it was */ }
+        MoreAsked();
+    }
+
+    /// <summary>The screenshot suite: --open more brings the section into sight once it is read; --open more:history,
+    /// more:help, more:tool presses that item too.</summary>
+    private async void MoreAsked()
+    {
+        if (disposed || narrow || !MoreFromCanvas.Shown(more) || Launch.Take("more") is not { } asked) return;
+        await Task.Delay(400);
+        navScroll.ScrollToEnd();
+        if (asked.TrimStart(':') is { Length: > 0 } kind && more!.Items.FirstOrDefault(i => i.Kind == kind) is { } it) MoreFromCanvas.Open(engine, it, window);
     }
 
     /// <summary>A row's place in a window of its own (its menu's Open in new window, Shift+click): every place row, its
@@ -845,6 +883,7 @@ public sealed partial class AppShell : Grid, IDisposable
 
     public void Dispose()
     {
+        disposed = true;
         prefetch.Stop();
         palette.Dispose();
         engine.PropertyChanged -= OnEngine;

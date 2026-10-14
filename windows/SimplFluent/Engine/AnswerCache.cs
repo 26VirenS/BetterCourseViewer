@@ -22,7 +22,7 @@ public sealed class AnswerCache
         "snapshot", "courses", "allCourses", "groups", "home", "today", "todaySheet", "todo", "calendar", "calView", "grades",
         "courseGrades", "coursesProgress", "notifications", "inbox", "conversation", "assignment", "topic",
         "announcements", "discussions", "assignments", "quizzes", "modules", "pages", "page", "files", "people",
-        "syllabus", "dashCourses", "dashList", "dashActivity", "dashSkyline", "externalTools",
+        "syllabus", "dashCourses", "dashList", "dashActivity", "dashSkyline", "externalTools", "moreFromCanvas",
     };
 
     /// <summary>An answer the page gave this long ago, nothing changed since, is as good as asking again.</summary>
