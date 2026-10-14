@@ -306,6 +306,8 @@ jobs:
           #  page; the window Simpl first opens at; a theme's pictures in the narrowest one-row tiles)
           Shot 'dashboard-counter-first' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'today'))
           Shot 'dashboard-counter-last' '1024x681' 45 ($mock + @('--appearance', 'dark', '--sheet', 'graded'))
+          # (the quick look a counter's row opens, over its panel: the due said once)
+          Shot 'dashboard-counter-preview' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'today', '--open', 'sheetpreview'))
           Shot 'dashboard-1280' '1280x820' 45 ($mock + @('--appearance', 'light'))
           Shot 'theme-dusk-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'Dusk'))
           Shot 'dashboard-1080p' '1920x1050' 45 ($mock + @('--appearance', 'dark'))
