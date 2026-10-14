@@ -742,6 +742,63 @@ final class BioLabValues {
     }
 }
 
+// MARK: - Hand-offs
+
+/// Cell Explorer's "Why are cells small?" (spec §4.1), for the surface area and volume card: `savShape` (sphere, box or
+/// cylinder), `savSize` (a sphere's diameter; a box's length,width,height; a cylinder's diameter,length), `savUnit` and
+/// `from` — the names both apps send. The Windows app's own words for the same are read too: `calc=sav`, `mode` and the
+/// card's fields `r`, `s`, `l`, `w`, `h` as they are.
+struct BioLabSAVHandOff: Equatable {
+    /// Every key it reads (each taken from the hand-off, so none is left for another tool).
+    static let keys = ["savShape", "savSize", "savUnit", "from", "mode", "r", "s", "l", "w", "h"]
+
+    /// The card's mode: sphere, cube, rect or cylinder.
+    let mode: String
+    /// The fields' texts, by field id.
+    let texts: [String: String]
+    let unit: String?
+    let from: String?
+
+    /// nil when it names no shape the card has.
+    init?(_ info: [String: String]) {
+        let shape = (info["savShape"] ?? info["mode"])?.lowercased() ?? ""
+        switch shape {
+        case "sphere": mode = "sphere"
+        case "box", "rect", "rectangular", "cuboid": mode = "rect"
+        case "cube": mode = "cube"
+        case "cylinder": mode = "cylinder"
+        default: return nil
+        }
+        var t: [String: String] = [:]
+        if let size = info["savSize"] {
+            let n = size.split(whereSeparator: { ",×x ".contains($0) }).compactMap { BioLabParse.number(String($0))?.value }
+            // (the sizes in the order the card's fields take them; a diameter halved to the radius)
+            let order: [String]
+            switch mode {
+            case "sphere": order = ["d"]
+            case "cube": order = ["s"]
+            case "rect": order = ["l", "w", "h"]
+            default: order = ["d", "h"]
+            }
+            if n.count >= order.count {
+                for (k, v) in zip(order, n) {
+                    if k == "d" { t["r"] = BioLabFormat.plain(v / 2) } else { t[k] = BioLabFormat.plain(v) }
+                }
+            }
+        } else {
+            for k in ["r", "s", "l", "w", "h"] { if let v = info[k], !v.isEmpty { t[k] = v } }
+        }
+        texts = t
+        unit = info["savUnit"]
+        from = info["from"] ?? (info["mode"] != nil ? "cell" : nil)
+    }
+
+    /// The line over the card's fields saying where its numbers came from.
+    var note: String? {
+        from == "cell" ? "From Cell Explorer: the cell's own shape and size, as the AP sheet's formulas take it." : nil
+    }
+}
+
 // MARK: - Self-check (spec §10.1 item 9: every row of §5.5)
 
 extension BioSelfCheck {
@@ -805,6 +862,17 @@ extension BioSelfCheck {
         r.check("biolab.sa-v", "\(sphere?.full ?? "-"),\(cube?.full ?? "-")", sphere?.text == "3.0" && cube?.text == "3.0"
                 && abs((lab("sav", "cylinder", ["r": "1", "h": "2"])?.answers.first?.value ?? 0) - 3) < 1e-9
                 && abs((lab("sav", "rect")?.answers.first?.value ?? 0) - 22.0 / 6.0) < 1e-9)
+        // (Cell Explorer's cells handed over: the animal cell's diameter halved, the plant's box, the bacterium's rod — and
+        // the Windows app's words for the same)
+        let animal = BioLabSAVHandOff(["savShape": "sphere", "savSize": "18.9", "savUnit": "µm", "from": "cell"])
+        let plant = BioLabSAVHandOff(["savShape": "box", "savSize": "44,26,26", "savUnit": "µm", "from": "cell"])
+        let rod = BioLabSAVHandOff(["savShape": "cylinder", "savSize": "1,2", "savUnit": "µm", "from": "cell"])
+        let rodWin = BioLabSAVHandOff(["mode": "cylinder", "r": "0.5", "h": "2"])
+        let rodSAV = lab("sav", rod?.mode, rod?.texts ?? [:])?.answers.first?.value ?? 0
+        r.check("biolab.sav-handoff", "r\(animal?.texts["r"] ?? "-"),\(plant?.mode ?? "-"),r\(rod?.texts["r"] ?? "-")h\(rod?.texts["h"] ?? "-"),\(BioLabFormat.plain(rodSAV))",
+                animal?.mode == "sphere" && animal?.texts == ["r": "9.45"] && plant?.texts == ["l": "44", "w": "26", "h": "26"]
+                    && rod?.texts == ["r": "0.5", "h": "2"] && rodWin?.texts == rod?.texts && rodWin?.from == "cell" && rod?.note != nil
+                    && abs(rodSAV - 5) < 1e-9 && BioLabSAVHandOff(["savShape": "star"]) == nil)
         r.near("biolab.water-sucrose", lab("water")?.answers.first?.value ?? 0, -2.45, 0.005, digits: 4)
         r.near("biolab.water-NaCl", lab("water", nil, ["i": "2"])?.answers.first?.value ?? 0, -4.90, 0.005, digits: 4)
         r.near("biolab.hemocytometer", lab("hemocytometer")?.answers.first?.value ?? 0, 8.4e5, 1e-6, digits: 0)

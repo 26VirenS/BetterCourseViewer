@@ -26,6 +26,9 @@ final class BioLabStore: ObservableObject {
     }
     /// The calculators whose steps are open.
     @Published var expanded: Set<String> = []
+    /// A line over a calculator's fields saying where its numbers came from (another tool's hand-off), by calculator,
+    /// until they are changed.
+    @Published private(set) var notes: [String: String] = [:]
 
     private init() {
         digits = min(max(Int(BioPrefs.string(.biolab, "digits") ?? "") ?? 3, 2), 6)
@@ -48,14 +51,36 @@ final class BioLabStore: ObservableObject {
     func entry(_ c: BioLabCalculator) -> BioLabEntry { entries[c.id] ?? c.defaultEntry }
     func outcome(_ c: BioLabCalculator) -> BioLabOutcome { c.run(entry(c), digits: digits) }
 
-    func setText(_ c: BioLabCalculator, _ field: String, _ text: String) { change(c) { $0.texts[field] = text } }
-    func setUnit(_ c: BioLabCalculator, _ field: String, _ unit: String) { change(c) { $0.units[field] = unit } }
+    func setText(_ c: BioLabCalculator, _ field: String, _ text: String) {
+        notes[c.id] = nil
+        change(c) { $0.texts[field] = text }
+    }
+
+    func setUnit(_ c: BioLabCalculator, _ field: String, _ unit: String) {
+        notes[c.id] = nil
+        change(c) { $0.units[field] = unit }
+    }
+
+    /// Cell Explorer's cell put into the surface area and volume card ("Why are cells small?"): its shape, its sizes and
+    /// their unit, with a line saying so.
+    func take(_ h: BioLabSAVHandOff) {
+        guard let c = BioLab.calculator("sav"), c.modes.contains(where: { $0.id == h.mode }) else { return }
+        change(c) { e in
+            e.mode = h.mode
+            for (k, t) in h.texts where c.field(k) != nil { e.texts[k] = t }
+            if let u = h.unit {
+                for k in c.mode(h.mode).inputs where c.field(k)?.units.contains(where: { $0.symbol == u }) == true { e.units[k] = u }
+            }
+        }
+        notes[c.id] = h.note
+    }
 
     /// Another thing to solve for: the answer just worked out goes into the field it filled, so the numbers stay together
     /// (solve for V₁, then for C₂, and the V₁ found is the one used).
     func setMode(_ c: BioLabCalculator, _ mode: String) {
         let old = entry(c)
         guard old.mode != mode else { return }
+        notes[c.id] = nil
         let answer = c.mode(old.mode).unknown.flatMap { u in outcome(c).result?.answers.first { $0.field == u } }
         change(c) { e in
             if let a = answer, let f = a.field { e.texts[f] = a.text }
@@ -64,7 +89,10 @@ final class BioLabStore: ObservableObject {
     }
 
     /// Back to the worked example.
-    func reset(_ c: BioLabCalculator) { change(c) { $0 = c.defaultEntry } }
+    func reset(_ c: BioLabCalculator) {
+        notes[c.id] = nil
+        change(c) { $0 = c.defaultEntry }
+    }
 
     func showSteps(_ id: String, _ on: Bool) {
         if on { expanded.insert(id) } else { expanded.remove(id) }
@@ -117,7 +145,8 @@ struct BioLabTool: View {
         }
     }
 
-    /// What the launch or the pin asked for, once: a calculator to go to (its steps open), every card's steps, a rounding.
+    /// What the launch, the pin or another tool asked for, once: a calculator to go to (its steps open), every card's
+    /// steps, a rounding — or Cell Explorer's cell, put into the surface area and volume card (BioLabSAVHandOff).
     private func apply(_ proxy: ScrollViewProxy) {
         guard !applied else { return }
         applied = true
@@ -125,7 +154,16 @@ struct BioLabTool: View {
         if state?.has("steps") == true {
             for c in BioLab.on(nav.page(.biolab)) { store.showSteps(c.id, true) }
         }
-        let handed = ToolsCenter.shared.takeInfo("calc")
+        let tools = ToolsCenter.shared
+        var handed = tools.takeInfo("calc")
+        if handed == nil || handed == "sav" {
+            var info: [String: String] = [:]
+            for k in BioLabSAVHandOff.keys { if let v = tools.takeInfo(k) { info[k] = v } }
+            if let cell = BioLabSAVHandOff(info) {
+                store.take(cell)
+                handed = "sav"
+            }
+        }
         guard let id = handed ?? state?.value("calc"), let c = BioLab.calculator(id) else { return }
         nav.set(.biolab, c.page)
         if handed != nil { store.showSteps(c.id, true) }
@@ -261,6 +299,12 @@ struct BioLabCard: View {
         let outcome = calc.run(entry, digits: store.digits)
         let content = VStack(alignment: .leading, spacing: compact ? 10 : 14) {
             if !compact { header }
+            if !compact, let note = store.notes[calc.id] {
+                Label(note, systemImage: "arrow.down.right.circle")
+                    .font(.sFootnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(calc.formula)
                 .font(.system(size: compact ? 14 : 15, weight: .medium))
                 .padding(.horizontal, 10)

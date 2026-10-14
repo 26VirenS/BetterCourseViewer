@@ -547,7 +547,7 @@ struct CECellPage: View {
             info["savShape"] = "sphere"
             info["savSize"] = String(halfUp: "%.1f", d)
         case .plant:
-            info["savShape"] = "rectangular"
+            info["savShape"] = "box"
             info["savSize"] = "44,26,26"
         case .bacterium:
             info["savShape"] = "cylinder"
