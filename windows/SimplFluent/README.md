@@ -450,8 +450,10 @@ public sealed class TodoScreen : Screen
   Each card wears its counter's colour — the one its symbol wears: Due today Windows' blue, Tomorrow orange, Next 7
   days green, Overdue red, Unread orange, Graded purple — washed across the whole card inside it, with a faint edge of
   the colour (a little stronger in dark, lighter in light, so the number and its words stay easy to read; over a
-  theme's picture too, which shows through). Overdue with something in it wears the alert's own face instead (a solid
-  red tint ringed in red) and its number in red.
+  theme's picture too, which shows through). Overdue wears its red wash with nothing late too (`--overdue-none` draws
+  it so, for the `dashboard-overdue-none` pictures: the mock always has something late); with something late, the
+  alert instead — a stronger red wash ringed in red (in dark a deeper red, so the card is redder without lifting it
+  towards the red number, which reads on it at about 4:1) — and its number in red.
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
   light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`). In the
   light theme `B.Text2` and `B.Text3` are solid greys (#5F5F5F, #707070; `Appearance.ReadableText`): Fluent's
@@ -682,13 +684,16 @@ its row pressed again folds it back into its row. It takes nothing from the wind
 elsewhere does what it does and leaves it up, and it stays over whatever place is opened under it until it is closed;
 its heading moves it (`Kit/Drag.cs`: only once the pointer has gone Windows' drag distance — a click there is not a
 move). A counter's panel on the Dashboard is 0.2.9's, as the Mac's 1.3.77: pressed, the counter's card grows in place
-into its panel over the page (its place and size to the panel's, 400 ms on Windows' decelerate curve, the panel's words
-fading in from 90 ms) and folds back into the card as it closes (250 ms, the words fading first, then the card shows
-again) — with ×, a click on its heading, Escape, the card again, or a press anywhere else, which still does what it
-does (another card opens its own), so it never holds the window. It is drawn in the shell's overlay over the page
-(`WorkPreview.Layer`), under any quick look (a press there leaves it up), is not moved by its heading, and goes with the
-page when another place is opened. It stays on its card: as the page scrolls or is laid out again it goes with the
-card, cut under the page's header where the card has scrolled up there (`DashboardScreen.Follow`; `--sheet next
+into its panel over the page (its place and size to the panel's, 400 ms on Windows' decelerate curve; the surface is
+the card's own face at first — its wash, or the alert's, its edge, its picture — giving way to the panel's over 215 ms
+as the panel's words fade in from 90 ms) and folds back into the card as it closes (250 ms, the words fading first and
+the card's face coming back, then the surface lifts off the card, whose words show through it) — with ×, a click on its
+heading, Escape, the card again, or a press anywhere else, which still does what it does (another card opens its own),
+so it never holds the window. A panel folding lies under any panel opened meanwhile and takes no press: its own card
+pressed again as it folds opens it again. It is drawn in the shell's overlay over the page (`WorkPreview.Layer`; a
+Dashboard in a window of its own, the page's own overlay), under any quick look (a press there leaves it up), is not
+moved by its heading, and goes with the page when another place is opened. It stays on its card: as the page scrolls
+or is laid out again it goes with the card, cut under the page's header where the card has scrolled up there (`DashboardScreen.Follow`; `--sheet next
 --open sheetscroll` scrolls the page under it, for the `dashboard-counter-scrolled` picture). With Windows' Animation
 effects off nothing grows: the panel fades in where it opens, over its card, and fades away as it closes
 (`Motion.Fade`). `--sheet <key> --open sheetmorph` draws it as it is a quarter of the way through growing, for the

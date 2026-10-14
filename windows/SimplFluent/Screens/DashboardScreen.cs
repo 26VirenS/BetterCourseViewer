@@ -172,9 +172,14 @@ public sealed partial class DashboardScreen : Screen
         overlay = new Canvas { ClipToBounds = false };
         root.Children.Add(page);
         root.Children.Add(overlay);
-        // (a panel already up — over the page, or over another place — is kept, its list read again; one still on its tile
-        //  goes where the page built again has put the tile)
-        if (openKey != null) root.Loaded += (_, _) => { if (frame == null) ShowPanel(animate: !sheetAsked); else { Follow(); PanelData(); } };
+        // (a panel already up is kept, its list read again, and goes where the page built again has put its tile; one
+        //  asked for at launch, --sheet, opens once the page is up — tried again as each build of the page is)
+        if (openKey != null)
+            root.Loaded += (_, _) =>
+            {
+                if (frame != null) { Follow(); PanelData(); }
+                else if (!ShowPanel(animate: !sheetAsked) && !sheetAsked) Unplaced();
+            };
         return root;
     }
 
@@ -397,7 +402,7 @@ public sealed partial class DashboardScreen : Screen
     /// <summary>
     /// The alert's red, the same whatever the theme: Windows' critical red in light, and in dark a red of Overdue's own
     /// (#FF5A4F) — dark's critical (#FF99A4) is a pink that a theme's accent can match (Dusk's #FFAABB), and the alert
-    /// must never look like the accent. On the alert's face it reads at over 4:1 in dark, 5:1 in light.
+    /// must never look like the accent. On the alert's face it reads at about 4:1 in both (<see cref="AlertFace"/>).
     /// </summary>
     private static Color AlertRed => Appearance.Dark ? Color.FromRgb(0xff, 0x5a, 0x4f) : Color.FromRgb(0xc4, 0x2b, 0x1c);
 
@@ -432,30 +437,43 @@ public sealed partial class DashboardScreen : Screen
     /// A counter's card round its words: its colour washed across it, inside it, with a faint edge of the colour — over
     /// its theme's picture too, which still shows through — opening its panel when pressed, what it counts with its number
     /// (and the line about it, whole, wherever the card had no room for it) its tooltip and what a screen reader says.
-    /// Overdue with something in it wears the alert on its own face instead — a solid red tint ringed in red, over any
-    /// picture or theme — so late work is never only a tint.
+    /// Overdue with something in it wears the alert instead — a stronger red wash than its own, ringed in red, its number
+    /// red — so late work is never only a tint.
     /// </summary>
     private Button TileButton(Counter c, FrameworkElement content, (int? Value, string? Note, bool Kept) n, bool alert, Color color)
     {
-        // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
-        var face = new Grid();
-        if (Scenes.Backdrop(c.Key) is { } scene)
-        {
-            face.Children.Add(scene);
-            // (the scene kept faint behind the name and the number, whole only in the card's empty corner)
-            if (!alert) face.Children.Add(Scenes.WordsVeil());
-        }
-        face.Children.Add(alert ? AlertFace() : Wash(color));
+        var face = Face(c.Key, alert, color);
         face.Children.Add(content);
-        face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
         var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
-        b.BorderBrush = new SolidColorBrush(K.WithAlpha(color, Appearance.Dark ? 0.34 : 0.3));
+        b.BorderBrush = Edge(color);
         var spoken = Spoken(c.Key, c.Label, n.Value);
         b.ToolTip = string.IsNullOrEmpty(n.Note) ? spoken : $"{spoken}\n{n.Note}";
         System.Windows.Automation.AutomationProperties.SetName(b, spoken);
         if (!string.IsNullOrEmpty(n.Note)) System.Windows.Automation.AutomationProperties.SetHelpText(b, n.Note);
         return b;
     }
+
+    /// <summary>
+    /// What a counter's card is drawn on under its words: its theme's scene, or a photo of the student's (Settings ▸
+    /// Appearance), kept faint behind the name and the number by the page's colour, whole only in the card's empty
+    /// corner; over it the counter's wash, or the alert's. Cut to the card's corners. The panel the card grows into wears
+    /// it too, as it starts out and as it lands back (<see cref="CardLook"/>).
+    /// </summary>
+    private static Grid Face(string key, bool alert, Color color)
+    {
+        var face = new Grid();
+        if (Scenes.Backdrop(key) is { } scene)
+        {
+            face.Children.Add(scene);
+            face.Children.Add(Scenes.WordsVeil());
+        }
+        face.Children.Add(alert ? AlertFace() : Wash(color));
+        face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
+        return face;
+    }
+
+    /// <summary>A counter's card's faint edge in its colour.</summary>
+    private static SolidColorBrush Edge(Color color) => new(K.WithAlpha(color, Appearance.Dark ? 0.34 : 0.3));
 
     /// <summary>
     /// The line about a count, whole: on as many lines as it takes, up to two — its parts ("announcements · 2 courses" is
@@ -523,12 +541,20 @@ public sealed partial class DashboardScreen : Screen
         }
     }
 
-    /// <summary>The alert's face: Windows' critical background, solid, ringed in the alert's red.</summary>
+    /// <summary>
+    /// The alert's face, Overdue's while something is late: a stronger red wash than the one it wears with nothing late
+    /// (<see cref="Wash"/>), ringed in the alert's red. In light Overdue's own red, more of it; in dark a deeper red laid on
+    /// thicker, redder than its own wash without lifting the card towards the red number on it — which reads on it at
+    /// about 4:1 in both (34 px semibold).
+    /// </summary>
     private static Border AlertFace()
     {
-        var f = new Border { CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1.5), IsHitTestVisible = false, BorderBrush = new SolidColorBrush(AlertRed) };
-        f.SetResourceReference(Border.BackgroundProperty, B.CriticalBack);
-        return f;
+        var (c, near, far) = Appearance.Dark ? (Color.FromRgb(0xa0, 0x1c, 0x14), 0.46, 0.32) : (CounterColor("overdue"), 0.26, 0.16);
+        return new Border
+        {
+            Background = new LinearGradientBrush(K.WithAlpha(c, near), K.WithAlpha(c, far), new Point(0, 0), new Point(1, 1)),
+            CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1.5), BorderBrush = new SolidColorBrush(AlertRed), IsHitTestVisible = false,
+        };
     }
 
     /// <summary>
@@ -559,6 +585,9 @@ public sealed partial class DashboardScreen : Screen
         var quick = countsQuick.Data;
         if (c.Key == "overdue")
         {
+            // (the screenshot suite's --overdue-none: Overdue as it is with nothing late — the mock always has some — for
+            //  a picture of its own red wash beside the others)
+            if (OverdueNonePicture) return (0, "Nothing overdue", false);
             var k = fresh ?? quick;
             if (k?.Overdue is { } o)
             {
@@ -594,22 +623,28 @@ public sealed partial class DashboardScreen : Screen
     private FrameworkElement? sheetPreviewRow;
     private Action? sheetPreviewPress;
     private Border? frame;
+    /// <summary>The open panel's card face (<see cref="CardLook"/>): there as the card starts to grow, gone as it opens.</summary>
+    private FrameworkElement? frameLook;
     /// <summary>Panels folding back into their cards, still drawn: put away at once with the page.</summary>
     private readonly List<Border> folding = new();
 
-    /// <summary>Where the panel is drawn: over the page, above every place (the shell's overlay); this page's own until
-    /// the shell has one.</summary>
-    private Canvas? Layer => WorkPreview.Layer ?? overlay;
+    /// <summary>Where the panel is drawn: over the page, above every place (the shell's overlay) — this page's own until
+    /// the shell has one, and in a window of its own (the Dashboard opened in a new window), whose page the shell's
+    /// overlay is not over.</summary>
+    private Canvas? Layer => WorkPreview.Layer is { } shell && root != null && Window.GetWindow(root) is { } here && ReferenceEquals(Window.GetWindow(shell), here) ? shell : overlay;
     private FrameworkElement? panelContent;
     private Rect panelRect;
 
     /// <summary>How long a card takes to grow into its panel (Windows' decelerate curve), and when — and for how long —
-    /// the panel's words fade in as it grows.</summary>
-    private const double GrowMs = Motion.Slow + 67, WordsAfterMs = 90, WordsMs = Motion.Medium;
+    /// the panel's words fade in as it grows; how long the card's face takes to leave the panel's surface as it does.</summary>
+    private const double GrowMs = Motion.Slow + 67, WordsAfterMs = 90, WordsMs = Motion.Medium, LookMs = WordsAfterMs + WordsMs / 2;
 
     /// <summary>The screenshot suite's --open sheetmorph (with --sheet): the panel drawn as it is a quarter of the way
     /// through growing out of its card, for a picture of the grow (pictures are taken with motion off).</summary>
     private static bool MorphPicture => Launch.Get("open") == "sheetmorph";
+
+    /// <summary>The screenshot suite's --overdue-none: Overdue drawn with nothing late, for a picture of its own wash.</summary>
+    private static bool OverdueNonePicture => Shot.Asked && Launch.Flag("overdue-none");
     /// <summary>The page's scroller, listened to while the panel is up.</summary>
     private ScrollViewer? pageScroller;
     /// <summary>The screenshot suite's --open sheetscroll (with --sheet): the page under the open panel scrolled a little,
@@ -625,8 +660,16 @@ public sealed partial class DashboardScreen : Screen
         {
             Shell.Tour.Did(Shell.TourEvent.CounterOpened);
             sheet.Ensure(engine, "todaySheet", new { key });
-            ShowPanel(animate: true);
+            if (!ShowPanel(animate: true)) Unplaced();
         }
+    }
+
+    /// <summary>A panel that could not be put over its card (the page not on show, its card not laid out): not open after
+    /// all — its card as it was, and the page's live check not held for it.</summary>
+    private void Unplaced()
+    {
+        if (openKey is { } key && tiles.TryGetValue(key, out var t)) { t.BeginAnimation(UIElement.OpacityProperty, null); t.Opacity = 1; }
+        openKey = null;
     }
 
     public override bool Escape()
@@ -656,6 +699,7 @@ public sealed partial class DashboardScreen : Screen
         openKey = null;
         frame = null;
         panelContent = null;
+        frameLook = null;
         WatchScroll(on: false);
         if (f != null) folding.Add(f);
         foreach (var x in folding) { x.BeginAnimation(UIElement.OpacityProperty, null); (x.Parent as Panel)?.Children.Remove(x); }
@@ -679,16 +723,18 @@ public sealed partial class DashboardScreen : Screen
         catch (InvalidOperationException) { return Rect.Empty; }
     }
 
-    private void ShowPanel(bool animate)
+    /// <summary>The open counter's panel put over its card — grown out of it, or there at once — and whether it could be:
+    /// not while the page is not on show, or its card not laid out.</summary>
+    private bool ShowPanel(bool animate)
     {
-        if (openKey == null || root == null || Layer is not { } layer) return;
+        if (openKey == null || root == null || Layer is not { } layer) return false;
         var key = openKey;
         var tile = TileRect(key);
         var pageRect = PageRect(layer);
-        if (tile.IsEmpty || pageRect.IsEmpty) return;
+        if (tile.IsEmpty || pageRect.IsEmpty) return false;
         var d = today.Data;
         var c = d?.Counters.FirstOrDefault(k => k.Key == key);
-        if (c == null) { openKey = null; return; }
+        if (c == null) return false;
         if (frame != null) (frame.Parent as Panel)?.Children.Remove(frame);
         var w = PanelSpot(tile, pageRect, 0).Width;
         panelContent = PanelContent(c, key, w);
@@ -696,10 +742,12 @@ public sealed partial class DashboardScreen : Screen
         panelContent.Measure(new Size(w - 2, double.PositiveInfinity));
         var h = Math.Max(tile.Height, panelContent.DesiredSize.Height + 2);
         panelRect = PanelSpot(tile, pageRect, h);
+        var look = CardLook(c);
+        frameLook = look;
         frame = new Border
         {
             CornerRadius = new CornerRadius(8), ClipToBounds = true,
-            Child = new Grid { Children = { Wash(CounterColor(key), card: false), new Canvas { Children = { panelContent } } } },
+            Child = new Grid { Children = { Wash(CounterColor(key), card: false), look, new Canvas { Children = { panelContent } } } },
             Effect = K.Shadow(32, 10, 0.22), SnapsToDevicePixels = true,
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
@@ -714,11 +762,12 @@ public sealed partial class DashboardScreen : Screen
         ClipToPage(layer);
         // (the screenshot suite: --open sheetscroll scrolls the page under the panel a little, once it is up)
         if (!sheetScrolled && Launch.Get("open") == "sheetscroll") { sheetScrolled = true; ScrollForPicture(); }
-        if (MorphPicture) { CatchGrowing(); return; }
+        if (MorphPicture) { CatchGrowing(); return true; }
+        look.Opacity = 0;
         if (!animate || !Motion.Fades)
         {
             PlaceAt(frame, panelRect);
-            return;
+            return true;
         }
         if (!Motion.On)
         {
@@ -728,23 +777,41 @@ public sealed partial class DashboardScreen : Screen
             var f = frame;
             if (t != null) t.Opacity = 1;
             Motion.Fade(f, 0, 1, Motion.Normal, () => { if (ReferenceEquals(frame, f) && tiles.TryGetValue(key, out var t1)) t1.Opacity = 0; });
-            return;
+            return true;
         }
-        // the card grows in place into its panel: the surface grows from the card's place and size to its own, its words
-        // fading in as it opens (Windows' decelerate curve) — 0.2.9's
+        // the card grows in place into its panel: the surface grows from the card's place and size to its own — the
+        // card's own face at first, giving way to the panel's — its words fading in as it opens (Windows' decelerate
+        // curve), 0.2.9's
         PlaceAt(frame, tile);
         panelContent.Opacity = 0;
         Motion.FromTo(frame, Canvas.LeftProperty, tile.X, panelRect.X, GrowMs, Motion.Decelerate);
         Motion.FromTo(frame, Canvas.TopProperty, tile.Y, panelRect.Y, GrowMs, Motion.Decelerate);
         Motion.FromTo(frame, FrameworkElement.WidthProperty, tile.Width, panelRect.Width, GrowMs, Motion.Decelerate);
         Motion.FromTo(frame, FrameworkElement.HeightProperty, tile.Height, panelRect.Height, GrowMs, Motion.Decelerate);
+        Motion.FromTo(look, UIElement.OpacityProperty, 1, 0, LookMs, Motion.Standard);
         Motion.FadeIn(panelContent, WordsMs, WordsAfterMs);
         Shot.Moved();
+        return true;
+    }
+
+    /// <summary>
+    /// A counter's card's own face — its background, its scene, its wash (or the alert's) and its coloured edge, without
+    /// its words — laid in its panel's surface over the panel's own: there as the card starts to grow, gone by the time
+    /// the panel's words are in, and back as the panel folds into the card, so the surface is the card's at the first
+    /// frame of the grow and at the last of the fold, never jumping from one look to the other.
+    /// </summary>
+    private Border CardLook(Counter c)
+    {
+        var alert = c.Tone == "red" && (Count(c).Value ?? 0) > 0;
+        var color = CounterColor(c.Key);
+        var look = new Border { Child = Face(c.Key, alert, color), CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1), BorderBrush = Edge(color), IsHitTestVisible = false };
+        look.SetResourceReference(Border.BackgroundProperty, "CardBackground");
+        return look;
     }
 
     /// <summary>--open sheetmorph: the panel as it is a quarter of the way through growing out of its card — its surface
-    /// where the grow has taken it by then, its words as far faded in — drawn still, for a picture. Drawn again each time
-    /// the panel is laid out (its list come, the page settled).</summary>
+    /// where the grow has taken it by then, the card's face as far gone and its words as far faded in — drawn still, for
+    /// a picture. Drawn again each time the panel is laid out (its list come, the page settled).</summary>
     private void CatchGrowing()
     {
         if (frame == null || panelContent == null || openKey == null) return;
@@ -755,6 +822,7 @@ public sealed partial class DashboardScreen : Screen
         double Step(double from, double to) => from + (to - from) * p;
         PlaceAt(frame, new Rect(Step(tile.X, panelRect.X), Step(tile.Y, panelRect.Y), Step(tile.Width, panelRect.Width), Step(tile.Height, panelRect.Height)));
         panelContent.Opacity = Motion.Decelerate.Ease(Math.Clamp((at - WordsAfterMs) / WordsMs, 0, 1));
+        if (frameLook != null) frameLook.Opacity = 1 - Motion.Standard.Ease(Math.Clamp(at / LookMs, 0, 1));
     }
 
     /// <summary>
@@ -867,40 +935,59 @@ public sealed partial class DashboardScreen : Screen
         e.Height = r.Height;
     }
 
-    /// <summary>Folded back into its card (0.2.9's): the surface shrinks to the card's place and size, its words fading
-    /// first, then the card shows again. With Windows' Animation effects off nothing shrinks: the panel fades where it
-    /// is, and its card fades back in under it.</summary>
+    /// <summary>
+    /// Folded back into its card (0.2.9's): the surface shrinks to the card's place and size, its words fading first and
+    /// the card's face coming back into it, then lifts off the card, whose words show through it as it goes. A folding
+    /// panel lies under any panel opened meanwhile and takes no press — its own card pressed again while it folds opens
+    /// it again, over it. With Windows' Animation effects off nothing shrinks: the panel fades where it is, and its card
+    /// shows again under it.
+    /// </summary>
     private void ClosePanel(string key)
     {
         var f = frame;
         var content = panelContent;
+        var look = frameLook;
         frame = null;
         panelContent = null;
+        frameLook = null;
         WatchScroll(on: false);
         if (f == null) { if (tiles.TryGetValue(key, out var t0)) { t0.BeginAnimation(UIElement.OpacityProperty, null); t0.Opacity = 1; } return; }
         var tile = TileRect(key);
         folding.Add(f);
-        void Done()
+        f.IsHitTestVisible = false;
+        Panel.SetZIndex(f, -1);
+        void Gone()
+        {
+            if (folding.Remove(f)) (f.Parent as Panel)?.Children.Remove(f);
+        }
+        void CardBack()
+        {
+            if (tiles.TryGetValue(key, out var t)) { t.BeginAnimation(UIElement.OpacityProperty, null); t.Opacity = 1; }
+        }
+        void Landed()
         {
             // (put away already, with the page)
-            if (!folding.Remove(f)) return;
-            (f.Parent as Panel)?.Children.Remove(f);
-            if (tiles.TryGetValue(key, out var t) && t.Opacity < 1) Motion.Fade(t, 0, 1, Motion.Fast);
+            if (!folding.Contains(f)) return;
+            // (opened again as it folded: its card stays hidden under the new panel)
+            if (openKey == key) { Gone(); return; }
+            CardBack();
+            Motion.Fade(f, f.Opacity, 0, Motion.Fast, Gone);
         }
-        if (!Motion.Fades) { Done(); return; }
+        if (!Motion.Fades) { Gone(); CardBack(); return; }
         if (!Motion.On || tile.IsEmpty)
         {
             // (nothing shrinks: its card shows again under it as it fades where it is)
-            if (tiles.TryGetValue(key, out var t1)) { t1.BeginAnimation(UIElement.OpacityProperty, null); t1.Opacity = 1; }
-            Motion.Fade(f, f.Opacity, 0, Motion.Fast, Done);
+            CardBack();
+            Motion.Fade(f, f.Opacity, 0, Motion.Fast, Gone);
             return;
         }
         if (content != null) Motion.FadeOut(content, () => { }, Motion.Fast);
+        if (look != null) Motion.To(look, UIElement.OpacityProperty, 1, Motion.Medium, Motion.Standard);
         var from = new Rect(Canvas.GetLeft(f), Canvas.GetTop(f), f.ActualWidth, f.ActualHeight);
         Motion.FromTo(f, Canvas.LeftProperty, from.X, tile.X, Motion.Medium, Motion.Standard);
         Motion.FromTo(f, Canvas.TopProperty, from.Y, tile.Y, Motion.Medium, Motion.Standard);
         Motion.FromTo(f, FrameworkElement.WidthProperty, from.Width, tile.Width, Motion.Medium, Motion.Standard);
-        Motion.FromTo(f, FrameworkElement.HeightProperty, from.Height, tile.Height, Motion.Medium, Motion.Standard, 0, Done);
+        Motion.FromTo(f, FrameworkElement.HeightProperty, from.Height, tile.Height, Motion.Medium, Motion.Standard, 0, Landed);
     }
 
     /// <summary>The list came (or changed) while the panel is open: its words again, the surface to its new height.</summary>
