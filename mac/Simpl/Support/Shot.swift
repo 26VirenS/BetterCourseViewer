@@ -129,9 +129,14 @@ enum Shot {
     /// and two of the four pins were pictured closed, their windows inactive. Once only, and never past two seconds: the
     /// copies bringing themselves forward in turn took the front from each other, and under the full set's load each
     /// turn took seconds — two pictures were never taken before the suite gave up on them.
+    /// A pin's popover pictured (`-SimplPinOpen`), the one thing that is not there unless its app is in front, is waited
+    /// for longer: brought forward again until the app is in front, for up to eight seconds (it is five pictures of the
+    /// full set; with only one more try, Hardy–Weinberg's was pictured closed).
     private static func settle(_ file: String, again: Bool = true, since: Date = Date()) {
+        let popover = UserDefaults.standard.string(forKey: "SimplPinOpen") != nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            if NSApp.isActive || !again || Date().timeIntervalSince(since) > 2 {
+            let waited = Date().timeIntervalSince(since)
+            if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {
                 capture(file)
             } else {
                 NSLog("[Simpl] shot: another copy of the app is in front; brought forward again")
