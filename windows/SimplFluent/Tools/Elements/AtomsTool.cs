@@ -140,9 +140,11 @@ internal sealed class AtomsTool : Grid
             Refresh();
         };
 
+        // (no magnifier in it: between the element before and after, in the controls' column of a 1024 or 1366 popup, it
+        //  left the field room for "Symbol, name or numbe")
         field = new TextBox
         {
-            PlaceholderText = "Symbol, name or number", Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, MinHeight = 32,
+            PlaceholderText = "Symbol, name or number", MinHeight = 32,
             ClearButtonEnabled = false, VerticalAlignment = VerticalAlignment.Center,
         };
         field.TextChanged += (_, _) => Note();
