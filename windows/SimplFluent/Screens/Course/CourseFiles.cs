@@ -31,23 +31,28 @@ internal static class CourseFiles
 
     // ---- what a file is ----
 
-    /// <summary>What a file is, in a word (the Mac's FilesBrowser.kind).</summary>
-    public static string Kind(string name, string? kind)
+    /// <summary>What a file is, in a word (the Mac's FilesBrowser.kind): the engine's one vocabulary (PDF, Image,
+    /// Spreadsheet, Slides, Document, Text, Video, Audio, Archive, Web page, File) — "PNG" beside "….png" said the
+    /// extension again, and a .txt was a "Document" — else the same words worked out here, for an answer from before.</summary>
+    public static string Kind(string name, string? kind, string? typeText = null)
     {
+        if (!string.IsNullOrEmpty(typeText)) return typeText;
         var ext = Path.GetExtension(name).TrimStart('.').ToLowerInvariant();
         if (kind == "pdf" || ext == "pdf") return "PDF";
-        if (kind == "image") return "Image";
+        if (kind == "image" || ext is "png" or "jpg" or "jpeg" or "gif" or "webp" or "heic" or "bmp" or "svg") return "Image";
         if (kind == "video") return "Video";
         if (kind == "audio") return "Audio";
-        if (ext is "doc" or "docx" or "pages" or "txt" or "rtf") return "Document";
-        if (ext is "ppt" or "pptx" or "key") return "Presentation";
-        if (ext is "xls" or "xlsx" or "csv" or "numbers") return "Spreadsheet";
+        if (ext is "txt" or "md") return "Text";
+        if (ext is "doc" or "docx" or "pages" or "rtf" or "odt") return "Document";
+        if (ext is "ppt" or "pptx" or "key" or "odp") return "Slides";
+        if (ext is "xls" or "xlsx" or "csv" or "numbers" or "ods") return "Spreadsheet";
         if (ext is "zip" or "gz" or "tar" or "7z" or "rar") return "Archive";
-        return ext.Length == 0 ? "File" : ext.ToUpperInvariant();
+        if (ext is "html" or "htm") return "Web page";
+        return "File";
     }
 
-    /// <summary>"Open in Microsoft Edge", or "Open in Default App" when Windows has none for it (the Mac's FileKind.openTitle).</summary>
-    public static string OpenTitle(string name) => AppName(name) is { } app ? $"Open in {app}" : "Open in Default App";
+    /// <summary>"Open in Microsoft Edge", or "Open in default app" when Windows has none for it (the Mac's FileKind.openTitle).</summary>
+    public static string OpenTitle(string name) => AppName(name) is { } app ? $"Open in {app}" : "Open in default app";
 
     private static string? AppName(string name)
     {

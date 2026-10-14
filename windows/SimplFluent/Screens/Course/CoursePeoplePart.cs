@@ -11,7 +11,9 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// The people of a course or a group by role, teachers first (the Mac's PeopleList): each with their picture and
-/// pronouns, and a Message button (and menu item) that writes to them — in as many columns as fit, 260 wide.
+/// pronouns, and a Message button (and menu item) that writes to them — in as many columns as fit, 260 wide. One person
+/// in a role (most often the teacher) has the card's whole width, Message named at its right end: an envelope alone,
+/// floating where a second column would start, was the hardest thing to find on the page.
 /// </summary>
 internal sealed class CoursePeoplePart : CourseListPart<PeopleData>
 {
@@ -28,7 +30,8 @@ internal sealed class CoursePeoplePart : CourseListPart<PeopleData>
     {
         var v = K.V(22);
         if (d.Sections.Count == 0) v.Children.Add(CourseKit.EmptyCard(d.Empty ?? "Nobody to show", SymbolRegular.People24));
-        foreach (var s in d.Sections) v.Children.Add(CourseKit.CardSection(s.Title, Count(s.Rows.Count), null, PeopleGrid(s.Rows)));
+        foreach (var s in d.Sections)
+            v.Children.Add(CourseKit.CardSection(s.Title, Count(s.Rows.Count), null, s.Rows.Count == 1 ? Person(s.Rows[0], labelled: true) : PeopleGrid(s.Rows)));
         return v;
     }
 
@@ -57,13 +60,29 @@ internal sealed class CoursePeoplePart : CourseListPart<PeopleData>
         return g;
     }
 
-    private FrameworkElement Person(PersonRow p)
+    /// <summary>A person: their picture, name and pronouns, and Message — the envelope alone in a grid of many, named
+    /// when they have the card to themselves (<paramref name="labelled"/>).</summary>
+    private FrameworkElement Person(PersonRow p, bool labelled = false)
     {
         var words = K.V(1, K.Text(p.Name, Ty.Body));
         if (!string.IsNullOrEmpty(p.Pronouns)) words.Children.Add(K.Text(p.Pronouns!, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var mail = K.IconButton(SymbolRegular.Mail24, () => Write(p), $"Message {p.Name}", 16, 30);
-        mail.Height = 30;
+        FrameworkElement mail;
+        if (labelled)
+        {
+            var b = K.Button("Message", () => Write(p), icon: SymbolRegular.Mail24);
+            b.MinWidth = 0;
+            b.ToolTip = $"Message {p.Name}";
+            System.Windows.Automation.AutomationProperties.SetName(b, $"Message {p.Name}");
+            b.VerticalAlignment = VerticalAlignment.Center;
+            mail = b;
+        }
+        else
+        {
+            var b = K.IconButton(SymbolRegular.Mail24, () => Write(p), $"Message {p.Name}", 16, 30);
+            b.Height = 30;
+            mail = b;
+        }
         var g = K.Columns("auto, *, auto", CourseKit.Avatar(p.Name, p.Avatar, 38).Margin(0, 0, 12, 0).Col(0), words.Col(1), mail.Margin(4, 0, 0, 0).Col(2));
         g.Margin = new Thickness(8, 7, 8, 7);
         g.Background = Brushes.Transparent;
@@ -76,9 +95,9 @@ internal sealed class CoursePeoplePart : CourseListPart<PeopleData>
 }
 
 /// <summary>
-/// Writing to someone from a course's People (the Mac's ComposeSheet, addressed to them): New Message, to them, about
+/// Writing to someone from a course's People (the Mac's ComposeSheet, addressed to them): New message, to them, about
 /// the course, with a subject if you like and the message — Send, or Cancel (which asks first once something is
-/// written). Where the Inbox's own New Message is wired in (<see cref="Hook"/>), it is that instead.
+/// written). Where the Inbox's own New message is wired in (<see cref="Hook"/>), it is that instead.
 /// </summary>
 public static class CourseCompose
 {
@@ -103,7 +122,7 @@ public static class CourseCompose
         FrameworkElement Line(string label, UIElement field) =>
             K.Columns("70, *", K.Text(label, Ty.Body, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Margin(0, 0, 12, 0).Col(0), field.Col(1));
         var body = K.V(14, Line("To:", token), Line("Subject:", subject), message, status);
-        var sheet = new Sheet { Title = "New Message", Body = body, Width = 620 };
+        var sheet = new Sheet { Title = "New message", Body = body, Width = 620 };
         var sending = false;
         var confirming = false;
         SheetButton? send = null, cancel = null;
