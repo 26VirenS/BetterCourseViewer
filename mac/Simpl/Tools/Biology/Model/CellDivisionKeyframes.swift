@@ -943,7 +943,14 @@ struct DivisionBuilder {
                       cellPlates: cellPlates(first: 0.95, firstAlpha: 0, second: D, secondAlpha: 0.75), furrows: furrows(), chromatids: ks)
         let dy = o.plant ? 0.3 : 0.32
         let badges = (0..<4).map { DivBadgeDef(cell: $0, at: centres[$0] + DivPoint(0, $0 < 2 ? dy : -dy)) }
-        var labels = [DivLabelDef(part: "gamete", text: "Four haploid cells (n)", anchor: .cell(0, 100)),
+        // (1.3.78: with nondisjunction the cells are not all n — the label said "Four haploid cells (n)" over n + 1 and n − 1)
+        let cells: String
+        switch o.nondisjunction {
+        case .none: cells = "Four haploid cells (n)"
+        case .meiosisI: cells = "Four cells, each n + 1 or n − 1"
+        case .meiosisII: cells = "Four cells: n + 1, n − 1, n and n"
+        }
+        var labels = [DivLabelDef(part: "gamete", text: cells, anchor: .cell(0, 100)),
                       DivLabelDef(part: "nucleus", text: "Nucleus", anchor: .nucleus(3, DivMath.radians(-30)))]
         if crossing { labels.append(DivLabelDef(part: "recombinant", text: "Recombinant chromosome", anchor: .nucleus(0, DivMath.radians(200)))) }
         return DivisionKeyframe(frame: f, labels: labels, badges: badges, style: .perCell)

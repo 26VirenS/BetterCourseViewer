@@ -119,6 +119,9 @@ final class GXStore: ObservableObject {
         steps = BioStepController(steps: [])
         rebuild()
         refreshFrames()
+        // (1.3.78) the launch's state as the store is made, not when the page first appears: the screenshot suite's
+        // codon grid was pictured without its lookup (the wheel, the same lookup, with it)
+        applyLaunch(BioLaunchState.forTool(.gene))
     }
 
     /// "Type your own" cleaned (§3.7), kept to the step-through's 600 nt.
@@ -220,6 +223,10 @@ final class GXStore: ObservableObject {
         }
         if let n = s.value("step").flatMap(Int.init), n >= 1 {
             steps.go(to: min(n, steps.steps.count) - 1, animated: false)
+        }
+        if OpenClock.verbose {
+            NSLog("[Simpl] bio launch: gene %@: %@ gene, %@, codons as a %@, lookup %@, step %d of %d", s.raw, source.rawValue,
+                  cell.rawValue, codonView.rawValue, lookup.isEmpty ? "none" : lookup, steps.index + 1, steps.steps.count)
         }
     }
 

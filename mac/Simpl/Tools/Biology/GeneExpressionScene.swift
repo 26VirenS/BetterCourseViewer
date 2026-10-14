@@ -538,7 +538,15 @@ final class GXPainter {
             c.stroke(mark, with: .color(Theme.accent), style: StrokeStyle(lineWidth: 2, dash: [3, 2]))
             let a = x(g.column(mature: Double(s0 + 3 * sc.index)) - 0.5), b = x(g.column(mature: Double(s0 + 3 * sc.index + 2)) + 0.5)
             c.stroke(Path(roundedRect: CGRect(x: a, y: first.y - 11, width: b - a, height: 22), cornerRadius: 5), with: .color(Theme.accent), lineWidth: 2)
-            text(&c, "exon 1 | exon 2 · codon \(sc.index + 1) \(sc.codon) spans the joint", CGPoint(x: jx, y: first.y + 26), size: 10.5, weight: .bold, colour: Theme.accent)
+            // (on the card's colour: under the mRNA it sits on the nuclear envelope's line, which ran through its words)
+            let words = c.resolve(Text("exon 1 | exon 2 · codon \(sc.index + 1) \(sc.codon) spans the joint")
+                .font(.system(size: 10.5, weight: .bold)).foregroundColor(Theme.accent))
+            let wordsSize = words.measure(in: CGSize(width: 600, height: 40))
+            let wordsAt = CGPoint(x: jx, y: first.y + 26)
+            c.fill(Path(roundedRect: CGRect(x: wordsAt.x - wordsSize.width / 2 - 6, y: wordsAt.y - wordsSize.height / 2 - 2,
+                                            width: wordsSize.width + 12, height: wordsSize.height + 4),
+                        cornerRadius: (wordsSize.height + 4) / 2), with: .color(Theme.card))
+            c.draw(words, at: wordsAt)
         }
         // (the ends)
         let capped = f.cap > 0.5

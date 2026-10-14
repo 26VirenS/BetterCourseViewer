@@ -169,10 +169,14 @@ struct BioStepControls: View {
             button("forward.end.fill", "Last step (End)", disabled: controller.atEnd) { controller.last() }
             Divider().frame(height: 18)
             dots
-            Text(BioStepTiming.caption(controller.index, of: controller.steps))
-                .font(.sCallout.weight(.medium).monospacedDigit())
-                .lineLimit(1)
-                .frame(minWidth: 120, alignment: .leading)
+            // (1.3.78) the step's title beside its number where it fits whole, else the number alone — its title is the
+            // card's heading or the words over the bar; cut off, it read "Step 4 of 9 · DNA polymerase III add…")
+            ViewThatFits(in: .horizontal) {
+                stepText(BioStepTiming.caption(controller.index, of: controller.steps))
+                stepText(controller.steps.isEmpty ? "" : "Step \(controller.index + 1) of \(controller.steps.count)")
+            }
+            .frame(minWidth: 120, alignment: .leading)
+            .help(BioStepTiming.caption(controller.index, of: controller.steps))
             Menu {
                 ForEach(BioStepTiming.speeds, id: \.self) { s in
                     Button { controller.speed = s } label: {
@@ -191,6 +195,13 @@ struct BioStepControls: View {
         .padding(.vertical, 8)
         .glassCapsule()
         .help(groups.isEmpty ? "← → step · Space plays · Home and End" : "← → step · Space plays · " + groups.keys.sorted().map { "\($0) \(groups[$0] ?? "")" }.joined(separator: " · "))
+    }
+
+    private func stepText(_ s: String) -> some View {
+        Text(s)
+            .font(.sCallout.weight(.medium).monospacedDigit())
+            .lineLimit(1)
+            .fixedSize()
     }
 
     /// A dot per step (a press goes there); at most 24 drawn, else a thin bar of progress.

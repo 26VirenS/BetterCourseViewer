@@ -231,6 +231,7 @@ private struct EnzymeGraphs: View {
 
     private var substrateCard: some View {
         let a = c.apparent, v = c.effectiveVmax
+        let lowPoint = c.rate < 0.3 * max(c.vmax * 1.12, 1)
         let line = "v = Vmax·[S] / (Km + [S]) = \(EnzymeText.number(v)) × \(EnzymeText.number(c.substrate)) / (\(EnzymeText.number(a.km)) + \(EnzymeText.number(c.substrate))) = \(String(halfUp: "%.1f", c.rate)) µmol/min"
         return card("Rate against substrate", line) {
             Chart {
@@ -263,8 +264,10 @@ private struct EnzymeGraphs: View {
                 PointMark(x: .value("[S]", c.substrate), y: .value("Rate", c.rate))
                     .foregroundStyle(Theme.accent)
                     .symbolSize(80)
-                    // (below the curve, to the right of the point: above it, it ran into Km's label)
-                    .annotation(position: .bottomTrailing, alignment: .topLeading, spacing: 4) {
+                    // (below the curve, to the right of the point: above it, it ran into Km's label — but above it when the
+                    // point is low on the chart, as a denatured enzyme's is, where below it ran into the axis's numbers)
+                    .annotation(position: lowPoint ? .topTrailing : .bottomTrailing, alignment: lowPoint ? .bottomLeading : .topLeading,
+                                spacing: 4) {
                         Text("v = \(String(halfUp: "%.1f", c.rate))").font(.sCaption.weight(.semibold)).foregroundStyle(Theme.accent)
                     }
             }

@@ -255,7 +255,9 @@ struct CrossPedigreePage: View {
         return Button {
             change { model.selected = selected ? nil : s.id }
         } label: {
-            VStack(spacing: 6) {
+            // (the name 11 points under the symbol, clear of the ring 9 points round a ringed one: at 6 the ring ran
+            // through "I-2")
+            VStack(spacing: 11) {
                 PedigreeSymbol(male: p?.male ?? true, affected: p?.affected ?? false, carrier: p?.carrier ?? false, size: symbol)
                     .overlay {
                         if ringed {

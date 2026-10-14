@@ -449,11 +449,22 @@ struct EnergyMapView: View {
 private struct EnergyMapPage: View {
     var state: BioLaunchState?
     @ObservedObject private var nav = BioNav.shared
-    @State private var selected = BioPrefs.string(.energy, "stage") ?? "light"
-    @State private var respire = BioPrefs.bool(.energy, "respire", default: false)
+    @State private var selected: String
+    @State private var respire: Bool
 
     private var stage: EnergyStage { EnergyPathways.stage(selected) ?? EnergyPathways.stages[0] }
     private static let order = ["light", "calvin", "glycolysis", "pyruvate", "krebs", "oxphos", "fermentation"]
+
+    /// (1.3.78) The launch's stage and day-and-night as the page's first state, as the step-throughs have theirs: taken
+    /// once on appearing, a page made again before it appeared lost it (the dark picture showed the light reactions
+    /// where the launch asked for the Calvin cycle).
+    init(state: BioLaunchState? = nil) {
+        self.state = state
+        let s = EnergyLaunch.state("map", state)
+        let asked = s?.value("stage").flatMap { EnergyPathways.stage($0) == nil ? nil : $0 }
+        _selected = State(initialValue: asked ?? BioPrefs.string(.energy, "stage") ?? "light")
+        _respire = State(initialValue: s?.has("respire") == true || s?.has("dark") == true || BioPrefs.bool(.energy, "respire", default: false))
+    }
 
     var body: some View {
         PTWorkLayout {
@@ -477,9 +488,6 @@ private struct EnergyMapPage: View {
     }
 
     private func apply() {
-        guard let s = EnergyLaunch.take("map", state) else { return }
-        if let id = s.value("stage"), EnergyPathways.stage(id) != nil { select(id) }
-        if s.has("respire") || s.has("dark") { setRespire(true) }
         EnergyLaunch.tell("map", state, "\(selected)\(respire ? ", day and night" : "")")
     }
 
