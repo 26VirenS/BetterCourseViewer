@@ -7,9 +7,11 @@ import SwiftUI
 // MARK: - The radial picker
 
 /// The web's radial picker (content/app/personalize.js, setup-css.js .pz__pk), drawn as the web draws it: a disc with a
-/// thin hue band round its edge; inside it, saturation up the left arc (grey to full) and depth down the right (light to
-/// deep), each named along its arc; and at the middle the colour as words — "Aa" on white over "Aa" on the dark card,
+/// thin hue band round its edge; inside it, saturation up the left arc (grey to full) and the shade down the right (light
+/// to deep), each named along its arc; and at the middle the colour as words — "Aa" on white over "Aa" on the dark card,
 /// each stepped until it reads — ringed in the colour, with Done on it. Dragged anywhere on a part, that part follows.
+/// (onboarding-24) Its arcs' names are 11-point, the right one "Shade" (a word students use; it was "Depth"), and under
+/// the disc the colour's code can be read and typed.
 struct RadialColorPicker: View {
     let value: AppearanceStore.Custom
     let change: (AppearanceStore.Custom) -> Void
@@ -34,8 +36,19 @@ struct RadialColorPicker: View {
     private func color(_ h: Double, _ s: Double, _ l: Double) -> Color { Color(hex: AppearanceStore.hex(h: h, s: s, l: l)) }
 
     var body: some View {
+        VStack(spacing: 14) {
+            wheel
+            HexField(hex: value.hex, wear: wear)
+        }
+        .scaleEffect((shown && !leaving) || reduceMotion ? 1 : 0.92)
+        .opacity(shown && !leaving ? 1 : 0)
+        .onAppear { withAnimation(Motion.gentle) { shown = true } }
+        .allowsHitTesting(!leaving) // (put away: a click on it as it fades turns nothing, Done included)
+    }
+
+    private var wheel: some View {
         let hex = value.hex
-        ZStack {
+        return ZStack {
             Circle().fill(.regularMaterial)
             Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
             // the hue band: 108 to 127 from the middle, the web's
@@ -48,7 +61,7 @@ struct RadialColorPicker: View {
             arc(20, 160, LinearGradient(colors: [color(value.h, value.s, 0.72), color(value.h, value.s, 0.32)],
                                         startPoint: UnitPoint(x: 0.5, y: 40 / size), endPoint: UnitPoint(x: 0.5, y: 232 / size)))
             curved("SATURATION", around: 270)
-            curved("DEPTH", around: 90)
+            curved("SHADE", around: 90)
             knob(at: pt(value.h, 117.5), fill: color(value.h, 1, 0.5), r: 11, line: 3.5)
             knob(at: pt(200 + value.s * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
             knob(at: pt(20 + value.depth / 100 * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
@@ -56,16 +69,12 @@ struct RadialColorPicker: View {
         }
         .frame(width: size, height: size)
         .shadow(color: .black.opacity(0.28), radius: 24, y: 14)
-        .scaleEffect((shown && !leaving) || reduceMotion ? 1 : 0.92)
-        .opacity(shown && !leaving ? 1 : 0)
-        .onAppear { withAnimation(Motion.gentle) { shown = true } }
         .contentShape(Circle())
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { g in turn(g.startLocation, g.location) }
                 .onEnded { _ in mode = nil }
         )
-        .allowsHitTesting(!leaving) // (put away: a click on it as it fades turns nothing, Done included)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Colour")
         .accessibilityValue(Text(hex))
@@ -83,23 +92,26 @@ struct RadialColorPicker: View {
         .stroke(fill, style: StrokeStyle(lineWidth: 14, lineCap: .round))
     }
 
-    /// A word set along its arc at 66 from the middle, each letter turned to the arc (the web's textPath): up the left
-    /// side for saturation, down the right for depth.
+    /// A word set along its arc at 69 from the middle — between the core's ring (59) and the arcs (79 in), so 11-point
+    /// letters clear both — each letter turned to the arc (the web's textPath): up the left side for saturation, down
+    /// the right for the shade.
     private func curved(_ text: String, around centre: Double) -> some View {
         let letters = Array(text)
-        // (each letter's own width, with the web's .14em tracking, in degrees at this radius — a narrow I leaves no gap)
-        let widths = letters.map { ch -> Double in ("IJ1".contains(ch) ? 3.4 : ch == "M" || ch == "W" ? 7.6 : 6.2) + 1.2 }
+        let radius: CGFloat = 69
+        // (each letter's own width at 11 points, with the web's .14em tracking, in degrees at this radius — a narrow I
+        // leaves no gap)
+        let widths = letters.map { ch -> Double in ("IJ1".contains(ch) ? 4.4 : ch == "M" || ch == "W" ? 9.8 : 8.0) + 1.55 }
         let total = widths.reduce(0, +)
-        let toDeg = 180 / Double.pi / 66
+        let toDeg = 180 / Double.pi / Double(radius)
         let centres = widths.indices.map { i in centre + (widths[..<i].reduce(0, +) + widths[i] / 2 - total / 2) * toDeg }
         return ZStack {
             ForEach(Array(letters.enumerated()), id: \.offset) { i, ch in
                 let a = centres[i]
                 Text(String(ch))
-                    .font(.system(size: 8.5, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(a))
-                    .position(pt(a, 66))
+                    .position(pt(a, radius))
             }
         }
         .frame(width: size, height: size)
@@ -175,6 +187,73 @@ struct RadialColorPicker: View {
         }
         change(v)
     }
+
+    /// (onboarding-24) A colour code typed ("#2f7cf6", "2F7CF6", "#28f"): its hue, saturation and lightness, the
+    /// lightness kept within the wheel's shades (0.72 light to 0.32 deep — never so pale or so dark that words in it
+    /// stop reading), worn at once. False for what is not a code.
+    private func wear(_ raw: String) -> Bool {
+        guard let code = AppearanceStore.normalize(raw), let n = UInt32(code.dropFirst(), radix: 16) else { return false }
+        let r = Double((n >> 16) & 0xff) / 255, g = Double((n >> 8) & 0xff) / 255, b = Double(n & 0xff) / 255
+        let hi = max(r, g, b), lo = min(r, g, b), d = hi - lo
+        let l = (hi + lo) / 2
+        var v = value
+        if d > 0.0001 {
+            v.s = min(max(d / (1 - abs(2 * l - 1)), 0), 1)
+            var h: Double
+            if hi == r {
+                h = 60 * ((g - b) / d).truncatingRemainder(dividingBy: 6)
+            } else if hi == g {
+                h = 60 * ((b - r) / d + 2)
+            } else {
+                h = 60 * ((r - g) / d + 4)
+            }
+            if h < 0 { h += 360 }
+            v.h = h
+        } else {
+            v.s = 0 // (a grey: the hue left where it was)
+        }
+        v.depth = min(max((72 - l * 100) / 0.4, 0), 100)
+        change(v)
+        return true
+    }
+}
+
+/// (onboarding-24) Under the wheel: the colour as a code, to read or to type. Six digits typed wear it as they come (a
+/// three-digit code once Return is pressed or the field is left); a code that is not one goes back to the colour worn.
+private struct HexField: View {
+    let hex: String
+    let wear: (String) -> Bool
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Hex")
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+            TextField("Colour code", text: $text, prompt: Text("#2f7cf6"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .font(.sCallout.monospaced())
+                .autocorrectionDisabled()
+                .frame(width: 96)
+                .focused($focused)
+                .onSubmit(apply)
+                .accessibilityLabel("Colour code")
+        }
+        .onAppear { text = hex }
+        .onChange(of: hex) { _, h in if !focused { text = h } }
+        .onChange(of: text) { _, t in
+            // (a whole six-digit code, worn as it is typed: the wheel and the window follow)
+            let digits = t.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
+            if focused, digits.count == 6 { _ = wear(t) }
+        }
+        .onChange(of: focused) { _, on in if !on { apply() } }
+    }
+
+    private func apply() {
+        if !wear(text) { text = hex }
+    }
 }
 
 // MARK: - A place's photo editor
@@ -200,12 +279,23 @@ struct PhotoSlotEditor: View {
                     .font(.sHeadline)
                 Button("Upload Photo…") { store.upload(to: slot) }
                     .fixedSize()
-                Menu("Drawing") {
-                    ForEach(AppearanceStore.scenes, id: \.self) { s in
-                        Button(s) { store.setScene(s, in: slot) }
+                // (onboarding-24) a pop-up that says what the place wears ("Drawing: Ocean"), not a word that hid it
+                HStack(spacing: 6) {
+                    Text("Drawing")
+                    Picker("Drawing", selection: drawing) {
+                        if drawing.wrappedValue == PhotoSlotEditor.yours {
+                            Text("Your Photo").tag(PhotoSlotEditor.yours)
+                        }
+                        Text("None").tag("")
+                        Divider()
+                        ForEach(AppearanceStore.scenes, id: \.self) { s in
+                            Text(s).tag(s)
+                        }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
                 }
-                .fixedSize()
                 if photo != nil {
                     HStack(spacing: 8) {
                         Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
@@ -261,6 +351,27 @@ struct PhotoSlotEditor: View {
             if photo != nil { if inside { NSCursor.openHand.push() } else { NSCursor.pop() } }
         }
         .accessibilityLabel(Text("\(slot.title) photo"))
+    }
+
+    /// The drawing pop-up's tag for a photo of the student's own (no drawing is called that).
+    private static let yours = "photo:own"
+
+    /// What the place wears, as the Drawing pop-up says it: a drawing's name, the student's own photo, or none ("").
+    /// Picked: that drawing, or nothing (Remove's job too); the photo's own row is only ever the one shown.
+    private var drawing: Binding<String> {
+        Binding(get: {
+            switch photo?.source {
+            case .some(.scene(let s)): return s
+            case .some(.upload): return PhotoSlotEditor.yours
+            case .none: return ""
+            }
+        }, set: { v in
+            if v.isEmpty {
+                if photo != nil { store.remove(slot) }
+            } else if v != PhotoSlotEditor.yours {
+                store.setScene(v, in: slot)
+            }
+        })
     }
 
     private var zoom: Binding<Double> {

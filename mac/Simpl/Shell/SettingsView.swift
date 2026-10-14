@@ -275,14 +275,16 @@ private struct SaidBar: View {
     }
 }
 
-/// A pane's form, the Mac's grouped style, with the word at its foot.
+/// A pane's form, the Mac's grouped style, with the word at its foot. (onboarding-25) Tall enough that General shows
+/// whole and no row is cut by the window's foot (it was 460: General's last row sliced through its line); a longer
+/// pane — Appearance — scrolls.
 private struct Pane<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
         Form { content }
             .formStyle(.grouped)
-            .frame(minHeight: 360, idealHeight: 460)
+            .frame(minHeight: 420, idealHeight: 620)
             .overlay(alignment: .bottom) { SaidBar() }
     }
 }
@@ -481,6 +483,7 @@ private struct GeneralPane: View {
     @State private var saved = LoginVault.load()
     @State private var confirmSignOut = false
     @State private var confirmForget = false
+    @State private var confirmSave = false
 
     var body: some View {
         Pane {
@@ -503,30 +506,48 @@ private struct GeneralPane: View {
                     LabeledContent("Sign-in page", value: s.host)
                     Button("Forget Saved Sign-In…", role: .destructive) { confirmForget = true }
                 } else {
-                    Text("Not saved. When your school’s sign-in page comes up, sign in with Simpl’s card and answer Stay Logged In.")
-                        .foregroundStyle(.secondary)
+                    // (onboarding-5) not a dead end: a sign-in is saved from the card, so the way to save one is to
+                    // come back to the card — offered here, and done for the student
+                    LabeledContent {
+                        Button("Save Sign-In…") { confirmSave = true }
+                            .disabled(session.host == nil)
+                    } label: {
+                        Text("Not saved")
+                        Text("A saved sign-in lets Simpl sign you in by itself when your school asks again.")
+                    }
                 }
             } header: {
                 Text("Sign-In")
             } footer: {
-                Text("Kept in this Mac’s Keychain only: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too.")
+                // (how a saved one is kept, said once there is one)
+                Text(saved == nil ? "Saved sign-ins stay on this Mac only." : "Kept in this Mac’s Keychain only: never synced, and only ever typed into your school’s own sign-in page. Signing out forgets it too.")
                     .foregroundStyle(.secondary)
             }
             if settings.live {
-                Section("Simpl") {
+                // (onboarding-1, onboarding-19) one name for what the setup's ticks do, under a header that is not the
+                // app's own name
+                Section("Courses") {
                     LabeledContent {
                         Button("Set Up…") {
                             NSApp.keyWindow?.performClose(nil)
                             NotificationCenter.default.post(name: .simplOpenSetup, object: nil)
                         }
                     } label: {
-                        Text("Courses and Goals")
-                        Text("The courses that count and what you aim for in each.")
+                        Text("Courses shown and goals")
+                        Text("Which courses Simpl shows, and what you aim for in each.")
                     }
                 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
+        .confirmationDialog("Save your sign-in?", isPresented: $confirmSave) {
+            Button("Sign Out and Sign In Again") {
+                session.signOut()
+                NSApp.keyWindow?.performClose(nil)
+            }
+        } message: {
+            Text("Simpl signs you out of \(session.lmsName) on this Mac. Sign in again on Simpl’s card and choose Stay Logged In: your username and password are then kept in this Mac’s Keychain.")
+        }
         .confirmationDialog("Sign out of \(session.lmsName) on this Mac?", isPresented: $confirmSignOut) {
             Button("Sign Out", role: .destructive) { session.signOut() }
         } message: {
@@ -582,16 +603,17 @@ private struct NotificationsPane: View {
             } header: {
                 Text("Reminders")
             } footer: {
-                Text("Set on this Mac: they come on time even with Simpl closed, and nothing is sent anywhere. New work is picked up each time you open Simpl.")
+                Text("They come on time even with Simpl closed. New work is picked up each time you open Simpl.")
                     .foregroundStyle(.secondary)
             }
             Section {
+                // (onboarding-19) the switch named for what it does, not the header's words again
                 Toggle(isOn: Binding(get: { activity.on }, set: { on in
                     guard let engine = settings.engine else { return }
                     if on { Task { await activity.enable(engine) } } else { activity.disable() }
                 })) {
-                    Text("New Activity")
-                    Text("Alerts when something is posted in your courses.")
+                    Text("Alerts for new posts")
+                    Text("When something is posted in one of your courses.")
                 }
                 .disabled(settings.engine == nil)
                 if activity.on {
@@ -608,7 +630,8 @@ private struct NotificationsPane: View {
             } header: {
                 Text("New Activity")
             } footer: {
-                Text("Simpl looks about every 3 minutes while it is open — with its window closed too — reading with the sign-in on this Mac: nothing is sent anywhere." + (activity.onBrightspace ? " Brightspace ends a sign-in left unused after a while (your school sets how long): the alerts pause then, until you next open Simpl." : ""))
+                // (onboarding-20) what both kinds share said once, under the last of them
+                Text("Simpl looks about every 3 minutes while it is open, with its window closed too." + (activity.onBrightspace ? " Brightspace ends a sign-in left unused after a while (your school sets how long): the alerts pause then, until you next open Simpl." : "") + " Reminders and alerts are both worked out on this Mac: nothing is sent anywhere.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -642,17 +665,22 @@ private struct GradesPane: View {
                         .foregroundStyle(.secondary)
                 }
             } else if let info = settings.info {
+                // (onboarding-19) no header saying "Grades" again under the tab of that name; (onboarding-20) the switch
+                // called what the setup calls it, its one line saying what it keeps
                 Section {
-                    Toggle("Track grades over time", isOn: Binding(get: { info.tracking }, set: { on in
+                    Toggle(isOn: Binding(get: { info.tracking }, set: { on in
                         settings.info?.tracking = on
                         settings.save(["tracking": on])
-                    }))
+                    })) {
+                        Text("Keep grade history")
+                        Text("One snapshot a day, on this Mac.")
+                    }
                     Stepper(value: Binding(get: { settings.goal }, set: { v in
-                        withAnimation(Motion.snappy) { settings.goal = (v * 100).rounded() / 100 } // (the number rolls)
+                        withAnimation(Motion.snappy) { settings.goal = GoalFigure.value(v) } // (the number rolls)
                         settings.saveGoal()
                     }), in: 0...4, step: 0.05) {
                         LabeledContent("Term GPA goal") {
-                            Text(String(format: "%.2f", settings.goal))
+                            Text(GoalFigure.text(settings.goal))
                                 .monospacedDigit()
                                 .contentTransition(.numericText(value: settings.goal))
                         }
@@ -661,10 +689,6 @@ private struct GradesPane: View {
                         settings.info?.whatIf = on
                         settings.save(["whatIf": on])
                     }))
-                } header: {
-                    Text("Grades")
-                } footer: {
-                    Text("One snapshot a day, kept on this Mac.").foregroundStyle(.secondary)
                 }
                 Section {
                     LabeledContent {
@@ -681,7 +705,8 @@ private struct GradesPane: View {
                 } header: {
                     Text("Grade History")
                 } footer: {
-                    Text("A CSV exported before (a date and a GPA a line) adds the days it holds; a day already here is kept as it is.")
+                    // (onboarding-21) in plain words
+                    Text("Import a grade-history CSV you exported earlier; days you already have are kept.")
                         .foregroundStyle(.secondary)
                 }
                 Section {
@@ -751,9 +776,7 @@ private struct DataPane: View {
                                 .disabled(settings.busy)
                         }
                     }
-                } header: {
-                    Text("Data")
-                } footer: {
+                } footer: { // (onboarding-19: no header saying "Data" again under the tab of that name)
                     Text(session.onBrightspace ? "Brightspace data is never kept here: only your preferences, grade history and goals, and the course nicknames, colours, tasks and ticks Brightspace has no place for. Your Brightspace account and favourites live on Brightspace." : "Canvas data is never kept here: only your preferences, grade history and goals. Your Canvas account, favourites and course nicknames live on Canvas.")
                         .foregroundStyle(.secondary)
                 }
@@ -794,11 +817,14 @@ private struct DataPane: View {
         }
     }
 
-    /// (1.3.76) The Encryption row's line: what is encrypted, and where its key is (Support/Vault.swift): the Keychain,
-    /// or — only where the Keychain would not take it — a file beside it.
+    /// (1.3.76) The Encryption row's line: what is encrypted, and who can open it (Support/Vault.swift: its key in the
+    /// Keychain — or, only where the Keychain would not take it, in a file beside it). (onboarding-21) In plain words:
+    /// no cipher's name, no key's whereabouts unless it matters.
     private static var encryptionNote: String {
-        let key = Vault.keyHolder.map { "Its key is \($0)." } ?? "Its key is kept in a file beside it: the Keychain would not take it."
-        return "Simpl’s data on this Mac is encrypted (AES-256). " + key
+        guard Vault.keyHolder != nil else {
+            return "Your Simpl data on this Mac is encrypted. Its key is kept in a file beside it, as the Keychain would not take it."
+        }
+        return "Your Simpl data on this Mac is encrypted and can only be opened from your account on this Mac."
     }
 }
 
@@ -1067,19 +1093,49 @@ private struct VersionRow: View {
 }
 
 fileprivate extension AppRelease {
-    /// "8 Oct 2026 · 41.4 MB": when it came out and how large its download is, as far as either is known.
+    /// "Oct 8 · 41.4 MB": when it came out and how large its download is, as far as either is known — the date as every
+    /// date is written (1.3.78: the year only when it is not this year's, "Oct 8, 2025").
     var detail: String? {
         var parts: [String] = []
-        if let d = published { parts.append(d.formatted(date: .abbreviated, time: .omitted)) }
+        if let d = published { parts.append(AppRelease.dayText(d)) }
         if let s = size, s > 0 { parts.append(ByteCountFormatter.string(fromByteCount: Int64(s), countStyle: .file)) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
+
+    static func dayText(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        let thisYear = Calendar.current.isDate(d, equalTo: Date(), toGranularity: .year)
+        f.dateFormat = thisYear ? "MMM d" : "MMM d, yyyy"
+        return f.string(from: d)
+    }
+}
+
+/// (1.3.78) The goal as every app and the engine round it: half up to the hundredth, on its decimal value — 3.425 is
+/// 3.43, where `(v * 100).rounded() / 100` and "%.2f" read the double's 3.42499… as 3.42.
+private enum GoalFigure {
+    static func value(_ v: Double) -> Double {
+        guard v.isFinite, var d = Decimal(string: "\(v)", locale: Locale(identifier: "en_US_POSIX")) else { return v }
+        var out = Decimal()
+        NSDecimalRound(&out, &d, 2, .plain)
+        return NSDecimalNumber(decimal: out).doubleValue
+    }
+
+    /// Always two decimals: "3.43", "4.00".
+    static func text(_ v: Double) -> String { String(format: "%.2f", value(v)) }
 }
 
 // MARK: - About
 
 private struct AboutPane: View {
     @EnvironmentObject private var session: AppSession
+
+    /// "1.3.78 (102) · interface 2.99.33": the app's version and build, and the version of the extension's scripts it
+    /// carries (which number the interface's releases), in one row.
+    static var versionLine: String {
+        let ext = AppSession.extensionVersion
+        return ext.isEmpty ? AppSession.version : "\(AppSession.version) · interface \(ext)"
+    }
 
     var body: some View {
         Pane {
@@ -1096,10 +1152,12 @@ private struct AboutPane: View {
                     }
                 }
                 .padding(.vertical, 4)
-                LabeledContent("Version", value: AppSession.version)
-                LabeledContent("Interface", value: AppSession.extensionVersion)
+                // (onboarding-21) one row: the interface's version said in it, not a row of its own explaining itself
+                LabeledContent("Version", value: AboutPane.versionLine)
             } footer: {
-                Text("To take Simpl off this Mac with everything it stored, sign out here first, then move Simpl to the Bin. Your \(session.lmsName) account is not affected.")
+                // (onboarding-29) where the way out is — there is no Sign Out on this tab — and the one that takes
+                // everything Simpl keeps (signing out leaves the settings and the grade history)
+                Text("To take Simpl off this Mac with everything it stored, use Data ▸ Reset Everything… first (it signs you out too), then quit Simpl and move it to the Bin. Your \(session.lmsName) account is not affected.")
                     .foregroundStyle(.secondary)
             }
         }
