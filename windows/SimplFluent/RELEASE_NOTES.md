@@ -1,3 +1,12 @@
+**What's new in 0.3.1**
+
+- **More from Canvas** — History, Help and your school's own tools in the sidebar.
+- **Beta updates** — turn on **Settings ▸ Updates ▸ Get beta updates** to try new versions first; everyone else gets only the regular ones.
+- **Tools in popups** — tools open over your work and never block the app (only a quiz does).
+- **Biology tools, fixed** — controls and facts in sight at every window size, models full size, colours right from the start.
+- **Counters as before** — square, coloured counters and the old counter panels and previews are back.
+- **Tools by provider** — external tools grouped by their site (Macmillan Learning's links on one card), and their pages in light mode.
+
 **What's new in 0.3.0**
 
 - **A biology toolkit** — ten new tools, from a 3D cell to genetic crosses.

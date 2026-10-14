@@ -26,6 +26,13 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.1", "2026-10-14",
+            ("new", "More from Canvas", "History, Help and your school's own tools in the sidebar."),
+            ("new", "Beta updates", "Turn on Get beta updates to try new versions first."),
+            ("improved", "Tools in popups", "Tools open over your work and never block the app."),
+            ("improved", "Biology tools, fixed", "Controls in sight, models full size, colours right away."),
+            ("improved", "Counters as before", "Square, coloured counters and the old panels are back."),
+            ("fixed", "Tools by provider", "External tools grouped by their site, in light mode.")),
         R("0.3.0", "2026-10-14",
             ("new", "A biology toolkit", "Ten new tools, from a 3D cell to genetic crosses."),
             ("new", "Send from phone", "Scan a code to hand in photos; nothing leaves your Wi-Fi."),
