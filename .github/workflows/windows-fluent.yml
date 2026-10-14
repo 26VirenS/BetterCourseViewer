@@ -617,6 +617,16 @@ jobs:
           Shot 'calendar-preview-graded' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview', '--preview-of', 'Lec01-PreQuiz'))
           Shot 'settings-updates-earlier-installed' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-earlier', 'yes', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes', '--settings-scroll', '4000'))
           Shot 'place-window-assignment' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--place-window', '/courses/101/assignments/1012'))
+          # (the fixes for 1.3.78's biology reports, at the end so the pictures before keep their parts) Cell Explorer, DNA
+          # & RNA and the Biomolecule Builder opened plainly — no state, nothing selected — in dark, at 1024 beside the
+          # navigation pane and at 780 with it folded: each part in its own colour from the first frame, the model filling
+          # its view with its labels beside it, the controls and the facts in sight. And an outside tool's page in a dark
+          # app whose web profile prefers dark, as a Windows in dark mode has it: in light all the same (checked below)
+          foreach ($t in @('cell', 'dna', 'biomol')) {
+            Shot "bio-open-$t-1024" '1024x681' 50 ($inTools + @('--appearance', 'dark', '--tool', $t))
+            Shot "bio-open-$t-780" '780x683' 50 ($inTools + @('--appearance', 'dark', '--tool', $t))
+          }
+          Shot 'tool-window-light' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--open', 'tool:101:9', '--web-scheme', 'dark'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -631,6 +641,24 @@ jobs:
           }
           AloneShot 'pin-try-graph' 2 @('--appearance', 'light', '--pin', 'graph', '--pin-try', 'graph')
           AloneShot 'pin-try-fc' 3 @('--appearance', 'dark', '--pin', 'cite,fc', '--pin-try', 'fc', '--fc-demo')
+          # Cell Explorer opened plainly under a still pointer — the pointer put in the middle of the screen, over the cell,
+          # before Simpl starts; alone on the runner, so no other copy of Simpl is under it or moves it: nothing may show as
+          # pointed at (in 1.3.78 the part under it did: its name over the cell, its label ringed, the cell tinted in the
+          # accent until a click) — the view's log must name nothing pointed at before its picture (checked below)
+          function PointerShot($name, $part, $extra) {
+            if ($shard -ne $part) { return }
+            $script:mine += $name
+            foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+            Add-Type -AssemblyName System.Windows.Forms
+            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point([int]($screen.Width / 2), [int]($screen.Height / 2))
+            Write-Host "${name}: the pointer at $([System.Windows.Forms.Cursor]::Position)"
+            $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
+            $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', '50', '--profile', $prof, '--window-size', '1366x778') + $mock + $extra
+            $alone = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            if (-not $alone.WaitForExit(150000)) { Stop-Process -Id $alone.Id -Force -ErrorAction SilentlyContinue }
+          }
+          PointerShot 'bio-cell-pointer' 4 @('--appearance', 'dark', '--place', 'tools', '--tool', 'cell')
           # Send from Phone, tried as a phone would (one part each): Simpl's hand-in panel with --phone-test says its
           # server's address in simpl.log (on 127.0.0.1 too); the page is opened, a wrong key tried, then each file posted
           # as the phone's page posts it (X-File-Name, its type, its length) with Invoke-WebRequest; what came back goes
@@ -726,6 +754,24 @@ jobs:
             }
             if ($card -and $card -ne 'none') { Write-Host "::error::${still}: the table's top showed '$card' with nothing pointed at (shots/profile-$still.log)"; exit 1 }
             Write-Host "${still}: the table's top was empty"
+          }
+          # Cell Explorer opened under a still pointer: nothing pointed at before its picture (the 3D view writes "bio scene:
+          # pointed at …" in a picture run when what is under the pointer changes)
+          if ($script:mine -contains 'bio-cell-pointer') {
+            $pointed = $null
+            foreach ($l in @(Get-Content 'shots/profile-bio-cell-pointer.log' -ErrorAction SilentlyContinue)) {
+              if ($l -match ' picture at ') { break }
+              if ($l -match 'bio scene: pointed at (\S+)') { $pointed = $Matches[1] }
+            }
+            if ($pointed) { Write-Host "::error::bio-cell-pointer: '$pointed' showed as pointed at under a still pointer (shots/profile-bio-cell-pointer.log)"; exit 1 }
+            Write-Host "bio-cell-pointer: nothing pointed at"
+          }
+          # an outside tool's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
+          # tool window writes "web window: the page prefers …" in a picture run as each page comes in)
+          if ($script:mine -contains 'tool-window-light') {
+            $said = @(Select-String -Path 'shots/profile-tool-window-light.log' -Pattern 'web window: the page prefers (\w+)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value })
+            if ($said.Count -eq 0 -or $said -contains 'dark') { Write-Host "::error::tool-window-light: the tool's page did not prefer light ($($said -join ', ')) (shots/profile-tool-window-light.log)"; exit 1 }
+            Write-Host "tool-window-light: the page prefers $($said -join ', ')"
           }
           if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
