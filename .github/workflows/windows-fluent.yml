@@ -645,6 +645,15 @@ jobs:
               Shot "tool-popup-$($t[0])-$($size[0])-dark" $size[1] 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', $t[0]) + $t[1])
             }
           }
+          # (at the end, so the pictures before keep their parts) More from Canvas: what the mock school added to Canvas's
+          # own navigation — History, My Materials with its own icon, Help — in the pane under Simpl's places (light at
+          # 1366, dark in a 1024's compact pane); History and Help in their popups over the window; My Materials opened
+          # in the window for tools, on Canvas's launch page for it (checked below)
+          Shot 'more-pane' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'more'))
+          Shot 'more-pane-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'more'))
+          Shot 'more-history' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'more:history'))
+          Shot 'more-help' '1366x778' 45 ($mock + @('--appearance', 'dark', '--open', 'more:help'))
+          Shot 'more-tool' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'more:tool'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -790,6 +799,21 @@ jobs:
             $said = @(Select-String -Path 'shots/profile-tool-window-light.log' -Pattern 'web window: the page prefers (\w+)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value })
             if ($said.Count -eq 0 -or $said -contains 'dark') { Write-Host "::error::tool-window-light: the tool's page did not prefer light ($($said -join ', ')) (shots/profile-tool-window-light.log)"; exit 1 }
             Write-Host "tool-window-light: the page prefers $($said -join ', ')"
+          }
+          # More from Canvas read from the mock's own menu, in its order, My Materials with the picture the page drew of its
+          # icon; History's and Help's popups listing rows (Shell/MoreFromCanvas.cs writes "more from canvas: …" and "more
+          # list: …" in a picture run)
+          foreach ($name in @('more-pane', 'more-pane-dark')) {
+            if ($script:mine -notcontains $name) { continue }
+            $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'more from canvas: (.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
+            if ($said -notmatch '^History, My Materials \(picture\), Help ') { Write-Host "::error::${name}: More from Canvas was not History, My Materials with its picture, Help ('$said') (shots/profile-$name.log)"; exit 1 }
+            Write-Host "${name}: $said"
+          }
+          foreach ($list in @(@('more-history', 'history'), @('more-help', 'help'))) {
+            if ($script:mine -notcontains $list[0]) { continue }
+            $said = @(Select-String -Path "shots/profile-$($list[0]).log" -Pattern "more list: $($list[1]) (\d+) rows" -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
+            if (-not $said) { Write-Host "::error::$($list[0]): the $($list[1]) popup listed no rows (shots/profile-$($list[0]).log)"; exit 1 }
+            Write-Host "$($list[0]): $said rows"
           }
           if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
