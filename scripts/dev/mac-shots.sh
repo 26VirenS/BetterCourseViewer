@@ -141,6 +141,141 @@ walks() {
   curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":null}' http://localhost:8800/__mock/config || true
 }
 
+# (1.3.78) bio <light|dark|both> <name> <wait> <tool> <state> [flags…]: a biology tool on the Tools page at 1440×920,
+# opened as its launch's state asks (-SimplTool <tool> -SimplToolState <page>[:…], docs/mac-biology.md); "both" takes it
+# in light and in dark (<mode>-<name>). A picture's launch keeps the tool's settings to itself (BioPrefs), so one
+# picture's choices never show in the next.
+bio() {
+  local modes="$1" name="$2" wait="$3" tool="$4" state="$5" m
+  shift 5
+  [ "$modes" = both ] && modes="light dark"
+  for m in $modes; do
+    MODE="$m" SIZE=1440x920 shoot "$m-$name" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplToolState "$state" "$@"
+  done
+}
+
+# a push's biology pictures: each of the ten tools once, in light
+bio_quick() {
+  bio light 57-cell-animal 16 cell animal
+  bio light 58a-dna-helix 16 dna helix:measure:pair=3
+  bio light 59a-gene-transcribe 14 gene express:eukaryote:gene=teaching:step=22
+  bio light 61b-biomol-peptide 16 biomol proteins:build:ribbon=over:colour=part
+  bio light 62a-cross-dihybrid 14 cross cross -SimplBioCross "AaBb x AaBb"
+  bio light 63a-divide-metaphase 14 divide mitosis:step=6
+  bio light 64a-popgen-calculate 14 popgen calculate:q2=0.16
+  bio light 65a-biolab-solutions 14 biolab solutions
+  bio light 66a-enzyme-competitive 14 enzyme competitive
+  bio light 67a-energy-map 14 energy map:stage=calvin
+}
+
+# every biology tool's pages and what each is for (the full set): 57 Cell Explorer, 58 DNA & RNA, 59 Gene Expression,
+# 61 Biomolecule Builder, 62 Genetics Crosses, 63 Cell Division, 64 Hardy–Weinberg, 65 Bio Lab Calculator, 66 Enzyme
+# Lab, 67 Photosynthesis & Respiration; then the four pins' quick versions
+bio_full() {
+  # the three cells, a part's card, inside an organelle, pulled apart, at true scale, the membrane, the three compared
+  bio both 57-cell-animal 16 cell animal
+  bio light 57b-cell-mito-card 16 cell animal:select=mito
+  bio both 57c-cell-plant 18 cell plant:select=chloroplast
+  bio light 57d-cell-bacterium 14 cell bacterium
+  bio light 57e-cell-explode 16 cell animal:explode=0.7
+  bio light 57f-cell-true-scale 18 cell animal:true
+  bio light 57g-cell-mito-inside 16 cell animal:inside=mito
+  bio light 57h-cell-nucleus-inside 16 cell animal:inside=nucleus
+  bio both 57i-cell-membrane 18 cell membrane:select=integral:channel:osmosis
+  bio light 57j-cell-compare 18 cell compare
+  bio light 57k-cell-quiz 16 cell animal:quiz=name
+  bio light 57l-cell-gram-positive 14 cell bacterium:gram+:select=wall
+  # the double helix (measured, its grooves, in atoms, unzipped), the nucleotides, a strand's facts, replication, RNA
+  bio both 58a-dna-helix 16 dna helix:measure:pair=3
+  bio both 58b-dna-grooves 16 dna helix:grooves
+  bio both 58c-dna-atoms 16 dna helix:style=atoms:pair=5
+  bio both 58d-dna-unzip 16 dna helix:unzip=0.5
+  bio both 58e-dna-nucleotide 16 dna nucleotides:mol=DT:numbers:compare
+  bio both 58f-dna-bases 16 dna nucleotides:pairs
+  bio both 58g-dna-sequence 16 dna sequence
+  bio both 58h-dna-replication 16 dna replication:step=4
+  bio both 58i-dna-okazaki 16 dna replication:step=6
+  bio both 58j-dna-trna 16 dna rna:view=cloverleaf:modified:base=35
+  bio both 58k-dna-trna3d 16 dna rna:view=lshape
+  bio both 58l-dna-mrna 16 dna rna:view=mrna
+  # a gene made into a protein (transcription, splicing, initiation, elongation, the protein; a prokaryote's), the
+  # codon table and wheel, the six reading frames, the sickle-cell mutation and a frameshift
+  bio both 59a-gene-transcribe 14 gene express:eukaryote:gene=teaching:step=22
+  bio both 59b-gene-splice 14 gene express:eukaryote:gene=teaching:step=87
+  bio both 59c-gene-initiation 14 gene express:eukaryote:gene=teaching:step=89
+  bio both 59d-gene-translate 14 gene express:eukaryote:gene=teaching:step=93
+  bio both 59e-gene-result 14 gene express:eukaryote:gene=teaching:step=99
+  bio both 59f-gene-prokaryote 14 gene express:prokaryote:gene=teaching:step=30
+  bio both 59g-gene-codons 14 gene codons:find=Leu
+  bio both 59h-gene-wheel 14 gene codons:wheel:find=Leu
+  bio both 59i-gene-frames 14 gene frames:example=2
+  bio both 59j-gene-sickle 14 gene mutations:sickle
+  bio both 59k-gene-frameshift 14 gene mutations:mutgene=teaching:mut=c.6_7insA
+  # an amino acid and its D form, the peptide builder (atoms with the ribbon, the ribbon alone, a sheet), the four
+  # levels of structure and a denatured protein, a DNA strand and ATP, sugars, lipids
+  bio light 61a-biomol-amino 16 biomol amino:aa=W:colour=part
+  bio light 61b-biomol-peptide 16 biomol proteins:build:ribbon=over:colour=part
+  bio light 61c-biomol-ribbon 16 biomol proteins:build:ribbon=only
+  bio light 61d-biomol-sheet 16 biomol proteins:sheet
+  bio light 61e-biomol-primary 16 biomol proteins:level=primary
+  bio light 61f-biomol-secondary 16 biomol proteins:level=secondary
+  bio light 61g-biomol-tertiary 16 biomol proteins:level=tertiary:core
+  bio dark 61h-biomol-quaternary 16 biomol proteins:level=quaternary
+  bio dark 61i-biomol-denatured 18 biomol proteins:level=tertiary:denatured
+  bio light 61j-biomol-strand 16 biomol nucleic:strand:seq=ATGCGT:complement:colour=part
+  bio light 61k-biomol-atp 16 biomol nucleic:nt=ATP:colour=part
+  bio light 61l-biomol-anomers 16 biomol carbs:anomers:colour=part
+  bio light 61m-biomol-sucrose 16 biomol carbs:di=SUC
+  bio light 61n-biomol-maltose-split 16 biomol carbs:di=MAL:split
+  bio light 61o-biomol-cellulose 16 biomol carbs:poly=cellulose
+  bio light 61p-biomol-popc 16 biomol lipids:lipid=POV:colour=part
+  bio dark 61q-biomol-oleic 16 biomol lipids:lipid=compare
+  bio dark 61r-biomol-dform 16 biomol amino:aa=A:dform
+  # crosses (a dihybrid, X-linked, the forked line, a lethal, why), probability, chi-square and a pedigree
+  bio light 62a-cross-dihybrid 14 cross cross -SimplBioCross "AaBb x AaBb"
+  bio dark 62b-cross-xlinked 14 cross "cross:cross=X^A X^a x X^a Y"
+  bio light 62c-cross-forked 14 cross cross:forked -SimplBioCross "AaBbCc x AaBbCc"
+  bio light 62d-cross-lethal 14 cross cross:example=yellow
+  bio light 62e-cross-why 14 cross cross:why -SimplBioCross "AaBb x AaBb"
+  bio both 62f-cross-probability 14 cross probability
+  bio both 62g-cross-chi 14 cross chi:obs=315,108,101,32 -SimplBioCross "AaBb x AaBb"
+  bio light 62h-cross-pedigree 14 cross pedigree:example=xr:mode=xd
+  # mitosis and meiosis at their telling steps (a recombinant chromatid's card, the gametes, nondisjunction), a plant
+  # cell, 2n = 6, the two compared, the cell cycle's checkpoints and cancer
+  bio both 63a-divide-metaphase 14 divide mitosis:step=6
+  bio both 63b-divide-tetrads 14 divide meiosis:step=4
+  bio both 63c-divide-recombinant 14 divide meiosis:step=6:pick=0
+  bio both 63d-divide-gametes 14 divide meiosis:step=11
+  bio both 63e-divide-nondisjunction 14 divide meiosis:nd=1:step=11
+  bio both 63f-divide-plant 14 divide mitosis:plant:step=8
+  bio both 63g-divide-six 14 divide mitosis:2n=6:step=7
+  bio both 63h-divide-compare 14 divide compare:step=3
+  bio both 63i-divide-cycle 14 divide cycle:gate=g1s
+  bio both 63j-divide-cancer 14 divide cycle:gate=spindle:cancer
+  # Hardy–Weinberg worked out, tested and simulated (drift, and selection against a recessive lethal)
+  bio both 64a-popgen-calculate 14 popgen calculate:q2=0.16
+  bio light 64b-popgen-test 14 popgen test:counts=50,30,20
+  bio both 64c-popgen-drift 16 popgen simulate:n=10:p0=0.5:seed=7:reps=10:gens=100
+  bio dark 64d-popgen-selection 16 popgen simulate:infinite:p0=0.5:preset=recessiveLethal:gens=50
+  # the lab calculator's pages (statistics with its steps open), the enzyme's graphs, the energy pathways
+  bio both 65a-biolab-solutions 14 biolab solutions
+  bio both 65b-biolab-stats 14 biolab stats:steps
+  bio both 65c-biolab-cells 14 biolab cells
+  bio both 65d-biolab-molecules 14 biolab molecules
+  bio both 66a-enzyme-competitive 14 enzyme competitive
+  bio both 66b-enzyme-denatured 14 enzyme denatured
+  bio both 67a-energy-map 14 energy map:stage=calvin
+  bio both 67b-energy-respire 14 energy map:respire
+  bio both 67c-energy-respiration 14 energy respiration:step=7
+  bio both 67d-energy-photosynthesis 14 energy photosynthesis:step=6
+  bio both 67e-energy-atoms 14 energy atoms:trace=carbon:step=4
+  # the pins' quick versions: a codon looked up, a cross, Hardy–Weinberg, the lab's dilution and molarity
+  MODE=light shoot light-54b-pin-gene 14 -SimplPinnedTools gene -SimplPinOpen gene -SimplPinCodon UGG
+  MODE=light shoot light-54c-pin-cross 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen cross
+  MODE=light shoot light-54d-pin-popgen 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen popgen
+  MODE=light shoot light-54e-pin-biolab 14 -SimplPinnedTools biolab -SimplPinOpen biolab
+}
+
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
 # SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
 if [ "${SHOTS:-full}" = quick ]; then
@@ -249,7 +384,11 @@ if [ "${SHOTS:-full}" = quick ]; then
   BASE=http://localhost:8802 shoot dark-60-sign-in 10
   shoot dark-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
+  # (1.3.78) the Tools page's Biology section, with the toolkit's self-check on its console; each biology tool once, on
+  # the page its launch asked for (-SimplTool <key> -SimplToolState <page>[:…]) — every page of each is in the full set
+  MODE=light SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES
   phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
+  bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
   wait
   walks
   phone_check
@@ -299,6 +438,7 @@ for MODE in light dark; do
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
 done
+bio_full # (1.3.78) the biology toolkit, every tool's pages
 # (1.2) in light only: more of the redesign, and the narrow window's layouts
 MODE=light
 shoot light-01c-dashboard-activity 14 -SimplDashView activity
@@ -315,6 +455,7 @@ shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptab
 shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
 shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
 shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
+SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
 SIZE=940x820 shoot light-40-narrow-dashboard 14
 SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
 SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox

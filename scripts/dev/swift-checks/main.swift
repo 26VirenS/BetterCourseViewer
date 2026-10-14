@@ -2,11 +2,12 @@ import Foundation
 import simd
 
 // The Mac app's models that need no window, checked on their own: compiled with swiftc beside the files they check —
-// mac/Simpl/Tools/PeriodicData.swift, PeriodicExtraData.swift (the elements' data) and MoleculeShape.swift (VSEPR, the
-// molecule builder's and the Lewis maker's shapes) — and run, in seconds, by the Mac app's workflow (Models). By hand on
-// a Mac: swiftc -o /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
-// scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is printed with what was found, and the
-// exit code is the number that failed.
+// mac/Simpl/Tools/PeriodicData.swift, PeriodicExtraData.swift (the elements' data), MoleculeShape.swift (VSEPR, the
+// molecule builder's and the Lewis maker's shapes) and every file in mac/Simpl/Tools/Biology/Model (the biology
+// toolkit's data and arithmetic, and its self-check) — and run, in seconds, by the Mac app's workflow (Models). By hand
+// on a Mac: swiftc -o /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
+// mac/Simpl/Tools/Biology/Model/*.swift scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is
+// printed with what was found, and the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -81,6 +82,15 @@ let t = VSEPR.turning(a, to: b)
 check(simd_distance(VSEPR.turn(a, about: t.axis, by: t.angle), b) < 1e-9, "the turn found from one direction to another takes it there")
 let back = VSEPR.turning(a, to: -a)
 check(near(back.angle * 180 / .pi, 180) && simd_distance(VSEPR.turn(a, about: back.axis, by: back.angle), -a) < 1e-9, "and a half turn when they are opposite")
+
+// ---- the biology toolkit ----------------------------------------------------------------------------------------
+// (its self-check, BioSelfCheck.run: the specification's test vectors for the shared data and arithmetic, and each
+// tool's own checks — a line each, "bio-check <name> <value> <OK|FAIL>", the same lines -SimplBioCheck prints)
+print("the biology toolkit")
+let bio = BioSelfCheck.run()
+for line in bio.lines {
+    check(line.hasSuffix(" OK"), String(line.dropFirst("bio-check ".count).dropLast(line.hasSuffix(" OK") ? 3 : 5)))
+}
 
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))

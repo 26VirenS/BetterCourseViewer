@@ -185,7 +185,8 @@ struct DashCounterTile: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: Self.rowSymbolGap) {
                 if symbolBeside {
-                    symbol(size: 12.5).frame(width: Self.rowSymbolWidth)
+                    // (each symbol in the same square, so a tall one — Tomorrow's sunrise — moves no name down)
+                    symbol(size: 12.5).frame(width: Self.rowSymbolWidth, height: Self.rowSymbolWidth)
                 }
                 Text(counter.label)
                     .font(.system(size: Self.rowLabelSize, weight: .medium))
