@@ -357,6 +357,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01e-counter-first 14 -SimplSheet today
   shoot light-01f-counter-last 14 -SimplSheet graded
   shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
+  # (1.3.79) a window under 1024 points with the sidebar out: 1.3.77's tiles in two rows of three
+  SIZE=940x820 shoot light-40-narrow-dashboard 14
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
   shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
   shoot light-21f-alta-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable" # (1.3.73: the toolbar's pins on the popup's own bar)
@@ -368,7 +370,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
-  shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview
+  shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a row of the panel's own)
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
   shoot light-02-courses 10 -SimplPlace courses
   shoot light-04-grades 12 -SimplPlace grades
@@ -443,6 +445,9 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
+  # (1.3.79) a counter's panel, and the card of one of its rows over the window, in dark
+  shoot dark-01d-dashboard-counter 16 -SimplSheet next
+  shoot dark-01q-counter-preview 18 -SimplSheet today -SimplOpen preview:counter
   shoot dark-03-todo 12 -SimplPlace todo
   shoot dark-04-grades 12 -SimplPlace grades
   shoot dark-05-calendar 12 -SimplPlace calendar
@@ -507,6 +512,7 @@ for MODE in light dark; do
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
   shoot "$MODE-01d-dashboard-counter" 16 -SimplSheet next
+  shoot "$MODE-01q-counter-preview" 18 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
   shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/

@@ -92,15 +92,19 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   plain footnotes, one Version row with the interface's version in it, the goal half up on its decimal value, a
   drawing pop-up that shows what a place wears, the colour wheel's names at 11 points ("Shade") with a Hex field under
   it, and panes 620 points tall.
-- **The Dashboard's counters (1.3.78).** On a window 1024 points wide or wider — the sidebar out or not — the six
-  counters stand in one row of six, each a compact tile about 72 points tall: its name, then its number with its line
-  beside it (whole where it fits, ending in an ellipsis where a few words of it still fit, else left out — never a
-  third line). Each symbol is beside its name where every name in the row has room for one (measured as the tile draws
-  it), else in the tile's corner beside its number; a name is never cut short. A narrower window keeps tall tiles,
-  three across (two on a page under 520 points). The rule reads the window's own width (`DashboardView.rowOfSix`,
-  `WindowWidthProbe`), not the page's, so showing the sidebar or the side column coming in never sends the row back to
-  two. A tile's panel still opens over the page from its tile: the first from its left edge, the last from its right,
-  one between them in step, each kept on the page.
+- **The Dashboard's counters (1.3.78; 1.3.79: 1.3.77's tiles again).** On a window 1024 points wide or wider — the
+  sidebar out or not — the six counters stand in one row of six, each 1.3.77's tile: its symbol in its colour beside its
+  name at the top, its number large under them, and its line under that, over its photo. In the row of six each tile is
+  as tall as it is wide (up to 150 points; never shorter than what is on it). Where a tile is too narrow for the
+  shortest names beside their symbols (the row beside the sidebar on a 1024-point window, about 96 points a tile) each
+  symbol stands over its name; a name is never cut short. A tile's line is shown whole, in up to two lines, or left
+  out — measured as the tile wraps it (`DashCounterTile.noteFits`), never cut in the middle of a word — and its tooltip
+  always says it ("4 due today · 35 points total"). A narrower window keeps 1.3.77's two rows of three (two across on a
+  page under 520 points). The rule reads the window's own width (`DashboardView.rowOfSix`, `WindowWidthProbe`), not the
+  page's, so showing the sidebar or the side column coming in never sends the row back to two. A tile's panel still
+  opens over the page from its tile: the first from its left edge, the last from its right, one between them in step,
+  each kept on the page and in the window. (The compact strip of 1.3.78 — a name over a number, a cut line and a small
+  symbol in the corner — is gone.)
 - **The Dashboard and the window, after the UI review (the home findings; the same on Windows).** The view (Cards,
   List, Activity) and a labelled New Task sit in the page by the greeting, so a tool pinned to the toolbar never pushes
   them into its » menu; on a one-column page the view chosen comes straight under the counters. Each row of tiles shows
@@ -109,16 +113,19 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   never a name cut; tooltips and VoiceOver say the count in words ("3 unread announcements"). Red is for late work only:
   Overdue with work in it wears a red wash and edge of its own (not the glass's tint, which macOS mutes in a window in
   the background), Due today the accent. While the page shows what was kept from last time, the numbers stay, faint, and
-  the date line says "Updating…". A counter's panel lists its work as every Dashboard list does (course and kind over
-  the title, time over points on the right), about six rows before it scrolls, a row's preview opening under it in the
-  panel, and ends with "See All 14 in To Do" (Grades, Notifications). Course cards: a 48-point band with the sidebar's
-  name, the term and teacher under it, "2 new" announcements, quick links named where the card is wide. A colour worn
-  marks the sidebar's chosen row's glyph and the controls — never the words or the titles — and a drawn scene stays
-  faint behind the sidebar's rows and out of a tile's top. Typing in Search answers in its suggestions only; the page
-  changes on Return (a sum's Return copies its answer). The tour is six steps (the counters, Grades, a course, Tools,
-  Search, then Report a Bug at the account menu), with Skip Tour, ✕ and Escape, a Next that always works, and the whole
-  window dimmed, toolbar too, its buttons resting meanwhile. A quick look is a light-dismiss card with nothing dimmed
-  behind it, as Windows' flyout.
+  the date line says "Updating…". (1.3.79) A counter's panel is 1.3.77's again: its symbol, name and number with its
+  line beside the number and its ✕ at the right; a row is its course's colour, its title and the engine's line under
+  it (course, points, due time) with a chevron or Dismiss, three and a half rows before it scrolls (less where the
+  window has less room); a row pressed grows its card over the window, the window lightly dimmed but for the row, and
+  a click round the card folds the card back first, then the panel. The card says what the work's own facts say once
+  they are read — never the row's line again under them ("Due 11:59 PM" under "Due Oct 14 at 11:59 PM"). Course cards:
+  a 48-point band with the sidebar's name, the term and teacher under it, "2 new" announcements, quick links named where
+  the card is wide. A colour worn marks the sidebar's chosen row's glyph and the controls — never the words or the
+  titles — and a drawn scene stays faint behind the sidebar's rows; (1.3.79) a counter's tile wears its photo whole
+  again, as in 1.3.77. Typing in Search answers in its suggestions only; the page changes on Return (a sum's Return
+  copies its answer). The tour is six steps (the counters, Grades, a course, Tools, Search, then Report a Bug at the
+  account menu), with Skip Tour, ✕ and Escape, a Next that always works, and the whole window dimmed, toolbar too, its
+  buttons resting meanwhile. (1.3.79) A quick look dims the window lightly behind it but for its row, as in 1.3.77.
 - **Grades, To Do, Calendar, Notifications, the Inbox and the rubric (1.3.78).** Grades shows the engine's figures as
   they come (`gpaText`, `pctText`, `gradedText`; the goal's gap from the GPA as shown, so the two add up; the stepper's
   own goal written half up, `HalfUp` in `GradesView.swift`), says why a course has no score ("Hidden by instructor",
@@ -671,7 +678,8 @@ Simpl.app/Contents/MacOS/Simpl -SimplBaseURL http://localhost:8800 -SimplDemo YE
 Launch arguments (each read once): `-SimplPlace dashboard|courses|todo|calendar|grades|notifications|inbox|groups|
 search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas address>`, `-SimplOpen quiz:<course>:<quiz>
 [:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin | tour[:<n>] |
-touroffer`, `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
+touroffer | preview[:counter]` (`preview`: the first row on screen opens its card; `preview:counter`, with `-SimplSheet
+<counter>`: the first row of that counter's panel), `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
 and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, "Still signing in…" after a moment),
 `-SimplPreviewFail YES` (with `-SimplPickerConfirm YES`: "Is this your school?" with a preview that could not load),
 `-SimplCalView week|list` (the Calendar opened on that view), `-SimplWhatIf YES` (a course's grades with What-If on,

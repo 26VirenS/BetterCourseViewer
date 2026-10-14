@@ -4,7 +4,8 @@ import SwiftUI
 // The Dashboard's six counters (1.2): each a glass tile with its symbol, its number and the line under it. Pressed, a
 // tile grows where it stands into a panel floating over the page (1.2.8: a panel's width, from the tile's corner)
 // listing what it counted, and folds back into its tile when closed (its ✕, Escape, a click round it, or the tile).
-// (1.3.78) On a window 1024 points wide or wider they stand in one row of six, each a compact tile two lines tall.
+// (1.3.78) On a window 1024 points wide or wider they stand in one row of six; (1.3.79) each the tile it was in 1.3.77,
+// as tall as it is wide there — the compact strip of 1.3.78 is gone, and the panel is 1.3.77's again.
 
 /// A counter's look, as the web Dashboard's: its symbol and colour, and its name in full for the panel it opens.
 enum DashCounterLook {
@@ -105,14 +106,14 @@ struct DashCount: View {
     }
 }
 
-/// A counter's tile: its symbol and name, its number, the line under it. (1.3.78) In the row of six, a compact tile: its
-/// name over its number, the line beside the number — cut short, or left out where there is no room to say it.
+/// A counter's tile, as 1.3.77 drew it (1.3.79: brought back from the compact strip of 1.3.78): its symbol in its
+/// colour and its name, its number, and the line under it, whole — over its photo, whole too.
 struct DashCounterTile: View {
-    /// How a tile is laid out: tall, three across (or two); or compact, in the row of six — its symbol beside its name
-    /// where every name in the row has room for one, else in the tile's corner beside its number.
+    /// How its head is laid out: its symbol beside its name, as 1.3.77's; or, in a tile too narrow for both on one line
+    /// (the row of six beside the sidebar on the narrowest window), its symbol over its name.
     enum Style: Equatable {
-        case tall
-        case row(symbolBeside: Bool)
+        case beside
+        case over
     }
 
     let counter: Counter
@@ -123,29 +124,40 @@ struct DashCounterTile: View {
     let note: String?
     /// (home-25) The number kept from last time, shown faint until the live one is in.
     var stale = false
-    var style: Style = .tall
+    var style: Style = .beside
+    /// (1.3.79) How wide the row lays the tile out: its line is shown only where it fits whole at that width.
+    var width: CGFloat = 0
+    /// (1.3.79) How tall it stands at least: in the row of six, as tall as it is wide (a square).
+    var minHeight: CGFloat = 0
+    /// (1.3.79) What it counts, in full words, for its tooltip with its count: a line left out stays said there.
+    var tip: String? = nil
     let action: () -> Void
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
 
     private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
-    private var radius: CGFloat { style == .tall ? 18 : 16 }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         Button(action: action) {
-            Group {
-                switch style {
-                case .tall: tall
-                case .row(let symbolBeside): compact(symbolBeside: symbolBeside)
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                head
+                DashCount(value: value, alert: alert, stale: stale)
+                Text(shownNote ?? " ")
+                    .font(.sCaption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .opacity(stale ? 0.6 : 1)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.horizontal, Self.padding(style))
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
             .background {
-                // (1.3.1) its photo, frosted under its words (Settings ▸ Appearance, or its context menu); (home-27) it
-                // fades out towards the tile's top, so nothing of it sits by the name or in the corner
+                // (1.3.1) its photo, frosted under its words, the whole tile over (Settings ▸ Appearance, or its context
+                // menu) — the colour a theme gives the tile, as 1.3.77 had it
                 if let slot = PhotoSlot.card(counter.key) {
-                    SlotPhotoView(slot: slot, fade: .tile)
+                    SlotPhotoView(slot: slot)
                         .clipShape(shape)
                 }
                 // (home-1) something late: a red wash and a red edge of the tile's own, over its photo — drawn here, not
@@ -158,7 +170,7 @@ struct DashCounterTile: View {
                 if alert { shape.strokeBorder(DashCounterLook.alert.opacity(0.55), lineWidth: 1.5) }
             }
         }
-        .buttonStyle(CardButtonStyle(radius: radius))
+        .buttonStyle(CardButtonStyle(radius: 18))
         .contextMenu {
             if PhotoSlot.card(counter.key) != nil {
                 Button("Card Photo…") { editing = true }
@@ -170,139 +182,92 @@ struct DashCounterTile: View {
             }
         }
         .animation(Motion.snappy, value: value)
-        .help(DashCounterLook.spoken(counter.key, counter.label, value) + (stale ? " · updating" : ""))
+        .help(tooltip)
         .accessibilityLabel(DashCounterLook.spoken(counter.key, counter.label, value))
         .accessibilityValue(note ?? "")
         .accessibilityHint(Text("Shows what it counts"))
     }
 
-    /// (home-1) The wash under a late count: solid enough to read as a warning in light and dark, on any photo.
-    static let alertWash = Theme.dynamic(light: NSColor.systemRed.withAlphaComponent(0.14), dark: NSColor.systemRed.withAlphaComponent(0.24))
+    /// (home-1) The wash under a late count, drawn by the tile so a window in the background keeps it: 1.3.77's pink by
+    /// day (the glass's red tint it had then), and by night one that reads on dark glass, where that tint never showed.
+    static let alertWash = Theme.dynamic(light: NSColor.systemRed.withAlphaComponent(0.22), dark: NSColor.systemRed.withAlphaComponent(0.24))
 
-    private func symbol(size: CGFloat) -> some View {
-        Image(systemName: DashCounterLook.symbol(counter.key))
-            .font(.system(size: size, weight: .semibold))
+    /// Its count in words, and its line in full: "4 due today · 35 points total".
+    private var tooltip: String {
+        let line = tip ?? note
+        return [DashCounterLook.spoken(counter.key, counter.label, value), line, stale ? "updating" : nil]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// Its symbol beside its name (1.3.77's), or over it in a tile too narrow for both on one line.
+    @ViewBuilder
+    private var head: some View {
+        let symbol = Image(systemName: DashCounterLook.symbol(counter.key))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(DashCounterLook.color(counter.key))
-    }
-
-    /// Three lines: its symbol and name, its number, and the line under it.
-    private var tall: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let title = Text(name)
+            .font(.sCallout.weight(.medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(style == .beside ? 0.85 : 0.75) // (a sidebar dragged wide: smaller, never cut short)
+        switch style {
+        case .beside:
             HStack(spacing: 7) {
-                symbol(size: 14)
-                Text(name)
-                    .font(.sCallout.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                symbol
+                title
             }
-            DashCount(value: value, alert: alert, stale: stale)
-            Text(note?.isEmpty == false ? note! : " ")
-                .font(.sCaption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .opacity(stale ? 0.6 : 1)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-
-    // MARK: - Measuring the names
-
-    /// (1.3.78) A compact tile's name, as it is drawn (the row measures every name with it), and what is beside it.
-    static let rowLabelSize: CGFloat = 13
-    static let rowSymbolWidth: CGFloat = 16
-    static let rowSymbolGap: CGFloat = 6
-    static let rowPadding: CGFloat = 12
-    /// The compact tile's side padding with its symbol in the corner instead.
-    static let rowCornerPadding: CGFloat = 10
-
-    private static func widest(_ labels: [String], _ font: NSFont) -> CGFloat {
-        (labels.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0).rounded(.up)
-    }
-
-    /// (1.3.78) Whether every name has room beside its symbol on a tile `tileWidth` across — measured as the tile draws
-    /// them, so the row decides once for all six and no name is ever cut short.
-    static func symbolsFit(_ labels: [String], tileWidth: CGFloat) -> Bool {
-        rowFits(labels, tileWidth: tileWidth, symbolBeside: true)
-    }
-
-    /// (home-17) Whether every name has room on a compact tile `tileWidth` across, its symbol beside it or in the corner.
-    static func rowFits(_ labels: [String], tileWidth: CGFloat, symbolBeside: Bool) -> Bool {
-        let w = widest(labels, NSFont.systemFont(ofSize: rowLabelSize, weight: .medium))
-        let room = symbolBeside ? rowPadding * 2 + rowSymbolWidth + rowSymbolGap : rowCornerPadding * 2
-        return room + w + 2 <= tileWidth
-    }
-
-    /// (home-17) Whether every name has room on a tall tile `tileWidth` across, beside its symbol, as the tile draws it.
-    static func tallFits(_ labels: [String], tileWidth: CGFloat) -> Bool {
-        let w = widest(labels, NSFont.systemFont(ofSize: 14, weight: .medium))
-        return 14 * 2 + 18 + 7 + w + 2 <= tileWidth
-    }
-
-    // MARK: - In the row of six
-
-    /// Two lines: its name (its symbol beside it, where the row has room), then its number with the line beside it —
-    /// in full where it fits, cut short where a few words of it still say something, else left out; its symbol in the
-    /// corner where it is not beside the name. Never a third line.
-    private func compact(symbolBeside: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: Self.rowSymbolGap) {
-                if symbolBeside {
-                    // (each symbol in the same square, so a tall one — Tomorrow's sunrise — moves no name down)
-                    symbol(size: 12.5).frame(width: Self.rowSymbolWidth, height: Self.rowSymbolWidth)
-                }
-                Text(name)
-                    .font(.system(size: Self.rowLabelSize, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8) // (a sidebar dragged wide on the narrowest window: smaller, never cut short)
-            }
-            HStack(alignment: .center, spacing: 6) {
-                ViewThatFits(in: .horizontal) {
-                    numberLine(note: note)
-                    numberLine(note: note, cut: true)
-                    numberLine(note: nil)
-                }
-                .layoutPriority(1)
-                if !symbolBeside {
-                    Spacer(minLength: 0)
-                    symbol(size: 13)
-                }
+        case .over:
+            VStack(alignment: .leading, spacing: 4) {
+                symbol
+                title
             }
         }
-        .padding(.horizontal, symbolBeside ? Self.rowPadding : Self.rowCornerPadding)
-        .padding(.vertical, 11)
     }
 
-    /// The number, and the line beside it on its baseline: whole, or (`cut`) in whatever room is left once there is
-    /// room for a few words of it, ending in an ellipsis.
-    private func numberLine(note: String?, cut: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            DashCount(value: value, alert: alert, stale: stale, size: 26)
-                .fixedSize()
-            if let note, !note.isEmpty {
-                let line = Text(note)
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .opacity(stale ? 0.6 : 1)
-                if cut {
-                    line.frame(minWidth: 0, idealWidth: 64, maxWidth: .infinity, alignment: .leading)
-                } else {
-                    line
-                }
-            }
-        }
+    /// (1.3.79) The line under the number, whole in up to two lines at the tile's width; else left out (its words stay
+    /// in the tooltip) — never cut in the middle of a word.
+    private var shownNote: String? {
+        guard let note, !note.isEmpty else { return nil }
+        guard width > 0 else { return note }
+        return Self.noteFits(note, room: width - Self.padding(style) * 2) ? note : nil
+    }
+
+    // MARK: - Measuring
+
+    /// The tile's side padding: 1.3.77's 14 points; 12 where its symbol stands over its name (the narrowest tiles).
+    static func padding(_ style: Style) -> CGFloat { style == .beside ? 14 : 12 }
+
+    /// (home-17) Whether every name has room on a tile `tileWidth` across as the tile draws it — beside its symbol, or on
+    /// a line of its own under it — so the row decides once for all six and no name is ever cut short.
+    static func namesFit(_ labels: [String], tileWidth: CGFloat, style: Style) -> Bool {
+        let font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        let widest = (labels.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0).rounded(.up)
+        let beside: CGFloat = style == .beside ? 18 + 7 : 0 // (its symbol, and the room between them)
+        return padding(style) * 2 + beside + widest + 2 <= tileWidth
+    }
+
+    /// (1.3.79) Whether a line fits whole in two lines `room` wide, wrapped as the tile wraps it (12 points, a word never
+    /// broken): no word wider than the line, and no third line.
+    static func noteFits(_ note: String, room: CGFloat) -> Bool {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakStrategy = .standard // (as a SwiftUI Text wraps: no word left alone on the last line)
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .paragraphStyle: paragraph]
+        // (a little short of the whole: rounding never wraps a third line, or a word, that was measured to fit)
+        let width = room - 2
+        let words = note.split(whereSeparator: { $0 == " " }).map { (String($0) as NSString).size(withAttributes: attrs).width }
+        guard width > 0, (words.max() ?? 0) <= width else { return false }
+        let box = NSSize(width: width, height: .greatestFiniteMagnitude)
+        let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+        let line = ("Ag" as NSString).boundingRect(with: box, options: options, attributes: attrs).height
+        let all = (note as NSString).boundingRect(with: box, options: options, attributes: attrs).height
+        return all <= line * 2 + 0.5
     }
 }
 
 /// The panel a counter grows into: its header (the tile's symbol, name and number, larger) and what it counted —
-/// what wants attention first, then, quieter, the rest of the same span under it — and the way to the whole list. Each
-/// row previews its work under it, in the panel (1.2.3; home-20: never a second card over this one; a double-click opens
-/// it); an overdue one the student has let go can be cleared.
+/// what wants attention first, then, quieter, the rest of the same span under it. Each row previews its work (1.2.3; a
+/// double-click opens it); an overdue one the student has let go can be cleared. (1.3.79) As 1.3.77 had it: a row is
+/// its course's colour, its title and its line, and its preview the card over the window, not one opened in the panel.
 struct DashCounterPanel: View {
     /// (1.2.8) How wide a panel opens (narrower only on a narrower page).
     static let width: CGFloat = 440 // (1.3.62: was 520)
@@ -313,9 +278,9 @@ struct DashCounterPanel: View {
     /// The panel's width: its words are laid out at it from the first frame, so they never squeeze while the tile
     /// grows (the growing shape shows more of them as it opens).
     let width: CGFloat
-    /// (home-18) How tall its list may stand before it scrolls inside the panel: what the window has under the panel's
-    /// header, so the panel stays in the window — about six rows on a laptop's window.
-    var room: CGFloat = 380
+    /// (home-18) How tall its list may stand before it scrolls inside the panel, at most: what the window has under the
+    /// panel's header, so the panel stays in the window.
+    var room: CGFloat = 240
     let close: () -> Void
     /// (1.2.8) How tall what it shows stands, for the page to size the floating panel to it.
     var onHeight: (CGFloat) -> Void = { _ in }
@@ -325,11 +290,7 @@ struct DashCounterPanel: View {
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
     private var engine: Engine { link.acting }
-    @ObservedObject private var preview = WorkPreview.shared
     @State private var data: ItemsSheetData?
-
-    /// One of its rows has its preview open under it.
-    private var previewing: Bool { preview.inlineID?.hasPrefix("sheet:\(counter.key):") == true }
     @State private var error: String?
 
     var body: some View {
@@ -350,19 +311,19 @@ struct DashCounterPanel: View {
             .onTapGesture {} // (1.2.2: a click on the panel is the panel's — the page round it folds it back)
             .onExitCommand { close() }
             .task { await load() }
-            .onDisappear { if previewing { WorkPreview.shared.closeInline(animated: false) } }
+            // (1.3.79) a row's card folds back with the panel it came from: it never stays over a panel that is gone
+            .onDisappear {
+                if WorkPreview.shared.item?.id.hasPrefix("sheet:\(counter.key):") == true { WorkPreview.shared.close() }
+            }
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             header
             if let d = data {
-                // (1.2.2) no taller than the room the window has for it: the rest scrolls inside the panel (home-18:
-                // about six rows on a laptop's window, the footer under them leading to the whole list); taller while
-                // one of its rows has its preview open under it (1.2.15)
-                let cap = max(150, min(room, 380))
-                CappedScroll(max: previewing ? max(cap + 180, 420) : cap) { lists(d) }
-                if !d.sections.isEmpty { footer }
+                // (1.2.2) no taller than three and a half rows: the rest scrolls inside the panel (1.2.3: half of a
+                // fourth row shows, so it reads as one to scroll) — (home-18) less where the window has less room
+                CappedScroll(max: max(150, min(room, 240))) { lists(d) }
             } else if let error {
                 Text(error).font(.sCallout).foregroundStyle(.secondary)
             } else {
@@ -375,75 +336,43 @@ struct DashCounterPanel: View {
         }
         .padding(.horizontal, 22)
         .padding(.top, 16)
-        .padding(.bottom, 18)
+        .padding(.bottom, 20)
     }
 
-    /// Its symbol and name with its ✕, then its number with its line beside it — (home-10) the line given the panel's
-    /// whole width, under the ✕ as well, before it wraps.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: DashCounterLook.symbol(counter.key))
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(DashCounterLook.color(counter.key))
-                Text(data?.title ?? DashCounterLook.fullName(counter.key, counter.label))
-                    .font(.sHeadline)
-                Spacer(minLength: 8)
-                Button(action: close) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: DashCounterLook.symbol(counter.key))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(DashCounterLook.color(counter.key))
+                    Text(data?.title ?? DashCounterLook.fullName(counter.key, counter.label))
+                        .font(.sHeadline)
                 }
-                .buttonStyle(DashIconButtonStyle())
-                .keyboardShortcut(.cancelAction)
-                .help("Close (Esc)")
-                .accessibilityLabel("Close")
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                DashCount(value: value, alert: counter.tone == "red" && (value ?? 0) > 0, size: 40)
-                if let line = data?.note ?? note, !line.isEmpty {
-                    Text(line)
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    DashCount(value: value, alert: counter.tone == "red" && (value ?? 0) > 0, size: 40)
+                    if let line = data?.note ?? note, !line.isEmpty {
+                        Text(line)
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
             }
+            Spacer(minLength: 8)
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(DashIconButtonStyle())
+            .keyboardShortcut(.cancelAction)
+            .help("Close (Esc)")
+            .accessibilityLabel("Close")
         }
         // (1.2.11) the card pressed again — its head, where the tile was — closes it (the ✕ keeps its own press)
         .contentShape(Rectangle())
         .onTapGesture(perform: close)
-    }
-
-    /// (home-18) The panel's way on to the whole list, so it is never a dead end: the work in To Do (which lists it day by
-    /// day, overdue first), the grades in Grades, the announcements among the notifications.
-    private var footer: some View {
-        let way = seeAll
-        return HStack {
-            Button {
-                close()
-                engine.go(way.place)
-            } label: {
-                HStack(spacing: 3) {
-                    Text(way.label)
-                    Image(systemName: "chevron.right").font(.system(size: 10.5, weight: .semibold))
-                }
-                .font(.sCallout.weight(.medium))
-            }
-            .buttonStyle(.link)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 8)
-    }
-
-    private var seeAll: (label: String, place: Place) {
-        switch counter.key {
-        case "graded": return (label: "See All in Grades", place: .grades)
-        case "unread": return (label: "See All in Notifications", place: .notifications)
-        default:
-            let n = value ?? 0
-            return (label: n > 0 ? "See All \(n) in To Do" : "See All in To Do", place: .todo)
-        }
     }
 
     @ViewBuilder
@@ -490,37 +419,24 @@ struct DashCounterPanel: View {
         }
     }
 
-    /// (home-10, home-19, home-21) A row as the Dashboard's other lists draw work: its kind's symbol in its course's
-    /// colour, its course and kind over its title, and on the right its time (or the day it was posted) over its points
-    /// or score. An announcement's row names its course — the panel says they are announcements. An answer from an
-    /// older page (no facts one by one) shows its one line under the title, as before.
+    /// A row of the panel: a press grows its preview out of it (1.2.3, as the web's sheet previews its rows); a
+    /// double-click opens it.
     private func item(_ row: SheetRow) -> some View {
-        let quiet = row.quiet == true
-        let split = row.course != nil || row.kind != nil || row.when != nil
-        let kind = PreviewFormat.text(row.kind) ?? (counter.key == "unread" ? "Announcement" : "Assignment")
-        let context = [PreviewFormat.text(row.course), counter.key == "unread" ? nil : PreviewFormat.text(row.kind)]
-            .compactMap { $0 }.joined(separator: " · ")
-        // (home-20) its preview opens under it, in the panel — never a second card stacked over this one
-        return PreviewLink(item: .sheet(row, counter: counter.key, engine: engine), inline: true) {
+        PreviewLink(item: .sheet(row, counter: counter.key, engine: engine)) {
             HStack(spacing: 12) {
-                IconTile(symbol: DashGlyph.kind(kind), color: Color(hex: row.color), size: 28)
-                    .opacity(quiet ? 0.55 : 1)
-                if split {
-                    DashWorkText(context: context, title: row.title, quiet: quiet)
-                    Spacer(minLength: 6)
-                    DashWorkFigures(time: row.when, points: row.detail, stacked: true)
-                } else {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.title)
-                            .font(.sBody)
-                            .foregroundStyle(quiet ? .secondary : .primary)
-                            .lineLimit(2)
-                        if let sub = row.sub, !sub.isEmpty {
-                            Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
-                        }
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color(hex: row.color).opacity(row.quiet == true ? 0.5 : 1))
+                    .frame(width: 4, height: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.title)
+                        .font(.sBody)
+                        .foregroundStyle(row.quiet == true ? .secondary : .primary)
+                        .lineLimit(2)
+                    if let sub = row.sub, !sub.isEmpty {
+                        Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    Spacer(minLength: 6)
                 }
+                Spacer(minLength: 6)
                 if row.clearable == true, let k = row.key {
                     // (1.2.11) a button that says what it does; one after another, each row going as it is pressed
                     Button("Dismiss") { clear(k) }
@@ -528,6 +444,10 @@ struct DashCounterPanel: View {
                         .buttonStyle(.bordered)
                         .help("Dismiss from Overdue")
                         .accessibilityLabel("Dismiss \(row.title) from Overdue")
+                } else if row.url != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
@@ -583,8 +503,8 @@ struct DashTileAnchors: PreferenceKey {
 }
 
 /// (1.2.2) Content at its own height up to `max`, scrolling inside past it — the panel stays short however long its list.
-/// (home-20) Its height is read through a preference, every time the content's changes — rows arriving, a preview
-/// opening under one — so a short list never leaves the panel standing at the cap with nothing in its foot.
+/// (home-20) Its height is read through a preference, every time the content's changes — rows arriving, a row
+/// dismissed — so a short list never leaves the panel standing at the cap with nothing in its foot.
 struct CappedScroll<Content: View>: View {
     let max: CGFloat
     @ViewBuilder var content: () -> Content
