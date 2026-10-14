@@ -404,13 +404,13 @@ public sealed partial class AppShell : Grid, IDisposable
     }
 
     /// <summary>The screenshot suite: --open more brings the section into sight once it is read; --open more:history,
-    /// more:help, more:tool presses that item too.</summary>
+    /// more:help, more:tool presses that item's row too, as a click does.</summary>
     private async void MoreAsked()
     {
         if (disposed || narrow || !MoreFromCanvas.Shown(more) || Launch.Take("more") is not { } asked) return;
         await Task.Delay(400);
         navScroll.ScrollToEnd();
-        if (asked.TrimStart(':') is { Length: > 0 } kind && more!.Items.FirstOrDefault(i => i.Kind == kind) is { } it) MoreFromCanvas.Open(engine, it, window);
+        if (asked.TrimStart(':') is { Length: > 0 } kind && more!.Items.FirstOrDefault(i => i.Kind == kind) is { } it) nav.Press("more:" + it.Id);
     }
 
     /// <summary>A row's place in a window of its own (its menu's Open in new window, Shift+click): every place row, its

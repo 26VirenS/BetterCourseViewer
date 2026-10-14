@@ -168,51 +168,49 @@ public static class MoreFromCanvas
         }
     }
 
-    /// <summary>The History and Help popups up now, by kind, and what brings each forward: pressed again, the one there
-    /// comes to the front and is read afresh, never a second beside it.</summary>
-    private static readonly Dictionary<string, Action> Showing = new();
+    /// <summary>The History and Help popups up now, by kind: pressed again, the one there comes to the front, never a
+    /// second beside it.</summary>
+    private static readonly Dictionary<string, Sheet> Showing = new();
+    /// <summary>The kinds being read for a popup about to show: a press meanwhile adds nothing.</summary>
+    private static readonly HashSet<string> Reading = new();
 
     /// <summary>
     /// History or Help as a popup floating over the window — nothing held: the pane, the title bar and the page stay at
     /// hand — listing what the extension's sheet lists: what it is under its title, then its rows (History's each with
     /// its kind's symbol in its course's colour, what it was and the course · kind · when under it), and under them
-    /// Help's word on Report a problem. Read afresh each time it opens (Canvas's History changes as the student moves).
-    /// A row opens where it leads — one of the school's own pages as Simpl opens any (its own screen where it has one),
-    /// another site in Simpl's browser window, the mark of a window of its own at its end — and the popup goes, as the
-    /// extension's sheet does.
+    /// Help's word on Report a problem. Read afresh each time it opens (Canvas's History changes as the student moves),
+    /// and shown once read, as the extension's sheet is, whole from its first frame (a popup's window does not follow its
+    /// card growing after it shows: a strip of bare window stays under it). A row opens where it leads — one of the
+    /// school's own pages as Simpl opens any (its own screen where it has one), another site in Simpl's browser window,
+    /// the mark of a window of its own at its end — and the popup goes, as the extension's sheet does.
     /// </summary>
-    public static void ShowList(Engine.Engine engine, MoreNavItem item, Window over)
+    public static async void ShowList(Engine.Engine engine, MoreNavItem item, Window over)
     {
-        var help = item.Kind == "help";
-        if (Showing.TryGetValue(item.Kind, out var again)) { again(); return; }
+        var kind = item.Kind;
+        if (Showing.TryGetValue(kind, out var open)) { open.Window?.Activate(); return; }
+        if (!Reading.Add(kind)) return;
+        var help = kind == "help";
         var name = item.Label.Length > 0 ? item.Label : help ? "Help" : "History";
-        var holder = new ContentControl { Focusable = false, MinHeight = 96 };
+        var holder = new ContentControl { Focusable = false };
         var sheet = new Sheet { Title = name, Body = holder, Width = 460, Floats = true, HoldsUpdates = false, Name = name };
-        var turn = 0;
-        async void Read()
+        try
         {
-            var mine = ++turn;
-            holder.Content = K.Reading(help ? "Reading your school’s help links…" : "Reading what you opened lately…");
-            try
-            {
-                var list = await engine.Call<MoreList>(help ? "moreHelp" : "moreHistory");
-                if (mine != turn) return;
-                holder.Content = Body(engine, list, help, sheet, over);
-                if (Shot.Asked) Log.Write($"more list: {item.Kind} {list.Rows.Count} rows");
-            }
-            catch (Exception e)
-            {
-                if (mine != turn) return;
-                var retry = K.Link("Try again", Read);
-                retry.HorizontalAlignment = HorizontalAlignment.Left;
-                retry.Margin = new Thickness(-6, 0, 0, 0);
-                holder.Content = K.V(6, K.Wrapped(e.Message, Ty.Body, B.Text2), retry);
-            }
+            var list = await engine.Call<MoreList>(help ? "moreHelp" : "moreHistory");
+            holder.Content = Body(engine, list, help, sheet, over);
+            if (Shot.Asked) Log.Write($"more list: {kind} {list.Rows.Count} rows");
         }
-        Showing[item.Kind] = () => { sheet.Window?.Activate(); Read(); };
-        sheet.Closed += () => Showing.Remove(item.Kind);
+        catch (Exception e)
+        {
+            // (Try again: this popup closed and the list asked for anew, its popup shown once it is in)
+            var retry = K.Link("Try again", () => { sheet.Close(); Showing.Remove(kind); ShowList(engine, item, over); });
+            retry.HorizontalAlignment = HorizontalAlignment.Left;
+            retry.Margin = new Thickness(-6, 0, 0, 0);
+            holder.Content = K.V(6, K.Wrapped(e.Message, Ty.Body, B.Text2), retry);
+        }
+        finally { Reading.Remove(kind); }
+        Showing[kind] = sheet;
+        sheet.Closed += () => { if (Showing.TryGetValue(kind, out var s) && s == sheet) Showing.Remove(kind); };
         Dialogs.Show(sheet, over);
-        Read();
     }
 
     private static FrameworkElement Body(Engine.Engine engine, MoreList list, bool help, Sheet sheet, Window over)

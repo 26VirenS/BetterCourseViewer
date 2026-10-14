@@ -214,6 +214,17 @@ public sealed class NavList : Grid
         return b;
     }
 
+    /// <summary>A row pressed as a click presses it — the keyboard put on it (so it is in sight, and stays the pane's own
+    /// when the window is active again), then what it does — for the screenshot suite (--open more:history). False when
+    /// no row has that key.</summary>
+    public bool Press(string key)
+    {
+        if (!rows.TryGetValue(key, out var row)) return false;
+        row.Focus();
+        row.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, row));
+        return true;
+    }
+
     /// <summary>The school's own picture on a row's square: 13 across, made smaller smoothly from the 64 it comes at.</summary>
     private static FrameworkElement Picture(ImageSource source)
     {
