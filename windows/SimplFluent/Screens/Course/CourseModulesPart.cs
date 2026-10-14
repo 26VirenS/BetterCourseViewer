@@ -13,8 +13,10 @@ namespace Simpl.Screens;
 /// <summary>
 /// A course's modules (the Mac's ModulesList), each a card that opens under its name: its items indented as the course
 /// sets them, under their sub-headings — what each asks of you (View, Submit, Mark done), a tick once it is done, why one
-/// is locked, and Mark Done where it is yours to mark. Only the module last opened here opens by itself (kept on this
-/// PC, let go when it is closed again); others opened since stay open while the list is up.
+/// is locked, and Mark done where it is yours to mark. Only the module last opened here opens by itself (kept on this
+/// PC, let go when it is closed again) — or a course's only module, at once (one closed card was a click for nothing);
+/// others opened since stay open while the list is up. A locked module says why, or when it opens ("Opens Oct 20"),
+/// under its name, without being opened.
 /// </summary>
 internal sealed class CourseModulesPart : CourseListPart<ModulesData>
 {
@@ -47,6 +49,7 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
         if (restored) return;
         restored = true;
         if (Prefs.String(LastKey) is { Length: > 0 } last && d.Modules.Any(m => m.Id == last)) opened.Add(last);
+        else if (d.Modules.Count == 1) opened.Add(d.Modules[0].Id); // (a course's only module, open at once)
     }
 
     // ---- a module ----
@@ -65,7 +68,8 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
         return K.Card(card, new Thickness(6));
     }
 
-    /// <summary>Its name with the chevron that opens it, a lock or a tick, and how far through it you are.</summary>
+    /// <summary>Its name with the chevron that opens it, a lock or a tick, why it is locked or when it opens (under its
+    /// name), and how far through it you are.</summary>
     private FrameworkElement Header(ModuleData m, bool open)
     {
         var chevron = K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2);
@@ -88,23 +92,31 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
             marks.Children.Add(t);
         }
         var name = K.Wrapped(m.Name, Ty.BodyStrong, B.Text, 2);
-        name.VerticalAlignment = VerticalAlignment.Center;
+        FrameworkElement words = name;
+        if (LockLine(m) is { } why)
+        {
+            // (why it is locked, or when it opens, without opening it)
+            var line = K.Wrapped(why, Ty.Caption, B.Text2, 2);
+            words = K.V(2, name, line);
+        }
+        words.VerticalAlignment = VerticalAlignment.Center;
         var g = K.Columns("auto, auto, *, auto",
             chevron.Margin(0, 0, 10, 0).Col(0),
             marks.Margin(0, 0, marks.Children.Count > 0 ? 10 : 0, 0).Col(1),
-            name.Col(2));
+            words.Col(2));
         if (!string.IsNullOrEmpty(m.Progress)) g.Children.Add(K.Text(m.Progress!, Ty.Caption, B.Text2).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
         var b = K.Subtle(g, () => Toggle(m), new Thickness(10, 12, 10, 12), 6);
-        AutomationProperties.SetName(b, m.Name);
+        AutomationProperties.SetName(b, LockLine(m) is { } locked ? $"{m.Name}, {locked}" : m.Name);
         AutomationProperties.SetHelpText(b, open ? "Hides the module’s items" : "Shows the module’s items");
         return b;
     }
 
+    /// <summary>Why a locked module is locked, or when it opens ("Opens Oct 20"); null for one that is not.</summary>
+    private static string? LockLine(ModuleData m) => m.Locked == true && m.LockText is { Length: > 0 } t ? t : null;
+
     private FrameworkElement Items(ModuleData m, Color color)
     {
-        var v = K.V(0, K.Divider().Margin(10, 0, 10, 4));
-        if (m.Locked == true && !string.IsNullOrEmpty(m.LockText))
-            v.Children.Add(K.Columns("auto, *", K.Icon(SymbolRegular.LockClosed24, 14, B.Text2, filled: true).Margin(0, 1, 8, 0).Col(0), K.Wrapped(m.LockText!, Ty.Caption, B.Text2).Col(1)).Margin(10, 6, 10, 6));
+        var v = K.V(0, K.Divider().Margin(10, 0, 10, 4)); // (why it is locked is said under its name)
         for (var i = 0; i < m.Items.Count; i++)
         {
             var it = m.Items[i];
@@ -135,7 +147,7 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
         var g = K.Columns("*, auto", link.Col(0));
         if (it.Markable == true && !done)
         {
-            var b = K.Button("Mark Done", () => Mark(it, m, true));
+            var b = K.Button("Mark done", () => Mark(it, m, true));
             b.MinWidth = 0;
             b.IsEnabled = !locked;
             b.ToolTip = $"Mark this item done in {engine.LmsName}";
@@ -180,12 +192,9 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
             }
             end.Children.Add(tick);
         }
-        if (it.External == true)
-        {
-            var away = K.Icon(SymbolRegular.ArrowUpRight24, 12, B.Text3).Tip("Opens in your browser");
-            AutomationProperties.SetName(away, "Opens in your browser");
-            end.Children.Add(away);
-        }
+        // (another site, or a tool: in a Simpl window of its own — its symbol as a course's More and External Tools' chips
+        //  have it; nothing here leaves for the browser, so no ↗)
+        if (it.External == true || it.Type == "ExternalTool" && !locked) end.Children.Add(CourseKit.OwnWindowMark());
         end.VerticalAlignment = VerticalAlignment.Center;
         return K.Columns("auto, *, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), end.Margin(6, 0, 0, 0).Col(2));
     }
@@ -194,11 +203,11 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
     {
         if (it.Url != null || it.Type == "ExternalTool") items.Add(CourseKit.MenuEntry("Open", SymbolRegular.DocumentArrowRight24, () => OpenItem(it)));
         if (it.Markable == true && !locked)
-            items.Add(CourseKit.MenuEntry(done ? "Mark as Not Done" : "Mark as Done", done ? SymbolRegular.DismissCircle24 : SymbolRegular.CheckmarkCircle24, () => Mark(it, m, !done)));
+            items.Add(CourseKit.MenuEntry(done ? "Mark as not done" : "Mark as done", done ? SymbolRegular.DismissCircle24 : SymbolRegular.CheckmarkCircle24, () => Mark(it, m, !done)));
         if (string.IsNullOrEmpty(it.Url)) return;
         if (items.Count > 0) items.Add(new Separator());
         if (it.External != true) items.Add(CourseKit.MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(PageOf(it.Url!), it.Title)));
-        items.Add(CourseKit.MenuEntry("Copy Link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, PageOf(it.Url!))));
+        items.Add(CourseKit.MenuEntry("Copy link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, PageOf(it.Url!))));
     }
 
     /// <summary>A module item's own page on the school's site: a file's page, not its download.</summary>

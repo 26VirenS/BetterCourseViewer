@@ -19,7 +19,7 @@ namespace Simpl.Screens;
 /// words, its files, the assignment it is graded as — then every reply in reading order, threaded by depth, each step
 /// further in on a line in the course's colour. Reply writes under the post, and a reply's own Reply writes under that
 /// reply: Ctrl+Enter posts, Escape puts the box away. A discussion that wants your post first says so, and a closed one
-/// says why. Previous and Next, Reply and More (Open in Canvas, Copy Link) beside the title. Opening it marks it read.
+/// says why. Previous and Next, Reply and More (Open in Canvas, Copy link) beside the title. Opening it marks it read.
 /// </summary>
 public sealed class TopicScreen : Screen
 {
@@ -65,7 +65,14 @@ public sealed class TopicScreen : Screen
 
     public override string Title => model.Data?.Title is { Length: > 0 } t ? t : "Discussion";
 
+    /// <summary>"Discussion · F26-MATH 021 20" (the shell drops the course where the breadcrumb names it already).</summary>
     public override string? Subtitle => model.Data is { } d ? KindLine(d) : null;
+
+    /// <summary>A topic's name is often a whole question: it wraps to three lines before it is cut.</summary>
+    public override int TitleLines => 3;
+
+    /// <summary>Its course's colour, in the square before its title.</summary>
+    public override Color? TitleColor => Appearance.Hex(model.Data?.Color) ?? CourseKit.ContextColor(engine, ctx);
 
     /// <summary>(The Mac's 1.2) A reading width: a thread is read line by line.</summary>
     public override double? MaxContentWidth => 1000;
@@ -100,7 +107,7 @@ public sealed class TopicScreen : Screen
             System.Windows.Controls.Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreKit.Open(MoreKit.Menu(
                 ($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(Url, model.Data?.Title ?? "Discussion")),
-                ("Copy Link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(Url)?.ToString()))), more!), "More");
+                ("Copy link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(Url)?.ToString()))), more!), "More");
             commands = K.H(8, around, replyButton, more);
             PaintCommands();
             return commands;
@@ -188,11 +195,13 @@ public sealed class TopicScreen : Screen
     private void Link(string url) => engine.GoTo(url);
 
     /// <summary>The post: who wrote it (or, when the school names nobody, the course, on its own colour), when, the
-    /// assignment it is graded as, its words and its files.</summary>
+    /// assignment it is graded as, its words and its files. A Brightspace topic names its forum, not a person: the course
+    /// on the discussion's symbol, "in Weekly Discussions" under it — never the forum's initials, as if someone wrote it.</summary>
     private FrameworkElement PostCard(TopicData d, Color color)
     {
         var who = string.IsNullOrEmpty(d.Author) ? null : d.Author;
-        var line = string.Join(" · ", new[] { who == null ? null : d.Context, d.When }.Where(s => !string.IsNullOrEmpty(s)));
+        var forum = who == null && d.Forum is { Length: > 0 } f ? $"in {f}" : null;
+        var line = string.Join(" · ", new[] { who == null ? forum : d.Context, d.When }.Where(s => !string.IsNullOrEmpty(s)));
         FrameworkElement picture = who != null
             ? K.Avatar(who, null, d.Avatar, 42)
             : K.IconTile(d.Announcement == true ? SymbolRegular.Megaphone24 : SymbolRegular.ChatMultiple24, color, 42);
@@ -239,7 +248,7 @@ public sealed class TopicScreen : Screen
         b.ToolTip = $"Open {file.Name}";
         b.ContextMenu = MoreKit.Menu(
             ("Open", SymbolRegular.Open24, Open),
-            ("Copy Link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(file.Url)?.ToString())));
+            ("Copy link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(file.Url)?.ToString())));
         return b;
     }
 
@@ -267,7 +276,7 @@ public sealed class TopicScreen : Screen
         if (d.NeedFirst == true)
         {
             var g = K.Columns("*, auto", MoreKit.Note(SymbolRegular.EyeOff24, "Reply to see what others wrote.").Col(0));
-            if (d.CanReply == true) g.Children.Add(K.Link("Write Your Reply", () => Reply(null)).Margin(8, -4, 0, -4).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
+            if (d.CanReply == true) g.Children.Add(K.Link("Write your reply", () => Reply(null)).Margin(8, -4, 0, -4).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
             return g.Margin(8, 10, 8, 10);
         }
         if (d.Entries.Count == 0) return K.Empty(SymbolRegular.Chat24, d.Announcement == true ? "No replies." : "No replies yet. Be the first.").Margin(8, 10, 8, 10);
@@ -324,7 +333,7 @@ public sealed class TopicScreen : Screen
         {
             var items = new List<(string, SymbolRegular, Action)?>();
             if (d.CanReply == true) items.Add(("Reply", SymbolRegular.ArrowReply24, () => Reply(e)));
-            items.Add(("Copy Text", SymbolRegular.Copy24, () => MoreKit.Copy(e.Text)));
+            items.Add(("Copy text", SymbolRegular.Copy24, () => MoreKit.Copy(e.Text)));
             row.ContextMenu = MoreKit.Menu(items.ToArray());
         }
         return row;

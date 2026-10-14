@@ -519,6 +519,25 @@ public static class K
 
     public static Color WithAlpha(Color c, double a) => Color.FromArgb((byte)(255 * Math.Clamp(a, 0, 1)), c.R, c.G, c.B);
 
+    /// <summary>The words to put on a colour of the student's choosing (a course card's band, the pane's letter squares):
+    /// white where white stands 3:1 against it — the least WCAG asks of large text — else near-black. Students pick
+    /// their courses' colours in Canvas, and many are light (the Mac's CourseCard.whiteReads, the same sums).</summary>
+    public static Color InkOn(Color c) => WhiteReads(c) ? Colors.White : Color.FromRgb(0x1c, 0x1c, 0x1e);
+
+    /// <summary>White words stand 3:1 against the colour.</summary>
+    public static bool WhiteReads(Color c) => 1.05 / (Luminance(c) + 0.05) >= 3;
+
+    /// <summary>A colour's relative luminance (WCAG's, in sRGB).</summary>
+    public static double Luminance(Color c)
+    {
+        static double Ch(byte v)
+        {
+            var s = v / 255.0;
+            return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * Ch(c.R) + 0.7152 * Ch(c.G) + 0.0722 * Ch(c.B);
+    }
+
     /// <summary>A flag's colour by its kind (the page's words: red, orange, green, blue, purple, gray).</summary>
     public static Color Tone(string? kind) => kind switch
     {

@@ -49,6 +49,10 @@ public abstract class Screen
     /// <summary>The commands beside the title (a view picker, New Task), or null.</summary>
     public virtual FrameworkElement? Commands => null;
 
+    /// <summary>The colour of the course (or group) the screen is of, for the square before its title that ties the page
+    /// to its card and its square in the pane (the Mac's ScreenHeading color); null for a screen of no course.</summary>
+    public virtual System.Windows.Media.Color? TitleColor => null;
+
     /// <summary>The page scrolls as one (most do); a screen with its own scrolling parts says false.</summary>
     public virtual bool Scrolls => true;
 

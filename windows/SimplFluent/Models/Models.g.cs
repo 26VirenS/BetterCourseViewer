@@ -472,6 +472,8 @@ public sealed class PostRow
     public int? Replies { get; set; }
     public bool? Graded { get; set; }
     public string Url { get; set; } = "";
+    // (2.99.33) on Brightspace, the forum the topic is in ("Weekly Discussions"; the author is then ""); "" on Canvas
+    public string? Forum { get; set; }
 }
 
 public sealed class FrontPage
@@ -492,6 +494,8 @@ public sealed class HomeData
     public string? Teachers { get; set; }
     public double? Score { get; set; }
     public string? ScoreText { get; set; }
+    // (2.99.33) why there is no score ("No grade yet", "Hidden by instructor"; "" with one)
+    public string? ScoreWhy { get; set; }
     public string? Letter { get; set; }
     public List<SectionLink> Sections { get; set; } = new();
     public List<MoreLink>? More { get; set; }
@@ -569,6 +573,8 @@ public sealed class TopicData
     public string? LockText { get; set; }
     public List<Entry> Entries { get; set; } = new();
     public int? Count { get; set; }
+    // (2.99.33) on Brightspace, the forum the topic is in (the author is then ""); "" on Canvas
+    public string? Forum { get; set; }
 }
 
 public sealed class ModuleItem
@@ -785,6 +791,8 @@ public sealed class FileRow
     public string? Mime { get; set; }
     public string? Kind { get; set; }
     public bool? Locked { get; set; }
+    // (2.99.33) what it is, in one vocabulary: PDF, Image, Spreadsheet, Slides, Document, Text, Video, Audio, Archive, Web page, File
+    public string? TypeText { get; set; }
 }
 
 public sealed class FilesData
@@ -900,6 +908,9 @@ public sealed class GroupRow
     public string? Sub { get; set; }
     public string? Color { get; set; }
     public bool? Past { get; set; }
+    // (2.99.33) its course by name, and the course's code when it says something the name does not ("" else)
+    public string? Course { get; set; }
+    public string? CourseCode { get; set; }
 }
 
 public sealed class GroupsData

@@ -188,7 +188,7 @@ internal sealed class CourseSyllabusPart : CourseListPart<RowsData>
     private FrameworkElement DatedWork(RowsData d)
     {
         var color = K.Hex(d.Color);
-        return CourseKit.CardSection("Dated Work", Count(d.Rows.Count), null, CourseKit.Divided(d.Rows, r => WorkLink(r, color)));
+        return CourseKit.CardSection("Dated work", Count(d.Rows.Count), null, CourseKit.Divided(d.Rows, r => WorkLink(r, color)));
     }
 }
 

@@ -402,6 +402,28 @@ public sealed class TodoScreen : Screen
 - A screen whose `Refresh` does more than read overrides `ReadAhead` (what the prefetch asks of it); one that listens to
   something outside itself undoes it in `Release`; one with something of the student's in it (a reply being written)
   says `Busy`.
+- A screen of a course or a group says its colour (`TitleColor`): the shell draws a square in it before the title, as
+  the Mac's headings have (a section's comes from `CoursePart`, the course's colour in the pane). A screen whose title
+  is often long (a discussion, a page, an assignment) lets it wrap (`TitleLines`), the commands staying at the top
+  right; cut, its whole words are its tooltip. The line under the title never repeats a part the breadcrumb already
+  says (`AppShell.WithoutCrumbs`: "Discussion", not "Discussion · F26-MATH 021 20" under "F26-MATH 021 20 ›").
+- Words on a course's own colour (a card's band, the pane's letter squares) are `K.InkOn(color)`: white where white
+  reads 3:1 on it, else near-black — students pick their colours, and many are light. A course's second name is shown
+  only when it says something new (the engine's `altName`, or `CourseKit.SaysMore`, its comparison); a list of work
+  draws a chip only for news (Missing, Late, Submitted, a score — never "Not submitted"); what opens in a Simpl window
+  of its own ends in `CourseKit.OwnWindowMark()` (the window's symbol), never ↗. All Courses' filter reads Current ·
+  Past · Future, the line under its title the engine's `subs` for the one chosen (`--courses-filter past` opens on
+  Past, for the pictures).
+- In the school's rich text (`Kit/RichText.cs`), a video, a sound or another page set in it (an iframe — Canvas's media
+  player —, a video, an object) is drawn as what it is — a video as a 16:9 frame with its name ("Video player for
+  jump.mp4" → "jump.mp4") and a play button, a sound or a page as a row — and played or opened in a window of its own;
+  a web view in the text would float over the page as it scrolls, so none is played in place.
+- A tool, or a page of the school's or another site's, opens in a window of its own (`Shell/WebWindow.cs`, the Mac's
+  ToolWindow): a course's tool, a tool assignment or a module's tool by the school's one-time launch (the engine's
+  `toolLaunch`) — the tool alone, its school page only as the fallback —; Back, Forward and Refresh at the title bar's
+  left (Alt+←, Alt+→, F5), More at its right (Open in browser, Copy link), a thin line under the title bar while a page
+  loads, and why it could not open in the window with Try again. `--open tool:101:9` opens one at launch (the
+  screenshot suite pictures the window in front).
 
 ## Pages
 

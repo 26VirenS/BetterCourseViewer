@@ -269,11 +269,7 @@ public sealed class RichText : RichTextBox
             {
                 var src = n.Attrs.GetValueOrDefault("src") ?? n.Kids.FirstOrDefault(k => k.Tag == "source")?.Attrs.GetValueOrDefault("src") ?? n.Attrs.GetValueOrDefault("data");
                 if (string.IsNullOrEmpty(src)) return null;
-                var p = new Paragraph { Margin = new Thickness(0, 0, 0, 10) };
-                var label = n.Tag == "iframe" ? "Open the embedded content" : n.Tag == "audio" ? "Play the audio" : "Play the video";
-                var link = Link(src, new Run("▶  " + label));
-                p.Inlines.Add(link);
-                return p;
+                return new BlockUIContainer(Media(n, src)) { Margin = new Thickness(0, 2, 0, 12) };
             }
             case "table":
                 return TableOf(n, size);
@@ -440,6 +436,110 @@ public sealed class RichText : RichTextBox
     }
 
     private string Absolute(string href) => baseUrl != null && Uri.TryCreate(baseUrl, href, out var u) ? u.ToString() : href;
+
+    // ---- a video, a sound, another page set in the text ----
+
+    /// <summary>
+    /// A video, a sound or another page set in the text (an iframe — Canvas's media player —, a video, an audio, an
+    /// object), drawn as what it is: a video as a 16:9 frame with its name and a play button, a sound or a page as a row
+    /// with its name; a click plays or opens it in a window of its own. (A page's frame cannot sit in Windows text: a web
+    /// view floats over whatever scrolls past it.) Its name is the frame's own title ("Video player for jump.mp4" →
+    /// "jump.mp4"), else its file's, else its site's.
+    /// </summary>
+    private FrameworkElement Media(Node n, string src)
+    {
+        var abs = Absolute(src);
+        var type = (n.Attrs.GetValueOrDefault("data-media-type") ?? "").ToLowerInvariant();
+        var kind = n.Tag == "audio" || type == "audio" || abs.Contains("type=audio", StringComparison.OrdinalIgnoreCase) ? "audio"
+            : n.Tag == "video" || type == "video" || abs.Contains("type=video", StringComparison.OrdinalIgnoreCase) || abs.Contains("/media_objects", StringComparison.OrdinalIgnoreCase) ? "video"
+            : "page";
+        Uri.TryCreate(abs, UriKind.Absolute, out var u);
+        var name = MediaName(n, u);
+        var word = kind switch { "video" => "Video", "audio" => "Audio", _ => "Embedded page" };
+        var elsewhere = u != null && baseUrl != null && !string.Equals(u.Host, baseUrl.Host, StringComparison.OrdinalIgnoreCase) ? u.Host : null;
+        var line = elsewhere != null && elsewhere != name ? $"{word} · {elsewhere}" : word;
+        var verb = kind == "page" ? "Open" : "Play";
+        void Go()
+        {
+            if (onLink != null) onLink(abs);
+            else if (u != null) Engine.Engine.OpenExternally(u);
+        }
+
+        System.Windows.Controls.Button b;
+        if (kind == "video")
+        {
+            // a frame of the video's shape, dark as a player is, its play button in the middle, its name at its foot
+            var circle = new Grid { Width = 56, Height = 56, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            circle.Children.Add(new System.Windows.Shapes.Ellipse { Fill = K.Brush(Color.FromArgb(235, 255, 255, 255)) });
+            var play = K.Icon(Wpf.Ui.Controls.SymbolRegular.Play24, 24, Color.FromRgb(0x1c, 0x1c, 0x1e), filled: true);
+            play.Margin = new Thickness(3, 0, 0, 0); // (the triangle's weight sits left of its box: set right by eye)
+            circle.Children.Add(play);
+            var grow = new ScaleTransform(1, 1);
+            circle.RenderTransformOrigin = new Point(0.5, 0.5);
+            circle.RenderTransform = grow;
+            var title = new TextBlock { Text = name, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis };
+            var sub = new TextBlock { Text = line, FontSize = 12, Foreground = K.Brush(Color.FromArgb(200, 255, 255, 255)), TextTrimming = TextTrimming.CharacterEllipsis };
+            var foot = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(16, 0, 16, 12), Children = { title, sub } };
+            var frame = new Grid
+            {
+                MinHeight = 140,
+                Background = new LinearGradientBrush(Color.FromRgb(0x2c, 0x2c, 0x30), Color.FromRgb(0x10, 0x10, 0x12), 90),
+                Children = { circle, foot },
+            };
+            frame.SizeChanged += (_, e) =>
+            {
+                if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) < 0.5) return;
+                frame.Height = Math.Round(e.NewSize.Width * 9 / 16);
+                frame.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, frame.Height), 8, 8);
+            };
+            b = K.Subtle(frame, Go, new Thickness(0), 8);
+            b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            // (the play button leans in a little under the pointer: quick, and only where Windows' animations are on)
+            b.MouseEnter += (_, _) => { if (Motion.On) { Motion.To(grow, ScaleTransform.ScaleXProperty, 1.06, Motion.Normal, Motion.Out); Motion.To(grow, ScaleTransform.ScaleYProperty, 1.06, Motion.Normal, Motion.Out); } };
+            b.MouseLeave += (_, _) => { if (Motion.On) { Motion.To(grow, ScaleTransform.ScaleXProperty, 1, Motion.Normal, Motion.Out); Motion.To(grow, ScaleTransform.ScaleYProperty, 1, Motion.Normal, Motion.Out); } };
+        }
+        else
+        {
+            // a row: its symbol on a tile, its name over what it is, and Play or Open at its end
+            var tile = K.IconTile(kind == "audio" ? Wpf.Ui.Controls.SymbolRegular.MusicNote224 : Wpf.Ui.Controls.SymbolRegular.Globe24, Support.Appearance.Accent, 36);
+            var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 12, 0) };
+            words.Children.Add(K.Text(name, Ty.BodyStrong));
+            words.Children.Add(K.Text(line, Ty.Caption, B.Text2));
+            var act = K.Text(verb, Ty.Body, B.AccentText).Strong();
+            act.VerticalAlignment = VerticalAlignment.Center;
+            var row = K.Columns("auto, *, auto", tile.Col(0), words.Col(1), act.Col(2));
+            var card = new Border { Child = row, Padding = new Thickness(12, 10, 16, 10), CornerRadius = new CornerRadius(8) }.Bg(B.Card).Stroke(B.CardStroke);
+            b = K.Subtle(card, Go, new Thickness(0), 8);
+            b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        }
+        b.Cursor = Cursors.Hand;
+        b.ToolTip = $"{verb} in a window of its own";
+        System.Windows.Automation.AutomationProperties.SetName(b, $"{verb} {word.ToLowerInvariant()}: {name}");
+        // (as wide as the text's column, up to 560, at its left)
+        var holder = new Grid();
+        holder.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = 560 });
+        holder.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(b, 0);
+        holder.Children.Add(b);
+        return holder;
+    }
+
+    /// <summary>What a frame set in the text is called: Canvas's player says "Video player for jump.mp4" (→ "jump.mp4");
+    /// else the frame's own title, its file's name, or its site.</summary>
+    private static string MediaName(Node n, Uri? u)
+    {
+        var title = (n.Attrs.GetValueOrDefault("title") ?? "").Trim();
+        var player = System.Text.RegularExpressions.Regex.Match(title, @"^(?:video|audio|media)\s+player\s+for\s+(.+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (player.Success) return player.Groups[1].Value.Trim();
+        if (title.Length > 0) return title;
+        if (u != null)
+        {
+            var last = Uri.UnescapeDataString(u.Segments.LastOrDefault()?.Trim('/') ?? "");
+            if (System.IO.Path.HasExtension(last)) return last;
+            return u.Host;
+        }
+        return "Embedded content";
+    }
 
     private static string Collapse(string s)
     {

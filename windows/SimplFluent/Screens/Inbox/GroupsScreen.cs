@@ -13,31 +13,18 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Screens;
 
 /// <summary>
-/// Groups (the Mac's GroupsView): the student's groups — the current ones, then the past ones — each a card washed in
-/// its course's colour, with its course and how many are in it, that opens the group's own home. On a wide page, more to
-/// a row (cards 300 to 460 wide). A right-click opens it, opens it in Canvas or copies its link.
+/// Groups (the Mac's GroupsView): the student's groups — the current ones, then the past ones, each heading with how
+/// many it holds (no count again under the title) — each a card washed in its course's colour, with its course by name
+/// (its code in the tooltip) and how many are in it, that opens the group's own home. On a wide page, more to a row
+/// (cards 300 to 460 wide). A right-click opens it, opens it in Canvas or copies its link.
 /// </summary>
 public sealed class GroupsScreen : Screen
 {
     private readonly Loader<GroupsData> model;
-    private string? lastSubtitle;
 
     public GroupsScreen(Engine.Engine engine) : base(engine) { model = Watch(new Loader<GroupsData>()); }
 
     public override string Title => "Groups";
-
-    /// <summary>Under the title: how many current and past ("2 current · 1 past").</summary>
-    public override string? Subtitle
-    {
-        get
-        {
-            if (model.Data is not { } d) return null;
-            var parts = new List<string>();
-            if (d.Current.Count > 0) parts.Add($"{d.Current.Count} current");
-            if (d.Past.Count > 0) parts.Add($"{d.Past.Count} past");
-            return string.Join(" · ", parts);
-        }
-    }
 
     public override FrameworkElement? Commands => InboxUi.CanvasMenu(engine, () => "/groups", () => "Groups");
 
@@ -52,10 +39,9 @@ public sealed class GroupsScreen : Screen
 
     protected override FrameworkElement Build()
     {
-        if (Subtitle != lastSubtitle) { lastSubtitle = Subtitle; HeaderChange(); }
         if (model.Data is not { } d) return K.LoadState(model.Error, () => model.Reload(engine, "groups"));
         if (d.Current.Count == 0 && d.Past.Count == 0)
-            return new Grid { MinHeight = 360, Children = { InboxUi.Unavailable(SymbolRegular.PeopleTeam24, "No Groups", d.Empty ?? "You are not in any groups.") } };
+            return new Grid { MinHeight = 360, Children = { InboxUi.Unavailable(SymbolRegular.PeopleTeam24, "No groups", d.Empty ?? "You are not in any groups.") } };
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         if (d.Current.Count > 0) page.Children.Add(Section("Current", d.Current));
         if (d.Past.Count > 0) page.Children.Add(Section("Past", d.Past));
@@ -91,21 +77,30 @@ public sealed class GroupsScreen : Screen
     }
 
     /// <summary>
-    /// A group as a card (the Mac's GroupsCard): its symbol on its course's colour, its name, its course (with the
-    /// colour's dot) and how many are in it, a chevron — the card washed in the colour from its left.
+    /// A group as a card (the Mac's GroupsCard): its symbol on its course's colour, its name, its course by name — cut
+    /// short with an ellipsis where it is long, whole in its tooltip with its code ("ASRS") — with the colour's dot, how
+    /// many are in it, a chevron; the card washed in the colour from its left. The group's home names the course the same
+    /// way.
     /// </summary>
     private Button Card(GroupRow g)
     {
         var color = K.Hex(g.Color);
-        // its line in parts ("BIO 101 · 4 members")
+        // its line in parts ("Academic Success Resource Site (2026-27) · 4 members")
         var parts = (g.Sub ?? "").Split(" · ", StringSplitOptions.RemoveEmptyEntries);
         var members = parts.FirstOrDefault(p => p.Contains("member"));
-        var course = parts.FirstOrDefault(p => !p.Contains("member"));
+        var course = g.Course is { Length: > 0 } named ? named : parts.FirstOrDefault(p => !p.Contains("member"));
 
         var name = K.Wrapped(g.Name, Ty.BodyLarge, B.Text, 2);
         name.FontWeight = FontWeights.SemiBold;
         var words = K.V(5, name);
-        if (course != null) words.Children.Add(K.H(6, K.Dot(color, 8), K.Text(course, Ty.Body, B.Text2)));
+        if (course != null)
+        {
+            var courseText = K.Text(course, Ty.Body, B.Text2);
+            var courseLine = K.Columns("auto, *", K.Dot(color, 8).Margin(0, 0, 6, 0).Col(0), courseText.Col(1));
+            courseLine.ToolTip = g.CourseCode is { Length: > 0 } code ? $"{course} ({code})" : course;
+            courseLine.Background = Brushes.Transparent; // (the whole line answers the pointer, not only its letters)
+            words.Children.Add(courseLine);
+        }
         if (members != null) words.Children.Add(K.H(6, K.Icon(SymbolRegular.People24, 14, B.Text2), K.Text(members, Ty.Body, B.Text2)));
         words.VerticalAlignment = VerticalAlignment.Center;
         var row = K.Columns("auto, *, auto",
@@ -139,7 +134,7 @@ public sealed class GroupsScreen : Screen
             m.Items.Add(InboxUi.Item("Open", SymbolRegular.Open24, () => engine.Go(Place.Home($"groups/{id}"))));
             m.Items.Add(new Separator());
             m.Items.Add(InboxUi.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen($"/groups/{id}", g.Name)));
-            m.Items.Add(InboxUi.Item("Copy Link", SymbolRegular.Link24, () => InboxUi.CopyLink(engine, $"/groups/{id}")));
+            m.Items.Add(InboxUi.Item("Copy link", SymbolRegular.Link24, () => InboxUi.CopyLink(engine, $"/groups/{id}")));
             InboxUi.Open(m, b, atPointer: true);
         };
         return b;

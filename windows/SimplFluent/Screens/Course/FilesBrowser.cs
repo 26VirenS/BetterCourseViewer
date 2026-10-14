@@ -25,9 +25,9 @@ public sealed class FolderScreen : CoursePartScreen
 /// A folder of a course's or a group's files (the Mac's FilesBrowser; its root is Files): the folders in it, each
 /// opening its own list, then its files with their Explorer icon, kind, size and date. On a wide page the list keeps the
 /// left and the file picked is shown on the right as it is — drawn by Windows' own renderers, fetched the moment it is
-/// picked — with Open, Open With… and Download over it: a click picks a file, a double-click (or Space, or Enter) opens
+/// picked — with Open, Open with… and Download over it: a click picks a file, a double-click (or Space, or Enter) opens
 /// it in its app, ↑ ↓ walk the files. On a narrower page a click opens a file at once. A locked file is listed, not
-/// opened. Every file's menu: Open in its app, Open With…, Download, Open in Canvas, Copy Link.
+/// opened. Every file’s menu: Open in its app, Open with…, Download, Open in Canvas, Copy link.
 /// </summary>
 internal sealed class CourseFilesPart : CoursePart
 {
@@ -180,7 +180,7 @@ internal sealed class CourseFilesPart : CoursePart
         CourseKit.Menu(g, items =>
         {
             items.Add(CourseKit.MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(page, f.Name)));
-            items.Add(CourseKit.MenuEntry("Copy Link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, page)));
+            items.Add(CourseKit.MenuEntry("Copy link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, page)));
         });
         return g;
     }
@@ -202,7 +202,7 @@ internal sealed class CourseFilesPart : CoursePart
         var words = K.V(2, nameText);
         if (!string.IsNullOrEmpty(f.Sub)) words.Children.Add(K.Text(f.Sub!, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var kind = K.Text(locked ? "Locked" : CourseFiles.Kind(f.Name, f.Kind), Ty.Caption, B.Text2);
+        var kind = K.Text(locked ? "Locked" : CourseFiles.Kind(f.Name, f.Kind, f.TypeText), Ty.Caption, B.Text2);
         kind.VerticalAlignment = VerticalAlignment.Center;
         var g = K.Columns("auto, *, auto", box.Margin(0, 0, 12, 0).Col(0), words.Col(1), kind.Margin(8, 0, 0, 0).Col(2));
         return (g, nameText);
@@ -213,11 +213,11 @@ internal sealed class CourseFilesPart : CoursePart
     private void FileMenu(ItemCollection items, string url, string fileName, string page)
     {
         items.Add(CourseKit.MenuEntry(CourseFiles.OpenTitle(fileName), SymbolRegular.Open24, () => OpenFile(url, fileName)));
-        items.Add(CourseKit.MenuEntry("Open With…", SymbolRegular.AppGeneric24, () => OpenWith(url, fileName)));
+        items.Add(CourseKit.MenuEntry("Open with…", SymbolRegular.AppGeneric24, () => OpenWith(url, fileName)));
         items.Add(CourseKit.MenuEntry("Download", SymbolRegular.ArrowDownload24, () => Download(url, fileName)));
         items.Add(new Separator());
         items.Add(CourseKit.MenuEntry($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(page, fileName)));
-        items.Add(CourseKit.MenuEntry("Copy Link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, page)));
+        items.Add(CourseKit.MenuEntry("Copy link", SymbolRegular.Link24, () => CourseKit.CopyLink(engine, page)));
     }
 
     /// <summary>The row picked: the accent's wash under it (deeper while the list has the keyboard), its name in bold.</summary>
@@ -238,7 +238,7 @@ internal sealed class CourseFilesPart : CoursePart
         {
             var v = K.V(12,
                 K.Icon(SymbolRegular.DocumentSearch24, 40, B.Text3),
-                K.Text("No File Selected", Ty.Subtitle).Center(),
+                K.Text("No file selected", Ty.Subtitle).Center(),
                 K.Wrapped("Click a file to see it here. Double-click it, or press Space, to open it in its app.", Ty.Body, B.Text2).Center());
             v.MaxWidth = 340;
             v.HorizontalAlignment = HorizontalAlignment.Center;
@@ -255,13 +255,13 @@ internal sealed class CourseFilesPart : CoursePart
     private FrameworkElement PaneHead(FileRow f, string u)
     {
         var title = K.Wrapped(f.Name, Ty.BodyLarge, B.Text, 2);
-        var line = string.Join(" · ", new[] { CourseFiles.Kind(f.Name, f.Kind), f.Sub ?? "" }.Where(s => s.Length > 0));
+        var line = string.Join(" · ", new[] { CourseFiles.Kind(f.Name, f.Kind, f.TypeText), f.Sub ?? "" }.Where(s => s.Length > 0));
         var words = K.V(3, title, K.Text(line, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         var top = K.Columns("auto, *", CourseFiles.Icon(f.Name, 44).Margin(0, 0, 14, 0).Col(0), words.Col(1));
         var open = K.Button(CourseFiles.OpenTitle(f.Name), () => OpenFile(u, f.Name), accent: true, icon: SymbolRegular.Open24);
         open.ToolTip = $"Open {f.Name} in the app Windows has for it (Enter)";
-        var with = K.Button("Open With…", () => OpenWith(u, f.Name), icon: SymbolRegular.AppGeneric24);
+        var with = K.Button("Open with…", () => OpenWith(u, f.Name), icon: SymbolRegular.AppGeneric24);
         with.ToolTip = $"Choose the app to open {f.Name} in";
         var download = K.Button("Download", () => Download(u, f.Name), icon: SymbolRegular.ArrowDownload24);
         download.ToolTip = $"Save a copy of {f.Name} in Downloads";
@@ -286,16 +286,16 @@ internal sealed class CourseFilesPart : CoursePart
         return new Grid { Children = { v } };
     }
 
-    /// <summary>Why there is nothing to see (the Mac's "No Preview"), and what can be done: Try Again, or open it.</summary>
+    /// <summary>Why there is nothing to see (the Mac's "No Preview", in Windows' sentence case), and what can be done: Try Again, or open it.</summary>
     private FrameworkElement NoPreview(string why, bool retry, Action? open = null, string? openLabel = null)
     {
         var v = K.V(12,
             K.Icon(SymbolRegular.Warning24, 36, B.Text3),
-            K.Text("No Preview", Ty.Subtitle).Center(),
+            K.Text("No preview", Ty.Subtitle).Center(),
             K.Wrapped(why, Ty.Body, B.Text2).Center());
         if (retry)
         {
-            var again = K.Button("Try Again", () => { previewError = null; previewPath = null; LoadPreview(); });
+            var again = K.Button("Try again", () => { previewError = null; previewPath = null; LoadPreview(); });
             again.HorizontalAlignment = HorizontalAlignment.Center;
             v.Children.Add(again);
         }
@@ -408,7 +408,7 @@ internal sealed class CourseFilesPart : CoursePart
         catch (Exception e) { Failed(fileName, e.Message); }
     }
 
-    /// <summary>A copy kept in Downloads, then said so — with Show in Folder (the Mac's toast of a file kept).</summary>
+    /// <summary>A copy kept in Downloads, then said so — with Show in folder (the Mac's toast of a file kept).</summary>
     private async void Download(string url, string fileName)
     {
         Note(K.Columns("auto, *", K.Spinner(16).Margin(0, 0, 10, 0).Col(0), K.Text($"Saving {fileName} to Downloads…", Ty.Body, B.Text2).Col(1)), false);
@@ -418,7 +418,7 @@ internal sealed class CourseFilesPart : CoursePart
             var kept = K.Columns("auto, *, auto, auto",
                 K.Icon(SymbolRegular.CheckmarkCircle24, 18, CourseKit.Green, filled: true).Margin(0, 0, 10, 0).Col(0),
                 K.Wrapped($"Saved {System.IO.Path.GetFileName(path)} to Downloads", Ty.Body).Col(1),
-                K.Button("Show in Folder", () => CourseFiles.Reveal(path), icon: SymbolRegular.FolderOpen24).Margin(12, 0, 0, 0).Col(2),
+                K.Button("Show in folder", () => CourseFiles.Reveal(path), icon: SymbolRegular.FolderOpen24).Margin(12, 0, 0, 0).Col(2),
                 K.IconButton(SymbolRegular.Dismiss24, ClearNote, "Close", 14, 32).Margin(4, 0, 0, 0).Col(3));
             Note(kept, true);
             var shown = note.Content;

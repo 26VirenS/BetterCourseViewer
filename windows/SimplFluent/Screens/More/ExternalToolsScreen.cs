@@ -54,6 +54,8 @@ public sealed partial class ExternalToolsScreen : Screen
     private sealed class Soonest
     {
         public string Title { get; set; } = "";
+        /// <summary>(2.99.33) Its title with the tool's name taken off ("Unit 2" for "Knewton Alta: Unit 2").</summary>
+        public string? Short { get; set; }
         public string? Sub { get; set; }
         public string? Course { get; set; }
     }
@@ -78,6 +80,8 @@ public sealed partial class ExternalToolsScreen : Screen
         public string Kind { get; set; } = "";
         public string Id { get; set; } = "";
         public string Title { get; set; } = "";
+        /// <summary>(2.99.33) Its title with the tool's name taken off ("Unit 2").</summary>
+        public string? Short { get; set; }
         public string? Due { get; set; }
         public string? Sub { get; set; }
         public Simpl.Models.Status? Status { get; set; }
@@ -152,7 +156,7 @@ public sealed partial class ExternalToolsScreen : Screen
         if (d.Rows.Count == 0)
         {
             CloseList();
-            return MoreKit.Unavailable(SymbolRegular.PuzzlePiece24, "No External Tools", d.Empty ?? "None of your courses has an external tool.", 420);
+            return MoreKit.Unavailable(SymbolRegular.PuzzlePiece24, "No external tools", d.Empty ?? "None of your courses has an external tool.", 420);
         }
         var shown = Filtered(d.Rows);
         if (shown.Count == 0)
@@ -191,7 +195,13 @@ public sealed partial class ExternalToolsScreen : Screen
     /// </summary>
     private FrameworkElement Card(Tool t)
     {
-        var words = K.V(2, K.Wrapped(t.Name, Ty.BodyStrong, B.Text, 2));
+        // (the tool's name the card's strongest words — a size up from the body, semibold — over its course chips, which
+        //  are regular: a wall of course names must not outweigh what the card is about)
+        var name = K.Wrapped(t.Name, Ty.BodyStrong, B.Text, 2);
+        name.FontSize = 16;
+        name.LineHeight = 22;
+        name.MaxHeight = 2 * 22 + 1;
+        var words = K.V(2, name);
         if (!string.IsNullOrEmpty(t.Host)) words.Children.Add(K.Text(t.Host, Ty.Caption, B.Text2));
         words.Children.Add(K.Wrapped(WhereFound(t), Ty.Caption, B.Text2, 2));
         var head = K.Columns("auto, *", Monogram(t, 40).Margin(0, 0, 12, 0).Col(0), words.Col(1));
@@ -231,21 +241,17 @@ public sealed partial class ExternalToolsScreen : Screen
     }
 
     /// <summary>The next of the tool's work still to do, on a quiet wash across the card: its course's dot, its title, and
-    /// — after "Next" in the accent's colour — when it is due, in which course.</summary>
+    /// — after the Next pill its list wears too — when it is due, in which course.</summary>
     private static FrameworkElement NextLine(Tool t, Soonest n)
     {
         var dot = K.Dot(K.Hex(t.Courses.FirstOrDefault(c => c.Name == n.Course)?.Color, Gray), 8);
         dot.VerticalAlignment = VerticalAlignment.Top;
         dot.Margin = new Thickness(0, 6, 10, 0);
-        var title = K.Text(Short(t, n.Title), Ty.Body);
-        var line = K.Text("", Ty.Caption, B.Text2);
-        line.Inlines.Clear();
-        var next = new Run("Next") { FontWeight = FontWeights.SemiBold };
-        next.SetResourceReference(TextElement.ForegroundProperty, B.AccentText);
-        line.Inlines.Add(next);
+        var title = K.Text(n.Short is { Length: > 0 } s ? s : Short(t, n.Title), Ty.Body);
         // (when it is due, without its points: the line is about what comes next)
         var when = string.Join(" · ", new[] { (n.Sub ?? "").Split(" · ")[0], n.Course }.Where(s => !string.IsNullOrEmpty(s)));
-        if (when.Length > 0) line.Inlines.Add(new Run(" · " + when));
+        var line = K.Columns("auto, *", K.Chip("Next", Appearance.Accent, strong: true).Margin(0, 0, 6, 0).Col(0), K.Text(when, Ty.Caption, B.Text2).Col(1));
+        line.Margin = new Thickness(0, 2, 0, 0);
         var well = new Border
         {
             Child = K.Columns("auto, *", dot.Col(0), K.V(1, title, line).Col(1)),
@@ -280,16 +286,17 @@ public sealed partial class ExternalToolsScreen : Screen
         return wrap;
     }
 
-    /// <summary>A course the tool is in: its dot, its name (what room there is), and the arrow of a thing that opens
-    /// elsewhere. A press opens the tool there (on a card that opens a list, that press is the chip's alone).</summary>
+    /// <summary>A course the tool is in: its dot, its name (what room there is, in regular weight under the tool's name),
+    /// and the symbol of a Simpl window of its own — the one the tool opens in (a course's More and a module's tool wear it
+    /// too; ↗ would say it leaves for the browser). A press opens the tool there (on a card that opens a list, that press
+    /// is the chip's alone).</summary>
     private FrameworkElement CoursePill(Tool t, Course c)
     {
         var name = K.Text(c.Name, Ty.Caption);
-        name.FontWeight = FontWeights.Medium;
         var row = K.Columns("auto, *, auto",
             K.Dot(K.Hex(c.Color), 7).Margin(0, 0, 6, 0).Col(0),
             name.Col(1),
-            K.Icon(SymbolRegular.ArrowUpRight20, 10, B.Text2).Margin(6, 0, 0, 0).Col(2));
+            CourseKit.OwnWindowMark(11, B.Text2).Margin(6, 0, 0, 0).Col(2));
         // (K.Subtle marks its press handled: the card round it is not pressed, nor opened, by it)
         var b = K.Subtle(row, () => { CloseList(); Open(t, c); }, new Thickness(10, 5, 10, 6), 12);
         b.SetResourceReference(Control.BackgroundProperty, B.Subtle3);

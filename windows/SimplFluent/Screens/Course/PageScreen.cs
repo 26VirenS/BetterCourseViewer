@@ -46,8 +46,15 @@ public sealed class PageScreen : Screen
 
     public override string Title => data.Data?.Title is { Length: > 0 } t ? t : "Page";
 
-    /// <summary>Its course, and when it was last edited and by whom (the Mac's subtitle and the line under its heading).</summary>
+    /// <summary>Its course, and when it was last edited and by whom (the Mac's subtitle and the line under its heading);
+    /// the shell drops the course where the breadcrumb names it already.</summary>
     public override string? Subtitle => data.Data is { } d ? string.Join(" · ", new[] { d.Context, d.Edited }.Where(s => !string.IsNullOrEmpty(s))) : null;
+
+    /// <summary>A page's long name wraps to three lines before it is cut.</summary>
+    public override int TitleLines => 3;
+
+    /// <summary>Its course's colour, in the square before its title.</summary>
+    public override System.Windows.Media.Color? TitleColor => Support.Appearance.Hex(data.Data?.Color) ?? CourseKit.ContextColor(engine, ctx);
 
     /// <summary>The page's own address on the school's site (the front page's, when it has no name).</summary>
     private string CanvasPath
