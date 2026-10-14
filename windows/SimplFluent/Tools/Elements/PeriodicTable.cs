@@ -398,7 +398,9 @@ internal sealed class PeriodicTableTool : Grid
         hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.", Ty.Body, B.Text2);
         tablePage = ToolKit.Page(K.V(14, offerHost, top, colourRow, trendGrid, hint));
         tablePage.SizeChanged += (_, _) => FitTable();
-        foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint, grid }) part.SizeChanged += (_, _) => FitTable();
+        foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint }) part.SizeChanged += (_, _) => FitTable();
+        // (and after every layout that changes what the page holds or shows: the table then takes up the difference)
+        tablePage.ScrollChanged += (_, e) => { if (e.ExtentHeightChange != 0 || e.ViewportHeightChange != 0) FitTable(); };
 
         Children.Add(pagesBar.Row(0));
         Children.Add(tablePage.Row(1));
@@ -446,19 +448,27 @@ internal sealed class PeriodicTableTool : Grid
     {
         var view = tablePage.ViewportHeight;
         if (view <= 0) return;
-        double others;
-        // (once laid out, what the page holds besides the table is measured whole — the scroller's extent less the table:
-        //  its key, its colourings, its trends, its line and the room between them — so the table takes exactly the
-        //  rest, never a little more than shows; before that, the parts are added up)
+        var least = 30 * (9 + PTGrid.GapRow) + 8 * grid.Gap;
+        double h;
         if (tablePage.ExtentHeight > 0 && grid.ActualHeight > 0)
-            others = tablePage.ExtentHeight - grid.ActualHeight + 2;
+        {
+            // (once laid out, the table grows or shrinks by what the page is over or under its room — the scroller's
+            //  extent against what it shows, measured, not added up from its parts — so it ends filling the page exactly,
+            //  whatever else the page holds; a table held by its width, not its height, is left as it is)
+            var spare = view - tablePage.ExtentHeight;
+            if (Math.Abs(spare) <= 2) return;
+            if (spare > 0 && grid.ActualHeight < grid.MaxHeight - 2) return;
+            h = grid.ActualHeight + spare - 1;
+        }
         else
         {
+            // (before that, what is above and below it added up)
             static double Part(FrameworkElement e) => e.Visibility == Visibility.Collapsed ? 0 : e.ActualHeight + e.Margin.Top + e.Margin.Bottom + 14;
-            others = Part(offerHost) + Part(top) + Part(colourRow) + Part(hint) + (across.Visibility == Visibility.Collapsed ? 0 : across.ActualHeight + across.Margin.Bottom)
-                     + tablePage.Padding.Top + tablePage.Padding.Bottom + 2;
+            var others = Part(offerHost) + Part(top) + Part(colourRow) + Part(hint) + (across.Visibility == Visibility.Collapsed ? 0 : across.ActualHeight + across.Margin.Bottom)
+                         + tablePage.Padding.Top + tablePage.Padding.Bottom + 2;
+            h = view - others;
         }
-        var h = Math.Max(30 * (9 + PTGrid.GapRow) + 8 * grid.Gap, view - others);
+        h = Math.Max(least, h);
         if (double.IsInfinity(grid.MaxHeight) || Math.Abs(grid.MaxHeight - h) > 1) grid.MaxHeight = h;
     }
 

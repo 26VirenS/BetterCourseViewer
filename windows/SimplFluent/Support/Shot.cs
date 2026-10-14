@@ -98,10 +98,14 @@ public static class Shot
         return false;
     }
 
-    /// <summary>The app's frontmost window (Settings, a popup window, else the main one) with its menus and flyouts over it.</summary>
+    /// <summary>The app's frontmost window (Settings, a popup window, else the main one) with its menus and flyouts over it.
+    /// With none of them active — another copy of Simpl, started beside it, has the focus — the one opened last: a place
+    /// in a window of its own has no owner, and would otherwise lose to the main window.</summary>
     public static void Take(string file)
     {
-        var w = Application.Current.Windows.OfType<Window>().Where(x => x.IsVisible).OrderByDescending(x => x.IsActive).ThenByDescending(x => x.Owner != null).FirstOrDefault()
+        var w = Application.Current.Windows.OfType<Window>().Select((x, i) => (Window: x, Order: i)).Where(x => x.Window.IsVisible)
+                    .OrderByDescending(x => x.Window.IsActive).ThenByDescending(x => x.Window.Owner != null).ThenByDescending(x => x.Order)
+                    .Select(x => x.Window).FirstOrDefault()
                 ?? Application.Current.MainWindow;
         if (w == null) return;
         var hwnd = new WindowInteropHelper(w).Handle;

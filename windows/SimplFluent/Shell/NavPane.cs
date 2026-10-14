@@ -218,10 +218,12 @@ public sealed class NavList : Grid
             {
                 shownKey = key;
                 // (once the pane has settled — its foot and its rows laid out — and with a little room round it, so the row
-                //  is never left half under the foot; only when the choice moved, so a pane scrolled by hand stays put)
+                //  is never left half under the foot; only when the choice moved, so a pane scrolled by hand stays put. The
+                //  row is looked up then, not now: the rows may be built again meanwhile, as counts and sections arrive)
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
                 {
-                    if (row.IsVisible) row.BringIntoView(new Rect(0, -8, row.ActualWidth, row.ActualHeight + 16));
+                    if (selected != null && rows.TryGetValue(selected, out var shown) && shown.IsVisible)
+                        shown.BringIntoView(new Rect(0, -8, shown.ActualWidth, shown.ActualHeight + 16));
                 });
             }
         }
