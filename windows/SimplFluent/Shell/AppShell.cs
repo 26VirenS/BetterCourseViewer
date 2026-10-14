@@ -425,9 +425,24 @@ public sealed partial class AppShell : Grid, IDisposable
             for (var i = 0; i < 60 && current == null; i++) await Task.Delay(250);
             await Task.Delay(1200);
             for (var i = 0; i < 50 && FlatResources.Copying; i++) await Task.Delay(100);
+            // (a narrow window's pane: once it is open over the page and has slid in)
+            for (var i = 0; i < 40 && narrow && !paneOpen; i++) await Task.Delay(250);
+            if (narrow) await Task.Delay(600);
             if (disposed) return;
+            // (scrolled, its item pressed, and the pane scrolled again over the next two seconds whenever something has laid
+            //  it out afresh at its top meanwhile — the narrow pane's picture, and once Help's, showed its first rows; where
+            //  it ended said for the suite's check)
             navScroll.ScrollToEnd();
+            await Task.Delay(250);
             if (asked.TrimStart(':') is { Length: > 0 } kind && more!.Items.FirstOrDefault(i => i.Kind == kind) is { } it) nav.Press("more:" + it.Id);
+            for (var i = 0; i < 8; i++)
+            {
+                if (disposed) return;
+                if (navScroll.VerticalOffset < navScroll.ScrollableHeight - 1) navScroll.ScrollToEnd();
+                await Task.Delay(250);
+            }
+            navScroll.UpdateLayout();
+            Log.Write($"more from canvas: the pane scrolled to {navScroll.VerticalOffset:0} of {navScroll.ScrollableHeight:0}");
         }
         finally { Shot.Ended(); }
     }
