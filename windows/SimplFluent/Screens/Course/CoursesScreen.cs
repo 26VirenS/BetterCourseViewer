@@ -101,7 +101,7 @@ public sealed class CoursesScreen : Screen
                 SubtitleChanged();
             };
             // (a symbol of its own — the pane it fills —, not the checklist To Do and the quizzes wear)
-            var choose = K.Button("Choose courses", engine.AskSetup, icon: SymbolRegular.PanelLeftText24);
+            var choose = K.Button("Choose courses", engine.AskSetup, icon: SymbolRegular.PanelLeft24);
             choose.ToolTip = "Choose the courses in the navigation pane";
             return commands = K.H(12, selector, choose);
         }

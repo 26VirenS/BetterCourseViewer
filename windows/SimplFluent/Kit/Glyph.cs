@@ -16,7 +16,7 @@ public static class Glyph
         "modules" => SymbolRegular.Stack24,
         "pages" => SymbolRegular.DocumentOnePage24,
         "files" => SymbolRegular.Folder24,
-        "quizzes" => SymbolRegular.Quiz24, // (its own symbol: the checklist is To Do's)
+        "quizzes" => SymbolRegular.DocumentQuestionMark24, // (its own symbol, a question paper: the checklist is To Do’s)
         "people" or "groups" => SymbolRegular.People24,
         "syllabus" => SymbolRegular.BookOpen24,
         "calendar" => SymbolRegular.CalendarLtr24,
@@ -39,7 +39,7 @@ public static class Glyph
     /// <summary>A piece of work by its kind ("assignment", "quiz", "discussion", …).</summary>
     public static SymbolRegular Work(string? kind) => (kind ?? "").ToLowerInvariant() switch
     {
-        "quiz" or "quizzes" => SymbolRegular.Quiz24,
+        "quiz" or "quizzes" => SymbolRegular.DocumentQuestionMark24,
         "discussion" or "discussion_topic" => SymbolRegular.ChatMultiple24,
         "announcement" => SymbolRegular.Megaphone24,
         "page" or "wiki_page" => SymbolRegular.DocumentOnePage24,

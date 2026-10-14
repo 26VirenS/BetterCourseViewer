@@ -36,7 +36,7 @@ internal static class CourseKit
     public static SymbolRegular Item(string? type) => type switch
     {
         "Assignment" or "assignment" => SymbolRegular.DocumentText24,
-        "Quiz" or "quiz" => SymbolRegular.Quiz24, // (its own: the checklist is To Do's)
+        "Quiz" or "quiz" => SymbolRegular.DocumentQuestionMark24, // (its own, a question paper: the checklist is To Do’s)
         "Discussion" or "discussion" or "discussion_topic" => SymbolRegular.ChatMultiple24,
         "Page" or "page" => SymbolRegular.DocumentOnePage24,
         "File" or "file" => SymbolRegular.Document24,
@@ -410,7 +410,7 @@ internal static class CourseKit
         {
             var (label, icon) = (r.Kind ?? "").ToLowerInvariant() switch
             {
-                "quiz" => ("Take quiz", SymbolRegular.Quiz24),
+                "quiz" => ("Take quiz", SymbolRegular.DocumentQuestionMark24),
                 "discussion" or "discussion_topic" => ("Reply", SymbolRegular.Chat24),
                 "tool" => ("Open", SymbolRegular.PuzzlePiece24),
                 _ => ("Hand in", SymbolRegular.ArrowUpload24),
