@@ -51,6 +51,10 @@ struct CEScaleBar: View {
     var others: [Double] = [0.1, 0.2, 0.5, 2, 20, 50, 100]
     var badge: String? = nil
 
+    /// The room the bar takes at the bottom of a scene, with its padding: kept clear of the scene's labels
+    /// (BioSceneView's labelBottom), so a label in the left column never sits under it.
+    static let room: CGFloat = 58
+
     var length: Double? {
         guard pointsPerUnit > 0, pointsPerUnit.isFinite else { return nil }
         if let l = preferred.first(where: { (60...160).contains($0 * pointsPerUnit) }) { return l }

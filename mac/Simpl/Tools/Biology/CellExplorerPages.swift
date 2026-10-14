@@ -48,7 +48,8 @@ struct CEComparePage: View {
                                      guard let id, id.hasPrefix("cell:"), let k = CEKind(rawValue: String(id.dropFirst(5))) else { return }
                                      BioNav.shared.set(.cell, k.rawValue)
                                  },
-                                 onScale: { scale = $0 })
+                                 onScale: { scale = $0 },
+                                 labelBottom: CEScaleBar.room)
                     CEScaleBar(pointsPerUnit: scale).padding(14).allowsHitTesting(false)
                 }
             }
@@ -131,6 +132,26 @@ struct CEMembranePage: View {
     @State private var scale = 0.0
     @State private var hovered: String?
     @State private var showPOPC = false
+    /// The launch's state has been told on the console (the screenshot suite's).
+    @State private var launchTold = false
+
+    /// (-SimplTool cell -SimplToolState membrane:select=integral:channel:osmosis …) The page starts as its launch asks —
+    /// select=, osmosis, still (no carrier motion), nolabels, popc — from its first frame, in any page made for it (as the
+    /// cells' pages do: CECellPage.init). Nothing a launch sets is remembered.
+    init(state: BioLaunchState?) {
+        self.state = state
+        guard let s = state, s.page == "membrane" else { return }
+        if s.has("osmosis") { _osmosis = State(initialValue: true) }
+        if s.has("still") { _transport = State(initialValue: false) }
+        if s.has("nolabels") { _labels = State(initialValue: false) }
+        if s.has("popc") { _showPOPC = State(initialValue: true) }
+        // ("select=integral:channel" arrives split at its colon: the parts after "select=" rejoined)
+        if let i = s.parts.firstIndex(where: { $0.lowercased().hasPrefix("select=") }) {
+            var id = String(s.parts[i].dropFirst("select=".count))
+            if i + 1 < s.parts.count, CEMembrane.part(id + ":" + s.parts[i + 1]) != nil { id += ":" + s.parts[i + 1] }
+            if CEMembrane.part(id) != nil { _selection = State(initialValue: id.hasPrefix("side:") ? id : "part:" + id) }
+        }
+    }
 
     private var dark: Bool { scheme == .dark }
     private var anim: Animation? { reduceMotion ? nil : Motion.gentle }
@@ -233,7 +254,8 @@ struct CEMembranePage: View {
                                  + (selectedPart.map { "; selected: \(CEPart.inSentence($0.name))" } ?? ""),
                              onPick: { id in withAnimation(anim) { selection = id.flatMap { CEMembranePage.partID($0) }.map { $0.hasPrefix("side:") ? $0 : "part:" + $0 } } },
                              onHover: { hovered = $0 },
-                             onScale: { scale = $0 })
+                             onScale: { scale = $0 },
+                             labelBottom: CEScaleBar.room)
                 CEScaleBar(pointsPerUnit: scale, unit: "nm", preferred: [5, 10, 20], others: [1, 2, 50]).padding(14).allowsHitTesting(false)
                 VStack {
                     if let h = hovered.flatMap({ CEMembranePage.partID($0) }).flatMap({ CEMembrane.part($0) }) {
@@ -301,21 +323,11 @@ struct CEMembranePage: View {
         withAnimation(anim) { selection = id.hasPrefix("side:") ? id : "part:" + id }
     }
 
-    /// (-SimplTool cell -SimplToolState membrane:select=integral:channel:osmosis …) Once: select=, osmosis, still (no
-    /// carrier motion), nolabels, popc.
+    /// (the screenshot suite) The launch's state told on the console as the page shows it (init sets it).
     private func applyLaunch() {
-        guard let s = state, !CENav.shared.applied.contains("page.membrane"), s.page == "membrane" else { return }
-        CENav.shared.applied.insert("page.membrane")
-        if s.has("osmosis") { osmosis = true }
-        if s.has("still") { transport = false }
-        if s.has("nolabels") { labels = false }
-        if s.has("popc") { showPOPC = true }
-        // ("select=integral:channel" arrives split at its colon: the parts after "select=" rejoined)
-        if let i = s.parts.firstIndex(where: { $0.lowercased().hasPrefix("select=") }) {
-            var id = String(s.parts[i].dropFirst("select=".count))
-            if i + 1 < s.parts.count, CEMembrane.part(id + ":" + s.parts[i + 1]) != nil { id += ":" + s.parts[i + 1] }
-            if CEMembrane.part(id) != nil { select(id) }
-        }
+        guard OpenClock.verbose, !launchTold, let s = state else { return }
+        launchTold = true
+        NSLog("[Simpl] bio launch: cell %@ on the membrane page: osmosis %@, selected %@", s.raw, osmosis ? "on" : "off", selection ?? "none")
     }
 }
 

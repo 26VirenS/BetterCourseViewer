@@ -68,6 +68,8 @@ struct BioSceneView: View {
     /// Points on the screen per scene unit at the framed ball's centre, told when the camera's zoom changes it — for a
     /// scale bar.
     var onScale: ((Double) -> Void)? = nil
+    /// Room kept clear of labels along the bottom (a scale bar over the scene's corner): the label columns end above it.
+    var labelBottom: CGFloat = 0
 
     @StateObject private var live = BioSceneLive()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -76,7 +78,8 @@ struct BioSceneView: View {
         ZStack(alignment: .topLeading) {
             BioSceneRepresentable(key: key, build: build, extras: extras, selection: selection, showLabels: showLabels,
                                   turning: turning && !reduceMotion, frameKey: frameKey, reset: reset, zoom: zoom, dimOthers: dimOthers,
-                                  reduceMotion: reduceMotion, live: live, pick: pick, doubleClick: doubleClick, hover: onHover, scale: onScale)
+                                  reduceMotion: reduceMotion, live: live, pick: pick, doubleClick: doubleClick, hover: onHover, scale: onScale,
+                                  labelBottom: labelBottom)
             if showLabels {
                 BioLabelsOverlay(live: live, reduceMotion: reduceMotion, pick: pick)
             }
@@ -181,7 +184,9 @@ struct BioLabelsOverlay: View {
                 }
             }
             .allowsHitTesting(false)
-            ForEach(live.labels, id: \.id) { l in
+            // (by id and words: two labels can name one object — a β-strand and the C-terminus in it — and a ForEach
+            // given the same id twice drew one capsule, leaving the other's leader line pointing at nothing)
+            ForEach(live.labels, id: \.key) { l in
                 let f = l.frame
                 Button { pick(l.id) } label: {
                     Text(l.text)
@@ -207,8 +212,13 @@ struct BioLabelsOverlay: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: live.labels.map(\.id))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.12), value: live.labels.map(\.key))
     }
+}
+
+extension BioLabelPlacement {
+    /// What tells one placed label from another: its object and its words.
+    var key: String { id + "\u{1F}" + text }
 }
 
 // MARK: - The SceneKit view
@@ -283,6 +293,7 @@ struct BioSceneRepresentable: NSViewRepresentable {
     let doubleClick: (String?) -> Void
     var hover: ((String?) -> Void)? = nil
     var scale: ((Double) -> Void)? = nil
+    var labelBottom: CGFloat = 0
 
     func makeCoordinator() -> BioSceneCoordinator { BioSceneCoordinator(live: live) }
 
@@ -430,8 +441,17 @@ final class BioSceneCoordinator: NSObject {
             guard let self, self.buildingKey == key else { return }
             self.live.building = true
         }
+        // (the screenshot suite's picture waits for the scene, as it waits for the page's answers: a large cell takes
+        // seconds in a debug build, and a picture taken sooner showed an empty card with its spinner — Support/Shot.swift)
+        Shot.began()
+        let started = Date()
         Task { [weak self] in
             let made = await Task.detached(priority: .userInitiated) { build.make() }.value
+            if OpenClock.verbose {
+                NSLog("[Simpl] bio scene: %@ made in %d ms, %d objects", String(key.prefix(90)),
+                      Int(Date().timeIntervalSince(started) * 1000), made.items.count)
+            }
+            Shot.ended()
             guard let self, self.buildingKey == key else { return }
             self.apply(made, key: key)
         }
@@ -762,8 +782,9 @@ final class BioSceneCoordinator: NSObject {
         let pc = v.projectPoint(SCNVector3(CGFloat(c3.x), CGFloat(c3.y), CGFloat(c3.z)))
         let pe = v.projectPoint(SCNVector3(CGFloat(e3.x), CGFloat(e3.y), CGFloat(e3.z)))
         let r = hypot(Double(pe.x - pc.x), Double(pe.y - pc.y))
+        // (the columns end above any room the tool keeps clear at the bottom: its scale bar's)
         let out = BioLabelLayout.layout(inputs, cx: Double(pc.x), cy: screenY(pc.y), r: min(r, Double(v.bounds.width) * 0.32),
-                                        width: Double(v.bounds.width), height: h)
+                                        width: Double(v.bounds.width), height: max(h - Double(config?.labelBottom ?? 0), h * 0.6))
         if out.placed != live.labels { live.labels = out.placed }
         if out.more != live.more { live.more = out.more }
     }

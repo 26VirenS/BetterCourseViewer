@@ -94,13 +94,54 @@ struct CECellPage: View {
     @State private var wobbleSerial = 0
     @State private var madeSet: String?
     @FocusState private var listFocused: Bool
+    /// The launch's state has been told on the console (the screenshot suite's).
+    @State private var launchTold = false
 
     init(kind: CEKind, state: BioLaunchState?) {
         self.kind = kind
         self.state = state
         // (the parts hidden: as last left, else the "(Nice)" parts that start off)
         let saved = BioPrefs.string(.cell, "hidden.\(kind.rawValue)")
-        let initial = saved.map { Set($0.split(separator: ",").map(String.init)) } ?? Set(CEParts.all(kind).filter { !$0.defaultVisible }.map(\.id))
+        var initial = saved.map { Set($0.split(separator: ",").map(String.init)) } ?? Set(CEParts.all(kind).filter { !$0.defaultVisible }.map(\.id))
+        // (-SimplTool cell -SimplToolState animal:select=mito:explode=0.5 …: the page starts as its launch asks — nocut,
+        // nolabels, true, gram+, explode=, show=a,b, select=, isolate=, inside=, quiz=find|name — from its first frame, in
+        // any page made for it. Applied once as a page appeared, a launch's state was lost when the page was made again,
+        // and its pictures showed the cell as it opens. Nothing a launch sets is remembered.)
+        if let s = state, s.page == kind.rawValue || s.value("Cell")?.lowercased() == kind.rawValue {
+            if s.has("nocut") { _cutaway = State(initialValue: false) }
+            if s.has("cutaway") { _cutaway = State(initialValue: true) }
+            if s.has("nolabels") { _labels = State(initialValue: false) }
+            if s.has("true") { _trueScale = State(initialValue: true) }
+            if s.has("teaching") { _trueScale = State(initialValue: false) }
+            if s.has("gram+") || s.value("gram")?.lowercased() == "positive" { _gramPositive = State(initialValue: true) }
+            if let e = s.value("explode"), let x = Double(e) {
+                _explode = State(initialValue: min(max(x, 0), 1))
+                _framedExplode = State(initialValue: min(max(x, 0), 1))
+            }
+            if let show = s.value("show") { for p in show.split(separator: ",") { initial.remove(String(p)) } }
+            if let p = s.value("select"), CEParts.part(kind, p) != nil { _selection = State(initialValue: "organelle:\(p)") }
+            if let p = s.value("isolate"), CEParts.part(kind, p) != nil {
+                _selection = State(initialValue: "organelle:\(p)")
+                _isolate = State(initialValue: p)
+            }
+            if let p = s.value("inside"), CEScene.canLookInside(p), CEParts.part(kind, p) != nil {
+                _selection = State(initialValue: "organelle:\(p)")
+                _isolate = State(initialValue: p)
+                _lookInside = State(initialValue: true)
+            }
+            if let q = s.value("quiz") {
+                let mode: CEQuiz.Mode = q.lowercased() == "name" ? .name : .find
+                let hiddenNow = initial
+                let ids = CEParts.all(kind).filter { $0.defaultVisible && !hiddenNow.contains($0.id) && $0.id != "cytoplasm" }.map(\.id)
+                var g = SystemRandomNumberGenerator()
+                let quiz = CEQuiz(mode: mode, kind: kind, parts: ids, using: &g)
+                _quiz = State(initialValue: quiz)
+                _quizGlow = State(initialValue: mode == .name ? quiz.current.map { "organelle:\($0.part)" } : nil)
+                _selection = State(initialValue: nil)
+                _isolate = State(initialValue: nil)
+                _lookInside = State(initialValue: false)
+            }
+        }
         _hidden = State(initialValue: initial)
     }
 
@@ -150,7 +191,9 @@ struct CECellPage: View {
         .onAppear(perform: applyLaunch)
         .task(id: optionsKey) {
             let o = options
+            Shot.began() // (the screenshot suite's picture waits for the cell, Support/Shot.swift)
             let built = await Task.detached(priority: .userInitiated) { CEBuildCache.shared.model(o) }.value
+            Shot.ended()
             model = built
         }
         .onExitCommand { pick(nil) }
@@ -327,7 +370,8 @@ struct CECellPage: View {
                              onPick: pick,
                              onDoubleClick: doubleClick,
                              onHover: { hovered = $0 },
-                             onScale: { scale = $0 })
+                             onScale: { scale = $0 },
+                             labelBottom: CEScaleBar.room)
                 CEScaleBar(pointsPerUnit: scale, badge: trueScale ? nil : "Not to scale")
                     .padding(14)
                     .allowsHitTesting(false)
@@ -648,32 +692,17 @@ struct CECellPage: View {
 
     // MARK: The launch's state
 
-    /// (-SimplTool cell -SimplToolState animal:select=mito:explode=0.5 …) Applied once: nocut, nolabels, true, gram+,
-    /// explode=, show=a,b, select=, isolate=, inside=, quiz=find|name. Nothing a launch sets is remembered.
+    /// A part a Compare row asked for, selected; and (the screenshot suite) the launch's state told on the console as
+    /// the page shows it — the state itself is the page's from its first frame (init).
     private func applyLaunch() {
         if let p = CENav.shared.pending, p.kind == kind {
             CENav.shared.pending = nil
             hidden.remove(p.part)
             selection = "organelle:\(p.part)"
         }
-        let key = "page.\(kind.rawValue)"
-        guard let s = state, !CENav.shared.applied.contains(key), s.page == kind.rawValue || s.value("Cell")?.lowercased() == kind.rawValue else { return }
-        CENav.shared.applied.insert(key)
-        if s.has("nocut") { cutaway = false }
-        if s.has("cutaway") { cutaway = true }
-        if s.has("nolabels") { labels = false }
-        if s.has("true") { trueScale = true }
-        if s.has("teaching") { trueScale = false }
-        if s.has("gram+") || s.value("gram")?.lowercased() == "positive" { gramPositive = true }
-        if let e = s.value("explode"), let x = Double(e) { explode = min(max(x, 0), 1); framedExplode = explode }
-        if let show = s.value("show") { for p in show.split(separator: ",") { hidden.remove(String(p)) } }
-        if let sel = s.value("select"), CEParts.part(kind, sel) != nil { selection = "organelle:\(sel)" }
-        if let iso = s.value("isolate"), CEParts.part(kind, iso) != nil { selection = "organelle:\(iso)"; isolate = iso }
-        if let ins = s.value("inside"), CEScene.canLookInside(ins), CEParts.part(kind, ins) != nil {
-            selection = "organelle:\(ins)"
-            isolate = ins
-            lookInside = true
-        }
-        if let q = s.value("quiz") { startQuiz(q.lowercased() == "name" ? .name : .find) }
+        guard OpenClock.verbose, !launchTold, let s = state else { return }
+        launchTold = true
+        NSLog("[Simpl] bio launch: cell %@ on the %@ page: scale %@, cutaway %@, explode %.2f, selected %@, quiz %@", s.raw, kind.rawValue,
+              trueScale ? "true" : "teaching", cutaway ? "on" : "off", explode, selection ?? "none", quiz.map { $0.mode.rawValue } ?? "none")
     }
 }
