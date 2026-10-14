@@ -91,12 +91,13 @@ struct LevelTrack: View {
     }
 }
 
-/// "Your mark", on the criterion's colour.
+/// "Your mark", on the criterion's colour — (planning-5) "Your mark · 4 pts" where the points given are not the level's.
 struct YourMark: View {
     let colour: RingRGB
+    var text = "Your mark"
 
     var body: some View {
-        Text("Your mark")
+        Text(text)
             .font(.sCaption.weight(.semibold))
             .foregroundStyle(colour.ink)
             .padding(.horizontal, 7)
@@ -268,7 +269,7 @@ struct RubricGrid: View {
                         .font(.sCaption)
                         .foregroundStyle(.secondary)
                 }
-                if mark { YourMark(colour: colour) }
+                if mark { YourMark(colour: colour, text: c.markText) }
                 if !main.isEmpty {
                     Text(main)
                         .font(mark ? Font.sCallout.weight(.semibold) : Font.sCallout)

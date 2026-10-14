@@ -434,6 +434,15 @@ struct RingGeometry {
         return c.levels.isEmpty ? c.score != nil : c.mark == i
     }
 
+    /// (planning-5) Where the points given sit on the bar when they are not the given level's (a marker picked Partial,
+    /// 3 pts, and gave 4): the mark's dot goes there, where the bar's colour stops; nil otherwise.
+    func markY(_ k: Int, foot: Double) -> Double? {
+        guard model.graded, k >= 0, k < n else { return nil }
+        let c = model.criteria[k]
+        guard c.adjusted, let s = c.score, !c.levels.isEmpty else { return nil }
+        return min(max(barY(k, s, max(0, c.mark), foot), RingUnits.barTop), foot)
+    }
+
     /// Where a level sits on its bar: by points, the best at the top (evenly in order where there are none to go by).
     private func barY(_ k: Int, _ p: Double?, _ i: Int, _ foot: Double) -> Double {
         let c = model.criteria[k]
@@ -449,25 +458,40 @@ struct RingGeometry {
         return foot - (foot - top) * (p - lo) / (hi - lo)
     }
 
-    /// The levels at the height of their points; where two rows would overlap they are pushed apart (a leader joins
-    /// each moved row to its tick), and at the foot back up. `heights` are the rows' own, in the stage's units.
-    func places(_ k: Int, foot: Double, heights: [Double]) -> [BarPlace] {
+    /// The levels' ticks at the height of their points, and (planning-20) their rows stacked one under the next from
+    /// the top — a leader joins each row to its tick — so the room goes to the words, not to gaps between the rows; at
+    /// the foot they are pushed back up. `heights` are the rows' own, in the stage's units; `top` is where the first
+    /// row may start (under the criterion's whole description, where it is shown).
+    func places(_ k: Int, foot: Double, heights: [Double], top: Double? = nil) -> [BarPlace] {
         let ls = levels(k)
         guard !ls.isEmpty else { return [] }
         let want = ls.indices.map { barY(k, ls[$0].pts, $0, foot) }
         let hs = ls.indices.map { $0 < heights.count ? heights[$0] : 46 }
         var ys = want
+        if let top { ys[0] = max(ys[0], top + hs[0] / 2) }
         for i in ys.indices.dropFirst() {
-            ys[i] = max(ys[i], ys[i - 1] + hs[i - 1] / 2 + 6 + hs[i] / 2)
+            ys[i] = ys[i - 1] + hs[i - 1] / 2 + 8 + hs[i] / 2
         }
         let last = ys.count - 1
         if ys[last] + hs[last] / 2 > foot + 30 {
             ys[last] = foot + 30 - hs[last] / 2
             for i in stride(from: last - 1, through: 0, by: -1) {
-                ys[i] = min(ys[i], ys[i + 1] - hs[i + 1] / 2 - 6 - hs[i] / 2)
+                ys[i] = min(ys[i], ys[i + 1] - hs[i + 1] / 2 - 8 - hs[i] / 2)
             }
         }
         return ls.indices.map { BarPlace(tick: want[$0], row: ys[$0], picked: picked(k, $0)) }
+    }
+
+    /// (planning-20) Where the rows may start under the criterion's whole description (`head`: how tall the head is
+    /// with all of it, in the stage's units), when they still fit above the bar's foot that way; nil when the head keeps
+    /// its two lines and More.
+    func fullHeadTop(_ k: Int, foot: Double, heights: [Double], head: Double?) -> Double? {
+        guard let head, head > 0 else { return nil }
+        let ls = levels(k)
+        let hs = ls.indices.map { $0 < heights.count ? heights[$0] : 46 }
+        let rows = hs.reduce(0, +) + 8 * Double(max(0, hs.count - 1))
+        let top = 24 + head + 14
+        return top + rows <= foot + 30 ? top : nil
     }
 
     // MARK: The labels
@@ -519,6 +543,8 @@ struct RingPainter {
     /// A bar's unearned stretch.
     private static let track = RingRGB(r: 72, g: 72, b: 74)
     private static let tickFill = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
+    /// The dark ground round the ring, for the gaps between its slices.
+    private static let seamFill = Color(red: 18 / 255, green: 18 / 255, blue: 20 / 255)
 
     func paint(_ ctx: inout GraphicsContext, scale: CGFloat) {
         guard geo.n > 0, pose.sel >= 0, pose.sel < geo.n else { return }
@@ -623,6 +649,31 @@ struct RingPainter {
             dc.opacity = groupA * dotA * span(local, 0.5, 1)
             dc.fill(disc(d, r), with: .color(tones[k].color))
         }
+        // (planning-19) a gap where one criterion's slice meets the next, once the ring has bloomed: each reads as a
+        // piece of its own to pick, not one band of colour
+        let seamA = span(bloom, 0.85, 1)
+        if n > 1 && seamA > 0 {
+            var sc = ctx
+            sc.opacity = groupA * seamA
+            for k in 0..<n where !(moving && (k == pose.sel || k == (pose.sel + 1) % n)) { seam(sc, k) }
+        }
+    }
+
+    /// The ring's ground showing through where slice `k` starts, across the band.
+    private func seam(_ ctx: GraphicsContext, _ k: Int) {
+        let m = geo.model
+        let th = m.starts[k]
+        let b = m.between(th)
+        let thick = m.blend(m.thick, b)
+        let rad = RingUnits.radius + m.blend(go, b) - (thick - 10) / 2
+        let sn = sin(th)
+        let cs = cos(th)
+        let r0 = rad - thick / 2 - 3
+        let r1 = rad + thick / 2 + 3
+        var line = Path()
+        line.move(to: CGPoint(x: RingUnits.cx + r0 * sn, y: RingUnits.cy - r0 * cs))
+        line.addLine(to: CGPoint(x: RingUnits.cx + r1 * sn, y: RingUnits.cy - r1 * cs))
+        ctx.stroke(line, with: .color(RingPainter.seamFill), lineWidth: 3)
     }
 
     private func restSlice(_ ctx: GraphicsContext, _ k: Int, sweep: Double, grow: Double) {
@@ -797,6 +848,9 @@ struct RingPainter {
             }
         }
         let mine = geo.model.colors[pose.sel].color
+        // (planning-5) points given apart from the level's: the level keeps a ring of its colour, and the white dot —
+        // the mark — stands at the points given, where the bar's colour stops
+        let given = geo.markY(pose.sel, foot: pose.foot)
         for (i, p) in places.enumerated() {
             let x = Double(i)
             let a = span(u, 0.8 + 0.04 * x, 0.96 + 0.04 * x) * span(w, 0.3 + 0.06 * x, 0.8 + 0.06 * x)
@@ -804,9 +858,15 @@ struct RingPainter {
             let z = 0.2 + 0.8 * a
             var ctx = base
             ctx.opacity = a
-            let dot = disc(CGPoint(x: bx, y: p.tick), (p.picked ? 8 : 5.5) * z)
-            ctx.fill(dot, with: .color(p.picked ? Color.white : RingPainter.tickFill))
+            let full = p.picked && given == nil
+            let dot = disc(CGPoint(x: bx, y: p.tick), (full ? 8 : (p.picked ? 6.5 : 5.5)) * z)
+            ctx.fill(dot, with: .color(full ? Color.white : RingPainter.tickFill))
             ctx.stroke(dot, with: .color(p.picked ? mine : Color.white.opacity(0.82)), lineWidth: 2.5 * z)
+            if p.picked, let y = given {
+                let mark = disc(CGPoint(x: bx, y: y), 8 * z)
+                ctx.fill(mark, with: .color(Color.white))
+                ctx.stroke(mark, with: .color(mine), lineWidth: 2.5 * z)
+            }
         }
     }
 }
@@ -859,7 +919,7 @@ private struct RingStageFrame: View {
     let spun: Double
 
     var body: some View {
-        BarMeasure(geo: geo, k: pose.sel, width: BarSide.rowWidth(scale))
+        BarMeasure(geo: geo, k: pose.sel, width: BarSide.rowWidth(scale), scale: scale)
             .frame(width: CGFloat(RingUnits.width) * scale, height: CGFloat(RingUnits.height) * scale, alignment: .topLeading)
             .overlayPreferenceValue(BarRowHeights.self) { measured in
                 content(measured)
@@ -869,7 +929,11 @@ private struct RingStageFrame: View {
     private func content(_ measured: [Int: CGFloat]) -> some View {
         let tones = geo.tones(pose.g)
         let go = geo.bends(pose.g)
-        let places = geo.places(pose.sel, foot: pose.foot, heights: unitHeights(measured))
+        let heights = unitHeights(measured)
+        // (planning-20) the criterion's whole description where the rows still fit under it
+        let head = measured[pose.sel * 1000 + BarMeasure.headKey].flatMap { scale > 0 ? Double($0 / scale) : nil }
+        let top = geo.fullHeadTop(pose.sel, foot: pose.foot, heights: heights, head: head)
+        let places = geo.places(pose.sel, foot: pose.foot, heights: heights, top: top)
         let painter = RingPainter(geo: geo, pose: pose, tones: tones, fracs: geo.fracs(pose.g), go: go, places: places)
         return ZStack(alignment: .topLeading) {
             Canvas { ctx, _ in painter.paint(&ctx, scale: scale) }
@@ -877,7 +941,7 @@ private struct RingStageFrame: View {
                 .accessibilityHidden(true)
             RingLabels(geo: geo, pose: pose, go: go, tones: tones, motion: motion, scale: scale)
             RingCentre(model: geo.model, pose: pose, tones: tones, scale: scale)
-            BarSide(geo: geo, pose: pose, places: places, motion: motion, scale: scale, spun: spun)
+            BarSide(geo: geo, pose: pose, places: places, motion: motion, scale: scale, spun: spun, fullHead: top != nil)
         }
         .frame(width: CGFloat(RingUnits.width) * scale, height: CGFloat(RingUnits.height) * scale, alignment: .topLeading)
     }
@@ -891,19 +955,33 @@ private struct RingStageFrame: View {
     }
 }
 
-/// The open criterion's rows, unseen, each saying how tall it stands at the bar's width.
+/// The open criterion's rows, unseen, each saying how tall it stands at the bar's width; and (planning-20) its head
+/// with the whole description, saying how tall that stands (under `headKey`).
 private struct BarMeasure: View {
     let geo: RingGeometry
     let k: Int
     let width: CGFloat
+    let scale: CGFloat
+
+    /// The head's height's key, after the criterion's rows' (criterion × 1000 + level).
+    static let headKey = 999
 
     var body: some View {
         let levels = geo.levels(k)
         let lines = BarLevelRow.lines(levels.count)
         let tone = k >= 0 && k < geo.n ? geo.model.colors[k] : RingRGB.unmarked
         VStack(alignment: .leading, spacing: 0) {
+            if k >= 0 && k < geo.n {
+                BarHead(model: geo.model, k: k, tone: tone, scale: scale, full: true) { _ in }
+                    .frame(width: width, alignment: .topLeading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: BarRowHeights.self, value: [k * 1000 + BarMeasure.headKey: g.size.height])
+                    })
+            }
             ForEach(levels.indices, id: \.self) { i in
-                BarLevelRow(level: levels[i], picked: geo.picked(k, i), dim: false, tone: tone, lines: lines)
+                BarLevelRow(level: levels[i], picked: geo.picked(k, i), dim: false, tone: tone, lines: lines,
+                            mark: k >= 0 && k < geo.n ? geo.model.criteria[k].markText : "Your mark")
                     .frame(width: width, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .background(GeometryReader { g in
@@ -991,10 +1069,16 @@ private struct RingLabels: View {
             }
             .multilineTextAlignment(textAlign(spot.align))
             .fixedSize()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .contentShape(Rectangle())
             .shadow(color: Color.black.opacity(0.55), radius: 2, y: 1)
+            // (planning-19) a chip, lit under the pointer: the names read as what to click, not as captions
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background {
+                let chip = RoundedRectangle(cornerRadius: 9, style: .continuous)
+                chip.fill(Color.white.opacity(hot ? 0.15 : 0.07))
+                    .overlay(chip.strokeBorder(hot ? tones[k].color.opacity(0.7) : Color.white.opacity(0.12), lineWidth: 1))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { inside in
@@ -1072,7 +1156,8 @@ private struct RingCentre: View {
             Text(totalLine)
                 .font(.sCallout)
                 .foregroundStyle(Color.white.opacity(0.66))
-            Text("Pick a colour to open it")
+            // (planning-19) what to do, in words that match what is on the screen: the names round the ring
+            Text(model.graded ? "Click a criterion to see its levels and comment" : "Click a criterion to see its levels")
                 .font(.sCaption)
                 .foregroundStyle(Color.white.opacity(0.5))
                 .padding(.top, 8)
@@ -1096,8 +1181,8 @@ private struct RingCentre: View {
 // MARK: - The bar's side
 
 /// Beside the open criterion's bar: the way back (a little ring on top of the bar), which criterion this is with its
-/// name, description and the dots to switch, its levels at the height of their points (the one given marked), and the
-/// marker's note under them. It comes out from the bar once the bar is nearly straight, row by row.
+/// name, description and ‹ › to switch, its levels stacked with a leader to the height of their points (the one given
+/// marked), and the marker's note under them. It comes out from the bar once the bar is nearly straight, row by row.
 private struct BarSide: View {
     let geo: RingGeometry
     let pose: RingPose
@@ -1105,6 +1190,8 @@ private struct BarSide: View {
     let motion: RingMotion
     let scale: CGFloat
     let spun: Double
+    /// (planning-20) The rows stand under the whole description: show all of it.
+    var fullHead = false
 
     private func px(_ v: Double) -> CGFloat { CGFloat(v) * scale }
     private var rowWidth: CGFloat { BarSide.rowWidth(scale) }
@@ -1124,7 +1211,7 @@ private struct BarSide: View {
             rows(k, tone)
             note(k)
                 .opacity(headA)
-            BarHead(model: geo.model, k: k, tone: tone, scale: scale) { motion.select($0) }
+            BarHead(model: geo.model, k: k, tone: tone, scale: scale, full: fullHead) { motion.select($0) }
                 .frame(width: rowWidth, alignment: .topLeading)
                 .offset(x: px(RingUnits.rowsX), y: px(24) + CGFloat((1 - headA) * 8))
                 .opacity(headA)
@@ -1148,7 +1235,8 @@ private struct BarSide: View {
                 let i = key % 1000
                 let picked = geo.picked(k, i)
                 let a = rowAlpha(i)
-                BarLevelRow(level: levels[i], picked: picked, dim: marked && !picked, tone: tone, lines: lines)
+                BarLevelRow(level: levels[i], picked: picked, dim: marked && !picked, tone: tone, lines: lines,
+                            mark: geo.model.criteria[k].markText)
                     .frame(width: rowWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .opacity(a)
@@ -1177,13 +1265,16 @@ private struct BarSide: View {
     }
 }
 
-/// Which criterion is open: its colour, which of how many and its points, its name, its description (More shows the
-/// rest), and a dot per criterion to switch to another in place.
+/// Which criterion is open: its colour and its points, its name, its description (More shows the rest; all of it where
+/// the rows have room under it), and (planning-20) ‹ "1 of 2" › to switch to the one before or after, in place — each
+/// arrow naming where it goes.
 private struct BarHead: View {
     let model: RubricModel
     let k: Int
     let tone: RingRGB
     let scale: CGFloat
+    /// The whole description, with no More.
+    var full = false
     let select: (Int) -> Void
     @State private var more = false
 
@@ -1195,7 +1286,7 @@ private struct BarHead: View {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(tone.color)
                         .frame(width: 10, height: 10)
-                    Text("Criterion \(k + 1) of \(model.n) · \(model.pointsLabel(c))".uppercased())
+                    Text(model.n > 1 ? model.pointsLabel(c).uppercased() : "Criterion · \(model.pointsLabel(c))".uppercased())
                         .font(.sCaption.weight(.semibold))
                         .tracking(0.6)
                         .foregroundStyle(Color.white.opacity(0.64))
@@ -1207,27 +1298,27 @@ private struct BarHead: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
-                if !c.desc.isEmpty { description(c.desc, lines: c.name.count > 44 ? 1 : 2) } // (a long name: a line less, clear of the top level)
+                if !c.desc.isEmpty { description(c.desc, lines: full ? nil : (c.name.count > 44 ? 1 : 2)) } // (a long name: a line less, clear of the top level)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            PillFlow(spacing: 2, lineSpacing: 2) {
-                ForEach(model.criteria, id: \.index) { other in dot(other) }
+            if model.n > 1 {
+                stepper
             }
-            .frame(width: 150 * scale, alignment: .trailing)
         }
         .contentShape(Rectangle()) // (a press on the head is not a press beside the bar)
         .shadow(color: Color.black.opacity(0.6), radius: 6)
         .onChange(of: k) { _, _ in more = false }
     }
 
-    private func description(_ text: String, lines: Int) -> some View {
+    /// The criterion's description: `lines` of it with More for the rest, or (nil) all of it.
+    private func description(_ text: String, lines: Int?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(text)
                 .font(.sCallout)
                 .foregroundStyle(Color.white.opacity(0.8))
                 .lineLimit(lines)
                 .fixedSize(horizontal: false, vertical: true)
-            if text.count > lines * 66 {
+            if let lines, text.count > lines * 66 {
                 Button {
                     more = true
                 } label: {
@@ -1254,38 +1345,45 @@ private struct BarHead: View {
         .frame(maxWidth: 470 * scale, alignment: .leading)
     }
 
-    /// A dot per criterion in its colour, the open one larger in a ring of its colour; a press switches to it.
-    private func dot(_ other: RubricModel.Criterion) -> some View {
-        let on = other.index == k
+    /// (planning-20) ‹ "1 of 2" › in glass: the criterion before and after, each arrow saying which it opens (← and →
+    /// too). It replaced a dot per criterion, too small to find and to hit.
+    private var stepper: some View {
         let n = model.n
-        let d: CGFloat = on ? (n > 10 ? 11 : 14) : (n > 15 ? 6 : (n > 10 ? 8 : 11))
-        let hit: CGFloat = n > 15 ? 17 : 23
-        let colour = model.colors[other.index].color
-        return Button {
+        let before = model.criteria[(k - 1 + n) % n]
+        let after = model.criteria[(k + 1) % n]
+        return HStack(spacing: 0) {
+            arrow("chevron.left", to: before, word: "Previous", key: "←")
+            Text("\(k + 1) of \(n)")
+                .font(.sCallout.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Color.white.opacity(0.88))
+                .fixedSize()
+                .padding(.horizontal, 2)
+                .accessibilityLabel("Criterion \(k + 1) of \(n)")
+            arrow("chevron.right", to: after, word: "Next", key: "→")
+        }
+        .padding(.horizontal, 3)
+        .glass(Capsule())
+        .fixedSize()
+    }
+
+    private func arrow(_ symbol: String, to other: RubricModel.Criterion, word: String, key: String) -> some View {
+        Button {
             select(other.index)
         } label: {
-            Circle()
-                .fill(colour)
-                .frame(width: d, height: d)
-                .overlay {
-                    if on {
-                        Circle()
-                            .strokeBorder(colour, lineWidth: 2)
-                            .frame(width: d + 8, height: d + 8)
-                    }
-                }
-                .frame(width: hit, height: hit)
+            Image(systemName: symbol)
+                .font(.sCallout.weight(.bold))
+                .foregroundStyle(Color.white.opacity(0.92))
+                .frame(width: 32, height: 32)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(other.name)
-        .accessibilityLabel("\(other.name), criterion \(other.index + 1) of \(n)")
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .help("\(word): \(other.name) (\(key))")
+        .accessibilityLabel("\(word) criterion: \(other.name)")
     }
 }
 
-/// A level of the open criterion: its points in the criterion's colour, its name ("Your mark" on the one given) and
-/// what it asks for, on a card of its own beside the bar.
+/// A level of the open criterion: its points in the criterion's colour, its name ("Your mark" on the one given — with
+/// the points given where they are not the level's) and what it asks for, on a card of its own beside the bar.
 private struct BarLevelRow: View {
     let level: RubricModel.Level
     let picked: Bool
@@ -1293,6 +1391,8 @@ private struct BarLevelRow: View {
     let tone: RingRGB
     /// How many lines of what it asks for (fewer as the levels crowd the bar; none at all past six).
     let lines: Int
+    /// The badge on the one given ("Your mark", "Your mark · 4 pts").
+    var mark = "Your mark"
 
     private static let ground = RingRGB(r: 24, g: 24, b: 27)
 
@@ -1312,7 +1412,7 @@ private struct BarLevelRow: View {
                         .foregroundStyle(dim ? Color.white.opacity(0.62) : Color.white)
                         .lineLimit(2)
                     Spacer(minLength: 0)
-                    if picked { YourMark(colour: tone) }
+                    if picked { YourMark(colour: tone, text: mark) }
                 }
                 if lines > 0 && !level.text.isEmpty {
                     Text(level.text)

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // The rubric ring over the window (1.2.3): the web's rubric-ring.js overlay on the Mac. An assignment's page shows its
@@ -62,6 +63,8 @@ extension RubricPopup.Item {
 }
 
 /// The ring's layer over the whole window (MainShell): empty, and letting every press through, until a page asks.
+/// (planning-6) While the ring is up, MainShell rests everything under it, and the window's title is put away: the
+/// toolbar over the dark veil drew the covered page's title dark on black.
 struct RubricPopupLayer: View {
     @ObservedObject private var popup = RubricPopup.shared
 
@@ -73,6 +76,33 @@ struct RubricPopupLayer: View {
             }
         }
         .allowsHitTesting(popup.item != nil && !popup.leaving)
+        .background { RubricWindowTitle(hidden: popup.item != nil && !popup.leaving) }
+    }
+}
+
+/// The window's title put away while the rubric is up, and back as it was once it goes.
+private struct RubricWindowTitle: NSViewRepresentable {
+    let hidden: Bool
+
+    final class Probe: NSView {
+        /// The title's showing as it was before it was put away.
+        var was: NSWindow.TitleVisibility?
+    }
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ probe: Probe, context: Context) {
+        let hide = hidden
+        DispatchQueue.main.async {
+            guard let window = probe.window else { return }
+            if hide {
+                if probe.was == nil { probe.was = window.titleVisibility }
+                window.titleVisibility = .hidden
+            } else if let was = probe.was {
+                window.titleVisibility = was
+                probe.was = nil
+            }
+        }
     }
 }
 
@@ -221,8 +251,14 @@ struct RubricPopupView: View {
         return ZStack(alignment: .top) {
             header
                 .opacity(ring ? 1 : 0)
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 10) {
                 closeButton
+                // (planning-20) the way back from a criterion, in words, beside × (the little ring on the bar and Esc
+                // still go back too)
+                if ring && motion.target(.open) > 0.5 {
+                    backButton
+                        .transition(.opacity)
+                }
                 Spacer(minLength: 12)
                 RubricViewSwitch(view: Binding(get: { view }, set: { setView($0) }))
             }
@@ -245,6 +281,7 @@ struct RubricPopupView: View {
         .opacity(on ? 1 : 0)
         .animation(.easeOut(duration: 0.3).delay(on ? 0.1 : 0), value: on)
         .animation(Motion.gentle, value: ring)
+        .animation(reduceMotion ? nil : Motion.gentle, value: motion.target(.open) > 0.5)
     }
 
     private var header: some View {
@@ -283,6 +320,24 @@ struct RubricPopupView: View {
         .accessibilityLabel("Close the rubric")
     }
 
+    /// "‹ Ring": the open criterion's bar back into the ring.
+    private var backButton: some View {
+        Button {
+            motion.toRing()
+        } label: {
+            Label("Ring", systemImage: "chevron.left")
+                .font(.sCallout.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.9))
+                .padding(.horizontal, 14)
+                .frame(height: 38)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glass(Capsule(), interactive: true)
+        .help("Back to the ring (Esc)")
+        .accessibilityLabel("Back to the ring")
+    }
+
     /// Escape, wherever the keys are: the bar back into the ring, else the ring away.
     private var escapeKey: some View {
         Button("", action: escape)
@@ -307,12 +362,14 @@ struct RubricPopupView: View {
         return "\(many) · not graded yet"
     }
 
+    /// (planning-19, planning-20) What the picture shows, in words true to it — the controls say for themselves what
+    /// they do.
     private var footWords: String {
         if motion.target(.open) > 0.5 {
-            return "Height on the bar is points. Switch with the dots; the little ring at the top or Esc goes back."
+            return "The bar runs from 0 at its foot to the criterion’s full points; each level is marked at its points."
         }
-        if model.graded { return "The ring pushes out where you scored well and pulls in where you lost points." }
-        return "Each colour’s stretch is its share of the points. Pick one to open it."
+        if model.graded { return "Each criterion’s colour is its mark: green for full marks, yellow to orange for part marks, red where most was lost." }
+        return "Each criterion’s stretch is its share of the points. Click one to see its levels."
     }
 
     // MARK: Doing
