@@ -68,7 +68,8 @@ public sealed class CoursesScreen : Screen
     {
         data = Watch(new Loader<AllCoursesData>());
         progress = Watch(new Loader<Dictionary<string, CourseProgress>>());
-        filter = Prefs.String("coursesFilter") switch { "past" => 1, "future" => 2, _ => 0 };
+        // (the screenshot suite: --courses-filter past or future opens on that filter, the choice saved left as it is)
+        filter = (Launch.Take("", "courses-filter") ?? Prefs.String("coursesFilter")) switch { "past" => 1, "future" => 2, _ => 0 };
     }
 
     public override string Title => "Courses";
