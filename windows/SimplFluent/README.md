@@ -402,7 +402,9 @@ public sealed class TodoScreen : Screen
   reads 3:1 on it, else near-black — students pick their colours, and many are light. A course's second name is shown
   only when it says something new (the engine's `altName`, or `CourseKit.SaysMore`, its comparison); a list of work
   draws a chip only for news (Missing, Late, Submitted, a score — never "Not submitted"); what opens in a Simpl window
-  of its own ends in `CourseKit.OwnWindowMark()` (the window's symbol), never ↗.
+  of its own ends in `CourseKit.OwnWindowMark()` (the window's symbol), never ↗. All Courses' filter reads Current ·
+  Past · Future, the line under its title the engine's `subs` for the one chosen (`--courses-filter past` opens on
+  Past, for the pictures).
 - In the school's rich text (`Kit/RichText.cs`), a video, a sound or another page set in it (an iframe — Canvas's media
   player —, a video, an object) is drawn as what it is — a video as a 16:9 frame with its name ("Video player for
   jump.mp4" → "jump.mp4") and a play button, a sound or a page as a row — and played or opened in a window of its own;
