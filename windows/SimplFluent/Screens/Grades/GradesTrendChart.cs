@@ -12,18 +12,19 @@ namespace Simpl.Screens;
 /// <summary>
 /// The term GPA's history, kept by the page day by day once tracking is on (the Mac's TrendCard chart): a smooth line
 /// over its area in the accent, the goal as a dashed rule, faint rules at round GPAs along the right and the days along
-/// the foot. The pointer over it reads out that day's GPA in the card's heading, a rule and a dot marking the day.
+/// the foot. The pointer over it reads out that day's GPA in the card's heading as the engine writes it ("Oct 12 ·
+/// 3.43"), a rule and a dot marking the day.
 /// </summary>
 internal sealed class GradesTrendChart : Canvas
 {
     private const double RightRoom = 34, FootRoom = 20, TopRoom = 6;
-    private readonly List<(DateTime Day, double Gpa)> points;
+    private readonly List<(DateTime Day, double Gpa, string Label)> points;
     private readonly double low, high;
     private readonly TextBlock readout;
     private double goal;
     private int? hovered;
 
-    public GradesTrendChart(List<(DateTime Day, double Gpa)> points, double low, double high, double goal, TextBlock readout)
+    public GradesTrendChart(List<(DateTime Day, double Gpa, string Label)> points, double low, double high, double goal, TextBlock readout)
     {
         this.points = points;
         this.low = low;
@@ -53,7 +54,7 @@ internal sealed class GradesTrendChart : Canvas
     {
         if (hovered is { } i && i < points.Count)
         {
-            readout.Text = $"{points[i].Day.ToString("MMM d", CultureInfo.CurrentCulture)} · {points[i].Gpa.ToString("0.00", GradesKit.Inv)}";
+            readout.Text = points[i].Label;
             return;
         }
         var span = $"{low.ToString("0.00", GradesKit.Inv)} – {high.ToString("0.00", GradesKit.Inv)}";
@@ -101,7 +102,7 @@ internal sealed class GradesTrendChart : Canvas
         for (var k = 0; k < count; k++)
         {
             var day = points[0].Day.AddDays(Span * k / Math.Max(1, count - 1)).Date;
-            var label = K.Text(day.ToString("MMM d", CultureInfo.CurrentCulture), Ty.Caption, B.Text3);
+            var label = K.Text(day.ToString(day.Year == DateTime.Today.Year ? "MMM d" : "MMM d, yyyy", CultureInfo.InvariantCulture), Ty.Caption, B.Text3);
             label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var lw = label.DesiredSize.Width;
             SetLeft(label, Math.Clamp(X(day) - lw / 2, 0, Math.Max(0, pw - lw)));

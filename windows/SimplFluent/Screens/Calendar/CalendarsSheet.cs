@@ -76,7 +76,7 @@ internal static class CalendarsSheet
             foreach (var c in own) list.Children.Add(Row(c));
             if (other.Count > 0)
             {
-                list.Children.Add(K.Text("Other Calendars", Ty.Caption, B.Text2).Strong().Margin(0, own.Count == 0 ? 0 : 10, 0, 4));
+                list.Children.Add(K.Text("Other calendars", Ty.Caption, B.Text2).Strong().Margin(0, own.Count == 0 ? 0 : 10, 0, 4));
                 foreach (var c in other) list.Children.Add(Row(c));
             }
             body = new ScrollViewer

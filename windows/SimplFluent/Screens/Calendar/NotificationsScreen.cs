@@ -14,10 +14,11 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// Notifications (the Mac's NotificationsView): what is overdue, due soon, graded, commented on, said and announced, by
-/// day, with a filter by kind. A row opens its work and is marked read; under the pointer it offers Mark Read and Clear,
+/// day, with a filter by kind. A row opens its work and is marked read; under the pointer it offers Mark read and Clear,
 /// and its context menu has them too. Read and cleared marks stay on this PC; cleared ones can be brought back. (1.2) On a
-/// wide page the kinds sit down a side column with their counts, Mark all read, Clear all and Restore under them; on a
-/// narrow one they are a SelectorBar over the list (a drop-down when there is no room for every one).
+/// wide page the kinds sit down a side column with their counts, and Restore under them; on a narrow one they are a
+/// SelectorBar over the list (a drop-down when there is no room for every one). Mark all read and Clear all are the
+/// title's, at any width: one copy of each.
 /// </summary>
 public sealed class NotificationsScreen : Screen
 {
@@ -47,9 +48,9 @@ public sealed class NotificationsScreen : Screen
         {
             if (commands != null) return commands;
             markAllButton = K.Button("Mark all read", () => Mark("all", read: true), icon: SymbolRegular.MailRead24);
-            markAllButton.ToolTip = "Mark All Read";
+            markAllButton.ToolTip = "Mark every notification read";
             clearAllButton = K.Button("Clear all", ConfirmClear, icon: SymbolRegular.Delete24);
-            clearAllButton.ToolTip = "Clear All";
+            clearAllButton.ToolTip = "Clear every notification (they can be restored)";
             commands = K.H(8, markAllButton, clearAllButton);
             PaintCommands();
             return commands;
@@ -84,22 +85,17 @@ public sealed class NotificationsScreen : Screen
     // ---- the kinds ----
 
     /// <summary>(1.2) The kinds down the side: each with its symbol, its colour and how many there are, the one shown as
-    /// Windows marks a list's selection; under them, what can be done to them all.</summary>
+    /// Windows marks a list's selection; under them, Restore when something was cleared (Mark all read and Clear all are
+    /// the title's: not here again).</summary>
     private FrameworkElement Kinds(NotificationsData d)
     {
         var list = new Stack { Orientation = Orientation.Vertical, Spacing = 2 };
         list.Children.Add(KindRow("all", "All", SymbolRegular.Alert24, null, d.Total));
         foreach (var c in d.Cats) list.Children.Add(KindRow(c.Key, c.Label, Icon(c.Key), Tone(c.Key), c.Count));
-        var buttons = new Stack { Orientation = Orientation.Vertical, Spacing = 8 };
-        var mark = Wide2(K.Button("Mark all read", () => Mark("all", read: true), icon: SymbolRegular.MailRead24));
-        mark.IsEnabled = d.Unread > 0;
-        var clear = Wide2(K.Button("Clear all", ConfirmClear, icon: SymbolRegular.Delete24));
-        clear.IsEnabled = d.Total > 0;
-        buttons.Children.Add(mark);
-        buttons.Children.Add(clear);
+        var v = K.V(14, K.Card(list, new Thickness(6)));
         if (d.Cleared is > 0 and var n)
-            buttons.Children.Add(Wide2(K.Button($"Restore {n} cleared", () => Mark(Array.Empty<string>(), restore: true), icon: SymbolRegular.ArrowUndo24)));
-        return K.V(14, K.Card(list, new Thickness(6)), buttons);
+            v.Children.Add(Wide2(K.Button($"Restore {n} cleared", () => Mark(Array.Empty<string>(), restore: true), icon: SymbolRegular.ArrowUndo24)));
+        return v;
 
         static Wpf.Ui.Controls.Button Wide2(Wpf.Ui.Controls.Button b)
         {
@@ -190,33 +186,31 @@ public sealed class NotificationsScreen : Screen
     /// <summary>Nothing to show (the Mac's ContentUnavailableView).</summary>
     private static FrameworkElement Nothing(string text)
     {
-        var v = K.V(10, K.Icon(SymbolRegular.AlertOff24, 40, B.Text3), K.Text("Nothing Here", Ty.Subtitle).Center(), K.Wrapped(text, Ty.Body, B.Text2).Center());
+        var v = K.V(10, K.Icon(SymbolRegular.AlertOff24, 40, B.Text3), K.Text("Nothing here", Ty.Subtitle).Center(), K.Wrapped(text, Ty.Body, B.Text2).Center());
         v.HorizontalAlignment = HorizontalAlignment.Center;
         v.Margin = new Thickness(0, 30, 0, 30);
         return v;
     }
 
-    /// <summary>A notification: its kind's symbol on its colour, its title (heavier while unread, with the accent's dot),
-    /// its line and its kind; under the pointer, Mark Read and Clear at its end.</summary>
+    /// <summary>A notification: its kind's symbol on its colour, its title (heavier while unread, with the accent's dot)
+    /// and its line; under the pointer, Mark read and Clear at its end. The kind is said by its symbol alone — its word
+    /// is the symbol's tooltip and is spoken — so most rows are two lines.</summary>
     private FrameworkElement Row(NotifRow n)
     {
         var tone = Tone(n.Cat);
         var tile = K.IconTile(Icon(n.Cat), tone, 32);
         tile.VerticalAlignment = VerticalAlignment.Top;
+        tile.ToolTip = n.CatLabel;
         var title = K.Wrapped(n.Title, Ty.Body, B.Text, 2);
         if (!n.Read) title.FontWeight = FontWeights.SemiBold;
         var words = K.V(3, title);
         if (!string.IsNullOrEmpty(n.Sub)) words.Children.Add(K.Wrapped(n.Sub!, Ty.Body, B.Text2, 3));
-        var kind = K.Text(n.CatLabel, Ty.Caption);
-        kind.FontWeight = FontWeights.SemiBold;
-        kind.Foreground = K.Brush(K.Darkened(tone));
-        words.Children.Add(kind);
 
-        // at its end: the unread dot — or, under the pointer, Mark Read (Unread) and Clear
+        // at its end: the unread dot — or, under the pointer, Mark read (unread) and Clear
         var dot = new Ellipse { Width = 9, Height = 9, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 6, 4, 0) }.Bg(B.Accent);
         dot.Visibility = n.Read ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(dot, "Unread");
-        var mark = K.IconButton(n.Read ? SymbolRegular.MailUnread24 : SymbolRegular.MailRead24, () => Mark(new[] { n.Id }, read: !n.Read), n.Read ? "Mark Unread" : "Mark Read", 16, 28);
+        var mark = K.IconButton(n.Read ? SymbolRegular.MailUnread24 : SymbolRegular.MailRead24, () => Mark(new[] { n.Id }, read: !n.Read), n.Read ? "Mark unread" : "Mark read", 16, 28);
         var clear = K.IconButton(SymbolRegular.Dismiss24, () => Mark(new[] { n.Id }, gone: true), "Clear", 14, 28);
         var tools = K.H(4, mark, clear);
         tools.HorizontalAlignment = HorizontalAlignment.Right;
@@ -238,18 +232,18 @@ public sealed class NotificationsScreen : Screen
             dot.Visibility = n.Read ? Visibility.Collapsed : Visibility.Visible;
         };
         b.ContextMenu = Menu(n);
-        AutomationProperties.SetName(b, n.Read ? n.Title : $"Unread, {n.Title}");
+        AutomationProperties.SetName(b, string.Join(", ", new[] { n.CatLabel, n.Read ? "" : "unread", n.Title, n.Sub ?? "" }.Where(x => x.Length > 0)));
         return b;
     }
 
-    /// <summary>A row's own menu: Open, Mark Read (or Unread), Clear.</summary>
+    /// <summary>A row's own menu: Open, Mark read (or unread), Clear.</summary>
     private ContextMenu Menu(NotifRow n)
     {
         var m = new ContextMenu();
         var open = CalendarKit.Item("Open", SymbolRegular.Open24, () => Open(n));
         open.IsEnabled = n.Url != null;
         m.Items.Add(open);
-        m.Items.Add(CalendarKit.Item(n.Read ? "Mark Unread" : "Mark Read", n.Read ? SymbolRegular.MailUnread24 : SymbolRegular.MailRead24, () => Mark(new[] { n.Id }, read: !n.Read)));
+        m.Items.Add(CalendarKit.Item(n.Read ? "Mark unread" : "Mark read", n.Read ? SymbolRegular.MailUnread24 : SymbolRegular.MailRead24, () => Mark(new[] { n.Id }, read: !n.Read)));
         m.Items.Add(new Separator());
         m.Items.Add(CalendarKit.Item("Clear", SymbolRegular.Dismiss24, () => Mark(new[] { n.Id }, gone: true)));
         return m;
@@ -265,7 +259,7 @@ public sealed class NotificationsScreen : Screen
     }
 
     private void ConfirmClear() =>
-        Dialogs.Confirm(Window.GetWindow(View), "Clear all notifications?", "They can be restored from the foot of the list.", "Clear All", () => Mark("all", gone: true));
+        Dialogs.Confirm(Window.GetWindow(View), "Clear all notifications?", "They can be restored from the foot of the list.", "Clear all", () => Mark("all", gone: true));
 
     /// <summary>Read or unread, cleared, or the cleared brought back (ids: "all", or the rows'): the page keeps the marks on
     /// this PC; the list read again, and the navigation pane's count with it.</summary>

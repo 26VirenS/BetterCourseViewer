@@ -376,8 +376,9 @@ public sealed class TodoScreen : Screen
 }
 ```
 
-- The shell gives the page its title (a breadcrumb when something is pushed), the commands at the title's right, a
-  scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
+- The shell gives the page its title (a breadcrumb when something is pushed, and the screen's own `Before` parts ahead
+  of its title: a course's Grades reads "F26-MATH 021 20 › Grades", as Windows 11's Settings names where a page is), the
+  commands at the title's right, a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
   `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
   `WindowLayoutChanges` for its thresholds: the Dashboard's six counters sit in one row on a window 1024 wide or wider
@@ -502,6 +503,21 @@ Calendar's `CalendarPeek`). The card reads the work's details as it opens — ab
 its lists, bold and links kept (`RichText`), fading out where it runs on — Mark done ticks it, a double-click or a
 Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row. It is a
 light-dismiss flyout: nothing behind it is dimmed.
+
+The card is one width (440, as the Mac's card; narrower only on a page too narrow for it) whatever it grew from — a
+month's narrow chip as a Dashboard row — and says where the work stands once: a graded piece's score and letter as one
+chip, the engine's `grade.chip` ("13/16 · B−"), with no "Graded" beside it; Late, Missing and Submitted stay.
+
+## Files with a message
+
+New message (its foot's Attach, or files dropped on it) and a conversation's reply bar (the paperclip, or files dropped
+on it) send files with what is written (`MessageFiles`, `Screens/Inbox/InboxShared.cs`; the Mac's MessageAttachments).
+Each file is uploaded as it is picked to the student's own "conversation attachments" folder in Canvas — the engine's
+`messageUpload { name, type, data }` (base64), Canvas's own Inbox's way — and shows as a chip: its name and size, a ring
+while it goes up, a red mark and why if it could not (over 50 MB, unreadable, Canvas said no), × to take it out. Send
+waits until every file is up and sends the ids of those that are (`sendMessage` / `sendReply`'s `attachments`). A
+development run's `--attach sample` attaches a small text file of its own making to the first new message or reply
+opened (`--attach <path>`: that file), for the pictures.
 
 ## Send from Phone
 

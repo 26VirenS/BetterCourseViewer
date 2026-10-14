@@ -200,13 +200,31 @@ public sealed class NavList : Grid
         return b;
     }
 
+    /// <summary>
+    /// The row chosen marked. A course's section whose row is not drawn (its sections not read yet, or folded away)
+    /// marks its course instead, so the pane always says where the page is; and a row newly chosen is scrolled into
+    /// sight (a course's Grades far down its sections).
+    /// </summary>
     public void Select(string? key)
     {
         if (selected != null && rows.TryGetValue(selected, out var old)) old.Background = Brushes.Transparent;
+        if (key != null && !rows.ContainsKey(key) && key.IndexOf(':') is > 0 and var colon && rows.ContainsKey(key[..colon])) key = key[..colon];
         selected = key;
-        if (key != null && rows.TryGetValue(key, out var row)) row.SetResourceReference(Control.BackgroundProperty, B.Subtle);
+        if (key != null && rows.TryGetValue(key, out var row))
+        {
+            row.SetResourceReference(Control.BackgroundProperty, B.Subtle);
+            if (key != shownKey)
+            {
+                shownKey = key;
+                // (once it is laid out; only when the choice moved, so a pane being scrolled by hand stays where it is)
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => { if (row.IsVisible) row.BringIntoView(); });
+            }
+        }
         PlacePill(animate: true);
     }
+
+    /// <summary>The row last scrolled into sight for its choice.</summary>
+    private string? shownKey;
 
     private void PlacePill(bool animate)
     {

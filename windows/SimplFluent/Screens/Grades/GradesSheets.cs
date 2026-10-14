@@ -24,7 +24,7 @@ internal static class GradesSheets
         var possible = new TextBox { PlaceholderText = "Points", Text = "100" };
         var note = K.Wrapped("", Ty.Caption, B.Text2);
         var body = K.V(14, Field("Name", name), Field("Score", score), Field("Out of", possible), note);
-        var sheet = new Sheet { Title = "What-If Assignment", Body = body, Width = 460 };
+        var sheet = new Sheet { Title = "What-if assignment", Body = body, Width = 460 };
 
         // what it is out of, when that is more than nothing
         double? Points() => GradesKit.Number(possible.Text) is { } p && p > 0 ? p : null;
@@ -34,7 +34,7 @@ internal static class GradesSheets
             var weight = string.IsNullOrEmpty(group.WeightText) ? "" : $" ({group.WeightText})";
             var counts = $"Counts in {group.Name}{weight}. Nothing is saved to {engine.LmsName}.";
             if (Points() is not { } p || GradesKit.Number(score.Text) is not { } s) return counts;
-            return (s / p * 100).ToString("0.0", GradesKit.Inv) + "%. " + counts;
+            return GradesKit.Half(s / p * 100, 1).ToString("0.#", GradesKit.Inv) + "%. " + counts;
         }
 
         var addButton = sheet.Add("Add", SheetButtonKind.Primary, () =>
@@ -57,33 +57,40 @@ internal static class GradesSheets
 
     /// <summary>
     /// A course's grading scale, as its instructor set it (the Mac's GradingScaleSheet; the syllabus's cutoffs): the lowest
-    /// percentage for each letter from A+ down to D (F is anything under). Saved, the course's letter, its target and Grade
-    /// needed follow it; Standard Scale goes back to the usual cutoffs.
+    /// percentage for each letter from A+ down to D (F is anything under). Every cutoff in sight at once, to be checked
+    /// against a syllabus — two columns of compact rows in one card, A and B down the first, C and D down the second,
+    /// the keyboard going down each column in turn. Saved, the course's letter, its target and Grade needed follow it;
+    /// Standard scale goes back to the usual cutoffs.
     /// </summary>
     public static void Scale(Engine.Engine engine, string courseId, string course, List<ScaleStep> scale, bool own)
     {
         var letters = scale.Where(s => s.Letter != "F").ToList();
         var boxes = new List<(ScaleStep Step, TextBox Box)>();
-        var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 4 };
-        foreach (var s in letters)
+        var half = (letters.Count + 1) / 2;
+        var columns = new[] { new Stack { Orientation = Orientation.Vertical, Spacing = 2 }, new Stack { Orientation = Orientation.Vertical, Spacing = 2 } };
+        for (var i = 0; i < letters.Count; i++)
         {
-            var box = new TextBox { Text = Fmt(s.Min), PlaceholderText = Fmt(s.Min), Width = 88, TextAlignment = TextAlignment.Right, ClearButtonEnabled = false };
+            var s = letters[i];
+            var box = new TextBox { Text = Fmt(s.Min), PlaceholderText = Fmt(s.Min), Width = 72, MinWidth = 0, TextAlignment = TextAlignment.Right, ClearButtonEnabled = false };
             System.Windows.Automation.AutomationProperties.SetName(box, $"{s.Letter}, lowest percentage");
             boxes.Add((s, box));
-            var row = K.Columns("*, auto, auto",
+            var row = K.Columns("36, auto, *",
                 K.Text(s.Letter, Ty.BodyStrong).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0),
                 box.Col(1),
-                K.Text("% and up", Ty.Body, B.Text2).Margin(10, 0, 0, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(2));
-            rows.Children.Add(K.Card(row, new Thickness(16, 6, 12, 6), 4));
+                K.Text("% and up", Ty.Caption, B.Text2).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(2));
+            row.Margin = new Thickness(0, 2, 0, 2);
+            columns[i < half ? 0 : 1].Children.Add(row);
         }
-        var list = new ScrollViewer { Content = rows, MaxHeight = 360, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var grid = K.Columns("*, 1, *", columns[0].Margin(0, 0, 16, 0).Col(0), new Border { Margin = new Thickness(0, 4, 0, 4) }.Bg(B.Divider).Col(1), columns[1].Margin(16, 0, 0, 0).Col(2));
+        var card = K.Card(grid, new Thickness(16, 10, 16, 10));
+        var lowest = letters.LastOrDefault()?.Letter;
         var problem = new ContentControl { Focusable = false, IsTabStop = false };
         var body = K.V(12,
             K.Text(course, Ty.Body, B.Text2),
-            list,
-            K.Wrapped("Enter the lowest percentage for each letter, as your syllabus or instructor sets it.", Ty.Caption, B.Text2),
+            card,
+            K.Wrapped("Enter the lowest percentage for each letter, as your syllabus or instructor sets it." + (lowest != null ? $" F is anything below the {lowest} cutoff." : ""), Ty.Caption, B.Text2),
             problem);
-        var sheet = new Sheet { Title = "Grading Scale", Body = body, Width = 420 };
+        var sheet = new Sheet { Title = "Grading scale", Body = body, Width = 520 };
         var saving = false;
         var buttons = new List<SheetButton>();
 
@@ -135,7 +142,7 @@ internal static class GradesSheets
         }
 
         buttons.Add(sheet.Add("Save", SheetButtonKind.Primary, () => { if (Collect() is { } m) Save(m); }, closes: false));
-        if (own) buttons.Add(sheet.Add("Standard Scale", SheetButtonKind.Secondary, () => Save(null), closes: false));
+        if (own) buttons.Add(sheet.Add("Standard scale", SheetButtonKind.Secondary, () => Save(null), closes: false));
         buttons.Add(sheet.Add("Cancel", SheetButtonKind.Close));
         Dialogs.Show(sheet);
     }

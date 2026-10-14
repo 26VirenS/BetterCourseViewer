@@ -53,11 +53,11 @@ public sealed class GradesScreen : Screen
         data = Watch(new Loader<GradesData>());
         detail = Watch(new Loader<CourseGradesData>());
         data.Changed += Arrived;
-        // the goal, saved half a second after the last change (a run of presses is one save)
+        // the goal, saved half a second after the last change (a run of presses is one save), half up to two places
         goalSave.Tick += (_, _) =>
         {
             goalSave.Stop();
-            _ = this.engine.Act("setGoal", new { goal = Math.Round(goal * 100) / 100 });
+            _ = this.engine.Act("setGoal", new { goal = (double)GradesKit.Half(goal, 2) });
         };
     }
 
@@ -140,12 +140,13 @@ public sealed class GradesScreen : Screen
 
     // ---- the term: GPA, goal, trend ----
 
-    /// <summary>The term GPA, the goal and the trend: side by side on a wide page, the trend under the other two on a narrow one.</summary>
+    /// <summary>The term GPA, the goal and the trend: side by side on a wide page, the trend under the other two on a narrow
+    /// one. The GPA and the goal keep to 540 across on a wide page, the trend or not, so their words stay together.</summary>
     private FrameworkElement Summary(GradesData d, double w)
     {
         var pair = K.Columns("*, 18, *", GpaCard(d).Col(0), GoalCard(d).Col(2));
         var points = TrendPoints(d.Trend);
-        if (points.Count < 2) return pair;
+        if (points.Count < 2) return w >= WideAt ? K.Columns("540, *", pair.Col(0)) : pair;
         var a = d.MinY ?? 2.4;
         var b = d.MaxY ?? 4;
         var lo = Math.Min(a, b);
@@ -156,25 +157,59 @@ public sealed class GradesScreen : Screen
         return K.V(18, pair, trendCard);
     }
 
-    /// <summary>The page's snapshots as days, oldest first (one a day).</summary>
-    private static List<(DateTime Day, double Gpa)> TrendPoints(List<TrendPoint>? trend)
+    /// <summary>The page's snapshots as days, oldest first (one a day), each with its readout as the engine writes it
+    /// ("Oct 12 · 3.43").</summary>
+    private static List<(DateTime Day, double Gpa, string Label)> TrendPoints(List<TrendPoint>? trend)
     {
         var seen = new HashSet<DateTime>();
-        var list = new List<(DateTime, double)>();
+        var list = new List<(DateTime, double, string)>();
         foreach (var p in trend ?? new())
         {
             if (!double.IsFinite(p.Gpa) || !DateTime.TryParseExact(p.Date, "yyyy-MM-dd", Inv, DateTimeStyles.None, out var day) || !seen.Add(day)) continue;
-            list.Add((day, p.Gpa));
+            var date = !string.IsNullOrEmpty(p.DateText) ? p.DateText : day.ToString(day.Year == DateTime.Today.Year ? "MMM d" : "MMM d, yyyy", Inv);
+            var gpa = !string.IsNullOrEmpty(p.GpaText) ? p.GpaText : GradesKit.Gpa(p.Gpa);
+            list.Add((day, p.Gpa, $"{date} · {gpa}"));
         }
         return list.OrderBy(p => p.Item1).ToList();
     }
 
+    // ---- the GPA as the engine rounds it, and the goal against it ----
+
+    /// <summary>The GPA as it is shown — rounded once, half up to two places (3.425 is 3.43) — for everything worked out
+    /// from it here (the bar, the gap to a goal being moved), so the figures on the page add up. Null without one.</summary>
+    private static double? ShownGpa(GradesData d) => d.GpaShown ?? (d.Gpa is { } g ? (double)GradesKit.Half(g, 2) : null);
+
+    /// <summary>The GPA in words: the engine's ("3.43"; "–" with none).</summary>
+    private static string GpaWords(GradesData d) =>
+        !string.IsNullOrEmpty(d.GpaText) ? d.GpaText! : d.Gpa is { } g ? GradesKit.Gpa(g) : "–";
+
+    /// <summary>The goal as it is saved: the page's words for it, until it is moved here.</summary>
+    private string GoalWords(GradesData d) =>
+        Math.Abs(goal - d.Goal) < 0.0001 && !string.IsNullOrEmpty(d.GoalText) ? d.GoalText! : GradesKit.Gpa(goal);
+
+    /// <summary>
+    /// How far the GPA shown is from the goal, worked out from the two as they are shown (3.43 and 4.00: 0.57 below goal),
+    /// signed: the engine's own line for the goal it has saved, the same sum here while the goal is being moved. Null
+    /// without a GPA.
+    /// </summary>
+    private (string Words, bool Up)? Gap(GradesData d)
+    {
+        if (Math.Abs(goal - d.Goal) < 0.0001 && !string.IsNullOrEmpty(d.GoalLine))
+            return (d.GoalLine!, (d.GoalGap ?? 0) >= 0);
+        if (ShownGpa(d) is not { } shown) return null;
+        var gap = GradesKit.Half(shown, 2) - GradesKit.Half(goal, 2);
+        var words = gap < 0 ? $"{(-gap).ToString("0.00", Inv)} below goal" : gap > 0 ? $"+{gap.ToString("0.00", Inv)} above goal" : "On your goal";
+        return (words, gap >= 0);
+    }
+
     private FrameworkElement GpaCard(GradesData d)
     {
+        // (what the GPA is made of, and what it leaves out — a total the instructor hides — as the engine says it)
         var scored = d.Rows.Count(r => r.Pct != null);
-        var counted = scored == 0 ? "No course has a score yet." : $"From {scored} {(scored == 1 ? "course" : "courses")}, each counting equally.";
+        var counted = !string.IsNullOrEmpty(d.GpaNote) ? d.GpaNote!
+            : scored == 0 ? "No course has a score yet." : $"From {scored} {(scored == 1 ? "course" : "courses")}, each counting equally.";
         var number = new TextBlock { TextWrapping = TextWrapping.NoWrap }.Tabular();
-        var main = new Run(d.Gpa?.ToString("0.00", Inv) ?? "—") { FontSize = 40, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace };
+        var main = new Run(GpaWords(d)) { FontSize = 40, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace };
         main.SetResourceReference(TextElement.ForegroundProperty, B.Text);
         var tail = new Run("  of 4.00") { FontSize = 14, FontFamily = K.TextFace };
         tail.SetResourceReference(TextElement.ForegroundProperty, B.Text2);
@@ -183,20 +218,21 @@ public sealed class GradesScreen : Screen
         gpaBarHolder = new ContentControl { Focusable = false, IsTabStop = false, Content = GpaBar(d) };
         var v = K.V(10, GradesKit.CardHeading("Term GPA", "4.0 scale"), number, gpaBarHolder, K.Wrapped(counted, Ty.Caption, B.Text2));
         var card = K.Card(v, new Thickness(18));
-        AutomationProperties.SetName(card, $"Term GPA {(d.Gpa?.ToString("0.00", Inv) ?? "none yet")} of 4.00. {counted}");
+        AutomationProperties.SetName(card, $"Term GPA {(ShownGpa(d) != null ? GpaWords(d) : "none yet")} of 4.00. {counted}");
         return card;
     }
 
     /// <summary>The GPA out of 4, green at or above the goal and orange under it, the goal a tick across it.</summary>
     private FrameworkElement GpaBar(GradesData d)
     {
-        var color = d.Gpa is { } g ? K.Tone(g - goal >= 0 ? "green" : "orange") : Appearance.Accent;
-        return GradesKit.Bar(d.Gpa / 4, color, 8, goal / 4, "grades:gpa");
+        var shown = ShownGpa(d);
+        var color = shown != null ? K.Tone(Gap(d)?.Up == true ? "green" : "orange") : Appearance.Accent;
+        return GradesKit.Bar(shown / 4, color, 8, goal / 4, "grades:gpa");
     }
 
     private FrameworkElement GoalCard(GradesData d)
     {
-        goalText = new TextBlock { Text = goal.ToString("0.00", Inv), FontSize = 40, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace, VerticalAlignment = VerticalAlignment.Center }.Tabular();
+        goalText = new TextBlock { Text = GoalWords(d), FontSize = 40, FontWeight = FontWeights.SemiBold, FontFamily = K.DisplayFace, VerticalAlignment = VerticalAlignment.Center }.Tabular();
         goalText.Fg(B.Text);
         diffHolder = new ContentControl { Focusable = false, IsTabStop = false, Content = Diff(d) };
         var row = K.H(14, goalText, Stepper());
@@ -221,11 +257,10 @@ public sealed class GradesScreen : Screen
     /// <summary>Above or below the goal, by how much (green or orange), or that there is no score yet.</summary>
     private FrameworkElement Diff(GradesData d)
     {
-        if (d.Gpa is not { } gpa) return K.Text("No score to compare yet", Ty.Body, B.Text2);
-        var diff = gpa - goal;
-        var up = diff >= 0;
+        if (Gap(d) is not { } gap) return K.Text("No score to compare yet", Ty.Body, B.Text2);
+        var up = gap.Up;
         var color = K.Tone(up ? "green" : "orange");
-        var words = K.Text(up ? $"+{diff.ToString("0.00", Inv)} above goal" : $"{Math.Abs(diff).ToString("0.00", Inv)} below goal", Ty.Body).Tabular();
+        var words = K.Text(gap.Words, Ty.Body).Tabular();
         words.FontWeight = FontWeights.Medium;
         words.Foreground = K.Brush(K.Darkened(color));
         return K.H(6, K.Icon(up ? SymbolRegular.ArrowCircleUp24 : SymbolRegular.ArrowCircleDown24, 18, color, filled: true), words);
@@ -234,12 +269,12 @@ public sealed class GradesScreen : Screen
     /// <summary>The goal moved: shown at once (the number, above or below, the bar's colour and tick, the trend's rule); saved soon.</summary>
     private void Step(double by)
     {
-        var g = Math.Clamp(Math.Round((goal + by) * 100) / 100, 0, 4);
+        var g = Math.Clamp((double)GradesKit.Half(goal + by, 2), 0, 4);
         if (Math.Abs(g - goal) < 0.0001) return;
         goal = g;
-        if (goalText != null) goalText.Text = goal.ToString("0.00", Inv);
         if (data.Data is { } d)
         {
+            if (goalText != null) goalText.Text = GoalWords(d);
             if (diffHolder != null) diffHolder.Content = Diff(d);
             if (gpaBarHolder != null) gpaBarHolder.Content = GpaBar(d);
         }
@@ -252,7 +287,7 @@ public sealed class GradesScreen : Screen
         goalSave.Start();
     }
 
-    private FrameworkElement TrendCard(List<(DateTime Day, double Gpa)> points, double lo, double hi)
+    private FrameworkElement TrendCard(List<(DateTime Day, double Gpa, string Label)> points, double lo, double hi)
     {
         var readout = K.Text("", Ty.Caption, B.Text2).Tabular();
         trend = new GradesTrendChart(points, lo, hi, goal, readout);
@@ -297,21 +332,22 @@ public sealed class GradesScreen : Screen
         var rings = GradesKit.Rings(r.Pct, color, GradesKit.Bands(r.Cats), 3, 48, 5.5, 3.5, 1.5);
         rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover); // (the tour's "A quick breakdown")
         var words = K.V(2, K.Text(r.Code, Ty.BodyStrong));
-        if (!string.IsNullOrEmpty(r.Name) && r.Name != r.Code) words.Children.Add(K.Text(r.Name!, Ty.Caption, B.Text2));
+        if (GradesKit.SecondName(r) is { } alt) words.Children.Add(K.Text(alt, Ty.Caption, B.Text2));
         words.Children.Add(K.Text(GradesKit.GradedLine(r), Ty.Caption, B.Text3));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var score = K.Text(GradesKit.Percent(r.Pct), Ty.BodyLarge, r.Pct == null ? B.Text2 : B.Text).Tabular();
+        var score = K.Text(GradesKit.Percent(r.PctText, r.Pct), Ty.BodyLarge, r.Pct == null ? B.Text2 : B.Text).Tabular();
         score.FontWeight = FontWeights.SemiBold;
         score.HorizontalAlignment = HorizontalAlignment.Right;
         var right = K.V(4, score);
         if (r.Letter is { } l) right.Children.Add(GradesKit.Letter(l).Align(HorizontalAlignment.Right, VerticalAlignment.Center));
+        else if (GradesKit.Why(r) is { } why) right.Children.Add(GradesKit.WhyNote(r, why).Align(HorizontalAlignment.Right, VerticalAlignment.Center));
         right.VerticalAlignment = VerticalAlignment.Center;
         var pill = new Border { Width = 3, Height = 16, CornerRadius = new CornerRadius(1.5), VerticalAlignment = VerticalAlignment.Center };
         if (on) pill.Bg(B.Accent);
         var g = K.Columns("auto, auto, *, auto", pill.Margin(0, 0, 7, 0).Col(0), rings.Margin(0, 0, 14, 0).Col(1), words.Col(2), right.Margin(8, 0, 0, 0).Col(3));
         var b = K.Subtle(g, () => Pick(r.Id), new Thickness(4, 10, 10, 10), 6);
         if (on) b.SetResourceReference(Control.BackgroundProperty, B.Subtle);
-        b.ToolTip = $"{r.Code}: its groups and its latest grades";
+        b.ToolTip = GradesKit.Why(r) is { } tipWhy ? $"{r.Code}: {tipWhy}" : $"{r.Code}: its groups and its latest grades";
         AutomationProperties.SetName(b, Spoken(r));
         AutomationProperties.SetItemStatus(b, on ? "Selected" : "");
         b.ContextMenu = CourseMenu(r);
@@ -328,22 +364,22 @@ public sealed class GradesScreen : Screen
 
     private static string Spoken(GradeRow r)
     {
-        var score = r.Pct is { } p ? p.ToString("0.0", Inv) + " percent" : "no score";
+        var score = r.Pct != null ? GradesKit.Percent(r.PctText, r.Pct).Replace("%", " percent") : GradesKit.Why(r) ?? "no score";
         var letter = r.Letter is { } l ? $", {l}" : "";
-        return $"{r.Code}, {score}{letter}";
+        return $"{r.Code}, {score}{letter}, {GradesKit.GradedLine(r)}";
     }
 
-    /// <summary>A course's menu: Open Course, Course Grades; Open in Canvas, Copy Link.</summary>
+    /// <summary>A course's menu: Open course, Course grades; Open in Canvas, Copy link.</summary>
     private ContextMenu? CourseMenu(GradeRow r)
     {
         var link = r.Url ?? $"/courses/{r.Id}/grades";
         return GradesKit.Menu(new object[]
         {
-            GradesKit.Item("Open Course", SymbolRegular.ArrowUpRight24, () => engine.Go(Place.Home($"courses/{r.Id}"))),
-            GradesKit.Item("Course Grades", SymbolRegular.DataBarVertical24, () => engine.Go(Place.Section($"courses/{r.Id}", "grades"))),
+            GradesKit.Item("Open course", SymbolRegular.ArrowUpRight24, () => engine.Go(Place.Home($"courses/{r.Id}"))),
+            GradesKit.Item("Course grades", SymbolRegular.DataBarVertical24, () => engine.Go(Place.Section($"courses/{r.Id}", "grades"))),
             new Separator(),
             GradesKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(link, r.Code)),
-            GradesKit.Item("Copy Link", SymbolRegular.Link24, () => GradesKit.Copy(engine, link)),
+            GradesKit.Item("Copy link", SymbolRegular.Link24, () => GradesKit.Copy(engine, link)),
         });
     }
 
@@ -383,14 +419,15 @@ public sealed class GradesScreen : Screen
         Shell.Tour.Mark(rings, Shell.TourSpot.GradeRing);
         rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover);
         var words = K.V(2, K.Text(r.Code, Ty.BodyStrong));
-        if (!string.IsNullOrEmpty(r.Name) && r.Name != r.Code) words.Children.Add(K.Text(r.Name!, Ty.Caption, B.Text2));
+        if (GradesKit.SecondName(r) is { } alt) words.Children.Add(K.Text(alt, Ty.Caption, B.Text2));
         words.Children.Add(K.Text(GradesKit.GradedLine(r), Ty.Caption, B.Text3));
         words.VerticalAlignment = VerticalAlignment.Center;
-        var score = K.Text(GradesKit.Percent(r.Pct), Ty.Subtitle, r.Pct == null ? B.Text2 : B.Text).Tabular();
+        var score = K.Text(GradesKit.Percent(r.PctText, r.Pct), Ty.Subtitle, r.Pct == null ? B.Text2 : B.Text).Tabular();
         score.HorizontalAlignment = HorizontalAlignment.Right;
         var tags = K.H(6);
         if (r.Target is { } t) tags.Children.Add(K.Text($"Target {t}", Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
         if (r.Letter is { } l) tags.Children.Add(GradesKit.Letter(l));
+        else if (GradesKit.Why(r) is { } why) tags.Children.Add(GradesKit.WhyNote(r, why));
         tags.HorizontalAlignment = HorizontalAlignment.Right;
         var right = K.V(4, score, tags);
         right.VerticalAlignment = VerticalAlignment.Center;
@@ -412,7 +449,7 @@ public sealed class GradesScreen : Screen
         Ahead.On(card, build => engine.Prepare(Place.Section($"courses/{r.Id}", "grades"), build));
         Shell.Tour.Mark(card, Shell.TourSpot.GradeDetails); // (the tour's "What if?": a card opens every grade)
         card.VerticalContentAlignment = VerticalAlignment.Top;
-        card.ToolTip = $"{r.Code}: every assignment’s grade, and what-if scores";
+        card.ToolTip = GradesKit.Why(r) is { } tipWhy ? $"{r.Code}: {tipWhy}" : $"{r.Code}: every assignment’s grade, and what-if scores";
         AutomationProperties.SetName(card, Spoken(r));
         card.ContextMenu = CourseMenu(r);
         return card;
@@ -438,10 +475,11 @@ public sealed class GradesScreen : Screen
         Shell.Tour.Mark(rings, Shell.TourSpot.GradeRing);
         rings.MouseEnter += (_, _) => Shell.Tour.Did(Shell.TourEvent.RingHover);
         var words = K.V(5, K.Wrapped(row.Code, Ty.Subtitle, B.Text, 2));
-        if (!string.IsNullOrEmpty(row.Name) && row.Name != row.Code) words.Children.Add(K.Wrapped(row.Name!, Ty.Body, B.Text2, 2));
+        if (GradesKit.SecondName(row) is { } alt) words.Children.Add(K.Wrapped(alt, Ty.Body, B.Text2, 2));
         var score = new WrapPanel { Orientation = Orientation.Horizontal };
-        score.Children.Add(K.Text(GradesKit.Percent(row.Pct), Ty.Count, row.Pct == null ? B.Text2 : B.Text).Tabular().Margin(0, 0, 10, 0));
+        score.Children.Add(K.Text(GradesKit.Percent(row.PctText, row.Pct), Ty.Count, row.Pct == null ? B.Text2 : B.Text).Tabular().Margin(0, 0, 10, 0));
         if (row.Letter is { } l) score.Children.Add(GradesKit.Letter(l).Margin(0, 0, 10, 0));
+        else if (GradesKit.Why(row) is { } why) score.Children.Add(GradesKit.WhyNote(row, why).Margin(0, 0, 10, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
         if (row.Target is { } t) score.Children.Add(K.Text($"Target {t}", Ty.Body, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center));
         words.Children.Add(score);
         words.Children.Add(K.Text(GradesKit.GradedLine(row), Ty.Caption, B.Text3));
@@ -450,11 +488,11 @@ public sealed class GradesScreen : Screen
         AutomationProperties.SetName(header, Spoken(row));
 
         // its own grades, its home, its grading scale
-        var every = K.Button("Every Grade & What-If", () => engine.Go(Place.Section($"courses/{row.Id}", "grades")), accent: true, icon: SymbolRegular.Wand24);
+        var every = K.Button("Every grade & what-if", () => engine.Go(Place.Section($"courses/{row.Id}", "grades")), accent: true, icon: SymbolRegular.Wand24);
         every.ToolTip = "Every assignment’s grade, and scores to try";
         Shell.Tour.Mark(every, Shell.TourSpot.GradeDetails);
-        var open = K.Button("Open Course", () => engine.Go(Place.Home($"courses/{row.Id}")), icon: SymbolRegular.ArrowUpRight24);
-        var scaleButton = K.Button("Grading Scale…", () => GradesSheets.Scale(engine, row.Id, row.Code, row.Scale ?? scale, row.OwnScale == true), icon: SymbolRegular.Options24);
+        var open = K.Button("Open course", () => engine.Go(Place.Home($"courses/{row.Id}")), icon: SymbolRegular.ArrowUpRight24);
+        var scaleButton = K.Button("Grading scale…", () => GradesSheets.Scale(engine, row.Id, row.Code, row.Scale ?? scale, row.OwnScale == true), icon: SymbolRegular.Options24);
         scaleButton.ToolTip = row.OwnScale == true ? "Your instructor’s cutoffs for each letter" : "Set each letter’s cutoff as your instructor did";
         var actions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, -10) };
         foreach (var b in new[] { every, open, scaleButton }) actions.Children.Add(b.Margin(0, 0, 10, 10));
@@ -467,7 +505,7 @@ public sealed class GradesScreen : Screen
     private FrameworkElement Groups(GradeRow row, CourseGradesData? cg)
     {
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 11 };
-        v.Children.Add(GradesKit.CardHeading("Assignment Groups", cg?.Weighted == true ? "Weighted" : null));
+        v.Children.Add(GradesKit.CardHeading("Assignment groups", cg?.Weighted == true ? "Weighted" : null));
         if (cg is { Groups.Count: > 0 })
         {
             var colors = GradesKit.GroupColors(cg.Groups);
@@ -502,12 +540,12 @@ public sealed class GradesScreen : Screen
         if (graded.Count == 0 && waiting.Count == 0) v.Children.Add(K.Empty(SymbolRegular.DocumentText24, "Nothing with points in this course yet."));
         if (graded.Count > 0)
         {
-            v.Children.Add(GradesKit.CardHeading("Latest Grades", graded.Count > FirstShown ? $"{FirstShown} of {graded.Count}" : null));
+            v.Children.Add(GradesKit.CardHeading("Latest grades", graded.Count > FirstShown ? $"{FirstShown} of {graded.Count}" : null));
             v.Children.Add(Lines(graded.Take(FirstShown).ToList(), cg, colors, courseColor, letters));
         }
         if (waiting.Count > 0)
         {
-            v.Children.Add(GradesKit.CardHeading("Not Graded Yet", waiting.Count > FirstShown ? $"{FirstShown} of {waiting.Count}" : null).Margin(0, graded.Count == 0 ? 0 : 12, 0, 0));
+            v.Children.Add(GradesKit.CardHeading("Not graded yet", waiting.Count > FirstShown ? $"{FirstShown} of {waiting.Count}" : null).Margin(0, graded.Count == 0 ? 0 : 12, 0, 0));
             v.Children.Add(Lines(waiting.Take(FirstShown).ToList(), cg, colors, courseColor, letters));
         }
         return v;
@@ -543,7 +581,7 @@ public sealed class GradesScreen : Screen
         end.Children.Add(points);
         var g = K.Columns("auto, *, auto", K.Dot(color, 9).Margin(0, 0, 12, 0).Col(0), words.Col(1), end.Margin(8, 0, 0, 0).Col(2));
         var b = K.Subtle(g, r.Url is { } u ? () => engine.GoTo(u, r.Name) : null, new Thickness(8, 8, 8, 8));
-        if (r.Url is { } url) b.ContextMenu = GradesKit.Menu(GradesKit.LinkItems(engine, url, r.Name, "Open Assignment"));
+        if (r.Url is { } url) b.ContextMenu = GradesKit.Menu(GradesKit.LinkItems(engine, url, r.Name, "Open assignment"));
         if (r.Url != null) Ahead.On(b, build => engine.PrepareWeb(r.Url, build));
         return b;
     }
@@ -579,7 +617,7 @@ public sealed class GradesScreen : Screen
             holder.Content = ItemsCard(d, columns, holder);
         };
         holder.Content = ItemsCard(d, columns, holder);
-        return K.V(0, Heading.Section("Item Grades", null, picker), holder);
+        return K.V(0, Heading.Section("Item grades", null, picker), holder);
     }
 
     private FrameworkElement ItemsCard(GradesData d, int columns, ContentControl holder)
@@ -608,9 +646,9 @@ public sealed class GradesScreen : Screen
         v.Children.Add(grid);
         void Redo() => holder.Content = ItemsCard(d, columns, holder);
         if (picked.Count > shown.Count)
-            v.Children.Add(K.Link($"Show All {picked.Count}", () => { showAll = true; Redo(); }).Margin(2, 8, 0, 2).Align(HorizontalAlignment.Left));
+            v.Children.Add(K.Link($"Show all {picked.Count}", () => { showAll = true; Redo(); }).Margin(2, 8, 0, 2).Align(HorizontalAlignment.Left));
         else if (showAll && picked.Count > first)
-            v.Children.Add(K.Link("Show Fewer", () => { showAll = false; Redo(); }).Margin(2, 8, 0, 2).Align(HorizontalAlignment.Left));
+            v.Children.Add(K.Link("Show fewer", () => { showAll = false; Redo(); }).Margin(2, 8, 0, 2).Align(HorizontalAlignment.Left));
         return K.Card(v, new Thickness(6));
     }
 

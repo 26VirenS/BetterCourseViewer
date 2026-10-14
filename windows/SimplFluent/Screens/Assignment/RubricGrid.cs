@@ -10,8 +10,9 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// The rubric as a grid (the Mac's RubricGridPanel): what it is and for which assignment, its score and how many criteria,
-/// Before grading or Graded once it is marked, then the grid — a criterion a row, its levels lined up under columns by
-/// what they are worth, the one given marked — scrolling when it is taller than the room.
+/// Before grading or Graded once it is marked (a segmented control, unlike the Ring | Grid tabs above it), then the grid —
+/// a criterion a row, its levels lined up under columns by what they are worth, the one given marked — as tall as its
+/// rows, scrolling only when it is taller than the room.
 /// </summary>
 internal sealed class RubricGridPanel : Grid
 {
@@ -44,9 +45,10 @@ internal sealed class RubricGridPanel : Grid
             K.Text(model.Many, Ty.Body, B.Text2).Margin(18, 0, 0, 5).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(2));
         if (model.Graded)
         {
-            var shown = new SelectorBar(new[] { "Before grading", "Graded" }, 1) { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(18, 0, 0, 0) };
+            var shown = Segmented(new[] { "Before grading", "Graded" }, 1, i => { marks = i == 1; Fill(); });
+            shown.VerticalAlignment = VerticalAlignment.Bottom;
+            shown.Margin = new Thickness(18, 0, 0, 0);
             shown.ToolTip = "The rubric as it read before grading, or with your marks";
-            shown.Changed += i => { marks = i == 1; Fill(); };
             head.Children.Add(shown.Col(3));
         }
         head.Margin = new Thickness(0, 0, 0, 16);
@@ -144,7 +146,7 @@ internal sealed class RubricGridPanel : Grid
         var pts = K.Text(l.Pts is { } p ? RubricRing.Num(p) : "–", Ty.BodyStrong);
         if (mark) pts.Foreground = K.Brush(K.Darkened(colour.Color));
         var v = K.V(4, K.H(3, pts, K.Text(l.Pts == 1 ? "pt" : "pts", Ty.Caption, B.Text2).Margin(0, 0, 0, 1).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom)));
-        if (mark) v.Children.Add(RubricView.YourMark(colour));
+        if (mark) v.Children.Add(RubricView.YourMark(colour, c.MarkText));
         if (main.Length > 0)
         {
             var m = K.Wrapped(main, Ty.Body);
@@ -157,11 +159,55 @@ internal sealed class RubricGridPanel : Grid
         {
             cell.Children.Add(new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Background = K.Brush(colour.Color), HorizontalAlignment = HorizontalAlignment.Left });
             v.Margin = new Thickness(10, 0, 0, 0);
-            System.Windows.Automation.AutomationProperties.SetItemStatus(cell, "Your mark");
+            System.Windows.Automation.AutomationProperties.SetItemStatus(cell, c.MarkText);
         }
         cell.Children.Add(v);
         cell.ToolTip = string.Join(" — ", new[] { l.Label, l.Text }.Where(s => s.Length > 0));
         return cell;
+    }
+
+    /// <summary>
+    /// A segmented control (Windows 11's, as the Photos app's editing modes): its choices side by side in one rounded
+    /// box, the one chosen raised on a control's fill with its own edge, in the text's colour and heavier — a choice of how
+    /// to show the same thing, which the Ring | Grid tabs over it are not.
+    /// </summary>
+    private static Border Segmented(IReadOnlyList<string> choices, int selected, Action<int> changed)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var box = new Border { Child = row, CornerRadius = new CornerRadius(6), Padding = new Thickness(2), BorderThickness = new Thickness(1) };
+        box.Bg(B.Subtle3).Stroke(B.ControlStroke);
+        var items = new List<(System.Windows.Controls.Button B, TextBlock T)>();
+        void Paint()
+        {
+            for (var i = 0; i < items.Count; i++)
+            {
+                var on = i == selected;
+                var (b, t) = items[i];
+                if (on) { b.SetResourceReference(Control.BackgroundProperty, B.Control); b.SetResourceReference(Control.BorderBrushProperty, B.ControlStroke); }
+                else { b.Background = Brushes.Transparent; b.BorderBrush = Brushes.Transparent; }
+                t.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+                t.Fg(on ? B.Text : B.Text2);
+                System.Windows.Automation.AutomationProperties.SetItemStatus(b, on ? "Selected" : "");
+            }
+        }
+        for (var i = 0; i < choices.Count; i++)
+        {
+            var n = i;
+            var t = K.Text(choices[i], Ty.Body);
+            var b = K.Subtle(t, () =>
+            {
+                if (n == selected) return;
+                selected = n;
+                Paint();
+                changed(n);
+            }, new Thickness(12, 4, 12, 5), 4);
+            b.BorderThickness = new Thickness(1);
+            System.Windows.Automation.AutomationProperties.SetName(b, choices[i]);
+            items.Add((b, t));
+            row.Children.Add(b);
+        }
+        Paint();
+        return box;
     }
 
     /// <summary>The grid's columns: how many, which column each criterion's levels go in (by what each is worth out of its

@@ -13,10 +13,11 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 namespace Simpl.Screens;
 
 /// <summary>
-/// New Message (the Mac's ComposeSheet), as a Windows 11 dialog over the window: who it is to (found as you type, in a
+/// New message (the Mac's ComposeSheet), as a Windows 11 dialog over the window: who it is to (found as you type, in a
 /// flyout under the field — the arrow keys and Enter choose, Escape puts it away — and each one a token that can be taken
 /// out again, Backspace in the empty field taking the last), the course it is about (optional — it narrows the people
-/// found to those in it), a subject and the message, each a line with its name at its start; Cancel and Send at the foot.
+/// found to those in it), a subject and the message, each a line with its name at its start; the files going with it as
+/// chips under the message; Attach at the foot's start (or files dropped on the dialog), Cancel and Send at its end.
 /// Ctrl+Enter sends; Escape cancels, asking first when something is written.
 /// </summary>
 public sealed class ComposeSheet
@@ -48,7 +49,11 @@ public sealed class ComposeSheet
     private readonly Stack panelRows = new() { Orientation = Orientation.Vertical, Spacing = 0 };
     private readonly List<(Button B, FrameworkElement Plus)> panelItems = new();
     private readonly ContentControl status = new() { Focusable = false, IsTabStop = false, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Wpf.Ui.Controls.Button cancelButton, sendButton;
+    private readonly Wpf.Ui.Controls.Button cancelButton, sendButton, attachButton;
+    /// <summary>The files going with the message, uploaded as they are picked, and their chips under it.</summary>
+    private readonly MessageFiles files;
+    private readonly ContentControl filesHost = new() { Focusable = false, IsTabStop = false };
+    private readonly HashSet<Guid> chipsSeen = new();
     private readonly Grid confirm = new() { Visibility = Visibility.Collapsed };
     private readonly Border confirmCard;
     private Wpf.Ui.Controls.Button? keepButton;
@@ -105,24 +110,32 @@ public sealed class ComposeSheet
         System.Windows.Automation.AutomationProperties.SetName(message, "Message");
         message.TextChanged += (_, _) => Paint();
 
-        // ---- the foot: what is happening, Cancel and Send ----
+        // ---- the files going with it ----
+        files = new MessageFiles(engine);
+        files.Changed += () => { ShowFiles(); Paint(); };
+
+        // ---- the foot: Attach, what is happening, Cancel and Send ----
+        attachButton = K.Button("Attach", ChooseFiles, icon: SymbolRegular.Attach24);
+        attachButton.ToolTip = "Attach files to this message";
         cancelButton = K.Button("Cancel", Cancel);
         sendButton = K.Button("Send", Send, accent: true, icon: SymbolRegular.Send24);
         sendButton.ToolTip = "Send (Ctrl+Enter)";
-        var footRow = K.Columns("*, auto, auto", status.Col(0), cancelButton.Margin(12, 0, 0, 0).Col(1), sendButton.Margin(8, 0, 0, 0).Col(2));
+        var footRow = K.Columns("auto, *, auto, auto", attachButton.Margin(0, 0, 12, 0).Col(0), status.Col(1), cancelButton.Margin(12, 0, 0, 0).Col(2), sendButton.Margin(8, 0, 0, 0).Col(3));
         var foot = new Border { Child = footRow, Padding = new Thickness(Side, 18, Side, 18), BorderThickness = new Thickness(0, 1, 0, 0) };
         foot.SetResourceReference(Border.BackgroundProperty, "ContentDialogBackground");
         foot.SetResourceReference(Border.BorderBrushProperty, "ContentDialogSeparatorBorderBrush");
 
-        var title = K.Text("New Message", Ty.Subtitle).Margin(Side, 20, Side, 14);
-        var body = K.Rows("auto, auto, auto, auto, auto, *, auto",
+        var title = K.Text("New message", Ty.Subtitle).Margin(Side, 20, Side, 14);
+        filesHost.Visibility = Visibility.Collapsed;
+        var body = K.Rows("auto, auto, auto, auto, auto, *, auto, auto",
             title.Row(0),
             K.Divider().Row(1),
             toRow.Margin(Side, 14, Side, 6).Row(2),
             courseRow.Margin(Side, 6, Side, 6).Row(3),
             subjectRow.Margin(Side, 6, Side, 6).Row(4),
             message.Margin(Side, 6, Side, 18).Row(5),
-            foot.Row(6));
+            filesHost.Margin(Side, -8, Side, 12).Row(6),
+            foot.Row(7));
 
         // ---- the people found, floating just under the To field over what is below it ----
         panel = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(4), Effect = K.Shadow(24, 6, 0.22), Visibility = Visibility.Collapsed, Child = panelRows };
@@ -139,6 +152,21 @@ public sealed class ComposeSheet
 
         var layers = new Grid { Children = { body, overlay, confirm } };
         layers.PreviewKeyDown += OnKey;
+        // (files dropped anywhere on the dialog go with the message, as Attach's do)
+        layers.AllowDrop = true;
+        layers.PreviewDragOver += (_, e) =>
+        {
+            // (files only: words dragged within a field are the field's own)
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+            e.Effects = sending ? DragDropEffects.None : DragDropEffects.Copy;
+            e.Handled = true;
+        };
+        layers.PreviewDrop += (_, e) =>
+        {
+            if (sending || e.Data.GetData(DataFormats.FileDrop) is not string[] dropped) return;
+            e.Handled = true;
+            files.Add(dropped.Where(System.IO.File.Exists));
+        };
         // (someone already chosen: the typing starts at the subject)
         if (people.Count > 0) layers.Loaded += (_, _) => layers.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () => subject.Focus());
 
@@ -147,6 +175,7 @@ public sealed class ComposeSheet
         FillCourses();
         Paint();
         LoadContexts();
+        files.TakeLaunchFile(); // (the screenshot suite's --attach)
     }
 
     /// <summary>A line: its name at its start, as a mail app's are, then what is written there.</summary>
@@ -345,13 +374,13 @@ public sealed class ComposeSheet
 
     // ---- the course ----
 
-    /// <summary>Any course, or one of the student's (and "This Course" for the one it was opened from, if it is not among them).</summary>
+    /// <summary>Any course, or one of the student's (and "This course" for the one it was opened from, if it is not among them).</summary>
     private void FillCourses()
     {
         filling = true;
         courseBox.Items.Clear();
-        courseBox.Items.Add(new ComboBoxItem { Content = "Any Course", Tag = null });
-        if (context != null && contexts.All(c => c.Code != context)) courseBox.Items.Add(new ComboBoxItem { Content = "This Course", Tag = context });
+        courseBox.Items.Add(new ComboBoxItem { Content = "Any course", Tag = null });
+        if (context != null && contexts.All(c => c.Code != context)) courseBox.Items.Add(new ComboBoxItem { Content = "This course", Tag = context });
         foreach (var c in contexts) courseBox.Items.Add(new ComboBoxItem { Content = c.Name, Tag = c.Code });
         courseBox.SelectedItem = courseBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag as string) == course) ?? courseBox.Items[0];
         filling = false;
@@ -370,16 +399,40 @@ public sealed class ComposeSheet
         catch { /* no courses to offer: the line stays away */ }
     }
 
+    // ---- the files ----
+
+    /// <summary>Windows' Open dialog, any kind of file, several at once.</summary>
+    private void ChooseFiles()
+    {
+        if (sending) return;
+        var picked = Simpl.Tools.Files.Choose("All files|*.*", true, Window.GetWindow(message), "Attach files");
+        if (picked.Count > 0) files.Add(picked);
+    }
+
+    /// <summary>The files' chips under the message (none: the row folds away).</summary>
+    private void ShowFiles()
+    {
+        filesHost.Visibility = files.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        filesHost.Content = files.Items.Count > 0 ? files.Chips(chipsSeen) : null;
+    }
+
     // ---- sending ----
 
-    private bool CanSend => !sending && people.Count > 0 && message.Text.Trim().Length > 0;
+    private bool CanSend => !sending && people.Count > 0 && message.Text.Trim().Length > 0 && !files.Uploading;
 
-    /// <summary>Send ready once it is to someone and says something; while it goes, a word that it is going; why it did not, if not.</summary>
+    /// <summary>Send ready once it is to someone, says something and every file is up; while it goes, a word that it is
+    /// going; why it did not, if not.</summary>
     private void Paint()
     {
         sendButton.IsEnabled = CanSend;
         cancelButton.IsEnabled = !sending;
+        attachButton.IsEnabled = !sending;
         if (sending) status.Content = K.H(8, K.Spinner(16), K.Text("Sending…", Ty.Body, B.Text2));
+        else if (files.Uploading)
+        {
+            var n = files.Items.Count(f => f.Uploading);
+            status.Content = K.H(8, K.Spinner(16), K.Text(n == 1 ? "Uploading 1 file…" : $"Uploading {n} files…", Ty.Body, B.Text2));
+        }
         else if (error != null)
         {
             var words = K.Wrapped(error, Ty.Body, B.Critical, 2);
@@ -396,7 +449,7 @@ public sealed class ComposeSheet
         Paint();
         try
         {
-            await engine.Call<OK>("sendMessage", new { recipients = people.Select(p => p.Id).ToList(), subject = subject.Text, body = message.Text, context = course });
+            await engine.Call<OK>("sendMessage", new { recipients = people.Select(p => p.Id).ToList(), subject = subject.Text, body = message.Text, context = course, attachments = files.Ids });
             sending = false;
             sent?.Invoke();
             engine.DataChanged();

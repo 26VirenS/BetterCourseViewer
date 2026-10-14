@@ -5,6 +5,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Simpl.Engine;
 using Simpl.Kit;
 using Simpl.Models;
 using Simpl.Support;
@@ -75,7 +76,23 @@ public sealed class CourseGradesScreen : Screen
     public override string Title =>
         engine.Sections.TryGetValue($"courses/{courseId}", out var list) && list.FirstOrDefault(s => s.Kind == "grades") is { } s ? s.Label : "Grades";
 
-    /// <summary>The course, its name and how much of it is graded (the Mac's heading line).</summary>
+    /// <summary>
+    /// The course before the title, as Windows 11's Settings names where a page is ("F26-MATH 021 20 › Grades", the
+    /// course a click back to its home): the course's own Grades is never taken for the Grades of every course.
+    /// </summary>
+    public override IReadOnlyList<(string Title, Action Go)> Before
+    {
+        get
+        {
+            var c = engine.Courses.FirstOrDefault(x => x.Id == courseId);
+            var name = c != null ? (string.IsNullOrEmpty(c.Code) ? c.Name : c.Code) : grades.Data?.Code;
+            if (string.IsNullOrEmpty(name)) return Array.Empty<(string, Action)>();
+            return new[] { (name!, (Action)(() => engine.Go(Place.Home($"courses/{courseId}")))) };
+        }
+    }
+
+    /// <summary>The course's other name (only when it says something new) and how much of it is graded — the Grades
+    /// overview's own count (the Mac's heading line, the course itself named before the title).</summary>
     public override string? Subtitle => grades.Data is { } d ? Headline(d) : null;
 
     /// <summary>What-If, Sort and More, beside the title (the Mac's toolbar).</summary>
@@ -84,7 +101,7 @@ public sealed class CourseGradesScreen : Screen
         get
         {
             if (commands != null) return commands;
-            whatIfButton = K.Button("What-If", () => SetWhatIf(!whatIf), icon: SymbolRegular.Wand24);
+            whatIfButton = K.Button("What-if", () => SetWhatIf(!whatIf), icon: SymbolRegular.Wand24);
             whatIfButton.MinWidth = 0;
             PaintToggle();
             Wpf.Ui.Controls.Button? sortButton = null;
@@ -101,13 +118,13 @@ public sealed class CourseGradesScreen : Screen
         if (whatIfButton == null) return;
         whatIfButton.Appearance = whatIf ? ControlAppearance.Primary : ControlAppearance.Secondary;
         whatIfButton.IsEnabled = grades.Data != null;
-        whatIfButton.ToolTip = whatIf ? "Turn What-If off: your real scores come back" : "What-If: try scores and see where your grade would land";
+        whatIfButton.ToolTip = whatIf ? "Turn what-if off: your real scores come back" : "What-if: try scores and see where your grade would land";
         AutomationProperties.SetItemStatus(whatIfButton, whatIf ? "On" : "Off");
     }
 
     private static string SortName(GradeSort s) => s switch
     {
-        GradeSort.High => "Highest Grade", GradeSort.Low => "Lowest Grade", GradeSort.Due => "Due Date", GradeSort.Name => "Name", _ => "By Group",
+        GradeSort.High => "Highest grade", GradeSort.Low => "Lowest grade", GradeSort.Due => "Due date", GradeSort.Name => "Name", _ => "By group",
     };
 
     private static SymbolRegular SortSymbol(GradeSort s) => s switch
@@ -132,12 +149,25 @@ public sealed class CourseGradesScreen : Screen
 
     private static string Headline(CourseGradesData d)
     {
-        var real = d.Rows.Where(r => r.Added != true).ToList();
-        var parts = new List<string> { d.Code };
-        if (!string.IsNullOrEmpty(d.Name) && d.Name != d.Code) parts.Add(d.Name!);
-        if (real.Count > 0) parts.Add($"{real.Count(r => r.Earned != null)} of {real.Count} graded");
+        var parts = new List<string>();
+        if (d.AltName != null) parts.Add(d.AltName);
+        else if (!string.IsNullOrEmpty(d.Name) && d.Name != d.Code) parts.Add(d.Name!); // (a page a version older)
+        if (!string.IsNullOrEmpty(d.GradedText)) parts.Add(d.GradedText!);
+        else
+        {
+            var real = d.Rows.Where(r => r.Added != true).ToList();
+            if (real.Count > 0) parts.Add($"{real.Count(r => r.Earned != null)} of {real.Count} graded");
+        }
         return string.Join(" · ", parts.Where(p => p.Length > 0));
     }
+
+    /// <summary>The term GPA now ("3.43", as the engine rounds it), or null when there is none.</summary>
+    private static string? GpaNow(CourseGradesData d) =>
+        d.GpaText != null ? (d.GpaText.Length > 0 ? d.GpaText : null) : d.Gpa is { } g ? GradesKit.Gpa(g) : null;
+
+    /// <summary>The term GPA with the scores tried ("3.50"), or null when What-If makes none.</summary>
+    private static string? GpaIf(CourseGradesData d) =>
+        d.GpaIfText != null ? (d.GpaIfText.Length > 0 ? d.GpaIfText : null) : d.GpaIf is { } g ? GradesKit.Gpa(g) : null;
 
     // ---- reading ----
 
@@ -267,6 +297,12 @@ public sealed class CourseGradesScreen : Screen
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 14 };
         v.Children.Add(head);
         if (!string.IsNullOrEmpty(d.Note)) v.Children.Add(K.Wrapped(d.Note!, Ty.Body, B.Text2));
+        // (What-If starts from the LMS's total; where Simpl's own reading of the scores is apart from it, by how much —
+        // so a total that moves once a score is typed is never a surprise)
+        if (whatIf && !string.IsNullOrEmpty(d.EstimateNote))
+            v.Children.Add(K.Columns("auto, *",
+                K.Icon(SymbolRegular.Info16, 14, B.Text2).Margin(0, 1, 7, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0),
+                K.Wrapped(d.EstimateNote!, Ty.Caption, B.Text2).Col(1)));
         if (!string.IsNullOrEmpty(d.Final)) v.Children.Add(K.Wrapped(d.Final!, Ty.Caption, B.Text3));
         v.Children.Add(K.Divider());
         v.Children.Add(WhatIfControl(d));
@@ -285,7 +321,7 @@ public sealed class CourseGradesScreen : Screen
     private FrameworkElement TargetPicker(CourseGradesData d)
     {
         var tags = new List<string> { "" };
-        var labels = new List<string> { "No Target" };
+        var labels = new List<string> { "No target" };
         if (d.Target is { } t && !d.Scale.Any(s => s.Letter == t)) { tags.Add(t); labels.Add(t); }
         foreach (var s in d.Scale) { tags.Add(s.Letter); labels.Add(s.Letter); }
         var box = new ComboBox { ItemsSource = labels, MinWidth = 140, HorizontalAlignment = HorizontalAlignment.Left };
@@ -299,7 +335,7 @@ public sealed class CourseGradesScreen : Screen
     private FrameworkElement GroupsCard(CourseGradesData d, Dictionary<string, Color> colors)
     {
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 10 };
-        v.Children.Add(GradesKit.CardHeading("Assignment Groups", d.Weighted == true ? "Weighted" : null));
+        v.Children.Add(GradesKit.CardHeading("Assignment groups", d.Weighted == true ? "Weighted" : null));
         if (d.Groups.Count == 0) v.Children.Add(K.Empty(SymbolRegular.Stack24, "No assignment groups."));
         else if (d.Weighted == true) v.Children.Add(GradesKit.WeightBar(d.Groups, colors).Margin(0, 2, 0, 0));
         var lines = new Stack { Orientation = Orientation.Vertical, Spacing = 12, Margin = new Thickness(0, 2, 0, 0) };
@@ -317,30 +353,31 @@ public sealed class CourseGradesScreen : Screen
         var orange = GradesKit.Orange;
         var icon = K.Icon(SymbolRegular.Wand24, 20, orange);
         icon.Width = 26;
-        var words = K.V(2, K.Text("What-If Scores", Ty.BodyStrong),
+        var words = K.V(2, K.Text("What-if scores", Ty.BodyStrong),
             K.Wrapped(whatIf ? "Type a score into any assignment, or add one. Nothing is saved." : "Try scores and see where your grade would land.", Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         var toggle = new ToggleSwitch { IsChecked = whatIf, VerticalAlignment = VerticalAlignment.Center };
         toggle.Checked += (_, _) => SetWhatIf(true);
         toggle.Unchecked += (_, _) => SetWhatIf(false);
-        toggle.ToolTip = whatIf ? "Turn What-If off: your real scores come back" : "What-If: try scores and see where your grade would land";
-        AutomationProperties.SetName(toggle, "What-If Scores");
+        toggle.ToolTip = whatIf ? "Turn what-if off: your real scores come back" : "What-if: try scores and see where your grade would land";
+        AutomationProperties.SetName(toggle, "What-if scores");
         Shell.Tour.Mark(toggle, Shell.TourSpot.WhatIfSwitch);
         var row = K.Columns("auto, *, auto", icon.Margin(0, 0, 12, 0).Col(0), words.Col(1), toggle.Margin(8, 0, 0, 0).Col(2));
         var v = K.V(10, row);
-        if (whatIf && (d.GpaIf != null || drafts.Count > 0 || added.Count > 0))
+        if (whatIf && (GpaIf(d) != null || drafts.Count > 0 || added.Count > 0))
         {
             var line = K.Columns("*, auto");
-            if (d.GpaIf is { } g)
+            // (both figures as the engine rounds them, half up: the GPA the Grades page shows is the one "now" names)
+            if (GpaIf(d) is { } g)
             {
                 var t = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center }.Tabular();
                 K.Style(t, Ty.Body);
                 t.Fg(B.Text);
                 t.Inlines.Add(new Run("Term GPA would be "));
-                t.Inlines.Add(new Bold(new Run(g.ToString("0.00", GradesKit.Inv))));
-                if (d.Gpa is { } now)
+                t.Inlines.Add(new Bold(new Run(g)));
+                if (GpaNow(d) is { } now)
                 {
-                    var was = new Run($"  (now {now.ToString("0.00", GradesKit.Inv)})");
+                    var was = new Run($"  (now {now})");
                     was.SetResourceReference(TextElement.ForegroundProperty, B.Text2);
                     t.Inlines.Add(was);
                 }
@@ -364,20 +401,20 @@ public sealed class CourseGradesScreen : Screen
     private FrameworkElement WhatIfBar(CourseGradesData d)
     {
         var orange = GradesKit.Orange;
-        var label = K.Text("What-If", Ty.BodyStrong);
+        var label = K.Text("What-if", Ty.BodyStrong);
         label.Foreground = K.Brush(K.Darkened(orange));
         var row = K.H(12, K.H(6, K.Icon(SymbolRegular.Wand24, 16, orange), label), K.Text(d.TotalText, Ty.BodyStrong).Tabular());
         if (d.Letter is { } l) row.Children.Add(GradesKit.Letter(l));
-        if (d.GpaIf is { } g)
+        if (GpaIf(d) is { } g)
         {
             row.Children.Add(new Border { Width = 1, Height = 16 }.Bg(B.Divider));
-            row.Children.Add(K.Text($"Term GPA {g.ToString("0.00", GradesKit.Inv)}", Ty.Body, B.Text2).Tabular());
+            row.Children.Add(K.Text($"Term GPA {g}", Ty.Body, B.Text2).Tabular());
         }
         foreach (var c in row.Children.OfType<FrameworkElement>()) c.VerticalAlignment = VerticalAlignment.Center;
         var tint = new Border { Child = row, Padding = new Thickness(20, 12, 20, 12), CornerRadius = new CornerRadius(7), Background = K.Brush(K.WithAlpha(orange, 0.08)) };
         var bar = new Border { Child = tint, CornerRadius = new CornerRadius(8), Effect = K.Shadow(24, 6, 0.2) };
         bar.Bg(B.Flyout).Stroke(B.FlyoutStroke);
-        AutomationProperties.SetName(bar, $"What-If: {d.TotalText}{(d.Letter is { } sl ? ", " + sl : "")}{(d.GpaIf is { } sg ? $", term GPA {sg.ToString("0.00", GradesKit.Inv)}" : "")}");
+        AutomationProperties.SetName(bar, $"What-if: {d.TotalText}{(d.Letter is { } sl ? ", " + sl : "")}{(GpaIf(d) is { } sg ? $", term GPA {sg}" : "")}");
         return bar;
     }
 
@@ -513,7 +550,7 @@ public sealed class CourseGradesScreen : Screen
         }
         var list = RowList(Sorted(d), d, colors, true);
         if (whatIf && d.Groups.Count > 0) list.Children.Add(AddMenu(d));
-        return GradesKit.CardSection("All Assignments", SortName(sort), list);
+        return GradesKit.CardSection("All assignments", SortName(sort), list);
     }
 
     private FrameworkElement GroupColumn(List<CGGroup> groups, CourseGradesData d, Dictionary<string, Color> colors)
@@ -534,10 +571,10 @@ public sealed class CourseGradesScreen : Screen
         return GradesKit.CardSection(g.Name, meta, body);
     }
 
-    /// <summary>Add What-If Assignment (a link's look, the accent's colour).</summary>
+    /// <summary>Add what-if assignment (a link's look, the accent's colour).</summary>
     private static Button AddLink(Action click)
     {
-        var content = K.H(8, K.Icon(SymbolRegular.AddCircle24, 16, B.AccentText), K.Text("Add What-If Assignment", Ty.Body, B.AccentText));
+        var content = K.H(8, K.Icon(SymbolRegular.AddCircle24, 16, B.AccentText), K.Text("Add what-if assignment", Ty.Body, B.AccentText));
         var b = K.Subtle(content, click, new Thickness(8, 6, 10, 6));
         b.HorizontalAlignment = HorizontalAlignment.Left;
         return b;
@@ -676,7 +713,7 @@ public sealed class CourseGradesScreen : Screen
     {
         var tb = new TextBox
         {
-            PlaceholderText = "—", Width = 66, MinWidth = 0, TextAlignment = TextAlignment.Right, ClearButtonEnabled = false,
+            PlaceholderText = "–", Width = 66, MinWidth = 0, TextAlignment = TextAlignment.Right, ClearButtonEnabled = false,
             VerticalAlignment = VerticalAlignment.Center,
         }.Tabular();
         tb.TextChanged += (_, _) =>
@@ -717,14 +754,14 @@ public sealed class CourseGradesScreen : Screen
     private ContextMenu? RowMenu(CGRow r)
     {
         var items = new List<object>();
-        if (r.Url is { } open) items.Add(GradesKit.Item("Open Assignment", SymbolRegular.Open24, () => engine.GoTo(open, r.Name)));
-        if (r.Added == true) items.Add(GradesKit.Item("Remove What-If Assignment", SymbolRegular.SubtractCircle24, () => Remove(r)));
-        else if (drafts.ContainsKey(r.Id)) items.Add(GradesKit.Item("Use My Real Score", SymbolRegular.ArrowUndo24, () => UseReal(r)));
+        if (r.Url is { } open) items.Add(GradesKit.Item("Open assignment", SymbolRegular.Open24, () => engine.GoTo(open, r.Name)));
+        if (r.Added == true) items.Add(GradesKit.Item("Remove what-if assignment", SymbolRegular.SubtractCircle24, () => Remove(r)));
+        else if (drafts.ContainsKey(r.Id)) items.Add(GradesKit.Item("Use my real score", SymbolRegular.ArrowUndo24, () => UseReal(r)));
         if (r.Url is { } url)
         {
             items.Add(new Separator());
             items.Add(GradesKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url, r.Name)));
-            items.Add(GradesKit.Item("Copy Link", SymbolRegular.Link24, () => GradesKit.Copy(engine, url)));
+            items.Add(GradesKit.Item("Copy link", SymbolRegular.Link24, () => GradesKit.Copy(engine, url)));
         }
         return GradesKit.Menu(items);
     }

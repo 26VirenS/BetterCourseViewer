@@ -61,6 +61,9 @@ public sealed partial class TodoScreen
         var byCourse = group == "course";
         // (a card that is not one day — another grouping, or Overdue — gives each row its day as well as its time)
         var withDay = group != "date" || section.Title == "Overdue";
+        // (the flag's slot as wide as a priority's pill only where a row of the card shows one; else the faint flag's own
+        // width, the rest given to the titles)
+        var pills = section.Rows.Any(r => (r.Pri ?? 0) > 0);
         var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
         for (var i = 0; i < section.Rows.Count; i++)
         {
@@ -70,7 +73,7 @@ public sealed partial class TodoScreen
                 div.Margin = new Thickness(44, 0, 8, 0);
                 rows.Children.Add(div);
             }
-            var unit = TaskRow(section.Rows[i], !byCourse, withDay);
+            var unit = TaskRow(section.Rows[i], !byCourse, withDay, pills ? 74 : 38);
             units.Add((section.Rows[i].Id, unit));
             rows.Children.Add(unit);
         }
@@ -93,11 +96,11 @@ public sealed partial class TodoScreen
 
     /// <summary>
     /// A row of To Do (the Mac's TodoTaskRow over WorkRowView): its tick, its title and what it is, where it stands, its
-    /// course, its time — and its priority's flag at its end. A click opens its quick look under it (a double-click opens
-    /// the work); a right-click opens it, hands it in or shows its feedback, marks it done, sets its priority, deletes a
-    /// task of your own, or opens it in Canvas.
+    /// course, its time — and its priority's flag at its end, in a slot <paramref name="slot"/> wide. A click opens its
+    /// quick look under it (a double-click opens the work); a right-click opens it, hands it in or shows its feedback,
+    /// marks it done, sets its priority, deletes a task of your own, or opens it in Canvas.
     /// </summary>
-    private FrameworkElement TaskRow(WorkRow row, bool showCourse, bool withDay)
+    private FrameworkElement TaskRow(WorkRow row, bool showCourse, bool withDay, double slot)
     {
         var (sub, course, time) = Shown(row, showCourse, withDay);
         var check = new CheckCircle(row.Done, row.Done ? "Mark not done" : "Mark done");
@@ -123,15 +126,20 @@ public sealed partial class TodoScreen
         AutomationProperties.SetHelpText(press, "Shows a quick look; a double-click opens it");
 
         var (flag, faint) = PriorityFlag(row);
-        var unit = K.Columns("*, 74", press.Col(0), flag.Col(1));
+        var unit = new Grid();
+        unit.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        unit.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(slot) });
+        unit.Children.Add(press.Col(0));
+        unit.Children.Add(flag.Col(1));
         unit.Background = Brushes.Transparent;
         if (faint != null)
         {
-            // (a row with no priority shows its flag only under the pointer, or while the flag has the keyboard)
+            // (a row with no priority keeps a faint flag, so it can be found; plain under the pointer, or while it has the
+            // keyboard)
             unit.MouseEnter += (_, _) => Motion.To(faint, UIElement.OpacityProperty, 1, Motion.Fast);
-            unit.MouseLeave += (_, _) => { if (!flag.IsKeyboardFocused) Motion.To(faint, UIElement.OpacityProperty, 0, Motion.Fast); };
+            unit.MouseLeave += (_, _) => { if (!flag.IsKeyboardFocused) Motion.To(faint, UIElement.OpacityProperty, FaintFlag, Motion.Fast); };
             flag.GotKeyboardFocus += (_, _) => Motion.To(faint, UIElement.OpacityProperty, 1, Motion.Fast);
-            flag.LostKeyboardFocus += (_, _) => { if (!unit.IsMouseOver) Motion.To(faint, UIElement.OpacityProperty, 0, Motion.Fast); };
+            flag.LostKeyboardFocus += (_, _) => { if (!unit.IsMouseOver) Motion.To(faint, UIElement.OpacityProperty, FaintFlag, Motion.Fast); };
         }
         // (its menu is filled as it opens, from where the row stands then)
         var menu = new ContextMenu();
@@ -142,8 +150,12 @@ public sealed partial class TodoScreen
         return unit;
     }
 
+    /// <summary>How faint a row's flag is with no priority set, away from the pointer.</summary>
+    private const double FaintFlag = 0.35;
+
     /// <summary>A row's priority as a flag at its end, a menu of the four levels under it (the Mac's TodoPriorityMenu): the
-    /// level's colour and word when it has one, a faint flag under the pointer when not.</summary>
+    /// level's colour and word when it has one; a faint flag when not — always there to be found, plain under the
+    /// pointer.</summary>
     private (Button Flag, UIElement? Faint) PriorityFlag(WorkRow row)
     {
         var level = row.Pri ?? 0;
@@ -155,7 +167,7 @@ public sealed partial class TodoScreen
         else
         {
             var icon = K.Icon(SymbolRegular.Flag24, 14, B.Text2);
-            icon.Opacity = 0;
+            icon.Opacity = FaintFlag;
             faint = icon;
             content = new Border { Child = icon, Padding = new Thickness(9, 4, 9, 4) };
         }
