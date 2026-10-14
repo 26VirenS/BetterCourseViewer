@@ -342,8 +342,8 @@ jobs:
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'light', '--dash-view', 'activity'))
           Shot 'dashboard-counter' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next'))
           Shot 'dashboard-counter-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--sheet', 'unread'))
-          # (the counters one row of six from a window 1024 wide: the first tile's panel and the last one's, each on the
-          #  page; the window Simpl first opens at; a theme's pictures in the narrowest one-row tiles)
+          # (the first tile's panel and the last one's, each grown over the page from its tile; the window Simpl first
+          #  opens at; a theme's pictures under the counters' washes)
           Shot 'dashboard-counter-first' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'today'))
           Shot 'dashboard-counter-last' '1024x681' 45 ($mock + @('--appearance', 'dark', '--sheet', 'graded'))
           # (the quick look a counter's row opens, over its panel: the due said once)
@@ -526,8 +526,8 @@ jobs:
           Shot 'update-waiting-quiz' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--open', 'quiz:101:9011'))
           Shot 'update-critical-quiz' '1366x778' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-critical', '--open', 'quiz:101:9011'))
           Shot 'update-restarting' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed'))
-          # (two more themes' pictures in the narrowest one-row counters, a 1024 window's: City's skyline and Forest's
-          #  trees, the busiest, behind the numbers — last in the list, so every picture above keeps its part)
+          # (two more themes' pictures in a 1024 window's counters: City's skyline and Forest's trees, the busiest, behind
+          #  the numbers — last in the list, so every picture above keeps its part)
           Shot 'theme-city-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'City'))
           Shot 'theme-forest-1024' '1024x681' 45 ($mock + @('--appearance', 'dark', '--theme', 'Forest'))
           # the biology toolkit's other nine tools, each page in a launch's state (--tool <key> --tool-state <page>:…,
@@ -702,6 +702,12 @@ jobs:
           Shot 'bio-open-cell-720' '720x520' 50 ($mock + @('--place', 'tools', '--appearance', 'dark', '--tool', 'cell'))
           Shot 'bio-biomol-amino-phe' '1366x778' 50 ($mock + @('--place', 'tools', '--appearance', 'light', '--tool', 'biomol', '--tool-state', 'amino:aa=F'))
           Shot 'tool-window-framed' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--open', 'tool:101:19', '--web-scheme', 'dark'))
+          # a counter's panel caught as it grows out of its tile (--open sheetmorph: drawn as it is a quarter of the way
+          # through its time — the surface most of the way from the tile to its place, its words only starting to come
+          # in), light in a 1024 window and dark in a 1366 one; and the narrow window's counters in dark
+          Shot 'dashboard-counter-morph' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next', '--open', 'sheetmorph'))
+          Shot 'dashboard-counter-morph-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--sheet', 'unread', '--open', 'sheetmorph'))
+          Shot 'dashboard-narrow-dark' '780x683' 45 ($mock + @('--appearance', 'dark'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
