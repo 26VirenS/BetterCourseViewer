@@ -781,10 +781,13 @@ struct PTNarrowReader<Content: View>: View {
     var body: some View { content(narrow) }
 }
 
-/// (1.3.52) The Lewis maker's and the molecule builder's layout: on a wide window, the controls, the drawing and the facts
-/// side by side; on a narrower one, the drawing across the top and the controls and facts side by side under it —
-/// (tools-24) the drawing about half the height there, so what is under it is in sight too.
+/// (1.3.52) The Lewis maker's and the molecule builder's layout (and the biology tools'): on a wide window, the controls,
+/// the drawing and the facts side by side; on a narrower one, the drawing across the top and the controls and facts side
+/// by side under it — (tools-24) for the Lewis maker and the molecule builder (`shortDrawing`) the drawing about half the
+/// height there, their controls in its card's top row, so what is under it is in sight too; for a biology tool's
+/// step-through as tall as the window shows, up to 640, its parts never squeezed into each other.
 struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
+    var shortDrawing = false
     @ViewBuilder var left: Left
     @ViewBuilder var centre: Centre
     @ViewBuilder var right: Right
@@ -809,8 +812,11 @@ struct PTWorkLayout<Left: View, Centre: View, Right: View>: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // (1.3.78) the drawing as tall as the window shows, up to 640: at three quarters of a short
+                        // window's height a biology tool's step-through was squeezed until its parts ran into each other,
+                        // and its controls were pushed out over the columns under it
                         centre
-                            .frame(height: max(360, min(560, g.size.height * 0.58)))
+                            .frame(height: shortDrawing ? max(360, min(560, g.size.height * 0.58)) : max(460, min(640, g.size.height)))
                         HStack(alignment: .top, spacing: 18) {
                             left.frame(maxWidth: .infinity, alignment: .topLeading)
                             right.frame(maxWidth: .infinity, alignment: .topLeading)

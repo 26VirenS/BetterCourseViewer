@@ -156,7 +156,7 @@ bio() {
 
 # a push's biology pictures: each of the ten tools once, in light
 bio_quick() {
-  bio light 57-cell-animal 16 cell animal
+  bio light 57-cell-animal 30 cell animal
   bio light 58a-dna-helix 16 dna helix:measure:pair=3
   bio light 59a-gene-transcribe 14 gene express:eukaryote:gene=teaching:step=22
   bio light 61b-biomol-peptide 16 biomol proteins:build:ribbon=over:colour=part
@@ -173,18 +173,20 @@ bio_quick() {
 # Lab, 67 Photosynthesis & Respiration; then the four pins' quick versions
 bio_full() {
   # the three cells, a part's card, inside an organelle, pulled apart, at true scale, the membrane, the three compared
-  bio both 57-cell-animal 16 cell animal
-  bio light 57b-cell-mito-card 16 cell animal:select=mito
-  bio both 57c-cell-plant 18 cell plant:select=chloroplast
-  bio light 57d-cell-bacterium 14 cell bacterium
-  bio light 57e-cell-explode 16 cell animal:explode=0.7
-  bio light 57f-cell-true-scale 18 cell animal:true
-  bio light 57g-cell-mito-inside 16 cell animal:inside=mito
-  bio light 57h-cell-nucleus-inside 16 cell animal:inside=nucleus
-  bio both 57i-cell-membrane 18 cell membrane:select=integral:channel:osmosis
-  bio light 57j-cell-compare 18 cell compare
-  bio light 57k-cell-quiz 16 cell animal:quiz=name
-  bio light 57l-cell-gram-positive 14 cell bacterium:gram+:select=wall
+  # (each picture waits for its cell to be built — seconds in a debug build, the plant and the three compared longest —
+  # and is taken as soon as it is: the wait is the longest it may take)
+  bio both 57-cell-animal 30 cell animal
+  bio light 57b-cell-mito-card 30 cell animal:select=mito
+  bio both 57c-cell-plant 40 cell plant:select=chloroplast
+  bio light 57d-cell-bacterium 30 cell bacterium
+  bio light 57e-cell-explode 30 cell animal:explode=0.7
+  bio light 57f-cell-true-scale 40 cell animal:true
+  bio light 57g-cell-mito-inside 30 cell animal:inside=mito
+  bio light 57h-cell-nucleus-inside 30 cell animal:inside=nucleus
+  bio both 57i-cell-membrane 30 cell membrane:select=integral:channel:osmosis
+  bio light 57j-cell-compare 45 cell compare
+  bio light 57k-cell-quiz 30 cell animal:quiz=name
+  bio light 57l-cell-gram-positive 30 cell bacterium:gram+:select=wall
   # the double helix (measured, its grooves, in atoms, unzipped), the nucleotides, a strand's facts, replication, RNA
   bio both 58a-dna-helix 16 dna helix:measure:pair=3
   bio both 58b-dna-grooves 16 dna helix:grooves

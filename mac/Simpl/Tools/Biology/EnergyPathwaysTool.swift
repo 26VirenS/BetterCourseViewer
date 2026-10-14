@@ -37,15 +37,31 @@ struct EnergyPathwaysTool: View {
     }
 }
 
-/// A launch's state, for the page it names (the map if it names none), the first time that page appears.
+/// A launch's state, for the page it names (the map if it names none): the map's taken the first time it appears (what
+/// it sets is remembered); a step-through page's read as the page is made, so it starts at the launch's step from its
+/// first frame, in any page made for it — applied as the page appeared, the step was lost when the page was made again.
 @MainActor
 enum EnergyLaunch {
     private static var done: Set<String> = []
+    private static var told: Set<String> = []
 
     static func take(_ page: String, _ state: BioLaunchState?) -> BioLaunchState? {
         guard let state, !done.contains(page), (state.page ?? "map") == page else { return nil }
         done.insert(page)
         return state
+    }
+
+    /// The launch's state, if it names this page.
+    static func state(_ page: String, _ state: BioLaunchState?) -> BioLaunchState? {
+        guard let state, (state.page ?? "map") == page else { return nil }
+        return state
+    }
+
+    /// (the screenshot suite) What a page shows of its launch, once, on the console.
+    static func tell(_ page: String, _ state: BioLaunchState?, _ what: String) {
+        guard OpenClock.verbose, let s = self.state(page, state), !told.contains(page) else { return }
+        told.insert(page)
+        NSLog("[Simpl] bio launch: energy %@: %@", s.raw, what)
     }
 }
 
@@ -464,6 +480,7 @@ private struct EnergyMapPage: View {
         guard let s = EnergyLaunch.take("map", state) else { return }
         if let id = s.value("stage"), EnergyPathways.stage(id) != nil { select(id) }
         if s.has("respire") || s.has("dark") { setRespire(true) }
+        EnergyLaunch.tell("map", state, "\(selected)\(respire ? ", day and night" : "")")
     }
 
     private var left: some View {
@@ -734,9 +751,23 @@ private struct EnergyStepScene: View {
 
 private struct EnergyRespirationPage: View {
     var state: BioLaunchState?
-    @StateObject private var steps = BioStepController(steps: EnergyPathways.respiration().map(\.step))
-    @State private var aerobic = true
-    @State private var fermentation: EnergyFermentation = .lactate
+    @StateObject private var steps: BioStepController
+    @State private var aerobic: Bool
+    @State private var fermentation: EnergyFermentation
+
+    /// The page as its launch asks (respiration:step=7:ferment=ethanol, anaerobic) from its first frame (EnergyLaunch).
+    init(state: BioLaunchState?) {
+        self.state = state
+        let s = EnergyLaunch.state("respiration", state)
+        let f = s?.value("ferment").flatMap(EnergyFermentation.init(rawValue:))
+        let aerobic = f == nil && s?.has("anaerobic") != true
+        let fermentation = f ?? .lactate
+        _aerobic = State(initialValue: aerobic)
+        _fermentation = State(initialValue: fermentation)
+        let start = (s?.value("step").flatMap { Int($0) } ?? 1) - 1
+        _steps = StateObject(wrappedValue: BioStepController(steps: EnergyPathways.respiration(fermenting: aerobic ? nil : fermentation).map(\.step),
+                                                             start: start))
+    }
 
     private var data: [EnergyStep] { EnergyPathways.respiration(fermenting: aerobic ? nil : fermentation) }
 
@@ -794,10 +825,7 @@ private struct EnergyRespirationPage: View {
     }
 
     private func apply() {
-        guard let s = EnergyLaunch.take("respiration", state) else { return }
-        if let f = s.value("ferment").flatMap(EnergyFermentation.init(rawValue:)) { setPath(false, f) }
-        if s.has("anaerobic") { setPath(false, fermentation) }
-        if let n = s.value("step").flatMap({ Int($0) }) { steps.go(to: n - 1, animated: false) }
+        EnergyLaunch.tell("respiration", state, "\(aerobic ? "with oxygen" : fermentation.rawValue), step \(steps.index + 1)")
     }
 }
 
@@ -805,7 +833,14 @@ private struct EnergyRespirationPage: View {
 
 private struct EnergyPhotosynthesisPage: View {
     var state: BioLaunchState?
-    @StateObject private var steps = BioStepController(steps: EnergyPathways.photosynthesis.map(\.step))
+    @StateObject private var steps: BioStepController
+
+    /// The page at its launch's step (photosynthesis:step=6) from its first frame (EnergyLaunch).
+    init(state: BioLaunchState?) {
+        self.state = state
+        let start = (EnergyLaunch.state("photosynthesis", state)?.value("step").flatMap { Int($0) } ?? 1) - 1
+        _steps = StateObject(wrappedValue: BioStepController(steps: EnergyPathways.photosynthesis.map(\.step), start: start))
+    }
 
     var body: some View {
         let data = EnergyPathways.photosynthesis
@@ -845,8 +880,7 @@ private struct EnergyPhotosynthesisPage: View {
     }
 
     private func apply() {
-        guard let s = EnergyLaunch.take("photosynthesis", state) else { return }
-        if let n = s.value("step").flatMap({ Int($0) }) { steps.go(to: n - 1, animated: false) }
+        EnergyLaunch.tell("photosynthesis", state, "step \(steps.index + 1)")
     }
 }
 
@@ -854,8 +888,18 @@ private struct EnergyPhotosynthesisPage: View {
 
 private struct EnergyAtomsPage: View {
     var state: BioLaunchState?
-    @StateObject private var steps = BioStepController(steps: EnergyPathways.traceSteps(.oxygen))
-    @State private var trace: EnergyTrace = .oxygen
+    @StateObject private var steps: BioStepController
+    @State private var trace: EnergyTrace
+
+    /// The page as its launch asks (atoms:trace=carbon:step=4) from its first frame (EnergyLaunch).
+    init(state: BioLaunchState?) {
+        self.state = state
+        let s = EnergyLaunch.state("atoms", state)
+        let trace = s?.value("trace").flatMap(EnergyTrace.init(rawValue:)) ?? .oxygen
+        let start = (s?.value("step").flatMap { Int($0) } ?? 1) - 1
+        _trace = State(initialValue: trace)
+        _steps = StateObject(wrappedValue: BioStepController(steps: EnergyPathways.traceSteps(trace), start: start))
+    }
 
     var body: some View {
         let data = EnergyPathways.trace(trace)
@@ -962,8 +1006,6 @@ private struct EnergyAtomsPage: View {
     }
 
     private func apply() {
-        guard let s = EnergyLaunch.take("atoms", state) else { return }
-        if let t = s.value("trace").flatMap(EnergyTrace.init(rawValue:)) { setTrace(t) }
-        if let n = s.value("step").flatMap({ Int($0) }) { steps.go(to: n - 1, animated: false) }
+        EnergyLaunch.tell("atoms", state, "\(trace.rawValue), step \(steps.index + 1)")
     }
 }

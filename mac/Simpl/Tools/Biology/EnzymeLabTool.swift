@@ -263,7 +263,8 @@ private struct EnzymeGraphs: View {
                 PointMark(x: .value("[S]", c.substrate), y: .value("Rate", c.rate))
                     .foregroundStyle(Theme.accent)
                     .symbolSize(80)
-                    .annotation(position: .topLeading, alignment: .bottomTrailing) {
+                    // (below the curve, to the right of the point: above it, it ran into Km's label)
+                    .annotation(position: .bottomTrailing, alignment: .topLeading, spacing: 4) {
                         Text("v = \(String(halfUp: "%.1f", c.rate))").font(.sCaption.weight(.semibold)).foregroundStyle(Theme.accent)
                     }
             }

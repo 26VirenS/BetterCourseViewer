@@ -217,8 +217,11 @@ final class GXPainter {
             let box = Path(roundedRect: CGRect(x: a, y: bandTop + 2, width: b - a, height: bandBottom - bandTop - 4), cornerRadius: 4)
             if lit { c.stroke(box, with: .color(colour.opacity(0.3)), lineWidth: 6) }
             c.stroke(box, with: .color(colour), lineWidth: lit ? 2.2 : 1.3)
-            let mid = (a + b) / 2
+            // (a name kept whole inside the lanes' edges, beside the part of its box in view: at an edge it was cut —
+            // "tart codon" — and a box out of view keeps its name out of the way)
+            guard b > left && a < right else { continue }
             let w = CGFloat(m.name.count) * 6.2 + 8
+            let mid = min(max((a + b) / 2, left + w / 2), right - w / 2)
             let row = rowEnds[0] < mid - w / 2 ? 0 : 1
             rowEnds[row] = mid + w / 2
             text(&c, m.name, CGPoint(x: mid, y: y(GXPainter.yMarks + CGFloat(row) * 13)), size: 10.5, weight: lit ? .bold : .semibold, colour: colour)
@@ -728,7 +731,8 @@ final class GXPainter {
 
     /// Each amino acid of the chain: over the codon it came from, or on top of its tRNA.
     private func residuePoints() -> [CGPoint] {
-        let row = y(GXPainter.y4) - 118 - CGFloat(18 * apart)
+        // (in the cytoplasm, clear of the nuclear envelope even in a squeezed view, where it sat on the envelope's line)
+        let row = max(y(GXPainter.y4) - 118 - CGFloat(18 * apart), y(GXPainter.yEnvelope) + 14)
         return s.residues.map { r in
             let rowPt = CGPoint(x: x(g.codonColumn(r.x)), y: row)
             guard r.onTRNA > 0, let t = s.trnas.first(where: { $0.codon == r.index }) else { return rowPt }
@@ -761,11 +765,21 @@ final class GXPainter {
             cc.draw(Text(String(r.aa)).font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundColor(GXColors.letter(on: BioPalette.aminoAcid(one: r.aa), dark: dark)), at: p)
         }
+        // (each end's name beside its bead, or under it where the lanes' edge leaves no room beside — it was cut there)
+        let nameWidth: CGFloat = 58
         if let p0 = pts.first, s.residues.count > 1 || f.stage >= .tlEnd {
-            text(&c, "N-terminus", CGPoint(x: p0.x - 16, y: p0.y), size: 10, weight: .bold, anchor: .trailing)
+            if p0.x - 16 - nameWidth >= left {
+                text(&c, "N-terminus", CGPoint(x: p0.x - 16, y: p0.y), size: 10, weight: .bold, anchor: .trailing)
+            } else {
+                text(&c, "N-terminus", CGPoint(x: max(p0.x, left + nameWidth / 2), y: p0.y + 19), size: 10, weight: .bold)
+            }
         }
         if f.result > 0.01, let pl = pts.last {
-            text(&c, "C-terminus", CGPoint(x: pl.x + 16, y: pl.y), size: 10, weight: .bold, anchor: .leading, alpha: f.result)
+            if pl.x + 16 + nameWidth <= right {
+                text(&c, "C-terminus", CGPoint(x: pl.x + 16, y: pl.y), size: 10, weight: .bold, anchor: .leading, alpha: f.result)
+            } else {
+                text(&c, "C-terminus", CGPoint(x: min(pl.x, right - nameWidth / 2), y: pl.y + 19), size: 10, weight: .bold, alpha: f.result)
+            }
         }
     }
 
@@ -777,7 +791,8 @@ final class GXPainter {
         let shape = Path(roundedRect: CGRect(x: pl.x - sw / 2, y: pl.y + 9, width: sw, height: 22), cornerRadius: 11)
         c.fill(shape, with: .color(GXColors.ribosome.color.opacity(0.18)))
         c.stroke(shape, with: .color(GXColors.ribosome.color), style: StrokeStyle(lineWidth: 1.4, dash: [4, 3]))
-        text(&c, "a ribosome can start already", CGPoint(x: pl.x - sw / 2 + 2, y: pl.y + 42), size: 10.5, weight: .bold,
+        // (kept inside the lanes' left edge: the ribosome sits near it early on, and its words were cut)
+        text(&c, "a ribosome can start already", CGPoint(x: max(pl.x - sw / 2 + 2, left + 2), y: pl.y + 42), size: 10.5, weight: .bold,
              colour: GXColors.ribosome.color, anchor: .leading)
     }
 
@@ -816,10 +831,13 @@ final class GXPainter {
 
     private func gutterLabels(_ c: inout GraphicsContext) {
         let gx = GXPainter.gutter - 2
+        // (a name and its second line take about 27.5 points; when the lanes are squeezed closer than the 26 points
+        // between the two strands, the names shrink with them, so the coding strand's never runs into the template's)
+        let k = max(0.7, min(1, (GXPainter.y2 - GXPainter.y1) * sy / 27.5))
         func label(_ title: String, _ sub: String?, _ yy: CGFloat, alpha: Double = 1) {
             guard alpha > 0.01 else { return }
-            text(&c, title, CGPoint(x: gx, y: sub == nil ? yy : yy - 7), size: 11.5, weight: .semibold, colour: .primary, anchor: .trailing, alpha: alpha * 0.85)
-            if let sub { text(&c, sub, CGPoint(x: gx, y: yy + 7), size: 10.5, weight: .medium, colour: .secondary, anchor: .trailing, alpha: alpha) }
+            text(&c, title, CGPoint(x: gx, y: sub == nil ? yy : yy - 7 * k), size: 11.5 * k, weight: .semibold, colour: .primary, anchor: .trailing, alpha: alpha * 0.85)
+            if let sub { text(&c, sub, CGPoint(x: gx, y: yy + 7 * k), size: 10.5 * k, weight: .medium, colour: .secondary, anchor: .trailing, alpha: alpha) }
         }
         label("Whole gene", nil, y(GXPainter.yOverview))
         label("Coding (sense) strand", "5′→3′", y(GXPainter.y1))

@@ -507,6 +507,9 @@ struct ToolHeader: View {
                 row(pages: false, pinWords: true)
                 row(pages: true, pinWords: true)
                 row(pages: true, pinWords: false)
+                // (and where even their symbols leave the name no room — "Cell Explo…", "Bio La…" — the pages under the
+                // name, in place of its line)
+                stacked
             }
         } else if kind == .ptable {
             VStack(alignment: .leading, spacing: 12) {
@@ -518,44 +521,51 @@ struct ToolHeader: View {
         }
     }
 
+    /// Done (in the pin's sheet) or Back to the tiles — (tools-29) or, while one of the Periodic Table's elements is
+    /// open, Back to the table (beside Done in the sheet).
+    @ViewBuilder
+    private var leading: some View {
+        if let done {
+            Button("Done", action: done)
+                .font(.sCallout.weight(.medium))
+                .glassButton()
+                .controlSize(.large)
+                // (tools-3: while the Periodic Table's tour is on, Escape ends the tour, not the sheet)
+                .keyboardShortcut(kind == .ptable && ptTour.active ? nil : KeyboardShortcut.cancelAction)
+                .help("Close \(kind.name) (Escape)")
+        }
+        if kind == .ptable && ptNav.elementOpen {
+            Button {
+                ptNav.closeElement()
+            } label: {
+                Label("Table", systemImage: "chevron.left")
+                    .font(.sCallout.weight(.medium))
+                    .padding(.horizontal, 4)
+            }
+            .glassButton()
+            .controlSize(.large)
+            .keyboardShortcut("[", modifiers: .command)
+            .help("Back to the table (⌘[)")
+            .transition(.opacity)
+        } else if done == nil {
+            Button {
+                withAnimation(Motion.gentle) { tools.open = nil }
+            } label: {
+                Label("Tools", systemImage: "chevron.left")
+                    .font(.sCallout.weight(.medium))
+                    .padding(.horizontal, 4)
+            }
+            .glassButton()
+            .controlSize(.large)
+            .help("Back to all the tools")
+            .transition(.opacity)
+        }
+    }
+
     /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit).
     private func row(pages squished: Bool?, pinWords: Bool) -> some View {
         HStack(alignment: .center, spacing: 14) {
-            if let done {
-                Button("Done", action: done)
-                    .font(.sCallout.weight(.medium))
-                    .glassButton()
-                    .controlSize(.large)
-                    // (tools-3: while the Periodic Table's tour is on, Escape ends the tour, not the sheet)
-                    .keyboardShortcut(kind == .ptable && ptTour.active ? nil : KeyboardShortcut.cancelAction)
-                    .help("Close \(kind.name) (Escape)")
-            }
-            if kind == .ptable && ptNav.elementOpen {
-                Button {
-                    ptNav.closeElement()
-                } label: {
-                    Label("Table", systemImage: "chevron.left")
-                        .font(.sCallout.weight(.medium))
-                        .padding(.horizontal, 4)
-                }
-                .glassButton()
-                .controlSize(.large)
-                .keyboardShortcut("[", modifiers: .command)
-                .help("Back to the table (⌘[)")
-                .transition(.opacity)
-            } else if done == nil {
-                Button {
-                    withAnimation(Motion.gentle) { tools.open = nil }
-                } label: {
-                    Label("Tools", systemImage: "chevron.left")
-                        .font(.sCallout.weight(.medium))
-                        .padding(.horizontal, 4)
-                }
-                .glassButton()
-                .controlSize(.large)
-                .help("Back to all the tools")
-                .transition(.opacity)
-            }
+            leading
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(kind.title)
@@ -588,6 +598,35 @@ struct ToolHeader: View {
         }
         .animation(Motion.gentle, value: ptNav.elementOpen)
         .animation(Motion.gentle, value: tools.quietHeadings)
+    }
+
+    /// (1.3.78) A biology tool's heading in a narrow window: its name whole, its pages' symbols under it, its pin a
+    /// symbol.
+    private var stacked: some View {
+        HStack(alignment: .center, spacing: 14) {
+            leading
+            IconTile(symbol: kind.symbol, color: kind.color, size: 44)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(kind.name)
+                    .font(.sTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .help(kind.note)
+                BioHeaderControls(kind: kind, squished: true)
+            }
+            Spacer(minLength: 12)
+            // (tools-31, as the row's: what a press does, in a plain glass button)
+            Button {
+                tools.togglePin(kind)
+            } label: {
+                Label(tools.isPinned(kind) ? "Unpin" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.slash" : "pin")
+                    .font(.sCallout.weight(.medium))
+                    .labelStyle(SquishLabel(squished: true))
+            }
+            .glassButton()
+            .controlSize(.large)
+            .help(tools.isPinned(kind) ? "\(kind.name) is in the toolbar on every screen. Click to unpin it." : "Keep \(kind.name) in the toolbar on every screen")
+        }
     }
 }
 

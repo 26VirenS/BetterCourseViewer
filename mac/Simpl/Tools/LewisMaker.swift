@@ -679,7 +679,7 @@ struct LewisMaker: View {
         // (1.3.65) worked out when the molecule or the ranking changes, not each time the builder draws
         let r = memo.result(graph, mode)
         // (tools-24) laid out narrow, Quick or Draw and the preset ride in the drawing's own heading, always in sight
-        PTWorkLayout {
+        PTWorkLayout(shortDrawing: true) {
             PTNarrowReader { narrow in controls(narrow: narrow) }
         } centre: {
             PTNarrowReader { narrow in drawing(r, narrow: narrow) }

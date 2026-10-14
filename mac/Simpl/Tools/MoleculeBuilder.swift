@@ -405,7 +405,7 @@ struct MoleculeBuilder: View {
     private static let palette = ["H", "C", "N", "O", "F", "Cl", "Br", "I", "S", "P", "B", "Si"]
 
     var body: some View {
-        PTWorkLayout {
+        PTWorkLayout(shortDrawing: true) {
             PTNarrowReader { narrow in controls(narrow: narrow) }
         } centre: {
             PTNarrowReader { narrow in viewer(narrow: narrow) }

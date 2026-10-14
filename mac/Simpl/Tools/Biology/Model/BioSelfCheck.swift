@@ -31,39 +31,31 @@ struct BioCheckReport {
 }
 
 enum BioSelfCheck {
-    /// Every check, the foundation's then the tools'.
-    static func run() -> BioCheckReport {
+    /// Every check, the foundation's then the tools' — each group's lines told as it ends, if asked.
+    static func run(told: ((ArraySlice<String>) -> Void)? = nil) -> BioCheckReport {
         var r = BioCheckReport()
-        geneticCode(&r)
-        aminoAcids(&r)
-        molecules(&r)
-        bdna(&r)
-        randomness(&r)
-        chiSquare(&r)
-        crosses(&r)
-        sequences(&r)
-        structures(&r)
-        geometry(&r)
-        // (the tools' own, each in its model file under Biology/Model)
-        cellChecks(&r)
-        dnaChecks(&r)
-        geneChecks(&r)
-        biomolChecks(&r)
-        crossChecks(&r)
-        divideChecks(&r)
-        popgenChecks(&r)
-        biolabChecks(&r)
-        enzymeChecks(&r)
-        energyChecks(&r)
+        let groups: [(inout BioCheckReport) -> Void] = [
+            geneticCode, aminoAcids, molecules, bdna, randomness, chiSquare, crosses, sequences, structures, geometry,
+            // (the tools' own, each in its model file under Biology/Model)
+            cellChecks, dnaChecks, geneChecks, biomolChecks, crossChecks, divideChecks, popgenChecks, biolabChecks, enzymeChecks, energyChecks,
+        ]
+        for group in groups {
+            let before = r.lines.count
+            group(&r)
+            told?(r.lines[before...])
+        }
         return r
     }
 
     /// (-SimplBioCheck YES) Every line to standard error (unbuffered, so the screenshot suite's console file keeps
-    /// it), and a summary.
+    /// it), each group's as it ends — a debug build takes about a minute for all of them, longer than a picture's
+    /// launch lasts, and a check printed whole at the end never reached the console — then a summary.
     static func printAll() {
-        let r = run()
-        let text = (r.lines + ["bio-check summary \(r.passed)/\(r.passed + r.failed) \(r.failed == 0 ? "OK" : "FAIL")"]).joined(separator: "\n") + "\n"
-        FileHandle.standardError.write(Data(text.utf8))
+        let r = run { lines in
+            guard !lines.isEmpty else { return }
+            FileHandle.standardError.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+        }
+        FileHandle.standardError.write(Data("bio-check summary \(r.passed)/\(r.passed + r.failed) \(r.failed == 0 ? "OK" : "FAIL")\n".utf8))
     }
 
     // MARK: 1. The genetic code

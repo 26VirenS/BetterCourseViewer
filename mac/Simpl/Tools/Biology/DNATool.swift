@@ -150,6 +150,9 @@ final class DNAStore: ObservableObject {
         ntCompare = BioPrefs.bool(.dna, "compare", default: false)
         rnaView = DNARNAView(rawValue: BioPrefs.string(.dna, "rnaView") ?? "") ?? .cloverleaf
         showModified = BioPrefs.bool(.dna, "modified", default: false)
+        // (a launch's state from the start, before any page is drawn: applied as the tool appeared, some of it — the
+        // grooves, the unzip, the bases in 2D, the tRNA's L-shape — never reached the pictures)
+        apply(BioLaunchState.forTool(.dna))
     }
 
     // MARK: The sequence
@@ -259,6 +262,11 @@ final class DNAStore: ObservableObject {
         if let arm = s.value("arm"), let a = DNATRNAArm(rawValue: arm) { trnaSelection = "arm:\(a.rawValue)" }
         if let step = s.value("step").flatMap(Int.init) {
             replication.go(to: min(max(step, 1), DNAReplication.steps.count) - 1, animated: false)
+        }
+        if OpenClock.verbose {
+            NSLog("[Simpl] bio launch: dna %@: style %@, grooves %@, measure %@, unzip %.2f, nucleotide %@ (%@), rna %@, step %d", s.raw,
+                  helixStyle.rawValue, showGrooves ? "on" : "off", showMeasure ? "on" : "off", unzip, nucleotide, ntView.rawValue,
+                  rnaView.rawValue, replication.index + 1)
         }
     }
 

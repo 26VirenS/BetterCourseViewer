@@ -352,7 +352,8 @@ struct DNACloverleafView: View {
                 .contentShape(Rectangle())
                 .onTapGesture(coordinateSpace: .local) { pt in tap(pt, fit) }
         }
-        .frame(minHeight: 420)
+        // (fitted to whatever room the card gives it: at 420 at least, the card ran out over the page under it)
+        .frame(minHeight: 300)
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(.leftArrow) { move(-1); return .handled }

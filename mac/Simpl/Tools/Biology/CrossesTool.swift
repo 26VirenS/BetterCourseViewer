@@ -505,6 +505,10 @@ struct CrossPage: View {
 
     private func footer(_ cross: BioCross) -> String {
         let n1 = cross.gametes1.count, n2 = cross.gametes2.count
+        // (the forked line has no cells to hover: its own line, not the square's)
+        if model.shownDiagram == .forked {
+            return "\(cross.genes.count) gene\(cross.genes.count == 1 ? "" : "s"), each split on its own; multiply along a branch for each outcome's chance."
+        }
         return "\(n1) × \(n2) = \(n1 * n2) cell\(n1 * n2 == 1 ? "" : "s"), each as likely as the next. Hover a cell to light every cell with its genotype."
     }
 }
