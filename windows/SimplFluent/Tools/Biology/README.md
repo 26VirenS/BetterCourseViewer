@@ -305,11 +305,12 @@ layer added to the shared 3D view), `BiomolDrawings.cs`, `BiomolAminoPage.cs`, `
 `BiomolMoleculePages.cs`. Every page opens its molecule in the Molecule Builder (`MoleculeModel.Shared`, atom ids from
 1,000,000). The built peptide is shown laid out as the Mac lays it out (`BiomoleculeBuilderModel.ShownPeptide`): its CA
 trace's longest axis along x, N-terminus at the left, the next axis up, chosen again only when the camera frames it
-afresh (it grew out of the ball last framed, or shrank well inside it), so a helix is seen from its side. Launch: `amino:aa=W:colour=part`, `proteins:hbonds:ribbon=over`, `proteins:ss=helix`, `proteins:sheet`,
+afresh (it grew out of the ball last framed, or shrank well inside it), so a helix is seen from its side. Launch:
+`amino:aa=W:colour=part`, `proteins:hbonds:ribbon=over`, `proteins:ss=helix`, `proteins:sheet`,
 `proteins:level=tertiary:core`, `proteins:level=quaternary`, `nucleic:strand:seq=ATGCGT:complement`, `carbs:anomers`,
 `carbs:di=SUC:split`, `carbs:poly=cellulose`, `lipids:lipid=compare` (the Mac's words, a few aliases beside them).
 Takes `sequence`, `protein` and `molecule`; sends `mutation` = `sickle` (page `mutations`) to Gene Expression, `sequence`
-(page `sequence`) to DNA & RNA, and page `membrane` to Cell Explorer.
+(page `sequence`) or a `nucleotide` (page `nucleotides`) to DNA & RNA, and page `membrane` to Cell Explorer.
 
 ## DNA & RNA (`dna`)
 
@@ -323,7 +324,8 @@ page (`DNAHelixPage.cs` … `DNARnaPage.cs`). Launch, in the Mac's words with th
 `nucleotides:mol=DT` (or `nt=`), `pairs` (or `bases`), `model`, `au`, `numbers`, `compare`, `parts`/`noparts` (or
 `cpk`), `part=sugar`; `replication:step=6`; `rna:view=cloverleaf|lshape|mrna|ribosomes` (or `trna`, `trna3d`,
 `mrna`, `ribosome`), `modified`, `base=34`, `arm=anticodon`. Takes `sequence` (shown on the Sequence page, RNA letters
-written as DNA), `nucleotide` (the Nucleotides page) and `page` (Cell Division's "What happens in S phase" opens
+written as DNA), `nucleotide` (the Nucleotides page; `molecule` read as the same) and `page` (Cell Division's "What
+happens in S phase" opens
 `replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is).
 
 ## Cell Division (`divide`)
@@ -368,9 +370,10 @@ The keys are the Mac's, so a hand-off reads the same on both; a tool also reads 
 | Gene Expression → Biomolecule Builder | `protein` (page `proteins`), `molecule` (page `amino`) |
 | Biomolecule Builder → Gene Expression | `mutation` = sickle (page `mutations`) |
 | DNA & RNA ⇄ Gene Expression, Biomolecule Builder → DNA & RNA | `sequence` |
+| Biomolecule Builder → DNA & RNA ("See it in DNA & RNA") | `nucleotide` = DT … (page `nucleotides`; `molecule` read as the same) |
 | Cell Division → DNA & RNA | `page` = replication |
 | Cell Explorer → Flashcards | `deck` |
-| Genetics Crosses → Cell Division ("How meiosis makes them") | `focus` = assortment (not read yet on either app: Cell Division opens on its last page) |
+| Genetics Crosses → Cell Division ("How meiosis makes them") | `focus` = assortment (not read yet on either app: Cell Division opens on Meiosis, at the step it was on) |
 | a pin's quick version → its tool | Crosses `cross`, `chi`; Hardy–Weinberg `given`, `value`, `counts`; Gene Expression `codon`; Bio Lab `calc` |
 
 ## Numbers (rounding)

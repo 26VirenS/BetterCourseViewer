@@ -295,7 +295,7 @@ internal sealed class BiomolNucleicPage : BiomolPageView
             BioUI.FactRow("Formula", $"{BiomolText.Formula(mol.Formula ?? "")} · {BiomolKit.N(mol.Mass ?? 0, "0.00")} g/mol (neutral form)"),
             BioUI.FactRow("At pH 7", code == "ATP" ? "ATP⁴⁻: its phosphates' four OH have lost their H" : "Its phosphate is −2: both its OH have lost their H"),
             BioUI.FactRow("Numbering", "Sugar carbons 1′ to 5′: the base joins at 1′, the phosphate at 5′, and the next nucleotide's phosphate at the 3′-OH."),
-            BiomolKit.Action("See it in DNA & RNA", SymbolRegular.Ribbon20, () => BiomolHandOver.ToTool(C, "dna", "nucleotides", new Dictionary<string, string> { ["molecule"] = code }), "DNA & RNA ▸ Nucleotides")));
+            BiomolKit.Action("See it in DNA & RNA", SymbolRegular.Ribbon20, () => BiomolHandOver.ToTool(C, "dna", "nucleotides", new Dictionary<string, string> { ["nucleotide"] = code }), "DNA & RNA ▸ Nucleotides")));
         if (deoxy || code is "A" or "C" or "G" or "U")
             Right.Children.Add(BioUI.Card("DNA or RNA?", null, null,
                 K.Wrapped("Two differences: the sugar (deoxyribose has H at 2′ where ribose has –OH, not at 3′) and one base (DNA has thymine, T; RNA has uracil, U, which is T without its methyl group).", Ty.Body)));

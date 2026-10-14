@@ -75,19 +75,20 @@ internal sealed class DNATool : Grid
 
     /// <summary>
     /// What another tool handed over (spec §3.2; both apps' words): a strand (<c>sequence</c>, RNA letters written as DNA)
-    /// shown on the Sequence page, a nucleotide (<c>nucleotide</c>, "DT") on the Nucleotides page, or just a page
-    /// (<c>page</c>: Cell Division's "What happens in S phase" opens Replication) — <c>page</c> also says where a strand
-    /// or a nucleotide is shown.
+    /// shown on the Sequence page, a nucleotide (<c>nucleotide</c>, "DT"; <c>molecule</c> read as the same) on the
+    /// Nucleotides page, or just a page (<c>page</c>: Cell Division's "What happens in S phase" opens Replication) —
+    /// <c>page</c> also says where a strand or a nucleotide is shown.
     /// </summary>
     private static void TakeHandOff(ToolContext c)
     {
         var page = c.TakeInfo("page") is { } p && Pages.Any(x => x.Id == p) ? p : null;
+        var nucleotide = c.TakeInfo("nucleotide") ?? c.TakeInfo("molecule");
         if (c.TakeInfo("sequence") is { Length: > 0 } handed)
         {
             DNAToolModel.Quietly(() => DNAToolModel.SetSequence(handed.ToUpperInvariant().Replace('U', 'T')));
             BioNav.Set("dna", page ?? "sequence");
         }
-        else if (NucleotideCode(c.TakeInfo("nucleotide")) is { } code)
+        else if (NucleotideCode(nucleotide) is { } code)
         {
             DNAToolModel.Quietly(() => { DNAToolModel.Nucleotide = code; DNAToolModel.ShowPairs = false; });
             BioNav.Set("dna", page ?? "nucleotides");
