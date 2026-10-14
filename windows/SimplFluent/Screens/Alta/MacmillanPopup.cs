@@ -168,7 +168,7 @@ internal sealed class MacmillanPopupView
         core.Settings.IsPasswordAutosaveEnabled = false;
         core.Settings.IsGeneralAutofillEnabled = false;
         // (Macmillan's page in light, as it is made, whatever the app's appearance: the popup's own header stays as the app is)
-        await LightPages.Apply(core);
+        await LightPages.Apply(core, "macmillan");
         if (closed) return;
         core.NavigationCompleted += (_, e) =>
         {

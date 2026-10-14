@@ -565,6 +565,11 @@ const htmlPages = {
   // a widget's file at an address (the importer's "An address" pane fetches it through the background)
   '/dev/widget.html': () => `<!doctype html>\n<meta name="simpl-widget" content='{"name":"Fetched widget","note":"Came from an address.","icon":"globe","size":"S"}'>\n<p id="hi">Hello from an address.</p>\n<script>simpl.ready(function (t) { document.getElementById('hi').textContent = 'Hello from an address, ' + (t.dark ? 'dark' : 'light') + '.'; });</script>`,
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
+  // (Windows 0.3.1) a tool whose page has a dark look of its own and frames another site's page with one too (127.0.0.1
+  // is another site to the web view: a frame in a process of its own), its script reading the colour scheme once as it
+  // starts — opened by a sessionless launch of tool 19, for Windows' picture that both come out in light in a dark app
+  '/mock-tool-framed': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Framed tool</title><style>:root{color-scheme:light dark}body{font-family:sans-serif;padding:24px;background:#fff;color:#111}@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style></head><body><h2 id="mock-tool-framed">Framed tool (its page dark in dark mode)</h2><iframe id="tool_frame" title="The tool's frame" src="http://127.0.0.1:${port}/mock-tool-frame" width="640" height="200" style="border:1px solid #888"></iframe></body></html>`,
+  '/mock-tool-frame': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>The tool's frame</title><style>:root{color-scheme:light dark}body{font-family:sans-serif;padding:16px;background:#fff;color:#111}@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style></head><body><h3>The tool's frame, on another site (dark in dark mode)</h3><p id="start"></p><script>document.getElementById('start').textContent = 'As it started, this frame read the colour scheme: ' + (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');</script></body></html>`,
   // the tool a sessionless launch opens: its own page, at the top level
   '/mock-tool': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resources & Policy</title></head><body style="font-family:-apple-system,sans-serif;padding:24px"><h2 id="mock-tool">Resources &amp; Policy (the tool's own page)</h2><p>Opened by a sessionless launch, at the top level: no Canvas frame around it.</p><button onclick="alert('The tool says hello')">Say hello</button></body></html>`,
   '/accounts/1/external_tools/77': () => page({ title: 'My Materials', body: '<h2 id="account-tool">My Materials (an account-level tool, launched by Canvas)</h2><iframe id="tool_content" title="My Materials" src="/courses/104/external_tools/t1/resource_selection"></iframe>' }),
@@ -1275,6 +1280,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
   if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a4/cover` };
+  // (Windows 0.3.1) a tool whose page frames another site's, both with a dark look of their own
+  if (q.get('id') === '19') return { id: '19', name: 'Framed tool', url: `http://localhost:${port}/mock-tool-framed` };
   return { id: q.get('id') || '9', name: 'Resources & Policy', url: `http://localhost:${port}/mock-tool?for=${encodeURIComponent(what)}&course=${m[1]}` };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));

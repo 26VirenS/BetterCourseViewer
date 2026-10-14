@@ -489,9 +489,14 @@ public sealed class TodoScreen : Screen
   loads, and why it could not open in the window with Try again. The page is in light, whatever Simpl's appearance or
   Windows' (`LightPages`: the page and its frames are told the student prefers light, through the browser's DevTools
   protocol, per web view — the profile's preference is shared with the school's pages in the app, which follow the
-  app); Macmillan Learning's popup the same. `--open tool:101:9` opens one at launch (the screenshot suite pictures the
-  window in front; `--web-scheme dark` in a picture run gives its profile Windows' dark preference, and the window
-  writes "web window: the page prefers light" in simpl.log as each page comes in).
+  app; a frame in a process of its own is held at its start until it has been told, so a script that reads the
+  colour scheme as it starts reads light); Macmillan Learning's popup the same. A window the page opens (window.open,
+  a link to a new window, a sign-in's popup) opens as another of these windows, in light, the page that opened it still
+  its opener — left to the web view, it was a bare browser window that took Windows' dark. `--open tool:101:9` opens one
+  at launch (the screenshot suite pictures the window in front; `--web-scheme dark` in a picture run gives its profile
+  Windows' dark preference, and the window writes "web window: the page prefers light" in simpl.log as each page comes
+  in, and "web window: a frame prefers light" for each of its frames); `--open tool:101:19` opens the mock school's
+  tool whose page, and the other site's page it frames, each have a dark look of their own.
 
 ## Pages
 

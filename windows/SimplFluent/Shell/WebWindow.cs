@@ -21,7 +21,8 @@ namespace Simpl.Shell;
 /// under the title bar while a page loads. An external tool opens by the school's one-time launch (the engine's
 /// toolLaunch, as the Mac's window asks it): the tool alone, at the top of the window, not inside a second copy of the
 /// school's page — the school's own page for it only when the launch cannot be had. A tool that will not open says why
-/// in the window, with Try again.
+/// in the window, with Try again. A window the page opens (window.open, a link to a new window) opens as another of
+/// these, its page in light too and the page that opened it still its opener.
 /// </summary>
 public sealed class WebWindow : FluentWindow
 {
@@ -52,12 +53,18 @@ public sealed class WebWindow : FluentWindow
     /// <summary>The address the window opens (known at once for a page; the launch's answer for a tool).</summary>
     private Uri? start;
     private bool ready, opening;
+    /// <summary>A window a page asked for, still to be given this one's web view (<see cref="Opened"/>).</summary>
+    private (CoreWebView2NewWindowRequestedEventArgs Asked, CoreWebView2Deferral Deferral)? asked;
 
     /// <summary>A page of the school's (or another site's), at its address.</summary>
     public WebWindow(Uri url, string title, Window? owner) : this(null, null, url, title, owner) { }
 
     /// <summary>A launch (a tool, a page): a tool by the school's one-time launch, else at its address.</summary>
     public WebWindow(Engine.Engine engine, ToolLaunch t, Window? owner) : this(engine, t, null, t.Title, owner) { }
+
+    /// <summary>A window a page asked for: its web view handed to the page as the new window once it is set to light.</summary>
+    private WebWindow(CoreWebView2NewWindowRequestedEventArgs e, CoreWebView2Deferral deferral, Window? owner)
+        : this(null, null, Uri.TryCreate(e.Uri, UriKind.Absolute, out var u) ? u : null, u?.Host ?? "", owner) => asked = (e, deferral);
 
     private WebWindow(Engine.Engine? engine, ToolLaunch? launch, Uri? url, string title, Window? owner)
     {
@@ -148,9 +155,23 @@ public sealed class WebWindow : FluentWindow
                 web.CoreWebView2.NavigationStarting += (_, _) => { loading.Visibility = Visibility.Visible; Paint(); };
                 web.CoreWebView2.NavigationCompleted += (_, _) => { loading.Visibility = Visibility.Collapsed; Paint(); LightPages.Tell(web.CoreWebView2, "web window"); };
                 web.CoreWebView2.HistoryChanged += (_, _) => Paint();
+                // (a window the page opens — "Open in a new window", a sign-in's popup — is another of these, in light: left
+                //  to the web view, it was a bare window of the browser's, dark when Windows is)
+                web.CoreWebView2.NewWindowRequested += (_, e) => Popup(e);
                 // (the tool's page in light, whatever the app's appearance or Windows': its title bar stays as the app is)
-                await LightPages.Apply(web.CoreWebView2);
+                await LightPages.Apply(web.CoreWebView2, "web window");
                 ready = true;
+            }
+            if (asked is { } a)
+            {
+                // (the page that asked fills this web view itself: it is handed over, set to light, before it has loaded)
+                asked = null;
+                Opened(a.Asked, a.Deferral);
+                state.Content = null;
+                web.Visibility = Visibility.Visible;
+                opening = false;
+                Paint();
+                return;
             }
             start ??= await Launch();
             if (start == null) throw new InvalidOperationException("Simpl could not find where this tool opens.");
@@ -160,11 +181,41 @@ public sealed class WebWindow : FluentWindow
         }
         catch (Exception e)
         {
+            // (a window asked for that could not be made: the page's request let go, so the page is not left waiting)
+            if (asked is { } a) { asked = null; a.Deferral.Complete(); }
             web.Visibility = Visibility.Hidden;
             state.Content = Failed(e.Message);
         }
         opening = false;
         Paint();
+    }
+
+    /// <summary>A window the page asked for opened as another of these (owned as this one is), the request held until it
+    /// has its web view; one that cannot be made lets the request go, and the web view opens it as it would have.</summary>
+    private void Popup(CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        try
+        {
+            new WebWindow(e, deferral, Owner).Show();
+        }
+        catch (Exception x)
+        {
+            Log.Write("web window: a window the page asked for: " + x.Message);
+            deferral.Complete();
+        }
+    }
+
+    /// <summary>This window's web view given to the page that asked for a window, and the request let go.</summary>
+    private void Opened(CoreWebView2NewWindowRequestedEventArgs e, CoreWebView2Deferral deferral)
+    {
+        try
+        {
+            e.NewWindow = web.CoreWebView2;
+            e.Handled = true;
+        }
+        catch (Exception x) { Log.Write("web window: handing over a window: " + x.Message); }
+        finally { deferral.Complete(); }
     }
 
     /// <summary>
@@ -297,32 +348,61 @@ public sealed class WebWindow : FluentWindow
 internal static class LightPages
 {
     private const string Light = "{\"features\":[{\"name\":\"prefers-color-scheme\",\"value\":\"light\"}]}";
-    private const string AutoAttach = "{\"autoAttach\":true,\"waitForDebuggerOnStart\":false,\"flatten\":true}";
+    private const string AutoAttach = "{\"autoAttach\":true,\"waitForDebuggerOnStart\":true,\"flatten\":true}";
 
-    /// <summary>The web view's page, and every frame attached to it from now on, told the student prefers light.</summary>
-    public static async Task Apply(CoreWebView2 core)
+    /// <summary>
+    /// The web view's page, and every frame attached to it from now on, told the student prefers light. A frame in a
+    /// process of its own is held at its start until it has been told (waitForDebuggerOnStart), then let go: let run at
+    /// once, a tool's script that reads the colour scheme once as it starts could read dark before it was told. Every
+    /// target held is let go whatever happens (a worker too, which has no colour scheme to be told). In the screenshot
+    /// suite each of the page's frames says in simpl.log, after <paramref name="what"/>, which it prefers once loaded.
+    /// </summary>
+    public static async Task Apply(CoreWebView2 core, string what)
     {
         try
         {
             // (the screenshot suite: a profile that prefers dark, as a Windows in dark mode has it, so the picture shows
             //  the tool's page in light all the same)
             if (Shot.Asked && Launch.Get("web-scheme") == "dark") core.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
+            if (Shot.Asked) core.FrameCreated += (_, e) => e.Frame.NavigationCompleted += (_, _) => TellFrame(e.Frame, what);
             core.GetDevToolsProtocolEventReceiver("Target.attachedToTarget").DevToolsProtocolEventReceived += async (_, e) =>
             {
+                string? session = null;
+                var waiting = false;
                 try
                 {
-                    // (a frame — not a worker, which has no colour scheme to be told)
                     var said = System.Text.Json.Nodes.JsonNode.Parse(e.ParameterObjectAsJson);
-                    if (said?["sessionId"]?.GetValue<string>() is not { Length: > 0 } session || said["targetInfo"]?["type"]?.GetValue<string>() is not ("iframe" or "page")) return;
+                    session = said?["sessionId"]?.GetValue<string>();
+                    waiting = said?["waitingForDebugger"]?.GetValue<bool>() == true;
+                    if (session is not { Length: > 0 } || said!["targetInfo"]?["type"]?.GetValue<string>() is not ("iframe" or "page")) return;
                     await core.CallDevToolsProtocolMethodForSessionAsync(session, "Emulation.setEmulatedMedia", Light);
                     await core.CallDevToolsProtocolMethodForSessionAsync(session, "Target.setAutoAttach", AutoAttach);
                 }
                 catch (Exception x) { Log.Write("light page: a frame: " + x.Message); }
+                finally
+                {
+                    if (waiting && session is { Length: > 0 })
+                    {
+                        try { await core.CallDevToolsProtocolMethodForSessionAsync(session, "Runtime.runIfWaitingForDebugger", "{}"); }
+                        catch (Exception x) { Log.Write("light page: a frame let go: " + x.Message); }
+                    }
+                }
             };
             await core.CallDevToolsProtocolMethodAsync("Emulation.setEmulatedMedia", Light);
             await core.CallDevToolsProtocolMethodAsync("Target.setAutoAttach", AutoAttach);
         }
         catch (Exception x) { Log.Write("light page: " + x.Message); }
+    }
+
+    /// <summary>(the screenshot suite) Whether a frame of the page prefers light, in simpl.log, for CI to read.</summary>
+    private static async void TellFrame(CoreWebView2Frame frame, string what)
+    {
+        try
+        {
+            var dark = await frame.ExecuteScriptAsync("matchMedia('(prefers-color-scheme: dark)').matches");
+            Log.Write($"{what}: a frame prefers {(dark == "true" ? "dark" : "light")}");
+        }
+        catch (Exception x) { Log.Write($"{what}: a frame: {x.Message}"); }
     }
 
     /// <summary>(the screenshot suite) Whether the page shown prefers light, in simpl.log, for CI to read.</summary>
