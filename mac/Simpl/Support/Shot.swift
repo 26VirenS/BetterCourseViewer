@@ -44,6 +44,8 @@ enum Shot {
         let settle = d.object(forKey: "SimplShotSettle") == nil || d.bool(forKey: "SimplShotSettle")
         started = Date()
         lastActivity = Date()
+        // (1.3.80: -SimplLiveShotAfter 4 — the picture waits for that many live checks, Engine/LiveRefresh.swift)
+        if d.integer(forKey: "SimplLiveShotAfter") > 0 { began() }
         NSApp.activate(ignoringOtherApps: true)
         for delay in [0.6, 2.0, 5.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { place() }

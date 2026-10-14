@@ -193,12 +193,14 @@ struct DetailStack: View {
                     .background(PageGround().ignoresSafeArea())
                     .modifier(RootUnseen(top: path.isEmpty))
                     .modifier(PageArrival(move: engine.move, top: path.isEmpty && place != .dashboard))
+                    .environment(\.liveOnShow, path.isEmpty) // (1.3.80: checked live only while nothing is pushed over it)
                     .navigationDestination(for: Route.self) { route in
                         RouteScreen(route: route)
                             .navigationBarBackButtonHidden(true) // (the toolbar's own Back and Forward walk the history)
                             // (1.2.3) its own ground, up under the toolbar: the screen it was opened from never shows through
                             .background(PageGround().ignoresSafeArea())
                             .modifier(PageArrival(move: engine.move, top: engine.nav.current.path.last == route))
+                            .environment(\.liveOnShow, engine.nav.current.path.last == route) // (1.3.80: the one on top)
                     }
             }
             .onAppear {
@@ -225,6 +227,7 @@ struct DetailStack: View {
                     .accessibilityHidden(!dashboardUp)
             }
         }
+        .background { LiveWindowProbe(live: engine.live) } // (1.3.80: the window the live checks watch)
         .onAppear { if dashboardUp && !Engine.plain { dashboardKept = true } }
         .onChange(of: dashboardUp) { _, up in if up && !Engine.plain { dashboardKept = true } }
     }

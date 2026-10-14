@@ -269,6 +269,9 @@ final class FloatingPopups {
 
     func isOpen(_ key: String) -> Bool { panels[key] != nil }
 
+    /// (1.3.80) The keys of the popups up now (a live check waits while a dialog is up: Engine/LiveRefresh.swift).
+    var openKeys: [String] { Array(panels.keys) }
+
     /// The popup under `key`, if it is up, brought to the front and given the keys.
     func raise(_ key: String) {
         panels[key]?.makeKeyAndOrderFront(nil)

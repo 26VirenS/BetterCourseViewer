@@ -542,8 +542,15 @@ final class Loader<T: Decodable>: ObservableObject {
     private(set) var source = "fetched"
     /// (1.3.78) What is shown is this screen's own answer (or a fresh one): a reload is a redraw, not an arrival.
     private var settled = false
+    /// (1.3.80) What the live checks know of the answer shown (its fingerprint: LiveRefresh), and the read it came from —
+    /// its name (a check is said on the console by it) and its arguments.
+    let marks = LiveMarks()
+    private(set) var readName: String?
+    private var readArgs: [String: Any] = [:]
 
     func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
+        readName = name
+        readArgs = args
         if data == nil {
             if let held = engine.recent(name, args, as: T.self) {
                 quietly {
@@ -551,12 +558,14 @@ final class Loader<T: Decodable>: ObservableObject {
                     source = "cached"
                     settled = held.fresh
                 }
+                marks.shown(name, args, by: engine)
             } else if let k = await engine.keptAnswer(name, args, as: T.self), data == nil {
                 quietly {
                     data = k
                     kept = true
                     source = "kept"
                 }
+                marks.set(name, args, to: nil) // (from before: its fingerprint is not known, a first check compares it)
             }
         }
         // (answered moments ago, and nothing done since: nothing to ask)
@@ -577,8 +586,33 @@ final class Loader<T: Decodable>: ObservableObject {
                 }
             }
             settled = true
+            marks.shown(name, args, by: engine)
         } catch {
             if data == nil { self.error = error.localizedDescription }
+        }
+    }
+
+    /// (1.3.80) The live check of what is shown (LiveRefresh): the read it came from asked again with the check's age.
+    /// Nothing when it is what Canvas says now; else the new answer put in place — what changed moving to where it is
+    /// now, the rows that did not change left as they are (each screen draws its rows by their ids).
+    func liveCheck(_ engine: Engine, maxAge: Double) async throws -> LiveFound {
+        guard let name = readName, data != nil else { return .unchanged }
+        let args = readArgs
+        guard let change = try await engine.liveCheck(name, args, as: T.self, shown: data, marks: marks, maxAge: maxAge) else {
+            marks.at = Date()
+            return .unchanged
+        }
+        return LiveFound(parts: [name]) { [weak self] in
+            // (a read of its own made since — another mailbox, another grouping — is never undone by it)
+            guard let self, self.readName == name, AnswerMemo.key(name, self.readArgs) == AnswerMemo.key(name, args) else { return }
+            change.put {
+                withAnimation(LiveRefresh.motion) {
+                    self.data = change.value
+                    self.error = nil
+                    self.kept = false
+                }
+            }
+            self.marks.at = Date()
         }
     }
 
