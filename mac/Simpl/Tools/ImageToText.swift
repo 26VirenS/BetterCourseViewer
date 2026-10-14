@@ -180,8 +180,7 @@ struct ImageToTextTool: View {
                 } label: {
                     Label(copied ? "Copied" : "Copy Text", systemImage: copied ? "checkmark" : "doc.on.doc").font(.sCallout.weight(.semibold))
                 }
-                .glassButton(prominent: true)
-                .tint(ToolKind.ocr.color)
+                .glassButton(prominent: true, tint: ToolKind.ocr.color)
                 .disabled(text.isEmpty)
                 Button {
                     save()
