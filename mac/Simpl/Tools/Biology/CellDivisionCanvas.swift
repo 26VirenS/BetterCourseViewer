@@ -159,7 +159,7 @@ struct DivisionCanvas: View {
             let a = DivPainter.anchor(l.anchor, f, shapes)
             let p = map.point(a.point)
             return BioLabelInput(id: l.id, text: l.text, x: Double(p.x), y: Double(p.y), visible: a.visible, area: 0,
-                                 width: BioLabelLayout.estimatedWidth(l.text))
+                                 width: BioLabelWidth.of(l.text))
         }
         let r = Double(map.scale) * f.bounds.width / 2
         return BioLabelLayout.layout(inputs, cx: Double(map.size.width / 2), cy: Double(map.size.height / 2), r: r,

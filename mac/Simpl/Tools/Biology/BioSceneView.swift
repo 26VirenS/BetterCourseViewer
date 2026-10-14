@@ -147,6 +147,22 @@ struct BioSceneButtons: View {
 
 // MARK: - The labels over the scene (§3.5)
 
+/// A label's capsule width as it is drawn: its words measured at 12 pt semibold, its 10 pt padding a side, and a point
+/// to spare each side — so no label is cut short ("Plasma membr…"), as the model's estimate by letter count let wide
+/// words be. Measured once for each text.
+enum BioLabelWidth {
+    private static let cache = NSCache<NSString, NSNumber>()
+    private static let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+
+    static func of(_ text: String) -> Double {
+        let key = text as NSString
+        if let w = cache.object(forKey: key) { return w.doubleValue }
+        let w = Double(ceil(key.size(withAttributes: [.font: font]).width)) + 22
+        cache.setObject(NSNumber(value: w), forKey: key)
+        return w
+    }
+}
+
 struct BioLabelsOverlay: View {
     @ObservedObject var live: BioSceneLive
     let reduceMotion: Bool
@@ -737,7 +753,7 @@ final class BioSceneCoordinator: NSObject {
                 visible = rayVisible[l.id] ?? true
             }
             inputs.append(BioLabelInput(id: l.id, text: l.text, x: Double(p.x), y: screenY(p.y), visible: visible, area: l.area,
-                                        width: BioLabelLayout.estimatedWidth(l.text)))
+                                        width: BioLabelWidth.of(l.text)))
         }
         if still { raysDone = true }
         // (the model's circle on the screen: its framing ball's centre and edge, projected)
