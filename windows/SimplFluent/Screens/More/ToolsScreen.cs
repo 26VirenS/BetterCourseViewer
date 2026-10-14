@@ -66,8 +66,8 @@ public static class ToolsPins
 /// colour, its name and a one-line note, and its pin — under a heading for what they are for: Study (flashcards, the focus
 /// timer, citations, Grade needed), Math &amp; science (the calculators, the unit converter, the periodic table), Files (the
 /// file converter, Merge &amp; split PDFs, the PDF annotator, Image to text), and Biology (the biology toolkit's ten,
-/// Tools/Biology). A tile opens its tool on this page (<see cref="ToolScreen"/>: "Tools › Calculator", the breadcrumb's
-/// "Tools" and Back coming back here); a pin's flyout opens it over the window instead.
+/// Tools/Biology). A tile opens its tool in a popup over this page (Tools/ToolHost.cs, ToolPopup), the page and the rest
+/// of the window still at hand under it.
 /// </summary>
 public sealed class ToolsScreen : Screen
 {
@@ -136,8 +136,6 @@ public sealed class ToolsScreen : Screen
 
     public override void Refresh()
     {
-        // (the tiles shown: the Tools place opens on them again, not on the tool last open)
-        if (!Away) Simpl.Tools.ToolsCenter.Open = null;
         if (!ReferenceEquals(watched, Simpl.Tools.ToolRegistry.Timer))
         {
             if (watched != null) watched.Changed -= TimerChanged;
@@ -150,7 +148,7 @@ public sealed class ToolsScreen : Screen
         // (a pin changed anywhere — here, a sheet, the title bar — shows on the tiles while the page is up)
         ToolsPins.Changed -= PinsChanged;
         ToolsPins.Changed += PinsChanged;
-        // (the screenshot suite: --tool calc opens the Calculator on this page, as the Mac's -SimplTool)
+        // (the screenshot suite: --tool calc opens the Calculator in its popup over this page, as the Mac's -SimplTool)
         if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.FirstOrDefault(t => t.Key == k) is { } kind)
             Application.Current.Dispatcher.BeginInvoke(() => OpenTool(engine, kind), System.Windows.Threading.DispatcherPriority.Loaded);
         // (a development run's --bio-demo: the biology toolkit's foundation seen working, Tools/Biology/BioDemo.cs)
@@ -256,14 +254,14 @@ public sealed class ToolsScreen : Screen
         return b;
     }
 
-    /// <summary>A tool opened by its key (a command, a link): on the Tools page.</summary>
+    /// <summary>A tool opened by its key (a command, a link): in its popup over where you are.</summary>
     public static void OpenTool(Engine.Engine engine, string key)
     {
         if (Kinds.FirstOrDefault(k => k.Key == key) is { } kind) OpenTool(engine, kind);
     }
 
-    /// <summary>A tool opened on the Tools page ("Tools › Calculator") — from its tile, a command alike; the graphing
-    /// calculator, while it has no view of its own here, in a window.</summary>
+    /// <summary>A tool opened in its popup over where you are — from its tile, a command alike; the graphing calculator,
+    /// while it has no view of its own here, in a window.</summary>
     public static void OpenTool(Engine.Engine engine, Kind kind)
     {
         if (kind.Key == "graph" && !Simpl.Tools.ToolRegistry.Has("graph")) { engine.OpenBrowser(Desmos, kind.Name); return; }

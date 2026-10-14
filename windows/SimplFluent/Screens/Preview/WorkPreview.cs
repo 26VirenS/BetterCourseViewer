@@ -45,9 +45,11 @@ public sealed class PreviewItem
 /// A quick look at a piece of work (the Mac's WorkPreview and WorkPreviewOverlay; the web's preview.js): a click on a row
 /// of work grows a card out of that row with what the work is — its kind and course, its title, when it is due, its
 /// points, where it stands and the first words of what it says — with the way through to it (Open, or Enter), Hand In or
-/// Take Quiz where it waits on you, and Mark Done for a row with a tick. A click round it, Escape or Close folds it back
-/// into the row. A double-click (or a Ctrl+click) on a row opens the work whole. On Windows the card is a flyout surface
-/// over the page (the shell's overlay), rising out of its row as the Dashboard's counters do.
+/// Take Quiz where it waits on you, and Mark Done for a row with a tick. It takes nothing from the window round it — the
+/// page, the pane, the search all go on working, nothing dimmed — and stays where it is, over whatever place is opened
+/// under it, until Close, Escape or its row pressed again folds it back; its heading moves it (Kit/Drag.cs). A
+/// double-click (or a Ctrl+click) on a row opens the work whole. On Windows the card is a flyout surface over the page
+/// (the shell's overlay), rising out of its row as the Dashboard's counters do.
 /// </summary>
 public static class WorkPreview
 {
@@ -68,6 +70,9 @@ public static class WorkPreview
         engine = e;
         overlay.Background = null;
     }
+
+    /// <summary>The shell's overlay over the page: where a card that stays over every place is drawn (a counter's panel too).</summary>
+    public static Canvas? Layer => host;
 
     public static bool IsOpen => card != null;
 
@@ -129,6 +134,9 @@ public static class WorkPreview
         card.Bg(B.Flyout).Stroke(B.FlyoutStroke);
         Shell.Tour.Mark(card, Shell.TourSpot.Preview);
         card.MouseDown += (_, e) => e.Handled = true;
+        // (its heading — its kind and course, Close — moves it; Escape inside it folds it back)
+        Drag.ByHeading(card, 52);
+        card.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape && ReferenceEquals(card, WorkPreview.card)) { e.Handled = true; Close(); } };
         host.Children.Add(card);
         face.Resized += hh =>
         {
@@ -210,14 +218,6 @@ public static class WorkPreview
         var open = item?.OpenWhole;
         Dismiss();
         open?.Invoke();
-    }
-
-    /// <summary>A click anywhere outside the card folds it back (the click still does what it does).</summary>
-    public static void ClickedAt(Point p)
-    {
-        if (card == null) return;
-        var r = new Rect(Canvas.GetLeft(card), Canvas.GetTop(card), card.ActualWidth, card.ActualHeight);
-        if (!r.Contains(p) && !(anchor?.IsMouseOver ?? false)) Close();
     }
 
     // ---- from the rows (the Mac's PreviewItem.work, .dash, .sheet) ----
@@ -441,7 +441,7 @@ public static class WorkPreview
             kick.Foreground = K.Brush(K.Darkened(Tint));
             var close = K.Button("Close", Close, icon: SymbolRegular.Dismiss24);
             close.MinWidth = 0;
-            close.ToolTip = "Close (Esc, or click anywhere else)";
+            close.ToolTip = "Close (Esc)";
             var head = K.Columns("auto, *, auto, auto",
                 K.IconTile(item.Symbol, Tint, 26).Col(0),
                 kick.Margin(9, 0, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1),

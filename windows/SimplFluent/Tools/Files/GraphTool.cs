@@ -37,7 +37,6 @@ internal sealed class GraphWeb
     public static readonly GraphWeb Mini = new(compact: true);
 
     private static Task<CoreWebView2Environment>? environment;
-    private static bool covered;
     private readonly bool compact;
     private readonly List<GraphPane> holders = new();
     private FrameworkElement? view;
@@ -52,19 +51,6 @@ internal sealed class GraphWeb
 
     /// <summary>Loaded, failed, or covered (the panes show it, or why not).</summary>
     public event Action? Changed;
-
-    /// <summary>
-    /// Something of the window's own over the whole tool's web view (the navigation pane over a narrow window): the web
-    /// view, a window of its own, steps aside meanwhile — as the school's pages do (WebScreen.SheetOver).
-    /// </summary>
-    public static void Cover(bool over)
-    {
-        if (covered == over) return;
-        covered = over;
-        Full.Changed?.Invoke();
-    }
-
-    public static bool Covered => covered;
 
     /// <summary>The web view, made the first time it is asked for.</summary>
     public FrameworkElement View
@@ -269,13 +255,13 @@ internal sealed class GraphPane : Grid
         t.Start();
     }
 
-    /// <summary>Over this pane: a sheet it is not in, or the window's narrow navigation pane.</summary>
+    /// <summary>Over this pane: a dialog over its popup that it is not in (the whole tool is in a popup of its own,
+    /// Shell/FloatPopup.cs, so nothing of Simpl's window can come over it).</summary>
     private bool Covered()
     {
         if (web.Compact) return false;
-        if (GraphWeb.Covered) return true;
         if (sheets is not { IsOpen: true } s) return false;
-        // (in the sheet that is up — the whole tool opened over the window — it is on top)
+        // (in the sheet that is up, it is on top)
         for (DependencyObject? d = this; d != null; d = VisualTreeHelper.GetParent(d))
             if (ReferenceEquals(d, s)) return false;
         return true;

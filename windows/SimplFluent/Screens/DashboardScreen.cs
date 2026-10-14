@@ -177,7 +177,8 @@ public sealed partial class DashboardScreen : Screen
         overlay = new Canvas { ClipToBounds = false };
         root.Children.Add(page);
         root.Children.Add(overlay);
-        if (openKey != null) root.Loaded += (_, _) => ShowPanel(animate: !sheetAsked);
+        // (a panel already up — over the page, or over another place — is kept, its list read again)
+        if (openKey != null) root.Loaded += (_, _) => { if (frame == null) ShowPanel(animate: !sheetAsked); else PanelData(); };
         return root;
     }
 
@@ -345,7 +346,7 @@ public sealed partial class DashboardScreen : Screen
             grid.Children.Add(tile);
             tiles[c.Key] = tile;
             if (c.Key == "next") Shell.Tour.Mark(tile, Shell.TourSpot.CounterNext);
-            if (openKey == c.Key) tile.Opacity = 0;
+            if (openKey == c.Key && !panelMoved) tile.Opacity = 0;
         }
         Shell.Tour.Mark(grid, Shell.TourSpot.Counters);
         return grid;
@@ -574,10 +575,20 @@ public sealed partial class DashboardScreen : Screen
     }
 
     // ---- the panel a counter grows into (the Mac's DashCounterPanel: 440 wide; here a Windows 11 flyout surface) ----
+    // (it takes nothing from the window round it and stays until it is closed — its ×, Escape, its tile again — over
+    //  whatever place is opened meanwhile: it is drawn in the shell's overlay over the page, WorkPreview.Layer, and its
+    //  heading moves it)
 
     private string? openKey;
     private bool sheetAsked;
     private Border? frame;
+    /// <summary>The panel moved away from its tile by its heading: the tile shows again, and the panel fades away when it
+    /// is closed rather than folding into it.</summary>
+    private bool panelMoved;
+
+    /// <summary>Where the panel is drawn: over the page, above every place (the shell's overlay); this page's own until
+    /// the shell has one.</summary>
+    private Canvas? Layer => WorkPreview.Layer ?? overlay;
     private FrameworkElement? panelContent;
     private Rect panelRect;
 
@@ -601,40 +612,39 @@ public sealed partial class DashboardScreen : Screen
         return true;
     }
 
-    /// <summary>A press anywhere outside the open panel — the page round it, the pane, the header, the title bar — folds it
-    /// back (the press still does what it does).</summary>
-    public override void Pressed(MouseButtonEventArgs e)
-    {
-        if (e.ChangedButton != MouseButton.Left) return;
-        if (openKey == null || frame == null) return;
-        var p = e.GetPosition(frame);
-        if (p.X >= 0 && p.Y >= 0 && p.X <= frame.ActualWidth && p.Y <= frame.ActualHeight) return;
-        if (tiles.TryGetValue(openKey, out var t) && t.IsMouseOver) return; // (its own tile closes it by its click)
-        SetOpen(null);
-    }
-
+    /// <summary>A counter's tile where the panel is drawn (nothing while the page is not shown).</summary>
     private Rect TileRect(string key)
     {
-        if (root == null || !tiles.TryGetValue(key, out var t) || !t.IsLoaded) return Rect.Empty;
-        var p = t.TranslatePoint(new Point(0, 0), root);
-        return new Rect(p, new Size(t.ActualWidth, t.ActualHeight));
+        if (Layer is not { } layer || !tiles.TryGetValue(key, out var t) || !t.IsLoaded || !t.IsVisible) return Rect.Empty;
+        try { return new Rect(t.TranslatePoint(new Point(0, 0), layer), new Size(t.ActualWidth, t.ActualHeight)); }
+        catch (InvalidOperationException) { return Rect.Empty; }
+    }
+
+    /// <summary>The page's content where the panel is drawn.</summary>
+    private Rect PageRect(Canvas layer)
+    {
+        if (root == null || !root.IsVisible) return Rect.Empty;
+        try { return new Rect(root.TranslatePoint(new Point(0, 0), layer), new Size(root.ActualWidth, root.ActualHeight)); }
+        catch (InvalidOperationException) { return Rect.Empty; }
     }
 
     private void ShowPanel(bool animate)
     {
-        if (openKey == null || root == null || overlay == null) return;
+        if (openKey == null || root == null || Layer is not { } layer) return;
         var key = openKey;
         var tile = TileRect(key);
-        if (tile.IsEmpty) return;
+        var pageRect = PageRect(layer);
+        if (tile.IsEmpty || pageRect.IsEmpty) return;
         var d = today.Data;
         var c = d?.Counters.FirstOrDefault(k => k.Key == key);
         if (c == null) { openKey = null; return; }
-        overlay.Children.Clear();
-        var w = Math.Min(440, root.ActualWidth);
+        if (frame != null) (frame.Parent as Panel)?.Children.Remove(frame);
+        panelMoved = false;
+        var w = Math.Min(440, pageRect.Width);
         // placed by where its tile sits across the row: the first tile's panel from its left edge, the last one's from
         // its right, one between them centred on it in step — kept on the page (the Mac's, 1.3.16)
-        var along = root.ActualWidth > tile.Width ? Math.Clamp(tile.X / (root.ActualWidth - tile.Width), 0, 1) : 0;
-        var x = Math.Clamp(tile.X + (tile.Width - w) * along, 0, Math.Max(0, root.ActualWidth - w));
+        var along = pageRect.Width > tile.Width ? Math.Clamp((tile.X - pageRect.X) / (pageRect.Width - tile.Width), 0, 1) : 0;
+        var x = Math.Clamp(tile.X + (tile.Width - w) * along, pageRect.X, Math.Max(pageRect.X, pageRect.Right - w));
         panelContent = PanelContent(c, key, w);
         panelContent.Width = w - 2;
         panelContent.Measure(new Size(w - 2, double.PositiveInfinity));
@@ -648,7 +658,14 @@ public sealed partial class DashboardScreen : Screen
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
         Shell.Tour.Mark(frame, Shell.TourSpot.CounterPanel);
-        overlay.Children.Add(frame);
+        // (its heading moves it — its tile then shows again; Escape inside it closes it, wherever it is)
+        Drag.ByHeading(frame, 56, () =>
+        {
+            panelMoved = true;
+            if (openKey != null && tiles.TryGetValue(openKey, out var t2) && t2.Opacity < 1) { t2.Opacity = 1; Motion.FadeIn(t2, Motion.Fast); }
+        });
+        frame.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; SetOpen(null); } };
+        layer.Children.Add(frame);
         if (tiles.TryGetValue(key, out var t)) t.Opacity = 0;
         if (!animate || !Motion.On)
         {
@@ -681,15 +698,19 @@ public sealed partial class DashboardScreen : Screen
     {
         var f = frame;
         var content = panelContent;
+        var moved = panelMoved;
         frame = null;
         panelContent = null;
-        if (f == null || overlay == null) { if (tiles.TryGetValue(key, out var t0)) t0.Opacity = 1; return; }
+        panelMoved = false;
+        if (f == null) { if (tiles.TryGetValue(key, out var t0)) t0.Opacity = 1; return; }
         var tile = TileRect(key);
         void Done()
         {
-            overlay?.Children.Remove(f);
-            if (tiles.TryGetValue(key, out var t)) { t.Opacity = 1; Motion.FadeIn(t, Motion.Fast); }
+            (f.Parent as Panel)?.Children.Remove(f);
+            if (tiles.TryGetValue(key, out var t) && t.Opacity < 1) { t.Opacity = 1; Motion.FadeIn(t, Motion.Fast); }
         }
+        // (moved away from its tile, or its tile not shown — another place open under it: it fades where it is)
+        if (Motion.On && (moved || tile.IsEmpty)) { Motion.FadeOut(f, Done, Motion.Fast); return; }
         if (!Motion.On || tile.IsEmpty) { Done(); return; }
         if (content != null) Motion.FadeOut(content, () => { }, Motion.Fast);
         var from = new Rect(Canvas.GetLeft(f), Canvas.GetTop(f), f.ActualWidth, f.ActualHeight);
@@ -721,7 +742,7 @@ public sealed partial class DashboardScreen : Screen
         var n = Count(c, full: true);
         var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
         var color = TileColor(c, n.Value);
-        var close = K.IconButton(SymbolRegular.Dismiss24, () => SetOpen(null), "Close", 14, 32);
+        var close = K.IconButton(SymbolRegular.Dismiss24, () => SetOpen(null), "Close (Esc)", 14, 32);
         var titleRow = K.Columns("auto, *, auto",
             K.IconTile(Glyph.Counter(key), color, 28).Col(0),
             K.Text(data?.Title ?? FullName(key, c.Label), Ty.BodyStrong).Margin(10, 0, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1),
@@ -732,9 +753,7 @@ public sealed partial class DashboardScreen : Screen
         var countRow = K.Columns("auto, *", count.Col(0));
         if (!string.IsNullOrEmpty(line)) countRow.Children.Add(K.Wrapped(line!, Ty.Body, B.Text2, 2).Margin(14, 0, 0, 6).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1));
         var head = K.V(4, titleRow, countRow);
-        // (a click on the header folds it back too)
-        head.Background = Brushes.Transparent;
-        head.MouseLeftButtonUp += (_, e) => { if (e.OriginalSource is not DependencyObject o || !IsInside(o, close)) SetOpen(null); };
+        head.Background = Brushes.Transparent; // (its heading takes hold of the panel to move it: Kit/Drag.cs)
 
         // (the list under the header, scrolling past about five rows, and nothing under it: the panel as 0.2.9 had it)
         FrameworkElement body;
@@ -751,12 +770,6 @@ public sealed partial class DashboardScreen : Screen
         }
         var all = K.V(14, head, K.Divider(), body);
         return new Border { Child = all, Padding = new Thickness(18, 14, 14, 16) };
-    }
-
-    private static bool IsInside(DependencyObject o, DependencyObject container)
-    {
-        for (var p = o; p != null; p = VisualTreeHelper.GetParent(p) ?? LogicalTreeHelper.GetParent(p)) if (p == container) return true;
-        return false;
     }
 
     /// <summary>

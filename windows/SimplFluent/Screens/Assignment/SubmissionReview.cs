@@ -46,7 +46,7 @@ internal sealed class SubmissionReview : Grid
         var width = Math.Min(Math.Max(w - 64, 760), 1500);
         var height = Math.Min(Math.Max(h - 80, 520), 1000);
         var view = new SubmissionReview(engine, a, file, width);
-        var s = new Sheet { Bare = true, Width = width, Height = height, Body = view };
+        var s = new Sheet { Bare = true, Width = width, Height = height, Body = view, Floats = true, OwnClose = true, Name = a.Title };
         view.Done = s.Close;
         view.Loaded += (_, _) =>
         {

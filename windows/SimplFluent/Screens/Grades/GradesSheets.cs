@@ -24,7 +24,7 @@ internal static class GradesSheets
         var possible = new TextBox { PlaceholderText = "Points", Text = "100" };
         var note = K.Wrapped("", Ty.Caption, B.Text2);
         var body = K.V(14, Field("Name", name), Field("Score", score), Field("Out of", possible), note);
-        var sheet = new Sheet { Title = "What-if assignment", Body = body, Width = 460 };
+        var sheet = new Sheet { Title = "What-if assignment", Body = body, Width = 460, Floats = true };
 
         // what it is out of, when that is more than nothing
         double? Points() => GradesKit.Number(possible.Text) is { } p && p > 0 ? p : null;
@@ -90,7 +90,7 @@ internal static class GradesSheets
             card,
             K.Wrapped("Enter the lowest percentage for each letter, as your syllabus or instructor sets it." + (lowest != null ? $" F is anything below the {lowest} cutoff." : ""), Ty.Caption, B.Text2),
             problem);
-        var sheet = new Sheet { Title = "Grading scale", Body = body, Width = 520 };
+        var sheet = new Sheet { Title = "Grading scale", Body = body, Width = 520, Floats = true };
         var saving = false;
         var buttons = new List<SheetButton>();
 

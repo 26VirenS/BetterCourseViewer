@@ -106,8 +106,7 @@ public sealed partial class CalendarScreen : Screen
     public override void Hide()
     {
         base.Hide();
-        hidden = true;
-        peek.Dismiss();
+        hidden = true; // (a quick look stays over the place opened instead, until it is closed)
     }
 
     /// <summary>Read ahead, unseen: the month (or week, or list) it would show, nothing else.</summary>

@@ -108,9 +108,9 @@ window's side of it, `Shell/UpdateWatch.cs`:
   subject). An installer kept from before (Simpl quit before it went in) is checked and used rather than fetched again.
 - **When it goes in**: at once, unless something is open that an update must not cut off — then it waits, and goes in
   as soon as all of it is closed. What holds it: a quiz, a Knewton Alta or Macmillan assignment, a page of the school's
-  in the window (each holds while it is open, the Mac's `UpdateHold`); any dialog over the window (Hand In, the setup,
-  a message, a task, a tool opened whole, Sign out?… — all but What's New, which is only there to be read), a dialog in
-  Settings, a window of a page of the school's or a tool's (`WebWindow`), Alta's graph; Windows' own Open and Save
+  in the window (each holds while it is open, the Mac's `UpdateHold`); any dialog over the window (the setup, Sign out?…)
+  or popup floating over it (Hand In, a message, a task, a tool opened whole… — all but What's New, which is only there
+  to be read), a dialog in Settings, a window of a page of the school's or a tool's (`WebWindow`), Alta's graph; Windows' own Open and Save
   dialogs; the tour; the sign-in while it is on screen; Simpl opening; and, for a moment, a menu or a flyout, the quick
   look, a file on its way. Besides, with Simpl in front it waits for half a minute without a key or a click (the
   student may be reading); behind other windows, five seconds. Going in, the notice at the top of the window says so
@@ -369,11 +369,11 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | --- | --- |
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). Since 2.99.33 the page also writes the figures, dates and course names it sends (`pctText`, `gpaText`, `goalLine`, `dueLine`, `altName`, `gradedText`…): show those strings as they come rather than formatting the numbers here, so Windows reads every grade, date and course exactly as the Mac does. |
-| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `RichText` (Canvas's own HTML as Windows text), `Formula` (Canvas's formulas typeset from their TeX with WPF-Math, MIT, drawn in the text's colour; written out as plain maths where they cannot be), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs and popups), `Drag` (a popup moved by its heading), `Glyph` (symbols for the school's things), `RichText` (Canvas's own HTML as Windows text), `Formula` (Canvas's formulas typeset from their TeX with WPF-Math, MIT, drawn in the text's colour; written out as plain maths where they cannot be), `Styles.xaml` (card, subtle and row buttons). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole over the window or beside a popup, the pieces tools are made of; a tool on the Tools page is `Screens/More/ToolScreen.cs`), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -414,7 +414,8 @@ public sealed class TodoScreen : Screen
   Section headings on a page are `Heading.Section(title, trailing, action)`; groups of settings-like rows use
   `K.SectionHeader` and `K.Row`.
 - Surfaces: `K.Card` (8 radius; 4 for Settings rows), `K.CardButton`, `K.Subtle` for rows in a list. Lists sit in a card
-  with `K.Divider` between rows. Dialogs are `Sheet`s shown with `Dialogs.Show(sheet, window)`.
+  with `K.Divider` between rows. Dialogs are `Sheet`s shown with `Dialogs.Show(sheet, window)`; a popup is a `Sheet`
+  with `Floats` (Popups, below).
 - Motion: the shell brings the page in (below, Pages); a screen animates only what changes on it at the student's
   word — `Motion.Enter` / `Stagger` for a regrouped list or a filter's cards, `SlideIn` for steps, `DrillIn` for
   something opened over it — never its content as it first shows. Everything respects Windows' "Animation effects"
@@ -552,9 +553,12 @@ no picture of the one before it to move from: it arrives by its own entrance (th
 A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grows a card out of itself with
 `WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
 Calendar's `CalendarPeek`). The card reads the work's details as it opens — the first words of what the work says, as
-plain lines, up to five — Mark done ticks it, a double-click or a Ctrl-click opens the work whole, and a click round
-it, Escape or Close folds it back into its row. It is a light-dismiss flyout: nothing behind it is dimmed, and the app
-round it goes on working.
+plain lines, up to five — Mark done ticks it, a double-click or a Ctrl-click opens the work whole, and Close, Escape or
+its row pressed again folds it back into its row. It takes nothing from the window: nothing behind it is dimmed, a click
+elsewhere does what it does and leaves it up, and it stays over whatever place is opened under it until it is closed;
+its heading moves it (`Kit/Drag.cs`). A counter's panel on the Dashboard is the same: drawn in the shell's overlay over
+the page (`WorkPreview.Layer`), it stays over another place opened meanwhile, its heading moves it (its tile then shows
+again), and ×, Escape or its tile close it.
 
 The card is 0.2.9's: as wide as the row it grows out of and a little more, from 300 (a month's narrow chip) to 420 (a
 list's row), never wider than the page. It says where the work stands once: a graded piece's score and letter as one
@@ -630,40 +634,71 @@ internal static class CalculatorRegistration
 }
 ```
 
-A tool opens on the Tools page like any other page (`ToolScreen`, a `RouteKind.Tool` step of the Tools place): from its
-tile, a pin's menu, a command or another tool handing it something (`ToolsCenter.Show`), under the breadcrumb "Tools ›
-Calculator" — the breadcrumb's "Tools" and Back go to the tiles, the pane and the title bar's pins stay at hand, and the
-tool open is kept while you look elsewhere: picking Tools again opens on it (`ToolsCenter.Open`, `Engine.OpensOn`). A
-tool that shows pages of its own names the one shown after its name (`ToolContext.ShowPage`: "Tools › Periodic table ›
-Lewis structures"), and may hide its line under its name while it needs the room (`ShowNote`).
+A tool opens whole in a popup over where you are (`ToolPopup`, a popup floating over the window: Popups, below) —
+from its tile on the Tools page (or the tile's menu), a pin's menu or its flyout's name, a pulled-out pin's name, a
+command, a link, or another tool handing it something (`ToolsCenter.Show`) — as large as the page beside the pane less
+a margin and resized with the window, the Tools page (or whatever shows) behind it and the pane, the title bar and the
+search still at hand. Its heading, which moves it: the tool's tile and name, its line, its own controls (a biology
+tool's pages, the Periodic Table's search — on a line of their own under the name where the popup is too narrow for
+them beside it), its pin and ×; × or Escape closes it. One popup a tool: opened again, the one there comes forward,
+taking what was handed to it. A tool that shows pages of its own names the one shown after its name
+(`ToolContext.ShowPage`: "Periodic table › Lewis structures", the name going back to its first page), and may hide its
+line while it needs the room (`ShowNote`); a tool handing something to another from its popup (`BioTools.Open`, the
+Biomolecule Builder's molecule for the 3D builder) turns that popup into the other tool in place (`ToolsCenter.PopUp`),
+and the chemistry builders opened from elsewhere are the Periodic Table's own pages in its popup (`ChemSheet`).
+`--tool calc` opens one over the Tools page for a picture.
 
 A pin's flyout is the tool's quick version, under its whole name (with ›, the one way to the whole tool) and Pop out,
 which pulls the quick version into a small window of its own kept above Simpl and its popups (`ToolFloat`; pictured
 over a quiz with `--pin-popout calc`); unpinning is in the pin's menu, not in the flyout. The flyout folds back on a
 press elsewhere in the window, the window left (not for a part of the flyout that is a window of its own), moved or
 resized, Escape, or its pin pressed again (its opening and closing go to the log in picture runs; CI's `--pin-try
-graph|fc` opens one as a press does, clicks and types in it, and checks it is still open five seconds on). From a flyout the
-whole tool opens over the window in a sheet (`ToolPopup`: Done, the tool's heading with the other pinned tools in it, a
-hairline under the heading once the tool scrolls); from a popup's pins (a quiz, Knewton Alta, Macmillan, a tool's
-sheet, the chemistry builders' sheet: `PinBar(engine, inPopup: true)`) in a window of its own beside it
-(`ToolsCenter.Float`, `ToolWindow`), since a sheet would wait behind the popup. A sheet focuses its first field only when
-it shows without scrolling, and never read-only words, so it opens at its top; a tool's page opens at its top too
+graph|fc` opens one as a press does, clicks and types in it, and checks it is still open five seconds on). The same
+pins sit in the heading of a quiz (which covers the title bar), Knewton Alta and Macmillan (`PinBar(engine, inPopup:
+true)`); the whole tool opens in its popup from them too, above them. A popup focuses its first field only when it
+shows without scrolling, and never read-only words, so it opens at its top; a tool opens at its top too
 (`ToolKit.Edged`), whatever takes the focus as it comes up. The work and its side panel (`ToolKit.Columns`) sit side by
-side from about 860 of the page's width — the page beside the pane, about 980 in a 1366 window — and one over the other
-below that, a side that holds the tool's answer (Grade needed, Citations) first.
+side from about 860 of the popup's width — about 960 in a 1366 window, 870 in a 1280 one — and one over the other below
+that, a side that holds the tool's answer (Grade needed, Citations) first.
 
-`ToolContext` hands a tool the engine, where it is (`Quick`, `InPage`), what was handed over (`TakeFiles`, `TakeInfo`),
-`OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns, fields, notes, the drop zone
-and the scroll edge; `Files` has Windows' file dialogs.
+`ToolContext` hands a tool the engine, where it is (`Quick`; `Owner`, the window it is in), what was handed over
+(`TakeFiles`, `TakeInfo`), `OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns,
+fields, notes, the drop zone and the scroll edge; `Files` has Windows' file dialogs.
 
 The Tools page lists the tools under what they are for — Study, Math & science, Files, then Biology — a one-line note on
-each tile, three across from about 900 wide. Windows' sentence case on every button and menu ("Pin to title bar",
+each tile, three across from about 900 wide; a tile opens its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title bar",
 "Copy result", "Skip tour").
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
 plant:cutaway`); their shared data, 3D view, labels with leader lines, step-through and self-check (`--bio-check`) are
 described in `Tools/Biology/README.md`.
+
+## Popups
+
+Every popup floats over the window without holding it (`Shell/FloatPopup.cs`, a `Sheet` with `Floats`): a window of
+its own owned by Simpl's window — kept above it, minimized and brought back with it, hidden with it in the notification
+area and shown again with it — so nothing takes the window's clicks: the pane, the title bar, the search and the page
+behind it go on working, and another place opened under a popup leaves it where it is. Nothing is dimmed; Windows' own
+shadow and rounded corners set it apart (pictures draw them, `Support/Shot.cs`). It opens centred over the page beside
+the pane (`MainWindow.PopupRoom`); a large one (`Large`: a tool, Knewton Alta, Macmillan) is that page less a margin
+(24, 16 on a narrow page) and is resized with the window; it moves with the window, keeping where it was put, and its
+heading moves it (a press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).
+× (or its own Close: `OwnClose`), Escape while it has the keyboard (not while what it shows must be answered first:
+`Modal`, the popup's own keys then) and Alt+F4 close it — through its Cancel, or `Dismiss` (New message asks before a
+message is thrown away). Enter presses its default button. Its own questions show over it (its own `SheetHost`), and
+Windows' Open dialog over it. Windows' own window motion brings it in and takes it away, as Windows' Animation effects
+say. Each popup with something of the student's in it holds an update while it is open (`Shell/UpdateWatch.cs`).
+
+What each is now: a tool opened whole (its `ToolPopup`; the Periodic Table's builders are its pages in it); Knewton Alta
+and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
+review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
+Grading scale; the Calendar's Calendars; a course's Nickname — popups. The quick look and a counter's panel stay cards
+on the page that grow out of their rows, taking nothing from the window either (The quick look, above). Pinned tools'
+flyouts and their pulled-out windows, menus and the search's suggestions are as they were. Staying sheets over the
+window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first setup, the sign-in's
+"Stay logged in?", the tour (its own veil), and the questions that must be answered first (Sign out?, Delete this
+task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo.
 
 ## Icons
 

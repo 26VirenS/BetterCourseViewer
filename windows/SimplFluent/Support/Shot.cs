@@ -109,9 +109,9 @@ public static class Shot
     /// in a window of its own has no owner, and would otherwise lose to the main window.</summary>
     public static void Take(string file)
     {
-        // (a small window kept on top of the others — a tool pulled out of its pin, ToolFloat — is pictured over the
-        //  window under it, never on its own)
-        static bool Floating(Window x) => x.Topmost && !x.ShowInTaskbar && x.Owner != null;
+        // (a small window kept on top of the others — a tool pulled out of its pin, ToolFloat — or a popup floating over
+        //  the window, Shell/FloatPopup.cs, is pictured over the window under it, never on its own)
+        static bool Floating(Window x) => x is Shell.FloatPopup || (x.Topmost && !x.ShowInTaskbar && x.Owner != null);
         var visible = Application.Current.Windows.OfType<Window>().Select((x, i) => (Window: x, Order: i)).Where(x => x.Window.IsVisible).ToList();
         var w = visible.Where(x => !Floating(x.Window))
                     .OrderByDescending(x => x.Window.IsActive).ThenByDescending(x => x.Window.Owner != null).ThenByDescending(x => x.Order)
@@ -129,7 +129,21 @@ public static class Shot
             foreach (var f in visible.Where(x => Floating(x.Window)).OrderBy(x => x.Order).Select(x => x.Window))
             {
                 if (Print(new WindowInteropHelper(f).Handle) is not { } over) continue;
-                dc.DrawImage(over.Image, new Rect(over.At.L - at.L, over.At.T - at.T, over.At.R - over.At.L, over.At.B - over.At.T));
+                var r = new Rect(over.At.L - at.L, over.At.T - at.T, over.At.R - over.At.L, over.At.B - over.At.T);
+                if (f is not Shell.FloatPopup) { dc.DrawImage(over.Image, r); continue; }
+                // (a popup as Windows draws it: its soft shadow, its rounded corners and its hairline — none of which
+                //  PrintWindow gives)
+                var radius = 8 * r.Width / Math.Max(1, f.ActualWidth); // (Windows 11's 8, at the display's scale)
+                for (var i = 14; i >= 1; i--)
+                {
+                    var spread = new Rect(r.X - i, r.Y - i + 6, r.Width + 2 * i, r.Height + 2 * i);
+                    dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(Appearance.Dark ? (byte)9 : (byte)5, 0, 0, 0)), null, spread, radius + i, radius + i);
+                }
+                dc.PushClip(new RectangleGeometry(r, radius, radius));
+                dc.DrawImage(over.Image, r);
+                dc.Pop();
+                var hair = new Pen(new SolidColorBrush(Appearance.Dark ? Color.FromArgb(0x40, 255, 255, 255) : Color.FromArgb(0x26, 0, 0, 0)), 1);
+                dc.DrawRoundedRectangle(null, hair, new Rect(r.X + 0.5, r.Y + 0.5, r.Width - 1, r.Height - 1), radius, radius);
             }
             // what floats over it: a menu, a flyout (each a window of its own, drawn by WPF — pictured as WPF draws it,
             // its see-through edges and shadow kept)

@@ -342,7 +342,7 @@ public sealed class CoursesScreen : Screen
         var box = new TextBox { PlaceholderText = string.IsNullOrEmpty(c.Original) ? "Nickname" : c.Original, Text = c.Nickname ?? "", MaxLength = 80 };
         var where = engine.OnBrightspace ? "on this PC only" : "in Canvas too";
         var note = K.Wrapped($"Shown instead of “{(string.IsNullOrEmpty(c.Original) ? c.Code : c.Original)}” everywhere, {where}.", Ty.Body, B.Text2);
-        var s = new Sheet { Title = "Nickname", Body = K.V(14, note, box), Width = 440 };
+        var s = new Sheet { Title = "Nickname", Body = K.V(14, note, box), Width = 440, Floats = true };
         s.Add("Save", SheetButtonKind.Primary, () => Save(c, box.Text));
         if (!string.IsNullOrEmpty(c.Nickname)) s.Add("Remove nickname", SheetButtonKind.Secondary, () => Save(c, ""));
         s.Add("Cancel", SheetButtonKind.Close);

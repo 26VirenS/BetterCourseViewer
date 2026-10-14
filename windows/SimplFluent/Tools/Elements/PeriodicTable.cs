@@ -592,7 +592,7 @@ internal sealed class PeriodicTableTool : Grid
         CheckTour();
     }
 
-    /// <summary>The page shown named in the tool's heading ("Tools › Periodic table › Lewis structures", the table's name
+    /// <summary>The page shown named in the tool's heading ("Periodic table › Lewis structures", the table's name
     /// going back to the table); the table itself, the tool's name alone.</summary>
     private void Heading() =>
         ctx.ShowPage(PTNav.Page == PTPage.Table ? null : PTNav.Page.Label(), () => PTNav.Choose(PTPage.Table));

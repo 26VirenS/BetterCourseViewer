@@ -84,9 +84,6 @@ public sealed partial class AssignmentScreen : Screen
 
     private object Args => new { course, id };
 
-    /// <summary>Which assignment this is, to the rubric over the window.</summary>
-    private string Owner => $"{course}/{id}";
-
     private string CanvasUrl => model.Data?.CanvasUrl ?? $"/courses/{course}/assignments/{id}?bcv=native";
 
     public override string Title => model.Data?.Title ?? "Assignment";
@@ -104,13 +101,6 @@ public sealed partial class AssignmentScreen : Screen
         // (shown again with an arrival waiting — a press elsewhere on this same assignment's Hand In or See Feedback)
         if (model.Data is { } d && !model.Loading && engine.Arrival is { } a && a.Id == id)
             root.Dispatcher.BeginInvoke(() => Arrived(d), DispatcherPriority.ContextIdle);
-    }
-
-    /// <summary>The rubric goes with its page.</summary>
-    public override void Hide()
-    {
-        base.Hide();
-        RubricPopup.Dismiss(Owner);
     }
 
     /// <summary>Escape puts the comment being written away.</summary>
@@ -450,7 +440,7 @@ public sealed partial class AssignmentScreen : Screen
     /// <summary>Marked and posted, the rubric is the feedback.</summary>
     private static bool RubricMarked(AssignmentData d) => d.Rubric.Count > 0 && new RubricModel(d.Rubric).Graded;
 
-    private void OpenRubric(AssignmentData d, int? open = null, string? view = null) => RubricPopup.Show(d, Owner, open, view);
+    private void OpenRubric(AssignmentData d, int? open = null, string? view = null) => RubricPopup.Show(d, open, view);
 
     /// <summary>The screenshot suite's way to the rubric: "" opens it, ":2" opened on the second criterion, ":grid" as the grid.</summary>
     private void OpenRubricShot(string shot, AssignmentData d)

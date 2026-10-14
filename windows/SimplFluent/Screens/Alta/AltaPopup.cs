@@ -53,6 +53,7 @@ internal sealed class AltaPopupView
     private readonly AltaLayer layer = new();
     private readonly Dictionary<string, double> drawn = new();
     private Sheet? sheet;
+    private readonly FrameworkElement header;
     private string railSig = "", startSig = "", footerSig = "", stateSig = "";
     /// <summary>(2.99.33) The Canvas assignment's due line ("Due Oct 12 at 11:59 PM"), once read: the header's, in place of
     /// the publisher's own words for it.</summary>
@@ -72,7 +73,8 @@ internal sealed class AltaPopupView
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         tileSlot.Content = Tile(32);
         title.Text = launch.Title;
-        root.Children.Add(AltaLook.Header(engine, tileSlot, title, subtitle, logsSlot, Close, "Close — your progress is kept by Alta").Row(0));
+        header = AltaLook.Header(engine, tileSlot, title, subtitle, logsSlot, Close, "Close — your progress is kept by Alta");
+        root.Children.Add(header.Row(0));
 
         // the rail, and Alta's page in its frame (the popup's own in its place while it loads, and its buttons under it)
         var body = new Grid();
@@ -95,16 +97,17 @@ internal sealed class AltaPopupView
 
     public void Open()
     {
-        sheet = AltaLook.Popup(root, over);
-        railColumn.Width = new GridLength(sheet.Width >= 960 ? 290 : 240);
+        sheet = AltaLook.Popup(root, header, Close, "Knewton Alta");
+        // (the rail wider in a wide popup)
+        root.SizeChanged += (_, e) => railColumn.Width = new GridLength(e.NewSize.Width >= 960 ? 290 : 240);
         sheet.Closed += Cleanup;
         // (no update goes in while it is open: Support/Updates.cs, the Mac's UpdateHold)
         sheet.Closed += Support.Updates.Hold("Knewton Alta", "when you close Knewton Alta").Dispose;
         session.Changed += Update;
         layer.Gone += Update;
         Support.Appearance.Changed += OnAppearance;
-        over.PreviewKeyDown += OnKey;
-        // (begun once the popup is up: it may wait its turn behind another sheet)
+        root.PreviewKeyDown += OnKey;
+        // (begun once the popup is up)
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
         {
@@ -115,6 +118,7 @@ internal sealed class AltaPopupView
         root.Loaded += loaded;
         Update();
         Dialogs.Show(sheet, over);
+        if (sheet.Window is { } w) session.ShowsIn(w);
         ReadDue();
     }
 
@@ -142,7 +146,7 @@ internal sealed class AltaPopupView
         if (closed) return;
         closed = true;
         closing = true;
-        over.PreviewKeyDown -= OnKey;
+        root.PreviewKeyDown -= OnKey;
         Support.Appearance.Changed -= OnAppearance;
         session.Changed -= Update;
         layer.Gone -= Update;

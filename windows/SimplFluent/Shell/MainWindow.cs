@@ -72,6 +72,21 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
 
     public SheetHost Sheets => sheets;
 
+    /// <summary>
+    /// Where a popup over the window is centred (Shell/FloatPopup.cs), in the window's content's terms: the page beside
+    /// the pane while the app shows — a large popup is as large as it, less a margin, so the pane and the title bar stay
+    /// in sight beside it — else everything under the title bar.
+    /// </summary>
+    public Rect PopupRoom =>
+        shell != null && ReferenceEquals(cover.Content, shell) && shell.PageArea(root) is { IsEmpty: false } page
+            ? page
+            : new Rect(0, TitleBarHeight, root.ActualWidth, Math.Max(0, root.ActualHeight - TitleBarHeight));
+
+    /// <summary>The page beside the pane changed its place or size (the pane folded away on a narrow window).</summary>
+    public event EventHandler? PopupRoomChanged;
+
+    internal void PopupRoomMoved() => PopupRoomChanged?.Invoke(this, EventArgs.Empty);
+
     public MainWindow()
     {
         Title = "Simpl";
@@ -566,6 +581,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (!IsVisible && shell != null) Taskbar.Opened(this, Busy);
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        FloatPopup.ShowAgain(this); // (the popups hidden with it, as they were)
         Activate();
         Topmost = true;
         Topmost = false;

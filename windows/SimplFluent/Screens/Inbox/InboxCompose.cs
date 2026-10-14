@@ -170,7 +170,8 @@ public sealed class ComposeSheet
         // (someone already chosen: the typing starts at the subject)
         if (people.Count > 0) layers.Loaded += (_, _) => layers.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () => subject.Focus());
 
-        sheet = new Sheet { Body = layers, Bare = true, Modal = true, Width = 720, Height = 640 };
+        // (floating over the window, the Inbox and the rest of Simpl at hand beside it; its ×, like Escape, is Cancel)
+        sheet = new Sheet { Body = layers, Bare = true, Modal = true, Width = 720, Height = 640, Floats = true, Dismiss = Cancel, Name = "New message" };
         ShowTokens();
         FillCourses();
         Paint();

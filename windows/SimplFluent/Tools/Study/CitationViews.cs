@@ -15,7 +15,7 @@ namespace Simpl.Tools;
 /// Citation generator (the Mac's CitationTool): the style and the kind of source across the top, the details on the left,
 /// and on the right the citation as it forms — its in-text form, what is still needed (a press puts the cursor there),
 /// Copy and Save — with the saved citations under it. The source being cited is kept while the app runs, so the tool
-/// opened again (over the window, or back on the Tools page) has it as it was.
+/// opened again (from its tile, or from its pin) has it as it was.
 /// </summary>
 internal sealed class CitationTool : ContentControl
 {

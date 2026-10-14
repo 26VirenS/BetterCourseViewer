@@ -85,7 +85,6 @@ public sealed partial class AppShell
         lastNav = engine.NavVersion;
         var loc = engine.Nav.Current;
         var next = ScreenAt(loc, make: true)!;
-        WorkPreview.Dismiss();
         var move = MoveOf(shownAt0, loc, engine.LastMove);
         shownAt0 = loc;
         if (next != current)

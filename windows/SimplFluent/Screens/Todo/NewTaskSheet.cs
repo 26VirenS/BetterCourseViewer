@@ -25,7 +25,7 @@ public sealed class NewTaskSheet
     private static NewTaskSheet? showing;
 
     private readonly Engine.Engine engine;
-    private readonly Sheet sheet = new() { Bare = true, Width = 520 };
+    private readonly Sheet sheet = new() { Bare = true, Width = 520, Floats = true, Name = "New task" };
     private readonly SheetButton add;
     private readonly TextBox title;
     private readonly DatePicker day, untilPicker;

@@ -5,8 +5,8 @@ using Xunit;
 namespace Simpl.Tests;
 
 /// <summary>
-/// The tools' place in the window and their words: a tool opened on the Tools page is a step of the Tools place
-/// (Engine/Navigator.cs, Tools/ToolHost.cs), and the unit converter writes an answer with its unit
+/// The tools' place in the window and their words: a tool opened whole is a popup over the window, never a step of a
+/// place (Engine/Navigator.cs, Tools/ToolHost.cs), and the unit converter writes an answer with its unit
 /// (Tools/Everyday/UnitConverter.cs).
 /// </summary>
 public class ToolsTests
@@ -14,30 +14,10 @@ public class ToolsTests
     public ToolsTests() => _ = Profile.Folder;
 
     [Fact]
-    public void AToolOpenedFromElsewhereIsTheToolsPlaceWithTheToolOnIt()
+    public void AToolIsNoStepOfAPlace()
     {
-        var nav = new Navigator();
-        nav.Go(Place.Dashboard);
-        nav.Push(Route.Tool("calc"), Place.Tools);
-        Assert.Equal(Place.Tools, nav.Current.Place);
-        Assert.Equal(new[] { Route.Tool("calc") }, nav.Current.Path);
-        // (one step: Back goes to where it was opened from)
-        nav.GoBack();
-        Assert.Equal(Place.Dashboard, nav.Current.Place);
-        Assert.Empty(nav.Current.Path);
-    }
-
-    [Fact]
-    public void AToolOpenedFromTheTilesIsAStepDeeper()
-    {
-        var nav = new Navigator();
-        nav.Go(Place.Tools);
-        nav.Push(Route.Tool("ptable"), Place.Tools);
-        Assert.Equal(Place.Tools, nav.Current.Place);
-        Assert.Single(nav.Current.Path);
-        nav.GoBack();
-        Assert.Equal(Place.Tools, nav.Current.Place);
-        Assert.Empty(nav.Current.Path);
+        // (a tool opens in its popup over where you are: a route of one, kept by an earlier version, belongs to no place)
+        Assert.Null(Engine.Engine.PlaceOf(new Route(RouteKind.Tool, "units")));
     }
 
     [Fact]
@@ -47,7 +27,6 @@ public class ToolsTests
         Assert.False(Navigator.Within(Place.Dashboard, Place.Tools));
         Assert.True(Navigator.Within(Place.Home("courses/1"), Place.Section("courses/1", "assignments")));
         Assert.False(Navigator.Within(Place.Home("courses/2"), Place.Section("courses/1", "assignments")));
-        Assert.Equal(Place.Tools, Engine.Engine.PlaceOf(Route.Tool("units")));
     }
 
     [Theory]

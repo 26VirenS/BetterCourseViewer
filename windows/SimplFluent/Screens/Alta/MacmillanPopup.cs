@@ -37,6 +37,7 @@ internal sealed class MacmillanPopupView
     private readonly Border stateSlot = new();
     private readonly TextBlock title, subtitle;
     private Sheet? sheet;
+    private readonly FrameworkElement header;
     /// <summary>The page still opening (the launch through Canvas): a spinner in its place meanwhile.</summary>
     private bool opening = true;
     /// <summary>The launch could not be had from Canvas.</summary>
@@ -54,7 +55,8 @@ internal sealed class MacmillanPopupView
         var tile = K.IconTile(SymbolRegular.Library24, K.Tone("red"), 32);
         title = K.Text(launch.Title, Ty.Subtitle);
         subtitle = K.Text("Macmillan Learning", Ty.Body, B.Text2);
-        root.Children.Add(AltaLook.Header(engine, tile, title, subtitle, null, Close, "Close — your work is kept by Macmillan").Row(0));
+        header = AltaLook.Header(engine, tile, title, subtitle, null, Close, "Close — your work is kept by Macmillan");
+        root.Children.Add(header.Row(0));
         // (the page on white, edge to edge under the header, as Macmillan draws it — clear of the popup's rounded foot;
         // the popup's own ground in its place while it opens)
         stateSlot.Bg(B.Solid);
@@ -67,11 +69,11 @@ internal sealed class MacmillanPopupView
 
     public void Open()
     {
-        sheet = AltaLook.Popup(root, over);
+        sheet = AltaLook.Popup(root, header, Close, "Macmillan Learning");
         sheet.Closed += Cleanup;
         // (no update goes in while it is open: Support/Updates.cs, the Mac's UpdateHold)
         sheet.Closed += Support.Updates.Hold("Macmillan Learning", "when you close Macmillan Learning").Dispose;
-        over.PreviewKeyDown += OnKey;
+        root.PreviewKeyDown += OnKey;
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
         {
@@ -217,7 +219,7 @@ internal sealed class MacmillanPopupView
         closed = true;
         Hold(false);
         closing = true;
-        over.PreviewKeyDown -= OnKey;
+        root.PreviewKeyDown -= OnKey;
         try { web.Dispose(); } catch { }
     }
 

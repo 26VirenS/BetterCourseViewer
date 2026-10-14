@@ -995,7 +995,8 @@ public static class Updates
         var path = new List<Engine.Route>();
         foreach (var p in r.Path ?? new())
         {
-            if (p.Length < 1 || !Enum.TryParse<Engine.RouteKind>(p[0], out var kind)) break;
+            // (a tool open on the Tools place, as 0.3.0 kept one: the Tools page, the tool not opened again)
+            if (p.Length < 1 || !Enum.TryParse<Engine.RouteKind>(p[0], out var kind) || kind == Engine.RouteKind.Tool) break;
             path.Add(new Engine.Route(kind, p.ElementAtOrDefault(1) ?? "", p.ElementAtOrDefault(2) ?? "", p.ElementAtOrDefault(3) ?? ""));
         }
         return (place, path);

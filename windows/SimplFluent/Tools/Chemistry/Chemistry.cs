@@ -16,9 +16,8 @@ namespace Simpl.Tools;
 
 /// <summary>
 /// The Periodic Table's chemistry builders (the Mac's LewisMaker and MoleculeBuilder, the full Periodic Table's
-/// "Lewis structures" and "Molecule builder" pages): as views to put in a page, or opened over the window in a sheet
-/// nearly its size, the two builders a choice at its top as the Mac's tool header has them. Not tools of their own: the
-/// Periodic Table opens them.
+/// "Lewis structures" and "Molecule builder" pages): as views to put in a page, or opened from elsewhere as those pages
+/// of the Periodic Table in its popup. Not tools of their own: the Periodic Table opens them.
 /// </summary>
 public static class Chemistry
 {
@@ -35,16 +34,15 @@ public static class Chemistry
     /// </summary>
     public static FrameworkElement Molecule(ToolContext c, string? start) => new MoleculeBuilderView(start);
 
-    /// <summary>The Lewis structure maker over the window, in a sheet nearly its size (Done or Escape closes it).</summary>
+    /// <summary>The Lewis structure maker: the Periodic Table's page in its popup (ChemSheet).</summary>
     public static void OpenLewis(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, false, start, engine);
 
-    /// <summary>The 3D molecule builder over the window, in a sheet nearly its size (Done or Escape closes it).</summary>
+    /// <summary>The 3D molecule builder: the Periodic Table's page in its popup (ChemSheet).</summary>
     public static void OpenMolecule(Window owner, Engine.Engine engine, string? start) => ChemSheet.Show(owner, true, start, engine);
 
     /// <summary>
-    /// The Lewis maker's "Open in 3D builder" when it is not in the builders' own sheet (in a page of the Periodic
-    /// Table's, say): handed the Lewis view, with the molecule already in the 3D builder's model. Not set: the 3D
-    /// builder opens over the window.
+    /// The Lewis maker's "Open in 3D builder" (in a page of the Periodic Table's): handed the Lewis view, with the
+    /// molecule already in the 3D builder's model. Not set: the Periodic Table opens on its 3D builder (ChemSheet).
     /// </summary>
     public static Action<FrameworkElement>? OpenIn3D { get; set; }
 
@@ -58,51 +56,20 @@ public static class Chemistry
 }
 
 /// <summary>
-/// The builders over the window (the Mac's ToolPopup, with the Periodic Table's page buttons for the two of them): Done,
-/// the page's tile, name and line, the choice of builder and — the sheet covering the title bar — the title bar's pins
-/// (PinBar in a popup, as a tool's sheet, a quiz and Alta have them); under them the builder, the whole sheet.
+/// The builders opened from outside the Periodic Table (the Biomolecule Builder's molecule handed to the 3D builder, the
+/// Lewis maker's Open in 3D where it is not one of the table's pages, the --lewis and --molecule pictures): the Periodic
+/// Table's own Lewis structures or Molecule builder page, in its popup (the Mac's ToolPopup) — from a tool's popup, that
+/// popup turning into the Periodic Table in place, as a tool handing something to another does (ToolsCenter.PopUp).
 /// </summary>
 internal static class ChemSheet
 {
-    private static readonly Color Tone = Color.FromRgb(0x30, 0xd1, 0x58); // (the Periodic Table's tile colour)
-
     public static void Show(Window? owner, bool molecule, string? start, Engine.Engine? engine = null)
     {
-        var win = owner ?? Application.Current?.MainWindow;
-        engine ??= (win as MainWindow)?.School ?? (Application.Current?.MainWindow as MainWindow)?.School;
-        var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
-        var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
-        var sheet = new Sheet { Bare = true, Width = w, Height = h };
-        var host = new ContentControl { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
-        var title = K.Text("", Ty.Title);
-        var note = K.Text("", Ty.Body, B.Text2);
-        var pages = new SelectorBar(new[] { "Lewis structures", "Molecule builder" }, molecule ? 1 : 0);
-        void Page(bool mol, string? from)
-        {
-            title.Text = mol ? "Molecule builder" : "Lewis structures";
-            note.Text = mol ? "Build a molecule and turn it in 3D" : "Draw a molecule's Lewis structure";
-            host.Content = mol ? new MoleculeBuilderView(from) : new LewisMakerView(from, () => { pages.Select(1, false); Page(true, null); });
-            if (host.Content is FrameworkElement fe) Motion.FadeIn(fe, Motion.Medium);
-        }
-        pages.Changed += i => Page(i == 1, null);
-        var done = K.Button("Done", () => sheet.Close());
-        done.ToolTip = "Close (Esc)";
-        done.Margin = new Thickness(0, 0, 14, 0);
-        done.VerticalAlignment = VerticalAlignment.Center;
-        var words = K.V(2, title, note);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        pages.VerticalAlignment = VerticalAlignment.Center;
-        pages.Margin = new Thickness(12, 0, 0, 0);
-        var head = K.Columns("auto, auto, *, auto, auto", done.Col(0), K.IconTile(SymbolRegular.Molecule24, Tone, 44).Margin(0, 0, 14, 0).Col(1), words.Col(2), pages.Col(3));
-        if (engine != null) head.Children.Add(new PinBar(engine, inPopup: true).Margin(12, 0, 0, 0).Col(4));
-        head.Margin = new Thickness(40, 20, 40, 12);
-        var g = K.Rows("auto, *", head.Row(0), host.Row(1));
-        g.Bg(B.Window);
-        sheet.Body = g;
-        Page(molecule, start);
-        Dialogs.Show(sheet, win);
-        // (a sheet starts held to 900 wide until its host is laid out again: this one as wide as it was made)
-        if (sheet.Card is { } card && win != null) card.MaxWidth = Math.Max(card.MaxWidth, win.ActualWidth - 48);
+        engine ??= (Application.Current?.MainWindow as MainWindow)?.School;
+        if (engine == null) return;
+        if (start is { Length: > 0 }) (molecule ? PTChemistry.OpenMolecule : PTChemistry.OpenLewis)?.Invoke(start);
+        PTNav.Page = molecule ? PTPage.Molecules : PTPage.Lewis;
+        ToolsCenter.PopUp("ptable", engine, owner);
     }
 }
 

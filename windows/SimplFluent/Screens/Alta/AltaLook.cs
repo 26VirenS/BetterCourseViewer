@@ -10,21 +10,19 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Screens;
 
 /// <summary>
-/// What the Knewton Alta and Macmillan Learning popups share (the Mac's quiz-style popup): a sheet as large as the
-/// window less a margin, its own header row — the vendor's tile, the assignment's name over a line about it, and Close —
-/// the ground under the vendor's page, the popup's Loading and failure in its place, and dialogs of the popup's own (a
-/// Windows 11 ContentDialog over the popup, the page stepped aside: nothing can be drawn over a web view).
+/// What the Knewton Alta and Macmillan Learning popups share (the Mac's quiz-style popup): a popup floating over the
+/// window (Shell/FloatPopup.cs: homework, not a quiz — the rest of the window stays at hand while it is open), as large as
+/// the page beside the pane less a margin, its own header row — the vendor's tile, the assignment's name over a line
+/// about it, and Close — that it is moved by, the ground under the vendor's page, the popup's Loading and failure in its
+/// place, and dialogs of the popup's own (a Windows 11 ContentDialog over the popup, the page stepped aside: nothing can
+/// be drawn over a web view).
 /// </summary>
 internal static class AltaLook
 {
-    /// <summary>A full-size sheet over the window, its body edge to edge; Escape is the popup's to answer.</summary>
-    public static Sheet Popup(FrameworkElement body, Window over)
-    {
-        var room = over.Content as FrameworkElement;
-        var w = room?.ActualWidth > 0 ? room.ActualWidth : over.ActualWidth;
-        var h = room?.ActualHeight > 0 ? room.ActualHeight : over.ActualHeight;
-        return new Sheet { Body = body, Bare = true, Modal = true, Width = Math.Max(480, w - 48), Height = Math.Max(360, h - 48) };
-    }
+    /// <summary>A large floating popup, its body edge to edge, moved by its <paramref name="header"/>; Escape is the
+    /// popup's to answer, and its Close (<paramref name="close"/>) is the window's too (Alt+F4).</summary>
+    public static Sheet Popup(FrameworkElement body, FrameworkElement header, Action close, string name) =>
+        new() { Body = body, Bare = true, Modal = true, Floats = true, Large = true, OwnClose = true, Handle = header, Dismiss = close, Name = name, Width = 960, Height = 640 };
 
     /// <summary>
     /// Up over the window: the sheet's card as large as the window allows (a card is first held to a dialog's width until
@@ -46,7 +44,7 @@ internal static class AltaLook
     }
 
     /// <summary>The popup's header row: the vendor's tile, the assignment's name over its line, what the popup adds, the
-    /// tools pinned to the title bar (which the popup covers), and Close.</summary>
+    /// tools pinned to the title bar, and Close.</summary>
     public static FrameworkElement Header(Engine.Engine engine, FrameworkElement tile, TextBlock title, TextBlock subtitle, UIElement? extra, Action close, string closeTip)
     {
         var words = K.V(0, title, subtitle);

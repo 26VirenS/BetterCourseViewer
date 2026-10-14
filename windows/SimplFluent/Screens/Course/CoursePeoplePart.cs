@@ -122,7 +122,7 @@ public static class CourseCompose
         FrameworkElement Line(string label, UIElement field) =>
             K.Columns("70, *", K.Text(label, Ty.Body, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Margin(0, 0, 12, 0).Col(0), field.Col(1));
         var body = K.V(14, Line("To:", token), Line("Subject:", subject), message, status);
-        var sheet = new Sheet { Title = "New message", Body = body, Width = 620 };
+        var sheet = new Sheet { Title = "New message", Body = body, Width = 620, Floats = true };
         var sending = false;
         var confirming = false;
         SheetButton? send = null, cancel = null;

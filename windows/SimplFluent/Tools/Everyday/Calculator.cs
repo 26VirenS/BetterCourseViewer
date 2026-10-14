@@ -69,7 +69,7 @@ internal readonly record struct CalcResult(CalcOutcome Kind, double Value = 0, s
 /// </summary>
 internal sealed class CalcEngine
 {
-    /// <summary>The whole tool's (on the Tools page, and over the window from a pin).</summary>
+    /// <summary>The whole tool's (in its popup, from its tile or its pin).</summary>
     public static CalcEngine Full { get; } = new();
     /// <summary>The pin's flyout's.</summary>
     public static CalcEngine Quick { get; } = new();

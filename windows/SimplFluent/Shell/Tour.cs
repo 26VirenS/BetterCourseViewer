@@ -206,7 +206,7 @@ public sealed class TourOverlay : Grid
         };
         if (engine.Courses.Count > 0)
             s.Add(new("courses", TourSpot.FirstCourse, "Your courses", "Each course opens to its home, with its sections under it here."));
-        s.Add(new("tools", TourSpot.ToolsRow, "Tools", "A PDF editor, a file converter, calculators, flashcards, a citation maker and more. Pin one to keep it in the title bar.", "Click Tools to look", () => At(PlaceKind.Tools)));
+        s.Add(new("tools", TourSpot.ToolsRow, "Tools", "A PDF editor, a file converter, calculators, flashcards, a citation maker and more, each opening over where you are. Pin one to keep it in the title bar.", "Click Tools to look", () => At(PlaceKind.Tools)));
         s.Add(new("search", TourSpot.Search, "Search everything", "Find anything in your courses. Type / for commands, or press Ctrl+K."));
         s.Add(new("report", TourSpot.AccountMenu, "Something wrong? Tell us here", "Report a bug or ask for something new from your account menu. You can take this tour again from the same menu.", NextLabel: "Done"));
         return s;

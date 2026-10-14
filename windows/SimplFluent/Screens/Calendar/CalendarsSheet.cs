@@ -67,7 +67,8 @@ internal static class CalendarsSheet
             return b;
         }
 
-        var head = K.Columns("*, auto", K.Text("Calendars", Ty.Subtitle).Col(0), count.Margin(12, 0, 0, 3).Align(HorizontalAlignment.Right, VerticalAlignment.Bottom).Col(1));
+        // (the title the popup's own, beside its ×: how many are on under it)
+        var head = count.Align(HorizontalAlignment.Left, VerticalAlignment.Bottom);
         FrameworkElement body;
         if (choices.Count == 0) body = K.Text("No calendars to show.", Ty.Body, B.Text2);
         else
@@ -87,7 +88,7 @@ internal static class CalendarsSheet
         }
         var all = K.V(12, head, body, K.Divider(), foot);
         Paint();
-        var s = new Sheet { Body = all, Width = 400 };
+        var s = new Sheet { Title = "Calendars", Body = all, Width = 400, Floats = true };
         s.Add("Done", SheetButtonKind.Primary);
         Dialogs.Show(s, over);
     }

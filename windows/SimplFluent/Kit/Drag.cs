@@ -1,0 +1,83 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using Hyperlink = System.Windows.Documents.Hyperlink;
+
+namespace Simpl.Kit;
+
+/// <summary>
+/// What moves a popup by its heading: a press there that is not on a control (a button, a field, a list, a slider, a
+/// link, a page) takes hold of it. The popups floating in windows of their own (Shell/FloatPopup.cs) and the cards
+/// floating on the page — the quick look and a counter's panel, which grow out of their rows — share it.
+/// </summary>
+public static class Drag
+{
+    /// <summary>Whether a press is on something that takes it itself.</summary>
+    public static bool OnControl(DependencyObject d)
+    {
+        for (DependencyObject? p = d; p != null && p is not Window; p = Parent(p))
+        {
+            if (p is ButtonBase or TextBoxBase or System.Windows.Controls.PasswordBox or Selector or Thumb or RangeBase or Hyperlink or HwndHost) return true;
+            if (p is FrameworkElement { Cursor: { } c } && c == Cursors.Hand) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Whether <paramref name="d"/> is <paramref name="root"/> or inside it.</summary>
+    public static bool Within(DependencyObject d, DependencyObject root)
+    {
+        for (DependencyObject? p = d; p != null; p = Parent(p))
+            if (ReferenceEquals(p, root)) return true;
+        return false;
+    }
+
+    private static DependencyObject? Parent(DependencyObject d) =>
+        d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+
+    /// <summary>
+    /// A card on a canvas moved by its top <paramref name="band"/> (its heading): it follows the pointer from a press there
+    /// until it is let go, its heading kept inside the canvas; <paramref name="moved"/> is told once it has been moved.
+    /// </summary>
+    public static void ByHeading(FrameworkElement card, double band, Action? moved = null)
+    {
+        Point? from = null;
+        var at = new Point();
+        card.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (card.Parent is not Canvas || e.ClickCount > 1 || e.OriginalSource is not DependencyObject source) return;
+            if (e.GetPosition(card).Y > band || OnControl(source)) return;
+            // (where it is now, whatever was moving it: its growing out of its row stopped where it has got to)
+            at = new Point(Canvas.GetLeft(card), Canvas.GetTop(card));
+            card.BeginAnimation(Canvas.LeftProperty, null);
+            card.BeginAnimation(Canvas.TopProperty, null);
+            Canvas.SetLeft(card, at.X);
+            Canvas.SetTop(card, at.Y);
+            from = e.GetPosition((Canvas)card.Parent);
+            card.CaptureMouse();
+            e.Handled = true;
+        };
+        card.PreviewMouseMove += (_, e) =>
+        {
+            if (from is not { } f || card.Parent is not Canvas canvas || e.LeftButton != MouseButtonState.Pressed) return;
+            var p = e.GetPosition(canvas);
+            const double keep = 80;
+            var x = Math.Clamp(at.X + p.X - f.X, keep - card.ActualWidth, Math.Max(keep - card.ActualWidth, canvas.ActualWidth - keep));
+            var y = Math.Clamp(at.Y + p.Y - f.Y, 0, Math.Max(0, canvas.ActualHeight - band));
+            Canvas.SetLeft(card, x);
+            Canvas.SetTop(card, y);
+            e.Handled = true;
+        };
+        void Let(object? sender, EventArgs e)
+        {
+            if (from == null) return;
+            from = null;
+            if (card.IsMouseCaptured) card.ReleaseMouseCapture();
+            moved?.Invoke();
+        }
+        card.PreviewMouseLeftButtonUp += (s, e) => { if (from != null) { Let(s, e); e.Handled = true; } };
+        card.LostMouseCapture += Let;
+    }
+}

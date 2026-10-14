@@ -71,12 +71,6 @@ public sealed partial class TodoScreen : Screen
 
     public override void Refresh() => data.Ensure(engine, "todo");
 
-    public override void Hide()
-    {
-        base.Hide();
-        WorkPreview.Dismiss(); // (the window gone somewhere else takes the quick look with it)
-    }
-
 
     // ---- the page ----
 

@@ -123,6 +123,12 @@ public static class UpdateWatch
                 if (settings.Sheets.IsOpen) return new Updates.Holding("a dialog in Settings", "when you close the dialog in Settings");
                 continue;
             }
+            // (a popup floating over the window — Hand In, a tool, New message — by its name; What's New holds nothing)
+            if (w is FloatPopup popup)
+            {
+                if (!popup.HoldsUpdates) continue;
+                return new Updates.Holding($"a popup: {w.Title}", $"when you close {(w.Title == "Simpl" ? "the popup" : w.Title)}");
+            }
             // (a page of the school's or a tool's in a window of its own, Alta's graph: by its title)
             var title = string.IsNullOrWhiteSpace(w.Title) || w.Title == "Simpl" ? "the page’s window" : $"“{w.Title}”";
             return new Updates.Holding($"a window: {w.Title}", $"when you close {title}");

@@ -155,7 +155,8 @@ internal sealed class HandInSheet
         phone.Closed += Paint;
         filesSection = FilesSection();
 
-        sheet = new Sheet { Bare = true, Width = FormWidth, Body = body };
+        // (a popup floating over the window: the assignment, its files and the rest of Simpl at hand while it is open)
+        sheet = new Sheet { Bare = true, Width = FormWidth, Body = body, Floats = true, Name = a.Resubmit == true ? "Hand in again" : "Hand in" };
         submit = sheet.Add("Submit", SheetButtonKind.Primary, Submit, closes: false);
         cancel = sheet.Add("Cancel", SheetButtonKind.Close);
         sheet.Closed += Closed;
@@ -504,8 +505,9 @@ internal sealed class HandInSheet
         foreach (var p in dlg.FileNames) AddPath(p);
     }
 
-    private static bool? Ask(Microsoft.Win32.OpenFileDialog dlg) =>
-        Application.Current?.MainWindow is { } owner ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+    /// <summary>Windows' Open dialog over the hand-in's own popup (over Simpl's window it could open behind it).</summary>
+    private bool? Ask(Microsoft.Win32.OpenFileDialog dlg) =>
+        (Window.GetWindow(body) ?? Application.Current?.MainWindow) is { } owner ? dlg.ShowDialog(owner) : dlg.ShowDialog();
 
     /// <summary>Pictures and videos from the Pictures folder (the Mac's Choose from Photos…).</summary>
     private void ChoosePictures()

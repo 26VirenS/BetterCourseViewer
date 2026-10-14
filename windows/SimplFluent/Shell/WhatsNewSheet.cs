@@ -13,8 +13,8 @@ namespace Simpl.Shell;
 /// <summary>
 /// What changed in Simpl for Windows (the Mac's WhatsNewSheet), after an update or from the account menu: the app's
 /// mark, then each version — named once, over its notes, with the day it came out as every date is written ("Oct 13") —
-/// its notes with their kind's symbol on its tile — new, better, fixed — and Continue, as a Windows 11 dialog over the
-/// window. The build ("v058") is Settings ▸ About's to say.
+/// its notes with their kind's symbol on its tile — new, better, fixed — and Continue, in a popup floating over the window
+/// (only there to be read: the window stays at hand under it). The build ("v058") is Settings ▸ About's to say.
 /// </summary>
 public static class WhatsNewSheet
 {
@@ -46,7 +46,7 @@ public static class WhatsNewSheet
         list.Margin = new Thickness(0, 0, 0, 16); // (room at the foot that scrolls with the list)
         var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(32, 0, 32, 0) };
         var body = K.Rows("auto, *", head.Row(0), scroll.Row(1));
-        var s = new Sheet { Body = body, Bare = true, Width = 500, Height = 560, HoldsUpdates = false };
+        var s = new Sheet { Body = body, Bare = true, Width = 500, Height = 560, HoldsUpdates = false, Floats = true, Name = "What’s new" };
         s.Add("Continue", SheetButtonKind.Primary);
         Motion.Stagger(list.Children.OfType<UIElement>(), 60, 16);
         Dialogs.Show(s, over);

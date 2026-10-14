@@ -79,6 +79,15 @@ public sealed partial class AppShell : Grid, IDisposable
 
     public bool Narrow => narrow;
 
+    /// <summary>Where the page is — beside the pane, or the whole width on a narrow window — in <paramref name="to"/>'s
+    /// terms: what a popup over the window is centred on (MainWindow.PopupRoom).</summary>
+    public Rect PageArea(Visual to)
+    {
+        if (!page.IsLoaded || page.ActualWidth <= 0 || !to.IsAncestorOf(page)) return Rect.Empty;
+        var at = page.TransformToAncestor(to).Transform(new Point(0, 0));
+        return new Rect(at, new Size(page.ActualWidth, page.ActualHeight));
+    }
+
     public AppShell(Engine.Engine engine, MainWindow window)
     {
         this.engine = engine;
@@ -140,7 +149,7 @@ public sealed partial class AppShell : Grid, IDisposable
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.Children.Add(header.Row(0));
         page.Children.Add(deck.Row(1));
-        page.SizeChanged += (_, _) => Widths();
+        page.SizeChanged += (_, _) => { Widths(); window.PopupRoomMoved(); };
         Children.Add(page.Col(1));
 
         // a file on its way (FilePreview's word), at the foot of the page, as Windows 11's snackbar
@@ -511,7 +520,6 @@ public sealed partial class AppShell : Grid, IDisposable
     /// <summary>A press anywhere in the window: the quick look and the screen's own panel fold back when it is outside them.</summary>
     public void Pressed(MouseButtonEventArgs e)
     {
-        WorkPreview.ClickedAt(e.GetPosition(previewLayer));
         current?.Pressed(e);
     }
 
@@ -738,7 +746,6 @@ public sealed partial class AppShell : Grid, IDisposable
         if (sheetOpen == open) return;
         sheetOpen = open;
         WebScreen.SheetOver(open);
-        Simpl.Tools.GraphWeb.Cover(open);
     }
 
     // ---- narrow: the pane over the page ----
@@ -799,7 +806,6 @@ public sealed partial class AppShell : Grid, IDisposable
         paneHolder.Effect = K.Shadow(32, 0, 0.28);
         scrim.Visibility = Visibility.Visible;
         WebScreen.SheetOver(true);
-        Simpl.Tools.GraphWeb.Cover(true);
         var t = new TranslateTransform(-PaneWidth, 0);
         paneHolder.RenderTransform = t;
         Motion.FromTo(t, TranslateTransform.XProperty, -PaneWidth, 0, Motion.Medium, Motion.Decelerate);
@@ -811,7 +817,6 @@ public sealed partial class AppShell : Grid, IDisposable
         paneOpen = false;
         scrim.Visibility = Visibility.Collapsed;
         WebScreen.SheetOver(sheetOpen);
-        Simpl.Tools.GraphWeb.Cover(sheetOpen);
         if (paneHolder.RenderTransform is TranslateTransform t)
             Motion.FromTo(t, TranslateTransform.XProperty, 0, -PaneWidth, Motion.Normal, Motion.Accelerate, 0, () => { if (!paneOpen && narrow) paneHolder.Visibility = Visibility.Collapsed; });
         else paneHolder.Visibility = Visibility.Collapsed;

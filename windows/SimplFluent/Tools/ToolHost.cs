@@ -22,10 +22,9 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 namespace Simpl.Tools;
 
 /// <summary>
-/// What a tool is given where it opens (the Mac's ToolScreen, PinnedToolPopover and ToolPopup between them): the engine,
-/// whether it is the quick version in a pin's flyout, whether it is open on the Tools page, the files and details handed
-/// to it (from a pin's flyout, a command), how to open the whole tool or close what it is in, and how to tell its heading
-/// what it shows.
+/// What a tool is given where it opens (the Mac's PinnedToolPopover and ToolPopup between them): the engine, whether it
+/// is the quick version in a pin's flyout, the files and details handed to it (from a pin's flyout, a command), how to
+/// open the whole tool or close what it is in, and how to tell its heading what it shows.
 /// </summary>
 public sealed class ToolContext
 {
@@ -33,16 +32,17 @@ public sealed class ToolContext
     public required string Key { get; init; }
     /// <summary>The quick version, in a pin's flyout or pulled out of it (the Mac's FocusTimerCompact, CalculatorCompact …).</summary>
     public bool Quick { get; init; }
-    /// <summary>Open on the Tools page ("Tools › Calculator", the Mac's ToolScreen), not in a sheet or a window of its own.</summary>
+    /// <summary>Open on a page of the window's own rather than in a popup or a flyout. Never, now: a whole tool opens in a
+    /// popup over the window (ToolPopup).</summary>
     public bool InPage { get; init; }
-    /// <summary>The window it is in (for its dialogs).</summary>
+    /// <summary>The window it is in (for its dialogs): the tool's popup, a pin's window or Simpl's.</summary>
     public Window? Owner { get; init; }
 
     /// <summary>From the quick version: the whole tool over the window, with details or files for it.</summary>
     public Action<Dictionary<string, string>?, IReadOnlyList<string>?> OpenFull { get; init; } = (_, _) => { };
 
-    /// <summary>The flyout (the quick version), the sheet or the window (the whole tool) it is in, closed; on the Tools
-    /// page, nothing (the page stays).</summary>
+    /// <summary>The flyout (the quick version) or the popup (the whole tool) it is in, closed — a popup's a moment later,
+    /// so another tool handed something (BioTools.Open) takes its place instead.</summary>
     public Action Close { get; init; } = () => { };
 
     /// <summary>
@@ -127,9 +127,8 @@ public interface ITimerState
 }
 
 /// <summary>
-/// What the tools share across the window (the Mac's ToolsCenter): the tool open on the Tools page — kept while you go
-/// elsewhere, so the Tools place opens on it again — a tool opened whole, and files and details handed to it to take when
-/// it opens.
+/// What the tools share across the window (the Mac's ToolsCenter): a tool opened whole, and files and details handed to
+/// it to take when it opens.
 /// </summary>
 public static class ToolsCenter
 {
@@ -137,53 +136,26 @@ public static class ToolsCenter
     private static string? handoffTool;
     private static Dictionary<string, string> handoffInfo = new();
 
-    /// <summary>The tool open on the Tools page (the Mac's ToolsCenter.open), kept while you go elsewhere: picking the
-    /// Tools place again opens on it (Engine.OpensOn); null once the tiles show again.</summary>
-    public static string? Open { get; set; }
-
-#pragma warning disable CA2255
-    [System.Runtime.CompilerServices.ModuleInitializer]
-    internal static void Remember() =>
-        Engine.Engine.OpensOn = place => place == Place.Tools && Open is { } k && KindOf(k) != null ? Route.Tool(k) : null;
-#pragma warning restore CA2255
-
     /// <summary>
-    /// A tool opened whole from anywhere (its tile, a pin's menu, a command, another tool handing it something), with
-    /// files or details for it: on the Tools page, under "Tools › Calculator" (the Mac's show) — from the tiles a step
-    /// deeper, from another tool in its place, from elsewhere the Tools place with the tool on it, as one step.
+    /// A tool opened whole from anywhere — its tile on the Tools page, a pin's menu or flyout, a command, a link — with
+    /// files or details for it: in a popup over where you are (ToolPopup), the screen and the rest of the window still at
+    /// hand under it; the tool's popup already open comes forward, taking what was handed to it.
     /// </summary>
     public static void Show(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
     {
         if (KindOf(key) == null) return;
         Hand(key, files, info);
-        var route = Route.Tool(key);
-        if (engine.Nav.Current.Place == Place.Tools) engine.SetPath(new[] { route });
-        else engine.Open(route);
+        ToolPopup.Show(key, engine, Application.Current?.MainWindow);
     }
 
-    /// <summary>A pinned tool opened whole, over the window where you are (the Mac's popUp): the screen stays under it.</summary>
+    /// <summary>A tool opened whole by a tool (BioTools.Open, the Biomolecule Builder's molecule for the builder): from a
+    /// tool's popup (<paramref name="owner"/>), that popup turns into the other tool in place; from anywhere else, as
+    /// <see cref="Show"/>.</summary>
     public static void PopUp(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
     {
+        if (KindOf(key) == null) return;
         Hand(key, files, info);
-        ToolPopup.Show(key, engine, owner);
-    }
-
-    /// <summary>The whole tool in a window of its own (the Mac's floating tool window): what a pin opens from a popup that
-    /// holds the window (a quiz, Knewton Alta, Macmillan, a tool's sheet), where a sheet over the window would wait behind
-    /// the popup.</summary>
-    public static void Float(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
-    {
-        Hand(key, files, info);
-        ToolWindow.Show(key, engine, owner);
-    }
-
-    /// <summary>The whole tool from a pin's quick version: over Simpl's window as a sheet — or, a sheet holding the window
-    /// already (a popup, another tool's sheet), in a window of its own beside it.</summary>
-    public static void OpenWhole(string key, Engine.Engine engine, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
-    {
-        var main = Application.Current?.MainWindow;
-        if (main is ISheetWindow { Sheets.IsOpen: true }) Float(key, engine, main, files, info);
-        else PopUp(key, engine, main, files, info);
+        if (!ToolPopup.Change(owner, key)) ToolPopup.Show(key, engine, Application.Current?.MainWindow);
     }
 
     /// <summary>Files or details are waiting for this tool (it takes them as it is made).</summary>
@@ -245,17 +217,17 @@ public static class ToolsCenter
 /// <summary>The pieces every tool is made of, so they look one family.</summary>
 public static class ToolKit
 {
-    /// <summary>A tool's scrolling body: the page's side margins, its content as wide as the window allows up to its
-    /// widest, and centred past that (the Mac's ToolPage).</summary>
+    /// <summary>A tool's scrolling body: the popup's side margins (its heading's), its content as wide as the popup
+    /// allows up to its widest, and centred past that (the Mac's ToolPage).</summary>
     public static ScrollViewer Page(UIElement content, double maxWidth = 1480, double spacing = 20)
     {
         if (content is FrameworkElement fe) Fit(fe, maxWidth);
         var sv = new ScrollViewer
         {
             Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Padding = new Thickness(40, 8, 40, 40), Focusable = false,
+            Padding = new Thickness(28, 8, 28, 32), Focusable = false,
         };
-        sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 8, 20, 32) : new Thickness(40, 8, 40, 40);
+        sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(16, 8, 16, 24) : new Thickness(28, 8, 28, 32);
         return sv;
     }
 
@@ -275,8 +247,8 @@ public static class ToolKit
     /// <summary>
     /// Two columns side by side on a wide window (the work and its side panel), one over the other on a narrow one — the
     /// side first there when it holds the tool's answer (<paramref name="sideFirst"/>), so the answer is never under its
-    /// inputs. The breakpoints are for the page beside the navigation pane (about 980 of content in a 1366 window, 900
-    /// in a 1280 one), not for a sheet over the whole window.
+    /// inputs. The breakpoints are for the tool's popup, as large as the page beside the navigation pane less a margin
+    /// (about 960 of content in a 1366 window, 870 in a 1280 one).
     /// </summary>
     public static FrameworkElement Columns(UIElement main, UIElement side, double sideWidth = 380, double breakpoint = 860, double spacing = 28, bool sideFirst = false)
     {
@@ -382,9 +354,9 @@ public static class ToolKit
         }));
     }
 
-    /// <summary>A tool's view on the Tools page, with the scroll edge along its top (under the page's heading), opening
-    /// at its top: whatever takes the focus as a tool comes up (a card, a field) is not let scroll the page down to it,
-    /// past the tool's title and its first controls.</summary>
+    /// <summary>A tool's view in its popup, with the scroll edge along its top (under the popup's heading), opening at
+    /// its top: whatever takes the focus as a tool comes up (a card, a field) is not let scroll the tool down to it, past
+    /// its title and its first controls.</summary>
     public static FrameworkElement Edged(FrameworkElement body)
     {
         var line = K.Divider();
@@ -545,42 +517,104 @@ public static class Files
     }
 }
 
-// ---- a tool opened whole over the window (the Mac's ToolPopup) ----
+// ---- a tool opened whole, in a popup over the window (the Mac's ToolPopup) ----
 
 /// <summary>
-/// A pinned tool opened whole from its flyout, over the window, in a sheet nearly the window's size (the Mac's ToolPopup):
-/// its heading's Done, or Escape, closes it. The sheet opens at the tool's top, a hairline under the heading once the tool
-/// scrolls beneath it; the other pinned tools sit in its heading, since the sheet covers the title bar.
+/// A tool opened whole (the Mac's ToolPopup) — from its tile on the Tools page, a pin's menu or flyout, a command, a link
+/// or another tool handing it something — in a popup floating over where you are (Shell/FloatPopup.cs): as large as the
+/// page beside the pane less a margin and resized with the window, nothing dimmed, the Tools page (or whatever shows)
+/// behind it and the pane, the title bar and the search still at hand. Its heading: the tool's tile and name (and the
+/// page of its own that shows, "Periodic table › Lewis structures", the name going back to its first page), its line,
+/// its own controls (a biology tool's pages, the Periodic Table's search), its pin and ×; the popup is moved by it. It
+/// opens at the tool's top, a hairline under the heading once the tool scrolls beneath it; its own pages, and another
+/// tool it hands something to, change inside it. One popup a tool: opened again, the one there comes forward.
 /// </summary>
-public static class ToolPopup
+public sealed class ToolPopup
 {
+    private static readonly List<ToolPopup> Open = new();
+
+    private readonly Engine.Engine engine;
+    private readonly Sheet sheet;
+    private readonly ContentControl host = new() { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
+    private string key;
+    private bool closingSoon;
+
+    private ToolPopup(string key, Engine.Engine engine)
+    {
+        this.key = key;
+        this.engine = engine;
+        sheet = new Sheet { Floats = true, Large = true, Bare = true, OwnClose = true, Body = host, Name = ToolsCenter.KindOf(key)?.Name };
+        sheet.Closed += () => Open.Remove(this);
+    }
+
+    /// <summary>The tool's popup over the window: the one already open comes forward (made again when something was
+    /// handed to it, so it takes it); else a new one.</summary>
     public static void Show(string key, Engine.Engine engine, Window? owner)
     {
-        if (ToolsCenter.KindOf(key) is not { } kind) return;
-        var win = owner ?? Application.Current.MainWindow;
-        var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
-        var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
-        var sheet = new Sheet { Bare = true, Width = w, Height = h };
-        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open; what the
-        //  tool tells its heading as it is made is kept for the heading made after it)
+        if (ToolsCenter.KindOf(key) == null) return;
+        if (Open.FirstOrDefault(p => p.key == key) is { } there)
+        {
+            there.closingSoon = false;
+            if (ToolsCenter.Handed(key)) there.Make(key, fade: true);
+            there.sheet.Window?.Activate();
+            return;
+        }
+        owner ??= Application.Current?.MainWindow;
+        if (owner == null) return;
+        var p = new ToolPopup(key, engine);
+        Open.Add(p);
+        Simpl.Shell.FloatPopup.Show(p.sheet, owner);
+        p.Make(key, fade: false);
+        if (Shot.Asked || Launch.IsDevelopment) Log.Write($"tool popup open: {key}");
+    }
+
+    /// <summary>A tool handing something to another from inside its popup (<paramref name="from"/>, the popup's window):
+    /// the popup turns into the other tool where it is — another popup of that tool closing — and comes forward. False
+    /// when <paramref name="from"/> is not a tool's popup.</summary>
+    public static bool Change(Window? from, string key)
+    {
+        if (from == null || Open.FirstOrDefault(p => ReferenceEquals(p.sheet.Window, from)) is not { } p) return false;
+        p.closingSoon = false;
+        foreach (var other in Open.Where(o => o != p && o.key == key).ToList()) other.sheet.Close();
+        p.Make(key, fade: true);
+        p.sheet.Window?.Activate();
+        if (Shot.Asked || Launch.IsDevelopment) Log.Write($"tool popup changed to: {key}");
+        return true;
+    }
+
+    /// <summary>The tool made in the popup, with its heading: the popup is in place first, so the tool's dialogs (and a
+    /// hand-off) know the window it is in.</summary>
+    private void Make(string toolKey, bool fade)
+    {
+        if (ToolsCenter.KindOf(toolKey) is not { } kind) return;
+        key = toolKey;
+        var window = sheet.Window;
+        // (Close: the popup closed a moment later — a tool handing something to another closes itself first, then asks
+        //  for the other, which takes this popup's place instead; what the tool tells its heading as it is made is kept
+        //  for the heading made after it)
         var told = new ToolHeading.Told();
-        var c = new ToolContext { Engine = engine, Key = key, Owner = win, Close = () => sheet.Close(), ShowPage = told.Page, ShowNote = told.Note };
+        var c = new ToolContext { Engine = engine, Key = toolKey, Owner = window, Close = CloseSoon, ShowPage = told.Page, ShowNote = told.Note };
         var body = ToolRegistry.Full(c) ?? Missing(kind);
-        var done = K.Button("Done", () => sheet.Close());
-        done.ToolTip = $"Close {kind.Name} (Esc)";
-        var head = ToolHeader.Make(kind, c, done, new PinBar(engine, inPopup: true));
+        var close = K.IconButton(SymbolRegular.Dismiss24, () => sheet.Close(), $"Close {kind.Name} (Esc)", 16, 36);
+        var head = ToolHeader.Make(kind, c, close);
         told.Heading = head;
-        head.Margin = new Thickness(40, 20, 40, 12);
-        var edge = K.Divider();
-        edge.VerticalAlignment = VerticalAlignment.Bottom;
-        edge.IsHitTestVisible = false;
-        ToolKit.ScrollEdge(edge, body);
-        var top = new Grid { Children = { head, edge } };
-        var g = K.Rows("auto, *", top.Row(0), body.Row(1));
+        head.Margin = new Thickness(28, 16, 14, 12);
+        var g = K.Rows("auto, *", head.Row(0), ToolKit.Edged(body).Row(1));
         g.Bg(B.Window);
-        sheet.Body = g;
-        // (one Done, the heading's: no strip of buttons at the foot; Escape still closes it, as a sheet with no Close does)
-        Dialogs.Show(sheet, win);
+        host.Content = g;
+        sheet.Handle = head;
+        sheet.Name = kind.Name;
+        if (window != null) window.Title = kind.Name;
+        if (fade) Motion.FadeIn(g, Motion.Medium);
+        Shot.Moved();
+    }
+
+    /// <summary>The tool asked its popup closed: closed once whatever it asks next has had its turn (a hand-off to another
+    /// tool, BioTools.Open, comes on the next turn and keeps it).</summary>
+    private void CloseSoon()
+    {
+        closingSoon = true;
+        Application.Current?.Dispatcher.BeginInvoke(() => { if (closingSoon) sheet.Close(); }, DispatcherPriority.ContextIdle);
     }
 
     /// <summary>A tool not here yet: says so.</summary>
@@ -597,77 +631,75 @@ public static class ToolPopup
 }
 
 /// <summary>
-/// A tool opened whole in a window of its own, beside the popup it was opened from (ToolsCenter.Float): a Windows 11
-/// window, Mica round it, the tool's heading and the tool, its own dialogs over itself. It stays until it is closed.
-/// </summary>
-public sealed class ToolWindow : FluentWindow, ISheetWindow
-{
-    private readonly SheetHost sheets = new();
-
-    public SheetHost Sheets => sheets;
-
-    private ToolWindow(ToolsScreen.Kind kind, Engine.Engine engine, Window? owner)
-    {
-        Title = kind.Name;
-        Owner = owner;
-        WindowBackdropType = Appearance.Backdrop;
-        ExtendsContentIntoTitleBar = true;
-        FontFamily = K.TextFace;
-        SetResourceReference(ForegroundProperty, B.Text);
-        SetResourceReference(BackgroundProperty, B.Window);
-        Width = 980;
-        Height = 720;
-        MinWidth = 560;
-        MinHeight = 420;
-        WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
-        var told = new ToolHeading.Told();
-        var c = new ToolContext { Engine = engine, Key = kind.Key, Owner = this, Close = Close, ShowPage = told.Page, ShowNote = told.Note };
-        var body = ToolRegistry.Full(c) ?? ToolPopup.Missing(kind);
-        var head = ToolHeader.Make(kind, c, null);
-        told.Heading = head;
-        head.Margin = new Thickness(32, 4, 32, 12);
-        var bar = new TitleBar { Title = kind.Name };
-        var root = K.Rows("auto, auto, *", bar.Row(0), head.Row(1), body.Row(2));
-        Grid.SetRowSpan(sheets, 3);
-        root.Children.Add(sheets);
-        Content = root;
-    }
-
-    public static void Show(string key, Engine.Engine engine, Window? owner)
-    {
-        if (ToolsCenter.KindOf(key) is not { } kind) return;
-        new ToolWindow(kind, engine, owner ?? Application.Current?.MainWindow).Show();
-    }
-}
-
-/// <summary>
-/// A tool's heading over it in a sheet or a window of its own: Done, its tile, its name — and the page of its own that
-/// shows, after it ("Periodic table › Lewis structures", the tool's name going back to its first page) — and its line, its
-/// own controls, its pin, and, where the heading covers the title bar, the other pinned tools.
+/// A tool's heading in its popup: its tile, its name — and the page of its own that shows, after it ("Periodic table ›
+/// Lewis structures", the tool's name going back to its first page) — and its line, its own controls (a biology tool's
+/// pages, the Periodic Table's search), its pin and the popup's ×. Where the popup is too narrow for its controls beside
+/// its name, they go on a line of their own under it.
 /// </summary>
 public sealed class ToolHeading : Grid
 {
     private readonly ToolsScreen.Kind kind;
     private readonly StackPanel titleRow = new() { Orientation = Orientation.Horizontal };
     private readonly TextBlock note;
+    private readonly FrameworkElement? extra;
+    private readonly FrameworkElement tile, words, pin;
+    private readonly FrameworkElement? close;
     private bool noteWanted = true;
+    private bool? below;
 
-    internal ToolHeading(ToolsScreen.Kind kind, ToolContext c, UIElement? leading, UIElement? pins)
+    internal ToolHeading(ToolsScreen.Kind kind, ToolContext c, UIElement? close)
     {
         this.kind = kind;
         note = K.Text(kind.Note, Ty.Body, B.Text2);
-        var words = K.V(2, titleRow, note);
+        words = K.V(2, titleRow, note);
         Page(null, null);
         Note(true);
-        foreach (var w in new[] { "auto", "auto", "*", "auto", "auto", "auto" }) ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
-        if (leading is FrameworkElement l) { l.Margin = new Thickness(0, 0, 14, 0); l.VerticalAlignment = VerticalAlignment.Center; Children.Add(l.Col(0)); }
-        Children.Add(K.IconTile(kind.Symbol, kind.Color, 44).Margin(0, 0, 14, 0).Col(1));
+        foreach (var w in new[] { "auto", "*", "auto", "auto", "auto" }) ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        tile = K.IconTile(kind.Symbol, kind.Color, 44).Margin(0, 0, 14, 0);
+        Children.Add(tile.Col(0));
         words.VerticalAlignment = VerticalAlignment.Center;
-        Children.Add(words.Col(2));
-        if (ToolRegistry.Header(c) is { } extra) { extra.Margin = new Thickness(12, 0, 12, 0); extra.VerticalAlignment = VerticalAlignment.Center; Children.Add(extra.Col(3)); }
+        Children.Add(words.Col(1));
+        if (ToolRegistry.Header(c) is { } e) { extra = e; e.VerticalAlignment = VerticalAlignment.Center; Children.Add(e.Col(2)); }
         // (a header full of the tool's own controls — a biology tool's pages — the pin a symbol alone)
-        Children.Add(ToolHeader.PinButton(kind, squished: ToolHeader.Squished(kind.Key)).Col(4));
-        if (pins is FrameworkElement p) { p.Margin = new Thickness(10, 0, 0, 0); p.VerticalAlignment = VerticalAlignment.Center; Children.Add(p.Col(5)); }
+        pin = ToolHeader.PinButton(kind, squished: ToolHeader.Squished(kind.Key));
+        Children.Add(pin.Col(3));
+        if (close is FrameworkElement x) { this.close = x; x.Margin = new Thickness(8, 0, 0, 0); x.VerticalAlignment = VerticalAlignment.Center; Children.Add(x.Col(4)); }
+        Lay(false);
+        SizeChanged += (_, e2) => { if (e2.WidthChanged) Fits(); };
+    }
+
+    /// <summary>The tool's own controls beside its name while they fit there, else on a line under it.</summary>
+    private void Fits()
+    {
+        if (extra == null || ActualWidth <= 0) return;
+        var infinite = new Size(double.PositiveInfinity, double.PositiveInfinity);
+        foreach (var e in new[] { tile, titleRow, extra, pin, close }) e?.Measure(infinite);
+        var need = tile.DesiredSize.Width + Math.Min(titleRow.DesiredSize.Width, 260) + 24 + extra.DesiredSize.Width + pin.DesiredSize.Width + (close?.DesiredSize.Width ?? 0);
+        Lay(need > ActualWidth);
+    }
+
+    private void Lay(bool under)
+    {
+        if (extra == null || below == under) return;
+        below = under;
+        if (under)
+        {
+            Grid.SetRow(extra, 1);
+            Grid.SetColumn(extra, 0);
+            Grid.SetColumnSpan(extra, 5);
+            extra.HorizontalAlignment = HorizontalAlignment.Left;
+            extra.Margin = new Thickness(0, 12, 0, 0);
+        }
+        else
+        {
+            Grid.SetRow(extra, 0);
+            Grid.SetColumn(extra, 2);
+            Grid.SetColumnSpan(extra, 1);
+            extra.HorizontalAlignment = HorizontalAlignment.Right;
+            extra.Margin = new Thickness(12, 0, 12, 0);
+        }
     }
 
     /// <summary>The page of the tool's own that shows ("Lewis structures"), after its name; null, its first page.</summary>
@@ -739,7 +771,7 @@ public sealed class ToolHeading : Grid
 /// <summary>A tool's heading and its pin, where the tool opens whole.</summary>
 public static class ToolHeader
 {
-    public static ToolHeading Make(ToolsScreen.Kind kind, ToolContext c, UIElement? leading, UIElement? pins = null) => new(kind, c, leading, pins);
+    public static ToolHeading Make(ToolsScreen.Kind kind, ToolContext c, UIElement? close) => new(kind, c, close);
 
     /// <summary>A tool whose own controls fill its heading (a biology tool's pages): its pin a symbol alone.</summary>
     public static bool Squished(string key) => BioTools.Pages(key).Count > 1;
@@ -780,9 +812,9 @@ public static class ToolHeader
 /// The tools pinned to the title bar, on every screen: a button each in its tool's colour; a press opens a flyout with
 /// the tool's quickest use — its name (with ›) opens the whole tool, Pop out pulls the quick version into a small window of
 /// its own (ToolFloat). A running focus timer is live in its pin (it borrows a pin while it runs if the timer is not
-/// pinned). A pin's menu opens it, pops it out, moves or unpins it. The same pins sit in the heading of a popup that
-/// covers the title bar (a quiz, Knewton Alta, Macmillan, a tool's sheet: inPopup), their flyouts over it and the whole
-/// tool in a window of its own beside it (ToolsCenter.Float) — a sheet would wait behind the popup.
+/// pinned). A pin's menu opens it, pops it out, moves or unpins it. The same pins sit in the heading of a popup (a quiz,
+/// which covers the title bar, Knewton Alta, Macmillan: inPopup), their flyouts over it; the whole tool opens in its
+/// popup over the window either way, above them (ToolPopup).
 /// </summary>
 public sealed class PinBar : StackPanel
 {
@@ -1126,14 +1158,11 @@ public sealed class PinBar : StackPanel
         return s >= 3600 ? $"{s / 3600}:{s / 60 % 60:00}:{s % 60:00}" : $"{s / 60}:{s % 60:00}";
     }
 
-    /// <summary>The whole tool, from a pin: on the Tools page from the title bar's pins' menu; over the window as a sheet
-    /// from a flyout (the screen stays under it); from a popup's pins, in a window of its own beside it.</summary>
-    private void OpenWhole(string key, Dictionary<string, string>? info, IReadOnlyList<string>? files, bool fromFlyout = false)
+    /// <summary>The whole tool, from a pin's menu or its flyout: in its popup over the window, where you are.</summary>
+    private void OpenWhole(string key, Dictionary<string, string>? info, IReadOnlyList<string>? files)
     {
         CloseFlyout("opened");
-        if (inPopup) ToolsCenter.Float(key, engine, Window.GetWindow(this), files, info);
-        else if (fromFlyout) ToolsCenter.PopUp(key, engine, Window.GetWindow(this), files, info);
-        else ToolsCenter.Show(key, engine, files, info);
+        ToolsCenter.Show(key, engine, files, info);
     }
 
     /// <summary>The quick version pulled out of the flyout into a small window of its own (ToolFloat).</summary>
@@ -1156,7 +1185,7 @@ public sealed class PinBar : StackPanel
         if (ToolsCenter.KindOf(key) is not { } kind) return;
         var anchor = buttons.GetValueOrDefault(key);
         var owner = Window.GetWindow(this);
-        void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files) => OpenWhole(key, info, files, fromFlyout: true);
+        void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files) => OpenWhole(key, info, files);
         var c = new ToolContext { Engine = engine, Key = key, Quick = true, Owner = owner, OpenFull = Full, Close = () => CloseFlyout("closed by the tool") };
 
         var head = QuickHead(kind, () => Full(null, null), ToolRegistry.Has(key) && ToolsCenter.Accepts(key) == null ? () => PopOut(key) : null);
@@ -1330,10 +1359,10 @@ public sealed class ToolFloat : FluentWindow
         SetResourceReference(BackgroundProperty, B.Window);
         Width = ToolsCenter.FlyoutWidth(kind.Key) + 32;
         MaxHeight = 760;
-        var c = new ToolContext { Engine = engine, Key = kind.Key, Quick = true, Owner = this, OpenFull = (info, files) => ToolsCenter.OpenWhole(kind.Key, engine, files, info), Close = Close };
+        var c = new ToolContext { Engine = engine, Key = kind.Key, Quick = true, Owner = this, OpenFull = (info, files) => ToolsCenter.Show(kind.Key, engine, files, info), Close = Close };
         var body = ToolRegistry.Quick(c) ?? K.Wrapped($"Open {kind.Name} to use it.", Ty.Body, B.Text2);
         var bar = new TitleBar { Title = "", ShowMinimize = false, ShowMaximize = false, Height = 32 };
-        var head = PinBar.QuickHead(kind, () => ToolsCenter.OpenWhole(kind.Key, engine), null);
+        var head = PinBar.QuickHead(kind, () => ToolsCenter.Show(kind.Key, engine), null);
         var content = K.V(14, head, body);
         content.Margin = new Thickness(16, 0, 16, 16);
         Content = K.Rows("auto, auto", bar.Row(0), content.Row(1));

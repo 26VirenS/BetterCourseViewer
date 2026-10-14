@@ -171,7 +171,7 @@ internal sealed class AltaSession
     private const string PicsLightKey = "altaGraphsLight";
 
     private readonly Engine.Engine engine;
-    private readonly Window owner;
+    private Window owner;
     private readonly Dictionary<string, string> names;
     private readonly List<CoreWebView2Frame> frames = new();
     private readonly Dictionary<string, TaskCompletionSource<JsonNode?>> codeAsked = new();
@@ -230,6 +230,9 @@ internal sealed class AltaSession
         Launch = launch;
         names = ReadJson<Dictionary<string, string>>(NamesKey) ?? new();
     }
+
+    /// <summary>The popup's own window, once it shows: a graph opened from the page keeps above it (AltaGraphWindow).</summary>
+    public void ShowsIn(Window w) => owner = w;
 
     private string KnownKey => $"altaObjectives:{Launch.Course}:{Launch.Assignment}";
 

@@ -60,11 +60,39 @@ public class Sheet
     /// <summary>An update waits while it is open (Support/Updates.cs): every sheet but one only there to be read when the
     /// student likes (What's New), which would otherwise hold up every update for a Simpl kept in the notification area.</summary>
     public bool HoldsUpdates { get; set; } = true;
+
+    /// <summary>
+    /// A popup that floats over the window without holding it (Shell/FloatPopup.cs): nothing dimmed, the pane, the title
+    /// bar and the page behind it still at hand, there until it is closed. Every popup is one but a quiz being taken, the
+    /// first setup, the sign-in's questions and the questions that must be answered first ("Discard changes?").
+    /// </summary>
+    public bool Floats { get; set; }
+    /// <summary>Floating, as large as the page beside the pane less a margin, resized with the window (a tool, Knewton
+    /// Alta, Macmillan).</summary>
+    public bool Large { get; set; }
+    /// <summary>Floating, its heading has a Close of its own (×, Close, Done): the popup adds no × of its own.</summary>
+    public bool OwnClose { get; set; }
+    /// <summary>Floating, the part it is moved by (its heading): a press there that is not on a control drags it. Null: the
+    /// top of it, as far down as a heading reaches.</summary>
+    public FrameworkElement? Handle { get; set; }
+    /// <summary>Floating, what its ×, Escape and Alt+F4 do (a message asks before it is thrown away); null: its Close or
+    /// Cancel button pressed, else closed.</summary>
+    public Action? Dismiss { get; set; }
+    /// <summary>Floating, what it is called where its title does not say (the window's name, an update's notice).</summary>
+    public string? Name { get; set; }
+    /// <summary>Floating, the window it shows in (null until it shows): its own dialogs go over it.</summary>
+    public Window? Window { get; internal set; }
+
     public event Action? Closed;
     internal SheetHost? Host;
     internal Border? Card;
+    internal Action? CloseFloat;
 
-    public void Close() => Host?.Close(this);
+    public void Close()
+    {
+        if (CloseFloat != null) CloseFloat();
+        else Host?.Close(this);
+    }
 
     internal void RaiseClosed() => Closed?.Invoke();
 
@@ -119,6 +147,8 @@ public sealed class SheetHost : Grid
 
     public void Show(Sheet s)
     {
+        // (a popup that floats: a window of its own over the window this host is in, nothing of this one's dimmed)
+        if (s.Floats && Window.GetWindow(this) is { } over) { Simpl.Shell.FloatPopup.Show(s, over); return; }
         if (current != null) { waiting.Enqueue(s); return; }
         current = s;
         s.Host = this;
@@ -132,17 +162,21 @@ public sealed class SheetHost : Grid
         Motion.Pop(card);
         OpenChanged?.Invoke(true);
         Support.Shot.Moved();
-        Dispatcher.BeginInvoke(() =>
-        {
-            // the first thing to type in — if it shows without scrolling: focusing a field further down would scroll the
-            // sheet to it, the top of what it holds cut off — else the default button (Cancel, when the primary is the
-            // critical one), else (a sheet with no buttons of its own, a tool's: its heading's Done) the first thing the
-            // keyboard can reach in it, unless the sheet has put the keyboard somewhere itself
-            var primary = s.Buttons.FirstOrDefault(b => b.Kind == SheetButtonKind.Primary);
-            var first = FirstFocusable(s.Body) ?? (IInputElement?)(primary is { Danger: true } ? s.Buttons.LastOrDefault(b => b.Kind == SheetButtonKind.Close)?.Control : primary?.Control);
-            if (first is UIElement u) { u.Focus(); Keyboard.Focus(first); }
-            else if (!card.IsKeyboardFocusWithin) card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
-        }, System.Windows.Threading.DispatcherPriority.Input);
+        Dispatcher.BeginInvoke(() => FocusFirst(s, card), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// <summary>
+    /// The keyboard put in a sheet as it shows: the first thing to type in — if it shows without scrolling: focusing a
+    /// field further down would scroll the sheet to it, the top of what it holds cut off — else the default button (Cancel,
+    /// when the primary is the critical one), else (a sheet with no buttons of its own, a tool's: its heading's ×) the
+    /// first thing the keyboard can reach in it, unless the sheet has put the keyboard somewhere itself.
+    /// </summary>
+    internal static void FocusFirst(Sheet s, FrameworkElement card)
+    {
+        var primary = s.Buttons.FirstOrDefault(b => b.Kind == SheetButtonKind.Primary);
+        var first = FirstFocusable(s.Body) ?? (IInputElement?)(primary is { Danger: true } ? s.Buttons.LastOrDefault(b => b.Kind == SheetButtonKind.Close)?.Control : primary?.Control);
+        if (first is UIElement u) { u.Focus(); Keyboard.Focus(first); }
+        else if (!card.IsKeyboardFocusWithin) card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
     }
 
     public void Close(Sheet s)
@@ -167,14 +201,15 @@ public sealed class SheetHost : Grid
         Motion.Unpop(card, Gone);
     }
 
-    private static bool OpenPopupAround(DependencyObject f)
+    /// <summary>The keyboard is in a drop-down, a menu or a flyout that is open inside a sheet (Escape is its, then).</summary>
+    internal static bool OpenPopupAround(DependencyObject f)
     {
         for (var p = f; p != null; p = VisualTreeHelper.GetParent(p) ?? LogicalTreeHelper.GetParent(p))
         {
             if (p is System.Windows.Controls.ComboBox { IsDropDownOpen: true }) return true;
             if (p is System.Windows.Controls.ContextMenu { IsOpen: true } or System.Windows.Controls.MenuItem { IsSubmenuOpen: true }) return true;
             if (p is System.Windows.Controls.Primitives.Popup { IsOpen: true }) return true;
-            if (p is SheetHost) return false;
+            if (p is SheetHost or Window) return false;
         }
         return false;
     }
@@ -207,12 +242,45 @@ public sealed class SheetHost : Grid
 
     private Border Build(Sheet s)
     {
+        var grid = Content(s, b => Press(s, b), null);
+        var card = new Border
+        {
+            Child = grid, Width = s.Width, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            Effect = K.Shadow(64, 24, 0.32), SnapsToDevicePixels = true, ClipToBounds = false,
+        };
+        if (s.Height is { } h) card.Height = h;
+        card.SetResourceReference(Border.BackgroundProperty, "ContentDialogBackground");
+        card.SetResourceReference(Border.BorderBrushProperty, "ContentDialogBorderBrush");
+        // (the corners clip what is inside them: the top's overlay and the foot follow the card's rounding)
+        grid.Clip = null;
+        grid.SizeChanged += (_, e) => grid.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
+        KeyboardNavigation.SetTabNavigation(card, KeyboardNavigationMode.Cycle);
+        KeyboardNavigation.SetControlTabNavigation(card, KeyboardNavigationMode.Cycle);
+        KeyboardNavigation.SetDirectionalNavigation(card, KeyboardNavigationMode.Cycle);
+        card.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        Fit(card); // (kept inside a small window: see the host's SizeChanged)
+        return card;
+    }
+
+    /// <summary>
+    /// What a sheet shows, whether over the window or floating in a window of its own: its title (with
+    /// <paramref name="close"/> — a floating sheet's × — at its right), what it is about, and its buttons at the foot.
+    /// </summary>
+    internal static Grid Content(Sheet s, Action<SheetButton> press, UIElement? close)
+    {
         var top = new Stack(Orientation.Vertical, 12, Array.Empty<UIElement>());
         if (!string.IsNullOrEmpty(s.Title))
         {
             var title = K.Text(s.Title!, Ty.Subtitle, B.Text, TextWrapping.Wrap);
             title.TextTrimming = TextTrimming.None;
-            top.Children.Add(title);
+            if (close is FrameworkElement x && !s.Bare)
+            {
+                x.Margin = new Thickness(12, -6, -10, 0);
+                x.VerticalAlignment = VerticalAlignment.Top;
+                top.Children.Add(K.Columns("*, auto", title.Col(0), x.Col(1)));
+            }
+            else top.Children.Add(title);
         }
         if (!s.Bare) top.Children.Add(s.Body);
         var content = new Border { Child = s.Bare ? s.Body : top, Padding = s.Bare ? new Thickness(0) : new Thickness(24, 24, 24, 24) };
@@ -241,7 +309,7 @@ public sealed class SheetHost : Grid
                 };
                 b.Control = btn;
                 var bb = b;
-                btn.Click += (_, _) => Press(s, bb);
+                btn.Click += (_, _) => press(bb);
                 Grid.SetColumn(btn, col);
                 col += 2;
                 row.Children.Add(btn);
@@ -252,24 +320,7 @@ public sealed class SheetHost : Grid
             Grid.SetRow(foot, 1);
             grid.Children.Add(foot);
         }
-        var card = new Border
-        {
-            Child = grid, Width = s.Width, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            Effect = K.Shadow(64, 24, 0.32), SnapsToDevicePixels = true, ClipToBounds = false,
-        };
-        if (s.Height is { } h) card.Height = h;
-        card.SetResourceReference(Border.BackgroundProperty, "ContentDialogBackground");
-        card.SetResourceReference(Border.BorderBrushProperty, "ContentDialogBorderBrush");
-        // (the corners clip what is inside them: the top's overlay and the foot follow the card's rounding)
-        grid.Clip = null;
-        grid.SizeChanged += (_, e) => grid.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
-        KeyboardNavigation.SetTabNavigation(card, KeyboardNavigationMode.Cycle);
-        KeyboardNavigation.SetControlTabNavigation(card, KeyboardNavigationMode.Cycle);
-        KeyboardNavigation.SetDirectionalNavigation(card, KeyboardNavigationMode.Cycle);
-        card.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        Fit(card); // (kept inside a small window: see the host's SizeChanged)
-        return card;
+        return grid;
     }
 
     /// <summary>A card kept inside the window, 24 from each edge.</summary>

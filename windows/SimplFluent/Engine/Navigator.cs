@@ -40,12 +40,13 @@ public sealed record Place(PlaceKind Kind, string? Ctx = null, string? Arg = nul
     };
 }
 
+/// <summary>What a route opens. (Tool, a tool once open on the Tools place, is kept only so a place an earlier version
+/// kept for after an update still reads: a tool opens in a popup now, never as a page.)</summary>
 public enum RouteKind { Web, Notifications, Calendar, Course, Group, Groups, Section, Topic, Assignment, Page, Folder, Inbox, Conversation, Tool }
 
 /// <summary>
 /// A screen pushed on a place, or a native screen by name (the Mac's Route): web(url, title), course(id), group(id),
-/// section(ctx, kind), topic(ctx, id), assignment(course, id), page(ctx, slug), folder(ctx, id, name), conversation(id),
-/// tool(key) — a tool open on the Tools place.
+/// section(ctx, kind), topic(ctx, id), assignment(course, id), page(ctx, slug), folder(ctx, id, name), conversation(id).
 /// </summary>
 public sealed record Route(RouteKind Kind, string A = "", string B = "", string C = "")
 {
@@ -58,8 +59,6 @@ public sealed record Route(RouteKind Kind, string A = "", string B = "", string 
     public static Route Page(string ctx, string slug) => new(RouteKind.Page, ctx, slug);
     public static Route Folder(string ctx, string id, string name) => new(RouteKind.Folder, ctx, id, name);
     public static Route Conversation(string id) => new(RouteKind.Conversation, id);
-    /// <summary>A tool open on the Tools place ("Tools › Calculator"), by its key.</summary>
-    public static Route Tool(string key) => new(RouteKind.Tool, key);
     public static readonly Route InboxRoute = new(RouteKind.Inbox);
     public static readonly Route GroupsRoute = new(RouteKind.Groups);
     public static readonly Route NotificationsRoute = new(RouteKind.Notifications);
@@ -147,7 +146,7 @@ public sealed class Navigator
         Current = new Location(Current.Place);
     }
 
-    /// <summary>Already where a screen belongs: in its course (any of the course's places), or on its root place (Tools).</summary>
+    /// <summary>Already where a screen belongs: in its course (any of the course's places), or on its root place.</summary>
     public static bool Within(Place current, Place target) => target.Ctx != null ? current.Ctx == target.Ctx : current == target;
 
     private void Record()

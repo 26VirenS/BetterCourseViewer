@@ -816,22 +816,9 @@ public sealed partial class Engine : Observable, IShellListener
         NavVersion++;
     }
 
-    /// <summary>
-    /// The screen a place opens on when it is picked from elsewhere, for a place that keeps one open while you go away
-    /// (the Tools place: the tool left open there, ToolsCenter); null opens the place at its root.
-    /// </summary>
-    public static Func<Place, Route?>? OpensOn;
-
-    /// <summary>A place picked: shown at its root — or, coming to it from elsewhere, on the screen it keeps open (the tool
-    /// left open on the Tools place, as the Mac's does: its breadcrumb's first part goes on to the place's root).</summary>
+    /// <summary>A place picked: shown at its root.</summary>
     public void Go(Place place)
     {
-        if (!Navigator.Within(Nav.Current.Place, place) && OpensOn?.Invoke(place) is { } kept)
-        {
-            Nav.Push(kept, place);
-            Moved(NavMove.Go);
-            return;
-        }
         Nav.Go(place);
         Moved(NavMove.Go);
         if (place.Ctx is { } ctx) _ = LoadSections(ctx);
@@ -909,7 +896,6 @@ public sealed partial class Engine : Observable, IShellListener
         RouteKind.Assignment => Place.Section($"courses/{route.A}", "assignments"),
         RouteKind.Folder => Place.Section(route.A, "files"),
         RouteKind.Topic or RouteKind.Page => Place.Home(route.A),
-        RouteKind.Tool => Place.Tools,
         _ => null,
     };
 

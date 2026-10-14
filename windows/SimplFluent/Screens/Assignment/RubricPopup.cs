@@ -22,10 +22,10 @@ namespace Simpl.Screens;
 internal static class RubricPopup
 {
     private static Sheet? sheet;
-    private static string? owner;
 
-    /// <summary>The rubric shown: on the ring (or, for the screenshot suite, the grid, or opened on a criterion).</summary>
-    public static void Show(AssignmentData d, string who, int? open = null, string? view = null)
+    /// <summary>The rubric shown (one at a time): on the ring (or, for the screenshot suite, the grid, or opened on a
+    /// criterion). It stays while another screen is opened under it, until it is closed.</summary>
+    public static void Show(AssignmentData d, int? open = null, string? view = null)
     {
         if (d.Rubric.Count == 0) return;
         sheet?.Close();
@@ -33,7 +33,8 @@ internal static class RubricPopup
         var w = win is { ActualWidth: > 0 } ? win.ActualWidth : 1280;
         var h = win is { ActualHeight: > 0 } ? win.ActualHeight : 820;
         var v = new RubricView(d, open, view);
-        var s = new Sheet { Bare = true, Modal = true, Body = v, Width = Math.Clamp(w - 64, 360, 1180), Height = Math.Clamp(h - 96, 360, 880) };
+        // (floating over the window: the assignment and the rest of Simpl at hand beside it; Escape is its own)
+        var s = new Sheet { Bare = true, Modal = true, Body = v, Width = Math.Clamp(w - 64, 360, 1180), Height = Math.Clamp(h - 96, 360, 880), Floats = true, OwnClose = true, Name = "Rubric" };
         v.Close = () => s.Close();
         v.Loaded += (_, _) =>
         {
@@ -43,20 +44,12 @@ internal static class RubricPopup
         s.Closed += () =>
         {
             v.Stop();
-            if (sheet != s) return;
-            sheet = null;
-            owner = null;
+            if (sheet == s) sheet = null;
         };
         sheet = s;
-        owner = who;
         Dialogs.Show(s, win);
     }
 
-    /// <summary>The rubric taken down if it is the one this assignment's page put up (the page went away).</summary>
-    public static void Dismiss(string who)
-    {
-        if (owner == who) sheet?.Close();
-    }
 }
 
 /// <summary>

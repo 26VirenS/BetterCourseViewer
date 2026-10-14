@@ -552,7 +552,7 @@ internal sealed class FCEditView : ContentControl
 
     /// <summary>
     /// Typing changes the set without drawing it again; a card added or taken away does. Words changed elsewhere (the
-    /// editor open twice: on the Tools page and over the window) are taken into the boxes not being typed in.
+    /// editor open twice: in the tool's popup and in its pin's flyout) are taken into the boxes not being typed in.
     /// </summary>
     private void Changed()
     {

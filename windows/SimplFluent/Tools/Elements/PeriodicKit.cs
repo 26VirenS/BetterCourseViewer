@@ -300,8 +300,8 @@ internal static class PTKit
 }
 
 /// <summary>
-/// The window's top layer, where the Periodic Table's tour and its search's results float over everything under the title
-/// bar (a pinned tool's sheet too): a layer of its own added to the window once, that only its own pieces take presses on.
+/// The top layer of the window the Periodic Table is in (its popup, Shell/FloatPopup.cs), where its tour and its search's
+/// results float over everything: a layer of its own added to the window once, that only its own pieces take presses on.
 /// </summary>
 internal static class PTLayer
 {
