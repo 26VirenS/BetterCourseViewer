@@ -207,7 +207,12 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   object. Framing (1.3.79) fills 84% of the room the model has (the view's height, or the width beside the label
   columns: each the widest label and 40 points), worked out from the content's outline (`BioSceneContent.outline()`,
   26 extreme points, made off the main thread with the scene by `measured()`), and no nearer than a `frame` ball the
-  scene gives. Click picks (opaque first, through
+  scene gives. Translucent things write no depth and are drawn after the opaque, by `order`; (1.3.79) a translucent
+  surface round its object's centre — a cell's membrane or wall, `CEShape.add(round: true)` — is two items, its far
+  side (`BioMaterial.side = .far`: the faces turned from the camera, drawn before every other translucent thing) and
+  its near side (`.near`: after them), each wound outward by `BioMesh.facing(outward:from:)`: drawn whole after the
+  organelles, its far side lay over them too, and the animal cell was one gold veil until a part was picked and the
+  rest dimmed. Click picks (opaque first, through
   translucent membranes), hover outlines the opaque pieces and shows a hand, the selection glows and the rest dims to
   35%, ← → ↑ ↓ turn 15°, + − zoom, Escape deselects, double-click zooms (or resets on empty space). Labels with leader
   lines (§3.5: two columns, 22 pt apart, as many as the columns hold (24 at most) with "+N more" past that, the
@@ -294,7 +299,7 @@ labels' anchors, Look inside; `CEBuildCache`), `CellExplorerScene.swift` (`CESce
 fade, isolate, labels; the Compare page's three cells), `CellMembraneModel.swift` (`CEMembrane`: the 60 × 60 nm patch)
 and `CellExplorerChecks.swift` (the `cell.…` self-check lines: counts, the 250k-triangle budget, inside the membrane,
 the empty cutaway wedge, the same twice, explode and fade, chloroplasts, the dented vacuole, left-handed flagella, true
-scale, labels, SA:V, the membrane).
+scale, labels, SA:V, the membrane, (1.3.79) the plasma membrane's far and near sides).
 
 Scene ids: `organelle:<part>:<n>` (a click selects the part: every `organelle:<part>:…` glows; ribosomes, pores, actin and
 fimbriae are drawn in clusters, `organelle:<part>:g<x>_<y>_<z>`, so a selection is dozens of objects, not thousands), `inside:<part>:…` (Look
