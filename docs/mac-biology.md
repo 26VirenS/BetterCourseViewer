@@ -443,4 +443,6 @@ Photosynthesis & Respiration, and the pins' quick versions 54b–54e. CI's runne
 whatever is asked, so the pictures show each tool at the narrow end of a Mac's sizes. A pin's picture opens its popover
 with `-SimplPinOpen <tool>`; the suite runs several copies of the app at once, and a popover closes when its app is put
 behind another, so a pin opened that way opens its popover again whenever its app comes back to the front
-(`PinnedToolButton`, Tools/PinnedTools.swift) — without that, 54d and 54e were pictured with the popover closed.
+(`PinnedToolButton`, Tools/PinnedTools.swift) — without that, 54d and 54e were pictured with the popover closed. The
+four biology pins are pictured at the end of the full set, each alone (`bio_pins`): four copies picturing their pins
+at once took the front from each other, and three were pictured closed.

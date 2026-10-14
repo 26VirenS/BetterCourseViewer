@@ -273,11 +273,23 @@ bio_full() {
   bio both 67c-energy-respiration 14 energy respiration:step=7
   bio both 67d-energy-photosynthesis 14 energy photosynthesis:step=6
   bio both 67e-energy-atoms 14 energy atoms:trace=carbon:step=4
-  # the pins' quick versions: a codon looked up, a cross, Hardy–Weinberg, the lab's dilution and molarity
+  # (the pins' quick versions are taken at the end, each alone: bio_pins)
+  BIO_PINS=yes
+}
+
+# the biology pins' quick versions: a codon looked up, a cross, Hardy–Weinberg, the lab's dilution and molarity — each
+# alone, once the rest are done: a pin's popover is there only while its app is in front, and four copies picturing
+# their pins at once took the front from each other (three of the four were pictured closed)
+bio_pins() {
+  [ -n "${BIO_PINS:-}" ] || return 0
   MODE=light shoot light-54b-pin-gene 14 -SimplPinnedTools gene -SimplPinOpen gene -SimplPinCodon UGG
+  wait
   MODE=light shoot light-54c-pin-cross 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen cross
+  wait
   MODE=light shoot light-54d-pin-popgen 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen popgen
+  wait
   MODE=light shoot light-54e-pin-biolab 14 -SimplPinnedTools biolab -SimplPinOpen biolab
+  wait
 }
 
 # (1.3.78) the UI review's new states, each once (in both sets: what the review's findings changed, seen on every
@@ -545,6 +557,7 @@ shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo Y
 shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
 shoot light-54f-pin-timer 14 -SimplFocusDemo YES -SimplPinnedTools pomo -SimplPinOpen pomo # (1.3.78: the timer's quick version)
 wait
+bio_pins
 richtext_check
 keep_crashes
 exit 0
