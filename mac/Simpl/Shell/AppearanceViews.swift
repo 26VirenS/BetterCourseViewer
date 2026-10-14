@@ -386,10 +386,14 @@ struct PhotoSlotThumb: View {
             .frame(width: slot.isSide ? 34 : 70, height: slot.isSide ? 80 : 40)
             .clipShape(shape)
             .overlay(shape.strokeBorder(picked ? Theme.accent : Color.primary.opacity(0.14), lineWidth: picked ? 2.5 : 1))
+            // (home-17: a counter's name in full — "Graded this week" — on two lines where one is too narrow, never cut)
             Text(slot.title)
                 .font(.sCaption2)
                 .foregroundStyle(picked ? .primary : .secondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: slot.isSide ? nil : 78)
         }
     }
 }

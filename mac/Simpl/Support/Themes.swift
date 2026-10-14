@@ -7,9 +7,10 @@ import UniformTypeIdentifiers
 // or one of the web's six drawn scenes (extension/lib/theme.js, inked as the web inks them: scripts/dev/mac-theme-art.mjs
 // makes Theme<Name>Side and Theme<Name>Card0…5 in the asset catalogue), each pinned in its place by a point and zoomed
 // about it (the web's placeOf: x%, y% of the picture on x%, y% of the place; 0.5 to 3 times the fill), and frosted a
-// little under what is written on it. The accent is every control, link and selection, the sidebar's glyphs and words,
-// the counters' glyphs and the screens' titles — each shade stepped until it reads on its ground (lib/theme.js) — and
-// the greys are cast with it. Regular is the Mac's own accent, the sidebar's and the counters' glyphs in their own colours.
+// little under what is written on it. The accent is every control, link and selection, the glyph of the sidebar's row
+// chosen and the counters' glyphs — each shade stepped until it reads on its ground (lib/theme.js) — and the greys are
+// cast with it; (home-16) words and titles keep the Mac's own colours, and red stays the colour of something late.
+// Regular is the Mac's own accent, the sidebar's and the counters' glyphs in their own colours.
 
 /// Where a photo can go.
 enum PhotoSlot: String, CaseIterable, Identifiable, Codable {
@@ -27,8 +28,8 @@ enum PhotoSlot: String, CaseIterable, Identifiable, Codable {
         case .tomorrow: return "Tomorrow"
         case .next: return "Next 7 days"
         case .overdue: return "Overdue"
-        case .unread: return "Unread"
-        case .graded: return "Graded"
+        case .unread: return "Announcements" // (home-17: what the counter counts, as its tile and panel say it)
+        case .graded: return "Graded this week"
         }
     }
 
@@ -506,16 +507,29 @@ struct PageGround: View {
 }
 
 /// The photo in a place, filling it as it is pinned and zoomed; `frost`: a little blurred and veiled under the words on
-/// it, for them to read. Nothing where the place has no photo.
+/// it, for them to read; `fade`: how its ink gives way to what is written over it. Nothing where the place has no photo.
 struct SlotPhotoView: View {
+    /// How a photo's ink gives way to the words over it (its paper stays whole).
+    enum Fade {
+        /// As it is (the editor's previews).
+        case plain
+        /// (home-27) A counter's: faded out towards the tile's top, so nothing of it — a drawn sun, a photo's moon —
+        /// sits by the tile's name or in its corner, where a control would be.
+        case tile
+        /// (home-26) The sidebar's: a drawn scene kept faint behind the rows (a texture, under about a seventh of the
+        /// accent), never lines through the words.
+        case side
+    }
+
     let slot: PhotoSlot
     var frost = true
+    var fade: Fade = .plain
     @ObservedObject private var store = AppearanceStore.shared
 
     var body: some View {
         if let photo = store.photos[slot], let pic = store.image(photo, in: slot) {
             GeometryReader { g in
-                PhotoLayer(image: pic.image, kind: pic.kind, place: photo.place, size: g.size)
+                PhotoLayer(image: pic.image, kind: pic.kind, place: photo.place, size: g.size, fade: fade)
                     .blur(radius: frost ? 1 : 0, opaque: true)
                     .overlay { if frost && pic.kind == .scene { Theme.page.opacity(0.22) } }
                     .frame(width: g.size.width, height: g.size.height)
@@ -528,12 +542,13 @@ struct SlotPhotoView: View {
 }
 
 /// A picture drawn into a box as the web pins it: its point at x%, y% on the box's same point, at z times the size that
-/// just covers the box. A drawn scene's ink is coloured on its paper.
+/// just covers the box. A drawn scene's ink is coloured on its paper; `fade` takes the ink back where words sit over it.
 struct PhotoLayer: View {
     let image: NSImage
     let kind: AppearanceStore.InkKind
     let place: PhotoPlace
     let size: CGSize
+    var fade: SlotPhotoView.Fade = .plain
 
     var body: some View {
         let iw = max(image.size.width, 1), ih = max(image.size.height, 1)
@@ -542,33 +557,64 @@ struct PhotoLayer: View {
         let ox = place.x / 100 * (size.width - dw), oy = place.y / 100 * (size.height - dh)
         ZStack(alignment: .topLeading) {
             Theme.page
-            Image(nsImage: image)
-                .resizable()
-                .renderingMode(.template)
-                .foregroundStyle(kind == .scene ? Theme.ink : Theme.photoInk)
-                .frame(width: dw, height: dh)
-                .offset(x: ox, y: oy)
+            ZStack(alignment: .topLeading) {
+                Image(nsImage: image)
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(kind == .scene ? Theme.ink : Theme.photoInk)
+                    .frame(width: dw, height: dh)
+                    .offset(x: ox, y: oy)
+            }
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
+            .mask { inkMask }
+            // (a drawn scene's ink is a third of the way to the accent: kept to under half of that behind the sidebar's
+            // words; a photo's is already a shade off its paper)
+            .opacity(fade == .side && kind == .scene ? 0.45 : 1)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipped()
     }
+
+    /// Where the ink shows: everywhere, or (a counter's tile) from a little under its name down, nothing in its top
+    /// corners.
+    @ViewBuilder
+    private var inkMask: some View {
+        switch fade {
+        case .tile:
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.24),
+                                   .init(color: .black, location: 0.66)], startPoint: .top, endPoint: .bottom)
+        case .plain, .side:
+            Color.black
+        }
+    }
 }
 
-/// The sidebar's ground: its photo, frosted, behind its rows.
+/// The sidebar's ground: its photo, frosted, behind its rows — (home-26) a drawn scene kept faint behind them.
 struct SidebarGround: View {
     var body: some View {
-        SlotPhotoView(slot: .side)
+        SlotPhotoView(slot: .side, fade: .side)
             .ignoresSafeArea()
     }
 }
 
-/// (1.3.1) The sidebar's rows in a colour worn: the glyph in its glyph shade, the words in its word shade. Regular: as
-/// the Mac draws them.
+/// (1.3.1) The sidebar's rows in a colour worn. (home-16) Their words in the Mac's own colours, as every sidebar's —
+/// an accent on every row read as a warning in a red or a pink, and left the row chosen marked by a grey pill alone —
+/// and the accent where it says something: the glyph of the row showing. Regular: as the Mac draws them.
 struct SidebarThemeLabel: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
-        if Theme.themed {
+        SidebarThemeLabelBody(configuration: configuration)
+    }
+}
+
+private struct SidebarThemeLabelBody: View {
+    let configuration: LabelStyleConfiguration
+    @Environment(\.sidebarPlace) private var showing
+    @Environment(\.sidebarRowPlace) private var row
+
+    var body: some View {
+        if Theme.themed, let row, row == showing {
             Label {
-                configuration.title.foregroundStyle(Theme.accentText)
+                configuration.title
             } icon: {
                 configuration.icon.foregroundStyle(Theme.accentIcon)
             }
@@ -576,4 +622,31 @@ struct SidebarThemeLabel: LabelStyle {
             Label(configuration)
         }
     }
+}
+
+private struct SidebarPlaceKey: EnvironmentKey {
+    static let defaultValue: Place? = nil
+}
+
+private struct SidebarRowPlaceKey: EnvironmentKey {
+    static let defaultValue: Place? = nil
+}
+
+extension EnvironmentValues {
+    /// (home-16) The place the window shows, for the sidebar's rows to know the one chosen.
+    var sidebarPlace: Place? {
+        get { self[SidebarPlaceKey.self] }
+        set { self[SidebarPlaceKey.self] = newValue }
+    }
+
+    /// (home-16) The place a sidebar row opens.
+    var sidebarRowPlace: Place? {
+        get { self[SidebarRowPlaceKey.self] }
+        set { self[SidebarRowPlaceKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// (home-16) This sidebar row opens `place` (its glyph wears the accent while that place shows).
+    func sidebarRow(_ place: Place) -> some View { environment(\.sidebarRowPlace, place) }
 }
