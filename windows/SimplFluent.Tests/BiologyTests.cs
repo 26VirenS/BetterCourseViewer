@@ -449,6 +449,20 @@ public class BiologyTests
         // (without the model's box the layout is the Mac's)
         var (plain, _) = BioLabelLayout.Layout(inputs, 270, 280, 150, 545, 520);
         Assert.All(plain, p => Assert.Null(p.EdgeY));
+        // (two long labels over the same part: the second goes a row further out, its leader clear of the first's capsule)
+        var pair = new List<BioLabelInput>
+        {
+            new("p", "The first long label, upper left", 200, 230, Width: 240),
+            new("q", "The second long label, upper right", 330, 235, Width: 250),
+        };
+        var (two, _) = BioLabelLayout.Layout(pair, 270, 280, 150, 545, 520, box);
+        Assert.All(two, p => Assert.NotNull(p.EdgeY));
+        var (inner, outer) = two[0].Y > two[1].Y ? (two[0], two[1]) : (two[1], two[0]);
+        Assert.Equal(22, inner.Y - outer.Y, 6);
+        var (ex, ey) = outer.Leader[0];
+        double XAt(double y) => outer.AnchorX + (ex - outer.AnchorX) * (y - outer.AnchorY) / (ey - outer.AnchorY);
+        var f = inner.Frame;
+        Assert.False(Math.Max(XAt(f.Y), XAt(f.Y + f.Height)) > f.X && Math.Min(XAt(f.Y), XAt(f.Y + f.Height)) < f.X + f.Width);
     }
 
     // ---- the step-through (§3.6) ----

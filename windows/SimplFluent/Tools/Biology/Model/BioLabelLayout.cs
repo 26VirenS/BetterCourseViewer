@@ -11,9 +11,9 @@ namespace Simpl.Tools;
 //
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
 // model's box on the view, a label that would hide its own anchor, or (beside a model narrower than 70% of the view)
-// cover the model for more than half its width, goes instead to a row just above the model (an anchor in its upper
-// half) or below it, as near over its anchor as the row allows, its leader straight up or down; with no room there it
-// stays in its column.
+// reach more than 40 into the model's box (or over half its own width, for a short label), goes instead to a row just
+// above the model (an anchor in its upper half) or below it, as near over its anchor as the row allows, its leader
+// straight up or down and never through a capsule in a row nearer the model; with no room there it stays in its column.
 
 /// <summary>A label to place: its object, its words, where its anchor projects (y down), whether it can be seen (not
 /// behind the camera or hidden by another object), how much of the screen its object covers (the larger keep their labels
@@ -114,7 +114,7 @@ public static class BioLabelLayout
             var f = p.Frame;
             var onAnchor = p.AnchorX >= f.X - 4 && p.AnchorX <= f.X + f.Width + 4 && Math.Abs(p.AnchorY - p.Y) <= Height;
             var acrossModel = p.Y + Height / 2 >= box.Y0 && p.Y - Height / 2 <= box.Y1
-                && Math.Max(0, Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0)) > 0.5 * f.Width;
+                && Math.Max(0, Math.Min(f.X + f.Width, box.X1) - Math.Max(f.X, box.X0)) > Math.Min(40, 0.5 * f.Width);
             return onAnchor || (narrow && acrossModel);
         }
         var moving = placed.Where(Hides).OrderBy(p => p.AnchorX).ThenBy(p => p.Id, StringComparer.Ordinal).ToList();
@@ -132,6 +132,18 @@ public static class BioLabelLayout
                 .Select(p => (p.Frame.X - space, p.Frame.X + p.Frame.Width + space)).ToList();
             taken[(above, k)] = list;
             return list;
+        }
+        // (whether a leader from the anchor to a label in row k would run through a capsule in a row nearer the model)
+        bool Crosses(bool above, int k, double ax, double ay, double ex, double ey)
+        {
+            for (var j = 0; j < k; j++)
+            {
+                double yj = RowY(above, j), ya = yj - Height / 2, yb = yj + Height / 2;
+                double XAt(double y) => Math.Abs(ey - ay) < 1e-9 ? ex : ax + (ex - ax) * (y - ay) / (ey - ay);
+                double x0 = Math.Min(XAt(ya), XAt(yb)), x1 = Math.Max(XAt(ya), XAt(yb));
+                if (Taken(above, j).Any(t => x0 < t.X1 - space && x1 > t.X0 + space)) return true;
+            }
+            return false;
         }
         foreach (var p in moving)
         {
@@ -151,6 +163,8 @@ public static class BioLabelLayout
                 {
                     if (x < Inset - 1e-9 || x + p.Width > w - Inset + 1e-9) continue;
                     if (row.Any(t => x < t.X1 && x + p.Width > t.X0)) continue;
+                    var ex = Math.Clamp(p.AnchorX, x + 9, x + p.Width - 9);
+                    if (Crosses(above, k, p.AnchorX, p.AnchorY, ex, above ? y + Height / 2 : y - Height / 2)) continue;
                     var cost = Math.Abs(x - want) + 40 * k;
                     if (cost < bestCost) { bestCost = cost; best = (k, x); }
                 }
