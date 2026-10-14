@@ -400,7 +400,7 @@ jobs:
           Shot 'ptable-molecule' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-molecule', 'Ethanol'))
           Shot 'pin-ptable' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'ptable', '--pin-open', 'ptable', '--ptable-pin-element', '25'))
           Shot 'lewis-sheet' '1366x778' 45 ($mock + @('--appearance', 'dark', '--lewis', 'Benzene'))
-          Shot 'molecule-sheet' '1024x681' 45 ($mock + @('--appearance', 'light', '--molecule', 'CH4'))
+          Shot 'molecule-sheet' '1024x681' 45 ($mock + @('--appearance', 'light', '--pin', 'calc,ptable', '--molecule', 'CH4'))
           Shot 'tool-convert' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'conv', '--tool-file', 'sample'))
           Shot 'tool-split' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'pdfx', '--tool-file', 'sample'))
           Shot 'tool-merge' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'pdfx', '--tool-file', 'sample|sample'))
@@ -615,7 +615,7 @@ jobs:
           Shot 'pin-popout' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2', '--pin-popout', 'calc'))
           Shot 'pin-popout-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2', '--pin-popout', 'calc'))
           Shot 'calendar-preview-graded' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview', '--preview-of', 'Lec01-PreQuiz'))
-          Shot 'settings-updates-earlier-installed' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes', '--settings-scroll', '4000'))
+          Shot 'settings-updates-earlier-installed' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-earlier', 'yes', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes', '--settings-scroll', '4000'))
           Shot 'place-window-assignment' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--place-window', '/courses/101/assignments/1012'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
