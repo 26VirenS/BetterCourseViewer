@@ -1026,9 +1026,16 @@ public sealed class DivisionBuilder
         var f = Frame(FourCells(), ns, ps, Spindles(), CellPlates(first: 0.95, firstAlpha: 0, second: D, secondAlpha: 0.75), Furrows(), ks);
         var dy = o.Plant ? 0.3 : 0.32;
         var badges = Enumerable.Range(0, 4).Select(c => new DivBadgeDef(c, centres[c] + new DivPoint(0, c < 2 ? dy : -dy))).ToList();
+        // (after nondisjunction not every cell is n: the label says which they are)
+        var gametes = o.Nondisjunction switch
+        {
+            DivisionNondisjunction.MeiosisI => "Four cells: n+1 and n−1",
+            DivisionNondisjunction.MeiosisII => "Four cells: n, n+1 and n−1",
+            _ => "Four haploid cells (n)",
+        };
         var labels = new List<DivLabelDef>
         {
-            new("gamete", "Four haploid cells (n)", DivAnchor.Cell(0, 100)),
+            new("gamete", gametes, DivAnchor.Cell(0, 100)),
             new("nucleus", "Nucleus", DivAnchor.Nucleus(3, DivMath.Radians(-30))),
         };
         if (Crossing) labels.Add(new DivLabelDef("recombinant", "Recombinant chromosome", DivAnchor.Nucleus(0, DivMath.Radians(200))));

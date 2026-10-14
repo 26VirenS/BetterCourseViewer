@@ -43,6 +43,9 @@ internal sealed class DnaNucleotidesPage : Grid
         viewBar.Changed += i => DNAToolModel.ShowPairs = i == 1;
         scene.Picked += Pick;
         title.TextTrimming = TextTrimming.CharacterEllipsis;
+        // (the subtitle wraps to a second line rather than being cut short beside the view switch)
+        subtitle.TextWrapping = TextWrapping.Wrap;
+        subtitle.MaxHeight = 2 * subtitle.LineHeight + 1;
         subtitle.TextTrimming = TextTrimming.CharacterEllipsis;
         var words = K.V(2, title, subtitle);
         words.VerticalAlignment = VerticalAlignment.Center;

@@ -103,8 +103,67 @@ public static class BiomoleculeBuilderModel
         return made;
     }
 
-    /// <summary>The peptide as the page has it now.</summary>
+    /// <summary>The peptide as the page has it now (as built: its N at the origin).</summary>
     public static BiomolPeptide CurrentPeptide => Peptide(Sequence, StructureFor(Sequence), Ph7);
+
+    // (how the peptide is laid out for the view, as the Mac's BiomolState lays it out: a turn (rows) and the centre it
+    //  turns about, chosen again only when the camera frames afresh, so a residue added or taken off does not move the rest)
+    private static double[][] layoutRows = { new double[] { 1, 0, 0 }, new double[] { 0, 1, 0 }, new double[] { 0, 0, 1 } };
+    private static BioVec layoutCentre = BioVec.Zero;
+    private static (BioVec Centre, double Radius)? framed;
+
+    /// <summary>Counts the times the camera framed the peptide afresh (the view frames it again when this changes).</summary>
+    public static int PeptideFrame { get; private set; }
+
+    /// <summary>A peptide laid out for the view: its long axis along x (N-terminus left, so it grows to the right), the
+    /// next along y, centred.</summary>
+    public static BiomolPeptide LaidOut(BiomolPeptide p) => p.Moved(-layoutCentre).Transformed(layoutRows, BioVec.Zero);
+
+    /// <summary>The peptide as the view shows it: the layout chosen again first if the camera frames afresh.</summary>
+    public static BiomolPeptide ShownPeptide
+    {
+        get
+        {
+            var p = CurrentPeptide;
+            ReframePeptide(p);
+            return LaidOut(p);
+        }
+    }
+
+    /// <summary>The camera frames the peptide afresh when it has grown out of the ball last framed, or shrunk well inside
+    /// it; the layout is chosen again then (the CA trace's principal axes: the longest along x, pointing N → C, the next
+    /// along y, pointing up).</summary>
+    private static void ReframePeptide(BiomolPeptide p)
+    {
+        var ca = p.CaTrace;
+        if (ca.Count == 0) return;
+        var b = BioV.BoundingSphere(ca);
+        var r = b.Radius + 6;
+        if (framed is { } f && BioV.Distance(b.Centre, f.Centre) + r <= f.Radius * 1.1 && r >= f.Radius * 0.55) return;
+        framed = (b.Centre, r);
+        PeptideFrame++;
+        var c = BiomolMath.Centroid(ca);
+        if (ca.Count < 3)
+        {
+            layoutRows = new[] { new double[] { 1, 0, 0 }, new double[] { 0, 1, 0 }, new double[] { 0, 0, 1 } };
+            layoutCentre = c;
+            return;
+        }
+        var cov = new double[3, 3];
+        foreach (var q in ca)
+        {
+            double[] d = { q.X - c.X, q.Y - c.Y, q.Z - c.Z };
+            for (var i = 0; i < 3; i++)
+                for (var j = 0; j < 3; j++) cov[i, j] += d[i] * d[j];
+        }
+        var (_, axes) = BiomolMath.EigenSymmetric3(cov);
+        BioVec x = axes[0], y = axes[1];
+        if (BioV.Dot(x, ca[^1] - ca[0]) < 0) x = -x;
+        if (y.Y < 0) y = -y;
+        var z = BioV.Cross(x, y);
+        layoutRows = new[] { new[] { x.X, x.Y, x.Z }, new[] { y.X, y.Y, y.Z }, new[] { z.X, z.Y, z.Z } };
+        layoutCentre = c;
+    }
 
     // ---- Nucleic acids ----
 

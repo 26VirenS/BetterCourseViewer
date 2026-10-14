@@ -308,7 +308,10 @@ public static class DivisionModel
         if (ndI) telINotice = new List<string> { "After nondisjunction one cell has n+1 chromosomes and the other n−1.", telINotice[^1] };
         var anaIINotice = new List<string> { "Now the sister chromatids separate, as in mitosis's anaphase." };
         if (ndII) anaIINotice.Insert(0, "Nondisjunction: in the top cell one chromosome's sisters fail to separate.");
-        var telIINotice = new List<string> { "Four haploid cells, each 1c." };
+        var telIINotice = new List<string>
+        {
+            ndI ? "No cell has a normal set: two are n+1 and two n−1." : ndII ? "Two cells are n; one is n+1 and one n−1." : "Four haploid cells, each 1c.",
+        };
         if (o.Nondisjunction == DivisionNondisjunction.None)
             telIINotice.Add(o.CrossingOver ? "All four are genetically different: crossing over and independent assortment."
                 : "Without crossing over, the cells come in identical pairs; independent assortment still mixes the pairs.");

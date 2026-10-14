@@ -465,7 +465,7 @@ internal sealed class DivisionStageView : Grid
             {
                 ctx.BeginFigure(new Point(pl.AnchorX, pl.AnchorY), false, false);
                 ctx.LineTo(new Point(pl.ElbowX, pl.Y), true, true);
-                ctx.LineTo(new Point(pl.EdgeX, pl.Y), true, true);
+                ctx.LineTo(new Point(pl.LeaderX, pl.Y), true, true);
             }
         leaders.Freeze();
         var ink = dark ? Color.FromRgb(0xe8, 0xe8, 0xea) : Color.FromRgb(0x2b, 0x2b, 0x2e);

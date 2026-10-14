@@ -175,7 +175,10 @@ internal sealed class CrossPage : Grid
         letter.IsEnabled = g.Pattern != BioInheritance.Abo;
         letter.Width = 64;
         AutomationProperties.SetName(letter, $"Gene letter {g.Letter}");
-        var pattern = CrossKit.Menu(K.Text(g.Pattern.Label(), Ty.BodyStrong), m =>
+        // (the pattern's name read whole: beside the letter it has the card's width, and the longest goes onto two lines)
+        var patternFace = K.Text(g.Pattern.Label(), Ty.BodyStrong, wrap: TextWrapping.Wrap);
+        patternFace.TextTrimming = TextTrimming.None;
+        var pattern = CrossKit.Menu(patternFace, m =>
         {
             foreach (var p in Enum.GetValues<BioInheritance>())
             {
@@ -184,14 +187,7 @@ internal sealed class CrossPage : Grid
             }
         }, "How the gene's alleles show", $"pattern:{k}");
         AutomationProperties.SetName(pattern, $"Pattern: {g.Pattern.Label()}");
-        var top = K.Columns("auto, 8, *, auto", letter.Col(0), pattern.Col(2));
-        if (setup.Genes.Count > 1)
-        {
-            var remove = K.IconButton(SymbolRegular.SubtractCircle24, () => CrossesModel.Edit(s => s.RemoveGene(k)), $"Take gene {g.Letter} out of the cross");
-            remove.Margin = new Thickness(6, 0, 0, 0);
-            remove.Uid = $"remove:{k}";
-            top.Children.Add(remove.Col(3));
-        }
+        var top = K.Columns("auto, 8, *", letter.Col(0), pattern.Col(2));
         var current = k < setup.Examples.Count ? setup.Examples[k] : null;
         var exampleTitle = CrossExamples.Find(current)?.Title;
         var exampleFace = K.Text(exampleTitle ?? "Example…", Ty.Body, exampleTitle == null ? B.Text2 : B.Text);
@@ -203,7 +199,16 @@ internal sealed class CrossPage : Grid
                 m.Items.Add(CrossKit.Item(e.Title, e.Id == current, () => CrossesModel.Edit(s => s.ApplyExample(ee, k)), setup.Allowed(e.Gene.Pattern, k)));
             }
         }, "A gene from the textbook: its alleles, pattern and usual parents", $"example:{k}");
-        var v = K.V(10, top, example, ParentRow(setup, k, 1, x ? "♀ Mother" : "Parent 1"), ParentRow(setup, k, 2, x ? "♂ Father" : "Parent 2"));
+        // (taking the gene out sits beside the example, so the pattern above keeps the room for its name)
+        var exampleRow = K.Columns("*, auto", example.Col(0));
+        if (setup.Genes.Count > 1)
+        {
+            var remove = K.IconButton(SymbolRegular.SubtractCircle24, () => CrossesModel.Edit(s => s.RemoveGene(k)), $"Take gene {g.Letter} out of the cross");
+            remove.Margin = new Thickness(6, 0, 0, 0);
+            remove.Uid = $"remove:{k}";
+            exampleRow.Children.Add(remove.Col(1));
+        }
+        var v = K.V(10, top, exampleRow, ParentRow(setup, k, 1, x ? "♀ Mother" : "Parent 1"), ParentRow(setup, k, 2, x ? "♂ Father" : "Parent 2"));
         return K.Card(v, new Thickness(12), 10);
     }
 
@@ -425,7 +430,9 @@ internal static class CrossResults
         f.VerticalAlignment = VerticalAlignment.Center;
         var row = K.Columns("auto, *, auto, auto", sw.Col(0), name.Col(1), f.Margin(8, 0, 0, 0).Col(2), pct.Col(3));
         if (p.Carriers.IsZero) return row;
-        return K.V(2, row, K.Text($"{(p.Carriers / p.P).Text} of these are carriers", Ty.Caption, B.Text2).Margin(19, 0, 0, 0));
+        // (the share of these that carry the allele: "all" rather than "1 of these are")
+        var share = (p.Carriers / p.P).Text;
+        return K.V(2, row, K.Text(share == "1" ? "All of these are carriers" : $"{share} of these are carriers", Ty.Caption, B.Text2).Margin(19, 0, 0, 0));
     }
 }
 

@@ -109,7 +109,8 @@ public sealed class BioStepControls : ContentControl
         var divider = new Border { Width = 1, Height = 18, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
         divider.Bg(B.Divider);
         row.Children.Add(divider);
-        row.Children.Add(Dots());
+        var dots = Dots();
+        row.Children.Add(dots);
         var words = BioStepTiming.Caption(c.Index, c.Steps);
         var caption = K.Text(words, Ty.BodyStrong);
         caption.MinWidth = 120;
@@ -122,20 +123,39 @@ public sealed class BioStepControls : ContentControl
         var speed = Speed();
         row.Children.Add(speed);
         row.VerticalAlignment = VerticalAlignment.Center;
-        // (the caption gives way when the capsule would be wider than the controls — a long step title under a narrow
-        //  scene — so the speed stays in view; the whole caption is in its tooltip)
+        // (under a narrow scene the dots give way first — to a shorter bar of progress, then to nothing, as the caption
+        //  says which step it is — so the caption is read whole; only past that does it give way itself, the whole of it
+        //  in its tooltip, so the speed stays in view)
         if (ActualWidth > 0)
         {
             var others = 0.0;
             foreach (UIElement e in row.Children)
             {
-                if (ReferenceEquals(e, caption)) continue;
+                if (ReferenceEquals(e, caption) || ReferenceEquals(e, dots)) continue;
                 e.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 others += e.DesiredSize.Width;
             }
             // (the row's spacing, the capsule's padding and edge, the caption's margins)
             others += 6 * row.Children.Count + 24 + 10;
-            caption.MaxWidth = Math.Max(caption.MinWidth, ActualWidth - others);
+            caption.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            dots.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var room = ActualWidth - others;
+            var words0 = caption.DesiredSize.Width - 10;
+            if (words0 + dots.DesiredSize.Width > room)
+            {
+                var left = room - words0;
+                var at = row.Children.IndexOf(dots);
+                row.Children.RemoveAt(at);
+                if (left >= 40)
+                {
+                    var bar = K.Bar((c.Index + 1.0) / Math.Max(c.Steps.Count, 1), Appearance.Accent);
+                    bar.Width = Math.Min(left, 120);
+                    bar.VerticalAlignment = VerticalAlignment.Center;
+                    row.Children.Insert(at, bar);
+                }
+                else room += 6;
+            }
+            caption.MaxWidth = Math.Max(caption.MinWidth, room);
         }
         var capsule = new Border { CornerRadius = new CornerRadius(22), Padding = new Thickness(10, 6, 12, 6), Child = row, BorderThickness = new Thickness(1) };
         capsule.Bg(B.Card).Stroke(B.CardStroke);

@@ -212,7 +212,9 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   drag turns, right-drag pans, the wheel zooms; ← → ↑ ↓ turn 15°, + − zoom, Escape deselects; double-click zooms to an
   object (or resets on empty space). Labels with leader lines (§3.5: two columns 22 apart, ≤ 14 with "+N more", 120 ms
   fades, pressable, hover outlines their object) come from `Labels`; give a convex shell's label a `Normal`, else a ray
-  decides what hides it. It draws frame by frame only while something moves. Keep a scene under 300k triangles
+  decides what hides it. A label too wide for the room beside its column is moved in on its own (the Mac moves the whole
+  column in for its widest, which in this app's narrower view put the short labels over the model), and an anchor past
+  a label's far edge is led to that edge. It draws frame by frame only while something moves. Keep a scene under 300k triangles
   (§3.4: Viewport3D draws on one thread; icospheres for the many small spheres). `BioSceneCard.Make(bar, scene, hint)` and
   `BioSceneCard.Buttons(scene)` (Turn / Reset view) give the chemistry builder's card.
 - WPF side (`BioScene.cs`): `BioWpf.Mesh(mesh)` (frozen `MeshGeometry3D`), `BioWpf.Material(material, fade)`,
@@ -223,7 +225,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
 
 Keep the controller in your model: `var steps = new BioStepController(new[] { new BioStep(0, "Initiation", "…", Group:
 1), … })`. Put `new BioStepControls(steps, new Dictionary<int, string> { [1] = "Interphase", … })` under the scene (the
-explanation above a capsule of ⏮ ◀ ▶/⏸ ▶ ⏭, the dots, "Step 4 of 12 · Elongation", the speed menu; it takes ← →
+explanation above a capsule of ⏮ ◀ ▶/⏸ ▶ ⏭, the dots, "Step 4 of 12 · Elongation", the speed menu — under a narrow
+scene the dots give way to a shorter bar of progress, then to nothing, so the caption reads whole; it takes ← →
 Space Home End 1–9 when it has the focus) and `BioStepKeys.Attach(scene, steps)` on the scene (Space Home End 1–9 there:
 a 3D view keeps its own ← → ↑ ↓ for turning; on a 2D drawing ← → step too). Draw with
 `var anim = new BioStepAnimator(steps, phase => Draw(phase))` (`Loaded += (_, _) => anim.Start(); Unloaded += (_, _) =>
@@ -300,7 +303,9 @@ chains turned apart), `BiomolProteins.cs` (ubiquitin's and haemoglobin's four le
 cellulose and starch, fats, phospholipids, cholesterol). Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
 layer added to the shared 3D view), `BiomolDrawings.cs`, `BiomolAminoPage.cs`, `BiomolProteinPage.cs`,
 `BiomolMoleculePages.cs`. Every page opens its molecule in the Molecule Builder (`MoleculeModel.Shared`, atom ids from
-1,000,000). Launch: `amino:aa=W:colour=part`, `proteins:hbonds:ribbon=over`, `proteins:ss=helix`, `proteins:sheet`,
+1,000,000). The built peptide is shown laid out as the Mac lays it out (`BiomoleculeBuilderModel.ShownPeptide`): its CA
+trace's longest axis along x, N-terminus at the left, the next axis up, chosen again only when the camera frames it
+afresh (it grew out of the ball last framed, or shrank well inside it), so a helix is seen from its side. Launch: `amino:aa=W:colour=part`, `proteins:hbonds:ribbon=over`, `proteins:ss=helix`, `proteins:sheet`,
 `proteins:level=tertiary:core`, `proteins:level=quaternary`, `nucleic:strand:seq=ATGCGT:complement`, `carbs:anomers`,
 `carbs:di=SUC:split`, `carbs:poly=cellulose`, `lipids:lipid=compare` (the Mac's words, a few aliases beside them).
 Takes `sequence`, `protein` and `molecule`; sends `mutation` = `sickle` (page `mutations`) to Gene Expression, `sequence`
@@ -330,7 +335,8 @@ chromosomes, spindle and labels), `CellDivisionPainter.cs` (a frame as primitive
 600 ms a step or a crossfade), `CellCycleView.cs` (the wheel to scale — G1 11 h, S 8 h, G2 4 h, M 1 h — G0, the three
 checkpoints, cyclins, a cancer view). The Mac's model line for line: its frames, counts, labels' anchors and badges
 compare equal for eight option sets (its plate spacing, prophase I's pairing, telophase's angles and interphase's
-G1/S/G2 split among them). Launch: `mitosis:step=6`, `mitosis:plant:step=8`, `meiosis:step=4`, `meiosis:step=11:nd=1`,
+G1/S/G2 split among them); after nondisjunction, telophase II's label and its first note say which cells are n, n+1
+and n−1 rather than "four haploid cells" (the Mac's still say that). Launch: `mitosis:step=6`, `mitosis:plant:step=8`, `meiosis:step=4`, `meiosis:step=11:nd=1`,
 `meiosis:step=5:pick=0`, `compare:step=3`, `cycle:gate=g1s:cancer` (`--bio-cell plant`, `--bio-step <n>` too).
 "What happens in S phase" opens DNA & RNA on page `replication`.
 

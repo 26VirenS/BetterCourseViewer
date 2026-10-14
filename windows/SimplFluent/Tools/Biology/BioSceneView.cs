@@ -757,7 +757,7 @@ public sealed class BioSceneView : Grid
             {
                 g.BeginFigure(new Point(l.AnchorX, l.AnchorY), false, false);
                 g.LineTo(new Point(l.ElbowX, l.Y), true, true);
-                g.LineTo(new Point(l.EdgeX, l.Y), true, true);
+                g.LineTo(new Point(l.LeaderX, l.Y), true, true);
                 // (the dot at the anchor)
                 g.BeginFigure(new Point(l.AnchorX - 1.5, l.AnchorY), true, true);
                 g.ArcTo(new Point(l.AnchorX + 1.5, l.AnchorY), new Size(1.5, 1.5), 0, false, SweepDirection.Clockwise, true, true);

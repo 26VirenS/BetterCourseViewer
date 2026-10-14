@@ -742,7 +742,8 @@ internal sealed class EnergyMap : Grid
         Pill("fermentation", new Point(488, 392), shown.Id, state.Night);
         Pill("pyruvate", new Point(650, 188), shown.Id, state.Night);
         Pill("krebs", new Point(745, 250), shown.Id, state.Night);
-        Pill("oxphos", new Point(842, 330), shown.Id, state.Night);
+        // (oxidative phosphorylation's long name kept inside the cell's wall when the board is drawn small)
+        Pill("oxphos", new Point(812, 332), shown.Id, state.Night);
 
         // "Plants respire too": what works by day and by night
         if (state.Respire)
@@ -871,7 +872,11 @@ internal sealed class EnergyMap : Grid
         var t = new TextBlock { Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold, FontFamily = K.TextFace, IsHitTestVisible = false, Foreground = K.Brush(colour) };
         var bg = new Border { Child = t, Padding = new Thickness(4, 0, 4, 1), CornerRadius = new CornerRadius(4), IsHitTestVisible = false };
         bg.SetResourceReference(Border.BackgroundProperty, B.Card);
-        Over(bg, mid, chloro: chloro);
+        // (the card's colour laid over the solid ground, so a membrane's line under the words does not show through them:
+        //  "sugar" and "pyruvate" sit where their arrows cross the chloroplast's and the mitochondrion's edges)
+        var ground = new Border { CornerRadius = new CornerRadius(4), IsHitTestVisible = false };
+        ground.SetResourceReference(Border.BackgroundProperty, B.Solid);
+        Over(new Grid { IsHitTestVisible = false, Children = { ground, bg } }, mid, chloro: chloro);
     }
 
     private void Chip(string text, Point at, SymbolRegular symbol, bool off)

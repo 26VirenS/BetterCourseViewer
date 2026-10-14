@@ -391,7 +391,9 @@ internal sealed class GXPainter
         {
             foreach (var (dx, dy, l) in new[] { (6.0, -2.0, 'A'), (8.5, 14.0, 'U'), (11.0, 2.0, 'G'), (13.5, 16.0, 'C'), (15.5, 0.0, 'A') })
                 Ntp(dc, l, new Point(X(F.PolX + dx), Y(Y3) + dy), 0.6 * F.Polymerase);
-            Text(dc, "free NTPs", new Point(X(F.PolX + 10.5), Y(Y3) + 32), 10, alpha: F.Polymerase);
+            // (their name kept whole inside the view, its last letter was cut at the edge)
+            var half = v.Measure("free NTPs", 10, FontWeights.SemiBold) / 2;
+            Text(dc, "free NTPs", new Point(Math.Min(X(F.PolX + 10.5), right + 10 - half), Y(Y3) + 32), 10, alpha: F.Polymerase);
         }
     }
 
@@ -771,7 +773,8 @@ internal sealed class GXPainter
     /// <summary>Each amino acid of the chain: over the codon it came from, or on top of its tRNA.</summary>
     private List<Point> ResiduePoints()
     {
-        var row = Y(Y4) - 118 - 18 * Apart;
+        // (kept below the nuclear envelope: in a short view the lane comes up close to it, and the chain ran along its line)
+        var row = Math.Max(Y(Y4) - 118 - 18 * Apart, Y(YEnvelope) + 14);
         return s.Residues.Select(r =>
         {
             var rowPt = new Point(X(G.CodonColumn(r.X)), row);

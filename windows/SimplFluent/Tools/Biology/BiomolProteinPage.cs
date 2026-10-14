@@ -314,7 +314,8 @@ internal sealed class BiomolProteinPage : BiomolPageView
         Forget();
         if (!Levels && Stage.CanPlay && old.Length >= 1 && seq.Length >= 1)
         {
-            var p = BiomoleculeBuilderModel.CurrentPeptide;
+            // (the new peptide laid out for the view first, the old one then laid out the same way, so the rest stays put)
+            var p = BiomoleculeBuilderModel.ShownPeptide;
             var look = PeptideLook(p);
             var gen = ++motionGen;
             void Ended()
@@ -331,7 +332,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
             else if (old.Length == seq.Length + 1 && old.StartsWith(seq, StringComparison.Ordinal))
             {
                 during = ($"{PeptideKey(p, look)}|removing", () => PeptideScene(p, look, hideOH: true));
-                Stage.Play(BiomolScenes.PeptideRemoved(oldPeptide, look, Chem), PeptideKey(p, look), Ended);
+                Stage.Play(BiomolScenes.PeptideRemoved(BiomoleculeBuilderModel.LaidOut(oldPeptide), look, Chem), PeptideKey(p, look), Ended);
             }
         }
         BiomolPrefs.Changed();
@@ -342,7 +343,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
     private static BiomolLook PeptideLook(BiomolPeptide p) => LookFor("proteins", p.Atoms.Count);
 
     private static string PeptideKey(BiomolPeptide p, BiomolLook look) =>
-        $"pep|{p.Sequence}|{BiomolSSes.Text(p.Asked)}|{look.Key}|{BiomoleculeBuilderModel.ShowHBonds}|{BiomoleculeBuilderModel.Ribbon}";
+        $"pep|{p.Sequence}|{BiomolSSes.Text(p.Asked)}|{look.Key}|{BiomoleculeBuilderModel.ShowHBonds}|{BiomoleculeBuilderModel.Ribbon}|{BiomoleculeBuilderModel.PeptideFrame}";
 
     /// <summary>The peptide's scene: its atoms (all but <paramref name="hidden"/>, and without its C-terminal OH when
     /// <paramref name="hideOH"/>), H-bonds and ribbon as chosen, its charges marked, framed round the whole peptide.</summary>
@@ -402,7 +403,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
 
     private void DrawBuild()
     {
-        var p = BiomoleculeBuilderModel.CurrentPeptide;
+        var p = BiomoleculeBuilderModel.ShownPeptide;
         editor.Show(p.Sequence, BiomoleculeBuilderModel.StructureFor(p.Sequence), p.ProlineBreaks);
         prolineHost.Content = p.ProlineBreaks.Count == 0 ? null
             : ChemKit.Line(SymbolRegular.Warning16, $"Proline breaks α-helices: {string.Join(", ", p.ProlineBreaks.Select(i => $"Pro {i + 1}"))} and the residue before {(p.ProlineBreaks.Count == 1 ? "it are" : "each are")} built as coil. Proline has no N–H, and its ring bumps the C=O four back.", ChemKit.Orange);
@@ -426,8 +427,11 @@ internal sealed class BiomolProteinPage : BiomolPageView
         var shape = segs.Where(s => s.Kind != 'C').Select(s => $"{BiomolCartoon.Name(s.Kind)} {s.First + 1}–{s.Last + 1}").ToList();
         Title($"Peptide · {n} residue{(n == 1 ? "" : "s")}", shape.Count == 0 ? "All coil" : string.Join(" · ", shape));
         Stage.View.Accessibility = $"3D model of a peptide of {n} amino acids, {p.Sequence}; {(shape.Count == 0 ? "all coil" : string.Join(", ", shape))}";
-        if (during is { } d) Stage.Show(d.Key, d.Build, $"pep|{p.Sequence}|{BiomolSSes.Text(p.Asked)}");
-        else Stage.Show(PeptideKey(p, look), () => PeptideScene(p, look), $"pep|{p.Sequence}|{BiomolSSes.Text(p.Asked)}");
+        // (the camera frames the peptide afresh only when its layout is chosen again: a residue added or a structure changed
+        //  inside the ball last framed keeps the view where it is)
+        var frameKey = $"pep|{BiomoleculeBuilderModel.PeptideFrame}";
+        if (during is { } d) Stage.Show(d.Key, d.Build, frameKey);
+        else Stage.Show(PeptideKey(p, look), () => PeptideScene(p, look), frameKey);
     }
 
     private void DrawLevel()

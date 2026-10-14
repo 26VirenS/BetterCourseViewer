@@ -380,7 +380,8 @@ internal abstract class BiomolPageView : Grid
     /// <summary>The middle column: the 3D view's card, and anything a page shows instead of it.</summary>
     protected readonly Grid Centre = new();
     protected readonly Border SceneCard;
-    private readonly TextBlock title = K.Text("", Ty.Subtitle), subtitle = K.Text("", Ty.Body, B.Text2);
+    // (the subtitle wraps to a second line rather than being cut short beside the view's buttons)
+    private readonly TextBlock title = K.Text("", Ty.Subtitle), subtitle = K.Wrapped("", Ty.Body, B.Text2, maxLines: 2);
     /// <summary>What a press on the 3D view picked (its id), shown in the facts.</summary>
     protected string? Picked;
 

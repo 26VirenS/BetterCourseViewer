@@ -695,7 +695,8 @@ internal sealed class DivisionProcessPage : Grid
             var p = products[j];
             var ploidy = K.Text(p.Tally.Ploidy, Ty.BodyStrong).Center();
             ploidy.Foreground = K.Brush(K.Darkened(p.Tally.Ploidy.Length > 2 ? ChemKit.Orange : BioColors.Tool("divide")));
-            var facts = K.Text($"{p.Tally.Chromosomes} chr · {DivisionModel.CText(p.Tally.C)}", Ty.Caption, B.Text2).Center();
+            // (chromosomes over DNA amount, so four cells side by side in the narrow column read whole: "3 chr", "1.4c")
+            var facts = K.Text($"{p.Tally.Chromosomes} chr\n{DivisionModel.CText(p.Tally.C)}", Ty.Caption, B.Text2).Center();
             facts.FontFeatures();
             var cell = K.V(4, new DivMiniCell(p.Chromatids, o.Chiasma), ploidy, facts);
             cell.Margin = new Thickness(j == 0 ? 0 : 4, 0, j == products.Count - 1 ? 0 : 4, 0);

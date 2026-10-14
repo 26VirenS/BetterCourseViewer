@@ -561,7 +561,7 @@ internal sealed class HWSimulatePage : HWPageBase
         var generation = BioUI.Card($"Generation {g}", null, HardyWeinbergModel.Hovered == null ? "The last; point at the chart for another" : "Under the pointer", lines.ToArray());
         var order = BioUI.Card("One generation, in order", null, null,
             BioUI.FactRow("1. Mutation", "p₁ = p(1 − u) + (1 − p)v"),
-            BioUI.FactRow("2. Migration", "p₂ = (1 − m)p₁ + m·p_m"),
+            BioUI.FactRow("2. Migration", "p₂ = (1 − m)p₁ + m·pₘ (pₘ: the migrants' p)"),
             BioUI.FactRow("3. Mating", "AA = p₂² + Fp₂q₂ · Aa = 2p₂q₂(1 − F) · aa = q₂² + Fp₂q₂"),
             BioUI.FactRow("4. Selection", "w̄ = Σ genotype × w; each genotype × w ÷ w̄; p₃ = AA + Aa ÷ 2"),
             BioUI.FactRow("5. Drift", s.Size == null ? "None: an infinite population keeps p₃." : "2N alleles drawn, each A with chance p₃: p = k ÷ 2N."));

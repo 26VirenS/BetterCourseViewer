@@ -37,11 +37,12 @@ internal static class CycleOrder
         _ => K.Hex("#8e8e93"),
     };
 
-    /// <summary>Where each gate's pill sits (the two near the top spread apart so both can be pressed).</summary>
+    /// <summary>Where each gate's pill sits (the two near the top spread apart so both can be pressed, and M's name read
+    /// between them).</summary>
     public static double PillAngle(string id) => id switch
     {
         "g2m" => 330,
-        "spindle" => 22,
+        "spindle" => 30,
         _ => 172.5,
     };
 }
@@ -168,27 +169,46 @@ internal sealed class CellCycleWheel : FrameworkElement
             if (Math.Abs(b - cp.Angle) > 1) dc.DrawLine(DivColors.Pen(ink, 0.4, 1), At(c, cp.Angle, r + 8), At(c, b, r + 30));
         }
 
-        // (the phases' names on the ring; M's outside, it is thin)
+        // (the phases' names on the ring; M's outside, it is thin: on one line above its bracket, between the gates' pills)
         foreach (var (phase, start, end) in arcs)
         {
             var mid = (start + end) / 2;
-            var thin = end - start < 30;
-            var name = Text(phase.Name, thin ? 13 : 17, thin ? text : DivColors.Brush(Colors.White), Bold);
-            var hours = Text($"{phase.Hours.ToString("0", CultureInfo.InvariantCulture)} h", 12, thin ? text2 : DivColors.Brush(Colors.White, 0.92), Plain);
-            var p = thin ? At(c, mid - 14, r + 40) : At(c, mid, (r + inner) / 2);
+            if (end - start < 30)
+            {
+                var line = Text($"{phase.Name} · {phase.Hours.ToString("0", CultureInfo.InvariantCulture)} h", 13, text, Bold);
+                var above = At(c, mid, r + 30);
+                dc.DrawText(line, new Point(above.X - line.Width / 2, above.Y - line.Height / 2));
+                continue;
+            }
+            var name = Text(phase.Name, 17, DivColors.Brush(Colors.White), Bold);
+            var hours = Text($"{phase.Hours.ToString("0", CultureInfo.InvariantCulture)} h", 12, DivColors.Brush(Colors.White, 0.92), Plain);
+            var p = At(c, mid, (r + inner) / 2);
             var h = name.Height + hours.Height;
             dc.DrawText(name, new Point(p.X - name.Width / 2, p.Y - h / 2));
             dc.DrawText(hours, new Point(p.X - hours.Width / 2, p.Y - h / 2 + name.Height));
         }
+        // (interphase's name level beside its bracket at the lower left, clear of the curve; under the wheel if the view
+        //  is too narrow for that)
         var interphase = Text("Interphase · 23 h", 12, text2, Strong);
-        var ip = At(c, 232, r + 30);
-        dc.DrawText(interphase, new Point(ip.X - interphase.Width / 2, ip.Y - interphase.Height / 2));
+        var besideRight = c.X - (r + 24);
+        var ip = besideRight - interphase.Width >= 4
+            ? new Point(besideRight - interphase.Width, c.Y + r * 0.35 - interphase.Height / 2)
+            : new Point(At(c, 232, r + 30).X - interphase.Width / 2, c.Y + r + 22);
+        dc.DrawText(interphase, ip);
         var g0t = Text("G0", 15, text, Bold);
         dc.DrawText(g0t, new Point(g0.X - g0t.Width / 2, g0.Y - g0t.Height / 2));
-        var mid1 = Text(cancer ? "Checkpoints failing" : "One cell cycle", 15, cancer ? DivColors.Brush(red) : text, Strong);
-        var mid2 = Text(cancer ? "The cell keeps dividing" : "G1 → S → G2 → M", 12, text2, Plain);
-        dc.DrawText(mid1, new Point(c.X - mid1.Width / 2, c.Y - mid1.Height));
-        dc.DrawText(mid2, new Point(c.X - mid2.Width / 2, c.Y + 1));
+        // (the words in the middle kept inside the ring's hole: wrapped to its width, a size smaller in a small wheel)
+        var room = inner * 1.75;
+        var mid1 = Text(cancer ? "Checkpoints failing" : "One cell cycle", inner < 70 ? 13 : 15, cancer ? DivColors.Brush(red) : text, Strong);
+        var mid2 = Text(cancer ? "The cell keeps dividing" : "G1 → S → G2 → M", inner < 70 ? 11 : 12, text2, Plain);
+        foreach (var t in new[] { mid1, mid2 })
+        {
+            t.MaxTextWidth = room;
+            t.TextAlignment = TextAlignment.Center;
+        }
+        var midTop = c.Y - (mid1.Height + 2 + mid2.Height) / 2;
+        dc.DrawText(mid1, new Point(c.X - room / 2, midTop));
+        dc.DrawText(mid2, new Point(c.X - room / 2, midTop + mid1.Height + 2));
 
         // (each gate's pill: its short name, a shield, pressable)
         foreach (var cp in DivisionModel.Checkpoints)
