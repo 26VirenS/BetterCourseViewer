@@ -3,16 +3,20 @@ import SwiftUI
 
 // The work preview over the window (1.2.3; Components/WorkPreview.swift has what it shows and the rows that open it).
 // MainShell puts it over the split view, above the tour. Nothing is drawn, and nothing takes a press, while no card is
-// out. With one: the window lightly dimmed but for the row it grew from, and the card — Liquid Glass — growing out of
-// that row on the house spring to its place: just under the row (1.2.20), or just over it when there is no room under,
-// else in the middle of the screen's side of the window. It folds back into the row when it closes. Under Reduce Motion
-// it fades in and out in its place. (1.3.79: the dim is back, as 1.3.77 had it — 1.3.78 had taken it away.)
+// out. With one: the card — Liquid Glass — growing out of the row it came from on the house spring to its place: just
+// under the row (1.2.20), or just over it when there is no room under, else in the middle of the screen's side of the
+// window. (home-28) Nothing is dimmed behind it, as Windows' flyout is (it dimmed the page but not the toolbar, and
+// Windows dims nothing). (1.3.79) Nor is anything round it caught: it never blocks the window — a press round it does
+// what it does and leaves the card up, and going to another screen leaves it where it is — until its ✕, Escape (while
+// it has the keys) or its row pressed again closes it; dragged, it moves. It folds back into the row when it closes.
+// Under Reduce Motion it fades in and out in its place. (1.3.79) A row in a popup over the window — a counter's list,
+// a popup of its own above this overlay — has its card come up in a popup over that one, just under the row
+// (PopupPreviewCard), never hidden under it.
 
 struct WorkPreviewOverlay: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: a move takes the card with it)
     @ObservedObject private var preview = WorkPreview.shared
-    @ObservedObject private var tour = MacTour.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Where the overlay itself is in the window: the rows' places are read in the window and made the overlay's own.
     @State private var origin = PreviewAnchor()
@@ -20,20 +24,92 @@ struct WorkPreviewOverlay: View {
     @State private var measured: CGFloat = 0
     /// The card last grown out (its token): each grows once, after it has been laid out at its row.
     @State private var grown = -1
+    /// (1.3.79) Where the card stays once it no longer follows its row — dragged, or the window gone somewhere else —
+    /// its top left in the overlay (nil: by its row).
+    @State private var held: CGPoint?
+    /// Where the card is while it follows its row, for it to stay there.
+    @State private var following: CGPoint = .zero
+    /// Where a drag of the card started.
+    @State private var dragFrom: CGPoint?
+    /// (1.3.79) The card put up in a popup of its own (its token; -1: none), its row being in a popup over the window.
+    @State private var popped = -1
+    /// That card out at its place (its token), for its popup to go as the card folds back.
+    @State private var poppedOut = -1
     @FocusState private var focused: Bool
 
+    /// (1.3.79) The card's row is in a popup over the window (a counter's list), which this overlay is under: the card
+    /// comes up in a popup of its own over it (`popUpCard`), not here.
+    private var elsewhere: Bool {
+        popped == preview.token || preview.anchor?.view?.window is PopupPanel
+    }
+
     var body: some View {
+        let away = elsewhere
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 PreviewProbe(anchor: origin).allowsHitTesting(false)
-                if let item = preview.item {
+                if let item = preview.item, !away {
                     stage(item, size: proxy.size, top: proxy.safeAreaInsets.top)
                 }
             }
         }
-        .allowsHitTesting(preview.item != nil && preview.shown)
-        // (the window gone somewhere else — a place picked, Back — takes the card with it)
-        .onChange(of: whereabouts.nav.current) { _, _ in preview.dismiss() }
+        .allowsHitTesting(preview.item != nil && preview.shown && !away)
+        // (1.3.79: the window gone somewhere else — a place picked, Back — leaves the card where it is)
+        .onChange(of: whereabouts.nav.current) { _, _ in
+            if preview.item != nil, held == nil { held = following }
+        }
+        .onChange(of: preview.token) { _, _ in
+            held = nil // (a new card follows its own row)
+            dragFrom = nil
+            popUpCard()
+        }
+        .onChange(of: preview.shown) { _, now in
+            guard popped >= 0, popped == preview.token else { return }
+            if now {
+                poppedOut = popped
+            } else if poppedOut == popped {
+                // (the card folding back — its ✕, Escape: its popup goes with it)
+                popped = -1
+                poppedOut = -1
+                engine.popups.close(PopupPreviewCard.key)
+            }
+        }
+    }
+
+    /// (1.3.79) A card whose row is in a popup over this window — a counter's list — comes up in a popup of its own over
+    /// that one, just under its row, from the row's start, as the card here does; closed (its ✕, Escape, ⌘W), the card
+    /// folds back. Any other card — or none — takes that popup away.
+    private func popUpCard() {
+        let t = preview.token
+        guard preview.item != nil, let row = preview.anchor?.view, let rowWindow = row.window as? PopupPanel,
+              let window = origin.view?.window, rowWindow.parent === window else {
+            if popped >= 0 {
+                popped = -1
+                poppedOut = -1
+                engine.popups.close(PopupPreviewCard.key)
+            }
+            return
+        }
+        // (the row on the screen — cut to what its list shows — and the room under it there for the card's excerpt)
+        var r = row.convert(row.bounds, to: nil)
+        if let scroll = row.enclosingScrollView {
+            let shown = r.intersection(scroll.convert(scroll.bounds, to: nil))
+            if !shown.isNull, shown.height >= 1 { r = shown }
+        }
+        let onScreen = rowWindow.convertToScreen(r)
+        let visible = (rowWindow.screen ?? NSScreen.main)?.visibleFrame ?? onScreen
+        let room = onScreen.minY - PreviewPlacement.gap - PreviewPlacement.margin - visible.minY
+        let lines = room >= 640 ? 8 : (room >= 460 ? 5 : (room >= 340 ? 3 : 2))
+        let corner = CGPoint(x: onScreen.minX + 8, y: onScreen.minY - PreviewPlacement.gap)
+        popped = t
+        poppedOut = -1
+        engine.popups.present(PopupPreviewCard.key, title: preview.item?.title ?? "Preview", layout: .at(corner), ground: false,
+                              anchor: .top, onClose: { if WorkPreview.shared.token == t { WorkPreview.shared.close() } }) {
+            PopupPreviewCard(lines: lines).id(t)
+        }
+        DispatchQueue.main.async {
+            if WorkPreview.shared.token == t { WorkPreview.shared.grow() }
+        }
     }
 
     // MARK: - Where it goes
@@ -57,12 +133,18 @@ struct WorkPreviewOverlay: View {
         }
         let area = CGRect(x: lead, y: top, width: max(size.width - lead, 0), height: max(size.height - top, 0))
         let lines = PreviewPlacement.lines(source: source, area: area)
-        let target = PreviewPlacement.frame(source: source, area: area, height: measured > 0 ? measured : 300)
+        var target = PreviewPlacement.frame(source: source, area: area, height: measured > 0 ? measured : 300)
+        if let held {
+            // (1.3.79: held where it was left, kept in the window — its head at least)
+            target.origin = CGPoint(x: min(max(held.x, 0), max(0, size.width - target.width)),
+                                    y: min(max(held.y, top), max(top, size.height - min(target.height, 120))))
+        }
         return Placed(source: source, target: target, lines: lines)
     }
 
-    // MARK: - The dim and the card
+    // MARK: - The card
 
+    /// The card alone takes presses (1.3.79): everything round it is the window's, as ever.
     private func stage(_ item: PreviewItem, size: CGSize, top: CGFloat) -> some View {
         let g = geometry(size: size, top: top)
         let out = preview.shown
@@ -71,13 +153,12 @@ struct WorkPreviewOverlay: View {
         let start = g.source ?? g.target.insetBy(dx: g.target.width * 0.06, dy: g.target.height * 0.06)
         let r = out || reduceMotion ? g.target : start
         return ZStack(alignment: .topLeading) {
-            PreviewVeil(hole: g.source, dimmed: out && tour.step == nil) // (the tour dims the window itself)
-                .contentShape(PreviewHoleShape(hole: g.source), eoFill: true)
-                .onTapGesture { preview.close() }
-                .accessibilityHidden(true)
             card(item, g: g, frame: r, shape: shape, out: out)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .onChange(of: g.target.origin, initial: true) { _, o in
+            if held == nil { following = o }
+        }
     }
 
     private func card(_ item: PreviewItem, g: Placed, frame r: CGRect, shape: RoundedRectangle, out: Bool) -> some View {
@@ -90,9 +171,19 @@ struct WorkPreviewOverlay: View {
             .glass(shape)
             .opacity(reduceMotion && !out ? 0 : 1)
             .contentShape(shape)
-            // (a press on the card is the card's — the dim round it closes it — but a double-click's second, landing on
-            // the card where it came up over its row, opens the work as the row would have)
+            // (a press on the card is the card's — but a double-click's second, landing on the card where it came up over
+            // its row, opens the work as the row would have)
             .onTapGesture { if preview.isSecondClick { preview.openWhole() } }
+            // (1.3.79) dragged, the card moves, and stays where it is let go
+            .gesture(
+                DragGesture(minimumDistance: 3, coordinateSpace: .global)
+                    .onChanged { v in
+                        let from = dragFrom ?? g.target.origin
+                        if dragFrom == nil { dragFrom = from }
+                        held = CGPoint(x: from.x + v.translation.width, y: from.y + v.translation.height)
+                    }
+                    .onEnded { _ in dragFrom = nil }
+            )
             .tourSpot(.preview)
             .focusable(true, interactions: .edit)
             .focused($focused)
@@ -100,7 +191,6 @@ struct WorkPreviewOverlay: View {
             .onKeyPress(phases: .down) { press in key(press) }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text("Preview of \(item.title)"))
-            .accessibilityAddTraits(.isModal)
             .accessibilityAction(.escape) { preview.close() }
             .position(x: r.midX, y: r.midY)
             .id(preview.token)
@@ -134,6 +224,55 @@ struct WorkPreviewOverlay: View {
     }
 
     /// Escape closes it; Return opens the work.
+    private func key(_ press: KeyPress) -> KeyPress.Result {
+        guard press.modifiers.isDisjoint(with: [.command, .control, .option]) else { return .ignored }
+        switch press.key {
+        case .escape:
+            preview.close()
+            return .handled
+        case .return:
+            guard preview.item?.openWhole != nil else { return .ignored }
+            preview.openWhole()
+            return .handled
+        default:
+            return .ignored
+        }
+    }
+}
+
+/// (1.3.79) The card for a row of a popup over the window (a counter's list), in a popup of its own over that one: the
+/// card as the overlay draws it, on its glass, at the overlay's width; dragged, it moves; Escape or its ✕ folds it back,
+/// and Return opens the work.
+private struct PopupPreviewCard: View {
+    /// The card's popup among the window's popups.
+    static let key = "preview"
+
+    let lines: Int
+    @ObservedObject private var preview = WorkPreview.shared
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        if let item = preview.item {
+            PreviewCard(item: item, width: PreviewPlacement.width, lines: lines, onMeasure: { _ in })
+                .clipShape(shape)
+                .glass(shape)
+                .contentShape(shape)
+                .popupHeader()
+                .focusable(true, interactions: .edit)
+                .focused($focused)
+                .focusEffectDisabled()
+                .onKeyPress(phases: .down) { press in key(press) }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(Text("Preview of \(item.title)"))
+                .accessibilityAction(.escape) { preview.close() }
+                .task {
+                    try? await Task.sleep(nanoseconds: 80_000_000) // (once its popup has the keys)
+                    focused = true
+                }
+        }
+    }
+
     private func key(_ press: KeyPress) -> KeyPress.Result {
         guard press.modifiers.isDisjoint(with: [.command, .control, .option]) else { return .ignored }
         switch press.key {
@@ -186,37 +325,6 @@ enum PreviewPlacement {
             room = area.height - margin * 2
         }
         return room >= 640 ? 8 : (room >= 460 ? 5 : (room >= 340 ? 3 : 2))
-    }
-}
-
-/// The window lightly dimmed but for the row the card grew from.
-private struct PreviewVeil: View {
-    let hole: CGRect?
-    let dimmed: Bool
-    private static let dim = Theme.dynamic(light: NSColor(white: 0, alpha: 0.14), dark: NSColor(white: 0, alpha: 0.34))
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            Rectangle().fill(PreviewVeil.dim.opacity(dimmed ? 1 : 0))
-            if let hole {
-                RoundedRectangle(cornerRadius: min(10, hole.height / 2), style: .continuous)
-                    .frame(width: hole.width, height: hole.height)
-                    .offset(x: hole.minX, y: hole.minY)
-                    .blendMode(.destinationOut)
-            }
-        }
-        .compositingGroup()
-    }
-}
-
-/// The window, less the row (for presses: even-odd, so the row takes its own — a double-click's second opens it whole).
-private struct PreviewHoleShape: Shape {
-    let hole: CGRect?
-
-    func path(in r: CGRect) -> Path {
-        var p = Path(r)
-        if let hole { p.addRoundedRect(in: hole, cornerSize: CGSize(width: min(10, hole.height / 2), height: min(10, hole.height / 2)), style: .continuous) }
-        return p
     }
 }
 

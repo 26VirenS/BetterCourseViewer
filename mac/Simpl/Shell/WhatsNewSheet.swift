@@ -5,9 +5,10 @@ import SwiftUI
 /// single version, else at the head of each version's notes, with its day as every date is written ("Oct 13").
 struct WhatsNewSheet: View {
     let data: WhatsNewData
-    /// The sheet is up (What's New after an update is marked seen only then).
+    /// The popup is up (What's New after an update is marked seen only then).
     var onShown: (() -> Void)? = nil
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window, which Continue closes.
+    @Environment(\.popup) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +29,8 @@ struct WhatsNewSheet: View {
             }
             .padding(.top, 28)
             .padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     ForEach(data.releases) { release in
@@ -66,6 +69,7 @@ struct WhatsNewSheet: View {
         }
         .frame(width: 500, height: 560)
         .background(PageGround())
+        .overlay(alignment: .topLeading) { PopupCloseButton().padding(14) } // (1.3.79: its ×, as Continue)
         .onAppear { onShown?() }
     }
 

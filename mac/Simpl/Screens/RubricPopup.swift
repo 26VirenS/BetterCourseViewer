@@ -2,17 +2,21 @@ import AppKit
 import SwiftUI
 
 // The rubric ring over the window (1.2.3): the web's rubric-ring.js overlay on the Mac. An assignment's page shows its
-// rubric as one row (RubricSummaryRow) and the grade card's rubric button; either brings the ring up over the whole
-// window — sidebar and all — with nothing round it: the window behind dims and blurs, so nothing of it
-// reads through. The ring blooms in and, marked, bends to its marks; a slice, its label or Return opens a
-// criterion into its bar (RubricStage.swift); the little ring on the bar, Escape or a press beside it rolls the bar back
-// up; Escape or a press beside the ring (or ×) closes it. Ring or Grid at the top right (RubricPanels.swift).
+// rubric as one row (RubricSummaryRow) and the grade card's rubric button; either brings the ring up — (1.3.79) in a
+// large popup over the window that never blocks it (Shell/FloatingPopup.swift): the sidebar, the toolbar and the
+// assignment stay usable round it, and it stays up as the window goes elsewhere, until it is closed. Inside it the ground
+// is dimmed and blurred, so nothing reads through the ring. The ring blooms in and, marked, bends to its marks; a slice,
+// its label or Return opens a criterion into its bar (RubricStage.swift); the little ring on the bar, Escape or a press
+// beside it rolls the bar back up; Escape or a press beside the ring (or ×, or ⌘W) closes it. Ring or Grid at the top
+// right (RubricPanels.swift).
 
-/// What the rubric ring is showing over the window, if anything. One for the app: MainShell puts its layer over the
-/// whole window, and an assignment's page asks it to show its rubric.
+/// What the rubric ring is showing over the window, if anything: one for the app, in a popup over the window whose
+/// assignment's page asked for it.
 @MainActor
 final class RubricPopup: ObservableObject {
     static let shared = RubricPopup()
+    /// The ring's popup among its window's popups.
+    static let key = "rubric"
 
     struct Item: Identifiable {
         let id = UUID()
@@ -29,29 +33,29 @@ final class RubricPopup: ObservableObject {
     }
 
     @Published private(set) var item: Item?
-    /// On its way out: the ring fades and the window comes back into focus; then it goes.
-    @Published private(set) var leaving = false
+    /// The window the ring is over.
+    private weak var engine: Engine?
 
-    func show(_ next: Item) {
+    /// (1.3.79) The ring up in its popup over `engine`'s window — another rubric asked for takes the ring's place in it.
+    func show(_ next: Item, engine: Engine) {
         guard !next.rows.isEmpty else { return }
-        leaving = false
+        if let was = self.engine, was !== engine { was.popups.close(Self.key) }
         item = next
-    }
-
-    func dismiss() {
-        guard let current = item, !leaving else { return }
-        leaving = true
-        Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 430_000_000)
-            guard let self, self.item?.id == current.id else { return }
-            self.item = nil
-            self.leaving = false
+        self.engine = engine
+        engine.popups.present(Self.key, title: "\(next.title) rubric", layout: .large, onClose: { [weak self] in self?.closed() }) {
+            RubricPopupView(item: next, leaving: false) { [weak self] in self?.dismiss() }
+                .id(next.id)
         }
     }
 
-    /// Closes the ring if it is the one an assignment's page put up.
-    func dismiss(owner: String) {
-        if item?.owner == owner { dismiss() }
+    /// The ring closed: its popup goes the popup's way.
+    func dismiss() {
+        engine?.popups.close(Self.key)
+    }
+
+    private func closed() {
+        item = nil
+        engine = nil
     }
 }
 
@@ -59,50 +63,6 @@ extension RubricPopup.Item {
     init(data d: AssignmentData, owner: String, open: Int? = nil, view: String? = nil) {
         self.init(owner: owner, title: d.title, rubricTitle: (d.rubricTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
                   context: d.context ?? "", rows: d.rubric, held: d.held == true, open: open, view: view)
-    }
-}
-
-/// The ring's layer over the whole window (MainShell): empty, and letting every press through, until a page asks.
-/// (planning-6) While the ring is up, MainShell rests everything under it, and the window's title is put away: the
-/// toolbar over the dark veil drew the covered page's title dark on black.
-struct RubricPopupLayer: View {
-    @ObservedObject private var popup = RubricPopup.shared
-
-    var body: some View {
-        ZStack {
-            if let item = popup.item {
-                RubricPopupView(item: item, leaving: popup.leaving) { popup.dismiss() }
-                    .id(item.id)
-            }
-        }
-        .allowsHitTesting(popup.item != nil && !popup.leaving)
-        .background { RubricWindowTitle(hidden: popup.item != nil && !popup.leaving) }
-    }
-}
-
-/// The window's title put away while the rubric is up, and back as it was once it goes.
-private struct RubricWindowTitle: NSViewRepresentable {
-    let hidden: Bool
-
-    final class Probe: NSView {
-        /// The title's showing as it was before it was put away.
-        var was: NSWindow.TitleVisibility?
-    }
-
-    func makeNSView(context: Context) -> Probe { Probe() }
-
-    func updateNSView(_ probe: Probe, context: Context) {
-        let hide = hidden
-        DispatchQueue.main.async {
-            guard let window = probe.window else { return }
-            if hide {
-                if probe.was == nil { probe.was = window.titleVisibility }
-                window.titleVisibility = .hidden
-            } else if let was = probe.was {
-                window.titleVisibility = was
-                probe.was = nil
-            }
-        }
     }
 }
 
@@ -264,6 +224,7 @@ struct RubricPopupView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
+            .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             Text(footWords)
                 .font(.sCallout)
                 .foregroundStyle(Color.white.opacity(0.62))

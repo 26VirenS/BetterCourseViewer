@@ -5,9 +5,10 @@ import SwiftUI
 // row of work — the Dashboard's day, its List, a counter's panel, its activity; the Calendar's days, week and list; To
 // Do — grows a card out of that row with what the work is: its kind and course, its title, when it is due, its points,
 // where it stands and the first words of what it says, with the way through to it (Open, or Return), Hand In or Take
-// Quiz where it waits on you, and Mark Done for a row with a tick. A click round it, Escape or its ✕ folds it back into
-// the row. A double-click (or a ⌘-click) on a row opens the work whole, as a click did before; the row's own menu is as
-// it was. The card itself is drawn over the window by WorkPreviewOverlay (Shell/WorkPreviewOverlay.swift).
+// Quiz where it waits on you, and Mark Done for a row with a tick. Escape or its ✕ folds it back into the row; (1.3.79) a
+// click round it, or going to another screen, leaves it up — it never blocks the window. A double-click (or a ⌘-click)
+// on a row opens the work whole, as a click did before; the row's own menu is as it was. The card itself is drawn over
+// the window by WorkPreviewOverlay (Shell/WorkPreviewOverlay.swift).
 
 /// A piece of work as its row knows it: enough for the card to come up at once, the rest read as it opens.
 struct PreviewItem: Identifiable {

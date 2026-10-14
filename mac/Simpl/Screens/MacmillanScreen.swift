@@ -7,9 +7,11 @@ import WebKit
 /// working on it there. (The page laid out as the app's own comes next, from its saved code, as Alta's was.)
 struct MacmillanScreen: View {
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window (never blocking it: Shell/FloatingPopup.swift), which Close closes.
+    @Environment(\.popup) private var dismiss
     @StateObject private var session: MacmillanSession
-    @State private var ideal = MacmillanScreen.idealSize()
+    /// (1.3.79) The popup's size, as the window gives it — sized again with the window.
+    @Environment(\.popupSize) private var popupSize
     @State private var saving = false
     @State private var saved: URL?
     /// (1.3.78) The Canvas assignment's name and due line, for the header as Alta's has it.
@@ -19,15 +21,8 @@ struct MacmillanScreen: View {
         _session = StateObject(wrappedValue: MacmillanSession(launch: launch))
     }
 
-    /// Most of the window it opens over, as the quiz sheet takes.
-    private static func idealSize() -> CGSize {
-        let windows = NSApp.windows.filter { $0.isVisible && $0.sheetParent == nil && !($0 is NSPanel) }
-        guard let w = NSApp.mainWindow ?? windows.max(by: { $0.frame.width < $1.frame.width }), w.sheetParent == nil else {
-            return CGSize(width: 1040, height: 700)
-        }
-        let room = w.contentLayoutRect.size
-        return CGSize(width: min(max(room.width - 64, 760), 1400), height: min(max(room.height - 36, 520), 960))
-    }
+    /// Most of the window it is over: the large popup's size.
+    private var ideal: CGSize { popupSize ?? CGSize(width: 1040, height: 700) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,7 +54,7 @@ struct MacmillanScreen: View {
                 }
             }
             Spacer(minLength: 8)
-            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
+            PopupPins() // (1.3.73: the toolbar's pins, here too)
             // (1.3.72: Save Page Code is in the Developer menu now)
             GlassGroup(spacing: 8) {
                 Button("Close") { dismiss() }
@@ -72,6 +67,7 @@ struct MacmillanScreen: View {
         .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
+        .popupHeader() // (1.3.79: dragged by its head, the popup moves)
     }
 
     /// Canvas's name for the assignment; else the page's own heading (a launch from a tool's row is named for the tool);

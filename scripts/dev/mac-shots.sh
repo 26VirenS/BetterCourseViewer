@@ -373,6 +373,21 @@ pins_pages() {
   MODE=dark shoot dark-21j-macmillan-light-page 26 -SimplOpen macmillan:104:4005
 }
 
+# (1.3.79) a tool opened whole is a popup over the window, never in its place (Shell/FloatingPopup.swift): the Periodic
+# Table, Cell Explorer and Flashcards, each over the Tools page, in light and in dark, at 1024 points wide and at the
+# narrow size (the sidebar folded away)
+tool_popups() {
+  local m
+  for m in light dark; do
+    MODE="$m" SIZE=1024x768 shoot "$m-35p-popup-ptable" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
+    MODE="$m" SIZE=780x700 shoot "$m-35p-popup-ptable-narrow" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
+    MODE="$m" SIZE=1024x768 shoot "$m-35q-popup-cell" 30 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    MODE="$m" SIZE=780x700 shoot "$m-35q-popup-cell-narrow" 30 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    MODE="$m" SIZE=1024x768 shoot "$m-35r-popup-flashcards" 12 -SimplPlace tools -SimplTool fc
+    MODE="$m" SIZE=780x700 shoot "$m-35r-popup-flashcards-narrow" 12 -SimplPlace tools -SimplTool fc
+  done
+}
+
 # (1.3.78) a discussion's post that never measured in its web view says so on the console (Components/RichText.swift,
 # in a picture's run only: its words are shown natively meanwhile); said here as a warning of the run
 richtext_check() {
@@ -503,6 +518,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
   ui_review
   pins_pages # (1.3.79)
+  tool_popups # (1.3.79)
   bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
   wait
   walks
@@ -559,6 +575,7 @@ bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
 ui_review # (1.3.78) the UI review's new states
 pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
+tool_popups # (1.3.79) a tool's popup over the Tools page
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
 curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
 MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

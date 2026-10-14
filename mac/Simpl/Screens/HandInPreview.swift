@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 
 /// (1.3.2) A file chosen for Hand In, looked at before it goes: Quick Look's own view of it in a pane that opens at the
-/// sheet's right, the sheet widening for it — a sheet stays centred on its window, so the form moves left as the
-/// preview comes in (no window of its own beside the sheet, which ran off the screen). The same file pressed again, the
-/// pane's ✕, the file taken out or the sheet closed puts it away.
+/// form's right, the popup widening for it — (1.3.79) Hand In's popup is as large as what it shows and stays centred
+/// where it is, so the form moves left as the preview comes in (no window of its own beside it, which ran off the
+/// screen). The same file pressed again, the pane's ✕, the file taken out or the popup closed puts it away.
 @MainActor
 final class HandInPreview: ObservableObject {
     static let shared = HandInPreview()
@@ -20,7 +20,7 @@ final class HandInPreview: ObservableObject {
 
     static let form: CGFloat = 580
 
-    /// A file's row pressed: its preview opened in the sheet, or — the one already open — put away.
+    /// A file's row pressed: its preview opened in the popup, or — the one already open — put away.
     func toggle(_ f: PickedFile) {
         if showing == f.id {
             close()
@@ -38,7 +38,6 @@ final class HandInPreview: ObservableObject {
             file = url
             name = f.name
         }
-        resizeSheet()
     }
 
     func close(animated: Bool = true) {
@@ -49,29 +48,13 @@ final class HandInPreview: ObservableObject {
         }
         if animated { withAnimation(Motion.gentle, put) } else { put() }
         clean()
-        if animated { resizeSheet() }
     }
 
-    /// (1.3.8) The sheet's window made as wide as the form and the pane together. A sheet already up kept its width when
-    /// the pane came in, so the pane sat cut off past its right edge ("Previewing", and nothing to see); the window is
-    /// sized here, kept centred on its parent, its top where it was.
-    private func resizeSheet() {
-        let want = formWidth + (file != nil ? paneWidth + 1 : 0)
-        DispatchQueue.main.async {
-            guard let sheet = NSApp.windows.first(where: { $0.isSheet && $0.isVisible && $0.contentView?.frame.width ?? 0 > 0 }) else { return }
-            let content = sheet.contentRect(forFrameRect: sheet.frame)
-            guard abs(content.width - want) > 1 else { return }
-            var frame = sheet.frameRect(forContentRect: NSRect(x: content.minX, y: content.minY, width: want, height: content.height))
-            if let parent = sheet.sheetParent { frame.origin.x = parent.frame.midX - frame.width / 2 }
-            frame.origin.y = sheet.frame.maxY - frame.height
-            sheet.setFrame(frame, display: true, animate: true)
-        }
-    }
-
-    /// The widths for the window the sheet is on: the pane up to 540 points, the form 580 — the form giving up to 120
+    /// The widths for the window the popup is over: the pane up to 540 points, the form 580 — the form giving up to 120
     /// of its own before the pane goes below 380 — together never wider than the window, less a margin.
     private func fit() {
-        // (the window the sheet is on: the key window's, or the app's largest window — the app need not be in front)
+        // (the window the popup is over: the main window — a popup is never the main one — or the app's largest window;
+        // the app need not be in front)
         let parent = NSApp.keyWindow?.sheetParent ?? NSApp.mainWindow ?? NSApp.windows
             .filter { $0.isVisible && $0.sheetParent == nil && !($0 is NSPanel) }
             .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }

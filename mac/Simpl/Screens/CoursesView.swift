@@ -46,7 +46,8 @@ struct CoursesView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
-        .sheet(item: $naming) { c in
+        // (1.3.79: a popup over the window that never blocks it)
+        .floatingPopup("nickname", title: "Nickname", item: $naming) { c in
             NicknameSheet(course: c, onBrightspace: engine.onBrightspace) { name in save(c, name) }
         }
     }
@@ -355,12 +356,15 @@ private struct NicknameSheet: View {
     /// The school's site is Brightspace (Engine.onBrightspace), which keeps no nicknames: they stay on this Mac.
     let onBrightspace: Bool
     let save: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window, which Cancel and Save close.
+    @Environment(\.popup) private var dismiss
     @State private var name = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Nickname").font(.sTitle3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             Text("Shown instead of “\(course.original ?? course.code)” everywhere, \(onBrightspace ? "on this Mac only" : "in Canvas too").")
                 .font(.sCallout)
                 .foregroundStyle(.secondary)

@@ -2,10 +2,11 @@ import AppKit
 import SwiftUI
 
 // The Dashboard's six counters (1.2): each a glass tile with its symbol, its number and the line under it. Pressed, a
-// tile grows where it stands into a panel floating over the page (1.2.8: a panel's width, from the tile's corner)
-// listing what it counted, and folds back into its tile when closed (its ✕, Escape, a click round it, or the tile).
-// (1.3.78) On a window 1024 points wide or wider they stand in one row of six; (1.3.79) each the tile it was in 1.3.77,
-// as tall as it is wide there — the compact strip of 1.3.78 is gone, and the panel is 1.3.77's again.
+// tile opens a panel over itself (1.2.8: a panel's width, from the tile's corner) listing what it counted — (1.3.79) a
+// popup over the window that never blocks it (Shell/FloatingPopup.swift): a click round it leaves it up, as going to
+// another screen does; its ✕, Escape, ⌘W or the tile pressed again closes it, and its head drags it. (1.3.78) On a
+// window 1024 points wide or wider they stand in one row of six; (1.3.79) each the tile it was in 1.3.77, as tall as it
+// is wide there — the compact strip of 1.3.78 is gone, and the panel is 1.3.77's again.
 
 /// A counter's look, as the web Dashboard's: its symbol and colour, and its name in full for the panel it opens.
 enum DashCounterLook {
@@ -64,19 +65,6 @@ enum DashCounterLook {
         case "unread": return "\(n) unread \(n == 1 ? "announcement" : "announcements")"
         case "graded": return "\(n) graded this week"
         default: return "\(fullName(key, label)): \(n)"
-        }
-    }
-}
-
-extension View {
-    /// The counter's tile and its panel drawn as one shape moving from one to the other (matchedGeometryEffect), unless
-    /// Reduce Motion is on: then the panel simply fades in under its tile.
-    @ViewBuilder
-    func dashMorph(_ id: String, in ns: Namespace.ID, enabled: Bool) -> some View {
-        if enabled {
-            self.matchedGeometryEffect(id: id, in: ns)
-        } else {
-            self
         }
     }
 }
@@ -176,7 +164,8 @@ struct DashCounterTile: View {
                 Button("Card Photo…") { editing = true }
             }
         }
-        .sheet(isPresented: $editing) {
+        // (1.3.79: a popup over the window that never blocks it)
+        .floatingPopup("card-photo:\(counter.key)", title: "Card Photo", isPresented: $editing) {
             if let slot = PhotoSlot.card(counter.key) {
                 PhotoSlotSheet(slot: slot)
             }
@@ -308,7 +297,6 @@ struct DashCounterPanel: View {
             .clipShape(shape)
             .glass(shape, tint: DashCounterLook.color(counter.key).opacity(0.10))
             .contentShape(shape)
-            .onTapGesture {} // (1.2.2: a click on the panel is the panel's — the page round it folds it back)
             .onExitCommand { close() }
             .task { await load() }
             // (1.3.79) a row's card folds back with the panel it came from: it never stays over a panel that is gone
@@ -370,9 +358,8 @@ struct DashCounterPanel: View {
             .help("Close (Esc)")
             .accessibilityLabel("Close")
         }
-        // (1.2.11) the card pressed again — its head, where the tile was — closes it (the ✕ keeps its own press)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: close)
+        // (1.3.79) its head drags its popup (its ✕, Escape, ⌘W or the tile pressed again close it)
+        .popupHeader()
     }
 
     @ViewBuilder

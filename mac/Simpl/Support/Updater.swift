@@ -321,11 +321,11 @@ final class Updater: ObservableObject {
         if holds == 0 { installIfQuiet() }
     }
 
-    /// No quiz and no external tool open (1.2.19: in front or not), and no window with a sheet (a hand-in, a message, a
-    /// task) or a modal panel open.
+    /// No quiz and no external tool open (1.2.19: in front or not), and no window with a sheet or (1.3.79) a popup over
+    /// it (a hand-in, a message, a task, a tool) or a modal panel open.
     private var quiet: Bool {
         guard holds == 0, NSApp.modalWindow == nil else { return false }
-        return !NSApp.windows.contains(where: { $0.isVisible && $0.attachedSheet != nil })
+        return !NSApp.windows.contains(where: { $0.isVisible && ($0.attachedSheet != nil || $0 is PopupPanel) })
     }
 
     private func begin(asked: Bool) {

@@ -179,7 +179,7 @@ struct CEMembranePage: View {
         }
         .onAppear(perform: applyLaunch)
         .onExitCommand { withAnimation(anim) { selection = nil } }
-        .sheet(isPresented: $showPOPC) { CEPOPCSheet() }
+        .floatingPopup("cell-popc", title: "POPC, a phospholipid", isPresented: $showPOPC) { CEPOPCSheet() } // (1.3.79: never blocking)
     }
 
     private func saved(_ b: Binding<Bool>, _ field: String) -> Binding<Bool> {
@@ -440,7 +440,8 @@ enum CEWobble {
 
 /// "See a real phospholipid": POPC (§6.9), atom by atom, as the Biomolecule Builder draws it.
 struct CEPOPCSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window, which Done closes.
+    @Environment(\.popup) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {

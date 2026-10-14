@@ -320,7 +320,8 @@ struct TourOverlay: View {
         }
         s += [
             TourStep(id: "tools", aim: .spot(.toolsRow), title: "Tools",
-                     body: Text("A PDF editor, a file converter, calculators, flashcards, a citation maker and more. Pin one to keep it in the toolbar."),
+                     // (1.3.79: as Windows' says it — each tool opens in a popup over where you are, never in its place)
+                     body: Text("A PDF editor, a file converter, calculators, flashcards, a citation maker and more, each opening over where you are. Pin one to keep it in the toolbar."),
                      doing: "Click Tools to look", act: .place { p, _ in p == .tools }),
             TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands, or press ⌘K.")),
             // (home-9) the way to report a bug last, where it is a help rather than the first thing said
