@@ -1,8 +1,8 @@
 /* Canvas's own global navigation, kept. A school adds things to the left-hand nav that no
  * API lists: account-level tools with a global placement ("My Materials", Studio, a library),
  * History, Help, sometimes an admin link. Every Canvas page carries that menu in its markup
- * (#menu), so it is read from the page and shown under our own navigation: tools and links
- * open Canvas's page for them (the shell stays over it), History and Help open as sheets
+ * (#menu), so it is read from the page and shown under our own navigation: a tool opens in a
+ * tab of its own with Simpl's bar (exttool.js), a link Canvas's page for it, History and Help as sheets
  * drawn from the same lists Canvas's trays read. The last menu seen is kept for pages that
  * do not carry one. The Mac and Windows apps show the same items and lists in their own sidebar
  * and popups, asked of their engine page (native-app.js moreFromCanvas, moreHistory, moreHelp). */

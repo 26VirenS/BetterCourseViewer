@@ -802,16 +802,39 @@ try {
   check(task1.ok && rowsOf(l1).length === rowsOf(l0).length + 1 && rowsOf(l1).some((r) => r.id === task1.id && r.title === 'Live check task') && !rowsOf(l0).some((r) => r.id === task1.id),
     `a dev change adds a task of your own for today: a check finds one row more on the List: ${JSON.stringify({ change: task1, rows: [rowsOf(l0).length, rowsOf(l1).length] })}`);
   await nc('deleteTask', { id: task1.id });
-  // a topic left open: a check marks it read again only when something in it is unread
+  // a topic left open: a check marks it read again only when something in it is unread and the student is at the window
   const puts = () => sp.evaluate(() => self.__puts || 0);
   await sp.evaluate(() => { const put = self.BCV.canvas.put; self.__puts = 0; self.BCV.canvas.put = (p, ...a) => { if (/read_all$/.test(p)) self.__puts++; return put(p, ...a); }; });
   await nc('topic', { ctx: 'courses/101', id: '7004' });
   const opened7004 = await puts();
-  await nc('topic', { ctx: 'courses/101', id: '7004', maxAge: 60 });
+  await nc('topic', { ctx: 'courses/101', id: '7004', maxAge: 60, seen: true });
   const checked7004 = await puts();
   await nc('topic', { ctx: 'courses/101', id: '7001', maxAge: 60 });
+  const away7001 = await puts();
+  await nc('topic', { ctx: 'courses/101', id: '7001', maxAge: 60, seen: true });
   const checked7001 = await puts();
-  check(opened7004 === 1 && checked7004 === 1 && checked7001 === 2, `a topic opened is marked read; a check of it marks it read again only when Canvas says something in it is unread (7004 is read, 7001 not yet): ${JSON.stringify({ opened7004, checked7004, checked7001 })}`);
+  check(opened7004 === 1 && checked7004 === 1 && away7001 === 1 && checked7001 === 2, `a topic opened is marked read; a check of it marks it read again only when Canvas says something in it is unread (7004 is read, 7001 not yet) and the student is there (seen): ${JSON.stringify({ opened7004, checked7004, away7001, checked7001 })}`);
+  // a conversation left open: a check reads it without Canvas marking it read (auto_mark_as_read=false), and marks it
+  // read itself only while the student is there (seen); opened, it is read the plain way
+  const convLog = await sp.evaluate(async () => {
+    const C = self.BCV.canvas, get = C.get, put = C.put, log = [];
+    const settle = () => new Promise((r) => setTimeout(r, 300));
+    C.get = (p, o) => { if (/\/conversations\/c1$/.test(p)) log.push(o?.params?.auto_mark_as_read === false ? 'kept unread' : 'plain'); return get(p, o); };
+    C.put = (p, b, ...a) => { if (/\/conversations\/c1$/.test(p) && b?.conversation?.workflow_state === 'read') log.push('marked'); return put(p, b, ...a); };
+    try {
+      await put('/api/v1/conversations/c1', { conversation: { workflow_state: 'unread' } });
+      await self.BCVNative.call('conversation', { id: 'c1', maxAge: 60 });
+      await settle();
+      log.push('|');
+      await self.BCVNative.call('conversation', { id: 'c1', maxAge: 60, seen: true });
+      await settle();
+      log.push('|');
+      await self.BCVNative.call('conversation', { id: 'c1' });
+      await settle();
+    } finally { C.get = get; C.put = put; }
+    return log.join(' ');
+  });
+  check(convLog === 'kept unread | kept unread marked | plain', `a conversation's check leaves it unread while nobody is at the window, and marks it read once the student is: ${convLog}`);
   check((await nc('liveDevChange', { what: 'nothing' })).error === 'No such change: nothing', 'a dev change of no known kind is refused');
   // (1.2) no Tools on the iPhone yet: no row, no route, no command, no Convert on a file
   await sp.evaluate(() => self.BCV.lazy?.load?.('hub'));

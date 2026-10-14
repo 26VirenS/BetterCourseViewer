@@ -627,7 +627,9 @@
     const shown = hide ? upcoming.filter((it) => !doneOf(it)) : upcoming;
     const row = (it) => ({
       id: String(it.id), title: it.title || 'Untitled',
-      course: it.custom ? (it.course ? `${it.course.shortName || it.courseName} · My task` : 'My task') : (it.course?.shortName || it.courseName || ''),
+      // (a task of one's own: its course, if it has one — its kind says My task; the course said it too, and the row read
+      //  "My task · My task")
+      course: it.custom ? (it.course ? (it.course.shortName || it.courseName || '') : '') : (it.course?.shortName || it.courseName || ''),
       color: it.custom && !it.course ? TASK : (it.course?.color || GRAY),
       kind: it.custom ? 'My task' : `${it.kind}${it.isDue ? '' : ' · to-do date'}`, type: it.type || '',
       flags: store.workFlags(it).map((f) => ({ word: f.word, kind: f.kind || '' })),
@@ -1542,13 +1544,14 @@
     return { title: 'Discussions', context: info.title, color: info.color, sections, empty: 'No discussions yet.' };
   }
   /** One discussion or announcement: the topic and every reply in order, threaded by depth; read once opened. */
-  async function topic({ ctx, id, age = NO_AGE } = {}) {
+  async function topic({ ctx, id, age = NO_AGE, seen = false } = {}) {
     const c = ctxOf(ctx, age);
     const [info, t, view] = await Promise.all([contextInfo(c), store.discussion(c.id, id, c.opts), store.discussionView(c.id, id, c.opts).catch(() => null)]);
     if (!t) throw new Error('This discussion could not be loaded.');
-    // (2.99.35) read once opened; a live check of it marks it read again only when something in it is unread (a reply
-    // that came while it was open), so a topic left open is not written to Canvas once a minute
-    if (!age.maxAge || t.read_state === 'unread' || (t.unread_count || 0) > 0) store.markTopicRead(c.id, id, c.opts).then(() => app()?.refreshCounts?.()).catch(() => {});
+    // (2.99.35) read once opened; a live check of it marks it read only when something in it is unread (a reply that came
+    // while it was open) and the student is at the window (`seen`) — so a topic left open is not written to Canvas once
+    // a minute, and a reply that comes while nobody is looking stays unread
+    if (!age.maxAge || (seen && (t.read_state === 'unread' || (t.unread_count || 0) > 0))) store.markTopicRead(c.id, id, c.opts).then(() => app()?.refreshCounts?.()).catch(() => {});
     const people = new Map((view?.participants || []).map((p) => [String(p.id), p]));
     const entries = [];
     const walk = (list, depth, parent) => {
@@ -2065,7 +2068,9 @@
     if (!BCV.extras?.helpList) throw new Error('Help could not be loaded.');
     const d = await BCV.extras.helpList();
     return {
-      title: d.title, note: d.note, empty: d.empty, foot: d.foot,
+      // (2.99.35) the foot in the apps' words: they have no stock Canvas to switch to, only Canvas's own page (Open in
+      // Canvas), where Help offers Canvas's form
+      title: d.title, note: d.note, empty: d.empty, foot: d.foot ? 'Reporting a problem uses Canvas\'s own form: open Canvas\'s own page (Open in Canvas) and choose Help.' : '',
       rows: d.rows.map((r, i) => { const url = absUrl(r.url); return url ? { id: `${i}:${url}`, title: r.title, sub: r.sub, url, open: openOf(url) } : null; }).filter(Boolean),
     };
   }
@@ -2880,10 +2885,15 @@
       empty: sc === 'unread' ? 'No unread messages.' : sc === 'sent' ? 'Nothing sent yet.' : 'No messages.',
     };
   }
-  async function conversation({ id } = {}) {
-    const [cv, mine] = await Promise.all([store.conversation(String(id)), meOfInbox()]);
+  /** One conversation, its messages oldest first; read once opened. (2.99.35) An app's live check of it (an age) reads it
+   *  without Canvas marking it read (a plain read does) and marks it read only while the student is at the window
+   *  (`seen`, the app's word for it): a message that comes while nobody is looking — the window behind another, the PC
+   *  locked — stays unread on the student's Canvas, and the Inbox's badge counts it. */
+  async function conversation({ id, age = NO_AGE, seen = false } = {}) {
+    const live = !!age.maxAge;
+    const [cv, mine] = await Promise.all([store.conversation(String(id), { keepUnread: live }), meOfInbox()]);
     if (!cv) throw new Error('This conversation could not be loaded.');
-    if (cv.workflow_state === 'unread') store.markRead(String(id)).then(() => app()?.refreshCounts?.()).catch(() => {});
+    if (cv.workflow_state === 'unread' && (!live || seen)) store.markRead(String(id)).then(() => app()?.refreshCounts?.()).catch(() => {});
     const people = new Map((cv.participants || []).map((p) => [String(p.id), p]));
     const msgs = [...(cv.messages || [])].reverse().map((mm) => {
       const p = people.get(String(mm.author_id)) || {};
@@ -2996,7 +3006,9 @@
     if (what === 'grade') {
       const c = (await selection()).list.find((x) => x.score !== null && x.score !== undefined && !x.hideFinal);
       if (!c) throw new Error('No course has a total to move.');
-      const to = roundHalfUp(Number(c.score) + (Number(c.score) <= 97 ? 2.5 : -2.5), 1);
+      // (half a point: a move that stays inside its letter's band — the mock moves the score, not the letter, and 2.5 took
+      //  92.4% "A–" to 94.9% still called A–)
+      const to = roundHalfUp(Number(c.score) + (Number(c.score) <= 97 ? 0.5 : -0.5), 1);
       await C.post('/__mock/score', { courseId: String(c.id), courseScore: to });
       return { ok: true, what, id: String(c.id), title: c.shortName || c.name, from: Number(c.score), to };
     }
