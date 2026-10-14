@@ -51,7 +51,7 @@ enum TourEvent: Equatable {
 
 /// The parts of the window the tour lights.
 enum TourSpot: Hashable {
-    case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse
+    case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse, counters
     case gradeRing, gradeDetails, whatIfSwitch, whatIfScore, toolPin, counterNext, counterPanel
     case preview // (1.2.3) a piece of work's quick look (Shell/WorkPreviewOverlay.swift)
 }

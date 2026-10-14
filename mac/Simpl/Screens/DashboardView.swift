@@ -25,7 +25,11 @@ struct DashboardView: View {
     /// The view chosen (Cards, List, Activity), kept on this Mac. (The screenshot suite: -SimplDashView list.)
     @AppStorage("SimplDashView") private var chosen: DashView = .list // (1.2.1: List unless another is picked)
     @State private var counts: TodayCounts?
+    /// (home-25) Overdue's and Graded's numbers are Canvas's word now, not the ones counted from what was kept.
+    @State private var countsLive = false
     @State private var open: String?
+    /// (home-18) How tall the window is: a counter's panel stays in it.
+    @State private var windowHeight: CGFloat = 0
     /// (1.3.62) Where the opened counter's panel is, in the window, and the watch for a click anywhere else in the app.
     @State private var panelFrame: CGRect = .zero
     @State private var clickWatch: Any?
@@ -80,10 +84,11 @@ struct DashboardView: View {
         }
         // (1.3.78: its title and toolbar are DashboardChrome's, in the window's stack)
         .background {
-            // (1.3.78) how wide the window is, for the counters' row of six
-            WindowWidthProbe { w in
-                let wide = w >= Self.rowOfSix
+            // (1.3.78) how wide the window is, for the counters' row of six; (home-18) how tall, for a counter's panel
+            WindowWidthProbe { size in
+                let wide = size.width >= Self.rowOfSix
                 if wide != wideWindow { wideWindow = wide }
+                if abs(size.height - windowHeight) > 0.5 { windowHeight = size.height }
             }
         }
         .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
@@ -126,8 +131,7 @@ struct DashboardView: View {
     private func page(_ d: Today) -> some View {
         // (1.3: the width the window gives the page — read inside the page, a wide layout once drawn held itself wide)
         Page(spacing: 26, onWidth: { w in if abs(w - width) > 0.5 { width = w } }) {
-            ScreenHeading(title: greeting(d), sub: d.dateLine)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            header(d)
             // (laid out once the page's width is known: the counters' rows and the columns follow it)
             if width > 0 {
                 VStack(alignment: .leading, spacing: 26) {
@@ -140,6 +144,47 @@ struct DashboardView: View {
                 .onTapGesture { if open != nil { setOpen(nil) } }
             }
         }
+    }
+
+    /// (home-4) The greeting and the day, with the page's own controls beside them — its view (Cards, List, Activity) and
+    /// New Task — in the page, not the toolbar, so a tool pinned to the toolbar never pushes them into its » menu (as
+    /// Windows has them); under the greeting where the page is too narrow for both on one line. (home-25) While the page
+    /// shows what was kept from last time, the day's line says it is updating.
+    private func header(_ d: Today) -> some View {
+        let heading = ScreenHeading(title: greeting(d), sub: [d.dateLine, model.kept ? "Updating…" : nil].compactMap { $0 }.joined(separator: " · "))
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 16) {
+                heading
+                Spacer(minLength: 12)
+                viewControls
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                heading
+                viewControls
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The view chosen (kept on this Mac) and New Task (⌘N): its words beside its symbol.
+    private var viewControls: some View {
+        HStack(spacing: 10) {
+            Picker("View", selection: $chosen.animation(Motion.gentle)) {
+                ForEach(views) { v in
+                    Text(v.title).tag(v).help(v.help)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .help("Cards, a list by day, or recent activity")
+            Button { engine.newTask = true } label: {
+                Label("New Task", systemImage: "plus")
+            }
+            .glassButton()
+            .help("New Task (⌘N)")
+        }
+        .controlSize(.large)
     }
 
     private func greeting(_ d: Today) -> String {
@@ -165,14 +210,13 @@ struct DashboardView: View {
             Array(list[start..<min(start + cols, list.count)])
         }
         let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
-        let style: DashCounterTile.Style = six
-            ? .row(symbolBeside: DashCounterTile.symbolsFit(list.map(\.label), tileWidth: tile))
-            : .tall
+        let (style, full) = Self.wording(list, six: six, tileWidth: tile)
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                counterRow(row, cols: cols, style: style)
+                counterRow(row, cols: cols, style: style, full: full)
             }
         }
+        .tourSpot(.counters) // (the tour's first step: everything due, at a glance)
         .overlayPreferenceValue(DashTileAnchors.self) { anchors in
             GeometryReader { g in
                 if let key = open, let c = list.first(where: { $0.key == key }), let a = anchors[key] {
@@ -182,7 +226,10 @@ struct DashboardView: View {
                     // the last one's from its right, one between them centred on it in step — kept on the page
                     let along = g.size.width > tile.width ? min(max((tile.minX) / (g.size.width - tile.width), 0), 1) : 0
                     let x = min(max(tile.minX + (tile.width - w) * along, 0), max(0, g.size.width - w))
-                    DashCounterPanel(counter: c, value: value(c), note: note(c), width: w, close: { setOpen(nil) },
+                    // (home-18) its list as tall as the window has room for under the tile's top, less its header and
+                    // footer (about 170 points of them) and a margin at the window's foot
+                    let room = windowHeight > 0 ? windowHeight - (g.frame(in: .global).minY + tile.minY) - 186 : 380
+                    DashCounterPanel(counter: c, value: value(c), note: fullNote(c), width: w, room: room, close: { setOpen(nil) },
                                      onHeight: { h in
                                          if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
                                      },
@@ -216,10 +263,10 @@ struct DashboardView: View {
     /// The room between two tiles, across and down.
     static let counterSpacing: CGFloat = 14
 
-    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style) -> some View {
+    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, full: Bool) -> some View {
         HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c, style: style).frame(maxWidth: .infinity, maxHeight: .infinity)
+                counterSlot(c, style: style, full: full).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -228,17 +275,32 @@ struct DashboardView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    /// (home-17) Which names a row of tiles shows, decided once for the row where it measures them: every counter's full
+    /// name — the one that says exactly what it counts ("Announcements", "Graded this week") — where every one of them
+    /// fits as the tile draws it (beside its symbol, or else with the symbols in the corners); else every short name
+    /// ("Unread", "Graded"), whose line says the rest ("announcements · 2 courses"). Never a mix, and never a name cut.
+    static func wording(_ list: [Counter], six: Bool, tileWidth: CGFloat) -> (style: DashCounterTile.Style, full: Bool) {
+        let full = list.map { $0.fullLabel ?? $0.label }
+        let short = list.map(\.label)
+        guard six else { return (.tall, DashCounterTile.tallFits(full, tileWidth: tileWidth)) }
+        if DashCounterTile.rowFits(full, tileWidth: tileWidth, symbolBeside: true) { return (.row(symbolBeside: true), true) }
+        if DashCounterTile.rowFits(full, tileWidth: tileWidth, symbolBeside: false) { return (.row(symbolBeside: false), true) }
+        return (.row(symbolBeside: DashCounterTile.rowFits(short, tileWidth: tileWidth, symbolBeside: true)), false)
+    }
+
     /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
     /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
     @ViewBuilder
-    private func counterSlot(_ c: Counter, style: DashCounterTile.Style) -> some View {
+    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool) -> some View {
+        let name = full ? (c.fullLabel ?? c.label) : c.label
+        let line = full ? fullNote(c) : note(c)
         Group {
             if open == c.key && !reduceMotion {
-                DashCounterTile(counter: c, value: value(c), note: note(c), style: style) {}
+                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
-                DashCounterTile(counter: c, value: value(c), note: note(c), style: style) { setOpen(open == c.key ? nil : c.key) }
+                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: !reduceMotion)
                     .transition(.opacity)
@@ -247,8 +309,6 @@ struct DashboardView: View {
         .anchorPreference(key: DashTileAnchors.self, value: .bounds) { [c.key: $0] } // (where its panel grows from)
     }
 
-    /// A counter's number: never one from before (1.2) — while the page shows what was kept from last time, or the
-    /// overdue and graded counts are still being made, the tile says it is counting.
     /// (1.2.2) The counters in the day's order: today, tomorrow, the next seven days, overdue, unread, graded.
     static func ordered(_ list: [Counter]) -> [Counter] {
         let order = ["today", "tomorrow", "next", "overdue", "unread", "graded"]
@@ -258,12 +318,21 @@ struct DashboardView: View {
         }.map(\.element)
     }
 
+    /// A counter's number. (home-25) While the page shows what was kept from last time — or Overdue and Graded are
+    /// counted from what was kept — that number shows, faint (`stale`), and rolls to the live one in place, as the list
+    /// under it changes in place: never six blank tiles over a full list.
     private func value(_ c: Counter) -> Int? {
-        if model.kept { return nil }
         switch c.key {
         case "overdue": return counts?.overdue
         case "graded": return counts?.graded
         default: return c.value
+        }
+    }
+
+    private func stale(_ c: Counter) -> Bool {
+        switch c.key {
+        case "overdue", "graded": return !countsLive
+        default: return model.kept
         }
     }
 
@@ -284,12 +353,21 @@ struct DashboardView: View {
         withAnimation(Motion.snappy) { counts = c }
     }
 
+    /// The line that goes with a counter's short name ("announcements · 2 courses", "this week · 19 / 49 points").
     private func note(_ c: Counter) -> String? {
-        if model.kept { return nil }
         switch c.key {
         case "overdue": return counts?.overdueNote
         case "graded": return counts?.gradedNote
         default: return c.note
+        }
+    }
+
+    /// (home-17) The line that goes with its full name ("3 unread · 2 courses", "19 / 49 points"); the panel's, too.
+    private func fullNote(_ c: Counter) -> String? {
+        switch c.key {
+        case "overdue": return counts?.overdueNote
+        case "graded": return counts?.gradedFullNote ?? counts?.gradedNote
+        default: return c.fullNote ?? c.note
         }
     }
 
@@ -328,9 +406,11 @@ struct DashboardView: View {
                     .frame(width: railWidth, alignment: .topLeading)
             }
         } else {
+            // (home-11) the view chosen straight under the counters — picking Activity shows the activity on the first
+            // screen — then the day's work (List has it already), then the rest
             VStack(alignment: .leading, spacing: 26) {
-                if view != .list { today(d) }
                 main(d)
+                if view != .list { today(d) }
                 rail(d, narrow: true)
             }
         }
@@ -374,19 +454,11 @@ struct DashboardView: View {
                         .padding(.horizontal, 10)
                 }
                 ForEach(Array(d.list.rows.enumerated()), id: \.element.id) { i, row in
-                    if i > 0 { RowDivider(inset: 42) }
-                    Group {
-                        if twoColumns {
-                            DashTodayLine(row: row) { done in toggle(row, done) }
-                        } else {
-                            // (1.2.3) a press grows its preview out of the row; a double-click opens it
-                            PreviewLink(item: .work(row, engine: engine, toggle: { done in toggle(row, done) })) {
-                                WorkRowView(row: row) { done in toggle(row, done) }
-                            }
-                            .workMenu(WorkAction(row), engine: engine)
-                        }
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    if i > 0 { RowDivider(inset: 92) }
+                    // (home-21) drawn as Coming up draws work; in the side column, its figures one over the other.
+                    // (1.2.3) a press grows its preview out of the row; a double-click opens it
+                    DashTodayLine(row: row, narrow: twoColumns) { done in toggle(row, done) }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .padding(8)
@@ -485,7 +557,7 @@ struct DashboardView: View {
     @ViewBuilder
     private func weekLoad(_ d: Today) -> some View {
         if let load = d.load, d.hasCourses ?? true {
-            PageSection(title: "Week load", trailing: "Handed in of assigned") {
+            PageSection(title: "Week load", trailing: d.loadCaption ?? "Handed in this week") { // (home-22)
                 DashWeekLoad(load: load, idle: d.idle)
             }
         }
@@ -539,7 +611,10 @@ struct DashboardView: View {
                 }
                 courses = c
             }
-            if counts == nil, let c = engine.recent("todayCounts", ["kept": false], as: TodayCounts.self)?.value { counts = c }
+            if counts == nil, let c = engine.recent("todayCounts", ["kept": false], as: TodayCounts.self) {
+                counts = c.value
+                countsLive = c.fresh
+            }
             if sky == nil, let s = engine.recent("dashSkyline", ["kept": false], as: DashSkylineData.self)?.value ?? engine.kept("dashSkyline", ["kept": false], as: DashSkylineData.self) { sky = s }
             if list == nil, let l = engine.recent("dashList", as: DashListData.self)?.value ?? engine.kept("dashList", as: DashListData.self) { list = l }
             if activity == nil, let a = engine.recent("dashActivity", as: DashActivityData.self)?.value {
@@ -560,7 +635,10 @@ struct DashboardView: View {
             withAnimation(Motion.snappy) { counts = k }
         }
         if let f = await fresh {
-            withAnimation(Motion.snappy) { counts = f }
+            withAnimation(Motion.snappy) {
+                counts = f
+                countsLive = f.overdue != nil
+            }
         }
     }
 
@@ -676,32 +754,14 @@ struct DashboardView: View {
     }
 }
 
-/// (1.3.78) The Dashboard's title and toolbar — its view (Cards, List, Activity) and New Task — in the window's stack,
-/// where every screen's are; the Dashboard itself is kept over the stack (DetailStack), so going back to it never draws
-/// it again.
+/// (1.3.78) The Dashboard's title in the window's stack, where every screen's is; the Dashboard itself is kept over the
+/// stack (DetailStack), so going back to it never draws it again. (home-4) Its view (Cards, List, Activity) and New Task
+/// are in its page, by the greeting: the toolbar keeps Back, Refresh, the pinned tools and Search, the same on every
+/// screen, and a pinned tool never pushes the page's own controls into the toolbar's » menu.
 struct DashboardChrome: View {
-    @EnvironmentObject private var engine: Engine
-    @AppStorage("SimplDashView") private var chosen: DashView = .list
-
     var body: some View {
         Color.clear
             .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Picker("View", selection: $chosen.animation(Motion.gentle)) {
-                        ForEach(DashView.offered(brightspace: engine.onBrightspace)) { v in
-                            Text(v.title).tag(v)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .fixedSize()
-                    .help("Cards, a list by day, or recent activity")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { engine.newTask = true } label: { Label("New Task", systemImage: "plus") }
-                        .help("New Task (⌘N)")
-                }
-            }
     }
 }
 
@@ -712,23 +772,23 @@ extension DashView {
     }
 }
 
-/// (1.3.78) The width of the window a view is in — said once it is in a window, and again each time the window is
+/// (1.3.78) The size of the window a view is in — said once it is in a window, and again each time the window is
 /// resized — for a layout that follows the window itself rather than the room its column happens to have beside the
-/// sidebar. An unseen view (it takes no presses).
+/// sidebar (and, home-18, a panel that stays inside the window). An unseen view (it takes no presses).
 struct WindowWidthProbe: NSViewRepresentable {
-    let onWidth: (CGFloat) -> Void
+    let onSize: (CGSize) -> Void
 
     func makeNSView(context: Context) -> WindowWidthProbeView {
         let v = WindowWidthProbeView()
-        v.onWidth = onWidth
+        v.onSize = onSize
         return v
     }
 
-    func updateNSView(_ v: WindowWidthProbeView, context: Context) { v.onWidth = onWidth }
+    func updateNSView(_ v: WindowWidthProbeView, context: Context) { v.onSize = onSize }
 }
 
 final class WindowWidthProbeView: NSView {
-    var onWidth: (CGFloat) -> Void = { _ in }
+    var onSize: (CGSize) -> Void = { _ in }
     private var watch: NSObjectProtocol?
 
     override func viewDidMoveToWindow() {
@@ -737,12 +797,12 @@ final class WindowWidthProbeView: NSView {
         watch = nil
         guard let window else { return }
         // (said on the run loop's next turn: this is called while SwiftUI is putting the view in place)
-        let width = window.frame.width
-        DispatchQueue.main.async { [weak self] in self?.onWidth(width) }
+        let size = window.frame.size
+        DispatchQueue.main.async { [weak self] in self?.onSize(size) }
         watch = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] n in
             MainActor.assumeIsolated {
                 guard let w = n.object as? NSWindow else { return }
-                self?.onWidth(w.frame.width)
+                self?.onSize(w.frame.size)
             }
         }
     }

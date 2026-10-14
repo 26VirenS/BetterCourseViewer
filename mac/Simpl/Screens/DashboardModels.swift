@@ -58,6 +58,14 @@ struct DashCourse: Codable, Identifiable, Hashable {
     var next: DashNext?
     var links: [DashLink]?
     var url: String
+    /// (2.99.33) The course's other name only when it says something `code` does not ("" otherwise); why there is no
+    /// score ("No grade yet", "Hidden by instructor"); the score as a whole percent, from the one shown (92 for "92.4%");
+    /// its unread announcements as the pill says them ("2 new") and in full ("2 unread announcements").
+    var altName: String?
+    var scoreWhy: String?
+    var scoreWhole: Int?
+    var unreadText: String?
+    var unreadLabel: String?
 }
 
 struct DashCoursesData: Codable {
@@ -139,6 +147,9 @@ struct DashSkyCourse: Codable, Identifiable, Hashable {
     var score: Double?
     var url: String?
     var windows: [DashSkyWindow]?
+    /// (2.99.33) The score as it is shown ("92.4%", "–") and as a whole percent from that figure (92; nil with none).
+    var scoreText: String?
+    var scoreWhole: Int?
 }
 
 struct DashSkylineData: Codable {

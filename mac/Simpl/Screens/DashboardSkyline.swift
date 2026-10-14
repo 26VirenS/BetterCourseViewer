@@ -94,7 +94,7 @@ struct DashSkyline: View {
         let th = (height * fraction).rounded()
         let delay = Double(min(i, 8)) * 0.07
         return VStack(spacing: 6) {
-            Text(c.score.map { "\(Int($0.rounded()))%" } ?? "—")
+            Text(DashSkyline.whole(c) ?? "–")
                 .font(.system(size: 13, weight: .bold).monospacedDigit())
                 .foregroundStyle(c.score == nil ? .secondary : .primary)
                 .opacity(risen ? 1 : 0)
@@ -114,11 +114,24 @@ struct DashSkyline: View {
         }
     }
 
+    /// A tower's score as a whole percent: the engine's, made from the one-decimal figure shown elsewhere (92.46 is shown
+    /// "92.5%" and stands at 93 — never 92 beside it); an older page's, half up on the decimal value.
+    static func whole(_ c: DashSkyCourse) -> String? {
+        if let w = c.scoreWhole { return "\(w)%" }
+        guard let s = c.score, s.isFinite else { return nil }
+        let behaviour = NSDecimalNumberHandler(roundingMode: .plain, scale: 1, raiseOnExactness: false, raiseOnOverflow: false,
+                                               raiseOnUnderflow: false, raiseOnDivideByZero: false)
+        let shown = NSDecimalNumber(string: "\(s)").rounding(accordingToBehavior: behaviour) // (the double as written)
+        let whole = NSDecimalNumberHandler(roundingMode: .plain, scale: 0, raiseOnExactness: false, raiseOnOverflow: false,
+                                           raiseOnUnderflow: false, raiseOnDivideByZero: false)
+        return "\(shown.rounding(accordingToBehavior: whole).intValue)%"
+    }
+
     private func summary(_ c: DashSkyCourse) -> String {
         let w = c.windows ?? []
         let lit = w.filter { $0.band != nil && $0.free != true }.count
         let free = w.filter { $0.free == true }.count
-        let score = c.score.map { "\(Int($0.rounded()))%" } ?? "no score yet"
+        let score = PreviewFormat.text(c.scoreText).flatMap { $0 == "–" ? nil : $0 } ?? DashSkyline.whole(c) ?? "no score yet"
         guard c.windows != nil else { return "\(c.code ?? c.name): \(score)" }
         return "\(c.code ?? c.name): \(score) · \(lit) graded, \(w.count - lit - free) to come" + (free > 0 ? ", \(free) not counted" : "")
     }
@@ -279,7 +292,8 @@ private struct DashWindows: View {
 }
 
 /// The week's load: each course's share of this week's work handed in, a bar in its colour; a course opens its
-/// assignments.
+/// assignments. (home-22) One line a course, about 28 points tall — its name, a short bar, "2 / 9 handed in" — so the
+/// side column says it in a third of the room.
 struct DashWeekLoad: View {
     let load: [LoadRow]
     let idle: Int?
@@ -288,7 +302,7 @@ struct DashWeekLoad: View {
     private var engine: Engine { link.acting }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 4) {
             if load.isEmpty {
                 EmptyNote(text: "Nothing assigned this week.", symbol: "sun.max")
             }
@@ -297,31 +311,39 @@ struct DashWeekLoad: View {
                 Text("\(idle) \(idle == 1 ? "course" : "courses") with nothing assigned this week")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
+                    .padding(.top, 4)
             }
         }
-        .padding(18)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(radius: 18)
     }
 
     private func row(_ r: LoadRow) -> some View {
-        Button { engine.go(.section("courses/\(r.id)", "assignments")) } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Circle().fill(Color(hex: r.color)).frame(width: 9, height: 9)
-                    Text(r.code).font(.sCallout.weight(.semibold)).lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text("\(r.done) of \(r.total)")
-                        .font(.sCallout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText(value: Double(r.done)))
-                }
-                DashBar(fraction: r.total > 0 ? Double(r.done) / Double(r.total) : 0, color: Color(hex: r.color))
+        let text = PreviewFormat.text(r.text) ?? "\(r.done) / \(r.total) handed in"
+        return Button { engine.go(.section("courses/\(r.id)", "assignments")) } label: {
+            HStack(spacing: 10) {
+                Circle().fill(Color(hex: r.color)).frame(width: 8, height: 8)
+                Text(r.code)
+                    .font(.sCallout.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(1)
+                DashBar(fraction: r.total > 0 ? Double(r.done) / Double(r.total) : 0, color: Color(hex: r.color), height: 5)
+                    .frame(minWidth: 36, maxWidth: .infinity)
+                Text(text)
+                    .font(.sCaption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .contentTransition(.numericText(value: Double(r.done)))
             }
+            .frame(minHeight: 28)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("\(r.code)’s assignments")
+        .help("\(r.code): \(text). Open its assignments.")
     }
 }
 

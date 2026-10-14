@@ -16,6 +16,18 @@ enum DashGlyph {
         }
     }
 
+    /// A kind of work in words ("Assignment", "Quiz", "Announcement", "My task" — the engine's), as its symbol.
+    static func kind(_ kind: String?) -> String {
+        switch (kind ?? "").lowercased() {
+        case "announcement": return Glyph.item("announcement")
+        case "my task", "task": return Glyph.item("task")
+        case "event": return Glyph.item("event")
+        case "peer review": return "person.2"
+        case "": return Glyph.item("assignment")
+        default: return Glyph.item((kind ?? "").lowercased())
+        }
+    }
+
     static func activity(_ type: String?) -> String {
         switch type ?? "" {
         case "Announcement": return "megaphone"
@@ -59,10 +71,12 @@ struct DashDayList: View {
         }
     }
 
+    /// A day's title and its date as every date is written ("Tomorrow  Wed, Oct 14", "Thursday  Oct 15") — but Today's,
+    /// which the greeting over the page already says (home-8).
     private func heading(_ day: DashDay) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(day.title).font(.sHeadline)
-            if let date = day.date, !date.isEmpty {
+            if day.title != "Today", let date = day.date, !date.isEmpty {
                 Text(date.hasPrefix(day.title + ", ") ? String(date.dropFirst(day.title.count + 2)) : date)
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
@@ -94,31 +108,10 @@ struct DashWorkLine: View {
             HStack(spacing: 12) {
                 CheckCircle(done: row.done, color: .green) { toggle(!row.done) }
                 IconTile(symbol: DashGlyph.work(row.type), color: Color(hex: row.color), size: 32)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text([row.course, row.kind].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(.sCaption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        ForEach(row.flags ?? [], id: \.self) { f in FlagBadge(flag: f) }
-                    }
-                    Text(row.title)
-                        .strikethrough(row.done, color: .secondary)
-                        .font(.sBody)
-                        .lineLimit(2)
-                        .foregroundStyle(row.done ? .secondary : .primary)
-                }
+                DashWorkText(context: [row.course, row.kind].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+                             flags: row.flags ?? [], title: row.title, done: row.done)
                 Spacer(minLength: 8)
-                if let p = row.points, !p.isEmpty {
-                    Text(p)
-                        .font(.sCallout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(minWidth: wide ? 64 : 0, alignment: .trailing)
-                }
-                Text(row.due ?? row.time ?? "")
-                    .font(.sCallout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: wide ? 112 : 90, alignment: .trailing)
+                DashWorkFigures(time: row.due ?? row.time, points: row.points, stacked: false, wide: wide)
             }
             .animation(Motion.snappy, value: row.done)
         }
@@ -126,44 +119,104 @@ struct DashWorkLine: View {
     }
 }
 
-/// The day's work beside the cards, in the narrow column: its tick, its title, its course in its colour with its
-/// kind, its time. A press grows its preview out of it (1.2.3).
+/// (home-21) The words of a piece of work, as every Dashboard list draws them — Today, Coming up and a counter's panel:
+/// its course and kind on a small line (with where it stands beside them), its title under it.
+struct DashWorkText: View {
+    let context: String
+    var flags: [WorkFlag] = []
+    let title: String
+    var done = false
+    var quiet = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !context.isEmpty || !flags.isEmpty {
+                HStack(spacing: 6) {
+                    if !context.isEmpty {
+                        Text(context)
+                            .font(.sCaption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    ForEach(flags, id: \.self) { f in FlagBadge(flag: f) }
+                }
+            }
+            Text(title)
+                .strikethrough(done, color: .secondary)
+                .font(.sBody)
+                .lineLimit(2)
+                .foregroundStyle(done || quiet ? .secondary : .primary)
+        }
+    }
+}
+
+/// (home-21) A piece of work's figures on the right of its row: its points and its time side by side on a wide list,
+/// its time over its points where the row is narrow (the day's work in the side column, a counter's panel).
+struct DashWorkFigures: View {
+    let time: String?
+    let points: String?
+    var stacked = false
+    var wide = false
+
+    var body: some View {
+        if stacked {
+            VStack(alignment: .trailing, spacing: 2) {
+                if let t = PreviewFormat.text(time) {
+                    Text(t).font(.sCallout.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                if let p = PreviewFormat.text(points) {
+                    Text(p).font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .fixedSize()
+        } else {
+            HStack(spacing: 12) {
+                if let p = PreviewFormat.text(points) {
+                    Text(p)
+                        .font(.sCallout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: wide ? 64 : 0, alignment: .trailing)
+                }
+                Text(time ?? "")
+                    .font(.sCallout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: wide ? 112 : 76, alignment: .trailing)
+            }
+            .lineLimit(1)
+            .fixedSize()
+        }
+    }
+}
+
+/// The day's work: (home-21) drawn as Coming up draws work — its tick, its kind's symbol in its course's colour, its
+/// course and kind over its title, its points and its time on the right (one over the other in the narrow side column).
+/// A press grows its preview out of it (1.2.3).
 struct DashTodayLine: View {
     let row: WorkRow
+    /// In the side column beside the view: the figures one over the other.
+    var narrow = false
     let toggle: (Bool) -> Void
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
     private var engine: Engine { link.acting }
 
+    /// Its kind: the engine's word, else the first of its line ("Assignment · 10 pts"), or a task of one's own.
+    private var kind: String {
+        if let k = PreviewFormat.text(row.kind) { return k }
+        if row.custom == true { return "My task" }
+        return (row.sub ?? "").components(separatedBy: " · ").first.flatMap(PreviewFormat.text) ?? "Assignment"
+    }
+
     var body: some View {
         PreviewLink(item: .work(row, engine: engine, toggle: toggle)) {
-            HStack(alignment: .top, spacing: 11) {
+            HStack(spacing: 12) {
                 CheckCircle(done: row.done, color: .green) { toggle(!row.done) }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(row.title)
-                        .strikethrough(row.done, color: .secondary)
-                        .font(.sBody)
-                        .lineLimit(2)
-                        .foregroundStyle(row.done ? .secondary : .primary)
-                    HStack(spacing: 6) {
-                        if let course = row.course, !course.isEmpty {
-                            Circle().fill(Color(hex: row.color)).frame(width: 7, height: 7)
-                            Text(course).lineLimit(1)
-                        }
-                        if let sub = row.sub, !sub.isEmpty {
-                            Text(sub).lineLimit(1)
-                        }
-                    }
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-                    if let flag = row.flag { FlagBadge(flag: flag) }
-                }
-                Spacer(minLength: 6)
-                if let time = row.time, !time.isEmpty {
-                    Text(time)
-                        .font(.sCallout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
+                IconTile(symbol: DashGlyph.kind(kind), color: Color(hex: row.color), size: 32)
+                DashWorkText(context: [PreviewFormat.text(row.course), kind].compactMap { $0 }.joined(separator: " · "),
+                             flags: row.flag.map { [$0] } ?? [], title: row.title, done: row.done)
+                Spacer(minLength: 8)
+                DashWorkFigures(time: row.time, points: row.pts ?? PreviewFormat.points(in: row.sub), stacked: narrow)
             }
             .animation(Motion.snappy, value: row.done)
         }
