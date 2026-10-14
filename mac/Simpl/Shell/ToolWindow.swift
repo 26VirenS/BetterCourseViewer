@@ -20,6 +20,8 @@ struct ToolWindow: View {
     @ObservedObject private var focus = FocusTimer.shared
     /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it off).
     @AppStorage(ToolDarkPage.key) private var darkPage = true
+    /// The window's own appearance: the moon shows only in Dark Mode, where it does something.
+    @Environment(\.colorScheme) private var scheme
     @State private var url: URL?
     @State private var name = ""
     @State private var error: String?
@@ -106,10 +108,14 @@ struct ToolWindow: View {
                     }
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Toggle(isOn: $darkPage) { Label("Dark Page", systemImage: darkPage ? "moon.fill" : "moon") }
-                    .toggleStyle(.button)
-                    .help(darkPage ? "Light pages are drawn dark in Dark Mode. Click to show them as they are." : "Draw light pages dark in Dark Mode")
+            // (courses-33: only in Dark Mode, the one time it does anything — in Light Mode a lit moon over a white page
+            // read as "dark mode is on", the loudest control in the bar)
+            if scheme == .dark {
+                ToolbarItem(placement: .primaryAction) {
+                    Toggle(isOn: $darkPage) { Label("Dark Page", systemImage: darkPage ? "moon.fill" : "moon") }
+                        .toggleStyle(.button)
+                        .help(darkPage ? "Light pages are drawn dark in Dark Mode. Click to show them as they are." : "Draw light pages dark in Dark Mode")
+                }
             }
         }
         .task(id: model.engine == nil) { await start() }
