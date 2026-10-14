@@ -26,6 +26,13 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.0", "2026-10-14",
+            ("new", "A biology toolkit", "Ten new tools, from a 3D cell to genetic crosses."),
+            ("new", "Send from phone", "Scan a code to hand in photos; nothing leaves your Wi-Fi."),
+            ("improved", "Clearer screens", "Grades, dates and courses read one way everywhere."),
+            ("improved", "Updates on their own", "New versions install themselves when you're not busy."),
+            ("improved", "Lighter and faster", "Much less memory when minimized; screens open 2–3x faster."),
+            ("fixed", "Fewer PIN prompts", "Windows Hello asks once, not every time.")),
         R("0.2.9", "2026-10-13",
             ("new", "Locked with Windows Hello", "Your saved sign-in opens only with your face, fingerprint or PIN."),
             ("improved", "Encrypted by Windows", "The rest of Simpl's data is sealed by Windows itself, with its key in this PC's TPM.")),

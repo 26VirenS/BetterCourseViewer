@@ -1,4 +1,15 @@
-**Download Simpl-Setup.exe and open it.** It installs Simpl for you alone — no administrator needed — with a Start menu shortcut (and a desktop one if you tick it), then opens it. Simpl-Setup.exe is not code-signed yet: on "Windows protected your PC", choose **More info → Run anyway**. Once installed, Simpl updates itself from **Settings ▸ Updates** (Download, then Restart to Update), and you can uninstall it from Simpl's own **Settings ▸ General ▸ Uninstall Simpl** — where you can choose to erase your settings, grade history and saved sign-in too — or from Windows' **Settings ▸ Apps**, which keeps your settings and sign-in unless you erase them in Simpl first.
+**What's new in 0.3.0**
+
+- **A biology toolkit** — ten new tools, from a 3D cell to genetic crosses.
+- **Send from phone** — scan a code to hand in photos; nothing leaves your Wi-Fi.
+- **Clearer screens** — grades, dates and courses read one way everywhere.
+- **Updates on their own** — new versions install themselves when you're not busy.
+- **Lighter and faster** — much less memory when minimized; screens open 2–3x faster.
+- **Fewer PIN prompts** — Windows Hello asks once, not every time.
+
+Coming from 0.2.9 or earlier, update once from **Settings ▸ Updates** (Download, then Restart to Update); from 0.3.0 on, Simpl installs each new version by itself.
+
+**Download Simpl-Setup.exe and open it.** It installs Simpl for you alone — no administrator needed — with a Start menu shortcut (and a desktop one if you tick it), then opens it. Simpl-Setup.exe is not code-signed yet: on "Windows protected your PC", choose **More info → Run anyway**. Once installed, Simpl updates itself — each new version downloads and goes in at a quiet moment, never over a quiz, a hand-in or a dialog (**Settings ▸ Updates** can turn that off, or put one in now with Restart to Update) — and you can uninstall it from Simpl's own **Settings ▸ General ▸ Uninstall Simpl** — where you can choose to erase your settings, grade history and saved sign-in too — or from Windows' **Settings ▸ Apps**, which keeps your settings and sign-in unless you erase them in Simpl first.
 
 **Simpl-Windows-x64.zip** — the portable choice: unzip anywhere and run **Simpl.exe** (everything it needs is in the folder; it uses Microsoft Edge WebView2, which Windows 10 and 11 already have). The same "More info → Run anyway" applies.
 
@@ -12,9 +23,9 @@ What is in it — the Mac app's screens and steps, in Windows 11's look:
 - **every screen drawn by Simpl**: the Dashboard with its cards that open, To Do and New Task, the Calendar (month, week, list), Notifications, Grades with What-If, Inbox and New Message, Groups, All Courses, a course's home and every section, pages and files, an assignment with Hand In, its feedback and its rubric, Search, External Tools;
 - **a quick look at any piece of work**: click a row and a card grows out of it; double-click to open it whole;
 - **quizzes, Knewton Alta and Macmillan in their own popups**, as on the Mac;
-- **the tools**: Citation generator, Focus timer, Calculator, Graphing calculator, the Periodic Table (with the electron cloud, the Lewis structure maker and the 3D molecule builder), Grade needed, File converter, Unit converter, Merge & split PDFs, PDF annotator, Image to text, Flashcards — each opens over the window, and any of them can be pinned to the title bar for its quick version;
+- **the tools**: Citation generator, Focus timer, Calculator, Graphing calculator, the Periodic Table (with the electron cloud, the Lewis structure maker and the 3D molecule builder), Grade needed, File converter, Unit converter, Merge & split PDFs, PDF annotator, Image to text, Flashcards, and the biology tools (Cell Explorer, Gene Expression, Biomolecule Builder, DNA & RNA, Cell Division, Genetics Crosses, Hardy–Weinberg, Bio Lab Calculator, Enzyme Lab, Photosynthesis & Respiration) — each opens over the window, and any of them can be pinned to the title bar for its quick version;
 - **Settings laid out like Windows 11's Settings app**, Guided Setup, What's New, the guided tour, themes and photos, reminders and new-activity alerts;
-- **an installer**: Simpl-Setup.exe installs it for you alone, and updates it quietly when you choose Restart to Update — Simpl opens again on its own;
+- **an installer**: Simpl-Setup.exe installs it for you alone, and updates it quietly by itself (or when you choose Restart to Update) — Simpl opens again on its own, where you were;
 - **on your taskbar**: after the guided tour, Simpl asks once to be kept on the taskbar (and Settings ▸ General has Pin to taskbar… any time);
 - **runs in the background**: closing the window keeps Simpl in the notification area (right-click its icon to quit);
 - **the window's size**: it opens as you left it, never larger than your screen.
