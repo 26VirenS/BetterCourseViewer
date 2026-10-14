@@ -398,7 +398,7 @@ internal sealed class PeriodicTableTool : Grid
         hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.", Ty.Body, B.Text2);
         tablePage = ToolKit.Page(K.V(14, offerHost, top, colourRow, trendGrid, hint));
         tablePage.SizeChanged += (_, _) => FitTable();
-        foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint }) part.SizeChanged += (_, _) => FitTable();
+        foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint, grid }) part.SizeChanged += (_, _) => FitTable();
 
         Children.Add(pagesBar.Row(0));
         Children.Add(tablePage.Row(1));
@@ -446,9 +446,18 @@ internal sealed class PeriodicTableTool : Grid
     {
         var view = tablePage.ViewportHeight;
         if (view <= 0) return;
-        static double Part(FrameworkElement e) => e.Visibility == Visibility.Collapsed ? 0 : e.ActualHeight + e.Margin.Top + e.Margin.Bottom + 14;
-        var others = Part(offerHost) + Part(top) + Part(colourRow) + Part(hint) + (across.Visibility == Visibility.Collapsed ? 0 : across.ActualHeight + across.Margin.Bottom)
+        double others;
+        // (once laid out, what the page holds besides the table is measured whole — the scroller's extent less the table:
+        //  its key, its colourings, its trends, its line and the room between them — so the table takes exactly the
+        //  rest, never a little more than shows; before that, the parts are added up)
+        if (tablePage.ExtentHeight > 0 && grid.ActualHeight > 0)
+            others = tablePage.ExtentHeight - grid.ActualHeight + 2;
+        else
+        {
+            static double Part(FrameworkElement e) => e.Visibility == Visibility.Collapsed ? 0 : e.ActualHeight + e.Margin.Top + e.Margin.Bottom + 14;
+            others = Part(offerHost) + Part(top) + Part(colourRow) + Part(hint) + (across.Visibility == Visibility.Collapsed ? 0 : across.ActualHeight + across.Margin.Bottom)
                      + tablePage.Padding.Top + tablePage.Padding.Bottom + 2;
+        }
         var h = Math.Max(30 * (9 + PTGrid.GapRow) + 8 * grid.Gap, view - others);
         if (double.IsInfinity(grid.MaxHeight) || Math.Abs(grid.MaxHeight - h) > 1) grid.MaxHeight = h;
     }

@@ -208,7 +208,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         //  colour's; --settings-find <words>: Find a setting's list, as if typed)
         if (Launch.Take("uninstall", "settings-sheet") != null) Loaded += (_, _) => AskUninstall();
         else if (Launch.Take("customcolour", "settings-sheet") != null) Loaded += (_, _) => CustomColour(null);
-        if (Launch.Get("settings-find") is { Length: > 0 } words) Loaded += (_, _) => Dispatcher.BeginInvoke(() => { find.Focus(); find.Text = words; find.CaretIndex = words.Length; }, System.Windows.Threading.DispatcherPriority.Loaded);
+        // (the picture's list stays open while other copies of Simpl, started beside it, take the focus: StaysOpen in a
+        //  picture run only — a student's closes as Windows' own does, on a click elsewhere)
+        if (Launch.Get("settings-find") is { Length: > 0 } words) Loaded += (_, _) => Dispatcher.BeginInvoke(() => { findPopup.StaysOpen = true; find.Focus(); find.Text = words; find.CaretIndex = words.Length; }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnUpdates() => Dispatcher.BeginInvoke(() => { if (tab == "updates") Render(); });
@@ -726,8 +728,11 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             thumb.Bg(side ? B.Window : B.Card).Stroke(B.CardStroke);
             thumb.Child = Scenes.Backdrop(k, frost: false);
             thumb.Loaded += (_, _) => thumb.Clip = new RectangleGeometry(new Rect(0, 0, thumb.ActualWidth, thumb.ActualHeight), 3, 3);
-            var label = K.Text(name, Ty.Caption, B.Text2).Center();
-            label.TextTrimming = TextTrimming.CharacterEllipsis;
+            // (two lines for every name, so "Navigation pane" and "Graded this week" show whole and the cards stay one size)
+            var label = K.Wrapped(name, Ty.Caption, B.Text2, 2);
+            label.TextAlignment = TextAlignment.Center;
+            label.HorizontalAlignment = HorizontalAlignment.Stretch;
+            label.Height = 32;
             var b = K.CardButton(K.V(6, thumb, label), () => { photoSlot = k; Render(); }, 6, new Thickness(6, 6, 6, 6));
             b.Width = 104;
             b.Margin = new Thickness(0, 0, 6, 6);
@@ -924,7 +929,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             Title = "Custom colour",
             Width = 400,
             Body = K.V(14, spectrum, K.Columns("auto, 16, *, auto", sample.Col(0),
-                K.V(2, K.Text("Drag across for the hue, up and down for the shade.", Ty.Caption, B.Text2)).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(2),
+                K.V(2, K.Wrapped("Drag across for the hue, up and down for the shade.", Ty.Caption, B.Text2, 3)).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(2),
                 K.V(4, K.Text("Hex", Ty.Caption, B.Text2), code).Col(3))),
         };
         s.Add("Use colour", SheetButtonKind.Primary, () =>
