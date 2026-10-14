@@ -433,6 +433,9 @@ struct ToolHeader: View {
                 row(pages: false, pinWords: true)
                 row(pages: true, pinWords: true)
                 row(pages: true, pinWords: false)
+                // (and where even their symbols leave the name no room — "Cell Explo…", "Bio La…" — the pages under the
+                // name, in place of its line)
+                stacked
             }
         } else {
             // (1.3.62) the Periodic Table's header full of its own controls: its pin a symbol alone
@@ -440,28 +443,34 @@ struct ToolHeader: View {
         }
     }
 
+    /// Done (in the pin's sheet) or Back to the tiles.
+    @ViewBuilder
+    private var leading: some View {
+        if let done {
+            Button("Done", action: done)
+                .font(.sCallout.weight(.medium))
+                .glassButton()
+                .controlSize(.large)
+                .keyboardShortcut(.cancelAction)
+                .help("Close \(kind.name) (Escape)")
+        } else {
+            Button {
+                withAnimation(Motion.gentle) { tools.open = nil }
+            } label: {
+                Label("Tools", systemImage: "chevron.left")
+                    .font(.sCallout.weight(.medium))
+                    .padding(.horizontal, 4)
+            }
+            .glassButton()
+            .controlSize(.large)
+            .help("Back to all the tools")
+        }
+    }
+
     /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit).
     private func row(pages squished: Bool?, pinWords: Bool) -> some View {
         HStack(alignment: .center, spacing: 14) {
-            if let done {
-                Button("Done", action: done)
-                    .font(.sCallout.weight(.medium))
-                    .glassButton()
-                    .controlSize(.large)
-                    .keyboardShortcut(.cancelAction)
-                    .help("Close \(kind.name) (Escape)")
-            } else {
-                Button {
-                    withAnimation(Motion.gentle) { tools.open = nil }
-                } label: {
-                    Label("Tools", systemImage: "chevron.left")
-                        .font(.sCallout.weight(.medium))
-                        .padding(.horizontal, 4)
-                }
-                .glassButton()
-                .controlSize(.large)
-                .help("Back to all the tools")
-            }
+            leading
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(kind.name)
@@ -485,6 +494,35 @@ struct ToolHeader: View {
                 Label(tools.isPinned(kind) ? "Pinned" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.fill" : "pin")
                     .font(.sCallout.weight(.medium))
                     .labelStyle(SquishLabel(squished: !pinWords))
+            }
+            .glassButton(prominent: tools.isPinned(kind))
+            .tint(kind.color)
+            .controlSize(.large)
+            .help(tools.isPinned(kind) ? "In the toolbar on every screen. Press to take it out." : "Keep \(kind.name) in the toolbar on every screen")
+        }
+    }
+
+    /// (1.3.78) A biology tool's heading in a narrow window: its name whole, its pages' symbols under it, its pin a
+    /// symbol.
+    private var stacked: some View {
+        HStack(alignment: .center, spacing: 14) {
+            leading
+            IconTile(symbol: kind.symbol, color: kind.color, size: 44)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(kind.name)
+                    .font(.sTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .help(kind.note)
+                BioHeaderControls(kind: kind, squished: true)
+            }
+            Spacer(minLength: 12)
+            Button {
+                tools.togglePin(kind)
+            } label: {
+                Label(tools.isPinned(kind) ? "Pinned" : "Pin to Toolbar", systemImage: tools.isPinned(kind) ? "pin.fill" : "pin")
+                    .font(.sCallout.weight(.medium))
+                    .labelStyle(SquishLabel(squished: true))
             }
             .glassButton(prominent: tools.isPinned(kind))
             .tint(kind.color)
