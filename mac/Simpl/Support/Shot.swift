@@ -96,11 +96,18 @@ enum Shot {
         // the screen, and a copy another has covered draws nothing new — an animation under way in it (its screens
         // fading in as it opens) stopped where it was and was pictured so, faint or blank. In front, it finishes.
         if let w = target() {
+            // (what was in front of it and over it — the search field's suggestions — noted first, and brought back to
+            // the front after it: the window brought forward went over them, and they were left out of the picture)
+            lifted = above(w)
             NSApp.activate(ignoringOtherApps: true)
             w.orderFrontRegardless()
+            for s in lifted.reversed() { s.orderFrontRegardless() }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { capture(file) }
     }
+
+    /// (1.3.78) The windows that were in front of the one pictured, over it, when its picture was asked for.
+    nonisolated(unsafe) private static var lifted: [NSWindow] = []
 
     private static func capture(_ file: String, attempt: Int = 0) {
         guard let w = target(), let primary = NSScreen.screens.first else { return }
@@ -109,8 +116,8 @@ enum Shot {
         parts += NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.intersects(w.frame) }
         parts += NSApp.windows.filter { $0 is ToolFloatPanel && $0.isVisible } // (1.3.73: a quick panel pulled out, floating)
         // (1.3.78: the search field's suggestions, in front and over it — after the rest, so they are laid on top)
-        let front = above(w).reversed().filter { s in !parts.contains(where: { $0 === s }) }
-        parts += front
+        let over = lifted.reversed().filter { $0.isVisible && $0.frame.intersects(w.frame) } + above(w).reversed()
+        parts += over.filter { s in !parts.contains(where: { $0 === s }) }
         var seen = Set<Int>()
         parts = parts.filter { seen.insert($0.windowNumber).inserted }
         var rect = w.frame
