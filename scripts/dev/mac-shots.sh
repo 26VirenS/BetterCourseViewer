@@ -258,17 +258,17 @@ bio_full() {
   bio both 64c-popgen-drift 16 popgen simulate:n=10:p0=0.5:seed=7:reps=10:gens=100
   bio dark 64d-popgen-selection 16 popgen simulate:infinite:p0=0.5:preset=recessiveLethal:gens=50
   # the lab calculator's pages (statistics with its steps open), the enzyme's graphs, the energy pathways
-  bio light 65a-biolab-solutions 14 biolab solutions
-  bio light 65b-biolab-stats 14 biolab stats:steps
-  bio dark 65c-biolab-cells 14 biolab cells
-  bio light 65d-biolab-molecules 14 biolab molecules
-  bio light 66a-enzyme-competitive 14 enzyme competitive
-  bio dark 66b-enzyme-denatured 14 enzyme denatured
-  bio light 67a-energy-map 14 energy map:stage=calvin
-  bio dark 67b-energy-respire 14 energy map:respire
-  bio light 67c-energy-respiration 14 energy respiration:step=7
-  bio dark 67d-energy-photosynthesis 14 energy photosynthesis:step=6
-  bio light 67e-energy-atoms 14 energy atoms:trace=carbon:step=4
+  bio both 65a-biolab-solutions 14 biolab solutions
+  bio both 65b-biolab-stats 14 biolab stats:steps
+  bio both 65c-biolab-cells 14 biolab cells
+  bio both 65d-biolab-molecules 14 biolab molecules
+  bio both 66a-enzyme-competitive 14 enzyme competitive
+  bio both 66b-enzyme-denatured 14 enzyme denatured
+  bio both 67a-energy-map 14 energy map:stage=calvin
+  bio both 67b-energy-respire 14 energy map:respire
+  bio both 67c-energy-respiration 14 energy respiration:step=7
+  bio both 67d-energy-photosynthesis 14 energy photosynthesis:step=6
+  bio both 67e-energy-atoms 14 energy atoms:trace=carbon:step=4
   # the pins' quick versions: a codon looked up, a cross, Hardy–Weinberg, the lab's dilution and molarity
   MODE=light shoot light-54b-pin-gene 14 -SimplPinnedTools gene -SimplPinOpen gene -SimplPinCodon UGG
   MODE=light shoot light-54c-pin-cross 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen cross
