@@ -643,8 +643,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     ahead. These reads are quiet: the screenshot suite's pictures never wait for them.
   - *The Dashboard kept* (`DetailStack`): opened once, it stays — over the stack, out of sight and out of reach of the
     pointer while another screen shows — so its cards, their pictures and where it was scrolled are as they were when
-    the window comes back to it. It reads again only when it is shown and what it holds is stale or something was done
-    meanwhile, each card changing in place. Its title stays in the stack (`DashboardChrome`; its view and New Task are
+    the window comes back to it. It reads again only when it is shown and something was done meanwhile, each card
+    changing in place; (1.3.80) shown on what is older than a minute, it is checked live at once (Live checks, below).
+    Its title stays in the stack (`DashboardChrome`; its view and New Task are
     in its page, by the greeting). It and its
     parts act through the engine held as a plain value of the environment (`EngineLink`) rather than observe it, so,
     put away, the Dashboard is not drawn again each time the engine changes (a search typed, a count read).
@@ -680,6 +681,54 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   check's log line. What a course holds (its record, tabs, sections, people, groups, folders; modules, pages, files,
   quizzes, the front page and the syllabus already) is kept 10 minutes at most. Against the mock school only,
   `liveDevChange` (`done`, `grade`, `task`) changes the school behind the engine's back, for CI to see a check find it.
+
+- **Live checks (1.3.80).** A screen left open no longer shows what it was opened on until something is done: the
+  screen on show is checked against Canvas while the window is in front of the student, and only what changed is put
+  in place (Engine/LiveRefresh.swift; the plan, the fingerprint and the comparison in Engine/LivePlan.swift, checked
+  by scripts/dev/swift-checks).
+  - *When*: every minute; a course's or a group's pages (its home, modules, pages, files, assignments, discussions,
+    announcements, people, quizzes, syllabus, its grades, an assignment, a discussion) every ten minutes, as the engine
+    keeps their data ten minutes at most. Each screen says it is on show with `.liveChecks(…)` (a `Loader`'s screen
+    with `.liveChecks(model)`); `DetailStack` says which screen is on top (`\.liveOnShow`), the Dashboard kept over the
+    stack says so itself (`shown: active`). Two side by side (the Inbox's list and the conversation beside it) are each
+    checked. One check at a time in the whole app (the windows share one page); a check due while one is under way is
+    skipped; a check with no answer in two minutes is let go. After a check that did not work the next waits 2, 4, then
+    5 minutes (five times the interval at most), and one that works sets it back. A screen shown again — Back to it,
+    the Dashboard come back to — on what was read longer ago than its interval is checked at once; so is a window
+    brought back after longer than that.
+  - *Held back* (`LiveHolds`), and run as soon as it ends: the window minimized, covered or not in front, the app not
+    active, no network (`NWPathMonitor`), the page loading or a screen's own read under way; a quiz, an Alta or a
+    Macmillan assignment open; the student typing (a field being edited, or a key in the last 5 seconds); What-If on;
+    any sheet, dialog, popup (Hand In and Send from Phone among them; a tool's own popup aside, so a screen beside a tool
+    is still checked), menu or the tour; the mouse held down (a drag); a counter's panel or a row's preview open.
+    Something that comes up while a check is asked also keeps what it found from being put in place: it is checked
+    again as soon as that ends.
+  - *Only what changed*: a check asks each of the screen's reads again with the check's age as `maxAge` (60, or 600 for
+    a course's pages) and the fingerprint of the answer on screen as `known` (`Engine.liveAnswer`). The fingerprint of
+    every answer a screen reads is worked out as it arrives (`LiveFingerprint`, the page's own cyrb53 of the same JSON,
+    held with the answer in `AnswerMemo`), so even a screen's first check is answered "unchanged" with nothing to send,
+    decode or draw; a screen showing an answer kept from before compares the new one written out as JSON
+    (`LiveCompare`). Nothing new: nothing is touched, so nothing is drawn — no flicker, no scroll, no focus moved.
+    Something new: it is held and kept as a screen's read is, and the screen puts in place only the parts that changed,
+    in one transaction on the house's gentle spring (a short fade under Reduce Motion), its rows and cards drawn by
+    their ids so the rest stay as they are. The Dashboard checks each part apart — the day and its counters, Overdue's
+    and Graded's numbers, the cards and how much of each is handed in (in Cards), Coming up (List) or the activity
+    (Activity), the skyline — and only for the view on show: a counter's number rolls to its new count
+    (`.numericText`; simply the new number under Reduce Motion), a row a check adds or takes away fades in or out where
+    it is. Put away, the kept Dashboard is not checked. The sidebar's counts (`snapshot`) are checked beside every
+    screen. A check never sets a preference (To Do's grouping, Hide Completed are left out of its arguments) and never
+    checks a course's grades while scores are tried.
+  - *Said on the console*, one line a check, never a name or a title: `live: dashboard unchanged · 12 reads · 0
+    redraws`, `live: dashboard updated counters,day,list · 9 reads · 1 redraw`, `live: todo updated todo · 3 reads`,
+    `live: assignments unchanged · 2 reads` — the parts that changed, the reads it made of the school
+    (`BCVNative.stats`, page-wide) and, for the Dashboard, how many times it drew the page (`LiveTrace`). A check that did
+    not work: `live: <screen> not checked (<why>) · next in 120 s`; one found while something came up: `live: <screen>
+    found <parts>, held (<why>)`; in the screenshot suite and developer mode also `live: <screen> waits (<why>)` as a
+    hold begins.
+  - *For the screenshot suite*: `-SimplLiveEvery 5` checks every 5 seconds (a course's pages every 50, or
+    `-SimplLiveCourseEvery`), `-SimplLiveChange done:6` (`grade`, `task`) changes the mock school behind the engine's
+    back that many seconds after the first screen is shown (`live: dev change done made (assignment:1009)`), and
+    `-SimplLiveShotAfter 5` holds the picture until that many checks are done.
 
 - **Popups that never block the window (1.3.79).** Every popup but a quiz being taken stands over the window without
   getting in its way (`Shell/FloatingPopup.swift`): each is a window of its own over the main window (`PopupPanel`, a
@@ -867,6 +916,14 @@ errors and warnings and the built app go to the `mac-shots` branch. Nothing is s
 `SIMPLENC` mark, and no `login.bin` or `cookies.bin` may be found (the sign-in and the cookies are Keychain items: Data
 and encryption, above), or the run fails. Where each worker's vault keeps its key (`vault.key`'s mode) is printed:
 `keychain`, or `file` when the runner's Keychain would not take it.
+(1.3.80) Live checks are pictured last, one at a time (a check runs only while its app is in front) and against a mock
+of their own on :8810 (its changes never show in another picture): `light-48a-live-dashboard` (List; the soonest work
+marked done 6 seconds in), `light-48b-live-cards` (Cards; a course's total moved), `light-48c-live-todo` (a task added)
+and `light-48d-live-course` (a course's assignments at their own pace), each checked every 4 seconds and pictured after
+its fifth check (third for the course). `live_check` reads their consoles into `live-check.txt`, and the step "Live
+checks find what changed" fails the run on a FAIL line: each Dashboard check that found nothing new said `· 0 redraws`,
+the change was found and put in place as `counters` and `list` (`cards` in Cards, `todo` on To Do), the check after it
+found nothing new, the course's assignments were checked, and no check went unanswered.
 (1.3.78) Every screen's open is timed on the console — `[Simpl] open Grades: 14 ms (cached)`: from the press that
 opened it (a sidebar row, a link, Back) to the frame with its content, and where that content came from (`cached`, this
 session's answer in memory; `kept`, an answer kept from before, its counts held back until the `live` one is in;
