@@ -179,8 +179,8 @@ public static class MoreFromCanvas
     /// hand — listing what the extension's sheet lists: what it is under its title, then its rows (History's each with
     /// its kind's symbol in its course's colour, what it was and the course · kind · when under it), and under them
     /// Help's word on Report a problem. Read afresh each time it opens (Canvas's History changes as the student moves),
-    /// and shown once read, as the extension's sheet is, whole from its first frame (a popup's window does not follow its
-    /// card growing after it shows: a strip of bare window stays under it). A row opens where it leads — one of the
+    /// and shown once read, as the extension's sheet is: whole from its first frame, never growing and moving as its rows
+    /// come in. A row opens where it leads — one of the
     /// school's own pages as Simpl opens any (its own screen where it has one), another site in Simpl's browser window,
     /// the mark of a window of its own at its end — and the popup goes, as the extension's sheet does.
     /// </summary>

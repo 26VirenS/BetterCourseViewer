@@ -104,6 +104,10 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         Title = s.Title ?? s.Name ?? "Simpl";
         ShowInTaskbar = false;
         ResizeMode = ResizeMode.NoResize;
+        // (WPF-UI's window style holds a window to 460 × 320 at least: a popup shorter than that — History, Help — had a
+        //  strip of bare window under its card)
+        MinWidth = 0;
+        MinHeight = 0;
         WindowStartupLocation = WindowStartupLocation.Manual;
         WindowBackdropType = Appearance.Backdrop;
         ExtendsContentIntoTitleBar = true;

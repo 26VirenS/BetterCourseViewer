@@ -408,7 +408,11 @@ public sealed partial class AppShell : Grid, IDisposable
     private async void MoreAsked()
     {
         if (disposed || narrow || !MoreFromCanvas.Shown(more) || Launch.Take("more") is not { } asked) return;
-        await Task.Delay(400);
+        // (once the first screen is up and the pane has marked its row — which scrolls that row into sight —, as a
+        //  student's press comes after; the section can be read before the first screen shows)
+        for (var i = 0; i < 60 && current == null; i++) await Task.Delay(250);
+        await Task.Delay(1200);
+        if (disposed) return;
         navScroll.ScrollToEnd();
         if (asked.TrimStart(':') is { Length: > 0 } kind && more!.Items.FirstOrDefault(i => i.Kind == kind) is { } it) nav.Press("more:" + it.Id);
     }

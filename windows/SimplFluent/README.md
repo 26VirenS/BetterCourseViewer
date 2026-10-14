@@ -555,8 +555,8 @@ no picture of the one before it to move from: it arrives by its own entrance (th
   dark nav; Simpl never fetches another site's picture itself — the puzzle piece instead), and a tool or a link the
   mark of a window of its own: a tool opens Canvas's launch page for it in the window for tools (light, as every
   outside page is), a link the school's page or another site's in Simpl's browser window. History and Help open
-  popups listing the extension's sheets' rows (`moreHistory`, `moreHelp`, read afresh each time, the popup shown once
-  they are in: a popup's window does not follow its card growing after it shows): History's with
+  popups listing the extension's sheets' rows (`moreHistory`, `moreHelp`, read afresh each time, the popup shown whole
+  once they are in, as the extension's sheet is): History's with
   what each was in its course's colour, Help's with Report a problem's word at the foot; a row opens where it leads
   (the school's own as Simpl opens any, another site in Simpl's browser window) and the popup goes. No section when the
   school adds nothing; on Brightspace, *More from Brightspace* with the navbar's links Simpl does not show already.
@@ -742,7 +742,8 @@ Every popup floats over the window without holding it (`Shell/FloatPopup.cs`, a 
 its own owned by Simpl's window — kept above it, minimized and brought back with it, hidden with it in the notification
 area and shown again with it — so nothing takes the window's clicks: the pane, the title bar, the search and the page
 behind it go on working, and another place opened under a popup leaves it where it is. Nothing is dimmed; Windows' own
-shadow and rounded corners set it apart (pictures draw them, `Support/Shot.cs`). It opens centred over the page beside
+shadow and rounded corners set it apart (pictures draw them, `Support/Shot.cs`). Its window is as large as its card,
+however small (WPF-UI's least window size, 460 × 320, let go). It opens centred over the page beside
 the pane (`MainWindow.PopupRoom`); a large one (`Large`: a tool, Knewton Alta, Macmillan) is that page less a margin
 (24, 16 on a narrow page) and is resized with the window; it moves with the window, keeping where it was put, and its
 heading moves it (a press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).
