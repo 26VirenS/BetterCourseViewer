@@ -54,7 +54,9 @@ struct MacmillanScreen: View {
             IconTile(symbol: "books.vertical", color: .red, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.sTitle3).lineLimit(1)
-                Text(subtitle).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
+                if !subtitle.isEmpty {
+                    Text(subtitle).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
@@ -80,8 +82,10 @@ struct MacmillanScreen: View {
         return session.launch.title.isEmpty ? "Macmillan Learning" : session.launch.title
     }
 
+    /// "Macmillan Learning · Due Oct 12 at 11:59 PM" — never the publisher's name under itself, while the title is still
+    /// only that.
     private var subtitle: String {
-        ["Macmillan Learning", canvas?.dueLine ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+        [title == "Macmillan Learning" ? "" : "Macmillan Learning", canvas?.dueLine ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     private func saveCode() {

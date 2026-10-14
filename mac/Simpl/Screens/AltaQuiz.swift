@@ -3,10 +3,10 @@ import SwiftUI
 import WebKit
 
 /// (1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (QuizScreen): the assignment's
-/// name and when it is due across the top, Close at its right end (1.3.78); down the left, its objectives as the quiz's question tiles — the one being worked
-/// on filled, a mastered one ticked, the others filling as they are mastered — with each by name, and the total
-/// mastery bar. (1.3.45) In the rest, Alta's own page, as it is: the student works on it there. AltaSession.swift reads
-/// the objectives and their mastery from it.
+/// name and when it is due across the top, Close at its right end (1.3.78); down the left, its objectives as the quiz's
+/// question tiles — the one being worked on filled, a mastered one ticked, the others filling as they are mastered —
+/// with each by name, and the total mastery bar. (1.3.45) In the rest, Alta's own page, as it is: the student works on
+/// it there. AltaSession.swift reads the objectives and their mastery from it.
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
@@ -75,7 +75,7 @@ struct AltaQuizScreen: View {
         HStack(spacing: 14) {
             IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.report?.name ?? session.overview?.name ?? session.launch.title)
+                Text(session.report?.name ?? session.overview?.name ?? coverName ?? session.launch.title)
                     .font(.sTitle3)
                     .lineLimit(1)
                 Text(subtitle)
@@ -157,6 +157,12 @@ struct AltaQuizScreen: View {
         if let due = headerDue { parts.append(due) }
         if (session.report?.current.source ?? "").uppercased() == "PRACTICE" { parts.append("Practice") }
         return parts.joined(separator: " · ")
+    }
+
+    /// (1.3.78) The cover's name for the assignment: the bar's title on the start screen, which no longer says it again.
+    private var coverName: String? {
+        let n = (session.cover?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? nil : n
     }
 
     private var headerDue: String? {
