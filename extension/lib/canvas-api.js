@@ -182,11 +182,13 @@
   let REQUEST_TIMEOUT = 20000;
   let ttlScale = 1; // (a test makes the memo's answers lapse sooner: fluid-test.mjs)
   const tune = ({ requestTimeout, lifetimes } = {}) => { if (Number.isFinite(requestTimeout)) REQUEST_TIMEOUT = requestTimeout; if (Number.isFinite(lifetimes) && lifetimes > 0) ttlScale = lifetimes; };
+  let reads = 0; // (2.99.35) every GET asked of the school so far, page by page: what an app's live check cost (native-app.js stats)
 
   async function request(method, path, { params, body, all = false, maxPages = 10 } = {}) {
     // (a Brightspace page: the same request, answered by Brightspace in Canvas's shapes — lib/d2l-api.js)
     if (self.BCV?.d2l) {
       if (sessionLost) throw new CanvasError('Signed out of Brightspace', 401);
+      if (method === 'GET') reads += 1;
       return self.BCV.d2l.request(method, path, { params, body, all, maxPages });
     }
     let url = buildUrl(path, params);
@@ -207,6 +209,7 @@
       const ac = typeof AbortController === 'function' ? new AbortController() : null;
       slot.ac = ac;
       slot.at = ++order;
+      if (method === 'GET') reads += 1;
       const timer = ac ? setTimeout(() => ac.abort(), REQUEST_TIMEOUT) : null;
       try {
         // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
@@ -325,7 +328,10 @@
   // A write invalidates a key; a request for that key that was already running when the write
   // happened answers its caller but never lands in the memo (it would put the stale list back).
   // A caller that must not draw from an old answer (a score: a tool may have posted a grade since)
-  // asks with maxAge — an answer older than that is fetched again, whatever its TTL.
+  // asks with maxAge — an answer older than that is fetched again, whatever its TTL. (2.99.35) The
+  // apps' live checks ask so for every read of the screen on show (store.js); the age is the
+  // caller's own, so a caller without one still takes the memo's answer, and one already on its
+  // way when it asks counts as new (it is joined, not asked for twice).
   const memory = new Map(); // key → { value, at, until }
   const inflight = new Map();
   const generation = new Map();
@@ -472,6 +478,7 @@
   BCV.canvas = {
     get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, settled, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
     warming, budget: () => budget, keepWith, seed, revalidated, keptCount, // (2.99.33: reading ahead, and what is kept between page loads)
+    reads: () => reads, // (2.99.35)
     /** The session has ended (lib/d2l-api.js says so for Brightspace, whose answers do not come through here). */
     signedOut: loseSession,
   };

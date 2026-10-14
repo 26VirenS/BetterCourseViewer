@@ -662,6 +662,17 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     Under Reduce Motion every move is a cross-fade. No element is morphed from one screen into the next: the card and
     the course's heading are drawn by different screens, and a morph between them could not be kept clean.
 
+- **The engine's side of live checks (Simpl Courses 2.99.35).** A screen left open is checked against Canvas by asking
+  for its calls again with `maxAge` (seconds): every Canvas read the answer is made from that is older than that is read
+  again, and nothing younger is (`native-app.js` hands the age to each call, which passes it to every store read it
+  makes, so two calls under way at once keep their own ages). Who is signed in, the course colours and the school's
+  help links are not read again for it. With `known` (the `hash` of the answer on screen) a call answers
+  `{ unchanged: true, hash }` when nothing changed — nothing to decode or draw — else `{ unchanged: false, hash, value }`;
+  the same data always makes the same answer. `BCVNative.stats().reads` counts the Canvas reads the page has made, for a
+  check's log line. What a course holds (its record, tabs, sections, people, groups, folders; modules, pages, files,
+  quizzes, the front page and the syllabus already) is kept 10 minutes at most. Against the mock school only,
+  `liveDevChange` (`done`, `grade`, `task`) changes the school behind the engine's back, for CI to see a check find it.
+
 - **Popups that never block the window (1.3.79).** Every popup but a quiz being taken stands over the window without
   getting in its way (`Shell/FloatingPopup.swift`): each is a window of its own over the main window (`PopupPanel`, a
   child panel — above it, moving with it, key when clicked, never the main window), put up and closed by the window's

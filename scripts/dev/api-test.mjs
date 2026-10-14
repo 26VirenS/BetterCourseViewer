@@ -139,6 +139,43 @@ check(opened === 0 && finished.filter((u) => /memo11$/.test(u)).length === 1, 'a
   await first; await second;
 }
 
+// ---- a caller's own maxAge (2.99.35: the apps' live checks) -----------------------------------------
+// An answer older than the caller's maxAge is read again, whatever its lifetime; a caller without one
+// takes the memo's answer as before — also while a caller with one is waiting on Canvas for the same key.
+{
+  console.log('a caller\'s own maxAge');
+  const ask = (n, opts) => C.cached('aged', 60000, () => C.get(`/api/v1/aged?n=${n}`), opts);
+  const answer = async (re, body) => { await tick(); const p = pending.find((x) => re.test(x.url)); if (p) { pending.splice(pending.indexOf(p), 1); p.resolve(200, body); } return !!p; };
+  const reads = C.reads();
+  const one = ask(1);
+  await answer(/aged\?n=1/, '"one"');
+  check((await one) === 'one' && C.reads() === reads + 1, `the first ask reads Canvas and counts one read (reads ${C.reads() - reads})`);
+  await tick(30);
+  const plain = await ask(2);
+  check(plain === 'one' && !pending.some((x) => /aged/.test(x.url)), 'without maxAge an answer within its lifetime is the memo\'s: nothing read');
+  const fresh = await ask(3, { maxAge: 5000 });
+  check(fresh === 'one' && !pending.some((x) => /aged/.test(x.url)), 'with a maxAge longer than the answer\'s age: the memo\'s, nothing read');
+  // two at once: one with a maxAge the answer is older than, one without — the first reads Canvas, the second does not wait on it
+  const aged = ask(4, { maxAge: 10 });
+  const beside = ask(5);
+  let besideAt = null;
+  beside.then((v) => { besideAt = v; });
+  await tick();
+  const asked = pending.filter((x) => /aged/.test(x.url)).map(path);
+  check(asked.length === 1 && asked[0].endsWith('n=4') && besideAt === 'one', `with a maxAge it is older than it is read again, and a caller beside it without one takes the memo's answer at once (${asked.join(', ')}; beside: ${besideAt})`);
+  await answer(/aged\?n=4/, '"four"');
+  check((await aged) === 'four' && (await beside) === 'one', 'the one with the maxAge gets Canvas\'s new answer');
+  check((await ask(6)) === 'four' && !pending.some((x) => /aged/.test(x.url)), 'the memo holds the new answer for the next caller without a maxAge');
+  // an answer already on its way when a caller with a maxAge asks is joined, not asked for twice
+  await tick(30);
+  const a1 = ask(7, { maxAge: 10 });
+  const a2 = ask(8, { maxAge: 10 });
+  await tick();
+  const twice = pending.filter((x) => /aged/.test(x.url)).map(path);
+  await answer(/aged\?n=7/, '"seven"');
+  check(twice.length === 1 && (await a1) === 'seven' && (await a2) === 'seven', `two callers with a maxAge at once share one read (${twice.join(', ')})`);
+}
+
 // ---- the record CSV reader (extension/lib/record-csv.js) ------------------------------------------
 {
   console.log('the record CSV reader');

@@ -162,9 +162,10 @@
 
   // ---- the lists the sheets show (and the apps' popups: native-app.js moreHistory, moreHelp) --------------------------
   /** History: Canvas's own recently-visited list, as the History tray shows it — each visit's kind (Canvas's icon name
-   *  for it: "assignment", "quiz"…), title, course, category, time and address. A list Canvas refuses throws. */
-  async function historyList() {
-    const list = await store.history();
+   *  for it: "assignment", "quiz"…), title, course, category, time and address. A list Canvas refuses throws. `opts`: the
+   *  read's own (an app's live check passes its maxAge, store.js). */
+  async function historyList(opts = {}) {
+    const list = await store.history(opts);
     return {
       title: 'History',
       note: 'What you opened lately, as Canvas recorded it.',

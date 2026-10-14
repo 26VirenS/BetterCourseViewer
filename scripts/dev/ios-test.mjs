@@ -714,6 +714,105 @@ try {
   const ctxs = await nc('composeContexts');
   const sentMsg = await nc('sendMessage', { recipients: ['t101'], subject: 'A question', body: 'Is the midterm open book?', context: 'course_101' });
   check(ctxs.rows.length > 0 && sentMsg.ok && (await nc('sendMessage', { recipients: [], body: 'x' })).error === 'Choose who the message is to.', `a new message from the phone, to a course's teacher (and none without a recipient): ${JSON.stringify(sentMsg)}`);
+  // ---- (2.99.35) the apps' live checks: a call's own maxAge, and whether its answer is the one on screen ----
+  console.log('live checks (2.99.35)');
+  const mock = (path, body) => sp.evaluate(([p, b]) => fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, ''))), [path, body]);
+  const reads = () => sp.evaluate(() => self.BCVNative.stats().reads);
+  // a check that finds nothing new: the same answer is the same hash, nothing to decode, and nothing is read while what it
+  // is made from is younger than its age
+  const live0 = await nc('today', { maxAge: 30, known: '' });
+  const reads0 = await reads();
+  const live1 = await nc('today', { maxAge: 60, known: live0.hash });
+  const reads1 = await reads();
+  check(live0.unchanged === false && /^[0-9a-z]+-[0-9a-z]+$/.test(live0.hash || '') && live0.value?.counters?.length === 6 && live1.unchanged === true && live1.hash === live0.hash && !('value' in live1) && reads1 === reads0,
+    `a check that finds nothing new: { unchanged: true } with the same hash, no answer to decode, and no read of Canvas while what it is made from is younger than its age: ${JSON.stringify({ first: [live0.unchanged, live0.hash], again: live1, reads: reads1 - reads0 })}`);
+  check((await nc('nope', { known: '' })).error === 'No such call: nope' && (await nc('dashList', { maxAge: 60, known: '' })).value?.days?.length > 0, 'a call that fails is { error } with or without known; one that answers is in its envelope');
+  // every screen a check reads: the same data makes the same answer, call after call (so the same hash)
+  const SCREENS = [['snapshot'], ['todayCounts', { kept: false }], ['todaySheet', { key: 'next' }], ['dashCourses'], ['dashList'], ['dashActivity'], ['dashSkyline'], ['courses'], ['allCourses'], ['coursesProgress'], ['todo'], ['grades'], ['notifications'], ['calendar', { from: new Date(Date.now() - 7 * 864e5).toISOString(), to: new Date(Date.now() + 35 * 864e5).toISOString() }],
+    ['groups'], ['externalTools'], ['inbox'], ['home', { ctx: 'courses/101' }], ['announcements', { ctx: 'courses/101' }], ['discussions', { ctx: 'courses/101' }], ['modules', { ctx: 'courses/101' }], ['assignments', { ctx: 'courses/101' }],
+    ['pages', { ctx: 'courses/101' }], ['files', { ctx: 'courses/101' }], ['people', { ctx: 'courses/101' }], ['quizzes', { ctx: 'courses/101' }], ['syllabus', { ctx: 'courses/101' }], ['courseGrades', { id: '101' }], ['assignment', { course: '101', id: '1008' }], ['moreHistory']];
+  const flips = [];
+  for (const [name, args = {}] of SCREENS) {
+    const a = await nc(name, { ...args, maxAge: 600, known: '' });
+    const b = await nc(name, { ...args, maxAge: 600, known: a.hash });
+    if (a.error || !a.hash || b.unchanged !== true) flips.push({ name, a: a.error || a.hash, b: b.error || b.hash });
+  }
+  check(flips.length === 0, `every screen a check reads answers the same for the same data (${SCREENS.length} calls, each asked twice): ${JSON.stringify(flips)}`);
+  // a grade lands behind the engine's back (the mock's own route, not through the store): a call without an age answers
+  // from what it read; a call whose age that answer is older than reads Canvas again
+  const cs0 = await nc('courses', { maxAge: 30 });
+  const row0 = cs0.rows.find((r) => r.score !== null);
+  await mock('/__mock/score', { courseId: row0.id, courseScore: 71.3 });
+  await sp.waitForTimeout(1100);
+  const readsA = await reads();
+  const csPlain = await nc('courses');
+  const readsB = await reads();
+  const csAged = await nc('courses', { maxAge: 1 });
+  const readsC = await reads();
+  const scoreIn = (cs) => cs.rows?.find((r) => r.id === row0.id)?.scoreText;
+  check(scoreIn(csPlain) === row0.scoreText && readsB === readsA && scoreIn(csAged) === '71.3%' && readsC > readsB,
+    `without maxAge a call answers from what was read (no read); with one the answer is older than, it reads Canvas again and shows the new total: ${JSON.stringify({ before: row0.scoreText, plain: scoreIn(csPlain), aged: scoreIn(csAged), reads: [readsB - readsA, readsC - readsB] })}`);
+  // two calls at once with different ages keep their own: one with an age the course list is older than waits on Canvas
+  // (held 600 ms here), while a call beside it without one, and one whose age the list meets, answer from the memo at once
+  await mock('/__mock/score', { courseId: row0.id, courseScore: 72.4 });
+  await mock('/__mock/config', { apiDelay: { '^/api/v1/courses$': 600 } });
+  await sp.waitForTimeout(1100);
+  const both = await sp.evaluate(async () => {
+    const t0 = performance.now();
+    const at = (p) => p.then((v) => ({ v, ms: Math.round(performance.now() - t0) }));
+    const A = at(self.BCVNative.call('courses', { maxAge: 1 }));
+    await new Promise((r) => setTimeout(r, 60)); // (A is waiting on Canvas now)
+    const B = at(self.BCVNative.call('courses', {}));
+    const G = at(self.BCVNative.call('grades', { maxAge: 600 }));
+    return Promise.all([A, B, G]);
+  });
+  await mock('/__mock/config', { apiDelay: null });
+  const [inA, inB, inG] = both;
+  const gradeIn = (g) => g.rows?.find((r) => r.id === row0.id)?.pctText;
+  check(scoreIn(inA.v) === '72.4%' && inA.ms >= 550 && scoreIn(inB.v) === '71.3%' && inB.ms < 500 && gradeIn(inG.v) === '71.3%' && inG.ms < 500,
+    `interleaved calls with different ages do not leak: the one with the strict age reads Canvas again (and waits on it), the one beside it without an age and the one whose age the memo meets answer from it at once: ${JSON.stringify({ strict: [scoreIn(inA.v), inA.ms], none: [scoreIn(inB.v), inB.ms], grades: [gradeIn(inG.v), inG.ms] })}`);
+  // (2.99.35) the Grades overview shows a new total within a check: its course list read again with the age
+  await sp.waitForTimeout(1100);
+  check(gradeIn(await nc('grades', { maxAge: 1 })) === '72.4%', 'the Grades overview shows a new total on a check (its course list read again with the age)');
+  await mock('/__mock/score', { courseId: row0.id, courseScore: row0.score });
+  // the change the apps' CI makes between two checks (liveDevChange): written past the store, so only a check sees it
+  const t0 = await nc('today', { maxAge: 30, known: '' });
+  const done1 = await nc('liveDevChange', { what: 'done' });
+  const tPlain = await nc('today', { known: t0.hash });
+  await sp.waitForTimeout(1100);
+  const tLive = await nc('today', { maxAge: 1, known: t0.hash });
+  const key = done1.today ? 'today' : 'next';
+  const countOf = (t) => t.counters.find((c) => c.key === key).value;
+  check(done1.ok && tPlain.unchanged === true && tLive.unchanged === false && countOf(tLive.value) === countOf(t0.value) - 1 && (!done1.today || (t0.value.list.rows.some((r) => r.id === done1.id) && !tLive.value.list.rows.some((r) => r.id === done1.id))),
+    `a dev change marks the soonest work done behind the engine's back: unseen without an age, found by a check (its counter one less, its row gone): ${JSON.stringify({ change: done1, counter: [key, countOf(t0.value), countOf(tLive.value)], plain: tPlain.unchanged })}`);
+  await nc('complete', { id: done1.id, done: false });
+  const g0 = await nc('dashCourses', { maxAge: 30 });
+  const grade1 = await nc('liveDevChange', { what: 'grade' });
+  await sp.waitForTimeout(1100);
+  const g1 = await nc('dashCourses', { maxAge: 1 });
+  const cardOf = (d) => d.rows?.find((r) => r.id === grade1.id);
+  check(grade1.ok && cardOf(g1)?.score === grade1.to && cardOf(g0)?.score === grade1.from && g1.rows.filter((r) => r.id !== grade1.id).every((r) => JSON.stringify(r) === JSON.stringify(g0.rows.find((x) => x.id === r.id))),
+    `a dev change moves one course's total: a check finds that card changed and every other card the same: ${JSON.stringify({ change: grade1, card: [cardOf(g0)?.scoreText, cardOf(g1)?.scoreText] })}`);
+  await mock('/__mock/score', { courseId: grade1.id, courseScore: grade1.from });
+  const l0 = await nc('dashList', { maxAge: 30 });
+  const task1 = await nc('liveDevChange', { what: 'task' });
+  await sp.waitForTimeout(1100);
+  const l1 = await nc('dashList', { maxAge: 1 });
+  const rowsOf = (d) => d.days.flatMap((x) => x.rows);
+  check(task1.ok && rowsOf(l1).length === rowsOf(l0).length + 1 && rowsOf(l1).some((r) => r.id === task1.id && r.title === 'Live check task') && !rowsOf(l0).some((r) => r.id === task1.id),
+    `a dev change adds a task of your own for today: a check finds one row more on the List: ${JSON.stringify({ change: task1, rows: [rowsOf(l0).length, rowsOf(l1).length] })}`);
+  await nc('deleteTask', { id: task1.id });
+  // a topic left open: a check marks it read again only when something in it is unread
+  const puts = () => sp.evaluate(() => self.__puts || 0);
+  await sp.evaluate(() => { const put = self.BCV.canvas.put; self.__puts = 0; self.BCV.canvas.put = (p, ...a) => { if (/read_all$/.test(p)) self.__puts++; return put(p, ...a); }; });
+  await nc('topic', { ctx: 'courses/101', id: '7004' });
+  const opened7004 = await puts();
+  await nc('topic', { ctx: 'courses/101', id: '7004', maxAge: 60 });
+  const checked7004 = await puts();
+  await nc('topic', { ctx: 'courses/101', id: '7001', maxAge: 60 });
+  const checked7001 = await puts();
+  check(opened7004 === 1 && checked7004 === 1 && checked7001 === 2, `a topic opened is marked read; a check of it marks it read again only when Canvas says something in it is unread (7004 is read, 7001 not yet): ${JSON.stringify({ opened7004, checked7004, checked7001 })}`);
+  check((await nc('liveDevChange', { what: 'nothing' })).error === 'No such change: nothing', 'a dev change of no known kind is refused');
   // (1.2) no Tools on the iPhone yet: no row, no route, no command, no Convert on a file
   await sp.evaluate(() => self.BCV.lazy?.load?.('hub'));
   const toolsOff = await sp.evaluate(() => {

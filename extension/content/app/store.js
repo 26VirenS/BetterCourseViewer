@@ -9,6 +9,12 @@
   const IC = BCV.IC;
   const api = BCV.api;
   const MIN = 60e3;
+  // (2.99.35) Every read the apps' screens are built from takes `maxAge` (ms) beside force and refresh: an answer
+  // older than that is read from Canvas again, whatever its lifetime here, and the age goes on to the reads it is
+  // built from. The apps check the screen on show against Canvas once a minute with it (native-app.js call); without
+  // it nothing changes. Who is signed in (me), the course colours and the school's help links are not read again for
+  // it: the first two change only by the student's own hand here (which forgets them at once), the last hardly ever.
+  // What a course holds (its record, tabs, pages, files, people, groups…) is kept 10 minutes at most.
 
   /** Canvas's page ENV. Content scripts cannot see page globals, so it is
    *  parsed out of the inline <script> Canvas emits in the document head. */
@@ -183,10 +189,10 @@
    *  no other screen pays for the requests. */
   const DONE_MAX = 50;
   function doneCourses({ force = false, refresh = false, maxAge = 0 } = {}) {
-    return C.cached('courses:done', 30 * MIN, async () => {
+    return C.cached('courses:done', 10 * MIN, async () => {
       const [enrs, list] = await Promise.all([
         C.get('/api/v1/users/self/enrollments', { params: { per_page: 100, state: ['completed'] }, all: true, maxPages: 5 }).catch(() => []),
-        rawCourses().catch(() => []),
+        rawCourses({ maxAge }).catch(() => []),
       ]);
       const have = new Set((list || []).filter((c) => !c.access_restricted_by_date).map((c) => String(c.id)));
       const byCourse = new Map(); // course id → the enrollment that ended there
@@ -204,8 +210,8 @@
     }, { force, refresh, maxAge });
   }
 
-  function cards({ force = false, refresh = false } = {}) {
-    return C.cached('cards', 5 * MIN, () => C.get('/api/v1/dashboard/dashboard_cards'), { force, refresh });
+  function cards({ force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached('cards', 5 * MIN, () => C.get('/api/v1/dashboard/dashboard_cards'), { force, refresh, maxAge });
   }
 
   const now = () => new Date();
@@ -289,8 +295,8 @@
   }
 
   /** Favourite courses in dashboard order (falls back to all current courses). */
-  async function favorites({ force = false, refresh = false } = {}) {
-    const [all, cardList] = await Promise.all([courses({ force, refresh }), cards({ force, refresh }).catch(() => [])]);
+  async function favorites({ force = false, refresh = false, maxAge = 0 } = {}) {
+    const [all, cardList] = await Promise.all([courses({ force, refresh, maxAge }), cards({ force, refresh, maxAge }).catch(() => [])]);
     const byId = new Map(all.map((c) => [c.id, c]));
     const order = (cardList || []).map((k) => String(k.id));
     const favs = order.map((id) => byId.get(id)).filter(Boolean).map((c) => {
@@ -333,8 +339,8 @@
   }
 
   /** Term to show under the site name: the term shared by most favourite courses. */
-  async function currentTerm() {
-    const favs = await favorites().catch(() => []);
+  async function currentTerm({ maxAge = 0 } = {}) {
+    const favs = await favorites({ maxAge }).catch(() => []);
     const counts = new Map();
     for (const c of favs) if (c.term) counts.set(c.term, (counts.get(c.term) || 0) + 1);
     let best = '';
@@ -374,9 +380,9 @@
   function isoDays(n) {
     return U.addDays(U.startOfDay(now()), n).toISOString();
   }
-  function rawPlanner(days = 21, { force = false, refresh = false } = {}) {
+  function rawPlanner(days = 21, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`planner:${days}`, 1.5 * MIN, () => // (what is due changes under a tab left open: short-lived)
-      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-14), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force, refresh }); // (two weeks back: what is overdue, on To Do and in Notifications alike)
+      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-14), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force, refresh, maxAge }); // (two weeks back: what is overdue, on To Do and in Notifications alike)
   }
 
   /** Normalise a planner item: what it is, whether it is actually due, and its state. */
@@ -504,8 +510,8 @@
     return out;
   }
 
-  async function planner({ force = false, refresh = false, days = 21 } = {}) {
-    const [items, cs] = await Promise.all([rawPlanner(days, { force, refresh }), courses().catch(() => [])]);
+  async function planner({ force = false, refresh = false, days = 21, maxAge = 0 } = {}) {
+    const [items, cs] = await Promise.all([rawPlanner(days, { force, refresh, maxAge }), courses({ maxAge }).catch(() => [])]);
     const map = new Map(cs.map((c) => [c.id, c]));
     return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
   }
@@ -518,8 +524,8 @@
    *  those live under the course's context, which the first read never sees. A note the first read
    *  did not carry is shaped like a planner item, its override (done, dismissed) looked up in the
    *  student's own list of overrides. */
-  async function rawUserPlanner({ force = false, refresh = false } = {}) {
-    const u = await me();
+  async function rawUserPlanner({ force = false, refresh = false, maxAge = 0 } = {}) {
+    const u = await me(); // (for the user's id alone, which never changes: not read again for maxAge)
     return C.cached('planner:mine', 3 * MIN, async () => {
       const params = { start_date: isoDays(-90), end_date: isoDays(365), per_page: 100 };
       const [items, notes] = await Promise.all([
@@ -530,7 +536,7 @@
       const seen = new Set(out.filter((it) => it.plannable_type === 'planner_note').map((it) => String(it.plannable_id)));
       const extra = (Array.isArray(notes) ? notes : []).filter((n) => n && n.id !== undefined && n.id !== null && n.todo_date && n.workflow_state !== 'deleted' && !seen.has(String(n.id)));
       if (extra.length) {
-        const ovs = await plannerOverrides({ force }).catch(() => []);
+        const ovs = await plannerOverrides({ force, maxAge }).catch(() => []);
         const ovByNote = new Map((Array.isArray(ovs) ? ovs : []).filter((o) => o && o.plannable_type === 'planner_note').map((o) => [String(o.plannable_id), o]));
         for (const n of extra) {
           out.push({
@@ -542,14 +548,14 @@
         }
       }
       return out;
-    }, { force, refresh });
+    }, { force, refresh, maxAge });
   }
   /** Everything on the To Do list, including items already completed, submitted or dismissed
    *  (the screen decides what to show): course work from today through the next 7 days, and every
    *  task of the student's own whatever its date — a task is theirs until they tick it off or
    *  delete it, so one from yesterday or one for next month stays on the list. */
   async function todoWindow(opts = {}) {
-    const [items, mineRaw, cs] = await Promise.all([planner(opts), rawUserPlanner(opts).catch(() => []), courses().catch(() => [])]);
+    const [items, mineRaw, cs] = await Promise.all([planner(opts), rawUserPlanner(opts).catch(() => []), courses({ maxAge: opts.maxAge || 0 }).catch(() => [])]);
     const map = new Map(cs.map((c) => [c.id, c])); // (a task given a course wears that course: its name, its colour)
     const t = now();
     const start = U.startOfDay(t);
@@ -598,31 +604,31 @@
   /** Every planner override of the student's (marked complete, dismissed), whatever the item's date:
    *  what the Overdue card reads for late work, which comes from the course's assignments rather
    *  than the planner window and so carries no override of its own. */
-  async function plannerOverrides({ force = false } = {}) {
-    return C.cached('planner:overrides', 3 * MIN, () => C.get('/api/v1/planner/overrides', { params: { per_page: 100 }, all: true, maxPages: 5 }), { force });
+  async function plannerOverrides({ force = false, maxAge = 0 } = {}) {
+    return C.cached('planner:overrides', 3 * MIN, () => C.get('/api/v1/planner/overrides', { params: { per_page: 100 }, all: true, maxPages: 5 }), { force, maxAge });
   }
 
   // ---- activity + counts ------------------------------------------------------------------
-  function activity({ force = false, refresh = false } = {}) {
-    return C.cached('activity', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream', { params: { per_page: 40, only_active_courses: true } }), { force, refresh });
+  function activity({ force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached('activity', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream', { params: { per_page: 40, only_active_courses: true } }), { force, refresh, maxAge });
   }
-  function activitySummary({ force = false, refresh = false } = {}) {
-    return C.cached('activity:summary', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream/summary', { params: { only_active_courses: true } }), { force, refresh });
+  function activitySummary({ force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached('activity:summary', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream/summary', { params: { only_active_courses: true } }), { force, refresh, maxAge });
   }
   /** Announcements across the current courses (the Announcements API), newest
    *  first, each with its read state. Canvas refuses the whole request when one
    *  course is off-limits, so a refused chunk is retried one course at a time. */
   /** Canvas's own recently-visited list (what the History tray shows). */
-  function history({ force = false, refresh = false } = {}) {
-    return C.cached('history', 2 * MIN, () => C.get('/api/v1/users/self/history', { params: { per_page: 40 } }), { force, refresh });
+  function history({ force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached('history', 2 * MIN, () => C.get('/api/v1/users/self/history', { params: { per_page: 40 } }), { force, refresh, maxAge });
   }
   /** The account's help links (the Help tray reads the same list). */
   function helpLinks({ force = false, refresh = false } = {}) {
     return C.cached('helplinks', 60 * MIN, () => C.get('/help_links'), { force, refresh });
   }
-  function announcementsFeed({ force = false, refresh = false } = {}) {
+  function announcementsFeed({ force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached('annfeed', 3 * MIN, async () => {
-      const cs = (await courses()).filter((c) => c.state === 'current');
+      const cs = (await courses({ maxAge })).filter((c) => c.state === 'current');
       if (!cs.length) return [];
       const params = { start_date: isoDay(U.addDays(now(), -60)), end_date: isoDay(U.addDays(now(), 2)), active_only: true, per_page: 50 };
       const fetchCodes = (codes) => C.get('/api/v1/announcements', { params: { ...params, 'context_codes[]': codes }, all: true, maxPages: 3 });
@@ -646,7 +652,7 @@
         }
       }));
       return out.sort((a, b) => (U.parse(b.posted_at) || 0) - (U.parse(a.posted_at) || 0));
-    }, { force, refresh });
+    }, { force, refresh, maxAge });
   }
   // ---- notifications: what needs attention, from what Canvas already reports ----------------
   const NOTIF_STATE = 'notifState'; // { read: { id: true }, gone: { id: true } }, local: Canvas cannot mark these
@@ -671,13 +677,13 @@
    *  comment); Messages and Discussions from its unread Conversation and DiscussionTopic items (a
    *  new message, new replies); Announcements from the unread ones; System from Canvas's
    *  notification messages and the local grade snapshot. Each carries the URL Canvas gave it. */
-  async function notifications({ force = false, refresh = false } = {}) {
+  async function notifications({ force = false, refresh = false, maxAge = 0 } = {}) {
     const t = now();
     const [items, stream, anns, cs, snaps] = await Promise.all([
-      planner({ force, refresh }).catch(() => []),
-      activity({ force, refresh }).catch(() => []),
-      announcementsFeed({ force, refresh }).catch(() => []),
-      courses().catch(() => []),
+      planner({ force, refresh, maxAge }).catch(() => []),
+      activity({ force, refresh, maxAge }).catch(() => []),
+      announcementsFeed({ force, refresh, maxAge }).catch(() => []),
+      courses({ maxAge }).catch(() => []),
       pref('gpaSnapshots').catch(() => null),
     ]);
     const byId = new Map(cs.map((c) => [c.id, c]));
@@ -760,7 +766,7 @@
     await C.put(`/api/v1/users/self/colors/course_${courseId}`, { hexcode: hex });
     await C.invalidate('colors');
   }
-  function unreadCount({ force = false, refresh = false } = {}) {
+  function unreadCount({ force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached('unread', 2 * MIN, async () => {
       try {
         const r = await C.get('/api/v1/conversations/unread_count');
@@ -768,21 +774,21 @@
       } catch {
         return 0;
       }
-    }, { force, refresh });
+    }, { force, refresh, maxAge });
   }
 
   // ---- groups ---------------------------------------------------------------------------------
-  function groups({ force = false, refresh = false } = {}) {
+  function groups({ force = false, refresh = false, maxAge = 0 } = {}) {
     // the biggest pages Canvas gives: a student's groups run back through every course they took, and each page is a round trip of its own
-    return C.cached('groups', 15 * MIN, () => C.get('/api/v1/users/self/groups', { params: { per_page: 100, include: ['group_category'] }, all: true, maxPages: 3 }), { force, refresh });
+    return C.cached('groups', 15 * MIN, () => C.get('/api/v1/users/self/groups', { params: { per_page: 100, include: ['group_category'] }, all: true, maxPages: 3 }), { force, refresh, maxAge });
   }
 
   // ---- calendar -------------------------------------------------------------------------------
   /** Calendars Canvas has already refused on this page (a concluded course, a restricted section).
    *  Asking for them again only costs a round trip and gets the same answer. */
   const knownRefused = new Set();
-  async function calendarContexts() {
-    const [u, cs, gs] = await Promise.all([me(), courses(), groups().catch(() => [])]);
+  async function calendarContexts({ maxAge = 0 } = {}) {
+    const [u, cs, gs] = await Promise.all([me(), courses({ maxAge }), groups({ maxAge }).catch(() => [])]);
     const list = [{ code: `user_${u.id}`, name: u.name, color: '#0a84ff', kind: 'user' }];
     for (const c of cs) if (c.state !== 'past') list.push({ code: `course_${c.id}`, name: c.name, color: c.color, kind: 'course', courseId: c.id, favorite: !!c.favorite });
     for (const g of gs || []) list.push({ code: `group_${g.id}`, name: g.name, color: '#6b5f7a', kind: 'group' });
@@ -816,7 +822,7 @@
    *  off-limits (a concluded or restricted course), so a chunk that fails is
    *  retried one context at a time and the refused codes are reported back
    *  rather than blanking the calendar. Returns { events, refused }. */
-  function calendarEvents(start, end, codes, { force = false, refresh = false } = {}) {
+  function calendarEvents(start, end, codes, { force = false, refresh = false, maxAge = 0 } = {}) {
     const s = isoDay(start);
     const e = isoDay(U.addDays(U.startOfDay(end), 1));
     const key = `cal:${s.slice(0, 10)}:${e.slice(0, 10)}:${codes.join(',')}`;
@@ -871,7 +877,7 @@
         }
       }));
       return { events, refused };
-    }, { force, refresh });
+    }, { force, refresh, maxAge });
   }
   /** Planner items for any range: the calendar's stand-in when Canvas will
    *  not answer calendar_events at all (the dashboard reads the same API). */
@@ -961,11 +967,11 @@
   }
 
   // ---- course -------------------------------------------------------------------------------------
-  async function course(id, { force = false, refresh = false } = {}) {
-    const list = await courses({ force, refresh });
+  async function course(id, { force = false, refresh = false, maxAge = 0 } = {}) {
+    const list = await courses({ force, refresh, maxAge });
     const found = list.find((c) => c.id === String(id));
     if (found) return found;
-    const c = await C.cached(`course:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['term', 'teachers', 'total_scores', 'sections', 'course_image'] } }), { force, refresh });
+    const c = await C.cached(`course:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['term', 'teachers', 'total_scores', 'sections', 'course_image'] } }), { force, refresh, maxAge });
     const cols = await colors();
     const color = cols[`course_${id}`] || U.FALLBACK_COLORS[0];
     const enr = (c.enrollments || [])[0] || {};
@@ -977,11 +983,11 @@
     };
   }
   // `kind` is 'courses' or 'groups': the same endpoints exist under both.
-  function tabs(id, { force = false, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`tabs:${kind}:${id}`, 30 * MIN, () => C.get(`/api/v1/${kind}/${id}/tabs`), { force, refresh });
+  function tabs(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`tabs:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/tabs`), { force, refresh, maxAge });
   }
-  function frontPage(id, { force = false, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`front:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/front_page`).catch(() => null), { force, refresh });
+  function frontPage(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`front:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/front_page`).catch(() => null), { force, refresh, maxAge });
   }
   /** One group, shaped like a course so the course tab builders can draw it.
    *
@@ -990,9 +996,9 @@
    *  waited for it would sit blank for as long as the course list takes. So the course is folded in
    *  if the list is already here, and otherwise arrives on `withCourse`, which the screen can take
    *  up after it has drawn. */
-  async function group(id, { force = false, refresh = false } = {}) {
+  async function group(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     // (the members count comes with the group; the members themselves are the People tab's, not carried on every open)
-    const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category'] } }), { force, refresh });
+    const g = await C.cached(`group:${id}`, 10 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category'] } }), { force, refresh, maxAge });
     const shape = (course) => ({
       id: String(g.id), raw: g, name: g.name, originalName: g.name, nickname: null, code: g.name, term: course?.term || (g.context_type === 'Account' ? 'Account group' : ''), favorite: false,
       state: course?.state || 'current', role: 'Member', score: null, grade: null, teachers: [], sections: [], image: g.avatar_url || null, defaultView: 'feed', weighted: false,
@@ -1007,8 +1013,8 @@
     out.withCourse = here || !g.course_id ? Promise.resolve(null) : courses().catch(() => []).then((cs) => find(cs));
     return out;
   }
-  function syllabus(id, { force = false, refresh = false } = {}) {
-    return C.cached(`syllabus:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['syllabus_body'] } }).then((c) => c?.syllabus_body || ''), { force, refresh });
+  function syllabus(id, { force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached(`syllabus:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['syllabus_body'] } }).then((c) => c?.syllabus_body || ''), { force, refresh, maxAge });
   }
   function courseTodo(id, { force = false, refresh = false } = {}) {
     return C.cached(`ctodo:${id}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/todo`, { params: { per_page: 20 } }).catch(() => []), { force, refresh });
@@ -1034,10 +1040,10 @@
     return C.cached(`assignment:${id}:${aid}`, 5 * MIN, () =>
       C.get(`/api/v1/courses/${id}/assignments/${aid}`, { params: { include: ['submission', 'score_statistics', 'can_submit'] } }), { force, refresh, maxAge });
   }
-  function submission(id, aid, { force = false, refresh = false } = {}) {
+  function submission(id, aid, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`submission:${id}:${aid}`, 5 * MIN, () =>
       // submission_history carries per-question points for quiz attempts (the feedback screen reads it)
-      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force, refresh });
+      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force, refresh, maxAge });
   }
   function assignmentGroups(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`agroups:${id}`, 10 * MIN, async () => {
@@ -1242,7 +1248,7 @@
   /** Tools the instructor enabled for handing work in (Box, Office 365, …): Canvas draws one
    *  tab per tool with a homework_submission placement; the submit screen draws one row. */
   function homeworkTools(id, { force = false, refresh = false } = {}) {
-    return C.cached(`hwtools:${id}`, 30 * MIN, () =>
+    return C.cached(`hwtools:${id}`, 10 * MIN, () =>
       C.get(`/api/v1/courses/${id}/external_tools`, { params: { placement: 'homework_submission', include_parents: true, per_page: 50 }, all: true, maxPages: 2 }), { force, refresh });
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1337,10 +1343,10 @@
   }
 
   /** Submitted ÷ total assignments for the progress bars. */
-  async function progress(id) {
+  async function progress(id, { maxAge = 0 } = {}) {
     try {
       // what can be handed in and is not excused: paper, in-class and ungraded items would keep the bar from ever filling
-      const list = (await assignments(id) || []).filter((a) => a.published !== false && !a.submission?.excused && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t)));
+      const list = (await assignments(id, { maxAge }) || []).filter((a) => a.published !== false && !a.submission?.excused && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t)));
       const total = list.length;
       const done = list.filter((a) => ['submitted', 'graded', 'pending_review'].includes(a.submission?.workflow_state) && (a.submission?.submitted_at || a.submission?.workflow_state === 'graded')).length;
       return { done, total };
@@ -1348,19 +1354,19 @@
       return { done: 0, total: 0 };
     }
   }
-  function announcements(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+  function announcements(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
     return C.cached(`ann:${kind}:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50, include: ['sections'] }, all: true, maxPages: 2 }), { force, refresh }); // (sections: which sections a section-only post went to)
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50, include: ['sections'] }, all: true, maxPages: 2 }), { force, refresh, maxAge }); // (sections: which sections a section-only post went to)
   }
-  function discussions(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+  function discussions(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
     return C.cached(`disc:${kind}:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { per_page: 50, order_by: 'recent_activity', include: ['all_dates'] }, all: true, maxPages: 3 }), { force, refresh });
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { per_page: 50, order_by: 'recent_activity', include: ['all_dates'] }, all: true, maxPages: 3 }), { force, refresh, maxAge });
   }
-  function discussion(id, tid, { force = false, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`disc:${kind}:${id}:${tid}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}`, { params: { include: ['all_dates'] } }), { force, refresh });
+  function discussion(id, tid, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`disc:${kind}:${id}:${tid}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}`, { params: { include: ['all_dates'] } }), { force, refresh, maxAge });
   }
-  function discussionView(id, tid, { force = true, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force, refresh });
+  function discussionView(id, tid, { force = true, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force, refresh, maxAge });
   }
   async function postEntry(id, tid, message, parentId = null, { kind = 'courses' } = {}) {
     const r = parentId
@@ -1377,22 +1383,22 @@
       /* ignore */
     }
   }
-  function people(id, { force = false, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`people:${kind}:${id}`, 15 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/users`, { params: { per_page: 100, include: kind === 'groups' ? ['avatar_url'] : ['enrollments', 'avatar_url', 'pronouns'], sort: 'username' }, all: true, maxPages: 5 }), { force, refresh });
+  function people(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`people:${kind}:${id}`, 10 * MIN, () =>
+      C.get(`/api/v1/${kind}/${id}/users`, { params: { per_page: 100, include: kind === 'groups' ? ['avatar_url'] : ['enrollments', 'avatar_url', 'pronouns'], sort: 'username' }, all: true, maxPages: 5 }), { force, refresh, maxAge });
   }
-  function sections(id, { force = false, refresh = false } = {}) {
-    return C.cached(`sections:${id}`, 30 * MIN, () => C.get(`/api/v1/courses/${id}/sections`, { params: { per_page: 100 } }).catch(() => []), { force, refresh });
+  function sections(id, { force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached(`sections:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/sections`, { params: { per_page: 100 } }).catch(() => []), { force, refresh, maxAge });
   }
-  function courseGroups(id, { force = false, refresh = false } = {}) {
-    return C.cached(`cgroups:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}/groups`, { params: { per_page: 100, include: ['group_category'] } }).catch(() => []), { force, refresh });
+  function courseGroups(id, { force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached(`cgroups:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/groups`, { params: { per_page: 100, include: ['group_category'] } }).catch(() => []), { force, refresh, maxAge });
   }
-  function pages(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+  function pages(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
     return C.cached(`pages:${kind}:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/pages`, { params: { per_page: 100, sort: 'title', published: true }, all: true, maxPages: 3 }), { force, refresh });
+      C.get(`/api/v1/${kind}/${id}/pages`, { params: { per_page: 100, sort: 'title', published: true }, all: true, maxPages: 3 }), { force, refresh, maxAge });
   }
-  function page(id, slug, { force = false, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`page:${kind}:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/pages/${encodeURIComponent(slug)}`), { force, refresh });
+  function page(id, slug, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`page:${kind}:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/pages/${encodeURIComponent(slug)}`), { force, refresh, maxAge });
   }
   /** A course's files as one list, the most recently changed first (the search box's index, 2.98.65): as
    *  many as three pages of a hundred hold; past that the list is cut short and the search asks Canvas. */
@@ -1400,17 +1406,17 @@
   function courseFiles(id, { force = false, refresh = false } = {}) {
     return C.cached(`cfiles:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/files`, { params: { per_page: 100, sort: 'updated_at', order: 'desc' }, all: true, maxPages: COURSE_FILES_MAX / 100 }), { force, refresh });
   }
-  function rootFolder(id, { force = false, refresh = false, kind = 'courses' } = {}) {
-    return C.cached(`folder:root:${kind}:${id}`, 15 * MIN, () => C.get(`/api/v1/${kind}/${id}/folders/root`), { force, refresh });
+  function rootFolder(id, { force = false, refresh = false, kind = 'courses', maxAge = 0 } = {}) {
+    return C.cached(`folder:root:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/folders/root`), { force, refresh, maxAge });
   }
-  function folderContents(folderId, { force = false, refresh = false } = {}) {
+  function folderContents(folderId, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`folder:${folderId}`, 10 * MIN, async () => {
       const [folders, files] = await Promise.all([
         C.get(`/api/v1/folders/${folderId}/folders`, { params: { per_page: 100 }, all: true, maxPages: 2 }).catch(() => []),
         C.get(`/api/v1/folders/${folderId}/files`, { params: { per_page: 100, include: ['user'] }, all: true, maxPages: 3 }).catch(() => []),
       ]);
       return { folders: folders || [], files: files || [] };
-    }, { force, refresh });
+    }, { force, refresh, maxAge });
   }
   function folderByPath(id, path, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`folder:path:${kind}:${id}:${path}`, 10 * MIN, () =>
@@ -1419,8 +1425,8 @@
   function file(fileId, { force = false, refresh = false } = {}) {
     return C.cached(`file:${fileId}`, 10 * MIN, () => C.get(`/api/v1/files/${fileId}`), { force, refresh });
   }
-  function quizzes(id, { force = false, refresh = false } = {}) {
-    return C.cached(`quizzes:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes`, { params: { per_page: 100 }, all: true, maxPages: 3 }), { force, refresh });
+  function quizzes(id, { force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached(`quizzes:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes`, { params: { per_page: 100 }, all: true, maxPages: 3 }), { force, refresh, maxAge });
   }
   function quiz(id, qid, { force = false, refresh = false } = {}) {
     return C.cached(`quiz:${id}:${qid}`, 5 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes/${qid}`), { force, refresh });
@@ -1521,9 +1527,9 @@
     },
   };
 
-  function modules(id, { force = false, refresh = false } = {}) {
+  function modules(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`modules:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/modules`, { params: { per_page: 50, include: ['items', 'content_details'] }, all: true, maxPages: 4 }), { force, refresh });
+      C.get(`/api/v1/courses/${id}/modules`, { params: { per_page: 50, include: ['items', 'content_details'] }, all: true, maxPages: 4 }), { force, refresh, maxAge });
   }
   /** The module item an assignment (or page, quiz…) is, with its completion requirement. Canvas's
    *  own module_item_sequence first (what its page reads for "Mark as done"). Where that names no

@@ -85,6 +85,30 @@
   const TASK = '#5856d6';
   const GRAY = '#8e8e93';
 
+  // ---- live checks (2.99.35) ------------------------------------------------------------------------------------------
+  // The apps check the screen on show against Canvas while it stays open (once a minute; a course's pages every ten):
+  // they ask for its calls again with `maxAge` (seconds), and every Canvas read an answer is made from that is older than
+  // that is read again (store.js: each read takes the age and hands it on to the reads it is built from). call() gives
+  // each call its age as `age` — { maxAge } in milliseconds, or nothing — and the call passes it to every read it makes,
+  // so two calls under way at once keep their own: an age one asks for never makes another read again. The answers kept
+  // here between calls (Today's state, a course's grades, the Grades rows) say how new they are (`since`) and are made
+  // again for an age they do not meet. `known` (call) says whether an answer is the one on screen.
+  const NO_AGE = Object.freeze({});
+  /** A call's age from the app's `maxAge` (seconds; fractions allowed): { maxAge } in ms, or NO_AGE for none (0, absent). */
+  const ageOf = (s) => { const n = Number(s); return Number.isFinite(n) && n > 0 ? Object.freeze({ maxAge: Math.max(1, Math.round(n * 1000)) }) : NO_AGE; };
+  /** The time every read made with this age is newer than: now less the age, −∞ for none (anything will do). */
+  const sinceOf = (age) => (age?.maxAge > 0 ? Date.now() - age.maxAge : -Infinity);
+  /** The stricter of a freshness (ms, 0 for none) and a call's age. */
+  const tighter = (ms, age) => (age?.maxAge > 0 && !(ms > 0 && ms <= age.maxAge) ? age.maxAge : ms);
+  /** A short fingerprint of an answer's JSON (cyrb53, and its length): the same answer, the same fingerprint. */
+  function fingerprint(text) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < text.length; i++) { const ch = text.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return `${text.length.toString(36)}-${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}`;
+  }
+
   // ---- numbers, dates and names, written one way (the UI review, 2.99.33) ------------------------------------------
   // The Mac, Windows and the iPhone each used to format the figures in these answers themselves, and read the same one
   // three ways: 13/16 was 81.2 % on the Mac (rounding a tie to even) and 81.3 % on Windows, a term GPA of 3.425 read
@@ -153,8 +177,8 @@
    *  up from the figure shown (92.5 is 93; null without one) for a figure of whole percents. */
   const scoreFigures = (v) => { const has = v !== null && v !== undefined && Number.isFinite(Number(v)); return { scoreText: has ? pctFmt(v) : '–', scoreWhole: has ? wholeOf(v) : null }; };
   const byDate = (a, b) => a.date - b.date;
-  async function selection() {
-    const favs = await store.favorites().catch(() => []);
+  async function selection(age = NO_AGE) {
+    const favs = await store.favorites(age).catch(() => []);
     return { list: favs, ids: new Set(favs.map((c) => String(c.id))) };
   }
   const inSelection = (sel, it) => !!it.custom || !it.courseId || sel.ids.has(String(it.courseId));
@@ -173,8 +197,8 @@
   });
   const meOf = (me) => (me ? { name: me.name || '', email: me.email || me.loginId || '', pronouns: me.pronouns || '', initials: U.initials(me.name || '') || '', avatar: me.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? me.avatar : null } : null);
 
-  async function snapshot() {
-    const [me, notifs, unread, done] = await Promise.all([store.me().catch(() => null), store.notifUnread().catch(() => null), store.unreadCount().catch(() => null), setupDone()]);
+  async function snapshot({ age = NO_AGE } = {}) {
+    const [me, notifs, unread, done] = await Promise.all([store.me().catch(() => null), store.notifUnread(age).catch(() => null), store.unreadCount(age).catch(() => null), setupDone()]);
     // (Mac 1.3.8) the school's logo, as the web's sidebar finds it (app.js schoolLogo): a square mark, or a wide one on its colour
     const lg = (() => { try { return app()?.schoolLogo?.() || null; } catch { return null; } })();
     const logo = lg?.url ? { url: absUrl(lg.url), square: !!lg.square, bg: lg.bg || null } : null;
@@ -337,12 +361,28 @@
   }
 
   // Today: the six counters, the list for the day, the week's load per course — phone.js today()'s numbers
-  let todayState = null;
-  async function today() {
+  let todayState = null; // (the newest made: what Overdue, Graded and the counters' sheets read)
+  let todayRun = null; // (2.99.35) the newest under way: { since, done }, done its { state, answer }
+  async function today({ age = NO_AGE } = {}) {
+    const run = { since: sinceOf(age) };
+    run.done = makeToday(age, run.since);
+    todayRun = run;
+    return (await run.done).answer;
+  }
+  /** (2.99.35) Today's state, as new as the age asks: the last one made, or the one under way, when it was made with an age
+   *  at least as strict — else made again. Without an age, whatever there is (as before). */
+  async function stateFor(age) {
+    const need = sinceOf(age);
+    if (todayState && todayState.since >= need) return todayState;
+    if (todayRun && todayRun.since >= need) { try { return (await todayRun.done).state; } catch { /* made again below */ } }
+    await today({ age });
+    return todayState;
+  }
+  async function makeToday(age, since) {
     const now = new Date();
-    const selP = selection();
-    const freshP = selP.then((s) => Promise.all((s.list || []).map(async (c) => ({ c, list: await store.assignments(c.id) })))).catch(() => null);
-    const [planner, sel, feed, me, notifs, overrides, kept] = await Promise.all([store.planner().catch(() => null), selP, store.announcementsFeed().catch(() => null), store.me().catch(() => null), store.notifUnread().catch(() => null), store.plannerOverrides().catch(() => []), store.keptAssignments().catch(() => null)]);
+    const selP = selection(age);
+    const freshP = selP.then((s) => Promise.all((s.list || []).map(async (c) => ({ c, list: await store.assignments(c.id, age) })))).catch(() => null);
+    const [planner, sel, feed, me, notifs, overrides, kept] = await Promise.all([store.planner(age).catch(() => null), selP, store.announcementsFeed(age).catch(() => null), store.me().catch(() => null), store.notifUnread(age).catch(() => null), store.plannerOverrides(age).catch(() => []), store.keptAssignments().catch(() => null)]);
     keep(planner);
     const keptBy = kept ? sel.list.map((c) => ({ c, list: kept.get(String(c.id))?.list })) : [];
     const useKept = sel.list.length > 0 && keptBy.every((b) => Array.isArray(b.list));
@@ -364,7 +404,8 @@
     const readRecently = feed ? feed.filter((a) => a.read_state !== 'unread' && inSelFeed(a) && U.parse(a.posted_at) >= readSince).sort((x, y) => U.parse(y.posted_at) - U.parse(x.posted_at)) : [];
     const weekAll = live.filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0));
     const dayLine = (d) => `${U.DAYS_LONG[d.getDay()]}, ${U.MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
-    todayState = { W, Wf, now, todayStart, weekStart, dueToday, dueNext, dueTomorrow, unread, readRecently, dayLine, sel, counts: null };
+    const state = { W, Wf, now, todayStart, weekStart, dueToday, dueNext, dueTomorrow, unread, readRecently, dayLine, sel, counts: null, since };
+    todayState = state;
     const list = dueToday.length ? dueToday : upcoming.slice(0, 6);
     const latest = dueToday.length ? dueToday[dueToday.length - 1].date : null;
     const load = [];
@@ -382,7 +423,7 @@
       const pts = list.reduce((n, it) => n + (Number(it.points) || 0), 0);
       return pts > 0 ? `${store.fmtPts(pts)} ${pointsWord(pts)} total` : U.plural(list.length, 'item');
     };
-    return {
+    const answer = {
       dateLine: dayLine(now), me: meOf(me), notifUnread: notifs || 0,
       // (2.99.33) each counter in two wordings, so a name is never cut short and nothing it counts goes unsaid: `label`
       // and `note`, the short name and the line that says the rest ("Unread" with "announcements · 2 courses", "Graded" with
@@ -405,10 +446,11 @@
       },
       load, idle, hasCourses: sel.list.length > 0, loadCaption: 'Handed in this week',
     };
+    return { state, answer };
   }
   /** Overdue and Graded, which read every selected course's assignments: the copy kept from the last visit first (kept: true), then Canvas's answer. */
-  async function todayCounts({ kept = false } = {}) {
-    const st = todayState || (await today(), todayState);
+  async function todayCounts({ kept = false, age = NO_AGE } = {}) {
+    const st = await stateFor(age);
     const W = kept ? st.W : st.Wf;
     const [od, gr] = await Promise.all([W.overdueP, W.gradedP]);
     if (!od || !gr) return { overdue: null, graded: null };
@@ -475,8 +517,8 @@
     };
   };
   const section = (title, rows, quiet = false) => ({ title, quiet, rows: rows.map((i) => sheetRow(i, quiet)) });
-  async function todaySheet({ key } = {}) {
-    const st = todayState || (await today(), todayState);
+  async function todaySheet({ key, age = NO_AGE } = {}) {
+    const st = await stateFor(age);
     const { W, todayStart } = st;
     // (2.99.33) a day in a sheet's line as a date is written with its weekday ("Tue, Oct 13"): the panel's header line
     // fits on one line, where "Tuesday, October 13" wrapped it (the greeting keeps its long date)
@@ -497,7 +539,7 @@
       const recent = W.recentOf('Read recently', st.readRecently.map(annRow));
       return { title: 'Announcements', note: unreadLine(un, st.sel), empty: 'All caught up.', sections: [section(recent && un.length ? 'Unread' : '', un.map(annRow)), recent ? section(recent.label, recent.items, true) : null].filter((s) => s && s.rows.length) };
     }
-    if (!st.counts) await todayCounts({ kept: false }).catch(() => null);
+    if (!st.counts) await todayCounts({ kept: false, age }).catch(() => null);
     const c = st.counts;
     if (!c) return { title: key === 'overdue' ? 'Overdue' : 'Graded this week', note: `Could not be read from ${BCV.lms.name}.`, empty: 'Try again in a moment.', sections: [] };
     if (key === 'overdue') {
@@ -541,10 +583,10 @@
     return '';
   };
   /** The course cards: each chosen course with its score, what is due in it, its unread announcements, its quick links. */
-  async function dashCourses() {
+  async function dashCourses({ age = NO_AGE } = {}) {
     const now = new Date();
     const todayStart = U.startOfDay(now);
-    const [sel, planner, feed] = await Promise.all([selection(), store.planner().catch(() => null), store.announcementsFeed().catch(() => null)]);
+    const [sel, planner, feed] = await Promise.all([selection(age), store.planner(age).catch(() => null), store.announcementsFeed(age).catch(() => null)]);
     const open = (planner || []).filter((it) => it.isDue && !it.excused && !it.dismissed && !it.complete && !it.submitted && it.type !== 'announcement' && it.date);
     const unreadFor = (c) => (feed ? feed.filter((a) => a.read_state === 'unread' && String(a.context_code || '') === `course_${c.id}`).length : 0);
     const DEFAULT_LINKS = [['announcements', 'Announcements', 'announcements'], ['assignments', 'Assignments', 'assignments'], ['discussions', 'Discussions', 'discussion_topics'], ['files', 'Files', 'files']];
@@ -572,9 +614,9 @@
     };
   }
   /** The List: what is coming up (three weeks of the planner) by day, done work kept ticked unless it is asked to hide. */
-  async function dashList({ hideDone = null } = {}) {
+  async function dashList({ hideDone = null, age = NO_AGE } = {}) {
     if (hideDone !== null && hideDone !== undefined) await store.setPref('dashHideDone', !!hideDone);
-    const [planner, sel, hidePref] = await Promise.all([store.planner().catch(() => null), selection(), store.pref('dashHideDone', false).catch(() => false)]);
+    const [planner, sel, hidePref] = await Promise.all([store.planner(age).catch(() => null), selection(age), store.pref('dashHideDone', false).catch(() => false)]);
     if (!planner) return { error: 'Your planner could not be loaded.' };
     const now = new Date();
     const todayStart = U.startOfDay(now);
@@ -626,8 +668,8 @@
     if (comments.length) return comments.length === 1 ? 'Comment' : `${comments.length} comments`;
     return 'Submitted';
   };
-  async function dashActivity() {
-    const [stream, seen, feed, all] = await Promise.all([store.activity().catch(() => null), store.streamSeen().catch(() => new Set()), store.announcementsFeed().catch(() => null), store.courses().catch(() => [])]);
+  async function dashActivity({ age = NO_AGE } = {}) {
+    const [stream, seen, feed, all] = await Promise.all([store.activity(age).catch(() => null), store.streamSeen().catch(() => new Set()), store.announcementsFeed(age).catch(() => null), store.courses(age).catch(() => [])]);
     if (!Array.isArray(stream)) return { rows: [], empty: 'Recent activity could not be loaded.' };
     const byId = new Map((all || []).map((c) => [String(c.id), c]));
     const feedById = feed ? new Map(feed.map((a) => [String(a.id), a])) : null;
@@ -677,15 +719,15 @@
       return num ? `${name} ${num[0]}` : name;
     });
   }
-  async function dashSkyline({ kept = false } = {}) {
-    const [sel, ownPref, keptMap] = await Promise.all([selection(), store.pref('gradeWeights', {}).catch(() => ({})), kept ? store.keptAssignments().catch(() => null) : null]);
+  async function dashSkyline({ kept = false, age = NO_AGE } = {}) {
+    const [sel, ownPref, keptMap] = await Promise.all([selection(age), store.pref('gradeWeights', {}).catch(() => ({})), kept ? store.keptAssignments().catch(() => null) : null]);
     const own = ownPref && typeof ownPref === 'object' ? ownPref : {};
     const wmap = (o) => (o && typeof o === 'object' && Object.keys(o).length ? new Map(Object.entries(o).map(([g, w]) => [String(g), Number(w) || 0])) : null);
     const lists = kept
       ? sel.list.map((c) => ({ c, list: keptMap?.get(String(c.id))?.list || null, weights: wmap(own[c.id]) || (c.weighted ? wmap(keptMap?.get(String(c.id))?.weights) : null) }))
       : await Promise.all(sel.list.map(async (c) => {
         const mineW = wmap(own[c.id]);
-        const [list, groups] = await Promise.all([store.assignments(c.id).catch(() => null), !mineW && c.weighted ? store.assignmentGroups(c.id).catch(() => null) : null]);
+        const [list, groups] = await Promise.all([store.assignments(c.id, age).catch(() => null), !mineW && c.weighted ? store.assignmentGroups(c.id, age).catch(() => null) : null]);
         return { c, list: Array.isArray(list) ? list : null, weights: mineW || (Array.isArray(groups) ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null) };
       }));
     const names = skyNamesOf(sel.list);
@@ -717,8 +759,8 @@
   }
 
   // Courses: the selected courses, in their order, with the score and the unread announcements
-  async function courses() {
-    const [all, sel, term, feed] = await Promise.all([store.courses().catch(() => null), selection(), store.currentTerm().catch(() => ''), store.announcementsFeed().catch(() => null)]);
+  async function courses({ age = NO_AGE } = {}) {
+    const [all, sel, term, feed] = await Promise.all([store.courses(age).catch(() => null), selection(age), store.currentTerm(age).catch(() => ''), store.announcementsFeed(age).catch(() => null)]);
     if (!all) return { error: 'Your courses could not be loaded.' };
     const current = all.filter((c) => c.state === 'current');
     const list = sel.list;
@@ -733,8 +775,8 @@
   // (Mac 1.2.1) Courses, all of them, as the web's Courses screen has them: every course, in the sidebar or not —
   // current, past and to come. The ones in the sidebar (the setup's choice) come first, in their order, and say so
   // (`chosen`); the rest after, by name.
-  async function allCourses() {
-    const [all, sel, term, feed] = await Promise.all([store.courses({ past: true }).catch(() => null), selection(), store.currentTerm().catch(() => ''), store.announcementsFeed().catch(() => null)]);
+  async function allCourses({ age = NO_AGE } = {}) {
+    const [all, sel, term, feed] = await Promise.all([store.courses({ ...age, past: true }).catch(() => null), selection(age), store.currentTerm(age).catch(() => ''), store.announcementsFeed(age).catch(() => null)]);
     if (!all) return { error: 'Your courses could not be loaded.' };
     const unreadFor = (c) => (feed ? feed.filter((a) => a.read_state === 'unread' && String(a.context_code || '') === `course_${c.id}`).length : 0);
     const place = new Map(sel.list.map((c, i) => [String(c.id), i]));
@@ -776,10 +818,11 @@
   /** Each course's "done of total submitted", which reads its assignments (`all`: every current course, not only the
    *  sidebar's — the Mac's Courses screen, 1.2.1). */
   async function coursesProgress(args = {}) {
-    const sel = await selection();
-    const list = args.all ? ((await store.courses().catch(() => null)) || []).filter((c) => c.state === 'current') : sel.list;
+    const age = args.age || NO_AGE;
+    const sel = await selection(age);
+    const list = args.all ? ((await store.courses(age).catch(() => null)) || []).filter((c) => c.state === 'current') : sel.list;
     const out = {};
-    await Promise.all(list.map(async (c) => { try { const { done, total } = await store.progress(c.id); if (total) out[String(c.id)] = { done, total }; } catch { /* left off */ } }));
+    await Promise.all(list.map(async (c) => { try { const { done, total } = await store.progress(c.id, age); if (total) out[String(c.id)] = { done, total }; } catch { /* left off */ } }));
     return out;
   }
   async function setNickname({ id, name = '' } = {}) {
@@ -793,8 +836,8 @@
   // Due-date reminders (1.4.8): what is still to hand in over the next three weeks, for the phone to set its own
   // alerts with (Native/Reminders.swift) — course work with a due date (not pages or events), and the student's
   // own tasks, in the courses chosen, not handed in, done, dismissed or excused, not past. Soonest first.
-  async function reminders() {
-    const [items, list, sel] = await Promise.all([store.planner().catch(() => null), store.todoWindow().catch(() => []), selection()]);
+  async function reminders({ age = NO_AGE } = {}) {
+    const [items, list, sel] = await Promise.all([store.planner(age).catch(() => null), store.todoWindow(age).catch(() => []), selection(age)]);
     if (!items) return { error: 'Your planner could not be loaded.' };
     const now = Date.now();
     const seen = new Set();
@@ -817,15 +860,15 @@
   // student's own id (a comment of their own is not news). The check itself is the app's, not this page's.
   // (2.99.23) And which platform: Brightspace has no activity stream, so there the app reads each course's news and
   // released grades itself, at the API versions this page found the school's Brightspace answering (`lp`, `le`).
-  async function watchInfo() {
-    const [sel, me, v] = await Promise.all([selection(), store.me().catch(() => null), BCV.lms?.d2l ? BCV.d2l?.versions?.().catch(() => null) : null]);
+  async function watchInfo({ age = NO_AGE } = {}) {
+    const [sel, me, v] = await Promise.all([selection(age), store.me().catch(() => null), BCV.lms?.d2l ? BCV.d2l?.versions?.().catch(() => null) : null]);
     const out = { me: me?.id ? String(me.id) : null, courses: (sel.list || []).map((c) => ({ id: String(c.id), name: c.shortName || c.name || '' })), lms: BCV.lms?.kind || 'canvas' };
     if (v?.lp) out.lp = String(v.lp);
     if (v?.le) out.le = String(v.le);
     return out;
   }
 
-  async function todo({ group = null, showDone = null } = {}) {
+  async function todo({ group = null, showDone = null, age = NO_AGE } = {}) {
     if (group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
     if (showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
     let g = await store.pref('todoGroup', 'date');
@@ -834,7 +877,7 @@
     const [priPref, repPref] = await Promise.all([store.pref('todoPriority', {}), store.pref('todoRepeat', {})]);
     const pri = priPref && typeof priPref === 'object' ? priPref : {};
     const rep = repPref && typeof repPref === 'object' ? repPref : {};
-    const [list, sel] = await Promise.all([store.todoWindow().catch(() => null), selection()]);
+    const [list, sel] = await Promise.all([store.todoWindow(age).catch(() => null), selection(age)]);
     if (!list) return { error: 'Your planner could not be loaded.' };
     keep(list);
     const now = new Date();
@@ -928,10 +971,12 @@
   }
 
   // Grades: the term GPA on the 4.0 scale, each course's score, letter, categories and target — phone.js gpa()'s numbers
-  async function grades() {
+  async function grades({ age = NO_AGE } = {}) {
     const G = BCV.screens.gpa;
+    const since = sinceOf(age);
     await G.loadScales?.(); // (2.99.27) each course's own grading scale, where entered
-    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref, ownPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots'), store.pref('gradeWeights')]);
+    // (2.99.35) a live check's age goes to the course list too: its totals are what this screen shows
+    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref, ownPref] = await Promise.all([store.courses(age).catch(() => null), store.currentTerm(age).catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots'), store.pref('gradeWeights')]);
     if (!all) return { error: 'Your courses could not be loaded.' };
     const ownW = ownPref && typeof ownPref === 'object' ? ownPref : {};
     const ownFor = (c) => (ownW[c.id] && typeof ownW[c.id] === 'object' && Object.keys(ownW[c.id]).length ? ownW[c.id] : null);
@@ -942,7 +987,7 @@
     const goal = Number.isFinite(goalPref) ? goalPref : 4;
     const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
     const groups = new Map();
-    await Promise.all(list.map(async (c) => groups.set(c.id, await store.assignmentGroups(c.id).catch(() => null))));
+    await Promise.all(list.map(async (c) => groups.set(c.id, await store.assignmentGroups(c.id, age).catch(() => null))));
     const gm = new Map();
     const gmFor = (c) => { if (!gm.has(c.id)) gm.set(c.id, store.gradeModel(groups.get(c.id) || [], c, {}, false, false, [], { ownWeights: ownFor(c) })); return gm.get(c.id); };
     const rows = list.map((c) => {
@@ -970,6 +1015,7 @@
       };
     });
     gradesRows = rows; // (the course sheet's what-if term GPA reads these)
+    gradesSince = since;
     gradeCache.clear(); // (a fresh Grades screen: each course's sheet reads its groups again)
     const scoredRows = rows.filter((r) => r.points !== null);
     const { items: gi, counts } = G.gradedItems(list, gmFor);
@@ -1059,16 +1105,16 @@
   }
 
   // Calendar: the events of a span on the chosen calendars, one shape for every view
-  async function calendar({ from, to } = {}) {
+  async function calendar({ from, to, age = NO_AGE } = {}) {
     const now = new Date();
     const s = from ? new Date(from) : U.startOfDay(now);
     const e = to ? new Date(to) : U.addDays(s, 42);
-    const [contexts, plannerItems] = await Promise.all([store.calendarContexts().catch(() => []), store.planner().catch(() => [])]);
+    const [contexts, plannerItems] = await Promise.all([store.calendarContexts(age).catch(() => []), store.planner(age).catch(() => [])]);
     const submittedIds = new Set((plannerItems || []).filter((it) => it.submitted).map((it) => `${it.type}:${it.raw?.plannable_id}`));
     const chosen = await store.selectedContexts(contexts);
     const ctxMap = new Map(contexts.map((c) => [c.code, c]));
     let res;
-    try { res = await store.calendarEvents(s, e, chosen); } catch (err) { return { error: `Calendar events could not be loaded: ${err.message}`, events: [], calendars: calsOf(contexts, chosen) }; }
+    try { res = await store.calendarEvents(s, e, chosen, age); } catch (err) { return { error: `Calendar events could not be loaded: ${err.message}`, events: [], calendars: calsOf(contexts, chosen) }; }
     const out = [];
     for (const ev of Array.isArray(res) ? res : (res.events || [])) {
       const cc = ctxMap.get(ev.context_code) || null;
@@ -1093,7 +1139,9 @@
         color: cc?.color || GRAY, url: ev.html_url || a?.html_url || null,
       });
     }
-    out.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+    // (2.99.35) events at the same time by their id: Canvas's answers for several calendars arrive in any order, and the same
+    // events are always the same answer (a live check compares them)
+    out.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
     return { events: out, calendars: calsOf(contexts, chosen), notice: chosen.length ? '' : 'No calendars are selected. Turn one on under Calendars.' };
   }
   function calsOf(contexts, chosen) {
@@ -1115,9 +1163,9 @@
   const NF = { overdue: 'Overdue', soon: 'Due soon', graded: 'Graded', feedback: 'Feedback', message: 'Messages', discuss: 'Discussions', announce: 'News', system: 'System' };
   const NF_ORDER = Object.keys(NF);
   let nfFeed = null;
-  async function notifications({ force = false } = {}) {
+  async function notifications({ force = false, age = NO_AGE } = {}) {
     let feed, state, sel;
-    try { [feed, state, sel] = await Promise.all([store.notifications({ force }), store.notifState(), selection()]); } catch { return { error: 'Notifications could not be loaded.' }; }
+    try { [feed, state, sel] = await Promise.all([store.notifications({ force, ...age }), store.notifState(), selection(age)]); } catch { return { error: 'Notifications could not be loaded.' }; }
     nfFeed = (feed || []).filter((n) => { const cid = n.courseId ?? n.course_id; return !cid || sel.ids.has(String(cid)); });
     const live = nfFeed.filter((n) => !state.gone[n.id]);
     // (2.99.33) work due tomorrow under "Tomorrow", as To Do and the Dashboard say it, not under its date
@@ -1248,10 +1296,11 @@
   // Each is read through the same store calls the web screens make (the same caches, the same rules), and
   // handed over as plain rows; Canvas's own rich text (an announcement, instructions, a page) goes as HTML
   // cleaned here — no scripts, no handlers, every address made whole — for the app's text view.
-  const ctxOf = (ctx) => {
+  // (2.99.35) `age`: a live check's (call), on every read made for it — `opts` carries it with the kind
+  const ctxOf = (ctx, age = NO_AGE) => {
     const m = /^(courses|groups)\/(\d+)$/.exec(String(ctx || ''));
     if (!m) throw new Error('That course or group could not be found.');
-    return { kind: m[1], id: m[2], base: `/${m[1]}/${m[2]}`, opts: { kind: m[1] } };
+    return { kind: m[1], id: m[2], base: `/${m[1]}/${m[2]}`, opts: { ...age, kind: m[1] }, age };
   };
   const absUrl = (u) => { try { return u ? new URL(u, location.origin).href : null; } catch { return null; } };
   const local = (u) => { try { const x = new URL(u, location.origin); return x.origin === location.origin ? x.pathname + x.search + x.hash : x.href; } catch { return u || null; } };
@@ -1413,10 +1462,10 @@
   /** A course's or a group's name, colour and short line. */
   async function contextInfo(c) {
     if (c.kind === 'groups') {
-      const g = await store.group(c.id);
+      const g = await store.group(c.id, c.age);
       return { name: g?.name || 'Group', title: g?.name || 'Group', color: g?.color || GRAY, sub: [g?.course?.name || g?.course?.shortName || '', g?.membersCount ? U.plural(g.membersCount, 'member') : ''].filter(Boolean).join(' · '), raw: g };
     }
-    const [course, favs] = await Promise.all([store.course(c.id), store.favorites().catch(() => [])]);
+    const [course, favs] = await Promise.all([store.course(c.id, c.age), store.favorites(c.age).catch(() => [])]);
     const fav = (favs || []).find((f) => String(f.id) === String(c.id));
     const title = fav?.shortName || course?.nickname || course?.code || course?.name || 'Course';
     // (2.99.33) the line under the title: the course's other name only when it says something new, then its term
@@ -1441,8 +1490,8 @@
   }
 
   /** A course's home (or a group's): its name and colour, its sections, open work, the latest announcements, its front page. */
-  async function home({ ctx } = {}) {
-    const c = ctxOf(ctx);
+  async function home({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, secs, anns] = await Promise.all([contextInfo(c), sectionsOf(c), store.announcements(c.id, c.opts).catch(() => null)]);
     const latest = (anns || []).slice(0, 3).map((a) => annRow(a, c));
     if (c.kind === 'groups') {
@@ -1450,12 +1499,12 @@
       return { ctx, kind: 'groups', title: info.title, name: info.name, sub: info.sub, color: info.color, sections: secs.sections, more: secs.more, open: [], done: [], announcements: latest, html: clean(info.raw?.description || ''), front: fp ? { title: fp.title || 'Front page', excerpt: textOf(fp.body, 220), slug: fp.url || '' } : null };
     }
     const course = info.raw || {};
-    const list = await store.assignments(c.id).catch(() => null);
+    const list = await store.assignments(c.id, age).catch(() => null);
     const pub = (list || []).filter((a) => a.published !== false);
     const open = pub.filter((a) => !submittedA(a) && !a.submission?.excused && !ungradable(a) && !(a.locked_for_user && !a.due_at)).sort((x, y) => (U.parse(x.due_at)?.getTime() || Infinity) - (U.parse(y.due_at)?.getTime() || Infinity));
     const done = pub.filter(submittedA).sort((x, y) => (U.parse(y.submission?.submitted_at)?.getTime() || 0) - (U.parse(x.submission?.submitted_at)?.getTime() || 0)).slice(0, 5);
     const wantsFront = !course.defaultView || ['wiki', 'syllabus'].includes(course.defaultView);
-    const fp = wantsFront && course.defaultView !== 'syllabus' ? await store.frontPage(c.id).catch(() => null) : null;
+    const fp = wantsFront && course.defaultView !== 'syllabus' ? await store.frontPage(c.id, c.opts).catch(() => null) : null;
     return {
       ctx, kind: 'courses', title: info.title, name: info.name, sub: info.sub, color: info.color,
       teachers: (course.teachers || []).slice(0, 3).join(', '),
@@ -1470,13 +1519,13 @@
     const who = authorOf(a);
     return { id: String(a.id), title: a.title || 'Announcement', author: who.name, forum: who.forum, avatar: who.avatar, when: whenText(a.delayed_post_at || a.posted_at), preview: textOf(a.message, 180), unread: a.read_state === 'unread' || (a.unread_count || 0) > 0, replies: a.discussion_subentry_count || 0, url: `${c.base}/discussion_topics/${a.id}` };
   }
-  async function announcements({ ctx } = {}) {
-    const c = ctxOf(ctx);
+  async function announcements({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, list] = await Promise.all([contextInfo(c), store.announcements(c.id, c.opts)]);
     return { title: 'Announcements', context: info.title, color: info.color, rows: (list || []).map((a) => annRow(a, c)), empty: 'No announcements yet.' };
   }
-  async function discussions({ ctx } = {}) {
-    const c = ctxOf(ctx);
+  async function discussions({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, list] = await Promise.all([contextInfo(c), store.discussions(c.id, c.opts)]);
     const last = (t) => Math.max(U.parse(t.last_reply_at)?.getTime() || 0, U.parse(t.posted_at)?.getTime() || 0, U.parse(t.created_at)?.getTime() || 0);
     const sorted = [...(list || [])].sort((x, y) => last(y) - last(x));
@@ -1493,11 +1542,13 @@
     return { title: 'Discussions', context: info.title, color: info.color, sections, empty: 'No discussions yet.' };
   }
   /** One discussion or announcement: the topic and every reply in order, threaded by depth; read once opened. */
-  async function topic({ ctx, id } = {}) {
-    const c = ctxOf(ctx);
+  async function topic({ ctx, id, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, t, view] = await Promise.all([contextInfo(c), store.discussion(c.id, id, c.opts), store.discussionView(c.id, id, c.opts).catch(() => null)]);
     if (!t) throw new Error('This discussion could not be loaded.');
-    store.markTopicRead(c.id, id, c.opts).then(() => app()?.refreshCounts?.()).catch(() => {});
+    // (2.99.35) read once opened; a live check of it marks it read again only when something in it is unread (a reply
+    // that came while it was open), so a topic left open is not written to Canvas once a minute
+    if (!age.maxAge || t.read_state === 'unread' || (t.unread_count || 0) > 0) store.markTopicRead(c.id, id, c.opts).then(() => app()?.refreshCounts?.()).catch(() => {});
     const people = new Map((view?.participants || []).map((p) => [String(p.id), p]));
     const entries = [];
     const walk = (list, depth, parent) => {
@@ -1552,9 +1603,9 @@
       default: return null;
     }
   }
-  async function modules({ ctx } = {}) {
-    const c = ctxOf(ctx);
-    const [info, mods] = await Promise.all([contextInfo(c), store.modules(c.id)]);
+  async function modules({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
+    const [info, mods] = await Promise.all([contextInfo(c), store.modules(c.id, age)]);
     const byId = new Map((mods || []).map((m) => [String(m.id), m]));
     return {
       title: BCV.lms?.d2l ? 'Content' : 'Modules', context: info.title, color: info.color, empty: BCV.lms?.d2l ? 'No content in this course.' : 'No modules in this course.', // (Brightspace's own name, as the course's sections say it)
@@ -1587,9 +1638,9 @@
   }
 
   // Assignments
-  async function assignments({ ctx } = {}) {
-    const c = ctxOf(ctx);
-    const [info, list] = await Promise.all([contextInfo(c), store.assignments(c.id)]);
+  async function assignments({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
+    const [info, list] = await Promise.all([contextInfo(c), store.assignments(c.id, age)]);
     const now = new Date();
     const pub = (list || []).filter((a) => a.published !== false);
     const graded = (a) => { const s = a.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && s.posted_at !== null; };
@@ -1603,9 +1654,9 @@
   }
   const NATIVE_TYPES = ['online_text_entry', 'online_url', 'online_upload'];
   /** One assignment: its facts, instructions, where your work stands, the grade and feedback, and whether (and how) it can be handed in here. */
-  async function assignment({ course, id } = {}) {
+  async function assignment({ course, id, age = NO_AGE } = {}) {
     const cid = String(course), aid = String(id);
-    const [info, a, s] = await Promise.all([contextInfo(ctxOf(`courses/${cid}`)), store.assignment(cid, aid), store.submission(cid, aid, { force: true }).catch(() => null)]);
+    const [info, a, s] = await Promise.all([contextInfo(ctxOf(`courses/${cid}`, age)), store.assignment(cid, aid, age), store.submission(cid, aid, { force: true }).catch(() => null)]);
     if (!a) throw new Error('This assignment could not be loaded.');
     const sub = s || a.submission || {};
     const types = a.submission_types || [];
@@ -1749,8 +1800,8 @@
   }
 
   // Pages, files, people, quizzes, the syllabus
-  async function pages({ ctx } = {}) {
-    const c = ctxOf(ctx);
+  async function pages({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, list] = await Promise.all([contextInfo(c), store.pages(c.id, c.opts)]);
     const sorted = [...(list || [])].sort((x, y) => Number(!!y.front_page) - Number(!!x.front_page));
     return { title: 'Pages', context: info.title, color: info.color, rows: sorted.map((p) => ({ slug: p.url, title: p.title || 'Page', sub: [p.front_page ? 'Front page' : '', p.updated_at ? `Edited ${recentText(p.updated_at)}` : ''].filter(Boolean).join(' · ') })), empty: 'No pages yet.' };
@@ -1764,8 +1815,8 @@
     const one = (x) => (x && x.href ? { name: x.name || 'Untitled', url: x.href } : null);
     return { prev: one(n?.prev), next: one(n?.next) };
   }
-  async function page({ ctx, slug = '' } = {}) {
-    const c = ctxOf(ctx);
+  async function page({ ctx, slug = '', age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, p] = await Promise.all([contextInfo(c), slug ? store.page(c.id, slug, c.opts) : store.frontPage(c.id, c.opts)]);
     if (!p) throw new Error(slug ? 'This page could not be loaded.' : 'There is no front page.');
     const locked = !!p.locked_for_user;
@@ -1777,12 +1828,12 @@
   const MIME_CLASS = { pdf: 'PDF', image: 'Image', video: 'Video', audio: 'Audio', xls: 'Spreadsheet', ppt: 'Slides', doc: 'Document', zip: 'Archive', html: 'Web page', text: 'Text' };
   const fileType = (x) => { const m = String(x?.['content-type'] || '').toLowerCase(); const hit = m && FILE_TYPES.find(([re]) => re.test(m)); return hit ? hit[1] : MIME_CLASS[String(x?.mime_class || '').toLowerCase()] || 'File'; };
   const sizeText = (n) => (!Number.isFinite(Number(n)) ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${roundHalfUp(n / 1024, 0)} KB` : `${roundHalfUp(n / 1048576, 1).toFixed(1)} MB`);
-  async function files({ ctx, folder = null } = {}) {
-    const c = ctxOf(ctx);
+  async function files({ ctx, folder = null, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const info = await contextInfo(c);
     const f = folder ? { id: folder } : await store.rootFolder(c.id, c.opts);
     if (!f?.id) throw new Error('Files are not available here.');
-    const box = await store.folderContents(f.id);
+    const box = await store.folderContents(f.id, age);
     const byName = (x, y) => String(x.name || x.display_name).localeCompare(String(y.name || y.display_name), undefined, { numeric: true });
     return {
       title: 'Files', context: info.title, color: info.color, empty: 'This folder is empty.',
@@ -1791,8 +1842,8 @@
     };
   }
   const ROLE = { TeacherEnrollment: 'Teacher', TaEnrollment: 'TA', StudentEnrollment: 'Student', ObserverEnrollment: 'Observer', DesignerEnrollment: 'Designer' };
-  async function people({ ctx } = {}) {
-    const c = ctxOf(ctx);
+  async function people({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
     const [info, list] = await Promise.all([contextInfo(c), store.people(c.id, c.opts)]);
     const roleOf = (p) => { if (c.kind === 'groups') return 'Member'; const e = (p.enrollments || [])[0] || {}; return e.role && !/Enrollment$/.test(e.role) ? e.role : ROLE[e.type || e.role] || 'Student'; };
     const order = ['Teacher', 'TA', 'Designer', 'Student', 'Observer', 'Member'];
@@ -1801,9 +1852,9 @@
     const sections = [...groups.entries()].sort((x, y) => (order.indexOf(x[0]) + 1 || 99) - (order.indexOf(y[0]) + 1 || 99)).map(([title, rows]) => ({ title: title === 'Member' ? 'Members' : `${title}${rows.length === 1 ? '' : title.endsWith('s') ? '' : 's'}`, rows }));
     return { title: BCV.lms?.d2l && c.kind === 'courses' ? 'Classlist' : 'People', context: info.title, color: info.color, sections, empty: 'Nobody to show.' };
   }
-  async function quizzes({ ctx } = {}) {
-    const c = ctxOf(ctx);
-    const [info, list, as] = await Promise.all([contextInfo(c), store.quizzes(c.id).catch(() => []), store.assignments(c.id).catch(() => [])]);
+  async function quizzes({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
+    const [info, list, as] = await Promise.all([contextInfo(c), store.quizzes(c.id, age).catch(() => []), store.assignments(c.id, age).catch(() => [])]);
     const rows = (list || []).filter((q) => q.published !== false).map((q) => {
       const a = (as || []).find((x) => String(x.id) === String(q.assignment_id) || (x.is_quiz_assignment && String(x.quiz_id) === String(q.id)));
       return { id: String(q.id), title: q.title || 'Quiz', sub: [ptsOf(q.points_possible), dueText(q.due_at), q.time_limit ? `${q.time_limit} min` : '', q.allowed_attempts > 1 ? `${q.allowed_attempts} attempts` : q.allowed_attempts === -1 ? 'Unlimited attempts' : ''].filter(Boolean).join(' · '), status: a ? chipOf(store.workStatus(a)) : null, url: a ? `/courses/${c.id}/assignments/${a.id}` : `/courses/${c.id}/quizzes/${q.id}`, kind: 'Quiz' };
@@ -1811,9 +1862,9 @@
     for (const a of (as || []).filter((x) => x.is_quiz_lti_assignment && x.published !== false)) rows.push({ ...aRow(a, c.id), kind: 'Quiz' });
     return { title: 'Quizzes', context: info.title, color: info.color, rows, empty: 'No quizzes in this course.' };
   }
-  async function syllabus({ ctx } = {}) {
-    const c = ctxOf(ctx);
-    const [info, body, as] = await Promise.all([contextInfo(c), store.syllabus(c.id).catch(() => ''), store.assignments(c.id).catch(() => [])]);
+  async function syllabus({ ctx, age = NO_AGE } = {}) {
+    const c = ctxOf(ctx, age);
+    const [info, body, as] = await Promise.all([contextInfo(c), store.syllabus(c.id, age).catch(() => ''), store.assignments(c.id, age).catch(() => [])]);
     const dated = (as || []).filter((a) => a.published !== false && a.due_at).sort((x, y) => U.parse(x.due_at) - U.parse(y.due_at));
     return { title: 'Syllabus', context: info.title, color: info.color, html: clean(body || ''), rows: dated.map((a) => aRow(a, c.id)), empty: 'The syllabus is empty.' };
   }
@@ -1989,11 +2040,11 @@
   /** History as the app's popup: { title, note, empty, rows: [{ id, title, sub, kind (Canvas's icon name for it:
    *  assignment, quiz, discussion…), category, course, color, when, whenText, url, open }] } — the web's sheet's rows
    *  (extras.js historyList), each course named as the sidebar names it and each time as the apps write one. */
-  async function moreHistory() {
+  async function moreHistory({ age = NO_AGE } = {}) {
     if (!BCV.extras?.historyList) throw new Error('History could not be loaded.');
     let d;
-    try { d = await BCV.extras.historyList(); } catch (e) { throw new Error(`History could not be loaded: ${e?.message || e}`); }
-    const [sel, all] = await Promise.all([selection(), store.courses().catch(() => [])]);
+    try { d = await BCV.extras.historyList(age); } catch (e) { throw new Error(`History could not be loaded: ${e?.message || e}`); }
+    const [sel, all] = await Promise.all([selection(age), store.courses(age).catch(() => [])]);
     const byId = new Map((all || []).map((c) => [String(c.id), c]));
     return {
       title: d.title, note: d.note, empty: d.empty,
@@ -2584,21 +2635,24 @@
   // One course's grades, with what-if scores (the course Grades screen's model; nothing saved)
   const gradeCache = new Map();
   let gradesRows = null; // the Grades screen's last courses, for the term GPA a what-if score would give
+  let gradesSince = -Infinity; // (2.99.35) how new they are (sinceOf: the age they were made with)
   /** `on`: the what-if switch (scores typed in `tried`, by assignment id; '' clears a real one); `added`: what-if
    *  assignments, { id, groupId, name, possible }, their scores in `tried` too. */
-  async function courseGrades({ id, tried = {}, added = [], on: switchOn = false, fresh = false } = {}) {
+  async function courseGrades({ id, tried = {}, added = [], on: switchOn = false, fresh = false, age = NO_AGE } = {}) {
     const G = BCV.screens.gpa;
     const key = String(id);
     let entry = gradeCache.get(key);
-    if (!entry || fresh) {
-      const [all, ownPref, targetsPref] = await Promise.all([store.courses(), store.pref('gradeWeights'), store.pref('gradeTargets')]);
-      const c = (all || []).find((x) => String(x.id) === key) || (await store.course(key));
+    // (2.99.35) a course's grades kept here are made again for a live check whose age they do not meet
+    if (!entry || fresh || entry.since < sinceOf(age)) {
+      const since = sinceOf(age);
+      const [all, ownPref, targetsPref] = await Promise.all([store.courses(age), store.pref('gradeWeights'), store.pref('gradeTargets')]);
+      const c = (all || []).find((x) => String(x.id) === key) || (await store.course(key, age));
       if (!c) throw new Error('That course could not be found.');
-      const groups = await store.assignmentGroups(c.id, { maxAge: store.freshness?.grades });
+      const groups = await store.assignmentGroups(c.id, { maxAge: tighter(store.freshness?.grades, age) });
       const own = ownPref && typeof ownPref === 'object' && ownPref[c.id] && Object.keys(ownPref[c.id]).length ? ownPref[c.id] : null;
       const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
-      const favs = await store.favorites().catch(() => []);
-      entry = { c, groups, own, target: targets[c.id] || null, short: (favs || []).find((f) => String(f.id) === key)?.shortName || c.nickname || c.code || c.name };
+      const favs = await store.favorites(age).catch(() => []);
+      entry = { c, groups, own, target: targets[c.id] || null, short: (favs || []).find((f) => String(f.id) === key)?.shortName || c.nickname || c.code || c.name, since };
       gradeCache.set(key, entry);
     }
     const wi = {};
@@ -2649,7 +2703,7 @@
       scoreText: r.effective === null || r.effective === undefined ? `–/${store.fmtPts(r.possible)}` : `${store.fmtPts(r.effective)}/${store.fmtPts(r.possible)}`,
     }));
     let gpa = null, gpaIf = null;
-    const others = gradesRows || (await grades().then((d) => d.rows).catch(() => null));
+    const others = (gradesRows && gradesSince >= sinceOf(age) ? gradesRows : null) || (await grades({ age }).then((d) => d.rows).catch(() => null));
     if (others) {
       const pts = (rowsOf) => { const p = rowsOf.filter((x) => x !== null); return p.length ? p.reduce((s, x) => s + x, 0) / p.length : null; };
       gpa = pts(others.map((r) => r.points));
@@ -2667,8 +2721,8 @@
   }
 
   // Groups
-  async function groups() {
-    const [list, all] = await Promise.all([store.groups(), store.courses().catch(() => [])]);
+  async function groups({ age = NO_AGE } = {}) {
+    const [list, all] = await Promise.all([store.groups(age), store.courses(age).catch(() => [])]);
     const byId = new Map((all || []).map((c) => [String(c.id), c]));
     // (2.99.33) a group's course by the same name its home gives it (the course's name, not its code "ASRS"); the code
     // goes with it for a tooltip
@@ -2696,8 +2750,8 @@
   // whole number from 1 (a module's tool with id 0 is one Canvas could not match, no tool's); an unknown provider is its
   // whole host, named by its site only while no other host of that site is among the tools ("jupyter.school.edu" and
   // "library.school.edu" are two tools).
-  async function externalTools() {
-    const all = await store.courses().catch(() => null);
+  async function externalTools({ age = NO_AGE } = {}) {
+    const all = await store.courses(age).catch(() => null);
     if (!all) return { error: 'Your courses could not be loaded.' };
     const cs = all.filter((c) => c.state === 'current');
     try { await BCV.lazy?.load?.('hub'); } catch { /* not loaded: tools named by their hosts */ }
@@ -2747,7 +2801,7 @@
     // every course's tabs, tool assignments and module tools first, each with its provider as its own address or name
     // says it and the tool's id where Canvas gives one
     const found = await Promise.all(cs.map(async (c) => {
-      const [tabs, list, mods] = await Promise.all([store.tabs(c.id).catch(() => []), store.assignments(c.id).catch(() => []), store.modules(c.id).catch(() => [])]);
+      const [tabs, list, mods] = await Promise.all([store.tabs(c.id, age).catch(() => []), store.assignments(c.id, age).catch(() => []), store.modules(c.id, age).catch(() => [])]);
       const tabbed = (tabs || []).filter((t) => !t.hidden && (t.type === 'external' || String(t.id || '').startsWith('context_external_tool')))
         .map((t) => ({ t, tool: String(t.id || '').replace(/^context_external_tool_/, '') })).filter((x) => /^\d+$/.test(x.tool))
         .map((x) => ({ ...x, p: providerOf({ label: x.t.label || '' }) }));
@@ -2875,12 +2929,12 @@
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
-  async function gradeNeeded({ id } = {}) {
+  async function gradeNeeded({ id, age = NO_AGE } = {}) {
     const key = String(id);
-    const [all, ownPref] = await Promise.all([store.courses(), store.pref('gradeWeights')]);
-    const c = (all || []).find((x) => String(x.id) === key) || (await store.course(key));
+    const [all, ownPref] = await Promise.all([store.courses(age), store.pref('gradeWeights')]);
+    const c = (all || []).find((x) => String(x.id) === key) || (await store.course(key, age));
     if (!c) throw new Error('That course could not be found.');
-    const groups = (await store.assignmentGroups(c.id).catch(() => [])) || [];
+    const groups = (await store.assignmentGroups(c.id, age).catch(() => [])) || [];
     const own = ownPref && typeof ownPref === 'object' && ownPref[c.id] && typeof ownPref[c.id] === 'object' && Object.keys(ownPref[c.id]).length ? ownPref[c.id] : null;
     const r1 = (v) => roundHalfUp(v, 1); // (2.99.33: half up on the decimal figure, as every figure shown)
     let now = c.score === null || c.score === undefined ? null : Number(c.score);
@@ -2909,20 +2963,82 @@
   }
   CALLS.gradeNeeded = gradeNeeded;
   Object.assign(CALLS, { moreFromCanvas, moreHistory, moreHelp });
-  /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
+
+  // (2.99.35) A change to the mock school made behind the engine's back, for the apps' CI: a live check has to find it
+  // (an app's launch flag asks for one a while after the screen is drawn). It is written straight to the mock's own
+  // routes, past the store, so nothing here forgets what it read: only a check that reads Canvas again (maxAge) sees it.
+  // `what`: done — the soonest work due today (else in the next 7 days) marked done on the planner (Due today or Next 7
+  // days one less, its row off Today's list, ticked on the List); grade — the first chosen course's total moved by 2.5
+  // points (its card, its tower, its row on Grades); task — a task of your own for today (a row more on the List and To
+  // Do). Against the mock school only, which is served from this machine; never a school.
+  const onMock = () => /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  async function liveDevChange({ what = 'done' } = {}) {
+    if (!onMock()) throw new Error('Only against the mock school.');
+    const C = BCV.canvas;
+    if (what === 'done') {
+      const [items, sel] = await Promise.all([store.planner(), selection()]);
+      const now = new Date(), start = U.startOfDay(now), end = U.addDays(start, 7);
+      const open = (items || []).filter((it) => it.isDue && !it.custom && !it.complete && !it.submitted && !it.dismissed && !it.excused && it.type !== 'announcement' && inSelection(sel, it) && it.date >= start && it.date < end).sort(byDate);
+      const it = open.find((x) => U.sameDay(x.date, now)) || open[0];
+      if (!it) throw new Error('Nothing is due to mark done.');
+      const put = (id) => C.put(`/api/v1/planner/overrides/${id}`, { marked_complete: true });
+      if (it.raw.planner_override?.id) await put(it.raw.planner_override.id);
+      else {
+        try { await C.post('/api/v1/planner/overrides', { plannable_type: it.type, plannable_id: it.raw.plannable_id, marked_complete: true }); } catch (e) {
+          // (one written before, undone since: Canvas keeps one an item, so that one is changed)
+          const had = ((await C.get('/api/v1/planner/overrides', { params: { per_page: 100 }, all: true })) || []).find((o) => String(o.plannable_type) === String(it.type) && String(o.plannable_id) === String(it.raw.plannable_id));
+          if (!had?.id) throw e;
+          await put(had.id);
+        }
+      }
+      return { ok: true, what, id: it.id, title: it.title, today: U.sameDay(it.date, now) };
+    }
+    if (what === 'grade') {
+      const c = (await selection()).list.find((x) => x.score !== null && x.score !== undefined && !x.hideFinal);
+      if (!c) throw new Error('No course has a total to move.');
+      const to = roundHalfUp(Number(c.score) + (Number(c.score) <= 97 ? 2.5 : -2.5), 1);
+      await C.post('/__mock/score', { courseId: String(c.id), courseScore: to });
+      return { ok: true, what, id: String(c.id), title: c.shortName || c.name, from: Number(c.score), to };
+    }
+    if (what === 'task') {
+      const due = new Date();
+      due.setHours(23, 59, 0, 0);
+      const n = await C.post('/api/v1/planner_notes', { title: 'Live check task', todo_date: due.toISOString() });
+      return { ok: true, what, id: `planner_note:${n?.id}`, title: 'Live check task' };
+    }
+    throw new Error(`No such change: ${what}`);
+  }
+  CALLS.liveDevChange = liveDevChange;
+
+  /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge.
+   *  (2.99.35) Two arguments every call takes, for the apps' live checks (the comment above ageOf):
+   *  - `maxAge` (seconds): every Canvas read the answer is made from that is older than that is read again. Each call is
+   *    handed it as `age`; without it (or 0) nothing changes.
+   *  - `known` (a string: the `hash` of the answer on screen, '' for none): the answer comes back as { unchanged: true,
+   *    hash } when it is the same as that one — the app has nothing to decode or draw — else as { unchanged: false, hash,
+   *    value }, `value` being the answer. The same data always makes the same answer, so the same hash. An answer that is
+   *    an error ({ error }, or one carrying `error`) comes as { error } either way: the screen stays as it is.
+   *  Without `known` the answer comes as it always has. */
   async function call(name, args = {}) {
     const fn = CALLS[name];
     if (!fn) return { error: `No such call: ${name}` };
+    const { maxAge, known, ...rest } = args && typeof args === 'object' ? args : {};
     try {
-      const r = await fn(args && typeof args === 'object' ? args : {});
-      return JSON.parse(JSON.stringify(r ?? null));
+      const r = await fn({ ...rest, age: ageOf(maxAge) });
+      const text = JSON.stringify(r ?? null);
+      if (typeof known !== 'string') return JSON.parse(text);
+      if (r && typeof r === 'object' && r.error) return { error: String(r.error) };
+      const hash = fingerprint(text);
+      return hash === known ? { unchanged: true, hash } : { unchanged: false, hash, value: JSON.parse(text) };
     } catch (e) {
       return { error: e?.message || String(e) };
     }
   }
 
   BCV.iosShell = { intercept, rendered, sayState, call, show, CALLS };
-  self.BCVNative = { call, show, state: () => ({ shell: wanted(), url: location.href, settled: html.classList.contains('bcv-settled') }) };
+  // (2.99.35) stats: the Canvas reads this page has made so far (each page of a list, each retry), for an app's log of what
+  // a live check cost ("live: dashboard unchanged · 0 reads") — the difference before and after it
+  self.BCVNative = { call, show, state: () => ({ shell: wanted(), url: location.href, settled: html.classList.contains('bcv-settled') }), stats: () => ({ reads: BCV.canvas?.reads?.() ?? 0 }) };
 
   // the state now, and whenever what decides it changes (the look switched, the setup opened or closed)
   sayState(true);
