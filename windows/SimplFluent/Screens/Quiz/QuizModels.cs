@@ -51,7 +51,14 @@ public sealed class QuizIntro
     public bool OneAtATime { get; set; }
     public bool NoBack { get; set; }
     public string Begin { get; set; } = "Begin Attempt";
+    /// <summary>(2.99.33) The one line on where the attempts stand, counting the attempt under way ("Attempt 2 of 5 · 3 more
+    /// after this one", "This is your only attempt").</summary>
     public string? Note { get; set; }
+    /// <summary>(2.99.33) The attempts as the quiz counts them ("0 of 1 attempt used"), how many are left (null: no limit),
+    /// and the assignment page's facts line with them.</summary>
+    public string? AttemptsText { get; set; }
+    public int? AttemptsLeft { get; set; }
+    public string? FactsLine { get; set; }
     public string? LockText { get; set; }
     public LastAttempt? Last { get; set; }
     public List<PastAttempt>? Attempts { get; set; }
@@ -114,6 +121,8 @@ public sealed class QuizQuestion
         public string Id { get; set; } = "";
         public int N { get; set; }
         public string Label { get; set; } = "";
+        /// <summary>(2.99.33) The words either side of it in the question, "the ___ of" ("" when there are none): its field's label.</summary>
+        public string Around { get; set; } = "";
         public List<Choice> Options { get; set; } = new();
     }
 
@@ -331,6 +340,10 @@ public sealed class QuizFeedback
     public string? Score { get; set; }
     public string? Possible { get; set; }
     public double? Pct { get; set; }
+    /// <summary>(2.99.33) The percentage as every app shows it ("81.3%") and the ring's whole percent (81), from that figure.</summary>
+    public string? PctText { get; set; }
+    public int? PctWhole { get; set; }
+    public string? Band { get; set; }
     public string? Summary { get; set; }
     public bool? Released { get; set; }
     public List<Comment>? Comments { get; set; }

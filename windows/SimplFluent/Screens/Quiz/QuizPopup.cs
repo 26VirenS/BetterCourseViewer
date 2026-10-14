@@ -369,7 +369,7 @@ internal sealed class QuizSheet
         instructions.IsOpen = true;
     }
 
-    /// <summary>⋯: Review Answers and Submit… during the attempt; the quiz on Canvas and its link.</summary>
+    /// <summary>⋯: Review answers and Submit… during the attempt; the quiz on Canvas and its link.</summary>
     private void MoreMenu()
     {
         var menu = new ContextMenu { PlacementTarget = moreButton, Placement = PlacementMode.Bottom, MinWidth = 220 };
@@ -381,12 +381,12 @@ internal sealed class QuizSheet
         }
         if (Run.Now == QuizRun.Stage.Taking)
         {
-            menu.Items.Add(Item("Review Answers", SymbolRegular.TextBulletListSquare24, () => _ = Run.ToReview()));
+            menu.Items.Add(Item("Review answers", SymbolRegular.TextBulletListSquare24, () => _ = Run.ToReview()));
             menu.Items.Add(Item("Submit…", SymbolRegular.Send24, AskSubmit));
             menu.Items.Add(new Separator());
         }
         menu.Items.Add(Item("Open in Canvas", SymbolRegular.Globe24, OpenCanvas));
-        menu.Items.Add(Item("Copy Link", SymbolRegular.Link24, CopyLink));
+        menu.Items.Add(Item("Copy link", SymbolRegular.Link24, CopyLink));
         menu.Opened += (_, _) => Hold(true);
         menu.Closed += (_, _) => Hold(false);
         menu.IsOpen = true;
@@ -427,9 +427,9 @@ internal sealed class QuizSheet
         {
             Title = "Leave the quiz?",
             Message = $"Every answer is saved with Canvas. The attempt stays open — come back to it from the quiz{(Run.Attempt?.Timed == true ? "; the clock keeps running" : "")}.",
-            Go = "Save and Exit",
+            Go = "Save and exit",
             OnGo = async () => { await Run.Flush(); Dismiss(); },
-            Cancel = "Keep Working",
+            Cancel = "Keep working",
         });
     }
 
@@ -478,10 +478,10 @@ internal sealed class QuizSheet
         {
             Title = "Some answers were not kept",
             Message = $"Canvas did not keep your {(one ? "answer" : "answers")} to {which}. Go back to answer {(one ? "it" : "them")} again, or submit as it is.",
-            Go = "Submit Anyway",
+            Go = "Submit anyway",
             Danger = true,
             OnGo = () => { Run.Missing = new(); _ = Run.Submit(force: true); },
-            Cancel = "Go Back",
+            Cancel = "Go back",
             OnCancel = () => Run.Missing = new(),
         });
     }
@@ -495,11 +495,11 @@ internal sealed class QuizSheet
         box.TextChanged += (_, _) => Run.Code = box.Text;
         ask.Show(new QuizAskLayer.Ask
         {
-            Title = "Access Code",
+            Title = "Access code",
             Message = "Canvas wants the quiz’s access code to save your answers. It stays with this attempt.",
             Extra = box,
             Focus = box,
-            Go = "Save Answer",
+            Go = "Save answer",
             OnGo = () => { askingCode = false; Run.AskCode = false; _ = Run.CodeGiven(); },
             Cancel = "Cancel",
             OnCancel = () => { askingCode = false; Run.AskCode = false; },
@@ -566,10 +566,11 @@ internal sealed class QuizSheet
 // ---- the intro ----
 
 /// <summary>
-/// A quiz before an attempt (the Mac's QuizIntroPane): what it is, its instructions, its rules (the attempts, the time
-/// limit, one question at a time), the access code when it wants one, why it cannot begin, the attempts so far, and the
-/// one thing to do next at the foot. On a wide popup the instructions are on the left and the rules, the code and the
-/// attempts in a column beside them.
+/// A quiz before an attempt (the Mac's QuizIntroPane): what it is — its name and course are the popup's header, so the
+/// page starts with its facts and where the attempts stand — its instructions, its rules (the time limit, one question at
+/// a time), the access code when it wants one, why it cannot begin, the attempts so far, and the one thing to do next at
+/// the foot. On a wide popup the instructions are on the left and the rules, the code and the attempts in a column
+/// beside them.
 /// </summary>
 internal sealed class QuizIntroPane : IQuizPane
 {
@@ -636,18 +637,14 @@ internal sealed class QuizIntroPane : IQuizPane
         return v;
     }
 
-    private FrameworkElement Heading()
+    /// <summary>The quiz's facts ("4 questions · 17 points · Due Oct 14 at 10:30 AM") and, under them, where the attempts
+    /// stand — the name and the course are the header's, 60 px above, not said again.</summary>
+    private FrameworkElement? Heading()
     {
-        var ink = QuizUi.Ink(s.Tint);
-        var ctx = K.Text(intro.Context ?? "Quiz", Ty.BodyStrong);
-        ctx.Foreground = ink;
-        var label = K.H(8, K.Icon(SymbolRegular.TaskListLtr24, 16, K.Darkened(s.Tint)), ctx);
-        var title = K.Wrapped(intro.Title, Ty.Title);
-        title.TextTrimming = TextTrimming.None;
-        var v = K.V(10, label, title);
-        if (intro.Facts.Count > 0) v.Children.Add(K.Wrapped(string.Join(" · ", intro.Facts), Ty.Body, B.Text2));
-        if (!string.IsNullOrEmpty(intro.Note)) v.Children.Add(K.Wrapped(intro.Note!, Ty.Caption, B.Text2));
-        return v;
+        var v = K.V(6);
+        if (intro.Facts.Count > 0) v.Children.Add(K.Wrapped(string.Join(" · ", intro.Facts), Ty.BodyLarge));
+        if (!string.IsNullOrEmpty(intro.Note)) v.Children.Add(K.Wrapped(intro.Note!, Ty.Body, B.Text2));
+        return v.Children.Count > 0 ? v : null;
     }
 
     /// <summary>Why it cannot begin (Windows' InfoBar, red), and when it unlocks.</summary>
@@ -664,7 +661,7 @@ internal sealed class QuizIntroPane : IQuizPane
     }
 
     private FrameworkElement? Instructions() =>
-        intro.Html.Length == 0 ? null : QuizUi.Section("Before You Start", QuizUi.Rich(s.Engine, intro.Html, 15));
+        intro.Html.Length == 0 ? null : QuizUi.Section("Before you start", QuizUi.Rich(s.Engine, intro.Html, 15));
 
     private FrameworkElement? Rules()
     {
@@ -691,7 +688,7 @@ internal sealed class QuizIntroPane : IQuizPane
         codeBox = box;
         var field = K.Columns("*, auto", box.Col(0));
         field.ColumnDefinitions[0].MaxWidth = 320;
-        return QuizUi.Section("Access Code", K.V(8, field, K.Wrapped("Your instructor gives the code. It stays with this attempt.", Ty.Caption, B.Text2)));
+        return QuizUi.Section("Access code", K.V(8, field, K.Wrapped("Your instructor gives the code. It stays with this attempt.", Ty.Caption, B.Text2)));
     }
 
     /// <summary>Every attempt, newest first, with its score and when it was handed in, the kept one marked (the Mac's
@@ -708,7 +705,7 @@ internal sealed class QuizIntroPane : IQuizPane
             }
             var v = K.V(8, K.Card(rows, new Thickness(14, 2, 14, 2)));
             if (!string.IsNullOrEmpty(intro.KeptNote)) v.Children.Add(K.Wrapped(intro.KeptNote!, Ty.Caption, B.Text2));
-            return QuizUi.Section(list.Count == 1 ? "Your Attempt" : "Your Attempts", v);
+            return QuizUi.Section(list.Count == 1 ? "Your attempt" : "Your attempts", v);
         }
         if (intro.Last is { } last)
         {
@@ -716,7 +713,7 @@ internal sealed class QuizIntroPane : IQuizPane
             if (last.Score is { } sc) g.Children.Add(K.Text(sc, Ty.Body, B.Text2).Digits().Col(1));
             else if (!string.IsNullOrEmpty(last.Why)) g.Children.Add(K.Wrapped(last.Why!, Ty.Caption, B.Text2).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
             g.Margin = new Thickness(0, 12, 0, 12);
-            return QuizUi.Section("Your Last Attempt", K.Card(g, new Thickness(14, 0, 14, 0)));
+            return QuizUi.Section("Your last attempt", K.Card(g, new Thickness(14, 0, 14, 0)));
         }
         return null;
     }
@@ -744,31 +741,43 @@ internal sealed class QuizIntroPane : IQuizPane
 
     private bool Feedback => intro.Last?.Feedback == true && !intro.Begin.StartsWith("Continue", StringComparison.Ordinal);
     private bool CodeMissing => intro.NeedsCode && Run.Code.Trim().Length == 0;
-    private string TakeTitle => CodeMissing ? "Enter the Code" : intro.Survey ? "Take Survey" : "Take Quiz";
-    private string BeginTitle => CodeMissing && intro.CanStart ? "Enter the Access Code" : intro.Begin;
+    private string TakeTitle => intro.Survey ? "Take survey" : "Take quiz";
 
-    /// <summary>An attempt under way, Resume; a finished one with its feedback and another attempt left, Take Quiz and See
-    /// Feedback side by side; with none left, See Feedback alone. Enter presses the accent one.</summary>
+    /// <summary>
+    /// An attempt under way, Resume; a finished one with its feedback and another attempt left, Take quiz and See feedback
+    /// side by side; with none left, See feedback alone. Enter presses the accent one. A quiz that wants a code keeps its
+    /// button's own words ("Begin attempt"), greyed until the code is typed — the field, focused, says what is wanted.
+    /// </summary>
     private void Actions()
     {
         actions.Children.Clear();
         if (Feedback && intro.CanStart)
         {
-            actions.Children.Add(K.Button("See Feedback", OpenLastFeedback));
-            var take = K.Button(TakeTitle, StartAttempt, accent: true);
-            take.IsEnabled = !CodeMissing;
-            actions.Children.Add(take);
+            actions.Children.Add(K.Button("See feedback", OpenLastFeedback));
+            actions.Children.Add(Waiting(K.Button(TakeTitle, StartAttempt, accent: true)));
         }
         else if (Feedback)
         {
-            actions.Children.Add(K.Button("See Feedback", OpenLastFeedback, accent: true, icon: SymbolRegular.Comment24));
+            actions.Children.Add(K.Button("See feedback", OpenLastFeedback, accent: true, icon: SymbolRegular.Comment24));
         }
         else
         {
-            var begin = K.Button(BeginTitle, StartAttempt, accent: true);
-            begin.IsEnabled = intro.CanStart && !CodeMissing;
+            var begin = Waiting(K.Button(QuizUi.Sentence(intro.Begin), StartAttempt, accent: true));
+            if (!intro.CanStart) begin.IsEnabled = false;
             actions.Children.Add(begin);
         }
+    }
+
+    /// <summary>A start button greyed while the access code is still to be typed, its tooltip saying so.</summary>
+    private Wpf.Ui.Controls.Button Waiting(Wpf.Ui.Controls.Button b)
+    {
+        b.IsEnabled = !CodeMissing;
+        if (CodeMissing)
+        {
+            b.ToolTip = "Type the access code first";
+            ToolTipService.SetShowOnDisabled(b, true);
+        }
+        return b;
     }
 
     private void StartAttempt()

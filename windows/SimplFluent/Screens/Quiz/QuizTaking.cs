@@ -19,8 +19,8 @@ namespace Simpl.Screens;
 /// <summary>
 /// The attempt, one question at a time: the questions (a strip at the top, or down the side of a wide popup), the
 /// question on the page (it slides the way the student moves), and at the foot Previous, how much is answered and
-/// whether it is saved, Submit and Next. Keys: ← and → move, 1–9 pick an answer, Enter goes on (to the review after the
-/// last), F flags — none of them while an answer is being typed.
+/// whether it is saved — the one place the count is said — Submit and Next. Keys: ← and → move, 1–9 pick an answer,
+/// Enter goes on (to the review after the last), F flags — none of them while an answer is being typed.
 /// </summary>
 internal sealed class QuizTakePane : IQuizPane
 {
@@ -33,8 +33,7 @@ internal sealed class QuizTakePane : IQuizPane
     private readonly ProgressRing statusSpinner = K.Spinner(14);
     private readonly Wpf.Ui.Controls.Button previous, submit, next;
     private Button? review;
-    // the side column's count, bar and save word
-    private TextBlock? cardCount, railCount, railSave;
+    // the side column's bar of how much is answered (its count is the foot's)
     private readonly ContentControl railBar = new() { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };
 
     public FrameworkElement View { get; }
@@ -121,10 +120,8 @@ internal sealed class QuizTakePane : IQuizPane
         var word = Run.SaveWord;
         status.Text = $"{done} of {total} answered" + (word.Length > 0 ? $" · {word}" : "");
         statusSpinner.Visibility = moving != null ? Visibility.Visible : Visibility.Collapsed;
-        if (cardCount != null) cardCount.Text = $"{done} of {total}";
-        if (railCount != null) railCount.Text = $"{done} of {total} answered";
-        if (railSave != null) { railSave.Text = word; railSave.Visibility = word.Length > 0 ? Visibility.Visible : Visibility.Collapsed; }
-        railBar.Content = K.Bar(total > 0 ? (double)done / total : 0, s.Tint, 4);
+        railBar.Content = Progress(total > 0 ? (double)done / total : 0);
+        railBar.ToolTip = $"{done} of {total} answered";
         previous.IsEnabled = Run.CanGoBack && moving == null;
         next.IsEnabled = moving == null;
         if (review != null) review.IsEnabled = moving == null;
@@ -132,7 +129,7 @@ internal sealed class QuizTakePane : IQuizPane
         if (next.Tag as bool? != last)
         {
             next.Tag = last;
-            next.Content = K.H(8, new TextBlock { Text = last ? "Review Answers" : "Next", VerticalAlignment = VerticalAlignment.Center },
+            next.Content = K.H(8, new TextBlock { Text = last ? "Review answers" : "Next", VerticalAlignment = VerticalAlignment.Center },
                 new SymbolIcon { Symbol = last ? SymbolRegular.TextBulletListSquare24 : SymbolRegular.ChevronRight24, FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
             next.ToolTip = last ? "Review your answers (Enter)" : "Next question (Enter or →)";
         }
@@ -170,11 +167,10 @@ internal sealed class QuizTakePane : IQuizPane
         return K.Columns("*, auto", scroll.Col(0), review.Col(1));
     }
 
-    /// <summary>The questions down the side of a wide popup: every question's number in a small card, what the tiles
-    /// mean, how much is answered (and whether it is saved), and the review.</summary>
+    /// <summary>The questions down the side of a wide popup: every question's number in a small card, a bar of how much is
+    /// answered under them (the count itself is the foot's, said once), what the tiles mean in a line, and the review.</summary>
     private FrameworkElement Rail()
     {
-        // the card of tiles, five across, with how many are answered at its head
         var grid = new UniformGrid { Columns = 5, Margin = new Thickness(-3) };
         for (var k = 0; k < Run.Questions.Count; k++)
         {
@@ -182,42 +178,49 @@ internal sealed class QuizTakePane : IQuizPane
             tiles.Add(t);
             grid.Children.Add(t);
         }
-        cardCount = K.Text("", Ty.Caption, B.Text2).Digits();
-        var head = K.Columns("*, auto", K.Text("Questions", Ty.BodyStrong).Col(0), cardCount.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
-        var card = K.Card(K.V(12, head, grid), new Thickness(14));
+        var card = K.Card(K.V(12, K.Text("Questions", Ty.BodyStrong), grid, railBar), new Thickness(14));
 
-        var legend = K.V(8,
-            Key(Face.Current, "On screen"),
-            Key(Face.Done, "Answered"),
-            Key(Face.Flagged, "Flagged"),
-            Key(Face.Blank, "Not answered"));
+        // (what the tiles mean, in a line or two: the one showing needs no key, being the page's own)
+        var legend = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, -14, -6) };
+        foreach (var key in new[] { Key(Face.Done, "Answered"), Key(Face.Flagged, "Flagged"), Key(Face.Blank, "Not answered") })
+            legend.Children.Add(key.Margin(0, 0, 14, 6));
 
-        railCount = K.Text("", Ty.BodyStrong).Digits();
-        railSave = K.Text("", Ty.Caption, B.Text2);
-        review = QuizUi.Button("Review Answers", Review, icon: SymbolRegular.TextBulletListSquare24);
+        review = QuizUi.Button("Review answers", Review, icon: SymbolRegular.TextBulletListSquare24);
         review.HorizontalAlignment = HorizontalAlignment.Stretch;
         review.ToolTip = "Review every answer before submitting";
-        review.Margin = new Thickness(0, 6, 0, 0);
-        var progress = K.V(10, railCount, railBar, railSave, review);
 
-        var v = K.V(18, card, legend, K.Divider(), progress);
+        var v = K.V(16, card, legend, review);
         v.Margin = new Thickness(22, 14, 22, 24);
         return v;
     }
 
-    private enum Face { Current, Done, Flagged, Blank }
+    /// <summary>How much is answered, as a bar whose track shows even with nothing answered (never a hairline that reads as
+    /// a divider).</summary>
+    private FrameworkElement Progress(double fraction)
+    {
+        var track = new Border { Height = 4, CornerRadius = new CornerRadius(2) }.Bg(B.Subtle3);
+        var fill = new Border { Height = 4, CornerRadius = new CornerRadius(2), Background = K.Brush(s.Tint), HorizontalAlignment = HorizontalAlignment.Left };
+        var f = Math.Clamp(fraction, 0, 1);
+        var g = new Grid { Height = 4, Children = { track, fill } };
+        g.SizeChanged += (_, e) => fill.Width = Math.Max(f > 0 ? 4 : 0, e.NewSize.Width * f);
+        return g;
+    }
+
+    private enum Face { Done, Flagged, Blank }
 
     private FrameworkElement Key(Face f, string text)
     {
         var swatch = new Border { Width = 13, Height = 13, CornerRadius = new CornerRadius(3.5) };
         switch (f)
         {
-            case Face.Current: swatch.Background = K.Brush(s.Tint); break;
-            case Face.Done: swatch.Background = K.Brush(K.WithAlpha(s.Tint, 0.2)); break;
+            case Face.Done:
+                swatch.Background = K.Brush(K.WithAlpha(s.Tint, QuizTile.DoneWash));
+                swatch.Child = new SymbolIcon { Symbol = SymbolRegular.Checkmark24, FontSize = 9, Foreground = QuizUi.Ink(s.Tint), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+                break;
             case Face.Flagged: swatch.Bg(B.Subtle); swatch.BorderBrush = K.Brush(QuizUi.Orange); swatch.BorderThickness = new Thickness(1.5); break;
             default: swatch.Bg(B.Subtle).Stroke(B.CardStroke); break;
         }
-        return K.H(10, swatch, K.Text(text, Ty.Caption, B.Text2));
+        return K.H(8, swatch, K.Text(text, Ty.Caption, B.Text2));
     }
 
     // ---- what the keys and buttons do ----
@@ -306,7 +309,8 @@ internal sealed class QuizTakePane : IQuizPane
 
 /// <summary>
 /// One question's tile as a button (the Mac's QuizChip and QuizNumberTile): its number in a small rounded square — the
-/// one showing filled with the quiz's colour, an answered one washed in it, one not yet answered a quiet grey; a flagged
+/// one showing filled with the quiz's colour, an answered one washed in it with a tick in its corner (told apart from a
+/// blank one by more than a faint hue, in dark mode and without colour), one not yet answered a quiet grey; a flagged
 /// one edged in orange with its flag in the corner, one on its way a spinner, one sealed behind the student (no going
 /// back) dimmed and shut. A touch brighter under the pointer, a little smaller under a click.
 /// </summary>
@@ -316,7 +320,11 @@ internal sealed class QuizTile : Button
     private readonly Border face = new() { Height = 32, CornerRadius = new CornerRadius(6), SnapsToDevicePixels = true };
     private readonly TextBlock text;
     private readonly SymbolIcon flag = K.Icon(SymbolRegular.Flag24, 9, QuizUi.Orange, filled: true);
+    private readonly SymbolIcon tick = new() { Symbol = SymbolRegular.Checkmark24, FontSize = 9, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 4, 3) };
     private readonly ProgressRing spinner = K.Spinner(14);
+
+    /// <summary>How strongly an answered tile is washed in the quiz's colour: on dark, enough to stand apart from a blank one.</summary>
+    public static double DoneWash => Support.Appearance.Dark ? 0.42 : 0.2;
     private readonly Border hover = new() { CornerRadius = new CornerRadius(6), Visibility = Visibility.Hidden, IsHitTestVisible = false };
     private readonly ScaleTransform scale = new(1, 1);
 
@@ -334,7 +342,7 @@ internal sealed class QuizTile : Button
         flag.VerticalAlignment = VerticalAlignment.Top;
         flag.Margin = new Thickness(0, 3, 4, 0);
         spinner.Visibility = Visibility.Collapsed;
-        face.Child = new Grid { Children = { text, flag, spinner } };
+        face.Child = new Grid { Children = { text, flag, tick, spinner } };
         hover.Bg(B.Subtle);
         Content = new Grid { Children = { face, hover } };
         if (width is { } w) Width = w;
@@ -364,7 +372,7 @@ internal sealed class QuizTile : Button
         }
         else if (done)
         {
-            face.Background = K.Brush(K.WithAlpha(tint, Support.Appearance.Dark ? 0.32 : 0.18));
+            face.Background = K.Brush(K.WithAlpha(tint, DoneWash));
             text.Foreground = QuizUi.Ink(tint);
         }
         else
@@ -377,6 +385,9 @@ internal sealed class QuizTile : Button
         else face.BorderThickness = new Thickness(0);
         flag.Visibility = flagged ? Visibility.Visible : Visibility.Collapsed;
         flag.Foreground = K.Brush(current ? Colors.White : QuizUi.Orange);
+        // (an answered one's tick, in the corner the flag leaves free)
+        tick.Visibility = done && !loading ? Visibility.Visible : Visibility.Collapsed;
+        tick.Foreground = current ? Brushes.White : QuizUi.Ink(tint);
         spinner.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
         text.Visibility = loading ? Visibility.Hidden : Visibility.Visible;
         face.Opacity = sealedOff ? 0.35 : 1;
@@ -393,8 +404,9 @@ internal sealed class QuizTile : Button
 
 /// <summary>
 /// One question on the page (the Mac's QuizQuestionPage), with no box round it: its number and points, the flag, its
-/// words (Canvas's own, pictures included; formulas as their TeX) at a reading size, and its answer in the shape its
-/// kind takes — a row per choice, a box per answer that applies, a field, a list per match or blank, a file chosen or
+/// words (Canvas's own, pictures included; formulas typeset; a blank's numbered mark — the word picked for it, once there
+/// is one) at a reading size, and its answer in the shape its kind takes — a row per choice, a box per answer that
+/// applies, a field, a list per match or blank (each labelled with the words around its blank), a file chosen or
 /// dropped, or Canvas's own page for a kind it answers there.
 /// </summary>
 internal sealed class QuizQuestionPage
@@ -412,6 +424,9 @@ internal sealed class QuizQuestionPage
     private Rectangle? dropEdge;
     private SymbolIcon? dropIcon;
     private TextBlock? dropWords;
+    /// <summary>The question's words, drawn again when a blank's word changes (so the sentence reads with it).</summary>
+    private readonly ContentControl words = new() { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+    private string wordsKey = "";
 
     public FrameworkElement View { get; }
 
@@ -432,7 +447,8 @@ internal sealed class QuizQuestionPage
         }
         else
         {
-            column.Children.Add(QuizUi.Rich(s.Engine, q.Html, 18));
+            ShowWords();
+            column.Children.Add(words);
             if (Answer() is { } a) column.Children.Add(a);
             if (q.Hint.Length > 0)
                 column.Children.Add(K.Columns("auto, *", K.Icon(SymbolRegular.Info24, 16, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 0, 8, 0).Col(0), K.Wrapped(q.Hint, Ty.Caption, B.Text2).Col(1)));
@@ -491,12 +507,38 @@ internal sealed class QuizQuestionPage
             if (on) letter.Foreground = QuizUi.Ink(s.Tint); else letter.Fg(B.Text2);
         }
         if (q.Kind == "file") FileArea();
+        // (a blank's word into the sentence: a pick at once; a typed one once the student is out of its field)
+        if (q.Kind == "drops" || (q.Kind == "blanks" && !QuizUi.Typing())) ShowWords();
+    }
+
+    /// <summary>The word given for each blank so far, by its number: the choice picked from its list, or what was typed.</summary>
+    private Dictionary<int, string> BlankWords()
+    {
+        var picked = new Dictionary<int, string>();
+        foreach (var b in q.Blanks)
+        {
+            if (!q.Map.TryGetValue(b.Id, out var v)) continue;
+            var word = q.Kind == "drops" ? b.Options.FirstOrDefault(c => c.Id == v)?.Text ?? "" : v.Trim();
+            if (word.Length > 0) picked[b.N] = word;
+        }
+        return picked;
+    }
+
+    /// <summary>The question's words, with each blank's word in its place once given (drawn again only when one changed).</summary>
+    private void ShowWords()
+    {
+        var picked = q.Blanks.Count > 0 ? BlankWords() : null;
+        var key = picked == null ? "" : string.Join("\u0001", picked.OrderBy(p => p.Key).Select(p => $"{p.Key}={p.Value}"));
+        if (words.Content != null && key == wordsKey) return;
+        wordsKey = key;
+        words.Content = QuizUi.Rich(s.Engine, q.Html, 18, picked);
     }
 
     private FrameworkElement? Answer() => q.Kind switch
     {
         "choice" => Options(false),
-        "multi" => K.V(12, Options(true), K.Text("Pick every answer that applies.", Ty.Caption, B.Text2)),
+        // (said before the choices, where it changes how they are read; the square boxes the second cue)
+        "multi" => K.V(14, K.H(8, K.Icon(SymbolRegular.CheckboxChecked24, 16, B.Text2), K.Text("Select all that apply", Ty.Body, B.Text2)), Options(true)),
         "text" => Line(false),
         "number" => Line(true),
         "essay" => Essay(),
@@ -510,11 +552,12 @@ internal sealed class QuizQuestionPage
     // ---- choices ----
 
     /// <summary>A row per option with its radio (one answer) or its box (every answer that applies), the whole row the
-    /// target; its number on the keyboard picks it. The rows reach a little past the column, so their words start where
-    /// the question's do.</summary>
+    /// target, about 48 px apart so five short answers fit above the foot; its number on the keyboard picks it — the key
+    /// shown at the row's end while the pointer is on that row, and in its tooltip. The rows reach a little past the
+    /// column, so their words start where the question's do.</summary>
     private FrameworkElement Options(bool multi)
     {
-        var list = new Stack { Orientation = Orientation.Vertical, Spacing = 8, Margin = new Thickness(-20, 0, -20, 0) };
+        var list = new Stack { Orientation = Orientation.Vertical, Spacing = 4, Margin = new Thickness(-16, 0, -16, 0) };
         for (var k = 0; k < q.Options.Count; k++)
         {
             var o = q.Options[k];
@@ -529,14 +572,21 @@ internal sealed class QuizQuestionPage
             letter.MinWidth = 18;
             letter.VerticalAlignment = VerticalAlignment.Center;
             var g = K.Columns("auto, auto, *, auto", mark.Col(0), letter.Margin(8, 0, 16, 0).Col(1), QuizUi.OptionText(s.Engine, o.Text, o.Html).Col(2));
+            Border? key = null;
             if (k < 9)
             {
-                var key = new Border { CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 0, 6, 1), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0), Child = K.Text($"{k + 1}", Ty.Caption, B.Text3) }.Stroke(B.ControlStroke);
-                key.ToolTip = $"Press {k + 1} to choose this answer";
+                key = new Border { CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 0, 6, 1), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0), Child = K.Text($"{k + 1}", Ty.Caption, B.Text2), Visibility = Visibility.Hidden }.Stroke(B.ControlStroke);
                 g.Children.Add(key.Col(3));
             }
-            var wash = new Border { Child = g, Padding = new Thickness(20, 14, 20, 14), CornerRadius = new CornerRadius(8), MinHeight = 56, Background = Brushes.Transparent };
+            var wash = new Border { Child = g, Padding = new Thickness(16, 9, 16, 9), CornerRadius = new CornerRadius(8), MinHeight = 44, Background = Brushes.Transparent };
             var row = K.Subtle(wash, () => choose(q, o), new Thickness(0), 8);
+            if (key != null)
+            {
+                var shown = key;
+                row.MouseEnter += (_, _) => shown.Visibility = Visibility.Visible;
+                row.MouseLeave += (_, _) => shown.Visibility = Visibility.Hidden;
+                row.ToolTip = $"Press {k + 1} to choose this answer";
+            }
             System.Windows.Automation.AutomationProperties.SetName(row, QuizFormat.OptionName(o));
             rows.Add((o, wash, mark, letter));
             list.Children.Add(row);
@@ -616,39 +666,47 @@ internal sealed class QuizQuestionPage
         return v;
     }
 
-    /// <summary>One field per blank, numbered as its mark in the question's words: a list to pick from, or a line to type.</summary>
+    /// <summary>One field per blank, numbered with the same pill as its mark in the question's words and labelled with the
+    /// words around its blank ("Velocity is the ___ of"), so each reads beside its sentence: a list to pick from, or a line
+    /// to type.</summary>
     private FrameworkElement Blanks()
     {
-        var v = K.V(12);
+        var v = K.V(16);
         foreach (var b in q.Blanks)
         {
-            var badge = new Border
-            {
-                MinWidth = 28, Height = 28, CornerRadius = new CornerRadius(14), Padding = new Thickness(6, 0, 6, 0),
-                Background = K.Brush(K.WithAlpha(s.Tint, 0.16)), VerticalAlignment = VerticalAlignment.Center,
-            };
-            var n = K.Text($"{b.N}", Ty.Caption).Digits().Center();
-            n.FontWeight = FontWeights.Bold;
-            n.Foreground = QuizUi.Ink(s.Tint);
-            n.VerticalAlignment = VerticalAlignment.Center;
-            badge.Child = n;
+            var badge = RichText.BlankMark($"{b.N}", false, 15);
+            badge.VerticalAlignment = VerticalAlignment.Center;
+            var name = b.Around.Length > 0 ? $"Blank {b.N}: {b.Around}" : $"Blank {b.N}";
             FrameworkElement field;
             if (q.Kind == "drops")
             {
                 var blank = b;
-                field = Capped(Picker(b.Label, b.Options, q.Map.TryGetValue(b.Id, out var m) ? m : null, id =>
+                field = Capped(Picker(name, b.Options, q.Map.TryGetValue(b.Id, out var m) ? m : null, id =>
                     Run.Set(q.Id, x => { if (id == null) x.Map.Remove(blank.Id); else x.Map[blank.Id] = id; })), 340);
             }
             else
             {
                 var box = new TextBox { PlaceholderText = "Your answer", Text = q.Map.TryGetValue(b.Id, out var t) ? t : "", ClearButtonEnabled = false };
-                System.Windows.Automation.AutomationProperties.SetName(box, $"Blank {b.N}");
+                System.Windows.Automation.AutomationProperties.SetName(box, name);
                 var id = b.Id;
                 box.TextChanged += (_, _) => Run.Set(q.Id, x => x.Map[id] = box.Text, typed: true);
                 box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) { onReturn(); e.Handled = true; } };
+                box.LostKeyboardFocus += (_, _) => ShowWords(); // (what was typed, into the sentence)
                 field = Capped(box, 380);
             }
-            v.Children.Add(K.Columns("auto, 14, *", badge.Col(0), field.Col(2)));
+            var row = K.Columns("auto, 12, *", badge.Col(0), field.Col(2));
+            if (b.Around.Length > 0)
+            {
+                // (the words around the blank over its field, as a Windows field's header)
+                row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var around = K.Wrapped(b.Around, Ty.Caption, B.Text2);
+                around.Margin = new Thickness(0, 0, 0, 6);
+                row.Children.Add(around.Col(2));
+                Grid.SetRow(badge, 1);
+                Grid.SetRow(field, 1);
+            }
+            v.Children.Add(row);
         }
         return v;
     }
@@ -689,7 +747,7 @@ internal sealed class QuizQuestionPage
         dropIcon = new SymbolIcon { Symbol = SymbolRegular.DocumentArrowDown20, FontSize = 30, HorizontalAlignment = HorizontalAlignment.Center };
         dropWords = K.Text("", Ty.Body, B.Text2).Center();
         var busy = Run.Uploading != null;
-        var chooseFile = QuizUi.Button(q.Files.Count == 0 ? "Choose File…" : "Replace…", PickFile, icon: SymbolRegular.Folder24);
+        var chooseFile = QuizUi.Button(q.Files.Count == 0 ? "Choose file…" : "Replace…", PickFile, icon: SymbolRegular.Folder24);
         var photo = QuizUi.Button("Photo…", PickPhoto, icon: SymbolRegular.Image24);
         chooseFile.IsEnabled = photo.IsEnabled = !busy;
         var buttons = K.H(10, chooseFile, photo);
@@ -739,7 +797,7 @@ internal sealed class QuizQuestionPage
 
     private void PickFile()
     {
-        var d = new Microsoft.Win32.OpenFileDialog { Title = q.Files.Count == 0 ? "Choose a File" : "Replace the File", CheckFileExists = true };
+        var d = new Microsoft.Win32.OpenFileDialog { Title = q.Files.Count == 0 ? "Choose a file" : "Replace the file", CheckFileExists = true };
         if (d.ShowDialog(Window.GetWindow(View)) == true) Take(d.FileName);
     }
 
@@ -747,7 +805,7 @@ internal sealed class QuizQuestionPage
     {
         var d = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Choose a Photo", CheckFileExists = true,
+            Title = "Choose a photo", CheckFileExists = true,
             Filter = "Photos and videos|*.jpg;*.jpeg;*.png;*.heic;*.heif;*.gif;*.bmp;*.tif;*.tiff;*.webp;*.mp4;*.mov;*.m4v;*.avi;*.wmv|All files|*.*",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
         };
