@@ -4,7 +4,7 @@ import SwiftUI
 /// stays a moment, then moves where it now belongs), the flag at a row's end sets its priority, a click grows its
 /// preview out of the row (1.2.3; a double-click opens the work), a right-click has the rest — and + adds a task of your
 /// own. (1.2) On a wide window a side column keeps the week in view: how much is done, the grouping, what is left by
-/// day, by course and by priority, and New Task.
+/// day, by course and by priority. (planning-10) New Task is the toolbar's + alone, at any width.
 struct TodoView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<TodoData>()
@@ -84,7 +84,7 @@ struct TodoView: View {
 
     private var doneLine: String {
         guard let d = model.data else { return "" }
-        return "\(d.done) of \(d.total) done"
+        return PreviewFormat.text(d.doneText) ?? "\(d.done) of \(d.total) done"
     }
 
     private var deleteQuestion: String {
@@ -176,15 +176,21 @@ struct TodoView: View {
         .card()
     }
 
+    /// (planning-11) The ring for how much is done, and beside it what the student opens To Do to see: what is left
+    /// ("17 left") — or, when there is any, what is late, in red ("1 overdue") — with "1 of 18 done" under it.
     private func progress(_ d: TodoData) -> some View {
-        HStack(spacing: 16) {
+        let left = d.left ?? max(0, d.total - d.done)
+        let overdue = PreviewFormat.text(d.overdueText)
+        let big = overdue ?? PreviewFormat.text(d.leftText) ?? "\(left) left"
+        return HStack(spacing: 16) {
             Ring(value: Double(d.pct), color: .green, lineWidth: 8, key: "todo")
                 .frame(width: 64, height: 64)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(d.pct)%")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .contentTransition(.numericText(value: Double(d.pct)))
-                Text("\(d.done) of \(d.total) done")
+                Text(big)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(overdue == nil ? Color.primary : Color.red)
+                    .contentTransition(.numericText(value: Double(overdue == nil ? left : (d.overdue ?? 0))))
+                Text(PreviewFormat.text(d.doneText) ?? "\(d.done) of \(d.total) done")
                     .font(.sBody)
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText(value: Double(d.done)))
@@ -221,7 +227,7 @@ struct TodoView: View {
     // MARK: - The side column (1.2)
 
     /// The week at a glance beside the list: the progress, the grouping, what is left day by day, by course and by
-    /// priority, and New Task — one card, its parts between hairlines.
+    /// priority — one card, its parts between hairlines. (planning-10) New Task is the toolbar's +: one copy of it.
     private func overview(_ d: TodoData) -> some View {
         let open = d.sections.flatMap { $0.rows }.filter { !$0.done }
         return VStack(alignment: .leading, spacing: 16) {
@@ -234,16 +240,6 @@ struct TodoView: View {
                 courseLoad(open)
                 priorityLoad(open)
             }
-            Divider()
-            Button {
-                engine.newTask = true
-            } label: {
-                Label("New Task", systemImage: "plus")
-                    .frame(maxWidth: .infinity)
-            }
-            .glassButton(prominent: true)
-            .controlSize(.large)
-            .help("A task of your own")
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -390,6 +386,9 @@ struct TodoView: View {
         let byCourse = group == "course"
         // (a card that is not one day — another grouping, or Overdue — gives each row its day as well as its time)
         let withDay = group != "date" || section.title == "Overdue"
+        // (planning-12) the flag's slot as wide as a priority's pill only where a row of the card shows one; else the
+        // faint flag's own width, the rest given to the titles
+        let pills = section.rows.contains { ($0.pri ?? 0) > 0 }
         return CardSection(title: section.title, trailing: section.note) {
             ForEach(Array(section.rows.enumerated()), id: \.element.id) { i, row in
                 VStack(spacing: 0) {
@@ -401,7 +400,8 @@ struct TodoView: View {
                         preview: .work(row, engine: engine, toggle: { toggle(row, $0) }),
                         toggle: { toggle(row, $0) },
                         setPriority: { setPriority(row, $0) },
-                        delete: { deleting = row }
+                        delete: { deleting = row },
+                        slot: pills ? 70 : 30
                     )
                 }
                 .transition(.opacity)
@@ -512,6 +512,18 @@ struct TodoView: View {
             if was != now {
                 d.done = max(0, min(d.total, d.done + (now ? 1 : -1)))
                 d.pct = d.total > 0 ? Int((Double(d.done) / Double(d.total) * 100).rounded()) : 0
+                // (the progress card's words follow the tick at once, as the engine writes them; its answer follows)
+                let left = d.left.map { max(0, $0 + (now ? -1 : 1)) } ?? max(0, d.total - d.done)
+                d.left = left
+                d.leftText = "\(left) left"
+                d.doneText = "\(d.done) of \(d.total) done"
+                let row = d.sections[s].rows[i]
+                if let late = d.overdue, row.custom != true, let iso = row.date,
+                   let due = Self.isoFractional.date(from: iso) ?? Self.isoPlain.date(from: iso), due < Date() {
+                    let n = max(0, late + (now ? -1 : 1))
+                    d.overdue = n
+                    d.overdueText = n > 0 ? "\(n) overdue" : ""
+                }
             }
             break
         }
@@ -533,13 +545,15 @@ private struct TodoTaskRow: View {
     let toggle: (Bool) -> Void
     let setPriority: (Int) -> Void
     let delete: () -> Void
+    /// The flag's slot at the row's end (planning-12: a priority's pill's width only where the card shows one).
+    var slot: CGFloat = 70
     @EnvironmentObject private var engine: Engine
     @State private var hover = false
 
     var body: some View {
         HStack(spacing: 2) {
             PreviewLink(item: preview) { line }
-            TodoPriorityMenu(level: row.pri ?? 0, short: row.priShort, hovering: hover, set: setPriority)
+            TodoPriorityMenu(level: row.pri ?? 0, short: row.priShort, hovering: hover, set: setPriority, slot: slot)
         }
         .onHover { hover = $0 }
         .contextMenu { menu }
@@ -577,13 +591,14 @@ private struct TodoTaskRow: View {
 }
 
 /// A row's priority as a flag at its end, a menu of the four levels under it: the level's colour and word when it has
-/// one, a faint flag under the pointer when not.
+/// one; (planning-12) a faint flag when not — always there to be found, plain under the pointer.
 private struct TodoPriorityMenu: View {
     let level: Int
     /// The page's own short word for the level ("High", "Med", "Low").
     let short: String?
     let hovering: Bool
     let set: (Int) -> Void
+    var slot: CGFloat = 70
 
     var body: some View {
         let p = TodoPriority.of(level)
@@ -600,7 +615,7 @@ private struct TodoPriorityMenu: View {
                 } else {
                     Image(systemName: "flag")
                         .foregroundStyle(.secondary)
-                        .opacity(hovering ? 1 : 0)
+                        .opacity(hovering ? 1 : 0.35)
                 }
             }
             .font(.sFootnote.weight(.semibold))
@@ -613,7 +628,7 @@ private struct TodoPriorityMenu: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .frame(width: 70, alignment: .trailing)
+        .frame(width: slot, alignment: .trailing)
         .animation(Motion.hover, value: hovering)
         .help("Priority")
         .accessibilityLabel(spoken)

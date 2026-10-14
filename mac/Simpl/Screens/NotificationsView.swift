@@ -3,7 +3,8 @@ import SwiftUI
 /// Notifications: what is overdue, due soon, graded, commented on, said and announced, by day, with a filter by kind.
 /// A row opens its work and is marked read; under the pointer it offers Read and Clear, and its context menu has them
 /// too. Read and cleared marks stay on this Mac; cleared ones can be brought back. (1.2) On a wide window the kinds sit
-/// down a side column with their counts, Mark All Read, Clear All and Restore under them.
+/// down a side column with their counts, and Restore under them. (planning-10) Mark All Read and Clear All are the
+/// toolbar's, at any width: one copy of each.
 struct NotificationsView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<NotificationsData>()
@@ -124,25 +125,11 @@ struct NotificationsView: View {
             }
             .padding(8)
             .card()
-            GlassGroup(spacing: 8) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Button { mark("all", read: true) } label: {
-                        Label("Mark All Read", systemImage: "envelope.open").frame(maxWidth: .infinity)
-                    }
-                    .glassButton()
-                    .disabled(d.unread == 0)
-                    Button(role: .destructive) { confirmClear = true } label: {
-                        Label("Clear All", systemImage: "trash").frame(maxWidth: .infinity)
-                    }
-                    .glassButton()
-                    .disabled(d.total == 0)
-                    if let cleared = d.cleared, cleared > 0 {
-                        Button { mark([], restore: true) } label: {
-                            Label("Restore \(cleared) Cleared", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
-                        }
-                        .glassButton()
-                    }
+            if let cleared = d.cleared, cleared > 0 {
+                Button { mark([], restore: true) } label: {
+                    Label("Restore \(cleared) Cleared", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
                 }
+                .glassButton()
                 .controlSize(.large)
             }
         }
@@ -196,8 +183,9 @@ struct NotificationsView: View {
     }
 }
 
-/// A notification: its kind's symbol on its colour, its title (heavier while unread, with the blue dot), its line and
-/// its kind; under the pointer, Read and Clear at its end.
+/// A notification: its kind's symbol on its colour, its title (heavier while unread, with the blue dot) and its line;
+/// under the pointer, Read and Clear at its end. (planning-16) The kind is said by its symbol alone — its word is the
+/// symbol's tooltip and is spoken — so most rows are two lines.
 private struct NotificationRow: View {
     let row: NotifRow
     let open: () -> Void
@@ -209,6 +197,7 @@ private struct NotificationRow: View {
         RowLink(action: open) {
             HStack(alignment: .top, spacing: 12) {
                 IconTile(symbol: NotificationRow.icon(row.cat), color: NotificationRow.tone(row.cat), size: 32)
+                    .help(row.catLabel)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.title)
                         .font(.sBody.weight(row.read ? .regular : .semibold))
@@ -216,7 +205,6 @@ private struct NotificationRow: View {
                     if let sub = row.sub, !sub.isEmpty {
                         Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(3)
                     }
-                    Text(row.catLabel).font(.sFootnote.weight(.semibold)).foregroundStyle(NotificationRow.tone(row.cat))
                 }
                 Spacer(minLength: 8)
                 ZStack(alignment: .topTrailing) {
@@ -244,6 +232,7 @@ private struct NotificationRow: View {
                 .frame(width: 60, alignment: .topTrailing)
             }
         }
+        .accessibilityLabel([row.catLabel, row.title, row.sub ?? "", row.read ? "" : "unread"].filter { !$0.isEmpty }.joined(separator: ", "))
         .onHover { h in withAnimation(Motion.hover) { hover = h } }
         .contextMenu {
             Button("Open", action: open).disabled(row.url == nil)
