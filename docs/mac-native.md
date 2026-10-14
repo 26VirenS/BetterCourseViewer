@@ -215,7 +215,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   view with picking, hover, selection and labels with leader lines, a step-through with its keys, and §3.8's colours
   (`Tools/Biology/Model` is Foundation only and checked by CI's Models job, with the toolkit's self-check). A launch
   opens a tool in a state for pictures: `-SimplTool cell -SimplToolState plant:cutaway`; `-SimplBioCheck YES` prints
-  the self-check. The foundation's API, for the tools' builders: `docs/mac-biology.md`.
+  the self-check. The foundation's API, each tool's files, launch states and hand-offs, and their pictures:
+  `docs/mac-biology.md`.
   The *Biomolecule Builder* (`Tools/Biology/BiomoleculeTool.swift` and `Biomol*.swift`; its models in
   `Model/Biomol*.swift`, checked by the Models job as `biomol.*`): five pages sharing one state (`BiomolState`) and the
   chemistry builder's look (CPK colours and radii; ball and stick, space filling, sticks; Colour by element, part or

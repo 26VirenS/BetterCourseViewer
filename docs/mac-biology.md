@@ -1,9 +1,12 @@
-# The biology toolkit on the Mac: the foundation
+# The biology toolkit on the Mac
 
 Ten tools under a **Biology** heading on the Tools page (spec §2): `cell` Cell Explorer, `dna` DNA & RNA, `gene` Gene
 Expression, `biomol` Biomolecule Builder, `cross` Genetics Crosses, `divide` Cell Division, `popgen` Hardy–Weinberg,
 `biolab` Bio Lab Calculator, `enzyme` Enzyme Lab, `energy` Photosynthesis & Respiration. Each is pinnable like any
-tool. This page is for the people building them: what the foundation gives you, and which files are yours.
+tool. This page is for the people working on them: what the shared foundation gives, then each tool's files, launch
+states and hand-offs, and the pictures CI takes of them. The Windows app has the same ten (on the Windows branch,
+`windows/SimplFluent/Tools/Biology/README.md`); where the two must agree — the hand-offs' keys, the rounding, the
+seeds — it says so here.
 
 ## Files
 
@@ -35,10 +38,11 @@ mac/Simpl/Tools/Biology/
     <Tool>Model.swift     each tool's own model and its `<key>Checks` — yours
 ```
 
-**Yours:** `<Tool>Tool.swift` (and any new view files) and `Model/<Tool>Model.swift` (and any new Foundation-only model
-files in `Model/`; CI compiles the whole folder). Never edit `BioTools.swift`, `Tools.swift` or `PinnedTools.swift`.
-Keep `Model/` free of AppKit, SwiftUI, SceneKit and `simd` (use `BioV`). The Xcode project is a synchronized folder: a
-new file is in the app without a project edit (and do not put a `.md` or other resource in `mac/Simpl/`).
+A tool's own files are `<Tool>Tool.swift` (and its other view files) and `Model/<Tool>Model.swift` (and its other
+Foundation-only model files in `Model/`; CI compiles the whole folder). `BioTools.swift`, `Tools.swift` and
+`PinnedTools.swift` are shared by all ten. Keep `Model/` free of AppKit, SwiftUI, SceneKit and `simd` (use `BioV`).
+The Xcode project is a synchronized folder: a new file is in the app without a project edit (and do not put a `.md`
+or other resource in `mac/Simpl/`).
 
 ## Registration (done)
 
@@ -51,7 +55,9 @@ new file is in the app without a project edit (and do not put a `.md` or other r
   each `init(openFull: ([String: String]) -> Void)` — call `openFull(["sequence": "AUG…"])` to open the whole tool with
   something. Width: gene 420, cross 400, biolab 380, popgen 360. The other six show `BioQuickOpen`.
 - **Pages:** list them in `static let pages` (`BioPage(id:title:symbol:help:)`); the header shows them
-  (`BioHeaderControls`, glass buttons, squished to symbols when tight). Read the page with
+  (`BioHeaderControls`, glass buttons). The heading (`ToolHeader`) takes the first of three that fits beside the
+  tool's whole name — the pages' names and "Pin to Toolbar"; the pages as symbols with the pin's words; symbols alone,
+  the name shortened — so it is never wider than the window (a wider one widened the whole tool under it). Read the page with
   `@ObservedObject private var nav = BioNav.shared` and `nav.page(.cell)`; change it with `nav.set(.cell, "plant")`. It
   is remembered (`SimplBio.cell.page`).
 - **Prefs:** `BioPrefs.string/bool/set(.cell, "field", …)` → UserDefaults `SimplBio.<key>.<field>` (§3.2).
@@ -66,8 +72,10 @@ that page by itself. Read the rest with `state?.has("cutaway")` and `state?.valu
 same way: `-SimplBioSeq ATGC` is `value("Seq")`, `-SimplBioStep 4` is `value("Step")`, `-SimplBioPage <page>` picks
 the page. Apply it once, on first appear. `-SimplBioCheck YES` prints the self-check on the console
 (`bio-check <name> <value> <OK|FAIL>`, then `bio-check summary n/m OK`). `-SimplToolsScroll biology` scrolls the Tools
-page to the Biology section. Add your pictures to `scripts/dev/mac-shots.sh`, e.g.
-`SIZE=1440x920 shoot light-56c-cell-plant 16 -SimplPlace tools -SimplTool cell -SimplToolState plant:cutaway`.
+page to the Biology section. The pictures are in `scripts/dev/mac-shots.sh` (see **Pictures** below):
+`bio both 57c-cell-plant 18 cell plant:select=chloroplast` opens a tool at 1440×920 in light and dark. A picture's
+launch keeps the tools' settings in a suite of its own that starts empty (`BioPrefs`), so one picture's choices never
+show in the next.
 
 ## Data (Model, any thread)
 
@@ -176,7 +184,9 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   translucent membranes), hover outlines and shows a hand, the selection glows and the rest dims to 35%,
   ← → ↑ ↓ turn 15°, + − zoom, Escape deselects, double-click zooms (or resets on empty space). Labels with leader
   lines (§3.5: two columns, 22 pt apart, ≤ 14 with "+N more", 120 ms fades, pressable) come from `labels`; give a
-  convex shell's label a `normal`, else a ray decides what hides it. `BioSceneCard { bar } scene: { … }` and
+  convex shell's label a `normal`, else a ray decides what hides it. Each label's capsule is its words measured at
+  12 pt semibold plus its padding (`BioLabelWidth.of`; `BioLabelLayout.estimatedWidth` is only the model's guess), so
+  none is cut short. `BioSceneCard { bar } scene: { … }` and
   `BioSceneButtons(turning:reset:)` give the chemistry builder's card. Auto-turn is off by default and never under
   Reduce Motion.
 
@@ -196,6 +206,33 @@ for ← → Space Home End 1–9. Draw with
 `.hex(dark:)` (for `BioMaterial`). `BioColor.base`, `BioColor.aminoAcid`. Never colour alone: show the letter or a
 `BioLegend`. Pieces: `BioHeading`, `BioCard(title:swatch:subtitle:) { BioFactRow(label:text:) … }`, `BioValueRow`,
 `BioLegend`, `BioSequenceText`, `PTWorkLayout { left } centre: { } right: { }` (the chemistry layout).
+
+## Numbers shown
+
+Every number a tool shows is rounded **half up on its decimal digits**, as everywhere in the apps and on Windows:
+3.425 → 3.43 (though it is held as 3.42499…), 1/16 → 6.3%, 0.125 → 0.13, −2.5 → −3. Write it with
+`String(halfUp: "%.2f g/mol", mass)` — `String(format:)` with every fixed-point number rounded so first — or
+`x.bioHalfUp(2)` (`BioMath.swift`); `String(format:)` alone rounds the binary value and a true tie to even. A
+`NumberFormatter` gets `roundingMode = .halfUp`. The Bio Lab Calculator's `BioLabFormat` rounds the same way with its
+significant figures (§5.5). The self-check's `format.half-up` line covers ties, signs and a `%d` beside a `%.1f`.
+
+## Hand-offs between the tools
+
+`BioTools.open(<tool>, info: [...])`; the tool takes each key once (`ToolsCenter.shared.takeInfo`). The keys are the
+same in both apps; where a tool also reads the Windows app's older names, they are listed:
+
+| From → to | Keys |
+|---|---|
+| Cell Explorer → Bio Lab Calculator ("Why are cells small?") | `savShape` (`sphere`, `box`, `cylinder`), `savSize` (a sphere's diameter; a box's `l,w,h`; a cylinder's `d,l`), `savUnit`, `from` = `cell`; the calculator also reads Windows' `calc=sav`, `mode`, `r`, `s`, `l`, `w`, `h` (`BioLabSAVHandOff`) |
+| Cell Explorer → Biomolecule Builder ("See a real phospholipid" → Open) | `molecule` = `POV` |
+| Gene Expression → Biomolecule Builder | `protein` (one-letter codes) with `page` = `proteins`; `molecule` (an amino acid's three letters) with `page` = `amino` |
+| DNA & RNA ⇄ Gene Expression | `sequence` (and `page`); Gene Expression also takes `codon`, `mutation` |
+| Biomolecule Builder → Gene Expression (haemoglobin's sickle-cell marks) | `mutation` = `sickle` |
+| Biomolecule Builder → DNA & RNA (a strand) | `sequence` |
+| Cell Division → DNA & RNA (S phase) | `page` = `replication` |
+| any → Genetics Crosses / Hardy–Weinberg | `cross`, `chi`; `given` + `value`, `counts` |
+| any → Biomolecule Builder | `sequence` (≤ 12 ACGT letters: the strand builder; else the peptide builder), `molecule` (an amino acid, nucleotide, sugar or lipid code), `page` |
+| any → Flashcards | `deck` |
 
 ## Self-check (§10.1)
 
@@ -229,6 +266,149 @@ inside's labels), `cell:<kind>` (Compare), `part:<id>…` and `side:outside|insi
 Launch states: `animal|plant|bacterium[:nocut][:nolabels][:true][:gram+][:explode=0.6][:show=flagellum,amyloplast]`
 `[:select=<part>|:isolate=<part>|:inside=mito|chloroplast|nucleus][:quiz=find|name]`; `membrane[:select=<id>][:osmosis]`
 `[:still][:nolabels][:popc]`; `compare`; `-SimplBioCell animal|plant|bacterium` picks the cell. "Why are cells small?"
-opens the Bio Lab Calculator's `cells` page with `["from": "cell", "savShape": "sphere"|"rectangular"|"cylinder",
-"savSize": "18.9" | "44,26,26" | "1,2", "savUnit": "µm"]`; "Make flashcards" adds a Flashcards set and opens it
-(`["deck": id]`).
+opens the Bio Lab Calculator's `cells` page with `["from": "cell", "savShape": "sphere"|"box"|"cylinder",
+"savSize": "18.9" | "44,26,26" | "1,2", "savUnit": "µm"]` (the calculator's surface area and volume card takes the
+cell, with a line saying so); "Make flashcards" adds a Flashcards set and opens it (`["deck": id]`).
+
+## DNA & RNA (`dna`)
+
+The `dna` tool (spec §4.2). Five pages, chosen in the tool's header: **Double helix**, **Nucleotides**, **Sequence**, **Replication** and **RNA**.
+
+### Files
+
+```
+mac/Simpl/Tools/Biology/
+  DNATool.swift            the tool: its pages, the store they share (DNAStore: the sequence, each page's choices and
+                           selection, replication's step-through; remembered as SimplBio.dna.<field>), the launch state,
+                           the hand-off, and 3D text (DNASceneText; DNAMarkShelf carries a scene's words to the main thread)
+  DNAHelixPage.swift       the double helix: controls, the 3D view, the pair/backbone/groove cards, the pairs as buttons
+  DNANucleotidesPage.swift the nucleotides in 3D, their cards, DNA against RNA, and the bases in 2D (DNABasesPanel)
+  DNASequencePage.swift    a strand, its complement and reverse complement, and its facts
+  DNAReplicationPage.swift the replication fork: the drawing (DNAForkDrawing), the enzymes, the step card
+  DNARNAPage.swift         the tRNA cloverleaf, its 3D L-shape, the mRNA strip (DNAMRNAStrip) and the ribosomes
+  Model/                   Foundation only, checked by the Models job
+    DNAToolModel.swift     what the pages share (atom look, 3D text marks, cones, tube pieces) and dnaChecks
+    DNAHelixModel.swift    the helix's scene: cartoon, atoms, ends, grooves, measurements, unzip; picking; pair facts
+    DNANucleotideModel.swift  the nucleotides' parts, labels, numbers and differences; the bases and pairs in 2D
+    DNASequenceModel.swift the Sequence page's facts
+    DNAReplicationModel.swift  the nine steps and their keyframes
+    DNARNAModel.swift      the mRNA strip's parts, the cloverleaf's layout, the L-shape and the ribosomes
+```
+
+### What the models promise (and `dnaChecks` checks)
+
+- **Helix**: §6.7's atoms (BioBDNA), right-handed on both strands, 10.5 bp and 35.7 Å a turn. Cartoon: a tube (1.1 Å)
+  through each strand's P atoms, a piece per nucleotide; each base a rounded box from its C1′ toward its partner's, the
+  purine's 58% and the pyrimidine's 42% of C1′–C1′ less the 1.0 Å gap (so they fill it exactly); 2 white dashes for A·T,
+  3 for G·C. Atoms: every heavy atom with the chemistry radii, H-bonds dashed (0.08 Å) between §6.5's atoms. Strand 1's
+  5′ end at the bottom, strand 2's at the top; arrowheads point up strand 1 and down strand 2. Grooves: 148.45° (minor)
+  and 211.55° of arc; widths 6.6 and 11.6 Å (P–P less 5.8 Å). Unzip opens pair k once unzip > k/n, 8 Å apart.
+- **Ids** (what a press picks): `pair:<k>:<strand>:base`, `pair:<k>:<strand>:bb` (`:a<i>` per atom in the atom
+  views, `:arrow` for an arrowhead), `pair:<k>:hb`, `groove:major|minor`; selecting `pair:<k>` lights both
+  nucleotides. Nucleotides: `part:phosphate|sugar|base:a<i>`, `part:glyco`, `diff:2prime|methyl`. tRNA:
+  `arm:<arm>:<i>`, `arm:<arm>:rung<i>`.
+- **Nucleotides**: every atom of the nine in a part (phosphate with O5′, sugar, base), the parts' heavy atoms counted;
+  the masses equal the Sequence page's; numbers 1′–5′ and 1–9; A·T, G·C and A·U in 2D with H-bond lengths from the 3D
+  model (2.84/2.91; 2.87/2.79/3.00 Å).
+- **Sequence**: counts, GC, exact masses (5 of each base: 6196.87 g/mol), Tm (Wallace to 14 nt), Chargaff (50%),
+  complement against reverse complement, RNA's own masses.
+- **Replication**: nine steps, each naming its enzyme; the fork only moves on; the leading strand grows toward it; three
+  Okazaki fragments, each begun at its 5′ end (nearer the fork) from its own primer; primers replaced, nicks sealed,
+  semiconservative at the end.
+- **RNA**: the mRNA's coding sequence from its AUG at 14 reads MAFSDWQKG; the cloverleaf obeys §4.2's layout (stems 1.0
+  and 1.6, loop radius (m + 1)/(2π) × 1.05, arms up/left/down/right, the variable loop lower right, the codon UUC
+  under the anticodon GAA, antiparallel); the L-shape is turned (a rotation) so the elbow is top left, the acceptor arm
+  runs right and the anticodon arm down; anticodon to 3′ end 72 Å.
+
+### Launch state (pictures)
+
+`-SimplTool dna -SimplToolState <page>[:options]`, and the specification's flags (`-SimplBioDNAStyle`, `-SimplBioSeq`,
+`-SimplBioStep`, `-SimplBioPage`):
+
+- `helix:style=atoms|space|cartoon:grooves:measure:noends:nohbonds:nolabels:unzip=0.5:pair=3:seq=ATGC…`
+- `nucleotides:mol=DT:numbers:compare:noparts:part=sugar`, `nucleotides:pairs[:au]` (the 2D bases)
+- `sequence:seq=ATGC…`
+- `replication:step=4`
+- `rna:view=cloverleaf|lshape|mrna|ribosomes:modified:base=34:arm=anticodon`
+
+### Hand-off
+
+Gene Expression (or any tool) can open DNA & RNA with `BioTools.open(.dna, info: ["sequence": "ATG…"])` (the Sequence
+page, or `"page": "helix"`), or `["nucleotide": "DT"]`. The Sequence page's "Transcribe in Gene Expression" hands
+`["sequence": <coding strand>]` to `gene`.
+
+## Gene Expression (`gene`)
+
+`GeneExpressionTool.swift` (the tool, `GXStore` — what it remembers, `SimplBio.gene.*` — the launch, the hand-off and
+the pin's quick codon lookup `GeneExpressionCompact`), `GeneExpressionExpressPage.swift` and
+`GeneExpressionScene.swift` (transcription one nucleotide a step, processing — cap, poly-A tail, splicing at GU…AG,
+export — and translation one codon a step, on the shared step-through; a prokaryote's version without the intron, with
+the Shine–Dalgarno region), `GeneExpressionCodonsPage.swift` (§6.1's grid and the wheel, lookup both ways, an amino
+acid's card), `GeneExpressionFramesPage.swift` (six frames, the ORF finder), `GeneExpressionMutationsPage.swift` (every
+class of §4.3, the sickle-cell preset). Model: `GeneExpressionModel.swift`, `GeneExpressionProcess.swift` (the steps:
+the teaching gene 99, a prokaryote 68), `GeneExpressionMutations.swift`; checks `gene.*`.
+
+Launch states: `express:eukaryote|prokaryote:gene=teaching|hbb|own:seq=…:step=<n>`; `codons[:wheel][:dna][:find=Leu]`;
+`frames:example=<n>[:min=<codons>]`; `mutations:sickle` or `mutations:mutgene=teaching:mut=c.6_7insA`.
+`-SimplPinCodon UGG` fills the pin's codon field. Takes `sequence`, `codon`, `mutation` (`sickle` or a `c.…` change)
+and `page`; the last step's "Open in Biomolecule Builder" hands over the protein.
+
+## Biomolecule Builder (`biomol`)
+
+`BiomoleculeTool.swift` (pages, launch, hand-offs), `BiomolState.swift` (one state for the five pages, remembered),
+`BiomolNodes.swift`, `BiomolUI.swift`, and a page file each: `BiomolAminoPage`, `BiomolProteinPage`,
+`BiomolNucleicPage`, `BiomolCarbPage`, `BiomolLipidPage`. Model: `BiomoleculeBuilderModel.swift` (input, easing,
+`biomolChecks`), `BiomolPeptide.swift` (§6.4: NeRF backbone, side chains, clash relief, proline's rule),
+`BiomolProteins.swift` (ubiquitin 1UBQ, haemoglobin 2HHB), `BiomolMolecules.swift`, `BiomolScenes.swift`.
+"Open in Molecule Builder" hands the atoms to the Periodic Table's builder, which keeps their shape
+(`MoleculeModel.load(handOff:)`, `fixedShape`).
+
+Launch states (the page first): any page `style=ball|space|sticks`, `colour=element|part|class`, `neutral`,
+`nolabels`, `h=on|off`, `select=<id>`; `amino:aa=W[:dform]`; `proteins[:build][:level=primary|secondary|tertiary|
+quaternary][:seq=…][:ss=helix|strand|coil|<letters>][:nohbonds][:ribbon=off|over|only][:sheet][:core|:surface]
+[:denatured]`; `nucleic[:nt=ATP][:strand:seq=ATGCGT][:complement]`; `carbs[:mono=GLC][:anomers][:di=MAL][:split]
+[:poly=cellulose]`; `lipids:lipid=POV|compare`.
+
+## Cell Division (`divide`)
+
+`CellDivisionTool.swift` (four pages: Mitosis, Meiosis, Compare, Cell cycle), `CellDivisionCanvas.swift` (the cell in
+2D, its labels and badges), `CellDivisionPanels.swift` (the counts panel, always shown, with human values),
+`CellCycleView.swift` (the wheel, three checkpoints, cyclins, the cancer view; S phase opens DNA & RNA's Replication
+page). Model: `CellDivisionModel.swift`, `CellDivisionGeometry.swift`, `CellDivisionKeyframes.swift` (9 and 11 steps;
+meiosis' interphase split into G1, S and G2), `CellDivisionPainter.swift` (the drawing as a list of shapes, so the
+counts are counted from the keyframe itself); checks `divide.*`. Where it departs from §5.2.4 (both apps): plate
+spacing at least 0.22 / 0.16 and 0.08 between chromosomes where there is room; in prophase I the facing non-sister
+chromatids 0.05 apart; telophase arms at ±25°; nondisjunction acts on the short pair.
+
+Launch states: a page, then `plant`, `2n=6`, `nocross`, `chiasma=0.3`, `flip`, `nd=1|2`, `nolabels`, `step=<n>`,
+`pick=<chromatid>`, `part=<label>`; on Cell cycle `gate=g1s|g2m|spindle` or `phase=g1|s|g2|m|g0`, `cancer`.
+`-SimplBioCell plant` and `-SimplBioStep <n>` read the same.
+
+## Bio Lab Calculator (`biolab`), Enzyme Lab (`enzyme`), Photosynthesis & Respiration (`energy`)
+
+- **Bio Lab Calculator** (`BioLabTool.swift`; `Model/BioLabModel.swift`, `Model/BioLabCalculators.swift`): 26
+  calculators on six pages (`solutions`, `microscopy`, `cells`, `stats`, `ecology`, `molecules`), each a card with the
+  formula, fields with unit menus, "solve for", the answer to §5.5's significant figures (3 by default, 2–6 in the
+  page's menu, never more than one past the least precise input), the numbers substituted and "Show steps". Inputs
+  are remembered per calculator (`SimplBio.biolab.calc.<id>`); the pin's C₁V₁ and molarity share them. Launch:
+  `<page>[:steps][:calc=<id>][:digits=<n>]`. Takes `calc`, and Cell Explorer's cell (above).
+- **Enzyme Lab** (`EnzymeLabTool.swift`; `Model/EnzymeLabModel.swift`): rate against [S], temperature and pH, linked;
+  inhibitors; denaturing is for good (the cooled curve dashed at a tenth), and "Fresh enzyme" while the sample is still
+  too hot puts the temperature at that enzyme's optimum (both apps). Launch:
+  `[competitive|noncompetitive][:denatured][:enzyme=human|taq|fish][:phpreset=pepsin|amylase|catalase|trypsin]
+  [:temp=<°C>][:ph=<pH>][:s=<mM>]`.
+- **Photosynthesis & Respiration** (`EnergyPathwaysTool.swift`; `Model/EnergyPathwaysModel.swift`): Map, Respiration,
+  Photosynthesis, Follow the atoms. Launch: `map[:stage=<id>][:respire]`, `respiration[:step=<n>][:ferment=lactate|
+  ethanol]`, `photosynthesis[:step=<n>]`, `atoms[:trace=oxygen|carbon][:step=<n>]`.
+
+## Pictures
+
+`scripts/dev/mac-shots.sh`'s `bio <light|dark|both> <name> <wait> <tool> <state>`. A push takes each tool once, in light
+(`bio_quick`): 57 the animal cell, 58a the helix measured, 59a a gene being transcribed, 61b the peptide builder, 62a a
+dihybrid cross, 63a metaphase, 64a Hardy–Weinberg worked out, 65a the lab's solutions, 66a a competitive inhibitor,
+67a the energy map at the Calvin cycle, beside 35b (the Tools page's Biology section). The full set (`bio_full`, a
+commit saying `[full shots]` or Run workflow → full) takes every tool's pages, in light and dark where the builders
+asked: 57–57l Cell Explorer, 58a–58l DNA & RNA, 59a–59k Gene Expression, 61a–61r Biomolecule Builder, 62a–62h Genetics
+Crosses, 63a–63j Cell Division, 64a–64d Hardy–Weinberg, 65a–65d Bio Lab Calculator, 66a–66b Enzyme Lab, 67a–67e
+Photosynthesis & Respiration, and the pins' quick versions 54b–54e. CI's runner shows a window about 1,024 × 683
+whatever is asked, so the pictures show each tool at the narrow end of a Mac's sizes.

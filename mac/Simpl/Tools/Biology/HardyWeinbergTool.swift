@@ -4,7 +4,7 @@ import SwiftUI
 // genotype bar and a 10 × 10 grid of people; a population's counts tested against equilibrium (χ², df = 1); and a
 // population simulated over generations — selection, mutation, migration, inbreeding and drift — with five condition
 // chips that light up when broken. The arithmetic is HardyWeinbergModel.swift's; this file has the tool, its state, the
-// Calculate page and the pin's quick version; HardyWeinbergTest.swift and HardyWeinbergSimulate.swift the other pages.
+// Calculate page and the pin's quick version; HardyWeinbergPages.swift the Test and Simulate pages.
 
 /// The genotypes' colours: AA blue, Aa orange, aa green-blue — validated together for colour-vision deficiency on light
 /// and dark, and always shown with their names.
