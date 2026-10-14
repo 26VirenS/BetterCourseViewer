@@ -715,9 +715,6 @@ public sealed partial class DashboardScreen : Screen
         Shot.Moved();
     }
 
-    /// <summary>The rows a panel shows before its list scrolls: about six, the panel's foot (See all) under them.</summary>
-    private const double PanelListMost = 340;
-
     private FrameworkElement PanelContent(Counter c, string key, double w)
     {
         var data = sheet.Data;
@@ -739,8 +736,8 @@ public sealed partial class DashboardScreen : Screen
         head.Background = Brushes.Transparent;
         head.MouseLeftButtonUp += (_, e) => { if (e.OriginalSource is not DependencyObject o || !IsInside(o, close)) SetOpen(null); };
 
+        // (the list under the header, scrolling past about five rows, and nothing under it: the panel as 0.2.9 had it)
         FrameworkElement body;
-        FrameworkElement? foot = null;
         if (data == null)
         {
             body = sheet.Error is { } err ? K.Empty(SymbolRegular.ErrorCircle24, err) : K.Reading("Loading…");
@@ -750,28 +747,10 @@ public sealed partial class DashboardScreen : Screen
         {
             var sections = new Stack { Orientation = Orientation.Vertical, Spacing = 14 };
             foreach (var s in data.Sections) sections.Children.Add(Section(key, s));
-            body = new ScrollViewer { Content = sections, MaxHeight = PanelListMost, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-            foot = SeeAll(key, n.Value ?? data.Sections.Sum(s => s.Rows.Count));
+            body = new ScrollViewer { Content = sections, MaxHeight = 260, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         }
         var all = K.V(14, head, K.Divider(), body);
-        if (foot != null) all.Children.Add(foot);
-        return new Border { Child = all, Padding = new Thickness(18, 14, 14, foot != null ? 10 : 16) };
-    }
-
-    /// <summary>The panel's way on to the whole list, so it is never a dead end: the work in To Do (which lists it day by
-    /// day), the grades in Grades, the announcements among the notifications.</summary>
-    private FrameworkElement SeeAll(string key, int count)
-    {
-        var (words, place) = key switch
-        {
-            "graded" => ("See all in Grades", Place.Grades),
-            "unread" => ("See all in Notifications", Place.Notifications),
-            _ => (count > 0 ? $"See all {count} in To Do" : "See all in To Do", Place.Todo),
-        };
-        var link = K.Link(words, () => { SetOpen(null); engine.Go(place); });
-        link.HorizontalAlignment = HorizontalAlignment.Left;
-        link.Margin = new Thickness(-6, -6, 0, 0);
-        return link;
+        return new Border { Child = all, Padding = new Thickness(18, 14, 14, 16) };
     }
 
     private static bool IsInside(DependencyObject o, DependencyObject container)
@@ -781,10 +760,9 @@ public sealed partial class DashboardScreen : Screen
     }
 
     /// <summary>
-    /// A section of the panel: its title, its rows — each the Dashboard's one row of work (its course and kind over its
-    /// title, when at its right with what to say about it under that: "10 pts", "Missing · 15 pts", "19 / 19"), a
-    /// chevron to its quick look, or Dismiss. A page from before those fields came draws a row as it did: a bar of the
-    /// course's colour, the title, its line.
+    /// A section of the panel: its title, its rows as 0.2.9 drew them — a bar of the course's colour, the title, and under
+    /// it the engine's one line about it ("F26-MATH 021 20 · 10 pts · due 11:59 PM") — each with a chevron to its quick
+    /// look, or Dismiss.
     /// </summary>
     private FrameworkElement Section(string key, SheetSection s)
     {
@@ -794,25 +772,10 @@ public sealed partial class DashboardScreen : Screen
         foreach (var row in s.Rows)
         {
             var rq = row.Quiet == true;
-            var title = K.Wrapped(row.Title, Ty.Body, rq ? B.Text2 : B.Text, 2);
-            Grid g;
-            if (row.When != null || row.Course != null || row.Kind != null)
-            {
-                var tint = K.Hex(row.Color);
-                if (rq) tint = K.Mix(tint, Color.FromRgb(0x8a, 0x8a, 0x8a), 0.5);
-                // (the symbol as Coming up chooses it — the row's kind first, so a quiz wears the quiz's symbol here too; in
-                //  the Announcements panel no kind word under each row: the panel's title and the megaphone say it)
-                var symbol = key == "unread" ? SymbolRegular.Megaphone24 : row.Kind != null ? Glyph.Work(row.Kind) : WorkPreview.KindOf(row.Url)?.Item2 ?? Glyph.Work(null);
-                g = K.Columns("*, auto", WorkFace(tint, symbol, row.Course, key == "unread" ? null : row.Kind, null, title, row.Detail, row.When, stacked: true, tileSize: 28).Col(0));
-            }
-            else
-            {
-                var bar = new Border { Width = 4, CornerRadius = new CornerRadius(2), Background = K.Brush(K.WithAlpha(K.Hex(row.Color), rq ? 0.5 : 1)), Margin = new Thickness(0, 2, 12, 2) };
-                var words = K.V(1, title);
-                if (!string.IsNullOrEmpty(row.Sub)) words.Children.Add(K.Text(row.Sub!, Ty.Caption, B.Text2));
-                g = K.Columns("auto, *, auto", bar.Col(0), words.Col(1));
-            }
-            var last = g.ColumnDefinitions.Count - 1;
+            var bar = new Border { Width = 4, CornerRadius = new CornerRadius(2), Background = K.Brush(K.WithAlpha(K.Hex(row.Color), rq ? 0.5 : 1)), Margin = new Thickness(0, 2, 12, 2) };
+            var words = K.V(1, K.Wrapped(row.Title, Ty.Body, rq ? B.Text2 : B.Text, 2));
+            if (!string.IsNullOrEmpty(row.Sub)) words.Children.Add(K.Text(row.Sub!, Ty.Caption, B.Text2));
+            var g = K.Columns("auto, *, auto", bar.Col(0), words.Col(1));
             var clearable = row.Clearable == true && row.Key != null;
             if (clearable)
             {
@@ -820,12 +783,12 @@ public sealed partial class DashboardScreen : Screen
                 var dismiss = K.Button("Dismiss", () => Clear(k));
                 dismiss.MinWidth = 0;
                 dismiss.Margin = new Thickness(8, 0, 0, 0);
-                g.Children.Add(dismiss.Col(last));
+                g.Children.Add(dismiss.Col(2));
                 v.Children.Add(K.Card(g, new Thickness(8), 4).Bg(B.Subtle));
             }
             else if (row.Url != null)
             {
-                g.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 12, B.Text3).Margin(8, 0, 0, 0).Col(last));
+                g.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 12, B.Text3).Margin(8, 0, 0, 0).Col(2));
                 var r = row;
                 var b = K.Subtle(g, null, new Thickness(8, 7, 8, 7));
                 b.Click += (_, _) => WorkPreview.Press(WorkPreview.Sheet(r, key, engine), b);

@@ -551,14 +551,20 @@ no picture of the one before it to move from: it arrives by its own entrance (th
 
 A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grows a card out of itself with
 `WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
-Calendar's `CalendarPeek`). The card reads the work's details as it opens — about five lines of what the work says,
-its lists, bold and links kept (`RichText`), fading out where it runs on — Mark done ticks it, a double-click or a
-Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row. It is a
-light-dismiss flyout: nothing behind it is dimmed.
+Calendar's `CalendarPeek`). The card reads the work's details as it opens — the first words of what the work says, as
+plain lines, up to five — Mark done ticks it, a double-click or a Ctrl-click opens the work whole, and a click round
+it, Escape or Close folds it back into its row. It is a light-dismiss flyout: nothing behind it is dimmed, and the app
+round it goes on working.
 
-The card is one width (440, as the Mac's card; narrower only on a page too narrow for it) whatever it grew from — a
-month's narrow chip as a Dashboard row — and says where the work stands once: a graded piece's score and letter as one
-chip, the engine's `grade.chip` ("13/16 · B−"), with no "Graded" beside it; Late, Missing and Submitted stay.
+The card is 0.2.9's: as wide as the row it grows out of and a little more, from 300 (a month's narrow chip) to 420 (a
+list's row), never wider than the page. It says where the work stands once: a graded piece's score and letter as one
+chip, the engine's `grade.chip` ("13/16 · B−"), with no "Graded" beside it; Late, Missing and Submitted stay. From a
+counter's panel (`WorkPreview.Sheet`) it reads the row's parts — its course, its detail, its day — and says the due
+once, on its clock line ("Due today at 11:59 PM", "Was due Oct 13"), never again as a line of detail.
+
+A counter's panel (`DashboardScreen.PanelContent`) is 0.2.9's too: the counter's symbol, name and number with the
+engine's line beside it, and its list — each row a bar of its course's colour, its title and the engine's one line about
+it (`sub`), a chevron to its quick look (or Dismiss, in Overdue) — scrolling past about five rows, nothing under it.
 
 ## Files with a message
 

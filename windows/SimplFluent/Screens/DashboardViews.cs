@@ -72,10 +72,10 @@ public sealed partial class DashboardScreen
     }
 
     /// <summary>
-    /// The Dashboard's one row of work — Coming up's, Today's and a counter panel's alike, so the same work reads the same
-    /// wherever it shows: its kind's symbol on a tile of its course's colour; its course and kind (with its flags) over
-    /// its title; its points and when it is due at its right — side by side in a wide list, the time over the points
-    /// where the row is narrow (the rail beside the view, a counter's panel).
+    /// The Dashboard's one row of work — Coming up's and Today's alike, so the same work reads the same wherever it
+    /// shows: its kind's symbol on a tile of its course's colour; its course and kind (with its flags) over its title;
+    /// its points and when it is due at its right — side by side in a wide list, the time over the points where the row
+    /// is narrow (the rail beside the view).
     /// </summary>
     internal static Grid WorkFace(Color color, SymbolRegular symbol, string? course, string? kind, IEnumerable<WorkFlag>? flags, TextBlock title,
         string? points, string? when, bool stacked, double tileSize = 32, double whenWidth = 0)
@@ -83,8 +83,8 @@ public sealed partial class DashboardScreen
         var tile = K.IconTile(symbol, color, tileSize);
         tile.VerticalAlignment = VerticalAlignment.Center;
         var meta = new WrapPanel { Orientation = Orientation.Horizontal };
-        // (the course and the kind as two pieces, so a narrow row — the rail, a counter's panel — takes the kind onto a
-        //  second line rather than cutting it: "F26-MATH 021 20 ·" then "Assignment")
+        // (the course and the kind as two pieces, so a narrow row — the rail — takes the kind onto a second line rather
+        //  than cutting it: "F26-MATH 021 20 ·" then "Assignment")
         var hasCourse = !string.IsNullOrEmpty(course);
         var hasKind = !string.IsNullOrEmpty(kind);
         if (hasCourse) meta.Children.Add(K.Text(hasKind ? course + " ·" : course!, Ty.Caption, B.Text2).Margin(0, 0, hasKind ? 4 : 8, 0));

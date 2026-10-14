@@ -59,9 +59,6 @@ public static class WorkPreview
     private static (string Id, DateTime At)? lastPress;
     private static int token;
 
-    /// <summary>The card's width (the Mac's about 460 points).</summary>
-    private const double CardWidth = 440;
-
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
 
     /// <summary>The shell's overlay over the page, where the card is drawn.</summary>
@@ -101,9 +98,9 @@ public static class WorkPreview
         anchor = from;
         var t = ++token;
         var room = host.ActualWidth;
-        // (one width, whatever it grew from — a month's narrow chip as a Dashboard row — as the Mac's card has: its
-        // header, its course and its Close side by side; narrower only on a page too narrow for it)
-        var w = Math.Min(CardWidth, Math.Max(280, room - 24));
+        // (as wide as the row it grows out of, a little more — from 300 for a month's narrow chip to 420 for a list's
+        // row — and never wider than the page: the card as 0.2.9 had it)
+        var w = Math.Min(420, Math.Max(300, Math.Min(room - 32, from.ActualWidth + 8)));
         var from0 = RowRect(from);
         var face = new CardFace(it, engine, w);
         face.Measure(new Size(w, double.PositiveInfinity));
@@ -295,20 +292,29 @@ public static class WorkPreview
         return it;
     }
 
-    /// <summary>A row of a counter's panel: its line under the title is "course · kind · points · when".</summary>
+    /// <summary>
+    /// A row of a counter's panel. The engine's rows (2.99.33) bring their parts one by one — the course, the detail
+    /// ("10 pts", "Missing · 15 pts", "13 / 16 · B−") and the day — and the card says each thing once: when the work is
+    /// due on its clock line (the row's day and time in Due today, Tomorrow and Next 7 days, "Was due Oct 13" in Overdue,
+    /// else the assignment's own once it is read), the points on theirs, and only what is left as its line of detail —
+    /// never the due a second time, nor Missing or a score that the card's chips say. A row from an engine before those
+    /// parts came is read from its one line ("course · kind · points · when").
+    /// </summary>
     public static PreviewItem Sheet(SheetRow row, string counter, Engine.Engine engine)
     {
-        var parts = (row.Sub ?? "").Split(" · ").Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
         var (kind, sym) = counter == "unread" ? ("Announcement", SymbolRegular.Megaphone24) : KindOf(row.Url) ?? ("Assignment", SymbolRegular.DocumentText24);
-        var kindWords = new HashSet<string> { "Assignment", "Quiz", "Discussion", "graded", "Page", "Event", "Peer review", "Announcement", "My task" };
-        var rest = parts.Skip(1).Where(x => !kindWords.Contains(x) && !x.EndsWith(" pts") && !x.EndsWith(" pt")).ToList();
-        var it = new PreviewItem
-        {
-            Id = $"sheet:{counter}:{row.Key ?? row.Url ?? row.Title}", Title = row.Title, Kind = kind, Symbol = sym, Color = row.Color,
-            Course = parts.FirstOrDefault() is { } c && c != "—" ? c : null, Points = PointsIn(row.Sub),
-            Detail = rest.Count == 0 ? null : char.ToUpperInvariant(string.Join(" · ", rest)[0]) + string.Join(" · ", rest)[1..],
-        };
+        var it = new PreviewItem { Id = $"sheet:{counter}:{row.Key ?? row.Url ?? row.Title}", Title = row.Title, Kind = kind, Symbol = sym, Color = row.Color };
         if (counter == "overdue" && row.Quiet != true) it.Flags = new() { new WorkFlag { Word = "Overdue", Kind = "bad" } };
+        if (row.Course != null || row.Detail != null || row.When != null) FromParts(it, row, counter);
+        else
+        {
+            var parts = Pieces(row.Sub);
+            var kindWords = new HashSet<string> { "Assignment", "Quiz", "Discussion", "graded", "Page", "Event", "Peer review", "Announcement", "My task" };
+            var rest = parts.Skip(1).Where(x => !kindWords.Contains(x) && !IsPoints(x)).ToList();
+            it.Course = parts.FirstOrDefault() is { } c && c != "—" ? c : null;
+            it.Points = PointsIn(row.Sub);
+            it.Detail = Sentence(rest);
+        }
         if (!string.IsNullOrWhiteSpace(row.Url))
         {
             it.Url = row.Url;
@@ -316,6 +322,57 @@ public static class WorkPreview
             if (counter != "unread") it.Work = (kind.ToLowerInvariant(), counter == "graded" || row.Quiet == true, true);
         }
         return it;
+    }
+
+    /// <summary>A counter's row read from its parts (see <see cref="Sheet"/>).</summary>
+    private static void FromParts(PreviewItem it, SheetRow row, string counter)
+    {
+        var detail = Pieces(row.Detail);
+        var when = string.IsNullOrWhiteSpace(row.When) ? null : row.When.Trim();
+        it.Course = string.IsNullOrWhiteSpace(row.Course) ? null : row.Course;
+        it.Points = detail.FirstOrDefault(IsPoints);
+        var rest = detail.Where(x => !IsPoints(x)).ToList();
+        switch (counter)
+        {
+            case "unread":
+                it.When = when == null ? null : $"Posted {when}";
+                rest.Clear();
+                break;
+            case "graded":
+                // (the score as its chip until the assignment's own comes — then the assignment's, once — and when it was
+                //  posted as its line)
+                if (rest.Count > 0) it.Flags = new() { new WorkFlag { Word = string.Join(" · ", rest), Kind = "info" } };
+                rest = when == null ? new() : new() { $"posted {when}" };
+                break;
+            case "overdue" when row.Quiet == true:
+                // (handed in late: the assignment's own due and its handing in say when; what came of it stays)
+                rest.RemoveAll(x => x.StartsWith("was due ", StringComparison.OrdinalIgnoreCase));
+                break;
+            case "overdue":
+                // (Missing is the card's chip — the assignment's own once read)
+                it.When = when == null ? null : $"Was due {when}";
+                rest.RemoveAll(x => x.Equals("Missing", StringComparison.OrdinalIgnoreCase));
+                break;
+            default:
+                // (due on the row's day, at the time the panel gives it: "Thu 10:30 AM" is Thursday's 10:30 AM)
+                it.When = When(DayWord(row.Date), when == null ? null : Regex.Replace(when, @"^[A-Za-z]{3}\s+(?=\d)", ""), true);
+                break;
+        }
+        it.Detail = Sentence(rest);
+    }
+
+    /// <summary>A line's parts, as the engine joins them (" · ").</summary>
+    private static List<string> Pieces(string? line) =>
+        (line ?? "").Split(" · ").Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+
+    private static bool IsPoints(string x) => x.EndsWith(" pts") || x.EndsWith(" pt");
+
+    /// <summary>Parts joined again as a line that starts with a capital ("Missing · was due Oct 13"), or null.</summary>
+    private static string? Sentence(List<string> parts)
+    {
+        if (parts.Count == 0) return null;
+        var s = string.Join(" · ", parts);
+        return char.ToUpperInvariant(s[0]) + s[1..];
     }
 
     /// <summary>What an address is, by its path (…/assignments/12 is an assignment), with its symbol.</summary>
@@ -361,8 +418,6 @@ public static class WorkPreview
         private AssignmentData? assignment;
         private PageData? page;
         private string? excerpt;
-        /// <summary>What the work says, as its HTML (its lists, bold and links kept), once it is read.</summary>
-        private string? excerptHtml;
         private bool loading;
         public event Action<double>? Resized;
 
@@ -408,8 +463,8 @@ public static class WorkPreview
                 facts.Children.Add(K.Columns("auto, *", K.Icon(sym, 14, B.Text2).Margin(0, 3, 9, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), t.Col(1)));
             }
             if (facts.Children.Count > 0) v.Children.Add(facts);
-            if (excerptHtml is { Length: > 0 } html && Formatted(html) is { } rich) v.Children.Add(rich);
-            else if ((excerpt ?? item.Excerpt) is { Length: > 0 } ex) v.Children.Add(K.Wrapped(ex, Ty.Body, B.Text2, 5));
+            // (the first words of what it says, as plain lines — up to five — as 0.2.9's card had them)
+            if ((excerpt ?? item.Excerpt) is { Length: > 0 } ex) v.Children.Add(K.Wrapped(ex, Ty.Body, B.Text2, 5));
 
             // what can be done: Mark Done at the start; its own action and Open at the end
             var actions = K.Columns("auto, *, auto");
@@ -558,50 +613,9 @@ public static class WorkPreview
 
         private void Show(AssignmentData? a, PageData? p)
         {
-            if (a != null) { assignment = a; excerpt = Plain(a.Html); excerptHtml = Lean(a.Html); }
-            if (p != null) { page = p; excerpt = Plain(p.Html); excerptHtml = Lean(p.Html); }
+            if (a != null) { assignment = a; excerpt = Plain(a.Html); }
+            if (p != null) { page = p; excerpt = Plain(p.Html); }
             Redraw();
-        }
-
-        /// <summary>About five lines of what the work says, as the school wrote it — its bullets, numbers, bold and links
-        /// (a link opened through the app, the card folding away) — in the card's quieter colour; what runs on fades out
-        /// at the fifth line rather than stopping mid-word. Null when there are no words in it.</summary>
-        private FrameworkElement? Formatted(string html)
-        {
-            if (excerpt == null) return null;
-            var e = engine;
-            var text = new RichText(html, url => { Dismiss(); e.GoTo(url); }, engine.BaseUrl, 14);
-            text.Document.SetResourceReference(System.Windows.Documents.FlowDocument.ForegroundProperty, B.Text2);
-            // (five of its lines: 14 at 1.45 each)
-            var most = Math.Ceiling(14 * 1.45 * 5) + 2;
-            text.Measure(new Size(Math.Max(120, width - 2 - 34), double.PositiveInfinity));
-            var holder = new Border { Child = text, MaxHeight = most, ClipToBounds = true };
-            if (text.DesiredSize.Height > most + 1)
-            {
-                var fade = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
-                fade.GradientStops.Add(new GradientStop(Colors.Black, 0));
-                fade.GradientStops.Add(new GradientStop(Colors.Black, 0.72));
-                fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
-                fade.Freeze();
-                holder.OpacityMask = fade;
-            }
-            return holder;
-        }
-
-        /// <summary>The work's HTML for the card: its words and their formatting only — pictures, frames, media and
-        /// tables left out (the whole page has them) — and no more than its first few thousand characters, cut at a tag's
-        /// end.</summary>
-        private static string? Lean(string html)
-        {
-            if (string.IsNullOrWhiteSpace(html)) return null;
-            var s = Regex.Replace(html, @"<(script|style|table|iframe|video|audio|object|figure)\b[^>]*>.*?</\1\s*>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-            s = Regex.Replace(s, @"<(img|embed|source|iframe|input)\b[^>]*>", " ", RegexOptions.IgnoreCase);
-            if (s.Length > 4000)
-            {
-                var cut = s.LastIndexOf('>', 4000);
-                s = cut > 0 ? s[..(cut + 1)] : s[..4000];
-            }
-            return s;
         }
 
         private (string Course, string Quiz)? QuizIds(string raw)

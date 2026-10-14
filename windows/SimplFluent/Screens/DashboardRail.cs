@@ -48,7 +48,7 @@ public sealed partial class DashboardScreen
 
     /// <summary>A row of the day's work (the Mac's DashTodayLine): the check, then the Dashboard's one row of work — its
     /// course and kind over its title, its flag, its time and points at its right (one over the other in the rail, side by
-    /// side across a one-column page) — as Coming up and the counters' panels draw the same work.</summary>
+    /// side across a one-column page) — as Coming up draws the same work.</summary>
     private FrameworkElement TodayLine(WorkRow row, bool narrow)
     {
         var done = Done(row.Id, row.Done);
