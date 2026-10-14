@@ -72,6 +72,10 @@ struct Atom3DView: NSViewRepresentable {
             v.defaultCameraController.target = SCNVector3(CGFloat(aim.x), CGFloat(aim.y), CGFloat(aim.z))
             touched = false
             framedSize = s
+            if OpenClock.verbose {
+                let f = SceneFill.filled(points, aim: aim, distance: d, fov: AtomScene.fieldOfView, width: Double(s.width), height: Double(s.height))
+                NSLog("[Simpl] atom frame %@: view %.0f × %.0f, model %.0f%% across, %.0f%% up", key, s.width, s.height, f.across * 100, f.up * 100)
+            }
         }
 
         /// The view sized again: framed afresh — or, the camera moved by hand, brought nearer or further back by as much

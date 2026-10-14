@@ -669,6 +669,8 @@ struct MoleculeSceneView: NSViewRepresentable {
         var touched = false
         /// (1.3.80) The view's size when the molecule was last framed (or kept as large).
         var framedSize = CGSize.zero
+        /// (1.3.80) Whether it was framed turning by itself (for its whole turn) or at rest (as it stands).
+        var framedTurning = false
         init(model: MoleculeModel) { self.model = model }
 
         /// (1.3.80) How far from the molecule's middle the camera stands for it — wherever its turn takes it, while it
@@ -676,7 +678,19 @@ struct MoleculeSceneView: NSViewRepresentable {
         /// Before, the camera stood back by the molecule's reach whatever the view's shape.
         func distance(_ size: CGSize) -> Double {
             let limits = SceneFill.limits(fov: 40, width: Double(size.width), height: Double(size.height))
-            return SceneFill.distance(points, aim: SceneFill.middle(points) ?? BioVec(0, 0, 0), limits: limits, turning: model.autoRotate)
+            let pts = drawnPoints()
+            return SceneFill.distance(pts, aim: SceneFill.middle(pts) ?? BioVec(0, 0, 0), limits: limits, turning: model.autoRotate)
+        }
+
+        /// (1.3.80) The outline as the camera sees it: turned as far as the molecule has turned, when it is at rest (its
+        /// turn stopped part-way); as built while it turns, its whole turn being framed.
+        func drawnPoints() -> [BioVec] {
+            guard !model.autoRotate, let spin = view?.scene?.rootNode.childNode(withName: "spin", recursively: false) else { return points }
+            let t = spin.simdTransform
+            return points.map { p in
+                let w = t * SIMD4<Float>(Float(p.x), Float(p.y), Float(p.z), 1)
+                return BioVec(Double(w.x), Double(w.y), Double(w.z))
+            }
         }
 
         /// (1.3.80) The camera in front of the molecule, looking along −z at its middle, as far back as `distance` says.
@@ -684,13 +698,19 @@ struct MoleculeSceneView: NSViewRepresentable {
             guard let v = view, let cam = v.scene?.rootNode.childNode(withName: "camera", recursively: false), !points.isEmpty else { return }
             let s = v.bounds.size
             guard s.width > 1, s.height > 1 else { return }
-            let aim = SceneFill.middle(points) ?? BioVec(0, 0, 0)
+            let aim = SceneFill.middle(drawnPoints()) ?? BioVec(0, 0, 0)
             let d = max(distance(s), 0.5)
             cam.simdPosition = SIMD3<Float>(Float(aim.x), Float(aim.y), Float(aim.z + d))
             cam.eulerAngles = SCNVector3(0, 0, 0)
             v.defaultCameraController.target = SCNVector3(CGFloat(aim.x), CGFloat(aim.y), CGFloat(aim.z))
             touched = false
             framedSize = s
+            framedTurning = model.autoRotate
+            if OpenClock.verbose {
+                let f = SceneFill.filled(drawnPoints(), aim: aim, distance: d, fov: 40, width: Double(s.width), height: Double(s.height))
+                NSLog("[Simpl] molecule frame%@: view %.0f × %.0f, model %.0f%% across, %.0f%% up", model.autoRotate ? " (turning)" : "",
+                      s.width, s.height, f.across * 100, f.up * 100)
+            }
         }
 
         /// (1.3.80) The view sized again (a tool's popup resized by its edges): the molecule framed for it — or, its
@@ -825,6 +845,8 @@ struct MoleculeSceneView: NSViewRepresentable {
         } else {
             spin.removeAction(forKey: "turn")
         }
+        // (1.3.80) turning started or stopped, the camera untouched: framed again — for its whole turn, or as it stands
+        if c.framedTurning != model.autoRotate && !c.touched && c.framedSize.width > 1 { c.frame() }
         // (a new molecule: the camera back in front of it, far enough to see it all — (1.3.80) framed to fill 84% of the
         // view's height or width as it is drawn, wherever its turn takes it; until the view has its size, at a guess)
         if c.framing != model.framing, let cam = root.childNode(withName: "camera", recursively: false) {

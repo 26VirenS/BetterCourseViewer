@@ -632,33 +632,43 @@ final class BioSceneCoordinator: NSObject {
         SCNTransaction.commit()
         v.defaultCameraController.target = SCNVector3(CGFloat(aim.x), CGFloat(aim.y), CGFloat(aim.z))
         lastSignature = []
+        if OpenClock.verbose, framedSize.width > 1, framedSize.height > 1, let key = config?.key {
+            // (1.3.80) how the model was framed, for a picture's console: its reach across and up as shares of the view
+            let f = SceneFill.filled(outlinePoints, aim: aim, distance: d, fov: 40, width: Double(framedSize.width), height: Double(framedSize.height))
+            NSLog("[Simpl] bio frame %@: view %.0f × %.0f, model %.0f%% across, %.0f%% up", String(key.prefix(60)),
+                  framedSize.width, framedSize.height, f.across * 100, f.up * 100)
+        }
     }
 
     /// The tangents of the half-angles the model may fill, across and up and down (`SceneFill.limits`), in a view of
     /// `size` (nil: the view's own): (1.3.80) 84% of the height, and 84% of the width less a label column at each side
     /// (the widest label and the 24 points it stands out from the model) — so the model and its labels fill 84% of the
     /// width together; `labels` false, or none shown: 84% of the whole width.
-    private func fillLimits(labels: Bool, size: CGSize? = nil) -> (across: Double, up: Double) {
+    private func fillLimits(labels: Bool, size: CGSize? = nil, share: Double = SceneFill.share) -> (across: Double, up: Double) {
         let s = size ?? view?.bounds.size ?? .zero
         var beside = 0.0
         if labels, config?.showLabels == true, let texts = content?.labels.map(\.text), !texts.isEmpty {
             beside = (texts.map { BioLabelWidth.of($0) }.max() ?? 0) + BioLabelLayout.columnOffset
         }
-        return SceneFill.limits(fov: 40, width: Double(s.width), height: Double(s.height), beside: beside)
+        return SceneFill.limits(fov: 40, width: Double(s.width), height: Double(s.height), beside: beside, share: share)
     }
 
     /// How far from `aim` the camera stands for the model to fill its room (`fillLimits`) in a view of `size` (nil: the
     /// view's own): (1.3.79) worked out from the model's outline, each point at its own depth — (1.3.80) wherever its
-    /// turn takes it while it turns by itself — and the ball alone for a scene with no outline. (1.3.80) A ball the
+    /// turn takes it while it turns by itself, and never so far back for its labels that it fills less than 75% of the
+    /// view (its labels then come in over its edges) — and the ball alone for a scene with no outline. (1.3.80) A ball the
     /// tool gives (a cell's, as far apart as it may be pulled; a helix's, with room to unzip) is no longer framed too:
     /// framed within the narrower of the two sides, it left the model small — the helix 40% of its view's height. Only a
     /// scene drawn wholly by its extras (a molecule morphing from one shape into another, whose ball holds both) keeps
     /// it as the least.
     private func frameDistance(_ size: CGSize? = nil) -> Double {
-        let limit = fillLimits(labels: true, size: size)
+        let limit = fillLimits(labels: true, size: size), least = fillLimits(labels: false, size: size, share: SceneFill.least)
         let ball = SceneFill.distance(radius: framing.radius, limits: limit)
         guard !outlinePoints.isEmpty else { return ball }
-        let d = max(SceneFill.distance(outlinePoints, aim: aim, limits: limit, turning: config?.turning ?? false), ball * 0.1)
+        let turning = config?.turning ?? false
+        // (back for the labels' columns, but never past where the model fills 75% of the view: SceneFill.least)
+        let d = max(min(SceneFill.distance(outlinePoints, aim: aim, limits: limit, turning: turning),
+                        SceneFill.distance(outlinePoints, aim: aim, limits: least, turning: turning)), ball * 0.1)
         return content?.items.isEmpty == true && content?.frame != nil ? max(d, ball) : d
     }
 
@@ -961,14 +971,17 @@ final class BioSceneCoordinator: NSObject {
         let pc = project.point(c3), pe = project.point(e3)
         let r = hypot(pe.x - pc.x, pe.y - pc.y)
         var extent: (left: Double, right: Double)?
+        var shape: [(x: Double, y: Double)] = []
         if !outlinePoints.isEmpty {
-            let xs = outlinePoints.map { project.point(model.point($0)) }
-                .filter { $0.inFront }.map { $0.x }
+            let drawn = outlinePoints.map { project.point(model.point($0)) }.filter { $0.inFront }
+            let xs = drawn.map { $0.x }
             if let lo = xs.min(), let hi = xs.max() { extent = (left: max(lo, pc.x - r), right: min(hi, pc.x + r)) }
+            // (1.3.80) and the outline itself, for each label to stand out from it across its own row
+            shape = drawn.map { (x: $0.x, y: $0.y) }
         }
         // (the columns end above any room the tool keeps clear at the bottom: its scale bar's)
         let out = BioLabelLayout.layout(inputs, cx: pc.x, cy: pc.y, r: min(r, w * 0.32), width: w,
-                                        height: max(h - Double(config?.labelBottom ?? 0), h * 0.6), extent: extent)
+                                        height: max(h - Double(config?.labelBottom ?? 0), h * 0.6), extent: extent, outline: shape)
         if out.placed != live.labels { live.labels = out.placed }
         if out.more != live.more { live.more = out.more }
         letGoOfMovedLabel(out.placed)

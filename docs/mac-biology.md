@@ -209,8 +209,11 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   content's outline (`BioSceneContent.outline()`, 26 extreme points, made off the main thread with the scene by
   `measured()`, with the extras' corners) and stands back until the model fills 84% of the view's height, or 84% of
   its width together with a label column at each side (the widest label and the 24 points it stands out), whichever
-  runs out first — the model keeping 46% of the width at least — each outline point at its own depth (while the model
-  turns by itself, wherever its turn takes it). A `frame` ball the scene gives is no longer framed too (1.3.79 framed
+  runs out first — but never so far back for its labels that the model fills less than 75% of the view's limiting
+  side (`SceneFill.least`; its labels then come in over its edges) — each outline point at its own depth (while the
+  model turns by itself, wherever its turn takes it). Each label stands 24 points out from the model's outline across
+  its own row (the projected outline's convex hull, `BioLabelLayout.hull`/`across`), so a round cell's labels come in
+  toward its narrower top and bottom, and each is kept inside the view on its own (a wide one moves in alone). A `frame` ball the scene gives is no longer framed too (1.3.79 framed
   it within the narrower side: DNA & RNA's helix, its ball as wide as the helix is long, stood in 40% of its view's
   height): only a scene drawn wholly by its extras (a molecule morphing between two shapes) keeps its ball as the
   least, and a new scene of the same model that needs more room than is framed — a cell pulled apart, a helix

@@ -237,9 +237,30 @@ func corners(_ x: Double, _ y: Double, _ z: Double, at c: BioVec) -> [BioVec] {
 // 1.3.79 ball, 29 Å round, held it to 36%)
 let helixFit = framed(corners(10, 22.5, 10, at: BioVec(0, 22, 0)), w: 430, h: 420, beside: 174)
 check(abs(helixFit.up - 0.84) < 0.005, "a helix in the owner's view fills 84% of its height (\(Int((helixFit.up * 100).rounded()))%)")
-// a cell in a wide view with labels: the cell and its two label columns fill 84% of the width
-let cellFit = framed(corners(11, 8, 9.5, at: BioVec(0, 0, 0)), w: 800, h: 500, beside: 144)
-check(abs(cellFit.across * 800 + 2 * 144 - 0.84 * 800) < 4 && cellFit.up < 0.84, "a cell and its labels fill 84% of a wide view's width")
+// a cell with room for its labels beside it fills 84% of its view's height; one whose labels want more room than the
+// view has is still 75% of it (SceneFill.least), its labels coming in over its edges
+func labelled(_ pts: [BioVec], w: Double, h: Double, beside: Double) -> Double {
+    let aim = SceneFill.middle(pts) ?? BioVec(0, 0, 0)
+    let d = min(SceneFill.distance(pts, aim: aim, limits: SceneFill.limits(fov: 40, width: w, height: h, beside: beside)),
+                SceneFill.distance(pts, aim: aim, limits: SceneFill.limits(fov: 40, width: w, height: h, share: SceneFill.least)))
+    var up = 0.0
+    for p in pts { up = max(up, abs(p.y - aim.y) / (d - (p.z - aim.z)) / tan(20 * Double.pi / 180)) }
+    return up
+}
+let cell = corners(11, 8, 9.5, at: BioVec(0, 0, 0))
+let roomy = labelled(cell, w: 1000, h: 500, beside: 100), crowded = labelled(cell, w: 800, h: 500, beside: 144)
+check(abs(roomy - 0.84) < 0.005 && abs(crowded - 0.75) < 0.005,
+      "a cell fills 84% of its view's height with room for its labels, 75% without (\(Int((roomy * 100).rounded()))%, \(Int((crowded * 100).rounded()))%)")
+// labels beside a round model's outline: one by its narrow top stands nearer the middle than one by its widest row
+let ring = (0..<24).map { k -> (x: Double, y: Double) in
+    let a = Double(k) / 24 * 2 * Double.pi
+    return (x: 400 + 150 * cos(a), y: 400 + 150 * sin(a))
+}
+let round = BioLabelLayout.layout([BioLabelInput(id: "top", text: "Top", x: 380, y: 262), BioLabelInput(id: "mid", text: "Middle", x: 300, y: 400)],
+                                  cx: 400, cy: 400, r: 150, width: 800, height: 800, extent: (left: 250, right: 550), outline: ring)
+let topEdge = round.placed.first { $0.id == "top" }?.edgeX ?? 0, midEdge = round.placed.first { $0.id == "mid" }?.edgeX ?? 0
+check(abs(midEdge - (250 - 24)) < 0.5 && topEdge > midEdge + 40 && topEdge < 400,
+      "a label by a round model's top stands out from its outline there, nearer the middle (\(Int(topEdge)) beside \(Int(midEdge)))")
 // a molecule turning by itself: at most 84% of the limiting side over a whole turn, and that side's 84% reached
 let spin = framed(corners(5, 3, 2, at: BioVec(1, 0, 0)), w: 600, h: 400, turning: true)
 check(max(spin.across, spin.up) < 0.845 && max(spin.across, spin.up) > 0.83, "a turning molecule fills 84% of its view over a whole turn (\(Int((max(spin.across, spin.up) * 100).rounded()))%)")

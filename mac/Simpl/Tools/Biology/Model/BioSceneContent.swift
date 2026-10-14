@@ -188,6 +188,11 @@ struct BioSceneShape: Sendable {
 enum SceneFill {
     /// The share of the view's limiting side the model, with its labels, fills.
     static let share = 0.84
+    /// The least share the model itself is left with where its labels want more room beside it than the view has
+    /// (they then come in over its edges): a camera stood back for them no further than where the model, unlabelled,
+    /// fills this much (`limits(…, share: least)`). A cell with sixteen long labels in a popup's middle column stood in
+    /// 46% of it.
+    static let least = 0.75
 
     /// The tangents of the half-angles the model may fill, across and up and down, for a camera of `fov` degrees up and
     /// down and a view `width` × `height` points: `share` of the height, and `share` of the width less `beside` points
@@ -215,6 +220,22 @@ enum SceneFill {
             }
         }
         return d
+    }
+
+    /// How much of a view `width` × `height` a model fills (its points' furthest reach from the middle, across and up and
+    /// down, as shares of each side), seen from `distance` along +z from `aim` through a camera of `fov` degrees up and
+    /// down — for a picture's console to say how a model was framed.
+    static func filled(_ points: [BioVec], aim: BioVec, distance d: Double, fov: Double, width: Double, height: Double) -> (across: Double, up: Double) {
+        let t = tan(fov / 2 * Double.pi / 180)
+        guard width > 1, height > 1, t > 0 else { return (0, 0) }
+        var across = 0.0, up = 0.0
+        for p in points {
+            let q = p - aim
+            guard d - q.z > 1e-9 else { continue }
+            across = max(across, abs(q.x) / (d - q.z) / (t * width / height))
+            up = max(up, abs(q.y) / (d - q.z) / t)
+        }
+        return (across, up)
     }
 
     /// How far from its centre the camera stands for a ball of `radius` to fall within `limits`.
