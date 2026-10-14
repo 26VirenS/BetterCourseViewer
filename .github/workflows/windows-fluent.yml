@@ -584,7 +584,7 @@ jobs:
           Shot 'settings-find' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-find', 'beta'))
           Shot 'settings-custom-colour' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance', '--settings-sheet', 'customcolour'))
           Shot 'settings-photos' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'Dusk', '--open', 'settings', '--settings-tab', 'appearance', '--settings-scroll', '4000'))
-          Shot 'settings-updates-earlier' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes'))
+          Shot 'settings-updates-earlier' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes', '--settings-scroll', '4000'))
           # pins in the Alta and quiz popups' headers; files attached to a new message and to a reply; a rubric's
           # criterion open (the mark where it was given, Ring back, the stepper)
           Shot 'alta-pins' '1366x778' 50 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable', '--open', 'alta:104:4004'))
@@ -607,6 +607,30 @@ jobs:
           Shot 'ptable-tour-2' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '2'))
           Shot 'ptable-lewis-narrow' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-page', 'lewis'))
           Shot 'ptable-molecule-narrow' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-page', 'molecules'))
+          # (the UI fix pass's second round, added at the end so the pictures before keep their parts) a wrong password in
+          # dark; a pin's quick version pulled out into its own window over a quiz, light and dark; a graded quiz's quick
+          # look from the calendar; Updates' earlier versions as an installed copy lists them; an assignment in a window of
+          # its own
+          Shot 'sign-in-wrong-dark' '1024x681' 16 ($login + @('--appearance', 'dark', '--sign-in', 'student:wrong'))
+          Shot 'pin-popout' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2', '--pin-popout', 'calc'))
+          Shot 'pin-popout-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2', '--pin-popout', 'calc'))
+          Shot 'calendar-preview-graded' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview', '--preview-of', 'Lec01-PreQuiz'))
+          Shot 'settings-updates-earlier-installed' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes', '--settings-scroll', '4000'))
+          Shot 'place-window-assignment' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--place-window', '/courses/101/assignments/1012'))
+          # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
+          # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
+          # focus: five seconds on, its log must say it is still open (checked below)
+          function AloneShot($name, $part, $extra) {
+            if ($shard -ne $part) { return }
+            $script:mine += $name
+            foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+            $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
+            $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', '30', '--shot-settle', 'no', '--profile', $prof, '--window-size', '1366x778') + $mock + $extra
+            $alone = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            if (-not $alone.WaitForExit(120000)) { Stop-Process -Id $alone.Id -Force -ErrorAction SilentlyContinue }
+          }
+          AloneShot 'pin-try-graph' 2 @('--appearance', 'light', '--pin', 'graph', '--pin-try', 'graph')
+          AloneShot 'pin-try-fc' 3 @('--appearance', 'dark', '--pin', 'cite,fc', '--pin-try', 'fc', '--fc-demo')
           # Send from Phone, tried as a phone would (one part each): Simpl's hand-in panel with --phone-test says its
           # server's address in simpl.log (on 127.0.0.1 too); the page is opened, a wrong key tried, then each file posted
           # as the phone's page posts it (X-File-Name, its type, its length) with Invoke-WebRequest; what came back goes
@@ -672,6 +696,25 @@ jobs:
             if (([regex]::Matches($l, 'hand-in: added project01\.pdf \(1 files\)')).Count -lt 2) { $phoneBad += "hand-in-phone-photos: the two photos did not become one PDF in the hand-in" }
           }
           if ($phoneBad.Count -gt 0) { $phoneBad | ForEach-Object { Write-Host "::error::Send from Phone: $_" }; exit 1 }
+          # the graph's and Flashcards' pins' flyouts, used as a student uses them, stayed open (pin-try-*: the flyout's
+          # own log line five seconds after the click and the typing)
+          foreach ($try in @(@('pin-try-graph', 'graph'), @('pin-try-fc', 'fc'))) {
+            if ($script:mine -notcontains $try[0]) { continue }
+            $l = PhoneLog $try[0]
+            Write-Host "$($try[0]): $((@($l -split "`n" | Where-Object { $_ -match 'pin (flyout|try)' }) -join ' | '))"
+            if (-not $l.Contains("pin flyout still open: $($try[1])")) { Write-Host "::error::$($try[0]): the $($try[1]) pin's flyout did not stay open while it was used (shots/profile-$($try[0]).log)"; exit 1 }
+          }
+          # the periodic table's top showed Fe when ptable-hover was pictured (--ptable-hover Fe): the last card its log
+          # names before "picture at" (PTGrid.Show writes "ptable hover card: …" in a picture run)
+          if ($script:mine -contains 'ptable-hover') {
+            $card = $null
+            foreach ($l in @(Get-Content 'shots/profile-ptable-hover.log' -ErrorAction SilentlyContinue)) {
+              if ($l -match ' picture at ') { break }
+              if ($l -match 'ptable hover card: (\S+)') { $card = $Matches[1] }
+            }
+            if ($card -ne 'Fe') { Write-Host "::error::ptable-hover: the table's top showed '$card' when it was pictured, not Fe (shots/profile-ptable-hover.log)"; exit 1 }
+            Write-Host "ptable-hover: the table's top showed $card"
+          }
           if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
           # printed whole, with the bridge's own error, so its cause can be read here)
