@@ -17,7 +17,29 @@ namespace Simpl.Screens;
 /// </summary>
 internal static class CalendarKit
 {
-    public static CultureInfo Culture => CultureInfo.CurrentCulture;
+    /// <summary>How the Calendar writes its days and months: in English, one way whatever Windows' language ("Oct 13",
+    /// "October 2026"), as every date in Simpl is. The week still starts on the day Windows is set to
+    /// (<see cref="FirstDayOfWeek"/>).</summary>
+    public static CultureInfo Culture => CultureInfo.InvariantCulture;
+
+    /// <summary>The week's first day, as Windows is set (a Sunday, a Monday …).</summary>
+    public static DayOfWeek FirstDayOfWeek => CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek;
+
+    /// <summary>A day as every date is written: "Oct 13", or "Tue, Oct 13" with its weekday; the year only when it is not
+    /// this one ("Jan 5, 2027").</summary>
+    public static string DateWords(DateTime day, bool weekday = false)
+    {
+        var date = day.ToString(day.Year == DateTime.Today.Year ? "MMM d" : "MMM d, yyyy", Culture);
+        return weekday ? $"{day.ToString("ddd", Culture)}, {date}" : date;
+    }
+
+    /// <summary>Struck through: work handed in or excused, in every view (the engine's <c>struck</c>; from a page a
+    /// version older, work handed in) — never a lecture or a lab that is only over.</summary>
+    public static bool IsStruck(Models.CalEvent ev) =>
+        ev.Struck ?? (ev.Missing != true && (ev.Excused == true || (ev.Done == true && IsWork(ev.Kind))));
+
+    /// <summary>Greyed: over (its due time or its end gone by), or struck.</summary>
+    public static bool IsPast(Models.CalEvent ev) => (ev.Past ?? ev.Done == true) || IsStruck(ev);
 
     /// <summary>A menu's item with its symbol (the Mac's context menus and its More menu).</summary>
     public static MenuItem Item(string text, SymbolRegular icon, Action act)

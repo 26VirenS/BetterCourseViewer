@@ -59,6 +59,9 @@ public static class WorkPreview
     private static (string Id, DateTime At)? lastPress;
     private static int token;
 
+    /// <summary>The card's width (the Mac's about 460 points).</summary>
+    private const double CardWidth = 440;
+
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
 
     /// <summary>The shell's overlay over the page, where the card is drawn.</summary>
@@ -98,7 +101,9 @@ public static class WorkPreview
         anchor = from;
         var t = ++token;
         var room = host.ActualWidth;
-        var w = Math.Min(420, Math.Max(300, Math.Min(room - 32, from.ActualWidth + 8)));
+        // (one width, whatever it grew from — a month's narrow chip as a Dashboard row — as the Mac's card has: its
+        // header, its course and its Close side by side; narrower only on a page too narrow for it)
+        var w = Math.Min(CardWidth, Math.Max(280, room - 24));
         var from0 = RowRect(from);
         var face = new CardFace(it, engine, w);
         face.Measure(new Size(w, double.PositiveInfinity));
@@ -342,8 +347,8 @@ public static class WorkPreview
         if (d == today.AddDays(1)) return "Tomorrow";
         if (d == today.AddDays(-1)) return "Yesterday";
         var apart = (d - today).TotalDays;
-        if (apart > 0 && apart < 7) return d.ToString("dddd", CultureInfo.CurrentCulture);
-        return d.Year == today.Year ? d.ToString("MMM d", CultureInfo.CurrentCulture) : d.ToString("MMM d, yyyy", CultureInfo.CurrentCulture);
+        if (apart > 0 && apart < 7) return d.ToString("dddd", CultureInfo.InvariantCulture);
+        return d.Year == today.Year ? d.ToString("MMM d", CultureInfo.InvariantCulture) : d.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
     }
 
     // ---- the card's face ----
@@ -437,24 +442,38 @@ public static class WorkPreview
 
         private static string? Text(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 
+        /// <summary>
+        /// Where it stands: the assignment's own word and grade once read (with the row's Feedback or New), else the
+        /// row's. A graded piece says its score once — one chip, the engine's "13/16 · B−" — with no "Graded" (or, from a
+        /// page a version older, the same score again) beside it; Late, Missing and Submitted stay, and a late penalty
+        /// ("−3 pts late") says Late for itself.
+        /// </summary>
         private IEnumerable<WorkFlag> Chips()
         {
             if (assignment is not { } d) return item.Flags;
             var outList = new List<WorkFlag>();
-            if (d.Status is { Word.Length: > 0 } s) outList.Add(new WorkFlag { Word = s.Word, Kind = s.Kind });
+            var graded = d.Grade?.Score != null;
+            var late = Text(d.Grade?.Late);
+            if (d.Status is { Word.Length: > 0 } s)
+            {
+                var word = s.Word.ToLowerInvariant();
+                var sameScore = graded && s.Word.Replace(" ", "") == $"{Num(d.Grade!.Score!.Value)}/{Num(d.Grade.Possible ?? 0)}";
+                if (!(graded && word == "graded") && !sameScore && !(late != null && word == "late"))
+                    outList.Add(new WorkFlag { Word = s.Word, Kind = s.Kind });
+            }
             if (d.Grade is { Score: { } score } g)
             {
-                var text = $"{Num(score)} / {Num(g.Possible ?? 0)}";
+                var text = $"{Num(score)}/{Num(g.Possible ?? 0)}";
                 if (Text(g.Letter) is { } letter) text += $" · {letter}";
-                outList.Add(new WorkFlag { Word = text, Kind = "info" });
+                outList.Add(new WorkFlag { Word = Text(g.Chip) ?? text, Kind = "info" });
             }
-            if (Text(d.Grade?.Late) is { } late) outList.Add(new WorkFlag { Word = late, Kind = "warn" });
+            if (late != null) outList.Add(new WorkFlag { Word = late, Kind = "warn" });
             var words = outList.Select(x => x.Word).ToHashSet();
             foreach (var f in item.Flags) if (f.Word.ToLowerInvariant() is "feedback" or "new" && !words.Contains(f.Word)) outList.Add(f);
             return outList;
         }
 
-        private static string Num(double v) => v % 1 == 0 ? ((long)v).ToString(CultureInfo.CurrentCulture) : v.ToString("0.##", CultureInfo.CurrentCulture);
+        private static string Num(double v) => v % 1 == 0 ? ((long)v).ToString(CultureInfo.InvariantCulture) : v.ToString("0.##", CultureInfo.InvariantCulture);
 
         private IEnumerable<(SymbolRegular, string, bool)> Facts()
         {

@@ -14,8 +14,12 @@ namespace Simpl.Screens;
 
 public sealed partial class CalendarScreen
 {
-    /// <summary>A day of the month's height (the Mac's 112, with room for four of Windows' caption lines).</summary>
+    /// <summary>A day of the month's height in a month of six weeks (the Mac's 112, with room for four of Windows' caption
+    /// lines); the grid is always six of these tall, so a month of five weeks has taller days, and more of each name fits.</summary>
     private const double CellHeight = 120;
+
+    /// <summary>A line of an item on the month's grid: a caption line (16) and its padding, and the gap under it.</summary>
+    private const double ChipLine = 20;
 
     // ---- Month ----
 
@@ -29,8 +33,9 @@ public sealed partial class CalendarScreen
     }
 
     /// <summary>
-    /// The days of the week over six weeks of days from the first day of the week the month starts in (the grid always as
-    /// tall), each a rounded cell as Windows' CalendarView has them; a new month slides in from the side the move went.
+    /// The days of the week over the weeks the month touches (five or six) from the first day of the week it starts in —
+    /// the grid always as tall, its days taller when there are fewer weeks — each a rounded cell as Windows' CalendarView
+    /// has them; a new month slides in from the side the move went.
     /// </summary>
     private FrameworkElement MonthGrid(Dictionary<string, List<CalEvent>> byDay, bool slide)
     {
@@ -44,13 +49,15 @@ public sealed partial class CalendarScreen
             head.Children.Add(t.Col(i));
         }
         var days = new Grid();
+        var weeks = WeekCount(anchor);
+        var height = Math.Floor(6 * CellHeight / weeks);
         for (var i = 0; i < 7; i++) days.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        for (var w = 0; w < 6; w++) days.RowDefinitions.Add(new RowDefinition { Height = new GridLength(CellHeight) });
+        for (var w = 0; w < weeks; w++) days.RowDefinitions.Add(new RowDefinition { Height = new GridLength(height) });
         var first = FirstOfWeek(anchor);
-        for (var i = 0; i < 42; i++)
+        for (var i = 0; i < weeks * 7; i++)
         {
             var day = first.AddDays(i);
-            days.Children.Add(DayCell(day, EventsOn(byDay, day)).Col(i % 7).Row(i / 7));
+            days.Children.Add(DayCell(day, EventsOn(byDay, day), height).Col(i % 7).Row(i / 7));
         }
         // (the cells' own gaps at the grid's edges let go, so it lines up with what is under it; a month sliding in is
         // seen inside it only)
@@ -60,16 +67,26 @@ public sealed partial class CalendarScreen
     }
 
     /// <summary>
-    /// A day of the month: its number (today on the accent; the day picked outlined in it), and up to four of its items as
-    /// lines in their calendar's colour — (1.2) flat in the cell, no box round each. An item clicked opens its preview;
+    /// A day of the month: its number (today on the accent; the day picked outlined in it), and its items as lines in their
+    /// calendar's colour — (1.2) flat in the cell, no box round each. The open ones first, as many as the day has room
+    /// for, a name taking a second line while there is room for it; work handed in folded into one line ("3 done", with
+    /// what did not fit: "2 more · 3 done"), so the names still to do get the room. An item clicked opens its preview;
     /// the rest of the day picks the day.
     /// </summary>
-    private FrameworkElement DayCell(DateTime day, List<CalEvent> evs)
+    private FrameworkElement DayCell(DateTime day, List<CalEvent> evs, double height)
     {
         var off = day.Month != anchor.Month || day.Year != anchor.Year;
         var isToday = day == DateTime.Today;
         var isSel = day == selected;
-        var fits = evs.Count > 4 ? 3 : evs.Count;
+        var open = evs.Where(e => !CalendarKit.IsStruck(e)).ToList();
+        var done = evs.Count - open.Count;
+        // (the lines under the day's number: four in a day of 120, five in one of 144)
+        var lineCount = Math.Max(2, (int)Math.Floor((height - 40 + 2) / ChipLine));
+        var tail = done > 0 || open.Count > lineCount;
+        var room = lineCount - (tail ? 1 : 0);
+        var shown = open.Take(room).ToList();
+        var spare = room - shown.Count;
+        var hidden = open.Count - shown.Count;
         var num = K.Text(day.Day.ToString(Culture), Ty.Body, isToday ? B.OnAccent : isSel ? B.AccentText : off ? B.Text3 : B.Text);
         num.FontWeight = isToday || isSel ? FontWeights.SemiBold : FontWeights.Normal;
         num.HorizontalAlignment = HorizontalAlignment.Center;
@@ -78,12 +95,14 @@ public sealed partial class CalendarScreen
         if (isToday) badge.Children.Add(new Ellipse().Bg(B.Accent));
         badge.Children.Add(num);
         var lines = new Stack { Orientation = Orientation.Vertical, Spacing = 2 };
-        foreach (var ev in evs.Take(fits)) lines.Children.Add(Chip(ev));
-        if (evs.Count > fits)
+        for (var i = 0; i < shown.Count; i++) lines.Children.Add(Chip(shown[i], i < spare ? 2 : 1));
+        if (tail)
         {
-            var more = K.Text($"{evs.Count - fits} more", Ty.Caption, B.Text2);
+            var rest = string.Join(" · ", new[] { hidden > 0 ? $"{hidden} more" : null, done > 0 ? $"{done} done" : null }.Where(x => x != null));
+            var more = K.Text(rest, Ty.Caption, B.Text2);
             more.FontWeight = FontWeights.Medium;
-            lines.Children.Add(more.Margin(17, 0, 0, 0));
+            more.TextTrimming = TextTrimming.CharacterEllipsis;
+            lines.Children.Add(more.Margin(12, 0, 0, 0));
         }
         if (off) lines.Opacity = 0.6;
         var b = K.CardButton(K.V(2, badge, lines), () => Pick(day), 6, new Thickness(5, 4, 5, 4));
@@ -98,17 +117,20 @@ public sealed partial class CalendarScreen
         return new Grid { Children = { b, ring } };
     }
 
-    /// <summary>The Mac's CalendarChip: a line with its calendar's colour as a dot before its name — a red mark when it is
-    /// missing, greyed once done (work handed in struck through).</summary>
-    private FrameworkElement Chip(CalEvent ev)
+    /// <summary>The Mac's CalendarChip: its name after a thin bar in its calendar's colour — a red mark when it is missing;
+    /// greyed once over, struck through only once handed in (or excused). The name may take <paramref name="lines"/>
+    /// lines.</summary>
+    private FrameworkElement Chip(CalEvent ev, int lines = 1)
     {
         var missing = ev.Missing == true;
-        var done = ev.Done == true && !missing;
-        FrameworkElement mark = missing ? K.Icon(SymbolRegular.ErrorCircle24, 10, B.Critical, filled: true) : K.Dot(K.Hex(ev.Color), 7);
-        var markBox = new Grid { Width = 10, Margin = new Thickness(0, 0, 5, 0), Children = { mark } };
-        var title = K.Text(ev.Title, Ty.Caption, done ? B.Text2 : missing ? B.Critical : B.Text);
-        if (done && CalendarKit.IsWork(ev.Kind)) title.Struck();
-        var g = K.Columns("auto, *", markBox.Col(0), title.Col(1));
+        var grey = CalendarKit.IsPast(ev) && !missing;
+        FrameworkElement mark = missing
+            ? (FrameworkElement)K.Icon(SymbolRegular.ErrorCircle24, 10, B.Critical, filled: true).Margin(0, 3, 4, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top)
+            : new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 2, 6, 2), Background = K.Brush(K.WithAlpha(K.Hex(ev.Color), grey ? 0.55 : 1)) };
+        var title = lines > 1 ? K.Wrapped(ev.Title, Ty.Caption, grey ? B.Text2 : missing ? B.Critical : B.Text, lines) : K.Text(ev.Title, Ty.Caption, grey ? B.Text2 : missing ? B.Critical : B.Text);
+        if (lines <= 1) title.TextTrimming = TextTrimming.CharacterEllipsis;
+        if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
+        var g = K.Columns("auto, *", mark.Col(0), title.Col(1));
         var b = K.Subtle(g, null, new Thickness(3, 1, 4, 1), 5);
         b.Click += (_, _) => peek.Press(ev, b);
         b.ToolTip = ev.Title;
@@ -123,7 +145,7 @@ public sealed partial class CalendarScreen
     {
         var words = K.V(2,
             K.Text(day.ToString("dddd", Culture), Ty.Subtitle),
-            K.Text($"{day.ToString("M", Culture)} · {CountLine(day, evs.Count)}", Ty.Body, B.Text2));
+            K.Text($"{CalendarKit.DateWords(day)} · {CountLine(day, evs.Count)}", Ty.Body, B.Text2));
         var add = K.Button("New task", () => NewTask(day), icon: SymbolRegular.Add24);
         add.ToolTip = "A task of your own, due this day (it shows in To Do)";
         var head = K.Columns("*, auto", words.Col(0), add.Margin(10, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
@@ -143,21 +165,22 @@ public sealed partial class CalendarScreen
         return K.Card(rows, new Thickness(4));
     }
 
-    /// <summary>A day of the week or of the list: its name as the section's heading, its work and events in one card under it.</summary>
+    /// <summary>A day of the week or of the list: its name as the section's heading ("Tue, Oct 13"), its work and events in
+    /// one card under it.</summary>
     private FrameworkElement DayCard(DateTime day, List<CalEvent> evs) =>
-        K.V(0, Heading.Section(LongDay(day), CountLine(day, evs.Count)), DayRows(evs));
+        K.V(0, Heading.Section(CalendarKit.DateWords(day, weekday: true), CountLine(day, evs.Count)), DayRows(evs));
 
     /// <summary>
-    /// The Mac's CalendarEventLine: its kind's symbol in its calendar's colour, its name (struck through once done), its
-    /// course, kind, points and place, whether it is missing or excused, and its time.
+    /// The Mac's CalendarEventLine: its kind's symbol in its calendar's colour, its name (struck through only once handed
+    /// in, greyed once over — as on the month's grid), its course, kind, points and place, whether it is missing or
+    /// excused, and its time.
     /// </summary>
     private FrameworkElement EventRow(CalEvent ev)
     {
-        var done = ev.Done == true;
         var missing = ev.Missing == true;
         var tile = K.IconTile(CalendarKit.Glyph(ev.Kind), K.Hex(ev.Color), 32);
-        var title = K.Wrapped(ev.Title, Ty.Body, done ? B.Text2 : B.Text, 2);
-        if (done && !missing) title.Struck();
+        var title = K.Wrapped(ev.Title, Ty.Body, CalendarKit.IsPast(ev) && !missing ? B.Text2 : B.Text, 2);
+        if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
         var words = K.V(2, title);
         if (!string.IsNullOrEmpty(ev.Sub)) words.Children.Add(K.Text(ev.Sub!, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
@@ -195,7 +218,7 @@ public sealed partial class CalendarScreen
             m.Items.Add(CalendarKit.Item("Open", SymbolRegular.Open24, () => engine.OpenWeb(url, ev.Title)));
             m.Items.Add(new Separator());
             m.Items.Add(CalendarKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url, ev.Title)));
-            m.Items.Add(CalendarKit.Item("Copy Link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute(url))));
+            m.Items.Add(CalendarKit.Item("Copy link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute(url))));
             b.ContextMenu = m;
         }
         peek.Anchor(b, ev);
@@ -262,15 +285,15 @@ public sealed partial class CalendarScreen
         return v;
     }
 
-    /// <summary>The Mac's CalendarWeekBlock: (1.2) its name beside a bar in its calendar's colour, flat in the column, its
-    /// time, and whether it is missing or excused.</summary>
+    /// <summary>The Mac's CalendarWeekBlock: (1.2) its name beside a bar in its calendar's colour, flat in the column (struck
+    /// through only once handed in, greyed once over — as on the month's grid), its time, and whether it is missing or
+    /// excused.</summary>
     private FrameworkElement WeekBlock(CalEvent ev)
     {
-        var done = ev.Done == true;
         var missing = ev.Missing == true;
-        var title = K.Wrapped(ev.Title, Ty.Body, done ? B.Text2 : B.Text, 3);
+        var title = K.Wrapped(ev.Title, Ty.Body, CalendarKit.IsPast(ev) && !missing ? B.Text2 : B.Text, 3);
         title.FontWeight = FontWeights.Medium;
-        if (done && !missing) title.Struck();
+        if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
         var words = K.V(3, title);
         var meta = new WrapPanel { Orientation = Orientation.Horizontal };
         if (!string.IsNullOrEmpty(ev.Time)) meta.Children.Add(K.Text(ev.Time!, Ty.Caption, B.Text2).Margin(0, 1, 6, 1));

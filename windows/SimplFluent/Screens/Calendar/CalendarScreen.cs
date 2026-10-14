@@ -18,9 +18,9 @@ namespace Simpl.Screens;
 /// cells, today on the accent, the day picked outlined — each day's work and events on it in their calendar's colour, with
 /// the day picked listed beside it (and a task of your own added to it); a week day by day; or the next three weeks as a
 /// list. On the calendars chosen (Canvas shows ten at most). The chevrons round Today — or ← and → once the calendar has
-/// been clicked — move a month or a week, sliding the way they go; Today (Ctrl+T) comes back. An item clicked, on the
-/// grid, in the day, the week or the list, opens its preview out of itself (<see cref="CalendarPeek"/>); a double-click
-/// opens it whole.
+/// been clicked — move a month or a week, sliding the way they go; Today (Ctrl+T) comes back. The list, always the three
+/// weeks from today, does not page: it has none of them. An item clicked, on the grid, in the day, the week or the list,
+/// opens its preview out of itself (<see cref="CalendarPeek"/>); a double-click opens it whole.
 /// </summary>
 public sealed partial class CalendarScreen : Screen
 {
@@ -137,11 +137,12 @@ public sealed partial class CalendarScreen : Screen
     private FrameworkElement? commands;
     private SelectorBar? selector;
     private Button? prevButton, nextButton;
+    private FrameworkElement? pager;
     private ProgressRing? spinner;
 
     /// <summary>
     /// Beside the title: a spinner while the page is asked, Month · Week · List (Windows 11's SelectorBar), the chevrons
-    /// round Today, the calendars shown, and More (Open in Canvas, Copy Link).
+    /// round Today (a month's or a week's only), the calendars shown, and More (Open in Canvas, Copy link).
     /// </summary>
     public override FrameworkElement? Commands
     {
@@ -159,6 +160,7 @@ public sealed partial class CalendarScreen : Screen
             today.ToolTip = "Today (Ctrl+T)";
             var nav = K.H(4, prevButton, today, nextButton);
             nav.VerticalAlignment = VerticalAlignment.Center;
+            pager = nav;
             var calendars = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Choose the calendars shown", 16, 32);
             System.Windows.Automation.AutomationProperties.SetName(calendars, "Calendars");
             Button? more = null;
@@ -170,7 +172,8 @@ public sealed partial class CalendarScreen : Screen
         }
     }
 
-    /// <summary>The commands as things are now: the chevrons' words for a month or a week (none for the list), the spinner.</summary>
+    /// <summary>The commands as things are now: the chevrons' words for a month or a week — and for the list, which does
+    /// not page, no chevrons and no Today (it always starts today) — the spinner.</summary>
     private void PaintCommands()
     {
         if (commands == null) return;
@@ -179,11 +182,11 @@ public sealed partial class CalendarScreen : Screen
         {
             if (b == null) return;
             b.ToolTip = tip;
-            b.IsEnabled = mode != "list";
             System.Windows.Automation.AutomationProperties.SetName(b, name);
         }
-        Words(prevButton, week ? "Previous Week" : "Previous Month", week ? "Previous week (←)" : "Previous month (←)");
-        Words(nextButton, week ? "Next Week" : "Next Month", week ? "Next week (→)" : "Next month (→)");
+        Words(prevButton, week ? "Previous week" : "Previous month", week ? "Previous week (←)" : "Previous month (←)");
+        Words(nextButton, week ? "Next week" : "Next month", week ? "Next week (→)" : "Next month (→)");
+        if (pager != null) pager.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible;
         if (spinner != null) spinner.Visibility = cal.Loading ? Visibility.Visible : Visibility.Hidden;
         selector?.Select(Array.IndexOf(Modes, mode), false);
     }
@@ -193,7 +196,7 @@ public sealed partial class CalendarScreen : Screen
     {
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
         menu.Items.Add(CalendarKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen("/calendar", "Calendar")));
-        menu.Items.Add(CalendarKit.Item("Copy Link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute("/calendar"))));
+        menu.Items.Add(CalendarKit.Item("Copy link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute("/calendar"))));
         menu.IsOpen = true;
     }
 
@@ -256,7 +259,7 @@ public sealed partial class CalendarScreen : Screen
     {
         "list" => "Upcoming",
         "week" => WeekSpan(weekStart, weekStart.AddDays(6)),
-        _ => anchor.ToString("Y", Culture),
+        _ => anchor.ToString("MMMM yyyy", Culture),
     };
 
     private static string WeekSpan(DateTime a, DateTime b)
@@ -450,7 +453,7 @@ public sealed partial class CalendarScreen : Screen
 
     // ---- reading ----
 
-    /// <summary>The span shown: six weeks round the month, the week, or three weeks from today.</summary>
+    /// <summary>The span shown: the weeks the month touches, the week, or three weeks from today.</summary>
     private (DateTime From, DateTime To) Range
     {
         get
@@ -464,7 +467,7 @@ public sealed partial class CalendarScreen : Screen
                     return (s, s.AddDays(21));
                 default:
                     var first = FirstOfWeek(anchor);
-                    return (first, first.AddDays(42));
+                    return (first, first.AddDays(7 * WeekCount(anchor)));
             }
         }
     }
@@ -494,8 +497,17 @@ public sealed partial class CalendarScreen : Screen
     private static DateTime FirstOfWeek(DateTime d)
     {
         var s = d.Date;
-        var back = ((int)s.DayOfWeek - (int)Culture.DateTimeFormat.FirstDayOfWeek + 7) % 7;
+        var back = ((int)s.DayOfWeek - (int)CalendarKit.FirstDayOfWeek + 7) % 7;
         return s.AddDays(-back);
+    }
+
+    /// <summary>How many weeks a month touches, counted from the first day of the week it starts in: five or six (four for
+    /// a February that starts on the week's first day). A row of the next month's days alone is never drawn.</summary>
+    private static int WeekCount(DateTime month)
+    {
+        var first = FirstOfWeek(month);
+        var days = (int)(month.AddMonths(1) - first).TotalDays;
+        return Math.Clamp((days + 6) / 7, 4, 6);
     }
 
     /// <summary>A day as the page names it ("2026-10-08").</summary>
@@ -508,7 +520,7 @@ public sealed partial class CalendarScreen : Screen
     private static string[] WeekdayNames()
     {
         var names = Culture.DateTimeFormat.AbbreviatedDayNames;
-        var first = (int)Culture.DateTimeFormat.FirstDayOfWeek;
+        var first = (int)CalendarKit.FirstDayOfWeek;
         return Enumerable.Range(0, 7).Select(i => names[(first + i) % 7]).ToArray();
     }
 
@@ -520,7 +532,7 @@ public sealed partial class CalendarScreen : Screen
         return $"{rel}{n} {(n == 1 ? "item" : "items")}";
     }
 
-    /// <summary>"Wednesday, October 8".</summary>
+    /// <summary>"Wednesday, October 8", for a screen reader.</summary>
     private static string LongDay(DateTime day) => day.ToString("dddd, MMMM d", Culture);
 
     private static string Spoken(DateTime day, int count) =>
