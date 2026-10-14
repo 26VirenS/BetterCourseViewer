@@ -266,10 +266,20 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   or a module item's `content_id`), by what the same tool's other places say — so a tab the school named "Course
   Materials" joins Macmillan's card; else by a tab's label or an item's title that is a provider's name ("Achieve",
   "Knewton Alta: Unit 2", "Mastering Physics"); else by its site ("bfwpub.com"); a tab that names none by its label.
-  Never by the words of a title alone. Each row carries `provider` (the table's id) and `icon` (a word of icons.js:
-  book, video, disc…), both null for a provider the table does not know; the Mac and Windows screens draw its letter as
-  before. The mock's CHEM course has Macmillan's week-titled assignments, a module item and a "Course Materials" tab of
-  the same tool.
+  Never by the words of a title alone. A launch on Canvas's own route (`/courses/1/external_tools/retrieve?url=…`,
+  `…/external_tools/31`, `sessionless_launch?id=31`, on the school's Canvas or `school.instructure.com`) is the provider of
+  the address it hands on, else of the tool its id names. A tool's id is a whole number from 1: a module's tool with id 0
+  (one Canvas could not match to an installed tool) joins no card by it. Where several places share a tool's id, the
+  provider is taken in this order: a known launch address, a tab's label that names one, an item's title that names one,
+  an unknown site, then a tab's own label — so an unknown publisher's tab named "Course Materials" is that publisher's
+  card. An item on a site of its own takes a provider from its title only before a colon or a dash ("Knewton Alta: Unit
+  2"; "Pearson Correlation" on stats.example.org stays that site's). An unknown provider is its whole host: two tools of
+  one school are two cards, each named by its host ("jupyter.school.edu", "library.school.edu"), and one alone by its
+  site; a host on a shared service (herokuapp.com, amazonaws.com, instructure.com) is never named by that service, and a
+  US district is its own ("lausd.k12.ca.us"). The search hub's */open* lists such a tab once, as the tab. Each row
+  carries `provider` (the table's id) and `icon` (a word of icons.js: book, video, disc…), both null for a provider the
+  table does not know; the Mac and Windows screens draw its letter as before. The mock's CHEM course has Macmillan's
+  week-titled assignments, a module item and a "Course Materials" tab of the same tool.
   (1.3.68) Alta: a large picture or canvas (at least 140 × 100) counts as a graph too, and in dark mode each graph sits on
   a white card of its own (drawn in dark ink for a white page, its ground clear, it was lost on dark glass). A question
   is shown once Alta has finished drawing it — nothing changed on the page for 350 ms, no maths or answer box still

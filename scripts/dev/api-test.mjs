@@ -407,8 +407,47 @@ check(hub.toolNameOf({ name: 'Knewton Alta: Unit 2', external_tool_tag_attribute
   check(macs.every((p) => p === 'macmillan|Macmillan Learning|book|host')
     && named.join() === 'macmillan|Macmillan Learning|book|host,macmillan|Macmillan Learning|book|host,gradescope|Gradescope|check|host,panopto|Panopto|video|host,zybooks|zyBooks|book|host,piazza|Piazza|disc|host'
     && labels.join() === 'macmillan|Macmillan Learning|book|name,achieve3000|Achieve3000|book|name,macmillan|Macmillan Learning|book|name,panopto|Panopto|video|name,mcgrawhill|McGraw Hill Connect|book|name,,'
-    && sites.join() === 'site:unknown-pub.co.uk|unknown-pub.co.uk|null|site,site:example.com|example.com|null|site,,pearson|Pearson|book|name',
+    && sites.join() === 'site:lti.unknown-pub.co.uk|unknown-pub.co.uk|null|site,site:tool.example.com|example.com|null|site,,pearson|Pearson|book|name',
     `a tool's provider: every Macmillan launch one provider whatever its title, the known ones by host or by a tab's label, an unknown one by its site, Canvas's own address by nothing but a title that names one: ${JSON.stringify({ macs, named, labels, sites })}`);
+  // Canvas's own launch route, on the school's Canvas or another name it answers to, is the tool of the address it hands
+  // on (else nothing: never "instructure.com"); an item on a site of its own names a provider only before a colon; a
+  // tool's id is a whole number from 1 (a module's tool Canvas could not match comes with 0)
+  const routes = [
+    pv({ url: `https://canvas.test/courses/1/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://lmslink.bfwpub.com/lms/q5')}`, title: 'Quiz 5' }),
+    pv({ url: `/courses/1/external_tools/retrieve?url=${encodeURIComponent('https://lmslink.bfwpub.com/lms/q6')}`, title: 'Quiz 6' }),
+    pv({ url: 'https://school.instructure.com/courses/1/external_tools/31', title: 'W2' }), pv({ url: 'https://canvas.test/api/v1/courses/1/external_tools/sessionless_launch?id=31', title: 'W2 HW' }),
+    pv({ url: 'https://school.instructure.com/courses/1/external_tools/31', title: 'Achieve: Chapter 3' }),
+  ];
+  const launches = ['https://canvas.test/courses/1/external_tools/31', '/api/v1/courses/1/external_tools/sessionless_launch?id=45', 'https://school.instructure.com/courses/1/external_tools/retrieve?url=x', 'https://lmslink.bfwpub.com/courses/1/assignments/2', ''].map((u) => JSON.stringify(hub.canvasLaunch(u)));
+  const titled = [pv({ url: 'https://stats.example.org/lti', title: 'Pearson Correlation' }), pv({ url: 'https://unknown.example.org/x', title: 'Zoom Reflection' }), pv({ url: 'https://unknown.example.org/x', title: 'Zoom: Week 3 lecture' }), pv({ url: '', title: 'Mastering Physics' })];
+  const named2 = [pv({ url: 'https://rollcall.instructure.com/launch', title: 'Attendance' }), pv({ url: 'https://lor.instructure.com/x', title: 'Shared' })];
+  const ids = [0, '0', 31, '31', -1, '', null, undefined, 'abc'].map((v) => hub.toolIdOf(v));
+  check(routes.join() === 'macmillan|Macmillan Learning|book|host,macmillan|Macmillan Learning|book|host,,,macmillan|Macmillan Learning|book|name'
+    && launches.join('; ') === '{"tool":"31","url":""}; {"tool":"45","url":""}; {"tool":null,"url":"x"}; null; null'
+    && titled.join() === 'site:stats.example.org|example.org|null|site,site:unknown.example.org|example.org|null|site,zoom|Zoom|video|name,pearson|Pearson|book|name'
+    && named2.join() === 'rollcall|Roll Call Attendance|check|host,commons|Canvas Commons|folder|host' && ids.join() === ',,31,31,,,,,',
+    `Canvas's own launch route by the address it hands on, else nothing; a title over a site of its own only before a colon; Instructure's own tools by name; a tool's id from 1 up: ${JSON.stringify({ routes, launches, titled, named2, ids })}`);
+  // an unknown provider is its whole host, named by its site while no other host of that site is among the tools; a host
+  // on a service many tools share is no site of one ("foo-lti.herokuapp.com"); a US school district by its own domain
+  const at2 = (host) => hub.providerOf({ url: `https://${host}/lti` });
+  const school = [at2('jupyter.school.edu'), at2('library.school.edu'), at2('lmslink.newpub.com'), at2('foo-lti.herokuapp.com'), at2('bar-quiz.herokuapp.com'), at2('abc.execute-api.us-east-1.amazonaws.com'), at2('lti.lausd.k12.ca.us'), at2('lti.district.ca.us')];
+  const nameFor = hub.siteNames(school);
+  const names = school.map(nameFor);
+  check(names.join() === 'jupyter.school.edu,library.school.edu,newpub.com,foo-lti.herokuapp.com,bar-quiz.herokuapp.com,abc.execute-api.us-east-1.amazonaws.com,lausd.k12.ca.us,district.ca.us'
+    && new Set(school.map((p) => p.id)).size === school.length && hub.siteNames([school[0]])(school[0]) === 'school.edu',
+    `an unknown tool its own host, by its site's name unless two tools share the site: ${names.join(' · ')}`);
+}
+// (Mac 1.3.79, Windows 0.3.1) /open lists a course's tab the school named after nothing ("Course Materials") as the tool
+// its id says, and not that tool a second time by its provider's name through the assignments that carry the same id
+{
+  const kept = [hubStore.tabs, hubData.assignments[101]];
+  hubStore.tabs = async (id) => (String(id) === '101' ? [{ id: 'context_external_tool_31', label: 'Course Materials', html_url: '/courses/101/external_tools/31', type: 'external' }] : []);
+  const mac = (id, name, d, extra = {}) => ({ id, name, due_at: at(d), submission_types: ['external_tool'], external_tool_tag_attributes: { url: `https://lmslink.bfwpub.com/lms/launch?item=${id}`, ...extra }, submission: {} });
+  hubData.assignments[101] = [...kept[1], mac(1501, 'W2: Atoms', 4), mac(1502, 'W2 HW: Measurement', 3, { content_type: 'ContextExternalTool', content_id: 31 })];
+  got = await rowsFor('', { kind: 'tool' });
+  [hubStore.tabs, hubData.assignments[101]] = kept;
+  check(got.titles.includes('Course Materials') && !got.titles.includes('Macmillan Learning') && got.titles.includes('Knewton Alta'),
+    `under /open, a course's "Course Materials" tab is Macmillan's tool, listed once: ${got.titles.join(' · ')}`);
 }
 check(hub.parse("/what's due tomorrow").cmd?.name === 'find' && hub.parse('/take physics quiz').cmd?.name === 'start' && hub.parse('/physics quiz tomorrow').cmd === null && hub.matchCommands('physics').length === 0 && hub.byName('launch')?.name === 'open', '"/what\'s" is /what (a name of /find), /take is /start, "/physics …" names no command (search.js reads it as a phrase)');
 check(hub.COMMANDS.every((c) => (c.label || c.hint).length <= 32) && hub.byName('open').hint === 'Open a tool in its own tab', `every command heads its list with a short title (the longest: ${Math.max(...hub.COMMANDS.map((c) => (c.label || c.hint).length))} characters), /open's line under it one clause`);
