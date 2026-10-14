@@ -134,10 +134,14 @@ public sealed class SheetHost : Grid
         Support.Shot.Moved();
         Dispatcher.BeginInvoke(() =>
         {
-            // the first thing to type in, else the default button (Cancel, when the primary is the critical one)
+            // the first thing to type in — if it shows without scrolling: focusing a field further down would scroll the
+            // sheet to it, the top of what it holds cut off — else the default button (Cancel, when the primary is the
+            // critical one), else (a sheet with no buttons of its own, a tool's: its heading's Done) the first thing the
+            // keyboard can reach in it, unless the sheet has put the keyboard somewhere itself
             var primary = s.Buttons.FirstOrDefault(b => b.Kind == SheetButtonKind.Primary);
             var first = FirstFocusable(s.Body) ?? (IInputElement?)(primary is { Danger: true } ? s.Buttons.LastOrDefault(b => b.Kind == SheetButtonKind.Close)?.Control : primary?.Control);
             if (first is UIElement u) { u.Focus(); Keyboard.Focus(first); }
+            else if (!card.IsKeyboardFocusWithin) card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
         }, System.Windows.Threading.DispatcherPriority.Input);
     }
 
@@ -279,7 +283,13 @@ public sealed class SheetHost : Grid
     {
         if (root is not Visual and not System.Windows.Media.Media3D.Visual3D) return null; // (a document, a run: nothing to focus)
         if (root is System.Windows.Controls.TextBox or System.Windows.Controls.PasswordBox or Wpf.Ui.Controls.TextBox or Wpf.Ui.Controls.PasswordBox)
-            return ((UIElement)root).IsEnabled && ((UIElement)root).IsVisible ? (IInputElement)root : null;
+        {
+            var u = (UIElement)root;
+            if (!u.IsEnabled || !u.IsVisible) return null;
+            // (words set out to be selected and copied — read-only — are not a field to type in)
+            if (root is System.Windows.Controls.Primitives.TextBoxBase { IsReadOnly: true }) return null;
+            return InFirstScreen(u) ? (IInputElement)root : null;
+        }
         var n = VisualTreeHelper.GetChildrenCount(root);
         for (var i = 0; i < n; i++)
             if (FirstFocusable(VisualTreeHelper.GetChild(root, i)) is { } f) return f;
@@ -287,5 +297,23 @@ public sealed class SheetHost : Grid
             foreach (var c in LogicalTreeHelper.GetChildren(fe).OfType<DependencyObject>())
                 if (FirstFocusable(c) is { } f2) return f2;
         return null;
+    }
+
+    /// <summary>Whether an element shows whole in every scroller it is in, as the sheet opens (focusing one that does not
+    /// would scroll the sheet down to it).</summary>
+    private static bool InFirstScreen(UIElement u)
+    {
+        for (var p = VisualTreeHelper.GetParent(u); p != null; p = VisualTreeHelper.GetParent(p))
+        {
+            if (p is SheetHost) break;
+            if (p is not ScrollViewer sv || sv.ViewportHeight <= 0) continue;
+            try
+            {
+                var at = u.TranslatePoint(new Point(0, 0), sv);
+                if (at.Y < -0.5 || at.Y + u.RenderSize.Height > sv.ViewportHeight + 0.5) return false;
+            }
+            catch (InvalidOperationException) { return false; }
+        }
+        return true;
     }
 }

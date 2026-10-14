@@ -40,11 +40,12 @@ public sealed record Place(PlaceKind Kind, string? Ctx = null, string? Arg = nul
     };
 }
 
-public enum RouteKind { Web, Notifications, Calendar, Course, Group, Groups, Section, Topic, Assignment, Page, Folder, Inbox, Conversation }
+public enum RouteKind { Web, Notifications, Calendar, Course, Group, Groups, Section, Topic, Assignment, Page, Folder, Inbox, Conversation, Tool }
 
 /// <summary>
 /// A screen pushed on a place, or a native screen by name (the Mac's Route): web(url, title), course(id), group(id),
-/// section(ctx, kind), topic(ctx, id), assignment(course, id), page(ctx, slug), folder(ctx, id, name), conversation(id).
+/// section(ctx, kind), topic(ctx, id), assignment(course, id), page(ctx, slug), folder(ctx, id, name), conversation(id),
+/// tool(key) — a tool open on the Tools place.
 /// </summary>
 public sealed record Route(RouteKind Kind, string A = "", string B = "", string C = "")
 {
@@ -57,6 +58,8 @@ public sealed record Route(RouteKind Kind, string A = "", string B = "", string 
     public static Route Page(string ctx, string slug) => new(RouteKind.Page, ctx, slug);
     public static Route Folder(string ctx, string id, string name) => new(RouteKind.Folder, ctx, id, name);
     public static Route Conversation(string id) => new(RouteKind.Conversation, id);
+    /// <summary>A tool open on the Tools place ("Tools › Calculator"), by its key.</summary>
+    public static Route Tool(string key) => new(RouteKind.Tool, key);
     public static readonly Route InboxRoute = new(RouteKind.Inbox);
     public static readonly Route GroupsRoute = new(RouteKind.Groups);
     public static readonly Route NotificationsRoute = new(RouteKind.Notifications);
@@ -101,10 +104,10 @@ public sealed class Navigator
         Current = Current with { Path = Current.Path.Append(route).ToList() };
     }
 
-    /// <summary>A course's screen opened from elsewhere: the course's own place with the screen on it, as one step.</summary>
+    /// <summary>A course's screen (or a tool) opened from elsewhere: its own place with the screen on it, as one step.</summary>
     public void Push(Route route, Place place)
     {
-        if (Current.Place.Ctx == place.Ctx) { Push(route); return; }
+        if (Within(Current.Place, place)) { Push(route); return; }
         Record();
         Current = new Location(place, new List<Route> { route });
     }
@@ -143,6 +146,9 @@ public sealed class Navigator
         Record();
         Current = new Location(Current.Place);
     }
+
+    /// <summary>Already where a screen belongs: in its course (any of the course's places), or on its root place (Tools).</summary>
+    public static bool Within(Place current, Place target) => target.Ctx != null ? current.Ctx == target.Ctx : current == target;
 
     private void Record()
     {

@@ -62,12 +62,12 @@ public static class ToolsPins
 }
 
 /// <summary>
-/// Tools (the Mac's ToolsView and ToolsGrid): the things Simpl does on its own — a citation generator, a focus timer, a
-/// calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge &amp; split PDFs, a PDF
-/// annotator, Image to text, flashcards and a unit converter — a tile each: its symbol on a wash of its colour, its name
-/// and line, and its pin; then, under a "Biology" heading, the biology toolkit's ten (Tools/Biology). A tile opens its
-/// tool whole, over the window (<see cref="Simpl.Tools.ToolPopup"/>), as a pin's flyout does; Done or Escape folds it
-/// away, back to the tiles.
+/// Tools (the Mac's ToolsView and ToolsGrid): the things Simpl does on its own, a tile each — its symbol on a wash of its
+/// colour, its name and a one-line note, and its pin — under a heading for what they are for: Study (flashcards, the focus
+/// timer, citations, Grade needed), Math &amp; science (the calculators, the unit converter, the periodic table), Files (the
+/// file converter, Merge &amp; split PDFs, the PDF annotator, Image to text), and Biology (the biology toolkit's ten,
+/// Tools/Biology). A tile opens its tool on this page (<see cref="ToolScreen"/>: "Tools › Calculator", the breadcrumb's
+/// "Tools" and Back coming back here); a pin's flyout opens it over the window instead.
 /// </summary>
 public sealed class ToolsScreen : Screen
 {
@@ -77,23 +77,34 @@ public sealed class ToolsScreen : Screen
         public Color Color => K.Hex(Hex);
     }
 
-    /// <summary>Every tool: the twelve under no heading, then the biology toolkit's ten under "Biology" (Tools/Biology/BioTools.cs).</summary>
+    /// <summary>Every tool: the twelve of Study, Math &amp; science and Files, then the biology toolkit's ten
+    /// (Tools/Biology/BioTools.cs).</summary>
     public static readonly Kind[] Kinds = Everyday.Concat(Simpl.Tools.BioTools.Kinds).ToArray();
 
+    /// <summary>The twelve (the Mac's ToolKind), each note short enough for one line on its tile.</summary>
     private static Kind[] Everyday => new Kind[]
     {
-        new("cite", "Citation generator", "Cite a source in MLA, APA or Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
-        new("pomo", "Focus timer", "Focus for a while, then take a break.", SymbolRegular.Timer24, "#ff9500"),
-        new("calc", "Calculator", "Scientific, with the keys you know.", SymbolRegular.Calculator24, "#ff9f0a"),
+        new("cite", "Citation generator", "Cite in MLA, APA or Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
+        new("pomo", "Focus timer", "Focus, then take a break.", SymbolRegular.Timer24, "#ff9500"),
+        new("calc", "Calculator", "Scientific, from your keyboard.", SymbolRegular.Calculator24, "#ff9f0a"),
         new("graph", "Graphing calculator", "Desmos, right here.", SymbolRegular.DataLine24, "#5856d6"),
-        new("ptable", "Periodic table", "Every element and its facts, in place.", SymbolRegular.Molecule24, "#30d158"),
-        new("need", "Grade needed", "What you need on the final to hit your goal.", SymbolRegular.TargetArrow24, "#ff375f"),
-        new("conv", "File converter", "Word, PDF and images, any way round.", SymbolRegular.ArrowSync24, "#34c759"),
-        new("units", "Unit converter", "Lengths, weights, temperatures and more.", SymbolRegular.Ruler24, "#64d2ff"),
-        new("pdfx", "Merge & split PDFs", "Join pages from PDFs into one, or take pages out.", SymbolRegular.DocumentCopy24, "#bf5af2"),
-        new("mark", "PDF annotator", "Highlight and add notes, saved in the file.", SymbolRegular.Highlight24, "#e5a500"),
-        new("ocr", "Image to text", "Read the words off a picture or a scan.", SymbolRegular.ScanText24, "#00b3a4"),
-        new("fc", "Flashcards", "Make a set. Flip, learn, test, match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
+        new("ptable", "Periodic table", "Every element and its facts.", SymbolRegular.Molecule24, "#30d158"),
+        new("need", "Grade needed", "What you need on the final.", SymbolRegular.TargetArrow24, "#ff375f"),
+        new("conv", "File converter", "Convert Word, PDF and images.", SymbolRegular.ArrowSync24, "#34c759"),
+        new("units", "Unit converter", "Lengths, weights, temperatures.", SymbolRegular.Ruler24, "#64d2ff"),
+        new("pdfx", "Merge & split PDFs", "Join PDFs, or take pages out.", SymbolRegular.DocumentCopy24, "#bf5af2"),
+        new("mark", "PDF annotator", "Highlight and add notes.", SymbolRegular.Highlight24, "#e5a500"),
+        new("ocr", "Image to text", "Copy the words in a picture.", SymbolRegular.ScanText24, "#00b3a4"),
+        new("fc", "Flashcards", "Flip, learn, test and match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
+    };
+
+    /// <summary>The Tools page's sections in its order: what each set of tools is for, its tools in the order they are
+    /// reached for (the biology toolkit's ten come after, under "Biology").</summary>
+    public static readonly (string Title, string[] Keys)[] Groups =
+    {
+        ("Study", new[] { "fc", "pomo", "cite", "need" }),
+        ("Math & science", new[] { "calc", "graph", "units", "ptable" }),
+        ("Files", new[] { "conv", "pdfx", "mark", "ocr" }),
     };
 
     /// <summary>Where the graphing calculator is (the Mac's GraphWeb.desmos), while it has no view of its own here.</summary>
@@ -125,6 +136,8 @@ public sealed class ToolsScreen : Screen
 
     public override void Refresh()
     {
+        // (the tiles shown: the Tools place opens on them again, not on the tool last open)
+        if (!Away) Simpl.Tools.ToolsCenter.Open = null;
         if (!ReferenceEquals(watched, Simpl.Tools.ToolRegistry.Timer))
         {
             if (watched != null) watched.Changed -= TimerChanged;
@@ -137,15 +150,18 @@ public sealed class ToolsScreen : Screen
         // (a pin changed anywhere — here, a sheet, the title bar — shows on the tiles while the page is up)
         ToolsPins.Changed -= PinsChanged;
         ToolsPins.Changed += PinsChanged;
-        // (the screenshot suite: --tool calc opens the Calculator, as the Mac's -SimplTool)
+        // (the screenshot suite: --tool calc opens the Calculator on this page, as the Mac's -SimplTool)
         if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.FirstOrDefault(t => t.Key == k) is { } kind)
-            Application.Current.Dispatcher.BeginInvoke(() => OpenTool(engine, kind, View), System.Windows.Threading.DispatcherPriority.Loaded);
+            Application.Current.Dispatcher.BeginInvoke(() => OpenTool(engine, kind), System.Windows.Threading.DispatcherPriority.Loaded);
         // (a development run's --bio-demo: the biology toolkit's foundation seen working, Tools/Biology/BioDemo.cs)
         else if (Launch.IsDevelopment && Launch.Take("", "bio-demo") != null)
             Application.Current.Dispatcher.BeginInvoke(() => Simpl.Tools.BioDemo.Show(View != null ? Window.GetWindow(View) : null), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnClock(object? sender, EventArgs e) => Tick();
+
+    /// <summary>Nothing to read ahead (and a read ahead never forgets the tool last open).</summary>
+    protected override void ReadAhead() { }
 
     private void PinsChanged() => Render();
 
@@ -160,18 +176,28 @@ public sealed class ToolsScreen : Screen
     protected override FrameworkElement Build()
     {
         timerLine = null;
-        var page = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
-        var grid = new MoreGrid(300, 16, Kinds.Where(k2 => !Simpl.Tools.BioTools.IsBiology(k2.Key)).Select(k2 => (UIElement)Tile(k2)), stretch: true);
-        page.Children.Add(grid);
+        var page = new Stack { Orientation = Orientation.Vertical, Spacing = 12 };
+        // (a heading for what each set of tools is for, its tiles under it: three across from about 900 wide)
+        FrameworkElement Heading(string title, string? line)
+        {
+            var h = K.V(2, K.Text(title, Ty.Subtitle));
+            if (line != null) h.Children.Add(K.Wrapped(line, Ty.Body, B.Text2));
+            h.Margin = new Thickness(0, page.Children.Count == 0 ? 0 : 18, 0, 0);
+            System.Windows.Automation.AutomationProperties.SetHeadingLevel(h.Children[0], System.Windows.Automation.AutomationHeadingLevel.Level2);
+            return h;
+        }
+        foreach (var (title, keys) in Groups)
+        {
+            page.Children.Add(Heading(title, null));
+            var kinds = keys.Select(k2 => Kinds.FirstOrDefault(t => t.Key == k2)).OfType<Kind>();
+            page.Children.Add(new MoreGrid(TileWidth, 16, kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
+        }
         // (the biology toolkit's ten under a heading of their own, as the Mac's Tools page has them)
-        var heading = K.V(4, K.Text("Biology", Ty.Subtitle),
-            K.Wrapped("Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.", Ty.Body, B.Text2));
-        heading.Margin = new Thickness(0, 14, 0, -8);
-        System.Windows.Automation.AutomationProperties.SetHeadingLevel(heading.Children[0], System.Windows.Automation.AutomationHeadingLevel.Level2);
+        var heading = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");
         page.Children.Add(heading);
-        page.Children.Add(new MoreGrid(300, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
+        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
         if (ToolsPins.Pinned.Count == 0)
-            page.Children.Add(MoreKit.Note(SymbolRegular.Pin24, "Press a tile’s pin to keep that tool in the title bar. Its button there opens a quick version of it."));
+            page.Children.Add(MoreKit.Note(SymbolRegular.Pin24, "Press a tile’s pin to keep that tool in the title bar. Its button there opens a quick version of it.").Margin(0, 10, 0, 0));
         var sv = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
         sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);
         sv.Padding = new Thickness(40, 0, 40, 40);
@@ -184,11 +210,15 @@ public sealed class ToolsScreen : Screen
         return sv;
     }
 
+    /// <summary>The narrowest a tile is: three across from about 900 of the page's width.</summary>
+    private const double TileWidth = 280;
+
     /// <summary>A tool's tile: its symbol on a wash of its colour, its name and line, and its pin at its corner.</summary>
     private FrameworkElement Tile(Kind kind)
     {
-        // (a long name — Photosynthesis & Respiration — on two lines rather than cut short)
-        var words = K.V(4, K.Wrapped(kind.Name, Ty.BodyStrong, maxLines: 2), K.Wrapped(kind.Note, Ty.Body, B.Text2));
+        // (a long name — Photosynthesis & Respiration — on two lines rather than cut short; the name keeps clear of the
+        //  pin in the corner, the note under it has the tile's width)
+        var words = K.V(4, K.Wrapped(kind.Name, Ty.BodyStrong, maxLines: 2).Margin(0, 0, 36, 0), K.Wrapped(kind.Note, Ty.Body, B.Text2));
         if (kind.Key == "pomo" && Simpl.Tools.ToolRegistry.Timer is { Active: true } t)
         {
             timerLine = K.Text(TimerWords(t), Ty.BodyStrong);
@@ -196,15 +226,15 @@ public sealed class ToolsScreen : Screen
             Simpl.Tools.FontFeatureExtensions.FontFeatures(timerLine);
             words.Children.Add(timerLine);
         }
-        var g = K.Columns("auto, *", K.IconTile(kind.Symbol, kind.Color, 48).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 0, 14, 0).Col(0), words.Margin(0, 0, 36, 0).Col(1));
-        var card = K.CardButton(g, () => OpenTool(engine, kind, View), 8, new Thickness(18));
+        var g = K.Columns("auto, *", K.IconTile(kind.Symbol, kind.Color, 44).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 0, 14, 0).Col(0), words.Col(1));
+        var card = K.CardButton(g, () => OpenTool(engine, kind), 8, new Thickness(16));
         card.VerticalContentAlignment = VerticalAlignment.Top;
-        card.MinHeight = 104;
+        card.MinHeight = 84;
         System.Windows.Automation.AutomationProperties.SetName(card, $"{kind.Name}. {kind.Note}");
         var on = ToolsPins.IsPinned(kind.Key);
         card.ContextMenu = MoreKit.Menu(
-            ("Open", SymbolRegular.Open24, () => OpenTool(engine, kind, View)),
-            (on ? "Unpin from Title Bar" : "Pin to Title Bar", on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24, () => ToolsPins.Toggle(kind.Key)));
+            ("Open", SymbolRegular.Open24, () => OpenTool(engine, kind)),
+            (on ? "Unpin from title bar" : "Pin to title bar", on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24, () => ToolsPins.Toggle(kind.Key)));
         var pin = Pin(kind, on);
         if (kind.Key == "graph") Shell.Tour.Mark(pin, Shell.TourSpot.ToolPin);
         return new Grid { Children = { card, pin } };
@@ -227,17 +257,17 @@ public sealed class ToolsScreen : Screen
         return b;
     }
 
-    /// <summary>A tool opened by its key (a command, a link): whole, over the window.</summary>
-    public static void OpenTool(Engine.Engine engine, string key, FrameworkElement? from = null)
+    /// <summary>A tool opened by its key (a command, a link): on the Tools page.</summary>
+    public static void OpenTool(Engine.Engine engine, string key)
     {
-        if (Kinds.FirstOrDefault(k => k.Key == key) is { } kind) OpenTool(engine, kind, from);
+        if (Kinds.FirstOrDefault(k => k.Key == key) is { } kind) OpenTool(engine, kind);
     }
 
-    /// <summary>A tool opened whole, over the window where you are — from its tile, its pin, a command alike; the
-    /// graphing calculator, while it has no view of its own here, in a window.</summary>
-    public static void OpenTool(Engine.Engine engine, Kind kind, FrameworkElement? from = null)
+    /// <summary>A tool opened on the Tools page ("Tools › Calculator") — from its tile, a command alike; the graphing
+    /// calculator, while it has no view of its own here, in a window.</summary>
+    public static void OpenTool(Engine.Engine engine, Kind kind)
     {
         if (kind.Key == "graph" && !Simpl.Tools.ToolRegistry.Has("graph")) { engine.OpenBrowser(Desmos, kind.Name); return; }
-        Simpl.Tools.ToolsCenter.PopUp(kind.Key, engine, from != null ? Window.GetWindow(from) : null);
+        Simpl.Tools.ToolsCenter.Show(kind.Key, engine);
     }
 }
