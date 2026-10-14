@@ -544,6 +544,15 @@ read twice over (the app's reading ahead and the page's), the page keeps no more
 extension's storage than it did before (the courses' assignments, for the Dashboard's counts), and a web screen takes
 no picture of the one before it to move from: it arrives by its own entrance (the app shows each one in place, so a
 220 ms fade on the house ease-out, where it rose before), and the app's pages make the move between them.
+
+The engine's side of live checks (Simpl Courses 2.99.35, `native-app.js`): a call asked with `maxAge` (seconds) reads
+again every Canvas answer it is made from that is older than that, and nothing younger — the age is the call's own, so
+two calls under way at once keep theirs. Who is signed in, the course colours and the help links are not read again for
+it. With `known` (the `hash` of the answer on screen) a call answers `{ unchanged: true, hash }` when nothing changed,
+else `{ unchanged: false, hash, value }`; the same data always makes the same answer. `BCVNative.stats().reads` counts
+the reads the page has made, for a check's log line. What a course holds (its record, tabs, sections, people, groups,
+folders) is kept 10 minutes at most, as its modules, pages and files already were. Against the mock school only,
+`liveDevChange` (`done`, `grade`, `task`) changes the school behind the engine's back, for CI to see a check find it.
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
 
