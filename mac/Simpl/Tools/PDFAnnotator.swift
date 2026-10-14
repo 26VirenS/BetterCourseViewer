@@ -263,6 +263,22 @@ struct PDFAnnotatorTool: View {
                 MarkPDFView(model: model)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1))
+                    // (tools-28) why Highlight, Underline and Strike are waiting, said on the page itself — not only in
+                    // their tooltips — until words are selected and the buttons light up
+                    .overlay(alignment: .top) {
+                        if !model.hasSelection {
+                            Label("Select words on the page to highlight, underline or strike them.", systemImage: "text.cursor")
+                                .font(.sCallout)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .glassCapsule()
+                                .padding(.top, 12)
+                                .allowsHitTesting(false)
+                                .transition(.opacity)
+                        }
+                    }
+                    .animation(Motion.gentle, value: model.hasSelection)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 panel
                     .frame(width: 330)
@@ -336,8 +352,7 @@ struct PDFAnnotatorTool: View {
         } label: {
             Label(name, systemImage: symbol)
         }
-        .glassButton(prominent: model.hasSelection)
-        .tint(ToolKind.mark.color)
+        .glassButton(prominent: model.hasSelection, tint: model.hasSelection ? ToolKind.mark.color : nil)
         .disabled(!model.hasSelection)
         .help(model.hasSelection ? "\(name) the words selected" : "Select some words on the page first")
     }

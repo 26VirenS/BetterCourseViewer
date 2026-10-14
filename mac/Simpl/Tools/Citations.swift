@@ -21,7 +21,9 @@ struct SavedCitation: Codable, Identifiable, Hashable {
     var plain: String
 }
 
-/// A field of a kind of source: its key, label, an example, whether a citation needs it, and whether it takes a whole row.
+/// A field of a kind of source: its key, label, a hint (tools-8: the form the field wants — "First Last; First Last",
+/// "YYYY" — or an example marked "e.g.", never a made-up value that reads as filled in), whether a citation needs it, and
+/// whether it takes a whole row.
 struct CiteField: Identifiable, Hashable {
     let key: String
     let label: String
@@ -46,24 +48,25 @@ enum CiteBuilder {
         func F(_ key: String, _ label: String, _ hint: String, _ required: Bool = false, wide: Bool = true) -> CiteField {
             CiteField(key: key, label: label, hint: hint, required: required, wide: wide)
         }
+        // (names as typed: first name first, several split by ";" — CiteBuilder turns them round for each style)
         switch type {
         case "journal":
-            return [F("author", "Author", "Jane R. Okonkwo", true), F("title", "Article title", "Reading Habits in First-Year Courses", true),
-                    F("container", "Journal", "Journal of Higher Education", true), F("volume", "Volume", "47", wide: false), F("issue", "Issue", "3", wide: false),
-                    F("year", "Year", "2026", true, wide: false), F("pages", "Pages", "112–137", wide: false), F("doi", "DOI", "10.1080/00221546.2026.1234567")]
+            return [F("author", "Author", "First Last; First Last", true), F("title", "Article title", "Title of the article", true),
+                    F("container", "Journal", "Name of the journal", true), F("volume", "Volume", "e.g. 47", wide: false), F("issue", "Issue", "e.g. 3", wide: false),
+                    F("year", "Year", "YYYY", true, wide: false), F("pages", "Pages", "e.g. 112–137", wide: false), F("doi", "DOI", "e.g. 10.1080/…")]
         case "book":
-            return [F("author", "Author", "Jane R. Okonkwo", true), F("title", "Book title", "The Unread Syllabus", true), F("edition", "Edition", "2nd ed.", wide: false),
-                    F("city", "City", "Chicago", wide: false), F("publisher", "Publisher", "University of Chicago Press", true), F("year", "Year", "2026", true, wide: false)]
+            return [F("author", "Author", "First Last; First Last", true), F("title", "Book title", "Title of the book", true), F("edition", "Edition", "e.g. 2nd ed.", wide: false),
+                    F("city", "City", "Where it was published", wide: false), F("publisher", "Publisher", "Name of the publisher", true), F("year", "Year", "YYYY", true, wide: false)]
         case "video":
-            return [F("author", "Uploader", "Simpl Courses", true), F("title", "Video title", "Reading a Rubric in Two Minutes", true), F("container", "Platform", "YouTube", true, wide: false),
-                    F("month", "Month", "March", wide: false), F("day", "Day", "4", wide: false), F("year", "Year", "2026", true, wide: false), F("url", "URL", "youtube.com/watch?v=…", true)]
+            return [F("author", "Uploader", "Channel or person", true), F("title", "Video title", "Title of the video", true), F("container", "Platform", "e.g. YouTube", true, wide: false),
+                    F("month", "Month", "Month", wide: false), F("day", "Day", "Day", wide: false), F("year", "Year", "YYYY", true, wide: false), F("url", "URL", "https://…", true)]
         case "coursefile":
-            return [F("author", "Instructor", "Yuwen Li", true), F("title", "File title", "Lec06 — Composition of Functions", true), F("course", "Course", "MATH 021", true, wide: false),
-                    F("institution", "Institution", "UC Merced", true, wide: false), F("year", "Year", "2026", true, wide: false), F("url", "URL", "Optional \(lms) link")]
+            return [F("author", "Instructor", "First Last", true), F("title", "File title", "Title of the file", true), F("course", "Course", "e.g. MATH 021", true, wide: false),
+                    F("institution", "Institution", "Your school", true, wide: false), F("year", "Year", "YYYY", true, wide: false), F("url", "URL", "Optional \(lms) link")]
         default:
-            return [F("author", "Author", "Jane R. Okonkwo; Amir Haddad", true), F("title", "Page title", "How Students Actually Read Syllabi", true), F("container", "Website", "The Atlantic", true, wide: false),
-                    F("publisher", "Publisher", "Optional if same as site", wide: false), F("month", "Month", "March", wide: false), F("day", "Day", "4", wide: false), F("year", "Year", "2026", true, wide: false),
-                    F("url", "URL", "theatlantic.com/…", true), F("accessed", "Date accessed", "12 September 2026", wide: false)]
+            return [F("author", "Author", "First Last; First Last", true), F("title", "Page title", "Title of the page", true), F("container", "Website", "Name of the site", true, wide: false),
+                    F("publisher", "Publisher", "If not the site’s own", wide: false), F("month", "Month", "Month", wide: false), F("day", "Day", "Day", wide: false), F("year", "Year", "YYYY", true, wide: false),
+                    F("url", "URL", "https://…", true), F("accessed", "Date accessed", "D Month YYYY", wide: false)]
         }
     }
 
@@ -396,8 +399,7 @@ struct CitationTool: View {
             Label(name, systemImage: symbol)
                 .font(.sCallout.weight(type == key ? .semibold : .regular))
         }
-        .glassButton(prominent: type == key)
-        .tint(ToolKind.cite.color)
+        .glassButton(prominent: type == key, tint: type == key ? ToolKind.cite.color : nil)
         .controlSize(.large)
     }
 
@@ -525,8 +527,7 @@ struct CitationTool: View {
                     Label(copied ? "Copied" : "Copy Citation", systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(.sCallout.weight(.semibold))
                 }
-                .glassButton(prominent: true)
-                .tint(ToolKind.cite.color)
+                .glassButton(prominent: true, tint: ToolKind.cite.color)
                 .controlSize(.large)
                 .disabled(!ready)
                 Button {
@@ -621,8 +622,7 @@ struct CitationCompact: View {
                     .font(.sCallout)
                     .onSubmit(cite)
                 Button("Cite", action: cite)
-                    .glassButton(prominent: true)
-                    .tint(ToolKind.cite.color)
+                    .glassButton(prominent: true, tint: ToolKind.cite.color)
                     .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             Picker("Style", selection: $store.style) {

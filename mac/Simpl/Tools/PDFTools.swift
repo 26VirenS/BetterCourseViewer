@@ -165,8 +165,7 @@ struct PDFMergeSplitTool: View {
                     } label: {
                         Label("Merge…", systemImage: "arrow.triangle.merge").font(.sCallout.weight(.semibold))
                     }
-                    .glassButton(prominent: true)
-                    .tint(ToolKind.pdfx.color)
+                    .glassButton(prominent: true, tint: ToolKind.pdfx.color)
                     .controlSize(.large)
                     .disabled(picks.isEmpty)
                 }
@@ -331,8 +330,7 @@ struct PDFMergeSplitTool: View {
                     } label: {
                         Label("Save Kept Pages…", systemImage: "square.and.arrow.down").font(.sCallout.weight(.semibold))
                     }
-                    .glassButton(prominent: true)
-                    .tint(ToolKind.pdfx.color)
+                    .glassButton(prominent: true, tint: ToolKind.pdfx.color)
                     .disabled(removed.count >= f.count)
                     Button {
                         saveEachPage(f)
@@ -341,7 +339,8 @@ struct PDFMergeSplitTool: View {
                     }
                     .glassButton()
                     .disabled(removed.count >= f.count)
-                    Text("Press a page to take it out (or put it back); its button turns it.")
+                    // (tools-28) the two things a page does, said plainly
+                    Text("Click a page to leave it out. ⟳ turns it.")
                         .font(.sFootnote)
                         .foregroundStyle(.secondary)
                 }
@@ -376,13 +375,18 @@ struct PDFMergeSplitTool: View {
             .help(out ? "Put page \(n + 1) back" : "Take page \(n + 1) out")
             HStack(spacing: 6) {
                 Text("Page \(n + 1)").font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
+                // (tools-28) a target big enough to find, and a tooltip that says what it does
                 Button {
-                    turns[n] = ((turns[n] ?? 0) + 90) % 360
+                    withAnimation(Motion.snappy) { turns[n] = ((turns[n] ?? 0) + 90) % 360 }
                 } label: {
                     Image(systemName: "rotate.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 24, height: 22)
                 }
-                .buttonStyle(.borderless)
-                .help("Turn a quarter")
+                .glassButton()
+                .controlSize(.small)
+                .help("Turn page \(n + 1) a quarter to the right")
+                .accessibilityLabel("Turn page \(n + 1)")
             }
         }
     }

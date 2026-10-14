@@ -108,6 +108,11 @@ enum UnitMath {
         return (formatter.string(from: NSNumber(value: v)) ?? String(v)).replacingOccurrences(of: "-", with: "−")
     }
 
+    /// (tools-27) A number with its unit: "212 °F", "3.28 ft" — the angle marks close up, as written: "90°", "30′".
+    static func withUnit(_ v: Double, _ u: UnitChoice) -> String {
+        ["°", "′", "″"].contains(u.symbol) ? text(v) + u.symbol : "\(text(v)) \(u.symbol)"
+    }
+
     private static let formatter: NumberFormatter = {
         let f = NumberFormatter()
         f.locale = Locale(identifier: "en_US")
@@ -140,8 +145,7 @@ struct UnitConverterTool: View {
                             } label: {
                                 Label(c.name, systemImage: c.symbol).font(.sCallout.weight(c == category ? .semibold : .regular))
                             }
-                            .glassButton(prominent: c == category)
-                            .tint(Color(hex: "#64d2ff"))
+                            .glassButton(prominent: c == category, tint: c == category ? Color(hex: "#64d2ff") : nil)
                             .controlSize(.large)
                         }
                     }
@@ -156,43 +160,51 @@ struct UnitConverterTool: View {
         }
     }
 
+    /// (tools-27) One column — the value, From, Swap between From and To, To — and the answer with its unit large
+    /// ("212 °F"), what it came from under it ("= 100 °C").
     private var converter: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .bottom, spacing: 12) {
-                ToolField(label: "Value", text: $value, placeholder: "1")
-                    .frame(maxWidth: 240)
+            VStack(alignment: .leading, spacing: 12) {
+                ToolField(label: "Value", text: $value, placeholder: "1", width: 260)
                 unitPicker("From", selection: $from)
-            }
-            HStack(alignment: .bottom, spacing: 12) {
                 Button {
-                    let f = from
-                    from = to
-                    to = f
+                    withAnimation(Motion.snappy) {
+                        let f = from
+                        from = to
+                        to = f
+                    }
                 } label: {
-                    Label("Swap", systemImage: "arrow.up.arrow.down")
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 20, height: 18)
                 }
                 .glassButton()
                 .controlSize(.large)
+                .help("Swap From and To")
+                .accessibilityLabel("Swap From and To")
                 unitPicker("To", selection: $to)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(result.map { UnitMath.text($0) } ?? "—")
+                Text(result.map { UnitMath.withUnit($0, to) } ?? "—")
                     .font(.system(size: 56, weight: .bold, design: .rounded).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.4)
                     .textSelection(.enabled)
                     .contentTransition(.numericText())
-                Text(to.name.lowercased() + (UnitMath.number(value).map { " in \(UnitMath.text($0)) \(from.symbol)" } ?? ""))
-                    .font(.sBody)
-                    .foregroundStyle(.secondary)
+                if let v = UnitMath.number(value) {
+                    Text("= \(UnitMath.withUnit(v, from))")
+                        .font(.sBody)
+                        .foregroundStyle(.secondary)
+                }
                 HStack {
                     Button {
-                        if let r = result { copyToPasteboard(UnitMath.text(r).replacingOccurrences(of: "−", with: "-")) }
+                        if let r = result { copyToPasteboard(UnitMath.withUnit(r, to).replacingOccurrences(of: "−", with: "-")) }
                     } label: {
                         Label("Copy", systemImage: "doc.on.doc")
                     }
                     .glassButton()
                     .disabled(result == nil)
+                    .help(result.map { "Copy \(UnitMath.withUnit($0, to))" } ?? "Copy")
                 }
             }
             .padding(24)
@@ -227,7 +239,7 @@ struct UnitConverterTool: View {
                             HStack {
                                 Text(u.name).font(.sBody)
                                 Spacer()
-                                Text("\(UnitMath.text(UnitMath.convert(v, from: from.unit, to: u.unit))) \(u.symbol)")
+                                Text(UnitMath.withUnit(UnitMath.convert(v, from: from.unit, to: u.unit), u))
                                     .font(.sBody.monospacedDigit())
                                     .foregroundStyle(u == to ? Theme.accent : Color.secondary)
                             }
@@ -282,11 +294,16 @@ struct UnitConverterCompact: View {
                 }
                 .labelsHidden()
             }
-            Text(UnitMath.number(value).map { "\(UnitMath.text(UnitMath.convert($0, from: from.unit, to: to.unit))) \(to.symbol)" } ?? "—")
+            Text(UnitMath.number(value).map { UnitMath.withUnit(UnitMath.convert($0, from: from.unit, to: to.unit), to) } ?? "—")
                 .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .textSelection(.enabled)
+            if let v = UnitMath.number(value) {
+                Text("= \(UnitMath.withUnit(v, from))")
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
