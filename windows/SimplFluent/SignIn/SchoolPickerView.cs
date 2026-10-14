@@ -18,20 +18,30 @@ namespace Simpl.SignIn;
 /// The first run (the Mac's SchoolPicker): which Canvas or Brightspace to open. The school is found by its name — the
 /// listings carried in the app, and Instructure's own "Find my school" for what they lack — as in Windows' own search:
 /// the field keeps the keyboard, ↑ and ↓ move through the schools found, Enter opens the one chosen; the address can
-/// still be typed by hand. The school chosen is shown before it is opened — a small square of its sign-in page and
-/// "Is this your school?": Yes opens it, No comes back to the search as it was left.
+/// still be typed by hand. While schools are listed the welcome above the field steps back (a smaller mark, no line
+/// under the name) and the list is as tall as its rows, five at most, so the page itself never scrolls at the window's
+/// usual size and the field glides to its new place rather than jumping. The school chosen is shown before it is opened
+/// — a small square of its sign-in page and "Is this your school?": Yes opens it, No comes back to the search as it was
+/// left.
 /// </summary>
 public sealed class SchoolPickerView : Grid
 {
+    /// <summary>The schools the list shows before it scrolls.</summary>
+    private const int RowsShown = 5;
+    /// <summary>A school's row: its name over its address (Body and Caption lines, the row's padding).</summary>
+    private const double RowHeight = 50, RowGap = 2;
+
     private readonly Action<string> open;
     private readonly Window owner;
     private readonly SchoolSearch search = new();
     private readonly Grid searching = new();
     private readonly TextBox query;
     private readonly Border results;
-    private readonly Stack list = new() { Orientation = Orientation.Vertical, Spacing = 2 };
+    private readonly Stack list = new() { Orientation = Orientation.Vertical, Spacing = RowGap };
     private readonly ScrollViewer scroller;
-    private readonly TextBlock note;
+    private readonly Image icon;
+    private readonly TextBlock sub;
+    private readonly FrameworkElement column;
     private readonly ProgressRing asking = K.Spinner(16);
     private readonly Dictionary<string, (Button Row, Border Pill, FrameworkElement Enter)> rows = new();
     private string? chosen;
@@ -43,10 +53,11 @@ public sealed class SchoolPickerView : Grid
         this.open = open;
         this.owner = owner;
 
-        // the welcome: the app's mark, its name, what to do
-        var icon = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 84, Height = 84, HorizontalAlignment = HorizontalAlignment.Center };
+        // the welcome: the app's mark, its name, what to do (the only words before a school is picked: how the sign-in
+        // goes is said where it happens, on the sign-in card and in "Stay logged in?")
+        icon = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 84, Height = 84, HorizontalAlignment = HorizontalAlignment.Center };
         var title = K.Text("Welcome to Simpl", Ty.Title).Center();
-        var sub = K.Text("Find your school’s Canvas or Brightspace.", Ty.BodyLarge, B.Text2).Center();
+        sub = K.Text("Find your school’s Canvas or Brightspace.", Ty.BodyLarge, B.Text2).Center();
 
         // the field: Windows' search box, large
         query = new TextBox
@@ -61,14 +72,14 @@ public sealed class SchoolPickerView : Grid
         asking.Margin = new Thickness(0, 0, 40, 0);
         var fieldGrid = new Grid { Children = { query, asking } };
 
-        // what matches, in a card that grows in under the query
-        scroller = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(4), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        // what matches, in a card that grows in under the query: as tall as its rows, five at most, then it scrolls
+        scroller = new ScrollViewer
+        {
+            Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(4), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            MaxHeight = RowsShown * RowHeight + (RowsShown - 1) * RowGap + 8,
+        };
         results = K.Card(scroller, new Thickness(0));
-        results.Height = 280;
         results.Visibility = Visibility.Collapsed;
-
-        note = K.Wrapped("If your school’s sign-in page has a username and password, Simpl shows its own sign-in card for it, and can keep you logged in on this PC if you choose.", Ty.Body, B.Text2).Center();
-        note.TextAlignment = TextAlignment.Center;
 
         // the address by hand
         var address = new TextBox { PlaceholderText = "school.instructure.com", ClearButtonEnabled = true };
@@ -84,11 +95,12 @@ public sealed class SchoolPickerView : Grid
             Content = K.V(8, manualRow, K.Wrapped("The address you open Canvas or Brightspace at in a browser, for example school.instructure.com or school.brightspace.com.", Ty.Caption, B.Text2)),
         };
 
-        var column = K.V(22, K.V(10, icon, title, sub), fieldGrid, results, note, manual);
-        column.Width = 520;
-        column.HorizontalAlignment = HorizontalAlignment.Center;
-        column.VerticalAlignment = VerticalAlignment.Center;
-        column.Margin = new Thickness(24, 12, 24, 36);
+        var stack = K.V(22, K.V(10, icon, title, sub), fieldGrid, results, manual);
+        stack.Width = 520;
+        stack.HorizontalAlignment = HorizontalAlignment.Center;
+        stack.VerticalAlignment = VerticalAlignment.Center;
+        stack.Margin = new Thickness(24, 12, 24, 36);
+        column = stack;
         searching.Children.Add(new ScrollViewer { Content = column, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         Children.Add(searching);
 
@@ -97,9 +109,11 @@ public sealed class SchoolPickerView : Grid
             if (e.PropertyName == nameof(SchoolSearch.Results)) ShowResults();
             if (e.PropertyName == nameof(SchoolSearch.Asking)) { asking.Visibility = search.Asking ? Visibility.Visible : Visibility.Collapsed; ShowResults(); }
         };
+        // (the window resized while schools are listed: the column held where a full list centres it at the new size)
+        SizeChanged += (_, _) => Dispatcher.BeginInvoke(() => { if (results.Visibility == Visibility.Visible) Settle(true); }, System.Windows.Threading.DispatcherPriority.Loaded);
         Loaded += async (_, _) =>
         {
-            Motion.Stagger(column.Children.OfType<UIElement>(), 60);
+            Motion.Stagger(stack.Children.OfType<UIElement>(), 60);
             await search.Load();
             query.Focus();
             Keyboard.Focus(query);
@@ -132,21 +146,24 @@ public sealed class SchoolPickerView : Grid
     private void ShowResults()
     {
         var shown = Trimmed.Length > 0;
-        if (shown != (results.Visibility == Visibility.Visible))
-        {
-            results.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
-            note.Visibility = shown ? Visibility.Collapsed : Visibility.Visible;
-            if (shown) Motion.Enter(results, 0, -12, 300); else Motion.FadeIn(note);
-        }
         list.Children.Clear();
         rows.Clear();
+        if (shown != (results.Visibility == Visibility.Visible))
+        {
+            var before = FieldTop();
+            results.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+            Compact(shown);
+            if (shown) Motion.Enter(results, 0, -12, 300);
+            Settle(shown);
+            Glide(before);
+        }
         if (!shown) return;
         if (SchoolSearch.AddressLike(query.Text) is { } typed)
             list.Children.Add(Row("open:" + typed, $"Open {typed}", "The address as typed", SymbolRegular.Open24, () => PickTyped(typed)));
         foreach (var s in search.Results)
         {
             var school = s;
-            list.Children.Add(Row(s.Id, s.Name, s.Domain, SymbolRegular.BuildingBank24, () => Pick(school)));
+            list.Children.Add(Row(s.Id, s.Name, s.Sub, SymbolRegular.BuildingBank24, () => Pick(school)));
         }
         if (search.Asking && search.Results.Count == 0)
             list.Children.Add(K.H(10, K.Spinner(16), K.Text("Searching…", Ty.Body, B.Text2)).Margin(12));
@@ -163,20 +180,89 @@ public sealed class SchoolPickerView : Grid
         }
     }
 
-    /// <summary>A school in the list (Windows 11's list item: the selection's fill, the accent's pill at its left).</summary>
+    /// <summary>
+    /// The welcome above the field, full (nothing typed) or stepped back while schools are listed: the mark smaller, the
+    /// line under the name put away — room for the list without the page scrolling. The mark shrinks into its new size
+    /// (a scale, so nothing is laid out frame by frame); the line comes back fading in.
+    /// </summary>
+    private void Compact(bool on)
+    {
+        const double Full = 84, Small = 48;
+        var size = on ? Small : Full;
+        if (icon.Width == size) return;
+        var from = icon.Width / size;
+        icon.Width = icon.Height = size;
+        sub.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        if (!on) Motion.FadeIn(sub, Motion.Medium);
+        if (!Motion.On) return;
+        var s = new ScaleTransform(from, from);
+        icon.RenderTransformOrigin = new Point(0.5, 1);
+        icon.RenderTransform = s;
+        Motion.FromTo(s, ScaleTransform.ScaleXProperty, from, 1, Motion.Page, Motion.Out);
+        Motion.FromTo(s, ScaleTransform.ScaleYProperty, from, 1, Motion.Page, Motion.Out);
+    }
+
+    private readonly TranslateTransform glide = new();
+
+    /// <summary>Where the field is in the page now (null before it is laid out).</summary>
+    private double? FieldTop()
+    {
+        if (!IsLoaded || !query.IsVisible) return null;
+        try { return query.TranslatePoint(new Point(0, 0), this).Y; } catch { return null; }
+    }
+
+    /// <summary>
+    /// Where the column stands: centred in the window with nothing typed; while schools are listed, held from the top
+    /// where a full list (five rows) would centre it — so the field stays put as the list grows and shrinks with each
+    /// letter typed, only what is under it moving.
+    /// </summary>
+    private void Settle(bool listing)
+    {
+        if (!listing || !IsLoaded)
+        {
+            column.VerticalAlignment = VerticalAlignment.Center;
+            column.Margin = new Thickness(24, 12, 24, 36);
+            return;
+        }
+        column.VerticalAlignment = VerticalAlignment.Top;
+        column.Margin = new Thickness(24, 12, 24, 36);
+        UpdateLayout();
+        var full = column.ActualHeight + Math.Max(0, scroller.MaxHeight - scroller.ActualHeight);
+        var top = Math.Max(12, (searching.ActualHeight - full - 36 + 12) / 2);
+        column.Margin = new Thickness(24, top, 24, 36);
+    }
+
+    /// <summary>The page laid out again around the list: the field moved from where it was to its new place, not jumped
+    /// there — the column is drawn where it was, then eased home (a transform only; at once with animations off).</summary>
+    private void Glide(double? before)
+    {
+        if (before is not { } was || !Motion.On) return;
+        column.RenderTransform = glide;
+        UpdateLayout();
+        if (FieldTop() is not { } now || Math.Abs(was - now) < 1) return;
+        var from = glide.Y + (was - now);
+        Motion.FromTo(glide, TranslateTransform.YProperty, from, 0, Motion.Page, Motion.Out);
+    }
+
+    /// <summary>A school in the list (Windows 11's list item: the selection's fill, the accent's pill at its left). A
+    /// line too long for the row ends in an ellipsis, said whole in its tooltip.</summary>
     private Button Row(string id, string title, string sub, SymbolRegular symbol, Action act)
     {
         var pill = new Border { Width = 3, Height = 16, CornerRadius = new CornerRadius(1.5), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Hidden };
         pill.SetResourceReference(Border.BackgroundProperty, B.Accent);
         var enter = K.Icon(SymbolRegular.ArrowEnterLeft24, 14, B.Text2);
         enter.Visibility = Visibility.Hidden;
-        var words = K.V(0, K.Text(title, Ty.Body), K.Text(sub, Ty.Caption, B.Text2));
+        var name = K.Text(title, Ty.Body);
+        var second = K.Text(sub, Ty.Caption, B.Text2);
+        name.TextTrimming = second.TextTrimming = TextTrimming.CharacterEllipsis;
+        var words = K.V(0, name, second);
         var grid = K.Columns("auto, *, auto",
             K.Icon(symbol, 18, B.AccentText).Margin(6, 0, 14, 0).Col(0),
             words.Col(1),
             enter.Margin(8, 0, 6, 0).Col(2));
         var holder = new Grid { Children = { grid, pill } };
         var b = K.Subtle(holder, act, new Thickness(6, 7, 6, 7));
+        b.ToolTip = $"{title}\n{sub}";
         pill.Margin = new Thickness(-6, 0, 0, 0);
         b.MouseEnter += (_, _) => { chosen = id; Highlight(); };
         rows[id] = (b, pill, enter);
@@ -233,10 +319,16 @@ public sealed class SchoolPickerView : Grid
         Pick(new SchoolSearch.School(host, host));
     }
 
-    /// <summary>A school chosen: its sign-in page shown small, to be confirmed.</summary>
+    /// <summary>A school chosen: its sign-in page shown small, to be confirmed. Yes keeps its name, for the sign-in card
+    /// to say ("Sign in to State Center Community College District") — not an address typed by hand, which has none.</summary>
     private void Pick(SchoolSearch.School school)
     {
-        confirm = new SchoolConfirm(school, () => { confirm?.Stop(); open(school.Domain); }, Back);
+        confirm = new SchoolConfirm(school, () =>
+        {
+            confirm?.Stop();
+            SchoolName.Remember(school.Name, school.Domain);
+            open(school.Domain);
+        }, Back);
         searching.Visibility = Visibility.Collapsed;
         Children.Add(confirm);
         Motion.DrillIn(confirm);

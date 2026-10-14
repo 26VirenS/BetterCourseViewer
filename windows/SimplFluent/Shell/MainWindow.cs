@@ -228,6 +228,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     {
         if (engine == null) return;
         Prefs.Remove("school");
+        SchoolName.Forget(engine.Host);
         var old = engine;
         engine = null;
         old.PropertyChanged -= OnEngine;
@@ -335,7 +336,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (sheets.IsOpen && pageArea.Visibility == Visibility.Visible) pageArea.Visibility = Visibility.Hidden;
         shell?.SheetOpen(sheets.IsOpen);
         var app = engine.Phase == Phase.Native && !login.Covers;
-        trailing.Content = !app && login.OnSchoolPage && !login.Handoff ? StartOverButton() : app ? Pins() : null;
+        // (Start over in the title bar only over the school's own page with nothing of Simpl's on it, as on the Mac: the
+        //  sign-in card has Change school, "Logging you in" and the hand-off note their own Start over)
+        trailing.Content = !app && !login.Covers && login.OnSchoolPage && !login.Handoff ? StartOverButton() : app ? Pins() : null;
         UpdateTitleButtons();
         if (login.AskStay && !stayAsked) AskStay();
     }

@@ -14,13 +14,17 @@ namespace Simpl.SignIn;
 /// The school chosen, before it is opened (the Mac's SchoolConfirm): a small square of its sign-in page, live, and "Is
 /// this your school?". Yes opens it and the sign-in goes on as always; No goes back to the search as it was left. The
 /// page in the square keeps nothing (InPrivate: no cookies, no storage), is drawn zoomed out as on a laptop's screen,
-/// and takes no clicks — it is a look, not the page.
+/// and takes no clicks — it is a look, not the page. Only a page that came is drawn on white (a page's own ground):
+/// while it comes the square is the theme's card, and one that cannot come leaves a smaller card that says so — and
+/// that the student can sign in all the same — never a bright empty square in a dark window.
 /// </summary>
 public sealed class SchoolConfirm : Grid
 {
     public const double Side = 320;
+    /// <summary>The card left where no preview came (the Mac's: 200 by 160).</summary>
+    private const double NoneWidth = 200, NoneHeight = 160;
     private readonly Border square;
-    private readonly Grid inside = new() { Background = Brushes.White };
+    private readonly Grid inside = new();
     private readonly FrameworkElement loading = K.Spinner(28);
     private WebView2CompositionControl? web;
     private readonly Border webHolder = new() { Opacity = 0 };
@@ -34,7 +38,7 @@ public sealed class SchoolConfirm : Grid
             Width = Side, Height = Side, CornerRadius = new CornerRadius(8), Child = inside, ClipToBounds = true,
             HorizontalAlignment = HorizontalAlignment.Center, Effect = K.Shadow(36, 10, 0.18),
         };
-        square.Stroke(B.CardStroke);
+        square.Bg(B.Card).Stroke(B.CardStroke);
         inside.Clip = new RectangleGeometry(new Rect(0, 0, Side - 2, Side - 2), 7, 7);
 
         var name = K.Wrapped(school.Name, Ty.BodyLarge, B.Text, 2).Center();
@@ -43,9 +47,9 @@ public sealed class SchoolConfirm : Grid
             K.Text("Is this your school?", Ty.Subtitle).Center(),
             name,
             K.Text(school.Domain, Ty.Body, B.Text2).Center());
-        var noB = K.Button("No, Search Again", no);
+        var noB = K.Button("No, search again", no);
         noB.MinWidth = 150;
-        var yesB = K.Button("Yes, Sign In", yes, accent: true);
+        var yesB = K.Button("Yes, sign in", yes, accent: true);
         yesB.MinWidth = 150;
         yesB.IsDefault = true;
         var buttons = K.H(12, noB, yesB);
@@ -105,38 +109,36 @@ public sealed class SchoolConfirm : Grid
         if (web == null) return;
         settled = true;
         loading.Visibility = Visibility.Collapsed;
+        // (the page's own ground under it, now that there is a page)
+        inside.Background = Brushes.White;
         webHolder.Opacity = 1;
         Motion.FadeIn(webHolder, Motion.Medium);
     }
 
+    /// <summary>No preview (offline, a page that would not come, the pictures): the square becomes a small card in the
+    /// theme's colours saying so, and that signing in still works.</summary>
     private void Failed()
     {
         settled = true;
         loading.Visibility = Visibility.Collapsed;
         webHolder.Visibility = Visibility.Collapsed;
-        var none = K.V(8, K.Icon(SymbolRegular.Globe24, 28, Color.FromArgb(115, 0, 0, 0)),
-            new TextBlockLike("No preview of this page").Element);
+        square.Width = NoneWidth;
+        square.Height = NoneHeight;
+        inside.Clip = new RectangleGeometry(new Rect(0, 0, NoneWidth - 2, NoneHeight - 2), 7, 7);
+        var said = K.Text("Couldn’t load a preview.", Ty.Caption).Center();
+        said.FontWeight = FontWeights.SemiBold;
+        var none = K.V(4, K.Icon(SymbolRegular.Globe24, 24, B.Text2).Margin(0, 0, 0, 4), said, K.Text("You can still sign in.", Ty.Caption, B.Text2).Center());
+        System.Windows.Automation.AutomationProperties.SetName(square, "Couldn’t load a preview of this school’s sign-in page. You can still sign in.");
         none.HorizontalAlignment = HorizontalAlignment.Center;
         none.VerticalAlignment = VerticalAlignment.Center;
         inside.Children.Add(none);
+        Motion.FadeIn(none, Motion.Normal);
     }
 
-    /// <summary>The square let go of (No, Search Again; the school opened).</summary>
+    /// <summary>The square let go of (No, search again; the school opened).</summary>
     public void Stop()
     {
         try { web?.Dispose(); } catch { }
         web = null;
-    }
-
-    /// <summary>Words on the square's white, whatever the theme.</summary>
-    private sealed class TextBlockLike
-    {
-        public System.Windows.Controls.TextBlock Element { get; }
-        public TextBlockLike(string s)
-        {
-            Element = K.Text(s, Ty.Body);
-            Element.Foreground = K.Brush(Color.FromArgb(115, 0, 0, 0));
-            Element.HorizontalAlignment = HorizontalAlignment.Center;
-        }
     }
 }

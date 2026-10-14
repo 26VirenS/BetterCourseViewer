@@ -99,11 +99,43 @@ public static class Appearance
         var theme = Dark ? ApplicationTheme.Dark : ApplicationTheme.Light;
         ApplicationThemeManager.Apply(theme, Backdrop, AccentHex == null);
         if (AccentHex is { } h && Hex(h) is { } c) ApplicationAccentColorManager.Apply(c, theme);
+        ReadableText(Application.Current.Resources, Dark);
         foreach (Window w in Application.Current.Windows)
         {
             try { WindowBackgroundManager.UpdateBackground(w, theme, w is FluentWindow fw ? fw.WindowBackdropType : WindowBackdropType.None); } catch { }
         }
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// The light theme's secondary and tertiary text, solid: Fluent's are black at 62% and 45% (#9E000000, #72000000),
+    /// and WPF draws a see-through text colour without ClearType, its glyphs' edges paler still — the picker's line,
+    /// the sign-in card's, every row's description in Settings measured about #8D8D8D on #F9F9F9 (3.2 to 1), under the
+    /// 4.5 to 1 small text needs. Solid greys instead: #5F5F5F (6 to 1 on the window, 6.4 on a card) and #707070 (4.7 and
+    /// 5), the second still a step dimmer than the first, the first a step dimmer than the text itself (#1B1B1B). Written
+    /// at the application's level, over the theme's dictionary (as the accent is); the dark theme keeps Fluent's own,
+    /// which read well (#C5FFFFFF on #202020 is 10 to 1).
+    /// </summary>
+    internal static void ReadableText(ResourceDictionary app, bool dark)
+    {
+        (string Key, Color Light)[] solid =
+        {
+            ("TextFillColorSecondary", Color.FromRgb(0x5F, 0x5F, 0x5F)),
+            ("TextFillColorTertiary", Color.FromRgb(0x70, 0x70, 0x70)),
+        };
+        foreach (var (key, light) in solid)
+        {
+            if (dark)
+            {
+                app.Remove(key);
+                app.Remove(key + "Brush");
+                continue;
+            }
+            app[key] = light;
+            var brush = new SolidColorBrush(light);
+            brush.Freeze();
+            app[key + "Brush"] = brush;
+        }
     }
 
     /// <summary>The accent now (Windows' own, or the one chosen), kept until the look is worn again (Apply).</summary>
