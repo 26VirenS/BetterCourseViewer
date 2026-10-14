@@ -266,11 +266,11 @@ struct DNAHelixPage: View {
         let name1 = DNAModel.baseName(f.base1), name2 = DNAModel.baseName(f.base2)
         let ring1 = DNAModel.isPurine(f.base1) ? "a purine: two rings" : "a pyrimidine: one ring"
         let ring2 = DNAModel.isPurine(f.base2) ? "a purine: two rings" : "a pyrimidine: one ring"
-        let bonds = f.hBonds.map { "\($0.text) (\(String(format: "%.2f", $0.distance)) Å)" }.joined(separator: "\n")
+        let bonds = f.hBonds.map { "\($0.text) (\(String(halfUp: "%.2f", $0.distance)) Å)" }.joined(separator: "\n")
         return BioCard(title: "\(f.name) base pair", swatch: BioColor.base(f.base1), subtitle: "Base pair \(f.pair + 1) of \(seq.count)") {
             BioFactRow(label: "Bases", text: "\(f.base1) \(f.number1) on strand 1 (\(name1), \(ring1)) pairs with \(f.base2) \(f.number2) on strand 2 (\(name2), \(ring2)).")
             BioFactRow(label: "Hydrogen bonds: \(f.hBonds.count)", text: bonds)
-            BioFactRow(label: "Why a purine with a pyrimidine", text: "A two-ring base always pairs with a one-ring base, so every pair is the same width (C1′ to C1′ \(String(format: "%.1f", f.c1c1)) Å) and the helix stays 2 nm wide.")
+            BioFactRow(label: "Why a purine with a pyrimidine", text: "A two-ring base always pairs with a one-ring base, so every pair is the same width (C1′ to C1′ \(String(halfUp: "%.1f", f.c1c1)) Å) and the helix stays 2 nm wide.")
             if let i = store.helixAtom { atomRow(i, seq) }
             BioFactRow(label: "Common mix-up", text: "H-bonds are weak and break one by one when DNA is copied or read; the bonds inside each strand are covalent. G·C, with three, holds a little tighter than A·T with two.")
             cardButtons(store.helixSelection ?? "")
@@ -300,7 +300,7 @@ struct DNAHelixPage: View {
             BioFactRow(label: "What it is", text: major
                        ? "Where the backbones are far apart. The base pairs' edges show here, and proteins that read DNA (like transcription factors) mostly fit into it."
                        : "Where the backbones are close together, on the side the sugars of each pair point to.")
-            BioFactRow(label: "Width in this model", text: String(format: "%.1f Å", major ? w.major : w.minor)
+            BioFactRow(label: "Width in this model", text: String(halfUp: "%.1f Å", major ? w.major : w.minor)
                        + " — phosphate to phosphate across the groove, less 5.8 Å for the phosphate groups (textbooks: \(major ? "11.7" : "5.7") Å). Some books quote the raw distance between phosphorus atoms instead.")
             cardButtons(store.helixSelection ?? "")
         }
@@ -367,13 +367,13 @@ struct DNAHelixPage: View {
             BioHeading("The double helix")
             VStack(spacing: 0) {
                 BioValueRow(label: "Base pairs", value: "\(n)")
-                BioValueRow(label: "Turns", value: String(format: "%.2f", DNAHelix.turns(n)))
-                BioValueRow(label: "Length", value: String(format: "%.2f nm", Double(n) * 0.34))
+                BioValueRow(label: "Turns", value: String(halfUp: "%.2f", DNAHelix.turns(n)))
+                BioValueRow(label: "Length", value: String(halfUp: "%.2f nm", Double(n) * 0.34))
                 BioValueRow(label: "Width", value: "2 nm")
                 BioValueRow(label: "Rise per base pair", value: "0.34 nm")
-                BioValueRow(label: "Twist per base pair", value: String(format: "%.1f°", BioBDNA.twist))
-                BioValueRow(label: "One turn", value: String(format: "10.5 bp · %.2f nm", DNAHelix.pitch / 10))
-                BioValueRow(label: "Grooves", value: String(format: "minor %.2f · major %.2f nm", w.minor / 10, w.major / 10))
+                BioValueRow(label: "Twist per base pair", value: String(halfUp: "%.1f°", BioBDNA.twist))
+                BioValueRow(label: "One turn", value: String(halfUp: "10.5 bp · %.2f nm", DNAHelix.pitch / 10))
+                BioValueRow(label: "Grooves", value: String(halfUp: "minor %.2f · major %.2f nm", w.minor / 10, w.major / 10))
                 BioValueRow(label: "Handedness", value: "Right-handed", last: true)
             }
             .card(radius: 14)

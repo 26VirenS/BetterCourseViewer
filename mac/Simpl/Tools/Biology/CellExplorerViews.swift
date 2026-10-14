@@ -61,7 +61,7 @@ struct CEScaleBar: View {
 
     private func text(_ l: Double) -> String {
         if unit == "µm" && l < 1 { return "\(Int((l * 1000).rounded())) nm" }
-        return (l == l.rounded() ? "\(Int(l))" : String(format: "%g", l)) + " " + unit
+        return (l == l.rounded() ? "\(Int(l))" : String(halfUp: "%g", l)) + " " + unit
     }
 
     var body: some View {

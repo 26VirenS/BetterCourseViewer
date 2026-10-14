@@ -282,7 +282,7 @@ struct DNARNAPage: View {
     }
 
     private var lCard: some View {
-        BioCard(title: "The L-shape", subtitle: String(format: "Anticodon to 3′ end: %.0f Å (about 7 nm)", DNARNA.anticodonTo3Prime)) {
+        BioCard(title: "The L-shape", subtitle: String(halfUp: "Anticodon to 3′ end: %.0f Å (about 7 nm)", DNARNA.anticodonTo3Prime)) {
             BioFactRow(label: "How it folds", text: "The acceptor stem stacks on the T arm and the anticodon arm on the D arm, making two helices at right angles.")
             BioFactRow(label: "Why it matters", text: "The anticodon (one end) reads the mRNA in the ribosome's small subunit while the amino acid (the other end, about 7 nm away) reaches the large subunit, where peptide bonds form.")
         }

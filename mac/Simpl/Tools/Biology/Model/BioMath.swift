@@ -74,6 +74,61 @@ enum BioV {
     }
 }
 
+// MARK: - Numbers as shown
+
+extension Double {
+    /// This number rounded half up on its decimal digits at `places` decimals: 3.425 → 3.43, 0.125 → 0.13, 2.5 → 3 and
+    /// −2.5 → −3 (a half goes away from zero). It is the one rounding the apps use for every number they show, the same
+    /// on the Mac and on Windows: "%.2f" alone rounds the binary value (3.425 is held as 3.42499…, so 3.42) and a true
+    /// tie to even (0.125 → 0.12). The number is read to 15 significant figures first, which drops the binary value's
+    /// noise; what comes back prints exactly at `places` decimals.
+    func bioHalfUp(_ places: Int) -> Double {
+        guard isFinite, self != 0, (0...15).contains(places), var d = Decimal(string: String(format: "%.14e", self)) else { return self }
+        var r = Decimal()
+        NSDecimalRound(&r, &d, places, .plain)
+        return Double(r.description) ?? self
+    }
+}
+
+extension String {
+    /// `String(format:)` with every fixed-point number in it ("%.2f", "%+.1f", "%.0f%%") rounded half up on its decimal
+    /// digits first (`Double.bioHalfUp`): how each biology tool writes a number it shows. Every other conversion is
+    /// String(format:)'s own.
+    init(halfUp format: String, _ args: CVarArg...) {
+        // (each argument's decimals if its conversion is an f, in order; nil for any other)
+        var places: [Int?] = []
+        var i = format.startIndex
+        while let pct = format[i...].firstIndex(of: "%") {
+            var j = format.index(after: pct)
+            guard j < format.endIndex else { break }
+            if format[j] == "%" {
+                i = format.index(after: j)
+                continue
+            }
+            while j < format.endIndex, "+- #0123456789".contains(format[j]) { j = format.index(after: j) }
+            var precision: Int?
+            if j < format.endIndex, format[j] == "." {
+                j = format.index(after: j)
+                var n = 0
+                while j < format.endIndex, let digit = format[j].wholeNumberValue {
+                    n = n * 10 + digit
+                    j = format.index(after: j)
+                }
+                precision = n
+            }
+            while j < format.endIndex, "hlLqjzt".contains(format[j]) { j = format.index(after: j) }
+            guard j < format.endIndex else { break }
+            places.append(format[j] == "f" || format[j] == "F" ? (precision ?? 6) : nil)
+            i = format.index(after: j)
+        }
+        let rounded: [CVarArg] = args.enumerated().map { k, a in
+            if k < places.count, let p = places[k], type(of: a) == Double.self, let d = a as? Double { return d.bioHalfUp(p) }
+            return a
+        }
+        self.init(format: format, arguments: rounded)
+    }
+}
+
 // MARK: - SplitMix64 (§5.6.3)
 
 /// SplitMix64: the toolkit's seeded randomness, bit for bit the same on the Mac and on Windows (every operation wraps).
@@ -167,7 +222,7 @@ struct BioFrac: Hashable, Comparable, CustomStringConvertible {
     var description: String { text }
 
     /// As a percent with one decimal: "9.4%" (3/32), "50.0%".
-    var percentText: String { String(format: "%.1f%%", double * 100) }
+    var percentText: String { String(halfUp: "%.1f%%", double * 100) }
 }
 
 /// Ratios of whole counts (the crosses' "9 : 3 : 3 : 1").
@@ -310,7 +365,7 @@ enum BioChiSquare {
 
         /// "χ² = 2.13 < 7.81 (df = 3, p = 0.05), so we fail to reject the null hypothesis." (AP's words.)
         var conclusion: String {
-            let a = String(format: "%.2f", chi2), b = String(format: "%.2f", critical)
+            let a = String(halfUp: "%.2f", chi2), b = String(halfUp: "%.2f", critical)
             return reject
                 ? "χ² = \(a) > \(b) (df = \(df), p = 0.05), so we reject the null hypothesis."
                 : "χ² = \(a) < \(b) (df = \(df), p = 0.05), so we fail to reject the null hypothesis."

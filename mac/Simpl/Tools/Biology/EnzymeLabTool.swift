@@ -107,7 +107,7 @@ private struct EnzymeControls: View {
                 Text("pH curve").font(.sCaption).foregroundStyle(.secondary)
                 Picker("pH curve", selection: $lab.c.phPreset) {
                     ForEach(EnzymeModel.phPresets) { p in
-                        Text("\(p.name), best at pH \(String(format: "%.1f", p.optimum))").tag(p.id)
+                        Text("\(p.name), best at pH \(String(halfUp: "%.1f", p.optimum))").tag(p.id)
                     }
                 }
                 .labelsHidden()
@@ -120,7 +120,7 @@ private struct EnzymeControls: View {
             EnzymeSlider(title: "Temperature", value: Binding(get: { lab.c.temperature }, set: { lab.c.setTemperature($0) }),
                          range: EnzymeConditions.temperatureRange, step: 0.5, text: "\(EnzymeText.number(c.temperature)) °C",
                          help: "Past \(EnzymeText.number(c.tempPreset.denatureAt)) °C this enzyme unfolds for good")
-            EnzymeSlider(title: "pH", value: $lab.c.ph, range: EnzymeConditions.phRange, step: 0.1, text: String(format: "%.1f", c.ph),
+            EnzymeSlider(title: "pH", value: $lab.c.ph, range: EnzymeConditions.phRange, step: 0.1, text: String(halfUp: "%.1f", c.ph),
                          help: "Acidity: each unit is a tenfold change in H⁺")
 
             BioHeading("Kinetics")
@@ -191,7 +191,7 @@ private struct EnzymeSlider: View {
 enum EnzymeText {
     /// 20 → "20", 7.5 → "7.5".
     static func number(_ x: Double) -> String {
-        abs(x - x.rounded()) < 0.05 ? String(Int(x.rounded())) : String(format: "%.1f", x)
+        abs(x - x.rounded()) < 0.05 ? String(Int(x.rounded())) : String(halfUp: "%.1f", x)
     }
 }
 
@@ -230,7 +230,7 @@ private struct EnzymeGraphs: View {
 
     private var substrateCard: some View {
         let a = c.apparent, v = c.effectiveVmax
-        let line = "v = Vmax·[S] / (Km + [S]) = \(EnzymeText.number(v)) × \(EnzymeText.number(c.substrate)) / (\(EnzymeText.number(a.km)) + \(EnzymeText.number(c.substrate))) = \(String(format: "%.1f", c.rate)) µmol/min"
+        let line = "v = Vmax·[S] / (Km + [S]) = \(EnzymeText.number(v)) × \(EnzymeText.number(c.substrate)) / (\(EnzymeText.number(a.km)) + \(EnzymeText.number(c.substrate))) = \(String(halfUp: "%.1f", c.rate)) µmol/min"
         return card("Rate against substrate", line) {
             Chart {
                 if c.inhibitor != .none {
@@ -263,14 +263,14 @@ private struct EnzymeGraphs: View {
                     .foregroundStyle(Theme.accent)
                     .symbolSize(80)
                     .annotation(position: .topLeading, alignment: .bottomTrailing) {
-                        Text("v = \(String(format: "%.1f", c.rate))").font(.sCaption.weight(.semibold)).foregroundStyle(Theme.accent)
+                        Text("v = \(String(halfUp: "%.1f", c.rate))").font(.sCaption.weight(.semibold)).foregroundStyle(Theme.accent)
                     }
             }
             .chartXScale(domain: 0...EnzymeConditions.substrateMax)
             .chartYScale(domain: 0...max(c.vmax * 1.12, 1))
             .chartXAxisLabel("Substrate concentration [S] (mM)")
             .chartYAxisLabel("Rate v (µmol/min)")
-            .accessibilityLabel("Rate against substrate concentration. Now \(String(format: "%.1f", c.rate)) at \(EnzymeText.number(c.substrate)) millimolar")
+            .accessibilityLabel("Rate against substrate concentration. Now \(String(halfUp: "%.1f", c.rate)) at \(EnzymeText.number(c.substrate)) millimolar")
             if c.inhibitor != .none {
                 Text(c.inhibitor == .competitive
                      ? "Dashed: without the inhibitor. Competitive: Km rises to \(EnzymeText.number(a.km)) mM, Vmax stays; enough substrate wins."
@@ -337,7 +337,7 @@ private struct EnzymeGraphs: View {
                 PointMark(x: .value("pH", p.optimum), y: .value("Relative rate", 1))
                     .opacity(0)
                     .annotation(position: .top) {
-                        Text("\(p.name), pH \(String(format: "%.1f", p.optimum))").font(.sCaption2)
+                        Text("\(p.name), pH \(String(halfUp: "%.1f", p.optimum))").font(.sCaption2)
                     }
                 RuleMark(x: .value("Now", c.ph))
                     .foregroundStyle(Theme.accent.opacity(0.45))
@@ -349,7 +349,7 @@ private struct EnzymeGraphs: View {
             .chartXScale(domain: EnzymeConditions.phRange)
             .chartYScale(domain: 0...1.15)
             .chartXAxisLabel("pH")
-            .accessibilityLabel("Rate against pH for \(p.name): best at pH \(String(format: "%.1f", p.optimum)); now \(Int((c.phFactor * 100).rounded())) percent of the best")
+            .accessibilityLabel("Rate against pH for \(p.name): best at pH \(String(halfUp: "%.1f", p.optimum)); now \(Int((c.phFactor * 100).rounded())) percent of the best")
         }
     }
 }
@@ -385,13 +385,13 @@ private struct EnzymeSide: View {
         let a = c.apparent
         let percent = c.vmax > 0 ? c.rate / c.vmax * 100 : 0
         return VStack(spacing: 0) {
-            BioValueRow(label: "Rate v", value: String(format: "%.1f µmol/min", c.rate), color: Theme.accent)
-            BioValueRow(label: "Of the most it could be", value: String(format: "%.0f%%", percent))
+            BioValueRow(label: "Rate v", value: String(halfUp: "%.1f µmol/min", c.rate), color: Theme.accent)
+            BioValueRow(label: "Of the most it could be", value: String(halfUp: "%.0f%%", percent))
             BioValueRow(label: "Vmax now", value: "\(EnzymeText.number(c.effectiveVmax)) µmol/min")
             BioValueRow(label: "Km now", value: "\(EnzymeText.number(a.km)) mM")
-            BioValueRow(label: "Temperature factor", value: String(format: "%.2f", c.temperatureFactor) + (c.denatured ? " (denatured)" : ""),
+            BioValueRow(label: "Temperature factor", value: String(halfUp: "%.2f", c.temperatureFactor) + (c.denatured ? " (denatured)" : ""),
                         color: c.denatured ? .red : .primary)
-            BioValueRow(label: "pH factor", value: String(format: "%.2f", c.phFactor), last: true)
+            BioValueRow(label: "pH factor", value: String(halfUp: "%.2f", c.phFactor), last: true)
         }
         .card(radius: 14)
     }

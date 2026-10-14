@@ -195,7 +195,7 @@ enum HardyWeinberg {
 
     /// "480", "19.8", "0.2".
     static func carriers(_ x: Double) -> String {
-        x >= 10 ? String(format: "%.0f", x) : (x >= 1 ? String(format: "%.1f", x) : num(x))
+        x >= 10 ? String(halfUp: "%.0f", x) : (x >= 1 ? String(halfUp: "%.1f", x) : num(x))
     }
 
     /// A frequency as the working shows it: up to four decimals, at least two ("0.40", "0.4225", "1.00"); a tiny one in
@@ -205,15 +205,15 @@ enum HardyWeinberg {
         if abs(x) < 0.0001 {
             let e = Int(floor(log10(abs(x))))
             let m = x / pow(10, Double(e))
-            return String(format: "%.2f × 10", m) + superscript(e)
+            return String(halfUp: "%.2f × 10", m) + superscript(e)
         }
-        var s = String(format: "%.\(places)f", x)
+        var s = String(halfUp: "%.\(places)f", x)
         while s.hasSuffix("0"), let dot = s.firstIndex(of: "."), s.distance(from: dot, to: s.endIndex) > 3 { s.removeLast() }
         return s
     }
 
     /// A typed number as typed: 16 → "16", 2.5 → "2.5".
-    static func plain(_ x: Double) -> String { x == x.rounded() && abs(x) < 1e12 ? String(format: "%.0f", x) : String(format: "%g", x) }
+    static func plain(_ x: Double) -> String { x == x.rounded() && abs(x) < 1e12 ? String(halfUp: "%.0f", x) : String(halfUp: "%g", x) }
 
     static func superscript(_ n: Int) -> String {
         let digits: [Character: Character] = ["0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻"]
@@ -268,7 +268,7 @@ struct HWTest {
 
     var lowExpected: Bool { expected.contains { $0 < 5 } }
 
-    var pText: String { result.p < 0.001 ? String(format: "p = %.5f", result.p) : String(format: "p = %.3f", result.p) }
+    var pText: String { result.p < 0.001 ? String(halfUp: "p = %.5f", result.p) : String(halfUp: "p = %.3f", result.p) }
 
     /// What the conclusion means here.
     var detail: String {

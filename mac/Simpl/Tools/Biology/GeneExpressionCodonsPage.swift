@@ -238,9 +238,9 @@ struct GXCodonsPage: View {
             }
             BioFactRow(label: a.codonCount == 1 ? "Its codon" : "Its \(a.codonCount) codons", text: codons.joined(separator: "  "))
             BioFactRow(label: "Class", text: "\(a.group.label) · \(a.lehninger)")
-            BioFactRow(label: "Side chain at pH 7.4", text: a.pKa.map { "Charge \(a.chargeText) · pKa ≈ \(String(format: "%.2f", $0)) (can shift inside a protein)" } ?? "Charge \(a.chargeText)")
-            BioFactRow(label: "Hydropathy (Kyte–Doolittle)", text: String(format: "%+.1f", a.hydropathy) + (a.hydropathy > 0 ? " · hydrophobic" : " · hydrophilic"))
-            BioFactRow(label: "Mass", text: String(format: "%.2f g/mol free · %.2f g/mol in a chain", a.mass, a.residueMass) + " · \(a.formula)")
+            BioFactRow(label: "Side chain at pH 7.4", text: a.pKa.map { "Charge \(a.chargeText) · pKa ≈ \(String(halfUp: "%.2f", $0)) (can shift inside a protein)" } ?? "Charge \(a.chargeText)")
+            BioFactRow(label: "Hydropathy (Kyte–Doolittle)", text: String(halfUp: "%+.1f", a.hydropathy) + (a.hydropathy > 0 ? " · hydrophobic" : " · hydrophilic"))
+            BioFactRow(label: "Mass", text: String(halfUp: "%.2f g/mol free · %.2f g/mol in a chain", a.mass, a.residueMass) + " · \(a.formula)")
             BioFactRow(label: "Note", text: a.note)
             Button {
                 BioTools.open(.biomol, info: ["molecule": a.three.uppercased(), "page": "amino"])

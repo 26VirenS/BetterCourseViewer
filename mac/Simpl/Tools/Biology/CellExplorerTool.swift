@@ -545,7 +545,7 @@ struct CECellPage: View {
         case .animal:
             let d = model.map { pow(6 * $0.volume / Double.pi, 1.0 / 3) } ?? 19
             info["savShape"] = "sphere"
-            info["savSize"] = String(format: "%.1f", d)
+            info["savSize"] = String(halfUp: "%.1f", d)
         case .plant:
             info["savShape"] = "rectangular"
             info["savSize"] = "44,26,26"

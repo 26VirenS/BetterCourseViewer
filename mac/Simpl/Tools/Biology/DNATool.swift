@@ -384,9 +384,10 @@ enum DNAText {
     static func number(_ v: Double, digits: Int = 2) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
+        f.roundingMode = .halfUp
         f.minimumFractionDigits = digits
         f.maximumFractionDigits = digits
-        return f.string(from: NSNumber(value: v)) ?? String(format: "%.\(digits)f", v)
+        return f.string(from: NSNumber(value: v.bioHalfUp(digits))) ?? String(halfUp: "%.\(digits)f", v)
     }
 }
 

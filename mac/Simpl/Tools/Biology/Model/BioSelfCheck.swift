@@ -317,6 +317,12 @@ enum BioSelfCheck {
         let bad = BioCross.parse("Aa")
         r.check("cross.parse-error", bad.error == nil ? "none" : "said", bad.cross == nil && bad.error != nil && BioCross.parse("aA × Aa").cross?.parent1 == [[0, 1]])
         r.same("frac.text", BioFrac(6, 64).text + "," + BioFrac(2, -4).text + "," + BioRatio.text(BioRatio.reduce([2, 4, 2])), "3/32,-1/2,1 : 2 : 1")
+        // (every number shown rounded half up on its decimal digits, as on Windows: a true tie up, not to even (1/16 is
+        // 6.25%), and 3.425 up though it is held as 3.42499…; the other conversions as they were)
+        let shown = [String(halfUp: "%.2f", 3.425), String(halfUp: "%.2f", 0.125), BioFrac(1, 16).percentText, String(halfUp: "%+.1f", -2.25),
+                     String(halfUp: "%.0f%%", 2.5), String(halfUp: "%%A + %%G = %.1f%%", 50.05), String(halfUp: "%d of %.1f", 3, 0.15),
+                     String(halfUp: "%.3f", -0.0004), String(halfUp: "%.2f × 10", 9.995)]
+        r.same("format.half-up", shown.joined(separator: "|"), "3.43|0.13|6.3%|-2.3|3%|%A + %G = 50.1%|3 of 0.2|0.000|10.00 × 10")
     }
 
     // MARK: 10. Sequences and genes

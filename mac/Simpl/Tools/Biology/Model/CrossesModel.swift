@@ -582,7 +582,7 @@ enum CrossProbability {
         if v >= 1 { return "100%" }
         if v < 0.001 { return "< 0.1%" }
         if v > 0.999 { return "> 99.9%" }
-        return String(format: "%.1f%%", v * 100)
+        return String(halfUp: "%.1f%%", v * 100)
     }
 }
 
@@ -629,7 +629,7 @@ struct ChiSquareWork {
     var lowExpected: Bool { expected.contains { $0 < 5 } }
 
     /// "p = 0.925", "p < 0.001".
-    var pText: String { result.p < 0.001 ? "p < 0.001" : String(format: "p = %.3f", result.p) }
+    var pText: String { result.p < 0.001 ? "p < 0.001" : String(halfUp: "p = %.3f", result.p) }
 
     /// What the p-value means, in a sentence.
     var meaning: String {
@@ -646,7 +646,7 @@ struct ChiSquareWork {
 
     /// A number as typed: 9 → "9", 0.5 → "0.5".
     static func number(_ v: Double) -> String {
-        v == v.rounded() && abs(v) < 1e12 ? String(Int64(v)) : String(format: "%g", v)
+        v == v.rounded() && abs(v) < 1e12 ? String(Int64(v)) : String(halfUp: "%g", v)
     }
 
     /// The work for the rows as typed, or what is wrong with them.

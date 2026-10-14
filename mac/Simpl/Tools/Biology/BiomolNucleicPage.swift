@@ -113,7 +113,7 @@ struct BiomolNucleicPage: View {
                     ("Sugar", deoxy ? "Deoxyribose (DNA)" : "Ribose (RNA)"),
                     ("Phosphates", code == "ATP" ? "3" : "1"),
                     ("Formula", BiomolText.formula(mol?.formula ?? "")),
-                    ("Molar mass", String(format: "%.2f g/mol", mol?.mass ?? 0)),
+                    ("Molar mass", String(halfUp: "%.2f g/mol", mol?.mass ?? 0)),
                 ])
                 BioFactRow(label: "Ribose or deoxyribose", text: deoxy
                            ? "Deoxyribose has only H at its 2′ carbon (no OH): that is the “deoxy”."

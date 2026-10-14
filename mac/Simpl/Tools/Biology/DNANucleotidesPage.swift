@@ -181,7 +181,7 @@ struct DNANucleotidesPage: View {
             BioFactRow(label: "Parts", text: i.isTriphosphate ? "Three phosphate groups + ribose + adenine" : "A phosphate group + \(sugar) + \(DNAModel.baseName(i.base))")
             BioFactRow(label: "Base", text: "\(DNAModel.baseName(i.base).capitalized) (\(i.base)), \(ring). " + pairsWith(i))
             if let f = mol?.formula, let m = mol?.mass {
-                BioFactRow(label: "Formula and mass", text: "\(DNAText.formula(f)) · \(String(format: "%.2f", m)) g/mol (neutral, as drawn with “As at pH 7” off)")
+                BioFactRow(label: "Formula and mass", text: "\(DNAText.formula(f)) · \(String(halfUp: "%.2f", m)) g/mol (neutral, as drawn with “As at pH 7” off)")
             }
             BioFactRow(label: "Found in", text: i.isTriphosphate
                        ? "Every cell: ATP carries energy, released when its last phosphate is split off. It is also one of the four building blocks of RNA."
@@ -340,7 +340,7 @@ struct DNABaseDrawing: View {
     }
 
     private var accessibility: String {
-        if pair { return title + ": " + model.hBonds.map { "\($0.text), \(String(format: "%.2f", $0.distance)) ångströms" }.joined(separator: "; ") }
+        if pair { return title + ": " + model.hBonds.map { "\($0.text), \(String(halfUp: "%.2f", $0.distance)) ångströms" }.joined(separator: "; ") }
         return title + (model.rings.count == 2 ? ", a purine with two rings" : ", a pyrimidine with one ring")
     }
 
@@ -416,7 +416,7 @@ struct DNABaseDrawing: View {
             // (the length just off the dashes, on the side away from the pair's middle)
             let mx = (a.x + c.x) / 2, my = (a.y + c.y) / 2
             let up = my <= oy + 4
-            ctx.draw(Text(String(format: "%.2f Å", h.distance)).font(.system(size: 10, weight: .medium).monospacedDigit()).foregroundColor(.secondary),
+            ctx.draw(Text(String(halfUp: "%.2f Å", h.distance)).font(.system(size: 10, weight: .medium).monospacedDigit()).foregroundColor(.secondary),
                      at: CGPoint(x: mx, y: my + (up ? -13 : 13)))
         }
         // Atoms: N and O by letter, H small, the methyl as CH₃, C1′ where the sugar joins.

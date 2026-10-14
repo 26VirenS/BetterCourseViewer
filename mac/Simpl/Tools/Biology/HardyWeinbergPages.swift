@@ -64,9 +64,9 @@ struct HWTestPage: View {
                     table(t)
                     chart(t)
                     VStack(spacing: 0) {
-                        BioValueRow(label: "χ²", value: String(format: "%.4f", t.result.chi2))
+                        BioValueRow(label: "χ²", value: String(halfUp: "%.4f", t.result.chi2))
                         BioValueRow(label: "Degrees of freedom", value: "\(t.result.df)")
-                        BioValueRow(label: "Critical value (p = 0.05)", value: String(format: "%.2f", t.result.critical))
+                        BioValueRow(label: "Critical value (p = 0.05)", value: String(halfUp: "%.2f", t.result.critical))
                         BioValueRow(label: "p-value", value: t.pText, last: true)
                     }
                     .card(radius: 14)
@@ -103,18 +103,18 @@ struct HWTestPage: View {
                     }
                     cell("\(observed[i])")
                     VStack(alignment: .trailing, spacing: 0) {
-                        cell(String(format: "%.2f", t.expected[i]))
+                        cell(String(halfUp: "%.2f", t.expected[i]))
                         Text(formulas[i]).font(.sCaption2).foregroundStyle(.tertiary)
                     }
-                    cell(String(format: "%.4f", t.result.terms[i]))
+                    cell(String(halfUp: "%.4f", t.result.terms[i]))
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)
             GridRow {
                 cell("N = \(t.counts.n)")
                 cell("\(t.counts.n)")
-                cell(String(format: "%.2f", t.expected.reduce(0, +)))
-                cell("χ² = " + String(format: "%.4f", t.result.chi2), bold: true)
+                cell(String(halfUp: "%.2f", t.expected.reduce(0, +)))
+                cell("χ² = " + String(halfUp: "%.4f", t.result.chi2), bold: true)
             }
         }
         .padding(14)
@@ -208,12 +208,12 @@ struct HWSimulatePage: View {
             HStack {
                 Text(title).font(.sCallout)
                 Spacer()
-                Text(String(format: "%.\(digits)f", model.sim[keyPath: key])).font(.sCallout.weight(.semibold).monospacedDigit())
+                Text(String(halfUp: "%.\(digits)f", model.sim[keyPath: key])).font(.sCallout.weight(.semibold).monospacedDigit())
             }
             Slider(value: Binding(get: { model.sim[keyPath: key] }, set: { model.sim[keyPath: key] = ($0 / step).rounded() * step }), in: range)
                 .help(help)
                 .accessibilityLabel(title)
-                .accessibilityValue(String(format: "%.\(digits)f", model.sim[keyPath: key]))
+                .accessibilityValue(String(halfUp: "%.\(digits)f", model.sim[keyPath: key]))
         }
     }
 

@@ -493,7 +493,8 @@ extension CEModel {
             f.numberStyle = .decimal
             f.maximumSignificantDigits = 3
             f.usesSignificantDigits = true
-            return f.string(from: NSNumber(value: x)) ?? String(format: "%.3g", x)
+            f.roundingMode = .halfUp
+            return f.string(from: NSNumber(value: x)) ?? String(halfUp: "%.3g", x)
         }
         return "Surface area \(fmt(area)) µm² · volume \(fmt(volume)) µm³ · SA:V \(fmt(volume > 0 ? area / volume : 0)) per µm"
     }

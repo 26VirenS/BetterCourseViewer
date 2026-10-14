@@ -125,7 +125,7 @@ struct BiomolCarbPage: View {
                 BioCard(title: BiomolSugar.shortName(code), subtitle: mol?.title) {
                     BiomolFacts(rows: [
                         ("Formula", BiomolText.formula(mol?.formula ?? "")),
-                        ("Molar mass", String(format: "%.2f g/mol", mol?.mass ?? 0)),
+                        ("Molar mass", String(halfUp: "%.2f g/mol", mol?.mass ?? 0)),
                         ("Ring", "\(ring?.atoms.count ?? 0) atoms (\(ring?.atoms.count == 5 ? "furanose" : "pyranose"))"),
                         ("Kind", ketose ? "Ketose (C=O at C2 when open)" : "Aldose (C=O at C1 when open)"),
                     ])
@@ -225,7 +225,7 @@ struct BiomolCarbPage: View {
                     ("Linkage", linkage),
                     ("Bridging O", g?.o ?? "—"),
                     ("Formula", BiomolText.formula(mol?.formula ?? "")),
-                    ("Molar mass", String(format: "%.2f g/mol", mol?.mass ?? 0)),
+                    ("Molar mass", String(halfUp: "%.2f g/mol", mol?.mass ?? 0)),
                 ])
                 BioFactRow(label: "Reading the linkage", text: linkageText(code))
                 BioFactRow(label: "Making and breaking it", text: "Dehydration synthesis joins the two and releases one H₂O (C₆H₁₂O₆ + C₆H₁₂O₆ → C₁₂H₂₂O₁₁ + H₂O). Hydrolysis uses one H₂O to split them.")

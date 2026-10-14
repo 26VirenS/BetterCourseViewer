@@ -463,7 +463,7 @@ enum DivisionModel {
     }
 
     /// "2c", or "1.4c" for an aneuploid cell.
-    static func cText(_ c: Double) -> String { abs(c - c.rounded()) < 1e-9 ? "\(Int(c.rounded()))c" : String(format: "%.1fc", c) }
+    static func cText(_ c: Double) -> String { abs(c - c.rounded()) < 1e-9 ? "\(Int(c.rounded()))c" : String(halfUp: "%.1fc", c) }
 
     // MARK: Sequences
 
@@ -475,7 +475,7 @@ enum DivisionModel {
 
     /// Independent assortment's count (spec §4.6): "2ⁿ = 4 possible assortments; humans 2²³ ≈ 8.4 million".
     static func assortments(pairs n: Int) -> String {
-        "2ⁿ = \(1 << n) possible assortments; humans 2²³ ≈ \(String(format: "%.1f", Double(1 << 23) / 1_000_000)) million"
+        "2ⁿ = \(1 << n) possible assortments; humans 2²³ ≈ \(String(halfUp: "%.1f", Double(1 << 23) / 1_000_000)) million"
     }
 
     // MARK: The parts' cards (a label pressed)

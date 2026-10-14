@@ -113,7 +113,7 @@ struct BiomolLipidPage: View {
             if let id = s.selection { selectionCard(id) }
             if codes.count == 1, let m = BioData.molecule(codes[0]) {
                 BioCard(title: BiomolLipid.shortName(m.code), subtitle: m.title) {
-                    BiomolFacts(rows: [("Formula", BiomolText.formula(m.formula ?? "")), ("Molar mass", String(format: "%.2f g/mol", m.mass ?? 0))])
+                    BiomolFacts(rows: [("Formula", BiomolText.formula(m.formula ?? "")), ("Molar mass", String(halfUp: "%.2f g/mol", m.mass ?? 0))])
                     ForEach(notes(m.code).indices, id: \.self) { i in
                         BioFactRow(label: notes(m.code)[i].0, text: notes(m.code)[i].1)
                     }

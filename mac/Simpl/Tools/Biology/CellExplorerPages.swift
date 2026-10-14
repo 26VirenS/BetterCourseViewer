@@ -435,7 +435,7 @@ struct CEPOPCSheet: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("POPC, a phospholipid").font(.sTitle3)
-                    Text([molecule?.formula, molecule?.mass.map { String(format: "%.1f g/mol", $0) }].compactMap { $0 }.joined(separator: " · "))
+                    Text([molecule?.formula, molecule?.mass.map { String(halfUp: "%.1f g/mol", $0) }].compactMap { $0 }.joined(separator: " · "))
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }

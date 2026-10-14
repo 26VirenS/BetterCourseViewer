@@ -818,7 +818,7 @@ enum BioLab {
             rows.append(["Total", BioLabFormat.plain(total), BioLabFormat.plain(e.reduce(0, +)), "χ² = " + BioLabFormat.sig(t.chi2, d)])
             steps.append("Each term (o − e)² / e: " + (0..<o.count).map { "(\(BioLabFormat.plain(o[$0])) − \(eText[$0]))² / \(eText[$0]) = \(BioLabFormat.sig(t.terms[$0], 3))" }.joined(separator: "; "))
             steps.append("χ² = " + t.terms.map { BioLabFormat.sig($0, 3) }.joined(separator: " + ") + " = \(BioLabFormat.sig(t.chi2, d))")
-            steps.append("df = categories − 1 = \(o.count) − 1 = \(t.df). The critical value at p = 0.05 is \(String(format: "%.2f", t.critical)).")
+            steps.append("df = categories − 1 = \(o.count) − 1 = \(t.df). The critical value at p = 0.05 is \(String(halfUp: "%.2f", t.critical)).")
             steps.append(t.conclusion)
             notes.insert(t.conclusion, at: 0)
             notes.insert(t.reject ? "A deviation this large would happen by chance less than 5% of the time."
@@ -827,7 +827,7 @@ enum BioLab {
             let pText = t.p < 0.001 ? "< 0.001" : BioLabFormat.sig(t.p, 2)
             return BioLabResult(answers: [plainAnswer("χ²", "Chi-square", t.chi2, "", d),
                                           BioLabAnswer(symbol: "df", label: "Degrees of freedom", value: Double(t.df), unit: "", text: "\(t.df)"),
-                                          BioLabAnswer(symbol: "", label: "Critical value (p = 0.05)", value: t.critical, unit: "", text: String(format: "%.2f", t.critical)),
+                                          BioLabAnswer(symbol: "", label: "Critical value (p = 0.05)", value: t.critical, unit: "", text: String(halfUp: "%.2f", t.critical)),
                                           BioLabAnswer(symbol: "p", label: "p-value", value: t.p, unit: "", text: pText)],
                                 formula: v.mode.formula, working: "χ² = " + t.terms.map { BioLabFormat.sig($0, 3) }.joined(separator: " + "),
                                 steps: steps, notes: notes,

@@ -118,7 +118,7 @@ struct BiomolAminoPage: View {
     // MARK: The card
 
     private func facts(_ aa: BioAminoAcid, model: BioMoleculeModel, look: BiomolLook) -> some View {
-        let pKa = aa.pKa.map { String(format: "≈ %.2f", $0) } ?? "—"
+        let pKa = aa.pKa.map { String(halfUp: "≈ %.2f", $0) } ?? "—"
         let codons = aa.codons.joined(separator: " ")
         let corn = BiomolAminoAcid.cornClockwise(model)
         return VStack(alignment: .leading, spacing: 14) {
@@ -129,9 +129,9 @@ struct BiomolAminoPage: View {
                     ("Polarity", polarity(aa)),
                     ("Side-chain pKa", pKa),
                     ("Charge at pH 7.4", aa.one == "H" ? "≈ 0 (4% +1)" : BiomolText.signed(aa.charge)),
-                    ("Hydropathy (Kyte–Doolittle)", String(format: "%+.1f", aa.hydropathy)),
-                    ("Mass (free)", String(format: "%.2f g/mol", aa.mass)),
-                    ("Mass in a chain", String(format: "%.2f g/mol", aa.residueMass)),
+                    ("Hydropathy (Kyte–Doolittle)", String(halfUp: "%+.1f", aa.hydropathy)),
+                    ("Mass (free)", String(halfUp: "%.2f g/mol", aa.mass)),
+                    ("Mass in a chain", String(halfUp: "%.2f g/mol", aa.residueMass)),
                     ("Formula", BiomolText.formula(aa.formula)),
                     ("Codons (\(aa.codonCount))", codons),
                 ])

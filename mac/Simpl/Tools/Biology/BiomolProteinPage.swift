@@ -310,9 +310,9 @@ struct BiomolProteinPage: View {
                 ("Residues", "\(n)"),
                 ("Peptide bonds", "\(max(n - 1, 0))"),
                 ("Water released", "\(max(n - 1, 0)) H₂O"),
-                ("Molecular mass", String(format: "%.2f g/mol", mass)),
+                ("Molecular mass", String(halfUp: "%.2f g/mol", mass)),
                 ("Net charge at pH 7", BiomolText.signed(charge)),
-                ("GRAVY (hydropathy)", String(format: "%+.2f", gravy) + (gravy > 0 ? " hydrophobic" : " hydrophilic")),
+                ("GRAVY (hydropathy)", String(halfUp: "%+.2f", gravy) + (gravy > 0 ? " hydrophobic" : " hydrophilic")),
             ])
             VStack(alignment: .leading, spacing: 6) {
                 BioHeading("By class")
@@ -559,8 +559,8 @@ struct BiomolProteinPage: View {
         let hp = BiomolPeptideBuilder.helixParameters(ala.caTrace)
         return VStack(alignment: .leading, spacing: 14) {
             BioCard(title: "α-helix", swatch: BioPalette.helix.color) {
-                BiomolFacts(rows: [("Residues a turn", String(format: "%.1f", hp.perTurn)), ("Rise a residue", String(format: "%.2f Å", hp.rise)),
-                                   ("A turn", String(format: "%.1f Å", hp.perTurn * hp.rise)), ("Hand", hp.rise > 0 ? "Right-handed" : "Left-handed")])
+                BiomolFacts(rows: [("Residues a turn", String(halfUp: "%.1f", hp.perTurn)), ("Rise a residue", String(halfUp: "%.2f Å", hp.rise)),
+                                   ("A turn", String(halfUp: "%.1f Å", hp.perTurn * hp.rise)), ("Hand", hp.rise > 0 ? "Right-handed" : "Left-handed")])
                 BioFactRow(label: "Held by", text: "H-bonds from each backbone N–H to the C=O four residues back — backbone atoms, not side chains, which point outward.")
             }
             BioCard(title: "β-pleated sheet", swatch: BioPalette.strand.color) {

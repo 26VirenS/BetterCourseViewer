@@ -852,7 +852,7 @@ private struct BioLabCriticalCard: View {
                 row(["df"] + BioChiSquare.tableP.map { "p = " + BioLabFormat.plain($0) }, header: true, lit: false)
                 Divider()
                 ForEach(1...10, id: \.self) { d in
-                    row(["\(d)"] + (BioChiSquare.table[d] ?? []).map { String(format: "%.2f", $0) }, header: false, lit: d == df)
+                    row(["\(d)"] + (BioChiSquare.table[d] ?? []).map { String(halfUp: "%.2f", $0) }, header: false, lit: d == df)
                 }
             }
             Text(df.map { "Lit: df = \($0), from the chi-square card." } ?? "The AP sheet gives p = 0.05 and 0.01; df = categories − 1.")

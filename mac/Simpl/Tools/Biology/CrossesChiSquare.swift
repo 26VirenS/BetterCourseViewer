@@ -128,7 +128,7 @@ struct CrossChiSquarePage: View {
         .card(radius: 20)
     }
 
-    private func f2(_ x: Double) -> String { String(format: "%.2f", x) }
+    private func f2(_ x: Double) -> String { String(halfUp: "%.2f", x) }
 
     private func head(_ s: String) -> some View {
         Text(s).font(.sCaption.weight(.semibold)).foregroundStyle(.secondary)
@@ -158,7 +158,7 @@ struct CrossChiSquarePage: View {
                     cell(f2(w.expected[i]), colour: w.expected[i] < 5 ? .orange : .primary)
                         .accessibilityLabel("expected \(f2(w.expected[i]))")
                     cell(f2(w.observed[i] - w.expected[i]))
-                    cell(String(format: "%.3f", w.result.terms[i]))
+                    cell(String(halfUp: "%.3f", w.result.terms[i]))
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)
@@ -167,7 +167,7 @@ struct CrossChiSquarePage: View {
                 cell(ChiSquareWork.number(w.total))
                 cell(f2(w.expected.reduce(0, +)))
                 cell("")
-                cell("χ² = " + String(format: "%.3f", w.result.chi2), bold: true)
+                cell("χ² = " + String(halfUp: "%.3f", w.result.chi2), bold: true)
             }
         }
         .padding(14)
@@ -206,9 +206,9 @@ struct CrossChiSquarePage: View {
 
     private func summary(_ w: ChiSquareWork) -> some View {
         VStack(spacing: 0) {
-            BioValueRow(label: "χ² = Σ (o − e)² ÷ e", value: String(format: "%.3f", w.result.chi2))
+            BioValueRow(label: "χ² = Σ (o − e)² ÷ e", value: String(halfUp: "%.3f", w.result.chi2))
             BioValueRow(label: "Degrees of freedom", value: "\(w.names.count) − 1 = \(w.result.df)")
-            BioValueRow(label: "Critical value (p = 0.05)", value: String(format: "%.2f", w.result.critical))
+            BioValueRow(label: "Critical value (p = 0.05)", value: String(halfUp: "%.2f", w.result.critical))
             BioValueRow(label: "p-value", value: w.pText, last: true)
         }
         .card(radius: 14)
@@ -255,20 +255,20 @@ struct ChiCriticalTable: View {
                     GridRow {
                         cell("df", row: 0, bold: true).gridColumnAlignment(.leading)
                         ForEach(BioChiSquare.tableP, id: \.self) { p in
-                            cell(p == 0.001 ? "0.001" : String(format: "%.2f", p), row: 0, bold: true)
+                            cell(p == 0.001 ? "0.001" : String(halfUp: "%.2f", p), row: 0, bold: true)
                         }
                     }
                     ForEach(1...10, id: \.self) { d in
                         GridRow {
                             cell("\(d)", row: d, bold: d == df)
                             ForEach(Array(BioChiSquare.tableP.enumerated()), id: \.offset) { i, p in
-                                cell(String(format: "%.2f", BioChiSquare.table[d]?[i] ?? 0), row: d, bold: d == df && p == 0.05)
+                                cell(String(halfUp: "%.2f", BioChiSquare.table[d]?[i] ?? 0), row: d, bold: d == df && p == 0.05)
                             }
                         }
                     }
                 }
                 if df > 10 {
-                    Text("df \(df): the critical value at p = 0.05 is \(String(format: "%.2f", BioChiSquare.critical(df: df))) (computed).")
+                    Text("df \(df): the critical value at p = 0.05 is \(String(halfUp: "%.2f", BioChiSquare.critical(df: df))) (computed).")
                         .font(.sCaption)
                         .foregroundStyle(.secondary)
                 }
@@ -299,9 +299,9 @@ struct ChiCriticalTable: View {
         guard let row = BioChiSquare.table[df], row.count == BioChiSquare.tableP.count else { return "" }
         var beyond: Int? = nil
         for i in row.indices where chi2 > row[i] { beyond = i }
-        guard let i = beyond else { return String(format: "χ² = %.2f is below %.2f, so p > 0.10.", chi2, row[0]) }
+        guard let i = beyond else { return String(halfUp: "χ² = %.2f is below %.2f, so p > 0.10.", chi2, row[0]) }
         let p = BioChiSquare.tableP[i]
-        let pText = p == 0.001 ? "0.001" : String(format: "%.2f", p)
-        return String(format: "χ² = %.2f is beyond %.2f, so p < ", chi2, row[i]) + pText + "."
+        let pText = p == 0.001 ? "0.001" : String(halfUp: "%.2f", p)
+        return String(halfUp: "χ² = %.2f is beyond %.2f, so p < ", chi2, row[i]) + pText + "."
     }
 }

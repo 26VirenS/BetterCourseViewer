@@ -453,8 +453,8 @@ struct GXExpressPage: View {
                     .textSelection(.enabled)
                 VStack(spacing: 0) {
                     BioValueRow(label: "Length", value: "\(g.protein.count) amino acids")
-                    BioValueRow(label: "Mass", value: String(format: "%.0f g/mol", BioAminoAcids.peptideMass(g.protein)))
-                    BioValueRow(label: "Net charge at pH 7", value: String(format: "%+d", BioAminoAcids.netCharge(g.protein)), last: true)
+                    BioValueRow(label: "Mass", value: String(halfUp: "%.0f g/mol", BioAminoAcids.peptideMass(g.protein)))
+                    BioValueRow(label: "Net charge at pH 7", value: String(halfUp: "%+d", BioAminoAcids.netCharge(g.protein)), last: true)
                 }
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.04)))
                 Button {

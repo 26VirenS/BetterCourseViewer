@@ -232,7 +232,7 @@ struct DNASequencePage: View {
             BioHeading("Facts")
             VStack(spacing: 0) {
                 BioValueRow(label: "Length", value: f.isRNA ? toolPlural(f.length, "nucleotide") : "\(f.length) nt · \(f.length) bp")
-                BioValueRow(label: "GC content", value: String(format: "%.1f%%", f.gcPercent))
+                BioValueRow(label: "GC content", value: String(halfUp: "%.1f%%", f.gcPercent))
                 BioValueRow(label: "A", value: "\(f.counts.a)", color: BioColor.base("A"))
                 if f.isRNA {
                     BioValueRow(label: "U", value: "\(f.counts.u)", color: BioColor.base("U"))
@@ -257,7 +257,7 @@ struct DNASequencePage: View {
         let ok = c.counts.a == c.counts.t && c.counts.g == c.counts.c
         return BioCard(title: "Chargaff's rule", swatch: ok ? Color.green : Color.orange, subtitle: "In the double strand this makes") {
             BioFactRow(label: "Counts", text: "A \(c.counts.a) = T \(c.counts.t) · G \(c.counts.g) = C \(c.counts.c)")
-            BioFactRow(label: "Purines", text: String(format: "%%A + %%G = %.1f%%", c.purinePercent) + (ok ? " ✓" : ""))
+            BioFactRow(label: "Purines", text: String(halfUp: "%%A + %%G = %.1f%%", c.purinePercent) + (ok ? " ✓" : ""))
             Text("Every A pairs with a T and every G with a C, so in double-stranded DNA A = T, G = C, and purines are half of all bases. One strand alone need not follow it.")
                 .font(.sCaption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
@@ -286,7 +286,7 @@ struct DNASequencePage: View {
         VStack(alignment: .leading, spacing: 8) {
             BioHeading("Melting temperature")
             VStack(spacing: 0) {
-                BioValueRow(label: "Estimate", value: String(format: "%.1f °C", tm.value))
+                BioValueRow(label: "Estimate", value: String(halfUp: "%.1f °C", tm.value))
                 BioValueRow(label: "Rule", value: tm.rule, last: true)
             }
             .card(radius: 14)
