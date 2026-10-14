@@ -67,16 +67,21 @@ internal static class AtomState
         _ => null,
     };
 
-    /// <summary>A launch's state (--tool atom --tool-state Fe:cloud:3d) set: an element by its symbol, name or number,
-    /// then the view, then the subshell for it ("all": the whole cloud).</summary>
+    /// <summary>A launch's state (--tool atom --tool-state Fe:cloud:3d) set, its parts in any order: an element by its
+    /// symbol, name or number, a view, and a subshell for the view ("all": the whole cloud).</summary>
     public static void Apply(string? state)
     {
-        var parts = (state ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length > 0 && PeriodicTable.Named(parts[0]) is { } e) Element = e;
-        if (parts.Length > 1 && Parse(parts[1]) is { } view) View = view;
-        if (parts.Length <= 2) return;
-        if (View == PTModel.Cloud) CloudFocus = parts[2] == "all" ? null : parts[2];
-        else Subshell = parts[2];
+        string? subshell = null;
+        foreach (var part in (state ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Parse(part) is { } view) View = view;
+            else if (PeriodicTable.Named(part) is { } e) Element = e;
+            else subshell = part;
+        }
+        // (after the element, which clears the subshells picked for another)
+        if (subshell == null) return;
+        if (View == PTModel.Cloud) CloudFocus = subshell == "all" ? null : subshell;
+        else Subshell = subshell;
     }
 }
 

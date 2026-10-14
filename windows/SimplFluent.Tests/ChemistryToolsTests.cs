@@ -66,4 +66,19 @@ public class ChemistryToolsTests
 
     [Fact]
     public void AnUnknownViewWordIsNone() => Assert.Null(AtomState.Parse("table"));
+
+    [Fact]
+    public void ALaunchStateNamesTheElementTheViewAndTheSubshell()
+    {
+        AtomState.Apply("Fe:cloud:3d");
+        Assert.Equal("Fe", AtomState.Element.Symbol);
+        Assert.Equal("Cloud", AtomState.View.ToString());
+        Assert.Equal("3d", AtomState.CloudFocus);
+        // (its parts in any order; another element clears the subshells picked for the last)
+        AtomState.Apply("orbitals:6");
+        Assert.Equal("C", AtomState.Element.Symbol);
+        Assert.Equal("Orbitals", AtomState.View.ToString());
+        Assert.Null(AtomState.CloudFocus);
+        Assert.Null(AtomState.Subshell);
+    }
 }
