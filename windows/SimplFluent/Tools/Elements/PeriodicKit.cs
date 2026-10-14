@@ -252,6 +252,14 @@ internal static class PTLayer
             if (g.RowDefinitions.Count > 1) { Grid.SetRow(c, 1); Grid.SetRowSpan(c, g.RowDefinitions.Count - 1); }
             if (g.ColumnDefinitions.Count > 1) Grid.SetColumnSpan(c, g.ColumnDefinitions.Count);
         }
+        else if (root is Canvas)
+        {
+            // (a popup's window holds its card on a canvas, and a canvas gives what it holds no size: the layer is made the
+            //  window's size itself, or the tour had no room to measure — its card stuck at the popup's corner over the
+            //  heading, nothing dimmed or lit)
+            c.SetBinding(FrameworkElement.WidthProperty, new System.Windows.Data.Binding(nameof(FrameworkElement.ActualWidth)) { Source = root });
+            c.SetBinding(FrameworkElement.HeightProperty, new System.Windows.Data.Binding(nameof(FrameworkElement.ActualHeight)) { Source = root });
+        }
         Panel.SetZIndex(c, 2000);
         root.Children.Add(c);
         Layers.Add(w, c);
