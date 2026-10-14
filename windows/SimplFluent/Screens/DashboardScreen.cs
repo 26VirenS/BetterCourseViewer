@@ -919,11 +919,16 @@ public sealed partial class DashboardScreen : Screen
     }
 
     /// <summary>--open sheetscroll: the page scrolled 72 down a moment after the panel is up — its tile part way under the
-    /// page's header, the panel with it.</summary>
+    /// page's header, the panel with it. The picture waits for it (on a slow runner it was once taken just before).</summary>
     private async void ScrollForPicture()
     {
-        await Task.Delay(3000);
-        pageScroller?.ScrollToVerticalOffset(72);
+        Shot.Began();
+        try
+        {
+            await Task.Delay(3000);
+            pageScroller?.ScrollToVerticalOffset(72);
+        }
+        finally { Shot.Ended(); }
     }
 
     private static void PlaceAt(FrameworkElement e, Rect r)
