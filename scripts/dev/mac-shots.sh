@@ -477,7 +477,7 @@ for MODE in light dark; do
   shoot "$MODE-18-quiz" 14 -SimplOpen quiz:101:9011
   shoot "$MODE-19-quiz-question" 18 -SimplOpen quiz:101:9011:take:5
   shoot "$MODE-20-quiz-review" 18 -SimplOpen quiz:101:9011:review
-  shoot "$MODE-21-tool" 16 -SimplOpen tool:101:9
+  shoot "$MODE-21-tool" 24 -SimplOpen tool:101:9
   shoot "$MODE-21a-alta" 20 -SimplOpen alta:104:4003
   shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
   shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
