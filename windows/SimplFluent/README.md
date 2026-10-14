@@ -410,7 +410,8 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). Since 2.99.33 the page also writes the figures, dates and course names it sends (`pctText`, `gpaText`, `goalLine`, `dueLine`, `altName`, `gradedText`…): show those strings as they come rather than formatting the numbers here, so Windows reads every grade, date and course exactly as the Mac does. |
 | `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs and popups), `Drag` (a popup moved by its heading), `Glyph` (symbols for the school's things), `RichText` (Canvas's own HTML as Windows text), `Formula` (Canvas's formulas typeset from their TeX with WPF-Math, MIT, drawn in the text's colour; written out as plain maths where they cannot be), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`, what the school added to Canvas's own navigation `MoreFromCanvas`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`, what the school added to Canvas's own navigation `MoreFromCanvas`, the screen on
+show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
@@ -523,9 +524,11 @@ What is kept, against memory: the Dashboard's page always (its cards stay loaded
 its answers read again in the background — a while after they came — update its cards in place); of the rest, the
 last three screens shown keep their pages; any screen with something of the student's in it is kept. Every other is
 let go — page, tree and screen — and made again when next shown, at once, from the answers kept in memory (the last
-few megabytes of them, `AnswerCache`) or sealed on disk. Answers are read again (stale while they are) once they are
-two minutes old, or when something changes them (a tick, a hand-in: `DataVersion`); one the page gave less than 90
-seconds ago, nothing changed since, is taken as it is.
+few megabytes of them, `AnswerCache`) or sealed on disk. Answers are read again when something changes them (a tick, a
+hand-in: `DataVersion`); a screen shown again with what it shows a minute old is checked at once (Live checks, below:
+the main window's screens and a place in a window of its own — a screen made only to read ahead reads again once its
+answers are a minute old, as before); one the page gave less than 60 seconds ago, nothing changed since, is taken as it
+is.
 
 Reading ahead (`Shell/Prefetch.cs`): once the start has settled — the counts live, nothing asked of the page for a
 moment — the root places (To Do, the Calendar, Grades, Notifications, the Inbox, All Courses) and each course's home
@@ -553,6 +556,53 @@ else `{ unchanged: false, hash, value }`; the same data always makes the same an
 the reads the page has made, for a check's log line. What a course holds (its record, tabs, sections, people, groups,
 folders) is kept 10 minutes at most, as its modules, pages and files already were. Against the mock school only,
 `liveDevChange` (`done`, `grade`, `task`) changes the school behind the engine's back, for CI to see a check find it.
+
+## Live checks
+
+A screen left open keeps up with the school by itself (`Shell/LiveCheck.cs`, its rules in `Support/LiveRules.cs` with
+their tests; the Mac's are the same):
+
+- **When.** While the window shows (visible, not minimized, not hidden in the notification area), the screen on show is
+  checked once what it shows is a minute old — a course's pages (its home, a section, a page, an assignment, a
+  discussion, its grades: `Screen.CoursePage`) once it is ten minutes old, as the engine keeps their data ten minutes
+  at most. Nothing while the window is out of sight (the memory given back there stays given back: the timer stops
+  too), offline, or while the page is not ready; back after more than a minute away, at once. A screen shown again with
+  what it shows a minute old is checked at once (the shell pokes the check as it shows one). One check at a time: one
+  due while the last still runs is skipped. A failure waits a minute, then two, four, five at most; a success starts
+  over. A place in a window of its own (`PlaceWindow`) is checked the same way, by its own window.
+- **What.** Each of the screen's loaders (`Screen.LiveReads`: what `Watch` and `Checked` registered, with something on
+  screen and nothing on its way) asks its call again with the engine's `maxAge` — the screen's interval, a course
+  page's for `coursesProgress` wherever it shows — and `known`, the hash of the answer on screen (none yet after a
+  read: the answer's text is compared with the one shown instead); the pane's counts (`snapshot`) go with it. Never the
+  arguments that write a preference (`dashList`'s `hideDone`, `todo`'s `group` and `showDone`), never the Dashboard's
+  copies kept from its last visit (`kept: true`), and of the Dashboard's views only the one on show.
+- **Nothing new: nothing.** An answer the same as the one on screen changes nothing at all — no build, no flicker, the
+  scroll and the keyboard where they were; it only says when the screen's data was last the school's.
+- **Something new: only that.** The loader takes the answer (`Loader.LastLive` while it tells its watchers) and the
+  screen shows it (`Screen.LiveApplied`): built again once, as for any answer, the scroll kept — or, on the Dashboard,
+  part by part and never whole (`Screens/DashboardLive.cs`): a counter's number rolls to its new value (a short
+  ease-out, 8 px; none under Animation effects off), its line and its tooltip with it, its face drawn again only when
+  late work comes or goes; a course's card drawn again in its place; a row of a list (Today, a day of Coming up, the
+  activity) drawn again where it was, a new one unfolding into its place, a gone one folding away before the rows under
+  it close up (200 ms each), the rows that did not change untouched (by their ids: planner ids, course ids, stream ids);
+  the rail's grades and week load drawn again on their own. A part whose shape changed (a counter more, a list emptied)
+  is built again alone, in its place. The kept Dashboard does not check while another place shows; shown again a
+  minute later, it checks at once.
+- **Waits.** No check, and nothing it found shown, while: a quiz, an Alta or a Macmillan assignment is open; the student
+  is typing (the keyboard in a text box or a page, or a key in the last five seconds); What-If is on; Hand In (or Send
+  from Phone) is open; a dialog, a popup (a tool's is not one: it is used beside the page), a menu or the tour is up; a
+  drag (the mouse held) is under way; a counter's panel or a quick look is open; the screen has something of the
+  student's in it (`Busy`: a reply). It runs once they end.
+- **The log.** One line a check in simpl.log, never anything of the student's: `live: dashboard unchanged · 0 reads`,
+  `live: dashboard updated counter:today,list(~1) · 7 reads` (the reads the page asked of the school meanwhile,
+  `BCVNative.stats`), `live: todo waits (typing)`, `live: next try in 120 s`.
+- **The screenshot suite.** `--live-every 5` checks every five seconds (a course's page every fifty) with `maxAge` 5,
+  says each screen's build in simpl.log (`live: dashboard built`), and turns the check on in a picture run (off
+  otherwise: a picture is of what the screen showed); `--live-change done:25` (or `task`, `grade`; several with commas)
+  has the engine change the mock school behind its back 25 s after the screens show. `--no-live` (a development run)
+  turns the check off. CI's `live-*` pictures check that a check before the change found nothing and built nothing,
+  that one after it showed only what changed, and that the next found nothing again (`.github/workflows/windows-fluent.yml`).
+
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
 
