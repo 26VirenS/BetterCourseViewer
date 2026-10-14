@@ -10,7 +10,6 @@ import WebKit
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var scheme
     @StateObject private var session: AltaSession
     @State private var ideal = AltaQuizScreen.idealSize()
     @State private var saving = false
@@ -41,19 +40,23 @@ struct AltaQuizScreen: View {
                 AltaRail(session: session)
                     .frame(width: ideal.width >= 960 ? 290 : 240)
                 Divider()
+                // (1.3.79) Alta's page in light whatever the app's appearance — on light glass, over a light ground —
+                // as every tool's page is: its question is made for a white page, and drawn dark (1.3.50: its colours
+                // turned over on dark glass) it read badly. The bar and the rail keep the app's appearance.
                 page
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(PageGround())
+                    .environment(\.colorScheme, .light)
             }
         }
         .frame(width: ideal.width, height: ideal.height)
         .background(PageGround())
         .tint(Theme.accent)
         .task {
-            session.appearance(dark: scheme == .dark)
+            session.appearance(dark: false) // (1.3.79: the page is light, in dark mode too)
             await session.start(engine: engine)
         }
         .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
-        .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
         .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
         // (1.3.51) Alta's pop-ups as the Mac's own sheet: Alta's picture of it, its buttons the Mac's
         .sheet(item: Binding(get: { session.dialog }, set: { if $0 == nil && session.dialog != nil { session.dialogDismissed() } })) { d in
@@ -191,8 +194,9 @@ struct AltaQuizScreen: View {
     private var page: some View {
         ZStack {
             // (1.3.49) Alta's question laid on Liquid Glass: its page draws no ground of its own (the page script clears
-            // the page's, its parts' and the question card's), and everything in it is drawn by Alta. (1.3.50) The glass is
-            // the app's own, light or dark: in dark mode the page script turns the question's colours over. (1.3.53) A
+            // the page's, its parts' and the question card's), and everything in it is drawn by Alta. (1.3.50) The glass
+            // was the app's own, light or dark, the question's colours turned over in dark mode — (1.3.79) light now
+            // whatever the app's appearance, the question as Alta draws it (body: the page's light environment). (1.3.53) A
             // glass panel behind each part — what it asks, its answer, a lesson — where the page lays it out: the page as
             // tall as its question and the popup scrolling it, the panels scrolling with it. Alta's page as it is (not
             // recognised): edge to edge, on white, scrolling itself. (The page is always in the same place in the views,
@@ -210,7 +214,7 @@ struct AltaQuizScreen: View {
                                 let right: CGFloat = session.panels.map(\.rect.maxX).max() ?? 0
                                 ForEach(session.panels) { p in
                                     Rectangle().fill(Color.clear)
-                                        .glassCard(radius: 22, tint: scheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
+                                        .glassCard(radius: 22, tint: Color.white.opacity(0.3))
                                         .frame(width: right - left + 32, height: p.rect.height + 32)
                                         .offset(x: left - 16, y: p.rect.minY - 16)
                                         .transition(.opacity)
@@ -219,11 +223,11 @@ struct AltaQuizScreen: View {
                             AltaPageHost(web: session.web, forwardScroll: split)
                                 .frame(width: g.size.width, height: split ? max(session.pageHeight, g.size.height) : g.size.height)
                                 .background { if !session.focused && session.pageShown && session.cover == nil { Color.white } }
-                            // (1.3.70) by each small graph: open it large in a window of its own, and (dark mode) Light
-                            // or Dark for the graphs' colours
+                            // (1.3.70) by each small graph: open it large in a window of its own — (1.3.79) the graphs
+                            // as Alta draws them, the page being light: no Light or Dark for them
                             if split && session.pageShown {
                                 ForEach(session.pics) { pic in
-                                    AltaPicControls(session: session, index: pic.id, dark: scheme == .dark)
+                                    AltaPicControls(session: session, index: pic.id, dark: false)
                                         .offset(x: pic.rect.maxX + 10, y: pic.rect.minY)
                                         .transition(.opacity)
                                 }
