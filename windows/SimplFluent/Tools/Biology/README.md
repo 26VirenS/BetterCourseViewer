@@ -216,10 +216,12 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   column in for its widest, which in this app's narrower view put the short labels over the model), and an anchor past
   a label's far edge is led to that edge. Given the model's box on the view (its items' boxes, projected), a label
   that would still hide its own anchor, or reach more than 40 into a model narrower than 70% of the view (over half its
-  width, for a short label), goes to a row just above the model (an anchor in its upper half) or below it, its leader
-  straight up or down and never through a capsule in a row nearer the model; with no room there it stays in its column. It draws frame by frame only while something moves. Keep a scene under 300k
-  triangles (§3.4: Viewport3D draws on one thread; icospheres for the many small spheres). `BioSceneCard.Make(bar, scene, hint)` and
-  `BioSceneCard.Buttons(scene)` (Turn / Reset view) give the chemistry builder's card.
+  width, for a short label), goes to a row just above the model (an anchor in its upper half) or below it; a row's
+  labels are packed side by side in their anchors' order, their leaders straight up or down and never through a capsule
+  in a row nearer the model; a label that fits no row stays in its column. It draws frame by frame only while something
+  moves. Keep a scene under 300k triangles (§3.4: Viewport3D draws on one thread; icospheres for the many small
+  spheres). `BioSceneCard.Make(bar, scene, hint)` and `BioSceneCard.Buttons(scene)` (Turn / Reset view) give the
+  chemistry builder's card.
 - WPF side (`BioScene.cs`): `BioWpf.Mesh(mesh)` (frozen `MeshGeometry3D`), `BioWpf.Material(material, fade)`,
   `BioWpf.Batches(items)` (one mesh per material and order, with `BioMeshBatch.ObjectAtVertex/ObjectAtTriangle`),
   `BioWpf.P/V/B` conversions, `BioBillboards.Text(s, size, colour, glow)`, `BioBillboard(model, anchor, lift, id)`.

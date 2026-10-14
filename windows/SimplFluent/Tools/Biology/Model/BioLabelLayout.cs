@@ -12,8 +12,10 @@ namespace Simpl.Tools;
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
 // model's box on the view, a label that would hide its own anchor, or (beside a model narrower than 70% of the view)
 // reach more than 40 into the model's box (or over half its own width, for a short label), goes instead to a row just
-// above the model (an anchor in its upper half) or below it, as near over its anchor as the row allows, its leader
-// straight up or down and never through a capsule in a row nearer the model; with no room there it stays in its column.
+// above the model (an anchor in its upper half) or below it. A row's labels are packed side by side in their anchors'
+// order, each as near over its anchor as the others allow (a label already there slides aside for a new one), their
+// leaders straight up or down and never through a capsule in a row nearer the model; a label that fits no row (three
+// at most) stays in its column.
 
 /// <summary>A label to place: its object, its words, where its anchor projects (y down), whether it can be seen (not
 /// behind the camera or hidden by another object), how much of the screen its object covers (the larger keep their labels
@@ -103,8 +105,8 @@ public static class BioLabelLayout
         return (out_, more);
     }
 
-    /// <summary>Each label that would hide its own anchor, or cover a narrow model for more than half its width, moved to
-    /// a row just above the model (an anchor in its upper half) or below it, as near over its anchor as the row allows.</summary>
+    /// <summary>Each label that would hide its own anchor, or reach well into a narrow model, moved to a row just above the
+    /// model (an anchor in its upper half) or below it, as near over its anchor as the row allows.</summary>
     private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h)
     {
         const double step = Height + Gap, space = 6;
@@ -121,61 +123,104 @@ public static class BioLabelLayout
         if (moving.Count == 0) return;
         var mid = (box.Y0 + box.Y1) / 2;
         double top = Inset + Height / 2, bottom = h - Inset - Height / 2;
-        // (what each row already holds: the capsules left in the columns that reach into it, then the labels moved there)
-        var taken = new Dictionary<(bool Above, int Row), List<(double X0, double X1)>>();
         double RowY(bool above, int k) => above ? box.Y0 - space - Height / 2 - k * step : box.Y1 + space + Height / 2 + k * step;
-        List<(double X0, double X1)> Taken(bool above, int k)
+        // (each row's capsules left in the columns that reach into it, which stay put)
+        var fixedIn = new Dictionary<(bool Above, int Row), List<(double X0, double X1)>>();
+        List<(double X0, double X1)> Fixed(bool above, int k)
         {
-            if (taken.TryGetValue((above, k), out var list)) return list;
+            if (fixedIn.TryGetValue((above, k), out var list)) return list;
             var y = RowY(above, k);
             list = placed.Where(p => !moving.Contains(p) && Math.Abs(p.Y - y) < Height + Gap / 2)
                 .Select(p => (p.Frame.X - space, p.Frame.X + p.Frame.Width + space)).ToList();
-            taken[(above, k)] = list;
+            fixedIn[(above, k)] = list;
             return list;
         }
-        // (whether a leader from the anchor to a label in row k would run through a capsule in a row nearer the model)
-        bool Crosses(bool above, int k, double ax, double ay, double ex, double ey)
+        // (the labels moved to each row, with where each sits)
+        var rows = new Dictionary<(bool Above, int Row), List<(BioLabelPlacement P, double X)>>();
+        List<(BioLabelPlacement P, double X)> Row(bool above, int k) =>
+            rows.TryGetValue((above, k), out var r) ? r : rows[(above, k)] = new List<(BioLabelPlacement P, double X)>();
+        double Want(BioLabelPlacement p) => Math.Clamp(p.AnchorX - p.Width / 2, Inset, Math.Max(Inset, w - Inset - p.Width));
+        double ElbowOf(BioLabelPlacement p, double x) => Math.Clamp(p.AnchorX, x + 9, x + p.Width - 9);
+        // (where a row's labels go, each as near over its anchor as it can: left to right in their anchors' order, pushed
+        //  apart, then back from the right edge if that ran over; null when they do not fit between the view's edges)
+        List<double>? Pack(List<BioLabelPlacement> ps)
         {
+            var xs = ps.Select(Want).ToList();
+            for (var i = 1; i < xs.Count; i++) xs[i] = Math.Max(xs[i], xs[i - 1] + ps[i - 1].Width + space);
+            if (xs[^1] + ps[^1].Width > w - Inset)
+            {
+                xs[^1] = w - Inset - ps[^1].Width;
+                for (var i = xs.Count - 2; i >= 0; i--) xs[i] = Math.Min(xs[i], xs[i + 1] - space - ps[i].Width);
+            }
+            return xs[0] < Inset - 1e-9 ? null : xs;
+        }
+        // (whether a leader from an anchor to the edge of a capsule in row k runs through a capsule in a row nearer the
+        //  model, given those rows' labels)
+        bool Crosses(bool above, int k, BioLabelPlacement p, double x, Func<int, IEnumerable<(double X0, double X1)>> capsules)
+        {
+            double ax = p.AnchorX, ay = p.AnchorY, ex = ElbowOf(p, x), y = RowY(above, k), ey = above ? y + Height / 2 : y - Height / 2;
             for (var j = 0; j < k; j++)
             {
                 double yj = RowY(above, j), ya = yj - Height / 2, yb = yj + Height / 2;
-                double XAt(double y) => Math.Abs(ey - ay) < 1e-9 ? ex : ax + (ex - ax) * (y - ay) / (ey - ay);
+                double XAt(double yy) => Math.Abs(ey - ay) < 1e-9 ? ex : ax + (ex - ax) * (yy - ay) / (ey - ay);
                 double x0 = Math.Min(XAt(ya), XAt(yb)), x1 = Math.Max(XAt(ya), XAt(yb));
-                if (Taken(above, j).Any(t => x0 < t.X1 - space && x1 > t.X0 + space)) return true;
+                if (capsules(j).Any(t => x0 < t.X1 - space && x1 > t.X0 + space)) return true;
             }
             return false;
+        }
+        IEnumerable<(double X0, double X1)> Capsules(bool above, int j, (int Row, List<(BioLabelPlacement P, double X)> Trial)? swap = null)
+        {
+            var moved = swap is { } t && t.Row == j ? t.Trial : Row(above, j);
+            return Fixed(above, j).Concat(moved.Select(m => (m.X - space, m.X + m.P.Width + space)));
         }
         foreach (var p in moving)
         {
             var above = p.AnchorY < mid;
-            var want = Math.Clamp(p.AnchorX - p.Width / 2, Inset, Math.Max(Inset, w - Inset - p.Width));
-            (int Row, double X)? best = null;
-            var bestCost = double.MaxValue;
             for (var k = 0; k < BandRows; k++)
             {
                 var y = RowY(above, k);
                 if (y < top || y > bottom) break;
-                var row = Taken(above, k);
-                // (the places it could go in this row: where it wants to be, or just beside a capsule already there)
-                var tries = new List<double> { want };
-                foreach (var (x0, x1) in row) { tries.Add(x1); tries.Add(x0 - p.Width); }
-                foreach (var x in tries)
+                List<(BioLabelPlacement P, double X)>? trial = null;
+                var fixedHere = Fixed(above, k);
+                if (fixedHere.Count == 0)
                 {
-                    if (x < Inset - 1e-9 || x + p.Width > w - Inset + 1e-9) continue;
-                    if (row.Any(t => x < t.X1 && x + p.Width > t.X0)) continue;
-                    var ex = Math.Clamp(p.AnchorX, x + 9, x + p.Width - 9);
-                    if (Crosses(above, k, p.AnchorX, p.AnchorY, ex, above ? y + Height / 2 : y - Height / 2)) continue;
-                    var cost = Math.Abs(x - want) + 40 * k;
-                    if (cost < bestCost) { bestCost = cost; best = (k, x); }
+                    // (a row with no column labels in it: its moved labels and this one packed together)
+                    var ps = Row(above, k).Select(m => m.P).Append(p).OrderBy(q => q.AnchorX).ThenBy(q => q.Id, StringComparer.Ordinal).ToList();
+                    if (Pack(ps) is { } xs) trial = ps.Select((q, i) => (q, xs[i])).ToList();
                 }
+                else
+                {
+                    // (beside column labels: where it wants to be, or just beside a capsule already there)
+                    var taken = Capsules(above, k).ToList();
+                    var want = Want(p);
+                    var tries = new List<double> { want };
+                    foreach (var (x0, x1) in taken) { tries.Add(x1); tries.Add(x0 - p.Width); }
+                    double? best = null;
+                    foreach (var x in tries.OrderBy(x => Math.Abs(x - want)))
+                    {
+                        if (x < Inset - 1e-9 || x + p.Width > w - Inset + 1e-9 || taken.Any(t => x < t.X1 && x + p.Width > t.X0)) continue;
+                        best = x;
+                        break;
+                    }
+                    if (best is { } bx) trial = Row(above, k).Append((p, bx)).ToList();
+                }
+                if (trial == null) continue;
+                // (every leader into this row clear of the rows nearer the model, and every leader into a row further out
+                //  clear of this row as it would be)
+                var swap = (k, trial);
+                var clear = trial.All(m => !Crosses(above, k, m.P, m.X, j => Capsules(above, j)))
+                    && Enumerable.Range(k + 1, BandRows - k - 1).All(o => Row(above, o).All(m => !Crosses(above, o, m.P, m.X, j => Capsules(above, j, swap))));
+                if (!clear) continue;
+                rows[(above, k)] = trial;
+                break;
             }
-            if (best is not { } b) continue;
-            var yRow = RowY(above, b.Row);
-            Taken(above, b.Row).Add((b.X - space, b.X + p.Width + space));
-            var at = placed.IndexOf(p);
-            var elbowX = Math.Clamp(p.AnchorX, b.X + 9, b.X + p.Width - 9);
-            placed[at] = new BioLabelPlacement(p.Id, p.Text, false, b.X, yRow, p.Width, p.AnchorX, p.AnchorY, elbowX,
-                above ? yRow + Height / 2 : yRow - Height / 2);
+        }
+        foreach (var ((above, k), list) in rows)
+        {
+            var yRow = RowY(above, k);
+            foreach (var (p, x) in list)
+                placed[placed.IndexOf(p)] = new BioLabelPlacement(p.Id, p.Text, false, x, yRow, p.Width, p.AnchorX, p.AnchorY, ElbowOf(p, x),
+                    above ? yRow + Height / 2 : yRow - Height / 2);
         }
     }
 

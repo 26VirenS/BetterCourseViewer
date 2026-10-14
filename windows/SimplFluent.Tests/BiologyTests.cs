@@ -449,15 +449,24 @@ public class BiologyTests
         // (without the model's box the layout is the Mac's)
         var (plain, _) = BioLabelLayout.Layout(inputs, 270, 280, 150, 545, 520);
         Assert.All(plain, p => Assert.Null(p.EdgeY));
-        // (two long labels over the same part: the second goes a row further out, its leader clear of the first's capsule)
+        // (two long labels that fit side by side in the row above are packed into it, the first slid left for the second)
         var pair = new List<BioLabelInput>
         {
             new("p", "The first long label, upper left", 200, 230, Width: 240),
             new("q", "The second long label, upper right", 330, 235, Width: 250),
         };
         var (two, _) = BioLabelLayout.Layout(pair, 270, 280, 150, 545, 520, box);
-        Assert.All(two, p => Assert.NotNull(p.EdgeY));
-        var (inner, outer) = two[0].Y > two[1].Y ? (two[0], two[1]) : (two[1], two[0]);
+        Assert.All(two, p => Assert.Equal(200 - 6 - 9, p.Y, 6));
+        var (lp, lq) = (two.Single(p => p.Id == "p").Frame, two.Single(p => p.Id == "q").Frame);
+        Assert.True(lp.X >= 16 && lp.X + lp.Width + 6 <= lq.X + 1e-9 && lq.X + lq.Width <= 545 - 16 + 1e-9);
+        // (two that do not fit side by side: the second a row further out, its leader clear of the first's capsule)
+        var wide = new List<BioLabelInput>
+        {
+            new("p", "A very long first label over the upper left", 150, 230, Width: 300),
+            new("q", "A very long second label over the upper right", 420, 235, Width: 300),
+        };
+        var (rowed, _) = BioLabelLayout.Layout(wide, 270, 280, 150, 545, 520, box);
+        var (inner, outer) = (rowed.Single(p => p.Id == "p"), rowed.Single(p => p.Id == "q"));
         Assert.Equal(22, inner.Y - outer.Y, 6);
         var (ex, ey) = outer.Leader[0];
         double XAt(double y) => outer.AnchorX + (ex - outer.AnchorX) * (y - outer.AnchorY) / (ey - outer.AnchorY);
