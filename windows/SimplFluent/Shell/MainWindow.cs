@@ -571,9 +571,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         }
     }
 
-    /// <summary>Something of Simpl's over the window that a question of its own should wait for: a dialog, the tour, the
-    /// sign-in. (Not the tour's offer: it dims nothing and may be left unanswered all day.)</summary>
-    private bool Busy() => sheets.IsOpen || tour?.On == true || engine == null || engine.Login.Covers || engine.Phase != Phase.Native;
+    /// <summary>Something of Simpl's over the window that a question of its own should wait for: a dialog, a popup, the
+    /// tour, the sign-in. (Not the tour's offer: it dims nothing and may be left unanswered all day.)</summary>
+    private bool Busy() => sheets.IsOpen || FloatPopup.Over(this).Count > 0 || tour?.On == true || engine == null || engine.Login.Covers || engine.Phase != Phase.Native;
 
     /// <summary>Brought back (the notification area's icon, Simpl opened again): shown, restored, in front.</summary>
     public void Bring()

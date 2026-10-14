@@ -81,6 +81,8 @@ public static class PerfWalk
                 s.Close();
                 await Until(() => m.Sheets.Current != s, 3000);
             }
+            // (and a popup floating over it, What's New's now)
+            foreach (var p in Shell.FloatPopup.Over(m)) p.Sheet.Close();
             await Task.Delay(500);
             // memory once the start has settled: nothing asked of the page for two seconds (twenty at most)
             stage = "the start settling";
@@ -166,7 +168,7 @@ public static class PerfWalk
         var k = new Mark();
         e.AskNewTask();
         var shown = await Perf.Idle();
-        var sheet = m.Sheets.Current;
+        var sheet = m.Sheets.Current ?? Shell.FloatPopup.Over(m).LastOrDefault()?.Sheet; // (New task floats over the window)
         var settled = await Perf.Settle(k.T0, shown, StepLimit);
         await k.FramesFor(700);
         rows.Add(k.Row("New task sheet", Perf.Ms(k.T0, shown), settled is { } t ? Perf.Ms(k.T0, t) : null, sheet == null ? "no sheet came up" : settled == null ? Late : null));
@@ -174,7 +176,7 @@ public static class PerfWalk
         if (sheet != null)
         {
             sheet.Close();
-            await Until(() => !m.Sheets.IsOpen, 3000);
+            await Until(() => !m.Sheets.IsOpen && Shell.FloatPopup.Over(m).Count == 0, 3000);
         }
         await Task.Delay(250);
     }

@@ -92,6 +92,9 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     /// <summary>An update waits while it is open (What's New does not hold one).</summary>
     public bool HoldsUpdates => sheet.HoldsUpdates;
 
+    /// <summary>What it shows.</summary>
+    public Sheet Sheet => sheet;
+
     private FloatPopup(Sheet s, Window over)
     {
         sheet = s;

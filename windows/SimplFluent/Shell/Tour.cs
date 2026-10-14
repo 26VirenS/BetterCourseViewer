@@ -220,6 +220,8 @@ public sealed class TourOverlay : Grid
         veil.Visibility = Visibility.Visible;
         card.Visibility = Visibility.Visible;
         WorkPreview.Dismiss();
+        // (the popups floating over the window — windows of their own, above its veil — stepped aside until it is over)
+        foreach (var p in FloatPopup.Over(window)) p.Hide();
         // (from the start, on the Dashboard; one begun part-way, as the screenshot suite does, stays where it is opened)
         if (at == 0 && (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0)) engine.Go(Place.Dashboard);
         steps = Steps();
@@ -260,6 +262,7 @@ public sealed class TourOverlay : Grid
         timer.Stop();
         Prefs.Set("tour:done", true);
         Motion.FadeOut(this, () => Visibility = Visibility.Collapsed, Motion.Normal);
+        FloatPopup.ShowAgain(window);
     }
 
     /// <summary>Left before its end (Skip tour, ×, Escape): it is over, and counts as seen — the account menu's Take the
@@ -307,7 +310,7 @@ public sealed class TourOverlay : Grid
         {
             await Task.Delay(500);
             var setUp = engine.Snapshot?.SetupDone != false || SetupSheet.Seen || SetupSheet.Later;
-            var free = engine.Phase == Phase.Native && setUp && !window.Sheets.IsOpen && !engine.Login.Covers && engine.Query.Length == 0 && !WorkPreview.IsOpen;
+            var free = engine.Phase == Phase.Native && setUp && !window.Sheets.IsOpen && FloatPopup.Over(window).Count == 0 && !engine.Login.Covers && engine.Query.Length == 0 && !WorkPreview.IsOpen;
             var ready = free && (engine.Courses.Count > 0 || ticks >= 20);
             calm = ready ? calm + 1 : 0;
             if (calm >= 5) { Offer(); return; }
