@@ -103,8 +103,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   1.3.78, which made 96-point tiles beside the sidebar, is gone). Each row shows every full name where all fit beside
   their symbols, else every short one, never a name cut (a tile too narrow for even those puts each symbol over its
   name). A tile's line is shown whole, in up to two lines, or left out — measured as the tile wraps it
-  (`DashCounterTile.noteFits`), never cut in the middle of a word — and its tooltip always says it ("4 due today · 35
-  points total"). Every tile wears a soft wash of its own colour over the whole tile, over its photo and under its
+  (`DashCounterTile.noteFits`), never cut in the middle of a word, a sum such as "19 / 49" held together — and its
+  tooltip always says it ("4 due today · 35 points total"). In a row of six the line takes one line, so the row stays
+  1.3.77's height (about 113 points): a short name's line that needs two gives way to its full name's where that fits
+  on one ("Graded" over "19 / 49 points", not "this week · 19 / 49 points"), else it is left out. Every tile wears a soft wash of its own colour over the whole tile, over its photo and under its
   words, and a faint edge in it (`DashCounterTile.wash`: the colour its symbol wears — Due today the accent, Tomorrow
   #ff9f0a, Next 7 days #34c759, Overdue the system red, Unread #ff9500, Graded #5856d6, or the colour worn — at 12% by
   day and 18% by night), drawn by the tile and not as the glass's tint, which macOS mutes in a window in the
@@ -113,8 +115,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   spring): the first tile's panel from its left edge, the last one's from its right, one between them in step, each
   kept on the page and in the window; nothing under it moves. Its ✕, Escape, the tile pressed again (the panel's head,
   where the tile was) or a click anywhere else in the app folds it back into its tile — that click still does what it
-  does, so the panel never blocks the app. Under Reduce Motion nothing grows: the panel fades in over its tile. (The
-  compact strip of 1.3.78 and the popup over the window of 1.3.79, which faded in, are gone.)
+  does, so the panel never blocks the app; with one of its rows' cards up, Escape folds the card back first and the next
+  closes the panel. The panel is laid out and measured at its own height, never squeezed into the one it was last
+  given, so it always shows its whole header and list. Under Reduce Motion nothing grows, its height either: the panel
+  fades in over its tile as the tile fades out under it. (The compact strip of 1.3.78 and the popup over the window of
+  1.3.79, which faded in, are gone.)
 - **The Dashboard and the window, after the UI review (the home findings; the same on Windows).** The view (Cards,
   List, Activity) and a labelled New Task sit in the page by the greeting, so a tool pinned to the toolbar never pushes
   them into its » menu; on a one-column page the view chosen comes straight under the counters. Each row of tiles shows

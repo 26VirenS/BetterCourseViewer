@@ -347,7 +347,7 @@ bio_pins() {
 ui_review() {
   MODE=light shoot light-01g-dashboard-cards 14 -SimplDashView cards
   MODE=light SIZE=1440x900 shoot light-01h-dashboard-cards-wide 14 -SimplDashView cards
-  MODE=light shoot light-01u-counter-unread 14 -SimplSheet unread
+  MODE=light shoot light-01u-counter-unread 30 -SimplSheet unread # (1.3.80: up to 30 seconds for its list, as the others)
   MODE=light shoot light-30b-palette-sum 14 -SimplOpen "palette:12*4"
   MODE=light shoot light-29b-tour-search 16 -SimplOpen tour:5
   MODE=light shoot light-27b-tour-offer 8 -SimplOpen touroffer
@@ -502,12 +502,14 @@ live_check() {
 if [ "${SHOTS:-full}" = quick ]; then
   MODE=light
   shoot light-01-dashboard 12
-  shoot light-01d-dashboard-counter 14 -SimplSheet next
-  shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
+  # (1.3.80: a counter's panel waits up to 30 seconds — taken as soon as it has settled — for its list: at 14, under load,
+  # the first tile's said "Loading…")
+  shoot light-01d-dashboard-counter 30 -SimplSheet next
+  shoot light-01r-counter-middle 30 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   # (1.3.78) the row of six: the first tile's panel from its left edge, the last one's from its right; and the row with
   # the sidebar folded away
-  shoot light-01e-counter-first 14 -SimplSheet today
-  shoot light-01f-counter-last 14 -SimplSheet graded
+  shoot light-01e-counter-first 30 -SimplSheet today
+  shoot light-01f-counter-last 30 -SimplSheet graded
   shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
   # (1.3.80) a 1024-point window: with the sidebar out, the tiles three across in two rows, as tall as what is on them;
   # with it folded away, six across — each tile washed with its own colour; a tile half-way through growing into its
@@ -616,13 +618,13 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
   shoot dark-01-dashboard 12
   # (1.3.79) a counter's panel, and the card of one of its rows over the window, in dark
-  shoot dark-01d-dashboard-counter 16 -SimplSheet next
+  shoot dark-01d-dashboard-counter 30 -SimplSheet next
   shoot dark-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter
   # (1.3.80) the tiles in their colours by night at 1024 points, the sidebar out and folded away; the first tile of the
   # second row grown into its panel over the page under it; the last tile half-way through growing
   SIZE=1024x820 shoot dark-01k-dashboard-1024 12
   SIZE=1024x820 shoot dark-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
-  SIZE=1024x820 shoot dark-01n-counter-1024-overdue 14 -SimplSheet overdue
+  SIZE=1024x820 shoot dark-01n-counter-1024-overdue 30 -SimplSheet overdue
   shoot dark-01m-counter-morph 30 -SimplSheet graded -SimplMorphHold 0.4
   SIZE=940x820 shoot dark-40-narrow-dashboard 14
   shoot dark-03-todo 12 -SimplPlace todo
