@@ -153,7 +153,8 @@ internal sealed class RubricClock
 /// <summary>
 /// The ring at rest on its stage (the Mac's RingPainter.rest): each slice blooming in — sweeping round from its start and
 /// growing to its thickness on a spring, one after another — bent to its marks and turned to its grade's colour as the
-/// clock says, the slice under the pointer swelling out; a dot beside each slice.
+/// clock says, the slice under the pointer swelling out; a dot beside each slice. Once it has bloomed, a narrow gap opens
+/// where one criterion's slice meets the next, so each reads as a piece of its own to pick, not one band of colour.
 /// </summary>
 internal sealed class RubricRingVisual : FrameworkElement
 {
@@ -190,12 +191,14 @@ internal sealed class RubricRingVisual : FrameworkElement
         t.Freeze();
         dc.PushTransform(t);
         var lead = n > 1 ? 0.42 / (n - 1) : 0;
+        // (the gaps between slices, as the bloom ends: about 4 of the stage's units wide)
+        var seam = n > 1 ? 4 / RubricRing.Radius * RubricRing.Span(bloom, 0.85, 1) : 0;
         for (var k = 0; k < n; k++)
         {
             var local = RubricRing.Clamp01((bloom - lead * k) / 0.58);
             var sweep = RubricRing.EaseOut(local);
             if (sweep <= 0.001) continue;
-            Slice(dc, k, sweep, RubricRing.SpringOut(local), tones, go, clock.Swell(k, now));
+            Slice(dc, k, sweep, RubricRing.SpringOut(local), tones, go, clock.Swell(k, now), seam);
             var d = RubricRing.Pt(RubricRing.Radius + go[k] + 22 + 9 * clock.Swell(k, now), geo.Model.Mids[k]);
             var r = k == Sel || k == Hov ? 4.5 : n > 15 ? 2.5 : 3.5;
             var a = RubricRing.Span(local, 0.5, 1);
@@ -207,11 +210,13 @@ internal sealed class RubricRingVisual : FrameworkElement
         dc.Pop();
     }
 
-    private void Slice(DrawingContext dc, int k, double sweep, double grow, RubricRGB[] tones, double[] bend, double bump)
+    private void Slice(DrawingContext dc, int k, double sweep, double grow, RubricRGB[] tones, double[] bend, double bump, double seam)
     {
         var m = geo.Model;
-        var a0 = m.Starts[k];
-        var a1 = m.Ends[k];
+        // (half the gap off each end, never more than a third of a narrow slice)
+        var half = Math.Min(seam / 2, (m.Ends[k] - m.Starts[k]) / 6);
+        var a0 = m.Starts[k] + half;
+        var a1 = m.Ends[k] - half;
         RubricBandPoint Sample(double v)
         {
             var th = a0 + (a1 - a0) * v * sweep;
@@ -318,7 +323,9 @@ internal sealed class RubricPinPanel : Panel
 /// The open criterion's bar (the Mac's RingPainter, the slice pulled out straight): a band of the criterion's own colour,
 /// darker at the foot and lighter at the top, the stretch above its mark unearned and grey; the thread from its top up to
 /// the little ring; a tick at the height of each level's points, the one given larger in the criterion's colour, and a
-/// leader to any row that had to move. It grows up from its foot as it opens.
+/// leader to any row that had to move. Where the points given are not the given level's, that level keeps a ring of its
+/// colour and the mark's white dot stands at the points given, where the bar's colour stops. It grows up from its foot as
+/// it opens.
 /// </summary>
 internal sealed class RubricBarVisual : FrameworkElement
 {
@@ -328,15 +335,18 @@ internal sealed class RubricBarVisual : FrameworkElement
     private readonly RubricRGB tone;
     private readonly double frac, foot;
     private readonly List<RubricBarPlace> places;
+    /// <summary>The points given, apart from the level given (null: the mark is the level's own tick).</summary>
+    private readonly double? markY;
 
     public double Grow { get => (double)GetValue(GrowProperty); set => SetValue(GrowProperty, value); }
 
-    public RubricBarVisual(RubricRGB tone, double frac, double foot, List<RubricBarPlace> places)
+    public RubricBarVisual(RubricRGB tone, double frac, double foot, List<RubricBarPlace> places, double? markY = null)
     {
         this.tone = tone;
         this.frac = frac;
         this.foot = foot;
         this.places = places;
+        this.markY = markY;
         Width = RubricRing.Width;
         Height = RubricRing.Height;
         IsHitTestVisible = false;
@@ -415,13 +425,28 @@ internal sealed class RubricBarVisual : FrameworkElement
             var a = RubricRing.Span(grow, 0.8 + 0.04 * i, 0.96 + 0.04 * i);
             if (a <= 0.001) continue;
             var z = 0.2 + 0.8 * a;
-            var r = (p.Picked ? 8 : 5.5) * z;
-            Brush fill = p.Picked ? Brushes.White : K.Brush(dark ? Color.FromRgb(28, 28, 30) : Colors.White);
+            // (the level given, its points not the ones given: a ring of its colour; the mark's dot stands apart)
+            var apart = p.Picked && markY != null;
+            var r = (p.Picked && !apart ? 8 : apart ? 6.5 : 5.5) * z;
+            Brush fill = p.Picked && !apart ? Brushes.White : K.Brush(dark ? Color.FromRgb(28, 28, 30) : Colors.White);
             var stroke = new Pen(p.Picked ? K.Brush(tone.Color) : K.Brush(dark ? Color.FromArgb(209, 255, 255, 255) : Color.FromArgb(150, 60, 60, 67)), 2.5 * z);
             stroke.Freeze();
             dc.PushOpacity(a);
             dc.DrawEllipse(fill, stroke, new Point(RubricRing.BarX, p.Tick), r, r);
             dc.Pop();
+        }
+        if (markY is { } my)
+        {
+            var a = RubricRing.Span(grow, 0.82, 1);
+            if (a > 0.001)
+            {
+                var z = 0.2 + 0.8 * a;
+                var stroke = new Pen(K.Brush(tone.Color), 2.5 * z);
+                stroke.Freeze();
+                dc.PushOpacity(a);
+                dc.DrawEllipse(Brushes.White, stroke, new Point(RubricRing.BarX, my), 8 * z, 8 * z);
+                dc.Pop();
+            }
         }
     }
 }

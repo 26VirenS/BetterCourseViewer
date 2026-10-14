@@ -152,8 +152,12 @@ internal sealed class RubricModel
 {
     public sealed record Level(string Label, string Text, double? Pts);
 
+    /// <summary>A criterion: its levels, what it is worth and the score given, the level given (<c>Mark</c>), and — when
+    /// the score given is not that level's points (a marker picks Partial, 3 pts, and gives 4, as Canvas lets them) —
+    /// <c>Adjusted</c>, its mark then drawn at the points given; <c>MarkText</c> is the mark's badge ("Your mark", "Your
+    /// mark · 4 pts").</summary>
     public sealed record Criterion(string Id, int Index, string Name, string Short, string Desc, List<Level> Levels, double Worth,
-        double? Score, int Mark, string Comment, double Frac);
+        double? Score, int Mark, string Comment, double Frac, bool Adjusted = false, string MarkText = "Your mark");
 
     public List<Criterion> Criteria { get; }
     /// <summary>Marked and posted: at least one criterion has a score.</summary>
@@ -244,8 +248,13 @@ internal sealed class RubricModel
         var name = (row.Name ?? "").Trim();
         var full = name.Length == 0 ? $"Criterion {k + 1}" : name;
         var comment = (row.Note ?? row.Comment ?? "").Trim('“', '”', '"', ' ', '\n');
+        // the points given apart from the level's: the engine's word (2.99.33), else read here
+        var given = mark >= 0 ? levels[mark].Pts : null;
+        var adjusted = row.Adjusted ?? (score is { } sc && given is { } gv && Math.Abs(sc - gv) > 1e-9);
+        var points = score is { } sp ? $"{RubricRing.Num(sp)} {(sp == 1 ? "pt" : "pts")}" : "";
+        var badge = !string.IsNullOrEmpty(row.MarkText) ? row.MarkText! : adjusted && points.Length > 0 ? $"Your mark · {points}" : "Your mark";
         return new Criterion(row.Id ?? "", k, full, Short(full), PlainLines(row.Desc ?? ""), levels, worth, score, mark, comment,
-            Fraction(levels, worth, score, mark));
+            Fraction(levels, worth, score, mark), adjusted, badge);
     }
 
     private static Level LevelOf(RubricRating r)
@@ -322,7 +331,7 @@ internal sealed class RubricModel
         if (Graded)
         {
             if (c.Score is not { } s) return $"{c.Name}, not marked yet, worth {RubricRing.Num(c.Worth)}";
-            var level = c.Mark >= 0 ? $", {c.Levels[c.Mark].Label}" : "";
+            var level = c.Mark >= 0 ? $", {c.Levels[c.Mark].Label}{(c.Adjusted ? ", adjusted" : "")}" : "";
             return $"{c.Name}, {RubricRing.Num(s)} of {RubricRing.Num(c.Worth)}{level}";
         }
         return $"{c.Name}, worth {RubricRing.Num(c.Worth)} {(c.Worth == 1 ? "point" : "points")}";
@@ -359,8 +368,8 @@ internal sealed class RubricModel
     }
 }
 
-/// <summary>A level's place on the open criterion's bar: its tick (at the height of its points) and its row (pushed clear
-/// of its neighbours), in the stage's units.</summary>
+/// <summary>A level's place on the open criterion's bar: its tick (at the height of its points) and its row (stacked under
+/// the one before it, a leader joining it to its tick), in the stage's units.</summary>
 internal readonly record struct RubricBarPlace(double Tick, double Row, bool Picked);
 
 /// <summary>The rubric's ring as it stands still (the Mac's RubricGeometry): what does not change from frame to frame.</summary>
@@ -447,23 +456,49 @@ internal sealed class RubricGeometry
         return foot - (foot - top) * (pv - lo) / (hi - lo);
     }
 
-    /// <summary>The levels at the height of their points; where two rows would overlap they are pushed apart (a leader
-    /// joins each moved row to its tick), and at the foot back up. Heights are the rows' own, in the stage's units.</summary>
-    public List<RubricBarPlace> Places(int k, double foot, IReadOnlyList<double> heights)
+    /// <summary>
+    /// The levels' ticks at the height of their points, and their rows stacked one under the next from the first one's
+    /// tick (or from <paramref name="top"/>, under the criterion's whole description) — a leader joins each row to its
+    /// tick — so the room goes to the words, not to gaps between rows; at the foot they are pushed back up. Heights are
+    /// the rows' own, in the stage's units.
+    /// </summary>
+    public List<RubricBarPlace> Places(int k, double foot, IReadOnlyList<double> heights, double? top = null)
     {
         var ls = Levels(k);
         if (ls.Count == 0) return new();
         var want = ls.Select((l, i) => BarY(k, l.Pts, i, foot)).ToArray();
         var hs = ls.Select((_, i) => i < heights.Count ? heights[i] : 46).ToArray();
         var ys = (double[])want.Clone();
-        for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + hs[i - 1] / 2 + 6 + hs[i] / 2);
+        if (top is { } t) ys[0] = Math.Max(ys[0], t + hs[0] / 2);
+        for (var i = 1; i < ys.Length; i++) ys[i] = ys[i - 1] + hs[i - 1] / 2 + 8 + hs[i] / 2;
         var last = ys.Length - 1;
         if (ys[last] + hs[last] / 2 > foot + 30)
         {
             ys[last] = foot + 30 - hs[last] / 2;
-            for (var i = last - 1; i >= 0; i--) ys[i] = Math.Min(ys[i], ys[i + 1] - hs[i + 1] / 2 - 6 - hs[i] / 2);
+            for (var i = last - 1; i >= 0; i--) ys[i] = Math.Min(ys[i], ys[i + 1] - hs[i + 1] / 2 - 8 - hs[i] / 2);
         }
         return ls.Select((_, i) => new RubricBarPlace(want[i], ys[i], Picked(k, i))).ToList();
+    }
+
+    /// <summary>Where the rows may start under the criterion's whole description (<paramref name="head"/>: how tall the
+    /// head stands with all of it), when they all still fit above the bar's foot that way; else null (the head keeps its
+    /// two lines and More).</summary>
+    public static double? FullHeadTop(double foot, IReadOnlyList<double> heights, double head)
+    {
+        if (head <= 0) return null;
+        var rows = heights.Sum() + 8 * Math.Max(0, heights.Count - 1);
+        var top = 24 + head + 14;
+        return top + rows <= foot + 30 ? top : null;
+    }
+
+    /// <summary>Where the points given sit on the bar when they are not the given level's (a marker picked Partial, 3 pts,
+    /// and gave 4): the mark's dot goes there, where the bar's colour stops; null otherwise.</summary>
+    public double? MarkY(int k, double foot)
+    {
+        if (!Model.Graded || k < 0 || k >= N) return null;
+        var c = Model.Criteria[k];
+        if (!c.Adjusted || c.Score is not { } s || c.Levels.Count == 0) return null;
+        return Math.Clamp(BarY(k, s, Math.Max(0, c.Mark), foot), RubricRing.BarTop, foot);
     }
 
     /// <summary>A label's place round the ring: the point beside its slice, which way it hangs from it, whether it shows (a

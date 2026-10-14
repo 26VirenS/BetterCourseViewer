@@ -62,10 +62,11 @@ internal static class RubricPopup
 /// <summary>
 /// The rubric as a ring (the Mac's RubricPopupView over RubricStage.swift): one slice per criterion, as long as its share
 /// of the points, blooming in and — marked — bending to its marks and turning to its grades' colours; the total in the
-/// middle, or the criterion under the pointer. A slice, its label, or Enter opens that criterion into its bar: its levels
-/// at the height of their points, the one given marked, the marker's note under them, a dot per criterion to switch, and
-/// the little ring on top to go back. ← → walk the criteria; Escape steps back, then closes; a press beside the ring
-/// closes it too. Ring or Grid at the top right (RubricGrid.cs).
+/// middle, or the criterion under the pointer. A slice, its name (a chip beside it), or Enter opens that criterion into
+/// its bar: its levels stacked beside it, each joined to the height of its points, the one given marked, the marker's
+/// note under them, ‹ 1 of 2 › to switch, and "Ring" beside × (or the little ring on top) to go back. ← → walk the
+/// criteria; Escape steps back, then closes; a press beside the ring closes it too. Ring or Grid at the top right
+/// (RubricGrid.cs).
 /// </summary>
 internal sealed class RubricView : Grid
 {
@@ -90,6 +91,8 @@ internal sealed class RubricView : Grid
     private readonly RubricPinPanel centreHost = new();
     private readonly Border centre = new() { Width = 220 };
     private readonly RubricRingBack back;
+    /// <summary>The way back from a criterion to the ring, in words, beside ×.</summary>
+    private readonly Wpf.Ui.Controls.Button backButton;
     private readonly FrameworkElement header;
     private readonly TextBlock foot;
     private FrameworkElement? gridPanel;
@@ -118,8 +121,15 @@ internal sealed class RubricView : Grid
 
         // the title over the ring, × at the top left, Ring / Grid at the top right
         var close = K.IconButton(SymbolRegular.Dismiss24, () => Close?.Invoke(), "Close the rubric (Esc)", 16, 36);
-        close.HorizontalAlignment = HorizontalAlignment.Left;
-        close.VerticalAlignment = VerticalAlignment.Top;
+        backButton = K.Button("Ring", () => ToRing(), icon: SymbolRegular.ChevronLeft24);
+        backButton.MinWidth = 0;
+        backButton.ToolTip = "Back to the ring (Esc)";
+        backButton.Visibility = Visibility.Collapsed;
+        backButton.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(backButton, "Back to the ring");
+        var corner = K.H(8, close, backButton);
+        corner.HorizontalAlignment = HorizontalAlignment.Left;
+        corner.VerticalAlignment = VerticalAlignment.Top;
         var switcher = new SelectorBar(new[] { "Ring", "Grid" }, view == "grid" ? 1 : 0) { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
         switcher.ToolTip = "Show the rubric as a ring or a grid";
         switcher.Changed += i => SetView(i == 1 ? "grid" : "ring");
@@ -131,7 +141,7 @@ internal sealed class RubricView : Grid
         head.Margin = new Thickness(130, 2, 130, 0);
         head.IsHitTestVisible = false;
         header = head;
-        var chrome = new Grid { Margin = new Thickness(16, 14, 16, 0), Children = { head, close, switcher } };
+        var chrome = new Grid { Margin = new Thickness(16, 14, 16, 0), Children = { head, corner, switcher } };
         Children.Add(chrome.Row(0));
 
         // the stage: the web ring's 760 × 560 units, as large as the room allows
@@ -215,13 +225,14 @@ internal sealed class RubricView : Grid
         }
     }
 
+    /// <summary>What the picture shows, in words true to it — the controls say for themselves what they do.</summary>
     private string FootWords
     {
         get
         {
-            if (open) return "Height on the bar is points. Switch with the dots; the little ring at the top or Esc goes back.";
-            if (model.Graded) return "The ring pushes out where you scored well and pulls in where you lost points.";
-            return "Each colour’s stretch is its share of the points. Pick one to open it.";
+            if (open) return model.Graded ? "The bar fills to your mark; each level sits at the height of its points." : "Each level sits on the bar at the height of its points.";
+            if (model.Graded) return "Each criterion’s colour is its mark: green for full marks, yellow to orange for part marks, red where most was lost.";
+            return "Each criterion’s stretch is its share of the points. Click one to see its levels.";
         }
     }
 
@@ -229,8 +240,9 @@ internal sealed class RubricView : Grid
 
     private double NameSize => model.N <= 6 ? 14 : model.N <= 10 ? 13 : 12;
 
-    /// <summary>A criterion's short name and points beside its slice: a button (what the keys, the pointer and a screen
-    /// reader work), riding round with the ring.</summary>
+    /// <summary>A criterion's short name and points beside its slice: a chip (what the keys, the pointer and a screen
+    /// reader work, and what reads as the thing to click), riding round with the ring — its edge in the criterion's colour
+    /// under the pointer.</summary>
     private void BuildLabels()
     {
         for (var k = 0; k < model.N; k++)
@@ -243,8 +255,11 @@ internal sealed class RubricView : Grid
             var words = new StackPanel { Children = { name } };
             if (model.N <= 15) words.Children.Add(pts);
             var n = k;
-            var b = K.Subtle(words, () => Select(n), new Thickness(6, 3, 6, 3));
+            var b = K.Subtle(words, () => Select(n), new Thickness(8, 4, 8, 4), 8);
             b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            b.BorderThickness = new Thickness(1);
+            b.SetResourceReference(Control.BackgroundProperty, B.Control);
+            b.SetResourceReference(Control.BorderBrushProperty, B.ControlStroke);
             b.ToolTip = c.Name;
             b.Cursor = Cursors.Hand;
             System.Windows.Automation.AutomationProperties.SetName(b, model.Spoken(c));
@@ -285,8 +300,16 @@ internal sealed class RubricView : Grid
             name.HorizontalAlignment = pts.HorizontalAlignment = h;
             if (paintedHov != hov || k == hov)
             {
-                if (k == hov && !open) name.Foreground = K.Brush(K.Darkened(tones[k].Color));
-                else name.Fg(B.Text);
+                if (k == hov && !open)
+                {
+                    name.Foreground = K.Brush(K.Darkened(tones[k].Color));
+                    b.BorderBrush = K.Brush(tones[k].Color);
+                }
+                else
+                {
+                    name.Fg(B.Text);
+                    b.SetResourceReference(Control.BorderBrushProperty, B.ControlStroke);
+                }
                 pts.Fg(k == hov && !open ? B.Text : B.Text2);
             }
         }
@@ -318,7 +341,7 @@ internal sealed class RubricView : Grid
             string line;
             if (!model.Graded) line = c.Worth == 1 ? "point" : "points";
             else if (c.Score == null) line = $"of {RubricRing.Num(c.Worth)} · not marked";
-            else line = $"of {RubricRing.Num(c.Worth)}" + (c.Mark >= 0 ? $" · {c.Levels[c.Mark].Label}" : "");
+            else line = $"of {RubricRing.Num(c.Worth)}" + (c.Mark >= 0 ? $" · {c.Levels[c.Mark].Label}{(c.Adjusted ? ", adjusted" : "")}" : "");
             v.Children.Add(K.Wrapped(line, Ty.Body, B.Text2, 2).Center());
         }
         else
@@ -326,7 +349,8 @@ internal sealed class RubricView : Grid
             v.Children.Add(K.Text(model.Graded ? "Score" : "Total", Ty.Caption, B.Text2).Strong().Center());
             v.Children.Add(Big(RubricRing.Num(model.Graded ? model.Earned : model.Possible)));
             v.Children.Add(K.Text(model.Graded ? $"of {RubricRing.Num(model.Possible)} · {model.Percent}%" : model.Possible == 1 ? "point" : "points", Ty.Body, B.Text2).Center());
-            v.Children.Add(K.Text("Pick a colour to open it", Ty.Caption, B.Text3).Margin(0, 8, 0, 0).Center());
+            // (what to do, in words that match what is on the screen: the names round the ring)
+            v.Children.Add(K.Wrapped(model.Graded ? "Click a criterion to see its levels and comment" : "Click a criterion to see its levels", Ty.Caption, B.Text3).Margin(0, 8, 0, 0).Center());
         }
         centre.Child = v;
     }
@@ -448,7 +472,16 @@ internal sealed class RubricView : Grid
         PlaceLabels();
         PaintCentre();
         foot.Text = FootWords;
+        ShowBack(true);
         KeepKeys();
+    }
+
+    /// <summary>"Ring" beside × while a criterion is open (a short fade; at once with Windows' animation effects off).</summary>
+    private void ShowBack(bool on)
+    {
+        if (on == (backButton.Visibility == Visibility.Visible)) return;
+        backButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        if (on) Motion.FadeIn(backButton, Motion.Fast);
     }
 
     /// <summary>The keys kept on the rubric when what had them went (a label, a dot built anew).</summary>
@@ -466,6 +499,7 @@ internal sealed class RubricView : Grid
         PlaceLabels();
         PaintCentre();
         foot.Text = FootWords;
+        ShowBack(false);
         KeepKeys();
     }
 
@@ -496,8 +530,10 @@ internal sealed class RubricView : Grid
 
     // ---- the bar's side ----
 
-    /// <summary>The open criterion: its bar, its levels at the height of their points (the one given marked), which
-    /// criterion this is with the dots to switch, the marker's note, and the little ring to go back.</summary>
+    /// <summary>The open criterion: its bar, its levels stacked beside it, each joined to the height of its points (the one
+    /// given marked — and the points given, where they are not that level's), which criterion this is with ‹ 1 of 2 ›
+    /// to switch, the whole of its description when the levels still fit under it, the marker's note, and the little
+    /// ring to go back.</summary>
     private void BuildBar(bool swap)
     {
         barLayer.Children.Clear();
@@ -512,15 +548,25 @@ internal sealed class RubricView : Grid
         for (var i = 0; i < levels.Count; i++)
         {
             var picked = geo.Picked(k, i);
-            var row = LevelRow(levels[i], picked, marked && !picked, tone, lines);
+            var row = LevelRow(levels[i], picked, marked && !picked, tone, lines, c.MarkText);
             row.Width = RowWidth;
             row.Measure(new Size(RowWidth, double.PositiveInfinity));
             rows.Add(row);
             heights.Add(row.DesiredSize.Height);
         }
         var foot = geo.Bottoms[k];
-        var places = geo.Places(k, foot, heights);
-        var bar = new RubricBarVisual(tone, model.Graded ? c.Frac : 1, foot, places);
+        // (the whole description, where the levels still fit under it; else two lines of it and More)
+        FrameworkElement head = Head(k, tone, full: false);
+        double? top = null;
+        if (c.Desc.Length > 0)
+        {
+            var whole = Head(k, tone, full: true);
+            whole.Width = RowWidth;
+            whole.Measure(new Size(RowWidth, double.PositiveInfinity));
+            if (RubricGeometry.FullHeadTop(foot, heights, whole.DesiredSize.Height) is { } t) { head = whole; top = t; }
+        }
+        var places = geo.Places(k, foot, heights, top);
+        var bar = new RubricBarVisual(tone, model.Graded ? c.Frac : 1, foot, places, geo.MarkY(k, foot));
         barLayer.Children.Add(bar);
         for (var i = 0; i < rows.Count; i++)
         {
@@ -528,7 +574,6 @@ internal sealed class RubricView : Grid
             Canvas.SetTop(rows[i], places[i].Row - heights[i] / 2);
             barLayer.Children.Add(rows[i]);
         }
-        var head = Head(k, tone);
         head.Width = RowWidth;
         Canvas.SetLeft(head, RubricRing.RowsX);
         Canvas.SetTop(head, 24);
@@ -570,8 +615,9 @@ internal sealed class RubricView : Grid
     }
 
     /// <summary>A level of the open criterion: its points in the criterion's colour, its name ("Your mark" on the one
-    /// given) and what it asks for, on a card of its own beside the bar.</summary>
-    private static FrameworkElement LevelRow(RubricModel.Level level, bool picked, bool dim, RubricRGB tone, int lines)
+    /// given — "Your mark · 4 pts" where the points given are not the level's) and what it asks for, on a card of its own
+    /// beside the bar.</summary>
+    private static FrameworkElement LevelRow(RubricModel.Level level, bool picked, bool dim, RubricRGB tone, int lines, string mark = "Your mark")
     {
         var pts = new TextBlock
         {
@@ -580,7 +626,7 @@ internal sealed class RubricView : Grid
         };
         if (dim) pts.Fg(B.Text3); else pts.Foreground = K.Brush(K.Darkened(tone.Color));
         var label = K.Wrapped(level.Label, Ty.BodyStrong, dim ? B.Text2 : B.Text, 2);
-        var top = K.Columns("*, auto", label.Col(0), picked ? YourMark(tone).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Top).Col(1) : null);
+        var top = K.Columns("*, auto", label.Col(0), picked ? YourMark(tone, mark).Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Top).Col(1) : null);
         var words = K.V(2, top);
         if (lines > 0 && level.Text.Length > 0) words.Children.Add(K.Wrapped(level.Text, Ty.Body, dim ? B.Text3 : B.Text2, lines));
         var box = new Border { Child = words, Padding = new Thickness(12, 9, 12, 9), CornerRadius = new CornerRadius(8), SnapsToDevicePixels = true };
@@ -594,53 +640,59 @@ internal sealed class RubricView : Grid
         var g = K.Columns("48, 14, *", pts.Col(0), box.Col(2));
         g.Background = Brushes.Transparent;
         g.MouseLeftButtonUp += (_, e) => e.Handled = true;
-        if (picked) System.Windows.Automation.AutomationProperties.SetItemStatus(g, "Your mark");
+        if (picked) System.Windows.Automation.AutomationProperties.SetItemStatus(g, mark);
         return g;
     }
 
-    /// <summary>"Your mark", on the criterion's colour.</summary>
-    public static Border YourMark(RubricRGB tone)
+    /// <summary>"Your mark" (or "Your mark · 4 pts", the points given where they are not the level's), on the criterion's
+    /// colour.</summary>
+    public static Border YourMark(RubricRGB tone, string text = "Your mark")
     {
-        var t = K.Text("Your mark", Ty.Caption);
+        var t = K.Text(text, Ty.Caption);
         t.FontWeight = FontWeights.SemiBold;
         t.Foreground = K.Brush(tone.Ink);
         return new Border { Child = t, Background = K.Brush(tone.Color), CornerRadius = new CornerRadius(10), Padding = new Thickness(7, 1, 7, 2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
     }
 
-    /// <summary>Which criterion is open: its colour, which of how many and its points, its name, its description (More
-    /// shows the rest), and a dot per criterion to switch to another in place.</summary>
-    private FrameworkElement Head(int k, RubricRGB tone)
+    /// <summary>Which criterion is open: its colour and its points, its name, its description — two lines and More, or
+    /// <paramref name="full"/>, all of it — and ‹ 1 of 2 › to switch to the one before or after in place, each arrow
+    /// saying which it opens.</summary>
+    private FrameworkElement Head(int k, RubricRGB tone, bool full)
     {
         var c = model.Criteria[k];
         var square = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = K.Brush(tone.Color), VerticalAlignment = VerticalAlignment.Center };
         var left = K.V(5,
-            K.H(8, square, K.Text($"Criterion {k + 1} of {model.N} · {model.PointsLabel(c)}", Ty.Caption, B.Text2).Strong()),
+            K.H(8, square, K.Text(model.PointsLabel(c), Ty.Caption, B.Text2).Strong()),
             K.Wrapped(c.Name, Ty.Subtitle, B.Text, 2));
-        if (c.Desc.Length > 0) left.Children.Add(Description(c.Desc, c.Name.Length > 44 ? 1 : 2)); // (a long name: a line less)
-        var dots = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
-        var n = model.N;
-        foreach (var other in model.Criteria)
-        {
-            var on = other.Index == k;
-            double d = on ? (n > 10 ? 11 : 14) : n > 15 ? 6 : n > 10 ? 8 : 11;
-            double hit = n > 15 ? 17 : 23;
-            var colour = K.Brush(model.Colors[other.Index].Color);
-            var face = new Grid { Width = hit, Height = hit };
-            face.Children.Add(new Ellipse { Width = d, Height = d, Fill = colour, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
-            if (on) face.Children.Add(new Ellipse { Width = Math.Min(hit, d + 8), Height = Math.Min(hit, d + 8), Stroke = colour, StrokeThickness = 2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
-            var idx = other.Index;
-            var b = K.Subtle(face, () => Select(idx), new Thickness(0), hit / 2);
-            b.Width = hit;
-            b.Height = hit;
-            b.Margin = new Thickness(1);
-            b.ToolTip = other.Name;
-            System.Windows.Automation.AutomationProperties.SetName(b, $"{other.Name}, criterion {other.Index + 1} of {n}");
-            dots.Children.Add(b);
-        }
-        var g = K.Columns("*, 150", left.Margin(0, 0, 14, 0).Col(0), dots.Col(1));
+        if (c.Desc.Length > 0)
+            left.Children.Add(full ? (FrameworkElement)AssignKit.Selectable(c.Desc, Ty.Body, B.Text2) : Description(c.Desc, c.Name.Length > 44 ? 1 : 2)); // (a long name: a line less)
+        var g = K.Columns("*, auto", left.Margin(0, 0, 14, 0).Col(0), Stepper(k).Align(HorizontalAlignment.Right, VerticalAlignment.Top).Col(1));
         g.Background = Brushes.Transparent;
         g.MouseLeftButtonUp += (_, e) => e.Handled = true; // (a press on the head is not a press beside the bar)
         return g;
+    }
+
+    /// <summary>‹ 1 of 2 ›: the criterion before and after, each arrow naming which it opens (← and → do it too). It took
+    /// the place of a dot per criterion, too small to find and to hit.</summary>
+    private FrameworkElement Stepper(int k)
+    {
+        var n = model.N;
+        var before = model.Criteria[(k - 1 + n) % n];
+        var after = model.Criteria[(k + 1) % n];
+        Button Arrow(SymbolRegular symbol, RubricModel.Criterion to, string word, string key)
+        {
+            var b = K.IconButton(symbol, () => Select(to.Index), $"{word}: {to.Name} ({key})", 14, 32);
+            System.Windows.Automation.AutomationProperties.SetName(b, $"{word} criterion: {to.Name}");
+            return b;
+        }
+        var count = K.Text($"{k + 1} of {n}", Ty.BodyStrong, B.Text2).Margin(2, 0, 2, 0);
+        count.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Documents.Typography.SetNumeralAlignment(count, FontNumeralAlignment.Tabular);
+        System.Windows.Automation.AutomationProperties.SetName(count, $"Criterion {k + 1} of {n}");
+        var box = new Border { Child = K.H(0, Arrow(SymbolRegular.ChevronLeft24, before, "Previous", "←"), count, Arrow(SymbolRegular.ChevronRight24, after, "Next", "→")), CornerRadius = new CornerRadius(6), Padding = new Thickness(1) };
+        box.Bg(B.Control).Stroke(B.ControlStroke);
+        box.Visibility = n > 1 ? Visibility.Visible : Visibility.Collapsed;
+        return box;
     }
 
     private static FrameworkElement Description(string text, int lines)
@@ -711,7 +763,8 @@ internal sealed class RubricView : Grid
         Hover(-1);
         if (gridPanel == null)
         {
-            gridPanel = new RubricGridPanel(model, eyebrow, data.Title) { Margin = new Thickness(24, 0, 24, 20) };
+            // (as tall as its rows, in the middle of the room: not a sheet left mostly blank under two criteria)
+            gridPanel = new RubricGridPanel(model, eyebrow, data.Title) { Margin = new Thickness(24, 0, 24, 20), VerticalAlignment = VerticalAlignment.Center };
             stageHost.Children.Add(gridPanel);
         }
         header.Visibility = Visibility.Hidden;
