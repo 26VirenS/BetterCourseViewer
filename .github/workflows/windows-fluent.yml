@@ -708,6 +708,40 @@ jobs:
           Shot 'dashboard-counter-morph' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next', '--open', 'sheetmorph'))
           Shot 'dashboard-counter-morph-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--sheet', 'unread', '--open', 'sheetmorph'))
           Shot 'dashboard-narrow-dark' '780x683' 45 ($mock + @('--appearance', 'dark'))
+          # (the owner's wider tool popups, at the end so the pictures before keep their parts) a large popup spans the
+          # window under its title bar — over the navigation pane, opened over the page on the 780 window — less a margin
+          # all round, and every 3D view's model fills its view: DNA & RNA, Cell Explorer, the Biomolecule Builder, the
+          # element's atom and the molecule builder at 1366, 1024 and 780, light and dark (each popup's width checked
+          # below); a popup opened at a size the student gave it (--popup-size); Knewton Alta over a tool's popup, a step
+          # down and along; a submission's feedback and the rubric, large popups too
+          foreach ($t in @(@('dna', @('--tool', 'dna')), @('cell', @('--tool', 'cell')), @('biomol', @('--tool', 'biomol')),
+                           @('atom', @('--tool', 'ptable', '--ptable-element', 'Fe')), @('molecule', @('--tool', 'ptable', '--ptable-molecule', 'Ethanol')))) {
+            foreach ($size in @(@('1366', '1366x778'), @('1024', '1024x681'), @('780', '780x683'))) {
+              Shot "wide-$($t[0])-$($size[0])" $size[1] 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--pane-open') + $t[1])
+              Shot "wide-$($t[0])-$($size[0])-dark" $size[1] 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--pane-open') + $t[1])
+            }
+          }
+          Shot 'wide-dna-sized' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'dna', '--popup-size', '860x520'))
+          Shot 'wide-two' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'cell', '--open', 'alta:104:4003'))
+          Shot 'wide-feedback' '1024x681' 50 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1008', '--open', 'feedback'))
+          Shot 'wide-rubric' '1024x681' 50 ($mock + @('--appearance', 'dark', '--place', 'course:104', '--push', '/courses/104/assignments/4001', '--open', 'rubric'))
+          # a large popup sized by its edge as a student sizes it (--popup-drag: the pointer pressed on its right edge,
+          # moved 300 left and let go, Windows' own sizing between; alone on the runner, so no other copy of Simpl takes
+          # the press), then Simpl opened again on the same profile: the tool's popup opens at the size kept (checked below)
+          function PopupEdgeShots($part) {
+            if ($shard -ne $part) { return }
+            $script:mine += @('popup-drag', 'popup-kept')
+            foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+            $prof = Join-Path $env:RUNNER_TEMP 'profile-popup-edge'
+            foreach ($run in @(@('popup-drag', @('--shot-settle', 'no', '--popup-drag', '300')), @('popup-kept', @()))) {
+              $argList = @('--shot', "$PWD/shots/$($run[0]).png", '--shot-after', '45', '--profile', $prof, '--window-size', '1366x778') + $mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'dna') + $run[1]
+              $alone = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+              if (-not $alone.WaitForExit(150000)) { Stop-Process -Id $alone.Id -Force -ErrorAction SilentlyContinue }
+              $edgeLog = Join-Path $prof 'simpl.log'
+              if (Test-Path $edgeLog) { Copy-Item $edgeLog "shots/$($run[0]).log" }
+            }
+          }
+          PopupEdgeShots 5
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -878,6 +912,31 @@ jobs:
             $said = @(Select-String -Path "shots/profile-$($list[0]).log" -Pattern "more list: $($list[1]) (\d+) rows" -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
             if (-not $said) { Write-Host "::error::$($list[0]): the $($list[1]) popup listed no rows (shots/profile-$($list[0]).log)"; exit 1 }
             Write-Host "$($list[0]): $said rows"
+          }
+          # the owner's wider tool popups: each tool's popup as wide as the window less its margins (48; 32 under 900 wide),
+          # over the pane — its own log line, "large popup tool:<key> opens at <w>×<h>" (Shell/FloatPopup.cs, a development
+          # run's) — and the 3D views' framing as their logs say it
+          foreach ($name in @($script:mine | Where-Object { $_ -match '^wide-(dna|cell|biomol|atom|molecule)-(1366|1024|780)(-dark)?$' })) {
+            $want = @{ '1366' = 1318; '1024' = 976; '780' = 748 }[($name -split '-')[2]]
+            $wideLog = "shots/profile-$name.log"
+            $said = @(Select-String -Path $wideLog -Pattern 'large popup tool:\S+ opens at (\d+)\D+(\d+)' -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+            if (-not $said -or [Math]::Abs($said - $want) -gt 2) { Write-Host "::error::${name}: the tool's popup opened $said wide, not $want (the window's width less its margins, over the pane) ($wideLog)"; exit 1 }
+            $framed = @(Select-String -Path $wideLog -Pattern '(3d view|element view|molecule view) .+$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Value }) | Select-Object -Last 1
+            Write-Host "${name}: the popup $said wide; $framed"
+          }
+          # a large popup sized by its right edge as a student sizes it, then Simpl opened again: its popup opens at the
+          # size kept (Shell/FloatPopup.cs: "popup drag: tool:dna is …, kept as …", "large popup tool:dna opens at … (the
+          # student's)")
+          if ($script:mine -contains 'popup-kept') {
+            $dragSaid = if (Test-Path shots/popup-drag.log) { Get-Content shots/popup-drag.log -Raw } else { '' }
+            $m = [regex]::Match($dragSaid, 'popup drag: tool:dna is (\d+)\D+(\d+), kept as (\d+),(\d+)')
+            if (-not $m.Success) { Write-Host "::error::popup-drag: the popup was not sized by its edge, or no size was kept (shots/popup-drag.log)"; Get-Content shots/popup-drag.log -Tail 30 -ErrorAction SilentlyContinue; exit 1 }
+            $kw = [int]$m.Groups[3].Value; $kh = [int]$m.Groups[4].Value
+            if ($kw -lt 900 -or $kw -gt 1100 -or [Math]::Abs($kh - 682) -gt 2) { Write-Host "::error::popup-drag: the size kept, $kw by $kh, is not the popup's 1318 by 682 made 300 narrower by its edge (shots/popup-drag.log)"; exit 1 }
+            $keptSaid = if (Test-Path shots/popup-kept.log) { Get-Content shots/popup-kept.log -Raw } else { '' }
+            $second = $keptSaid.Substring([Math]::Min($keptSaid.Length, $dragSaid.Length))
+            if ($second -notmatch "large popup tool:dna opens at $kw\D+$kh \(the student's\)") { Write-Host "::error::popup-kept: the tool's popup did not open at the size kept, $kw by $kh (shots/popup-kept.log)"; exit 1 }
+            Write-Host "popup-drag: sized by its edge to $kw by $kh and kept; popup-kept: opened at it"
           }
           if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
