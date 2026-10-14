@@ -15,8 +15,9 @@ endpoints the extension calls, the screens it draws, the fields it shows). Three
    the total says final vs current; a score the teacher has not posted is "Not graded" until it is.)
 2. **Global announcements** — what the school posts to everyone (outages, deadlines). Missing:
    `account_notifications` is never called.
-3. **Inbox actions** — archive, delete, mark unread, forward, attach a file to a reply. Missing.
-   (Reading is complete: attachments, voice and video notes, and forwarded messages are drawn.)
+3. **Inbox actions** — archive, delete, mark unread, forward. Missing. (Reading is complete:
+   attachments, voice and video notes, and forwarded messages are drawn. Since 2.99.33 the Mac and
+   Windows apps attach files to a new message or a reply: the engine's `messageUpload`.)
 4. **Discussions** — like, subscribe, edit or delete your own post, attach a file. Missing.
 5. **Calendar** — create or edit a personal event, planner notes on the grid. Missing.
 6. **Files** — upload, sort. Missing (the locked/hidden state and the uploader are drawn).
@@ -46,7 +47,8 @@ requirement, the account menu's e-mail and pronouns, and every row's status word
 | To Do (planner) with personal tasks | **Drawn** | An Overdue group two weeks back, then today onward; rows say Missing / Late / Excused / Feedback / New (planner `submissions` flags, `new_activity`) |
 | To Do: edit a task, task notes | Missing | No PUT for planner notes |
 | Inbox: inbox/unread/starred/sent/archived, course filter, reader, reply, compose with recipient search | **Drawn** | Rows: course, message count, attachment mark, time; reader: attachments, voice/video notes, forwarded messages; recipients say the course you share. First 50 conversations only (no paging) |
-| Inbox: archive/unarchive, delete, mark unread, forward, attachments and media on compose/reply, bulk actions, address book browsing | Missing | |
+| Inbox: files attached to a new message or a reply | **Drawn** (Mac and Windows apps) | Each file uploaded as it is picked to the student's "conversation attachments" folder (`messageUpload`), its id sent with the message; 50 MB at most. Not in the browser extension's own Inbox |
+| Inbox: archive/unarchive, delete, mark unread, forward, media (voice and video) on compose/reply, bulk actions, address book browsing | Missing | |
 | Notifications (Canvas has no page; Simpl's own feed) | **Drawn** | Overdue (two weeks back), Due soon, Graded (posted only), Feedback, Messages, Discussions, Announcements, System (with its category) |
 | History | **Drawn** (sheet) | |
 | Help menu | **Drawn** (sheet) | Report a problem is Canvas's form |
