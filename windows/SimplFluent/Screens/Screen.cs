@@ -39,11 +39,19 @@ public abstract class Screen
     /// <summary>A line under the title (a date, a course's term), or null.</summary>
     public virtual string? Subtitle => null;
 
+    /// <summary>How many lines the title may wrap to before it is cut (an assignment's long name: two), its whole words a
+    /// tooltip once it is cut.</summary>
+    public virtual int TitleLines => 1;
+
     /// <summary>Breadcrumb parts of the screen's own before its title (the Tools page's "Tools" before a tool open on it).</summary>
     public virtual IReadOnlyList<(string Title, Action Go)> Before => Array.Empty<(string, Action)>();
 
     /// <summary>The commands beside the title (a view picker, New Task), or null.</summary>
     public virtual FrameworkElement? Commands => null;
+
+    /// <summary>The colour of the course (or group) the screen is of, for the square before its title that ties the page
+    /// to its card and its square in the pane (the Mac's ScreenHeading color); null for a screen of no course.</summary>
+    public virtual System.Windows.Media.Color? TitleColor => null;
 
     /// <summary>The page scrolls as one (most do); a screen with its own scrolling parts says false.</summary>
     public virtual bool Scrolls => true;

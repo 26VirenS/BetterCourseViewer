@@ -31,6 +31,9 @@ public sealed class ContextHomeScreen : Screen
 
     public override string Title => data.Data?.Title is { Length: > 0 } t ? t : ScreenFactory.ContextName(engine, ctx);
 
+    /// <summary>Its colour, in the square before its title.</summary>
+    public override Color? TitleColor => Support.Appearance.Hex(data.Data?.Color) ?? CourseKit.ContextColor(engine, ctx);
+
     /// <summary>The school's own page for it, and its link (the Mac's CanvasMenu).</summary>
     public override FrameworkElement? Commands => commands ??= CourseKit.MoreButton(engine, () => "/" + ctx, () => Title);
 
@@ -52,12 +55,13 @@ public sealed class ContextHomeScreen : Screen
 
     // ---- the head of the home ----
 
-    /// <summary>Its name (when it is not the title), its term, its teachers, how much is still to do — every line with
-    /// its symbol in one column — and its grade ring (a group: its symbol on a tile of its colour).</summary>
+    /// <summary>Its name (only when it says something the title and the term line do not — "MATH-021-20" under
+    /// "F26-MATH 021 20" is the same name twice), its term, its teachers, how much is still to do — every line with its
+    /// symbol in one column — and its grade ring (a group: its symbol on a tile of its colour).</summary>
     private FrameworkElement Head(HomeData d, Color color)
     {
         var facts = K.V(8);
-        if (!string.IsNullOrEmpty(d.Name) && d.Name != d.Title) facts.Children.Add(K.Wrapped(d.Name!, Ty.BodyLarge, B.Text2, 2));
+        if (CourseKit.SaysMore(d.Name, d.Title, d.Sub)) facts.Children.Add(K.Wrapped(d.Name!, Ty.BodyLarge, B.Text2, 2));
         if (!string.IsNullOrEmpty(d.Sub)) facts.Children.Add(CourseKit.Fact(d.Kind == "groups" ? SymbolRegular.People24 : SymbolRegular.Book24, d.Sub!));
         if (!string.IsNullOrEmpty(d.Teachers)) facts.Children.Add(CourseKit.Fact(SymbolRegular.PersonCircle24, d.Teachers!));
         if (d.OpenCount is int n && n > 0) facts.Children.Add(CourseKit.Fact(SymbolRegular.TaskListLtr24, $"{n} still to do", color));
@@ -83,13 +87,15 @@ public sealed class ContextHomeScreen : Screen
         inside.HorizontalAlignment = HorizontalAlignment.Center;
         inside.VerticalAlignment = VerticalAlignment.Center;
         inside.Margin = new Thickness(12);
-        var ring = K.Ring(d.Score is { } s ? s / 100 : null, color, 104, 9, inside);
+        // (the track in the course's own colour, as on its card; with no score, why — "No grade yet" — in the tooltip)
+        var ring = K.Ring(d.Score is { } s ? s / 100 : null, color, 104, 9, inside, tinted: true);
         var b = K.Subtle(ring, () => engine.Go(Place.Section(ctx, "grades")), new Thickness(0), 52);
         b.Width = 104;
         b.Height = 104;
         b.HorizontalContentAlignment = HorizontalAlignment.Center;
-        b.ToolTip = "Grades";
-        AutomationProperties.SetName(b, $"Grades, {d.ScoreText ?? "no score"}{(d.Letter != null ? ", " + d.Letter : "")}");
+        var why = d.Score == null && d.ScoreWhy is { Length: > 0 } w ? w : null;
+        b.ToolTip = why != null ? $"Grades · {why}" : "Grades";
+        AutomationProperties.SetName(b, $"Grades, {d.ScoreText ?? why ?? "no score"}{(d.Letter != null ? ", " + d.Letter : "")}");
         var scale = new ScaleTransform(1, 1);
         b.RenderTransformOrigin = new Point(0.5, 0.5);
         b.RenderTransform = scale;
@@ -152,7 +158,7 @@ public sealed class ContextHomeScreen : Screen
     {
         var v = K.V(24);
         if (d.Front is { } f) v.Children.Add(FrontPageCard(f));
-        if (d.Done is { Count: > 0 } done) v.Children.Add(CourseKit.CardSection("Handed In Lately", null, null, CourseKit.Divided(done, r => WorkRow(r, color))));
+        if (d.Done is { Count: > 0 } done) v.Children.Add(CourseKit.CardSection("Handed in lately", null, null, CourseKit.Divided(done, r => WorkRow(r, color))));
         if (d.More is { Count: > 0 } more) v.Children.Add(MoreLinks(more, d, color));
         return v;
     }
@@ -163,12 +169,12 @@ public sealed class ContextHomeScreen : Screen
         var body = K.V(0);
         if (d.Open.Count == 0) body.Children.Add(K.Empty(SymbolRegular.CheckmarkCircle24, "You are all caught up here."));
         body.Children.Add(CourseKit.Divided(d.Open, r => WorkRow(r, color)));
-        return CourseKit.CardSection("Still to Do", null, all, body);
+        return CourseKit.CardSection("Still to do", null, all, body);
     }
 
     private FrameworkElement Announcements(HomeData d, Color color)
     {
-        UIElement? all = d.Sections.Any(s => s.Kind == "announcements") ? CourseKit.HeadLink("All Announcements", () => engine.Go(Place.Section(ctx, "announcements"))) : null;
+        UIElement? all = d.Sections.Any(s => s.Kind == "announcements") ? CourseKit.HeadLink("All announcements", () => engine.Go(Place.Section(ctx, "announcements"))) : null;
         var rows = CourseKit.Divided(d.Announcements, a =>
         {
             void Open() => engine.OpenWeb(a.Url, a.Title);
@@ -176,7 +182,7 @@ public sealed class ContextHomeScreen : Screen
             CourseKit.CanvasRowMenu(row, engine, a.Title, a.Url, Open);
             return row;
         }, 54);
-        return CourseKit.CardSection("Latest Announcements", null, all, rows);
+        return CourseKit.CardSection("Latest announcements", null, all, rows);
     }
 
     private FrameworkElement FrontPageCard(FrontPage f)
@@ -187,16 +193,19 @@ public sealed class ContextHomeScreen : Screen
         if (!string.IsNullOrEmpty(f.Excerpt)) words.Children.Add(K.Wrapped(f.Excerpt!, Ty.Caption, B.Text2, 6));
         var row = CourseKit.RowLink(words, Open);
         CourseKit.CanvasRowMenu(row, engine, f.Title, slug.Length == 0 ? $"/{ctx}/wiki" : $"/{ctx}/pages/{slug}", Open);
-        return CourseKit.CardSection("Front Page", null, null, row);
+        return CourseKit.CardSection("Front page", null, null, row);
     }
 
+    /// <summary>The course's other links: a tool, or another site, opens in a Simpl window of its own — the window's
+    /// symbol at its end, as External Tools' chips and a module's tool have it —; one of the school's own pages opens
+    /// here, a chevron at its end.</summary>
     private FrameworkElement MoreLinks(List<MoreLink> more, HomeData d, Color color)
     {
         var rows = CourseKit.Divided(more, m =>
         {
             void Open() => OpenMore(m, d);
-            var window = m.Tool != null || m.External == true; // (a tool opens in a window of its own)
-            var end = K.Icon(window ? SymbolRegular.Open24 : SymbolRegular.ChevronRight20, 12, B.Text3);
+            var window = m.Tool != null || m.External == true;
+            var end = window ? CourseKit.OwnWindowMark() : K.Icon(SymbolRegular.ChevronRight20, 12, B.Text3);
             var row = CourseKit.RowLink(CourseKit.InfoRow(m.Label, null, m.External == true ? SymbolRegular.PuzzlePiece24 : SymbolRegular.Link24, color, end), Open);
             CourseKit.CanvasRowMenu(row, engine, m.Label, m.Url, Open);
             return row;

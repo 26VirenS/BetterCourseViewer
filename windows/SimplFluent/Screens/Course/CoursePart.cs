@@ -34,6 +34,8 @@ internal abstract class CoursePart
 
     public abstract string Title { get; }
     public virtual string? Subtitle => null;
+    /// <summary>The course's (or group's) colour, for the square before the title.</summary>
+    public virtual System.Windows.Media.Color? TitleColor => CourseKit.ContextColor(engine, ctx);
     public virtual FrameworkElement? Commands => null;
     public virtual bool Scrolls => true;
     public virtual double? MaxContentWidth => null;
@@ -81,6 +83,7 @@ public abstract class CoursePartScreen : Screen
 
     public override string Title => part.Title;
     public override string? Subtitle => part.Subtitle;
+    public override System.Windows.Media.Color? TitleColor => part.TitleColor;
     public override FrameworkElement? Commands => part.Commands;
     public override bool Scrolls => part.Scrolls;
     public override double? MaxContentWidth => part.MaxContentWidth;

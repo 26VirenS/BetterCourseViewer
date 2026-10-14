@@ -305,6 +305,17 @@ public sealed partial class AppShell : Grid, IDisposable
         _ => p.Kind.ToString().ToLowerInvariant(),
     };
 
+    /// <summary>A screen's line under its title with the parts the breadcrumb already says taken out (parts are " · "
+    /// apart); null when nothing else is left.</summary>
+    internal static string? WithoutCrumbs(string? subtitle, IEnumerable<string> crumbs)
+    {
+        if (string.IsNullOrEmpty(subtitle)) return subtitle;
+        var said = crumbs.Where(c => c.Length > 0).ToHashSet(StringComparer.Ordinal);
+        if (said.Count == 0) return subtitle;
+        var parts = subtitle.Split(" · ").Where(p => !said.Contains(p.Trim())).ToList();
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
+    }
+
     private void GoPlace(Place p)
     {
         if (engine.Nav.Current.Place == p && engine.Nav.Current.Path.Count > 0) engine.PopToRoot();
@@ -399,12 +410,14 @@ public sealed partial class AppShell : Grid, IDisposable
         }
         foreach (var (t, go) in current.Before) crumbs.Add((t, go));
         crumbs.Add((current.Title, null));
-        var subtitle = current.Subtitle;
+        // (the line under the title never names again what the breadcrumb already does: "Discussion", not "Discussion ·
+        //  F26-MATH 021 20" under "F26-MATH 021 20 ›")
+        var subtitle = WithoutCrumbs(current.Subtitle, crumbs.Take(crumbs.Count - 1).Select(c => c.Title));
         var commands = current.Commands;
         window.Title = current.Title == "Dashboard" ? "Simpl" : $"{current.Title} – Simpl";
         // (the same screen with the same words, the same steps under it and the same commands: drawn already — kept, its
         // buttons with it; a screen that makes its commands anew each time is drawn again each time)
-        var words = string.Join("\u001f", crumbs.Select(c => (c.Go != null ? ">" : "") + c.Title).Concat(loc.Path.Select(r => r.ToString())).Append(subtitle ?? ""));
+        var words = string.Join("\u001f", crumbs.Select(c => (c.Go != null ? ">" : "") + c.Title).Concat(loc.Path.Select(r => r.ToString())).Append(subtitle ?? "").Append(current.TitleColor?.ToString() ?? ""));
         (Screen Screen, string Words, FrameworkElement? Commands) drawn = (current, words, commands);
         if (headerDrawn is { } was && was.Equals(drawn)) return;
         headerDrawn = drawn;
@@ -413,7 +426,8 @@ public sealed partial class AppShell : Grid, IDisposable
         {
             var (title, go) = crumbs[i];
             var last = i == crumbs.Count - 1;
-            var t = K.Text(title, Ty.Title, last ? B.Text : B.Text2);
+            var t = last && current.TitleLines > 1 ? K.Wrapped(title, Ty.Title, B.Text, current.TitleLines) : K.Text(title, Ty.Title, last ? B.Text : B.Text2);
+            if (last) TipWhenCut(t);
             if (go != null)
             {
                 var b = K.Subtle(t, go, new Thickness(2, 0, 2, 0));
@@ -423,10 +437,35 @@ public sealed partial class AppShell : Grid, IDisposable
             }
             else line.Children.Add(t);
         }
+        // (a page of a course's: a square in its colour before the title, as the Mac's headings have — the page's
+        //  course at a glance, the colour of its card and its square in the pane — beside the title's first line)
+        if (current.TitleColor is { } tint && line.Children.Count > 0 && line.Children[^1] is FrameworkElement titleText)
+        {
+            line.Children.Remove(titleText);
+            var square = new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) };
+            line.Children.Add(K.Columns("auto, *", square.Col(0), titleText.Col(1)));
+        }
+        // (a title that may wrap keeps the commands at the top right, beside its first line)
+        commandsHost.VerticalAlignment = current.TitleLines > 1 ? VerticalAlignment.Top : VerticalAlignment.Center;
         var stack = K.V(2, line);
         if (subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
         titleHost.Content = stack;
         commandsHost.Content = commands;
+    }
+
+    /// <summary>The title's whole words as its tooltip, while it is cut short (too long for the header beside the
+    /// commands); none while it all shows.</summary>
+    private static void TipWhenCut(TextBlock t)
+    {
+        t.SizeChanged += (_, _) =>
+        {
+            if (t.ActualWidth <= 0) return;
+            var face = new Typeface(t.FontFamily, t.FontStyle, t.FontWeight, t.FontStretch);
+            var full = new FormattedText(t.Text, System.Globalization.CultureInfo.CurrentUICulture, t.FlowDirection, face, t.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(t).PixelsPerDip);
+            if (t.TextWrapping != TextWrapping.NoWrap) full.MaxTextWidth = t.ActualWidth;
+            var cut = t.TextWrapping == TextWrapping.NoWrap ? full.Width > t.ActualWidth + 0.5 : full.Height > t.ActualHeight + 1;
+            t.ToolTip = cut ? t.Text : null;
+        };
     }
 
     private double ContentWidth => Math.Max(200, page.ActualWidth - 80);
