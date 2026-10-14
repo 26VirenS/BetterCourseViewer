@@ -320,8 +320,9 @@ jobs:
           Shot 'setup-saved' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'setup', '--setup-save', 'yes'))
           Shot 'preview' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'preview'))
           Shot 'tour-start' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'tour'))
-          Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:12'))
-          Shot 'tour-score' '1280x600' 45 ($mock + @('--appearance', 'dark', '--place', 'section:courses/101:grades', '--what-if', '--open', 'tour:6'))
+          # (the tour's six steps: the first lights the six counters, the last only the account tile's ⋯)
+          Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:1'))
+          Shot 'tour-end' '1280x600' 45 ($mock + @('--appearance', 'dark', '--open', 'tour:6'))
           Shot 'taskbar-ask' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'taskbar'))
           Shot 'theme-dusk' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme', 'Dusk'))
           # To Do, Calendar, Notifications
@@ -568,6 +569,44 @@ jobs:
           Shot 'bio-energy-respiration-dark' '1366x778' 50 ($inTools + @('--appearance', 'dark', '--tool', 'energy', '--tool-state', 'respiration:step=9'))
           Shot 'bio-energy-photosynthesis' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'energy', '--tool-state', 'photosynthesis:step=6'))
           Shot 'bio-energy-atoms' '1366x778' 50 ($inTools + @('--appearance', 'light', '--tool', 'energy', '--tool-state', 'atoms:trace=carbon:step=4'))
+          # the UI fix pass's new places (after the others, so every picture above keeps its part). The shell: the tour's
+          # Search step on a narrow window (the title bar's Search button lit), the search box moved into the title bar,
+          # the tour offered rather than started, its last step; a place in a window of its own
+          Shot 'tour-search-narrow' '780x683' 45 ($mock + @('--appearance', 'light', '--open', 'tour:5'))
+          Shot 'search-bar-narrow' '780x683' 45 ($mock + @('--appearance', 'light', '--search-bar', '--open', 'palette:phys'))
+          Shot 'tour-offer' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'touroffer'))
+          Shot 'tour-report' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'tour:6'))
+          Shot 'place-window' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--place-window', 'section:courses/101:grades'))
+          # the sign-in card named for its school; the first run's setup (Set up later); Settings' Find a setting, its
+          # Custom colour, its Photos, its earlier versions
+          Shot 'sign-in-school' '1024x681' 14 ($login + @('--appearance', 'light', '--school-name', 'University of California, Merced'))
+          Shot 'setup-first' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'setup', '--setup-first', 'yes'))
+          Shot 'settings-find' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-find', 'beta'))
+          Shot 'settings-custom-colour' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance', '--settings-sheet', 'customcolour'))
+          Shot 'settings-photos' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'Dusk', '--open', 'settings', '--settings-tab', 'appearance', '--settings-scroll', '4000'))
+          Shot 'settings-updates-earlier' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes'))
+          # pins in the Alta and quiz popups' headers; files attached to a new message and to a reply; a rubric's
+          # criterion open (the mark where it was given, Ring back, the stepper)
+          Shot 'alta-pins' '1366x778' 50 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable', '--open', 'alta:104:4004'))
+          Shot 'quiz-pins' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2'))
+          Shot 'compose-attach' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'compose', '--attach', 'sample'))
+          Shot 'inbox-reply-attach' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'inbox', '--open', 'conversation:c2', '--attach', 'sample'))
+          Shot 'rubric-criterion' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'course:104', '--push', '/courses/104/assignments/4001', '--open', 'rubric:1'))
+          # a course tool alone in its window (Back, Forward, Refresh, More), light and dark; All Courses' past courses and
+          # in dark; a course whose only module opens at once
+          Shot 'tool-window' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--open', 'tool:101:9'))
+          Shot 'tool-window-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--open', 'tool:101:9'))
+          Shot 'courses-past' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'courses', '--courses-filter', 'past'))
+          Shot 'courses-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'courses'))
+          Shot 'section-modules-one' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'section:courses/101:modules'))
+          # the Tools page at two sizes; the periodic table's tour offered and at its second step; its Lewis structures
+          # and Molecules pages on a 1024 window (their controls in the drawing's heading)
+          Shot 'tools-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools'))
+          Shot 'tools-1366' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools'))
+          Shot 'ptable-offer' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-offer'))
+          Shot 'ptable-tour-2' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '2'))
+          Shot 'ptable-lewis-narrow' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-page', 'lewis'))
+          Shot 'ptable-molecule-narrow' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-page', 'molecules'))
           # Send from Phone, tried as a phone would (one part each): Simpl's hand-in panel with --phone-test says its
           # server's address in simpl.log (on 127.0.0.1 too); the page is opened, a wrong key tried, then each file posted
           # as the phone's page posts it (X-File-Name, its type, its length) with Invoke-WebRequest; what came back goes
