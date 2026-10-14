@@ -51,6 +51,10 @@ A code is read from the error in hand when there is one, and otherwise from a fa
 few seconds (a request to Canvas, a part of Simpl loading). An error shown with nothing failed
 underneath is `APP`.
 
+An error Canvas's own page put up — one of its flash banners, which Simpl never lets draw over its
+screens and passes on as a toast instead — is `SC-X-…`, by what its words say: `401` signed out,
+`403` not allowed, `422` not saved, and `APP` for any other.
+
 ## The report page's own codes
 
 The report page on simplcourses.com has codes of its own, `SC-B-…`, for a report it could not

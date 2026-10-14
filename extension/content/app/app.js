@@ -1695,6 +1695,89 @@
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 
+  // ---- Canvas's own banners -----------------------------------------------------------------------
+  // Canvas's page under the shell still speaks through its flash banners: the planner Canvas boots under the Dashboard
+  // says "Nothing planned today. Selecting most recent item." as it lands, a save says it saved, a request that failed
+  // says so. Canvas pins them to the top of the window, over everything, so they came over the interface. While the
+  // shell is up app.css keeps every one of them hidden, and the live region Canvas reads them out from silent; here each
+  // is read as it arrives and taken off the page. What matters to the student — an error, being signed out, something
+  // not allowed or not saved — comes up once as the interface's own toast (an error's in red; the toast is what a screen
+  // reader says). Canvas's talk about its own hidden page is dropped: its loading and selecting, and a load of its own
+  // that failed (the screen on show reads Canvas for itself, and says so when that fails). On a page Canvas draws inside
+  // the shell (punch-through) the student is working in Canvas's page itself, so whatever it says about that work comes
+  // up, all but the loading talk. A page without the shell — the look off, a page left to Canvas — keeps Canvas's
+  // banners exactly as Canvas has them. (Canvas's planner itself is left to boot: stopping it would take a script in
+  // the page's own world, and the iPhone app turns the look off in place, onto Canvas's Dashboard as Canvas drew it.)
+  const FLASH_HOLDERS = ['flashalert_message_holder', 'flash_message_holder']; // (InstUI's alerts; the older jQuery ones)
+  const FLASH_TALK = /^(?:loading|selecting)\b|\bnothing planned\b/i;
+  const FLASH_SIGNED_OUT = /\b(?:logged|signed) out\b|\b(?:log|sign)(?:ged)? ?in again\b|\bnot (?:currently )?(?:logged|signed) in\b|\bsession (?:has )?(?:expired|ended|timed out)\b|\bperiod of inactivity\b/i;
+  const FLASH_NOT_ALLOWED = /\b(?:not |un)authori[sz]ed\b|\bpermission\b|\baccess denied\b|\bnot allowed\b/i;
+  const FLASH_NOT_SAVED = /\bcould ?n[o'’]t (?:be )?save|\bnot (?:been )?saved\b|\b(?:failed|unable) to save\b/i;
+  const FLASH_OWN_LOAD = /^(?:error|failed|unable|could ?n[o'’]t)\b.{0,24}\b(?:load|fetch|retriev)/i;
+  const flashSaid = new Map(); // words → when they last came up: a banner put up twice (both holders, or again at once) is said once
+  const shellUp = () => html.classList.contains('bcv-on') && !!document.getElementById('bcv-app') && !BCV.lms?.d2l;
+  /** A banner's kind — error, warning, success or info: Canvas's class for it (.ic-flash-error), the name of the icon
+   *  InstUI's alert draws (IconNoSolid for an error), or failing both the colour of the tile the icon sits on. */
+  function flashKind(el) {
+    const m = `${el.className} ${[...el.querySelectorAll('[class*="ic-flash-"]')].map((x) => x.className).join(' ')}`.match(/\bic-flash-(error|warning|success|info)\b/);
+    if (m) return m[1];
+    const icon = el.querySelector('svg[name]')?.getAttribute('name') || '';
+    if (/^IconNo|Error/.test(icon)) return 'error';
+    if (/Warning/.test(icon)) return 'warning';
+    if (/Check/.test(icon)) return 'success';
+    if (/Info/.test(icon)) return 'info';
+    for (let n = el.querySelector('svg'); n && n !== el.parentElement; n = n.parentElement) {
+      const [r, g, b, a = 1] = (getComputedStyle(n).backgroundColor.match(/[\d.]+/g) || []).map(Number);
+      if (r === undefined || !a || Math.max(r, g, b) - Math.min(r, g, b) < 48) continue; // (no tile here: clear, white or grey)
+      if (r > g && r > b) return g / r > 0.25 ? 'warning' : 'error';
+      return g > b ? 'success' : 'info';
+    }
+    return 'info';
+  }
+  /** A banner's words, without its buttons (Close, Details) and icons. */
+  function flashWords(el) {
+    const c = el.cloneNode(true);
+    for (const x of c.querySelectorAll('button, [role="button"], svg, style, script')) x.remove();
+    return (c.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  /** One of Canvas's banners, taken off the page and passed on as a toast when it matters (above). False when it is
+   *  left: the shell is not up, or the banner has no words yet (InstUI draws an alert a moment after its box arrives). */
+  function relayFlash(el) {
+    if (!shellUp()) return false;
+    const words = flashWords(el);
+    if (!words) return false;
+    const kind = flashKind(el);
+    el.remove();
+    const punched = html.classList.contains('bcv-punch');
+    const out = FLASH_SIGNED_OUT.test(words) ? '401' : FLASH_NOT_ALLOWED.test(words) ? '403' : FLASH_NOT_SAVED.test(words) ? '422' : null;
+    const error = kind === 'error' || !!out;
+    const matters = !!out || (kind === 'error' && (punched || !FLASH_OWN_LOAD.test(words)));
+    const now = Date.now();
+    if (!(matters || (punched && !FLASH_TALK.test(words))) || now - (flashSaid.get(words) || 0) < 8000) return true;
+    flashSaid.set(words, now);
+    // (an error Canvas's own page put up carries X, the page Canvas draws, and what its words say went wrong: docs/ERROR-CODES.md)
+    U.toast(words.length > 180 ? `${words.slice(0, 179).trimEnd()}…` : words, error ? { error: true, code: `SC-X-${out || 'APP'}` } : {});
+    return true;
+  }
+  /** The banners in a holder: its children, or the items of a list it holds them in. */
+  const flashItems = (holder) => [...holder.children].flatMap((c) => (/^(?:UL|OL)$/.test(c.tagName) ? [...c.children] : [c]));
+  let flashObs = null;
+  const flashWatched = new WeakSet();
+  /** Passes on, or drops, every banner Canvas has up, and from then on every one it puts up (while the shell is up). */
+  function quietCanvasFlash() {
+    if (BCV.lms?.d2l || !document.body) return;
+    if (!flashObs) {
+      flashObs = new MutationObserver(() => quietCanvasFlash());
+      flashObs.observe(document.body, { childList: true }); // (InstUI's holder is made, at the end of <body>, the first time Canvas has something to say)
+    }
+    for (const id of FLASH_HOLDERS) {
+      const holder = document.getElementById(id);
+      if (!holder) continue;
+      if (!flashWatched.has(holder)) { flashWatched.add(holder); flashObs.observe(holder, { childList: true, subtree: true, characterData: true }); }
+      for (const m of flashItems(holder)) relayFlash(m);
+    }
+  }
+
   // ---- the switch at the top right: Simpl on (green) or off (red), and for how long --------------
   // Over our own shell and over stock Canvas alike — it lives outside #bcv-app, so a page drawn
   // without the shell has it too. Folded, it is a disc with the mark, in the state's colour: green
@@ -1903,6 +1986,7 @@
   async function applySkin(on) {
     if (on) {
       mount();
+      quietCanvasFlash(); // (Canvas's banners: passed on or dropped from here on, see above)
       if (!started) {
         started = true;
         loadShellData();

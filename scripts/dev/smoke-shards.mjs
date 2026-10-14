@@ -10,7 +10,7 @@ export const SMOKE_SHARDS = {
   course: ['course', 'grades stay fresh', 'quiz focus', 'quiz flow', 'quiz feedback'],
   quizzes: ['restricted quiz', 'survey', 'quiz: matching and blanks', 'native pages', 'search'],
   hub: ['search hub'],
-  look: ['appearance', 'background loading', 'motion', 'the look off and on'],
+  look: ['appearance', 'background loading', 'motion', 'the look off and on', 'canvas banners'],
   setup: ['guided setup'],
   widgets: ['tools', 'widgets'],
   cards: ['converters and cards', 'quick menus'],
@@ -21,6 +21,6 @@ export const SMOKE_SHARDS = {
 
 // the two halves as they were before the shards (smoke-test.mjs --part 1|2), for a run by hand
 export const SMOKE_PARTS = {
-  1: ['install', 'bundles', "what's new notes", 'dashboard', 'courses', 'to do', 'to do: own tasks + priority', 'calendar', 'inbox', 'grades panel', 'submission', 'groups', 'course', 'grades stay fresh', 'quiz focus', 'quiz flow', 'quiz feedback', 'restricted quiz', 'survey', 'quiz: matching and blanks', 'native pages', 'search', 'search hub', 'appearance', 'background loading', 'motion', 'the look off and on'],
+  1: ['install', 'bundles', "what's new notes", 'dashboard', 'courses', 'to do', 'to do: own tasks + priority', 'calendar', 'inbox', 'grades panel', 'submission', 'groups', 'course', 'grades stay fresh', 'quiz focus', 'quiz flow', 'quiz feedback', 'restricted quiz', 'survey', 'quiz: matching and blanks', 'native pages', 'search', 'search hub', 'appearance', 'background loading', 'motion', 'the look off and on', 'canvas banners'],
   2: ['guided setup', "what's new", 'setup page', 'account panel', 'tools', 'widgets', 'converters and cards', 'grade needed', 'quick menus', 'widgets on a tool tab', 'resilience', 'getting unstuck', 'notifications', 'springs', 'extension pages', 'setup cannot be skipped', 'developer', 'reset'],
 };
