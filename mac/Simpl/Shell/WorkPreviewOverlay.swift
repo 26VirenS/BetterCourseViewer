@@ -301,16 +301,26 @@ struct PreviewCard: View {
     }
 
     /// Where it stands: the assignment's own word and grade once read (with the row's Feedback or New), else the row's.
+    /// (planning-27) A graded piece says its score once — one chip, "13/16 · B−" — with no "Graded" (or, from an older
+    /// page, the same score again) beside it; Late, Missing and Submitted stay, and a late penalty says Late for itself.
     private var chips: [WorkFlag] {
         guard let d = assignment else { return item.flags }
         var out: [WorkFlag] = []
-        if let s = d.status, !s.word.isEmpty { out.append(WorkFlag(word: s.word, kind: s.kind)) }
-        if let g = d.grade, let score = g.score {
-            var text = "\(PreviewFormat.number(score)) / \(PreviewFormat.number(g.possible ?? 0))"
-            if let letter = PreviewFormat.text(g.letter) { text += " · \(letter)" }
-            out.append(WorkFlag(word: text, kind: "info"))
+        let graded = d.grade?.score != nil
+        let late = PreviewFormat.text(d.grade?.late)
+        if let s = d.status, !s.word.isEmpty {
+            let word = s.word.lowercased()
+            let sameScore = graded && s.word.filter { !$0.isWhitespace } == "\(PreviewFormat.number(d.grade?.score ?? 0))/\(PreviewFormat.number(d.grade?.possible ?? 0))"
+            if !(graded && word == "graded") && !sameScore && !(late != nil && word == "late") {
+                out.append(WorkFlag(word: s.word, kind: s.kind))
+            }
         }
-        if let late = PreviewFormat.text(d.grade?.late) { out.append(WorkFlag(word: late, kind: "warn")) }
+        if let g = d.grade, let score = g.score {
+            var text = "\(PreviewFormat.number(score))/\(PreviewFormat.number(g.possible ?? 0))"
+            if let letter = PreviewFormat.text(g.letter) { text += " · \(letter)" }
+            out.append(WorkFlag(word: PreviewFormat.text(g.chip) ?? text, kind: "info"))
+        }
+        if let late { out.append(WorkFlag(word: late, kind: "warn")) }
         let words = Set(out.map(\.word))
         for f in item.flags where ["feedback", "new"].contains(f.word.lowercased()) && !words.contains(f.word) {
             out.append(f)
