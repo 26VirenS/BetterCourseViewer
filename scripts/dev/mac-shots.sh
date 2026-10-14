@@ -188,7 +188,7 @@ bio_plain() {
 bio_plain_all() {
   bio_plain 57z-cell-plain 45 cell
   bio_plain 58z-dna-plain 24 dna
-  bio_plain 61z-biomol-plain 24 biomol
+  bio_plain 61z-biomol-plain 40 biomol
 }
 
 # every biology tool's pages and what each is for (the full set): 57 Cell Explorer, 58 DNA & RNA, 59 Gene Expression,
@@ -213,7 +213,7 @@ bio_full() {
   bio light 57k-cell-quiz 30 cell animal:quiz=name
   bio light 57l-cell-gram-positive 30 cell bacterium:gram+:select=wall
   # the double helix (measured, its grooves, in atoms, unzipped), the nucleotides, a strand's facts, replication, RNA
-  bio both 58a-dna-helix 16 dna helix:measure:pair=3
+  bio both 58a-dna-helix 30 dna helix:measure:pair=3
   bio both 58b-dna-grooves 16 dna helix:grooves
   bio both 58c-dna-atoms 16 dna helix:style=atoms:pair=5
   bio both 58d-dna-unzip 16 dna helix:unzip=0.5
@@ -255,7 +255,7 @@ bio_full() {
   bio light 61m-biomol-sucrose 16 biomol carbs:di=SUC
   bio light 61n-biomol-maltose-split 16 biomol carbs:di=MAL:split
   bio light 61o-biomol-cellulose 16 biomol carbs:poly=cellulose
-  bio light 61p-biomol-popc 16 biomol lipids:lipid=POV:colour=part
+  bio light 61p-biomol-popc 30 biomol lipids:lipid=POV:colour=part
   bio dark 61q-biomol-oleic 16 biomol lipids:lipid=compare
   bio dark 61r-biomol-dform 16 biomol amino:aa=A:dform
   # crosses (a dihybrid, X-linked, the forked line, a lethal, why), probability, chi-square and a pedigree

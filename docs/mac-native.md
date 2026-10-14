@@ -693,9 +693,12 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   it). A popup's SwiftUI view sits in a plain view of the popup's own, never as its window's content view (which sized
   the window to what it showed, and a tool asking for more room the more it had grew it until AppKit stopped the app),
   and a large popup is placed again once the sidebar is shown or hidden (the window says whether it is out:
-  `FloatingPopups.sidebarMoved`, as a folded sidebar's view is still found where it stood). A popup that draws its own
-  glass — a counter's list, a work's card — measures itself and sizes its popup (`PopupHandle.fit`): measured from
-  outside, glass and all, such a popup kept the size it was guessed at, what it showed off to one side. Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
+  `FloatingPopups.sidebarMoved`, as a folded sidebar's view is still found where it stood) and a moment after it comes
+  in (one put up as the window opened was placed before the sidebar had said where it is, and lay over it). A fitted
+  popup is measured as what it shows appears and as it changes (a measure handed up as a SwiftUI preference never
+  reached a popup whose view is not its window's content view: Hand In, New Task, New Message and Why these gametes?
+  stayed at the size they were guessed at, cut off at their sides); one that draws its own glass — a counter's list, a
+  work's card — measures itself and sizes its popup (`PopupHandle.fit`). Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
   own panel and the Alta graph's window (all of which never blocked the window), the external tools' windows, and
   Alta's own pop-ups (a sheet on its popup alone). Still blocking, by design: a quiz being taken (a sheet: its timer and
   its integrity), the first run's setup, the sign-in, the tour, the Mac's confirmations and file choosers. An update

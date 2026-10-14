@@ -58,10 +58,9 @@ struct PopupHandle {
     @MainActor
     fileprivate func hold(_ on: Bool) { panel?.held = on }
 
-    /// (1.3.79) What it shows, measured by itself: the popup made that size — for one as large as what it shows asks
-    /// that draws its own glass (a counter's list, a work's card), whose size from outside, glass and all, was not its
-    /// own: those popups stayed at the size they were guessed at before they were measured, what they showed off to one
-    /// side in them.
+    /// (1.3.79) What it shows, measured by itself: the popup made that size, and no longer measured from outside — for
+    /// one as large as what it shows asks that draws its own glass (a counter's list, a work's card) and knows its own
+    /// size best.
     @MainActor
     func fit(_ size: CGSize) {
         guard let panel else { return }
@@ -347,6 +346,7 @@ final class FloatingPopups {
             panel.moved = CGSize(width: CGFloat(others) * 28, height: -CGFloat(others) * 28)
             panel.place()
             panel.comeIn()
+            panel.placeAgainSoon()
         } else {
             panel.prepare()
         }
@@ -585,6 +585,18 @@ final class PopupPanel: NSPanel {
         invalidateShadow()
     }
 
+    /// (1.3.79) A large popup placed again a moment after it came in, and once more a little later: one put up as the
+    /// window opened (a tool asked for at launch) was placed before the sidebar had said where it is, and lay over the
+    /// sidebar until the window was next sized. Not while it is being dragged; one dragged keeps how far it was moved.
+    fileprivate func placeAgainSoon() {
+        for delay in [0.5, 1.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, !self.closing, self.drag == nil, self.popupLayout.isLarge else { return }
+                self.place()
+            }
+        }
+    }
+
     /// Asked to show something under a new layout: a popup at a point or by a rect moved to the new one (a counter's
     /// list, opened from another tile; a work's card, from another row); any other kept where it is.
     fileprivate func moveTo(_ next: PopupLayout) {
@@ -715,19 +727,16 @@ private struct PopupRoot: View {
             if let size = model.size {
                 card.frame(width: size.width, height: size.height)
             } else {
+                // (measured as it appears and as it changes — a measure handed up as a preference never reached the
+                // popup from a hosting view that is not its window's content view, and every popup as large as what it
+                // shows asks stayed at the size it was guessed at, what it showed cut off at its sides)
                 card
                     .fixedSize()
                     .background {
-                        GeometryReader { g in Color.clear.preference(key: PopupFitKey.self, value: g.size) }
-                    }
-                    .onPreferenceChange(PopupFitKey.self) { s in
-                        MainActor.assumeIsolated {
-                            // (on the run loop's next turn: the window is not sized again while it is being laid out;
-                            // never for what measures itself, `PopupHandle.fit`)
-                            let panel = model.panel
-                            DispatchQueue.main.async {
-                                if panel?.selfSized == false { panel?.fit(s) }
-                            }
+                        GeometryReader { g in
+                            Color.clear
+                                .onAppear { measured(g.size) }
+                                .onChange(of: g.size) { _, s in measured(s) }
                         }
                     }
             }
@@ -757,9 +766,13 @@ private struct PopupRoot: View {
             model.content
         }
     }
-}
 
-private struct PopupFitKey: PreferenceKey {
-    static let defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
+    /// What it shows, measured from outside: the popup made that size — on the run loop's next turn (the window is not
+    /// sized again while it is being laid out), and never for what measures itself (`PopupHandle.fit`).
+    private func measured(_ s: CGSize) {
+        let panel = model.panel
+        DispatchQueue.main.async {
+            if panel?.selfSized == false { panel?.fit(s) }
+        }
+    }
 }
