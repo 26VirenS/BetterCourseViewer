@@ -448,11 +448,11 @@ Ctrl-click opens the work whole, and a click round it, Escape or Close folds it 
 
 ## Send from Phone
 
-Hand In's *Send from Phone…* (beside Choose Files…, for an assignment that takes files) opens a panel over the form
+Hand in's *Send from phone…* (beside Choose files…, for an assignment that takes files) opens a panel over the form
 with a QR code (`Screens/Assignment/PhoneHandIn.cs`). The phone's own camera opens it: a page this PC serves itself
 (`Assets/PhoneHandIn.html`, an embedded resource — the same file as the Mac app's), with the assignment, its course and
 the kinds of file it takes, *Take Photo* and *Choose Files*, each file's progress and Retry, then "Sent to your PC —
-finish handing in there." Each file comes into the hand-in as if chosen with Choose Files… (its type checked, converted
+finish handing in there." Each file comes into the hand-in as if chosen with Choose files… (its type checked, converted
 where it must be); the student looks it over and presses Submit on the PC — nothing is handed in by itself.
 
 - **No server anywhere.** `Support/PhoneServer.cs` is a small web server on plain sockets (`TcpListener`, not
