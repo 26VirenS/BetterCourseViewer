@@ -204,6 +204,7 @@ private struct EnzymeGraphs: View {
     private var tint: Color { EnzymeColors.enzyme.color }
 
     var body: some View {
+        // (the two small graphs 210 high, so the rate against [S] keeps room for its curve when the window is short)
         VStack(spacing: 16) {
             substrateCard
                 .frame(maxHeight: .infinity)
@@ -211,7 +212,7 @@ private struct EnzymeGraphs: View {
                 temperatureCard
                 phCard
             }
-            .frame(height: 250)
+            .frame(height: 210)
         }
     }
 
@@ -268,6 +269,7 @@ private struct EnzymeGraphs: View {
             }
             .chartXScale(domain: 0...EnzymeConditions.substrateMax)
             .chartYScale(domain: 0...max(c.vmax * 1.12, 1))
+            .frame(minHeight: 130)
             .chartXAxisLabel("Substrate concentration [S] (mM)")
             .chartYAxisLabel("Rate v (µmol/min)")
             .accessibilityLabel("Rate against substrate concentration. Now \(String(halfUp: "%.1f", c.rate)) at \(EnzymeText.number(c.substrate)) millimolar")

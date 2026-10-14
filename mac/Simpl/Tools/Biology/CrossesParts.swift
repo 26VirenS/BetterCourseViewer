@@ -147,6 +147,7 @@ struct GameteBubble: View {
             Text(gamete.p.text)
                 .font(.sCaption.monospacedDigit())
                 .foregroundStyle(.secondary)
+                .fixedSize()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Gamete \(Allele.spoken(gamete.text)), chance \(gamete.p.text)")

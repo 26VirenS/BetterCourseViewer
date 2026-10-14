@@ -452,9 +452,12 @@ struct CrossPage: View {
                 why
             }
         } else {
-            HStack(alignment: .top, spacing: 24) {
-                first
-                second
+            // ("Why?" under the two, so the pair stays narrow enough for a small window's card)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 24) {
+                    first
+                    second
+                }
                 why
             }
         }
