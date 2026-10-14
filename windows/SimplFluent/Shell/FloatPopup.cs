@@ -105,7 +105,6 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         ShowInTaskbar = false;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        SizeToContent = SizeToContent.WidthAndHeight;
         WindowBackdropType = Appearance.Backdrop;
         ExtendsContentIntoTitleBar = true;
         WindowCornerPreference = WindowCornerPreference.Round;
@@ -133,9 +132,11 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         card.Width = s.Width;
         if (s.Height is { } h) card.Height = h;
         s.Card = card;
-        // (in a grid of its own: what a tool floats over everything in its window — the Periodic Table's search results
-        //  and tour, PTLayer — goes in beside the card)
-        Content = new Grid { Children = { card } };
+        // (the card at its own size on a canvas, the window made its size as it changes — not the window's SizeToContent,
+        //  which a window without Windows' frame round it measures with the frame's room added; what a tool floats over
+        //  everything in its window — the Periodic Table's search results and tour, PTLayer — goes in beside it)
+        Content = new Canvas { Children = { card } };
+        card.SizeChanged += (_, e) => SizeTo(e.NewSize);
         KeyboardNavigation.SetTabNavigation(card, KeyboardNavigationMode.Cycle);
         KeyboardNavigation.SetControlTabNavigation(card, KeyboardNavigationMode.Cycle);
 
@@ -214,9 +215,17 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         var whole = Whole();
         if (room.IsEmpty || whole.IsEmpty) return;
         card.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        SizeTo(card.DesiredSize);
         var at = Centre(room, whole, card.DesiredSize);
         Left = at.X;
         Top = at.Y;
+    }
+
+    /// <summary>The window as large as its card.</summary>
+    private void SizeTo(Size size)
+    {
+        if (size.Width > 0 && (double.IsNaN(Width) || Math.Abs(Width - size.Width) > 0.5)) Width = size.Width;
+        if (size.Height > 0 && (double.IsNaN(Height) || Math.Abs(Height - size.Height) > 0.5)) Height = size.Height;
     }
 
     /// <summary>Centred over the page, where it was moved to from there, and kept on the window: its heading never
