@@ -7,8 +7,11 @@ import SwiftUI
 /// line, then everything coming up day by day, ticked off where it is done) and Activity (Canvas's recent activity).
 /// Beside the view on a wide window, and under it on a narrow one: the day's work, the grades skyline and the week's
 /// load per course. (1.3.78) Kept once opened (DetailStack): `active` while it is the screen showing; put away, it keeps
-/// everything it shows, and reads again — quietly, each card changing in place — when it is shown again and what it
-/// holds has gone stale, or something was done meanwhile.
+/// everything it shows, and reads again — quietly, each card changing in place — when something was done meanwhile.
+/// (1.3.80) While it is the screen showing it is checked live every minute (LiveRefresh): each part asked again, and only
+/// the parts that changed put in place — a counter's number, a card, a row, the skyline — the rest left as it is; a check
+/// that finds nothing new draws nothing. Put away, it is not checked; shown again on what is more than a minute old, it
+/// is checked at once.
 struct DashboardView: View {
     /// (1.3.78) It is the screen showing (not put away under another).
     let active: Bool
@@ -48,6 +51,11 @@ struct DashboardView: View {
     @State private var listError: String?
     @State private var activity: DashActivityData?
     @State private var activityError: String?
+    /// (1.3.80) What the live checks know of the parts' answers shown (their fingerprints), and when they were last read
+    /// or found the same: never drawn from, so a check that finds nothing new changes nothing the page draws.
+    @State private var marks = LiveMarks()
+    /// (1.3.80) Who holds the live checks back while a counter's panel is open.
+    @State private var holdToken = UUID()
     @Namespace private var morph
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -71,6 +79,7 @@ struct DashboardView: View {
     private var mainWidth: CGFloat { twoColumns ? width - railWidth - 28 : width }
 
     var body: some View {
+        let _ = LiveTrace.drew("dashboard") // (1.3.80: a live check's line says how many times it drew the page)
         Group {
             if let d = model.data {
                 page(d)
@@ -86,14 +95,17 @@ struct DashboardView: View {
             }
         }
         .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
+        // (1.3.80) checked live while it is the screen showing: only what changed is put in place
+        .liveChecks("dashboard", shown: active, since: { marks.at }) { _, age in try await liveCheck(age) }
         .task(id: version) {
             if active { await load() } else { behind = true }
         }
         .onChange(of: active) { _, now in
             if now {
-                // (shown again as it was: timed as such, and read again only if what it holds has gone stale)
+                // (shown again as it was: timed as such, and read again only if something was done meanwhile — on what
+                // has gone stale, the live check runs at once and changes only what changed, 1.3.80)
                 if model.data != nil { DispatchQueue.main.async { OpenClock.report("Dashboard", "alive") } }
-                if behind || engine.recent("today", as: Today.self)?.fresh != true {
+                if behind {
                     behind = false
                     Task { await load() }
                 }
@@ -241,7 +253,10 @@ struct DashboardView: View {
             }
         }
         .zIndex(1) // (over the page below it)
-        .onDisappear { watchClicks(false) }
+        .onDisappear {
+            watchClicks(false)
+            LiveHolds.shared.set("counter panel", holdToken, false)
+        }
     }
 
     /// The room between two tiles, across and down.
@@ -365,6 +380,7 @@ struct DashboardView: View {
         withAnimation(morphMotion) { open = key }
         if key != nil { MacTour.shared.did(.counterOpened) } // (the tour's "The cards open")
         watchClicks(key != nil)
+        LiveHolds.shared.set("counter panel", holdToken, key != nil) // (1.3.80: nothing changes under an open panel)
         if OpenClock.verbose {
             let how = DashMorphHold.asked.map { "grows, held \($0.fraction) of the way" } ?? (grows ? "grows" : "fades in (Reduce Motion)")
             NSLog("[Simpl] counter: %@", key.map { "\($0) \(how)" } ?? "folded back")
@@ -476,8 +492,10 @@ struct DashboardView: View {
                     if i > 0 { RowDivider(inset: 92) }
                     // (home-21) drawn as Coming up draws work; in the side column, its figures one over the other.
                     // (1.2.3) a press grows its preview out of the row; a double-click opens it
+                    // (1.3.80: a row a live check adds or takes away fades in or out where it is, under Reduce Motion
+                    // without moving)
                     DashTodayLine(row: row, narrow: twoColumns) { done in toggle(row, done) }
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .padding(8)
@@ -603,6 +621,7 @@ struct DashboardView: View {
         Task { await loadView() }
         await model.load(engine, "today", animated: animated)
         guard model.data != nil else { return }
+        marks.at = Date() // (1.3.80: read now — the next live check is a minute on)
         // (the screenshot suite: -SimplSheet next grows a counter's panel out of its tile, once the tile has been laid out)
         if let key = UserDefaults.standard.string(forKey: "SimplSheet"), !key.isEmpty, !sheetAsked {
             sheetAsked = true
@@ -659,12 +678,14 @@ struct DashboardView: View {
                 counts = f
                 countsLive = f.overdue != nil
             }
+            marks.shown("todayCounts", ["kept": false], by: engine) // (1.3.80: the answer a live check asks after)
         }
     }
 
     private func loadCourses() async {
         if let c = try? await engine.read("dashCourses", as: DashCoursesData.self) {
             withAnimation(courses == nil ? nil : Motion.gentle) { courses = c }
+            marks.shown("dashCourses", by: engine)
         } else if courses == nil {
             courses = DashCoursesData(rows: [], empty: "Your courses could not be loaded.")
         }
@@ -673,6 +694,7 @@ struct DashboardView: View {
                 progress = p
                 progressRead = true
             }
+            marks.shown("coursesProgress", by: engine)
         }
     }
 
@@ -683,6 +705,7 @@ struct DashboardView: View {
         }
         if let fresh = try? await engine.read("dashSkyline", ["kept": false], as: DashSkylineData.self) {
             withAnimation(Motion.gentle) { sky = fresh }
+            marks.shown("dashSkyline", ["kept": false], by: engine)
         }
     }
 
@@ -703,6 +726,7 @@ struct DashboardView: View {
                 list = l
                 listError = nil
             }
+            marks.shown("dashList", args, by: engine)
         } catch {
             if list == nil { listError = error.localizedDescription }
         }
@@ -713,9 +737,107 @@ struct DashboardView: View {
             let a = try await engine.read("dashActivity", as: DashActivityData.self)
             activity = a
             activityError = nil
+            marks.shown("dashActivity", by: engine)
         } catch {
             if activity == nil { activityError = error.localizedDescription }
         }
+    }
+
+    // MARK: - Live checks (1.3.80)
+
+    /// The live check (LiveRefresh): each part's read asked again with the check's age — the day and its counters,
+    /// Overdue's and Graded's numbers, the courses' cards and how much of each is handed in (in Cards), Coming up (List)
+    /// or the activity (Activity), the skyline — each answer compared with the one shown, and only the parts that changed
+    /// put in place, together: a counter's number rolls to its new count, a card or a row changes, arrives or goes, and
+    /// every other part keeps its value, so it is not drawn again (the rows and cards by their ids). A check that finds
+    /// nothing new changes nothing: the page is not drawn at all. (Only what the view shows is read: no reads for a view
+    /// not chosen.)
+    private func liveCheck(_ age: Double) async throws -> LiveFound {
+        let e = engine
+        var parts: [String] = []
+        var changes: [@MainActor () -> Void] = []
+        func note(_ part: String) { if !parts.contains(part) { parts.append(part) } }
+        if let c = try await e.liveCheck("today", as: Today.self, shown: model.data, marks: model.marks, maxAge: age) {
+            for p in Self.changedParts(model.data, c.value) { note(p) }
+            changes.append { c.put { model.data = c.value } }
+        }
+        if let c = try await e.liveCheck("todayCounts", ["kept": false], as: TodayCounts.self, shown: counts, marks: marks, maxAge: age) {
+            note("counters")
+            changes.append {
+                c.put {
+                    counts = c.value
+                    countsLive = c.value.overdue != nil
+                }
+            }
+        }
+        if view == .cards {
+            if let c = try await e.liveCheck("dashCourses", as: DashCoursesData.self, shown: courses, marks: marks, maxAge: age) {
+                note("cards")
+                changes.append { c.put { courses = c.value } }
+            }
+            if let c = try await e.liveCheck("coursesProgress", as: [String: CourseProgress].self, shown: progressRead ? progress : nil, marks: marks, maxAge: age) {
+                note("handed-in")
+                changes.append {
+                    c.put {
+                        progress = c.value
+                        progressRead = true
+                    }
+                }
+            }
+        }
+        if view == .list, list != nil {
+            if let c = try await e.liveCheck("dashList", as: DashListData.self, shown: list, marks: marks, maxAge: age) {
+                note("list")
+                changes.append {
+                    c.put {
+                        list = c.value
+                        listError = nil
+                    }
+                }
+            }
+        }
+        if view == .activity, activity != nil {
+            if let c = try await e.liveCheck("dashActivity", as: DashActivityData.self, shown: activity, marks: marks, maxAge: age) {
+                note("activity")
+                changes.append {
+                    c.put {
+                        activity = c.value
+                        activityError = nil
+                    }
+                }
+            }
+        }
+        if sky != nil, let c = try await e.liveCheck("dashSkyline", ["kept": false], as: DashSkylineData.self, shown: sky, marks: marks, maxAge: age) {
+            note("skyline")
+            changes.append { c.put { sky = c.value } }
+        }
+        guard !changes.isEmpty else {
+            marks.at = Date()
+            return .unchanged
+        }
+        let partMarks = marks
+        return LiveFound(parts: parts) {
+            // (one transaction: the parts that changed move to where they are now on the house spring, a counter's number
+            // rolling — under Reduce Motion a short fade, and the number simply the new one)
+            withAnimation(LiveRefresh.motion) {
+                for apply in changes { apply() }
+            }
+            partMarks.at = Date()
+        }
+    }
+
+    /// The parts of the day a new answer changes: the counters, the day's work (its rows by their ids), the week's load,
+    /// the greeting's line.
+    private static func changedParts(_ old: Today?, _ new: Today) -> [String] {
+        guard let old else { return ["day"] }
+        var parts: [String] = []
+        if old.counters != new.counters { parts.append("counters") }
+        if !LiveCompare.same(old.list, new.list) { parts.append("day") }
+        if old.load != new.load || old.idle != new.idle || old.loadCaption != new.loadCaption { parts.append("load") }
+        if old.dateLine != new.dateLine || old.me != new.me || old.hasCourses != new.hasCourses || old.notifUnread != new.notifUnread {
+            parts.append("greeting")
+        }
+        return parts.isEmpty ? ["day"] : parts
     }
 
     // MARK: - Doing
