@@ -49,9 +49,10 @@ public readonly record struct BiomolLook(BioAtomStyle Style = BioAtomStyle.BallS
 /// <param name="Hex">"#rrggbb", or null for the atom-symbol white.</param>
 /// <param name="Size">Its size (Å).</param>
 /// <param name="Lift">How far toward the viewer it sits (an atom's radius, so it shows on the atom's near side).</param>
-/// <param name="OnTop">Drawn over the whole model in the page's text colour (the view's marks), not in the scene, so no
-/// atom in front hides it: a carbon's number.</param>
-/// <param name="Atom">The atom an on-top mark numbers: it is kept just outside the atom's disc as the view turns.</param>
+/// <param name="OnTop">Drawn over the whole model (the view's marks), not in the scene, so no atom in front hides it: a
+/// carbon's number in the page's text colour, an amino acid's charge in its own.</param>
+/// <param name="Atom">The atom an on-top mark numbers or charges: it is kept just outside the atom's disc as the view
+/// turns.</param>
 /// <param name="Charge">A charge's sign on its atom (Pos the atom's centre): kept at the atom's upper right on the view, as
 /// a charge is written (N⁺, O⁻), however the model is turned.</param>
 public sealed record BiomolMark(BioVec Pos, string Text, string? Hex = null, double Size = 0.42, double Lift = 0,
@@ -153,9 +154,11 @@ public static class BiomolScenes
         return pts.OrderBy(p => BioV.Distance(p, c)).First();
     }
 
-    /// <summary>The charge marks of a form ("+" blue, "−" red), each on its atom: at the atom's upper right as the view has
-    /// it, as a charge is written (N⁺, O⁻), in front of the atom — set out from the molecule's centre in the scene, a sign
-    /// sat beside a neighbouring hydrogen or out in the open, and read as nobody's.</summary>
+    /// <summary>The charge marks of a form ("+" blue, "−" red), each on its atom: just outside it at the upper right as the
+    /// view has it, as a charge is written (N⁺, O⁻), drawn over the whole molecule — set out from the molecule's centre in
+    /// the scene, a sign sat beside a neighbouring hydrogen or out in the open, and read as nobody's; drawn in the scene,
+    /// lysine's NH₃⁺ at the side chain's end was hidden behind the carbon next to it, and only the backbone's two signs
+    /// showed on a "Basic (+)" amino acid.</summary>
     public static List<BiomolMark> ChargeMarks(BioMoleculeModel m, IReadOnlyDictionary<string, int> charges, BiomolLook look, BiomolChem chem)
     {
         if (charges.Count == 0) return new List<BiomolMark>();
@@ -163,16 +166,18 @@ public static class BiomolScenes
         foreach (var a in m.Atoms)
         {
             if (!charges.TryGetValue(a.Name, out var q) || q == 0) continue;
-            out_.Add(Charge(a.Pos, q, Radius(a.Element, look, chem), look, 0.62));
+            out_.Add(Charge(a.Pos, q, Radius(a.Element, look, chem), look, 0.62, onTop: true));
         }
         return out_;
     }
 
-    /// <summary>A charge's sign on its atom: at the atom's centre, lifted past its near side and its own hydrogens (an H on
-    /// it reaches 0.9 Å nearer in front, as the builder draws them, and hid the NH₃⁺'s sign), set to its upper right on
-    /// the view.</summary>
-    private static BiomolMark Charge(BioVec atom, int q, double radius, BiomolLook look, double size) =>
-        new(atom, q > 0 ? "+" : "−", (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), size, Lift: radius + 0.9, AtomRadius: radius, Charge: true);
+    /// <summary>A charge's sign on its atom. On top (one amino acid): over the whole molecule, just outside the atom's disc
+    /// at its upper right. In the scene (a peptide's many, which would show through the chain): at the atom's centre,
+    /// lifted past its near side and its own hydrogens (an H on it reaches 0.9 Å nearer in front, as the builder draws them,
+    /// and hid the NH₃⁺'s sign), set to its upper right on the view.</summary>
+    private static BiomolMark Charge(BioVec atom, int q, double radius, BiomolLook look, double size, bool onTop = false) =>
+        new(atom, q > 0 ? "+" : "−", (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), size, Lift: radius + 0.9,
+            OnTop: onTop, Atom: onTop ? atom : null, AtomRadius: radius, Charge: true);
 
     // ---- amino acids (§4.4 Amino acids) ----
 

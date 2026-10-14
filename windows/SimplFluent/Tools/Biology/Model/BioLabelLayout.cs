@@ -10,8 +10,10 @@ namespace Simpl.Tools;
 // leader runs anchor → elbow (12 short of the label, toward the model) → label. The two columns are kept even: while one
 // has three or more labels more than the other, its label nearest the model's middle (within the middle half) goes over
 // — an animal cell's parts lie mostly right of its centre, and its right column ran out of room ("+1 more") beside a left
-// one of four. A column holds as many as the view's height has room for, the objects covering the most of the screen
-// keeping theirs when it has not; only those left over are counted ("+N more"). Device-independent pixels, y down.
+// one of four. A column holds as many as the view's height has room for; one with more than that gives its labels
+// nearest the model's middle (within the middle half) to the other while the other has room, and past that the objects
+// covering the most of the screen keep theirs; only those left over are counted ("+N more"). Device-independent pixels,
+// y down.
 //
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
 // model's box on the view, a label that would hide its own anchor, or (beside a model narrower than 70% of the view)
@@ -83,29 +85,57 @@ public static class BioLabelLayout
             if (Math.Abs(shown[k].X - cx) > 0.5 * half) break;
             onLeft[k] = !from;
         }
+        // (the column's edge toward the model — 24 out from its box, when the box is narrower than its circle; a label too
+        //  wide to fit outside it in the view is moved in alone, so one long label does not pull the column's shorter ones
+        //  onto the model)
+        double EdgeFor(bool left)
+        {
+            var edge = left ? cx - (r + ColumnOffset) : cx + (r + ColumnOffset);
+            if (model is { } b && b.X1 > b.X0) edge = left ? Math.Max(edge, b.X0 - ColumnOffset) : Math.Min(edge, b.X1 + ColumnOffset);
+            return edge;
+        }
+        double EdgeOfSide(bool left, BioLabelInput l) => left ? Math.Max(EdgeFor(true), Inset + l.Width) : Math.Min(EdgeFor(false), w - Inset - l.Width);
+        double top = Inset + Height / 2;
+        // (a column's lowest place: a column that reaches over the box kept clear ends above it, with a line's room for
+        //  "+N more")
+        double BottomOf(bool left, List<int> mine)
+        {
+            var bottom = h - Inset - Height / 2;
+            if (keepClear is { } kc && mine.Count > 0)
+            {
+                double x0 = mine.Min(i => left ? EdgeOfSide(left, shown[i]) - shown[i].Width : EdgeOfSide(left, shown[i]));
+                double x1 = mine.Max(i => left ? EdgeOfSide(left, shown[i]) : EdgeOfSide(left, shown[i]) + shown[i].Width);
+                if (x0 < kc.X1 && x1 > kc.X0) bottom = Math.Min(bottom, kc.Y0 - Gap - Height);
+            }
+            return bottom;
+        }
+        // (a column holds what its height has room for, 22 apart inside its edges)
+        int Holds(bool left, List<int> mine) => Math.Max(1, (int)Math.Floor((BottomOf(left, mine) - top) / step + 1e-9) + 1);
+        List<int> Members(bool left) => Enumerable.Range(0, shown.Count).Where(i => onLeft[i] == left).ToList();
+        // (a column with more than it holds — the left one cut short by Cell Explorer's scale bar — gives its labels nearest
+        //  the model's middle, within the middle half, to the other while that has room, rather than counting them out)
+        for (var guard = 0; guard < shown.Count; guard++)
+        {
+            List<int> ls = Members(true), rs = Members(false);
+            bool leftOver = ls.Count > Holds(true, ls) && rs.Count < Holds(false, rs);
+            bool rightOver = rs.Count > Holds(false, rs) && ls.Count < Holds(true, ls);
+            if (!leftOver && !rightOver) break;
+            var k = (leftOver ? ls : rs).Where(i => Math.Abs(shown[i].X - cx) <= 0.5 * half)
+                .OrderBy(i => Math.Abs(shown[i].X - cx)).ThenBy(i => shown[i].Id, StringComparer.Ordinal).Select(i => (int?)i).FirstOrDefault();
+            if (k is not { } move) break;
+            onLeft[move] = !leftOver;
+        }
         var more = 0;
         var out_ = new List<BioLabelPlacement>();
         foreach (var left in new[] { true, false })
         {
-            var mine = Enumerable.Range(0, shown.Count).Where(i => onLeft[i] == left).ToList();
+            var mine = Members(left);
             if (mine.Count == 0) continue;
-            // (the column's edge toward the model — 24 out from its box, when the box is narrower than its circle; a label
-            //  too wide to fit outside it in the view is moved in alone, so one long label does not pull the column's
-            //  shorter ones onto the model)
-            var edge = left ? cx - (r + ColumnOffset) : cx + (r + ColumnOffset);
-            if (model is { } b && b.X1 > b.X0) edge = left ? Math.Max(edge, b.X0 - ColumnOffset) : Math.Min(edge, b.X1 + ColumnOffset);
-            double EdgeOf(BioLabelInput l) => left ? Math.Max(edge, Inset + l.Width) : Math.Min(edge, w - Inset - l.Width);
-            double top = Inset + Height / 2, bottom = h - Inset - Height / 2;
-            // (a column that reaches over the box kept clear ends above it, with a line's room for "+N more")
-            if (keepClear is { } kc)
-            {
-                double x0 = mine.Min(i => left ? EdgeOf(shown[i]) - shown[i].Width : EdgeOf(shown[i]));
-                double x1 = mine.Max(i => left ? EdgeOf(shown[i]) : EdgeOf(shown[i]) + shown[i].Width);
-                if (x0 < kc.X1 && x1 > kc.X0) bottom = Math.Min(bottom, kc.Y0 - Gap - Height);
-            }
-            // (a column holds what its height has room for, 22 apart inside its edges: past that, the objects covering the
-            //  most of the screen keep their labels and the rest are counted)
-            var holds = Math.Max(1, (int)Math.Floor((bottom - top) / step + 1e-9) + 1);
+            double EdgeOf(BioLabelInput l) => EdgeOfSide(left, l);
+            var bottom = BottomOf(left, mine);
+            // (past what a column holds, the objects covering the most of the screen keep their labels and the rest are
+            //  counted)
+            var holds = Holds(left, mine);
             if (mine.Count > holds)
             {
                 var keep = mine.OrderByDescending(i => shown[i].Area).ThenBy(i => i).Take(holds).ToHashSet();

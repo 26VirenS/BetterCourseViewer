@@ -458,6 +458,13 @@ public class BiologyTests
         Assert.All(clear.Where(p => p.Left), p => Assert.True(p.Frame.Y + p.Frame.Height <= bar.Y0 + 1e-9));
         Assert.Equal(4, clear.Count(p => !p.Left));
         Assert.Equal(8, clear.Count + gone);
+        // (and a left column with more than it holds above the bar gives its label nearest the middle to the right one,
+        //  which has room, rather than counting it out: six left of the middle, four right, all ten shown)
+        var near = Enumerable.Range(0, 10).Select(k => new BioLabelInput($"n{k}", $"Near {k}", k < 6 ? 370 + k : 500, 30 + 15 * k, Area: k, Width: 70)).ToList();
+        var (over, none) = BioLabelLayout.Layout(near, 400, 100, 150, 800, 200, keepClear: bar);
+        Assert.Equal((10, 0), (over.Count, none));
+        Assert.Equal(5, over.Count(p => p.Left));
+        Assert.All(over.Where(p => p.Left), p => Assert.True(p.Frame.Y + p.Frame.Height <= bar.Y0 + 1e-9));
     }
 
     [Fact]

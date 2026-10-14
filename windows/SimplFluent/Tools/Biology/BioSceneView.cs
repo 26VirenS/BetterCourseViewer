@@ -485,7 +485,8 @@ public sealed class BioSceneView : Grid
         Wake();
     }
 
-    /// <summary>The marks' words for a new scene, each with a halo of the ground round it, so it reads over atoms.</summary>
+    /// <summary>The marks' words for a new scene (in the page's text colour, or a charge's own), each with a halo of the
+    /// ground round it, so it reads over atoms.</summary>
     private void MakeMarks()
     {
         markLayer.Children.Clear();
@@ -494,15 +495,17 @@ public sealed class BioSceneView : Grid
         foreach (var m in markSource?.Invoke() ?? Array.Empty<BioMark>())
         {
             var t = new TextBlock { Text = m.Text, FontWeight = FontWeights.Bold, IsHitTestVisible = false };
-            t.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
+            if (m.Colour is { } colour) t.Foreground = new SolidColorBrush(colour);
+            else t.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
             t.Effect = new System.Windows.Media.Effects.DropShadowEffect { ShadowDepth = 0, BlurRadius = 5, Opacity = 1, Color = ground };
             markLayer.Children.Add(t);
             marks.Add((m, t));
         }
     }
 
-    /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them, and an atom's number
-    /// just outside the atom's disc, out from it the way its point is (or, seen end on, away from the model's centre).</summary>
+    /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them (a charge's sign
+    /// 14–22), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end on, away
+    /// from the model's centre); a charge's sign just outside it at the upper right.</summary>
     private void PlaceMarks()
     {
         if (marks.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
@@ -513,13 +516,14 @@ public sealed class BioSceneView : Grid
             var (x, y, front, dist) = Project(m.Anchor);
             t.Visibility = front ? Visibility.Visible : Visibility.Collapsed;
             if (!front) continue;
-            t.FontSize = Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 11, 17);
+            t.FontSize = m.Charge ? Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 14, 22) : Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 11, 17);
             t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var (w, h) = (t.DesiredSize.Width, t.DesiredSize.Height);
             if (m.Atom is { } atom && Project(atom) is { InFront: true } a)
             {
                 double dx = x - a.X, dy = y - a.Y;
-                if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (a.X - c.X, a.Y - c.Y);
+                if (m.Charge) (dx, dy) = (1, -1);
+                else if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (a.X - c.X, a.Y - c.Y);
                 var len = Math.Sqrt(dx * dx + dy * dy);
                 if (len < 1) (dx, dy, len) = (1, 0, 1);
                 var reach = m.AtomRadius * f / Math.Max(a.Distance, 1e-6) + Math.Max(w, h) / 2 + 1;

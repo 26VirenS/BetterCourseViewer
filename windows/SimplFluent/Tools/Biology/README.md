@@ -228,7 +228,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   drag turns, right-drag pans, the wheel zooms; ← → ↑ ↓ turn 15°, + − zoom, Escape deselects; double-click zooms to an
   object (or resets on empty space). Labels with leader lines (§3.5: two columns 22 apart, 24 out from the model's box
   on the view — beside the model, not at the view's edges — kept even, a column holding as many as the view's height
-  has room for before "+N more", 120 ms fades, pressable, hover outlines their object) come from `Labels`; give a
+  has room for, one with more giving its labels nearest the model's middle to the other while that has room, before
+  "+N more", 120 ms fades, pressable, hover outlines their object) come from `Labels`; give a
   convex shell's label a `Normal`, else a ray
   decides what hides it; `Always` shows it whatever covers it (a strand's ends: both ends of both strands are always
   named). Cell Explorer's nucleus, cut open, is anchored on its envelope's ring at the cut face that turns most to the
@@ -245,10 +246,13 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
 - WPF side (`BioScene.cs`): `BioWpf.Mesh(mesh)` (frozen `MeshGeometry3D`), `BioWpf.Material(material, fade)`,
   `BioWpf.Batches(items)` (one mesh per material and order, with `BioMeshBatch.ObjectAtVertex/ObjectAtTriangle`),
   `BioWpf.P/V/B` conversions, `BioBillboards.Text(s, size, colour, glow)`, `BioBillboard(model, anchor, lift, id)`
-  (drawn in the scene, so the model can hide it), and `BioMark(text, anchor, size, atom, atomRadius)`: a few letters
-  in 2D over the whole model, 11–17 px, an atom's number set just outside its atom's disc (DNA & RNA's "5′" and "3′"
-  and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`; the Biomolecule Builder's ring and sugar
-  carbons' numbers: `BiomolMark(…, OnTop: true)`, which `BiomolStage` hands the view as marks).
+  (drawn in the scene, so the model can hide it), and `BioMark(text, anchor, size, atom, atomRadius, colour, charge)`:
+  a few letters in 2D over the whole model, 11–17 px, an atom's number set just outside its atom's disc (DNA & RNA's
+  "5′" and "3′" and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`; the Biomolecule Builder's ring
+  and sugar carbons' numbers: `BiomolMark(…, OnTop: true)`, which `BiomolStage` hands the view as marks), or a charge's
+  sign in its colour, 14–22 px, just outside its atom's disc at the upper right (a free amino acid's: drawn in the
+  scene, lysine's side-chain NH₃⁺ sign was hidden behind the carbon next to it; a peptide's many stay in the scene,
+  so the chain hides those at its back).
 
 ## Step-through (§3.6)
 
@@ -274,8 +278,9 @@ anim.Stop();`): `phase.From`, `phase.To`, `phase.T` (eased; 600 ms at 1×; back 
 chemistry builders' layout, `ChemLayout`, decided on the width it is given — a tool's popup's: the three columns side
 by side from 1180 wide; from 840 — the popup on a 1280 or 1366 window — the drawing beside one column, the controls
 over the facts, each scrolling in its own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and
-45%); narrower — the popup on a 1024 window, or a narrow one — the drawing across the top, as tall as leaves 130 of the
-page for the two columns' headings and first controls under it (240 to 560). The controls and the facts are always in
+45%); narrower — the popup on a 1024 window, or a narrow one — the drawing across the top, as tall as leaves 100 of the
+page for the two columns' headings and first controls under it (240 to 560: room beside an animal cell for its sixteen
+labels). The controls and the facts are always in
 sight: 0.3.0 gave the drawing the whole page under 1180, and they sat out of sight below it. A scene's
 `LabelKeepClear` keeps its labels off a corner a page lays something over — Cell Explorer's scale bar),
 `BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
@@ -339,9 +344,11 @@ chains turned apart), `BiomolProteins.cs` (ubiquitin's and haemoglobin's four le
 `BiomolMolecules.cs` and `BiomolScenes.cs` (nucleotides joined into a strand, sugars and their glycosidic bonds,
 cellulose and starch, fats, phospholipids, cholesterol). A sugar's or a nucleotide's carbons are numbered over the
 whole model, each just outside its atom (in the scene the H or O in front hid them). A charge's sign sits on its atom,
-at the atom's upper right on the view as a charge is written (N⁺, O⁻), in front of it, whichever way the model is
-turned (`BioBillboard`'s shift; set out from the molecule's centre in the scene, a sign sat beside a neighbouring H or
-out in the open). Haemoglobin's chains are each
+at the atom's upper right on the view as a charge is written (N⁺, O⁻), whichever way the model is turned (set out from
+the molecule's centre in the scene, a sign sat beside a neighbouring H or out in the open): a free amino acid's over
+the whole model, just outside the atom's disc (in the scene, lysine's side-chain NH₃⁺ was hidden behind the carbon next
+to it), a peptide's in front of its atom in the scene (`BioBillboard`'s shift), so the chain hides those at its back.
+Haemoglobin's chains are each
 named at the residue nearest a third of the way along that the first view (down z) shows 12 Å clear of every heme, on
 the chain's near side, so no chain's leader ends on a heme. Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
 layer added to the shared 3D view), `BiomolDrawings.cs`, `BiomolAminoPage.cs`, `BiomolProteinPage.cs`,

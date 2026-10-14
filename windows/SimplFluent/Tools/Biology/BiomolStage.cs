@@ -67,8 +67,9 @@ internal sealed class BiomolStage
             lock (marks) return marks.Where(m => !m.OnTop).Select(Board).ToList();
         }, () =>
         {
-            // (a carbon's number over the whole model, so no atom in front of it hides it)
-            lock (marks) return marks.Where(m => m.OnTop).Select(m => new BioMark(m.Text, m.Pos, m.Size, m.Atom, m.AtomRadius)).ToList();
+            // (a carbon's number, or an amino acid's charge, over the whole model, so no atom in front of it hides it)
+            lock (marks) return marks.Where(m => m.OnTop).Select(m => new BioMark(m.Text, m.Pos, m.Size, m.Atom, m.AtomRadius,
+                m.Hex is { } h ? K.Hex(h) : (Color?)null, m.Charge)).ToList();
         });
     }
 
