@@ -342,10 +342,10 @@ final class LiveRefresh {
 
 /// (1.3.80) What holds a live check back, and the check resumes when it ends: the window put away (minimized, covered,
 /// the app not in front), no network, the page not ready or a screen's own read under way; a quiz, an Alta or a
-/// Macmillan assignment open; the student
-/// typing (a text field being edited, or a key pressed in the last 5 seconds); What-If on; any sheet, dialog, popup
-/// (Hand In and Send from Phone among them — a tool's own popup aside), menu or the tour up; the mouse held down (a
-/// drag); a counter's panel or a row's preview open. The screens say their own (`set`): What-If, a counter's panel.
+/// Macmillan assignment open; the student typing (a text field being edited, or a key pressed in the last 5 seconds);
+/// What-If on; any sheet, dialog, popover, popup (Hand In and Send from Phone among them — a tool's own popup aside),
+/// menu or the tour up; the mouse held down (a drag); a counter's panel or a row's preview open. The screens say their
+/// own (`set`): What-If, a counter's panel.
 @MainActor
 final class LiveHolds {
     static let shared = LiveHolds()
@@ -399,10 +399,12 @@ final class LiveHolds {
         return editor.isEditable
     }
 
-    /// A sheet or a dialog over the window, a popup of its own (a tool's popup aside: the screen beside a tool is checked),
-    /// the Settings window, the setup, What's New, a new task or message.
+    /// A sheet or a dialog over the window, a popover (a pinned tool's quick version, a picker's), a popup of its own (a
+    /// tool's popup aside: the screen beside a tool is checked), the Settings window, the setup, What's New, a new task or
+    /// message.
     private func dialog(_ engine: Engine, _ window: NSWindow) -> Bool {
         if window.attachedSheet != nil || NSApp.modalWindow != nil { return true }
+        if NSApp.windows.contains(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }) { return true }
         if engine.setup || engine.whatsNew != nil || engine.newTask || engine.newMessage || engine.settingsOpen { return true }
         // (a row's preview card is a popup too, "preview": it holds checks as the preview it is)
         return engine.popups.openKeys.contains { $0 != ToolsCenter.popupKey && $0 != "preview" }

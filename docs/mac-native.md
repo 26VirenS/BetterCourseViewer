@@ -699,8 +699,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   - *Held back* (`LiveHolds`), and run as soon as it ends: the window minimized, covered or not in front, the app not
     active, no network (`NWPathMonitor`), the page loading or a screen's own read under way; a quiz, an Alta or a
     Macmillan assignment open; the student typing (a field being edited, or a key in the last 5 seconds); What-If on;
-    any sheet, dialog, popup (Hand In and Send from Phone among them; a tool's own popup aside, so a screen beside a tool
-    is still checked), menu or the tour; the mouse held down (a drag); a counter's panel or a row's preview open.
+    any sheet, dialog, popover, popup (Hand In and Send from Phone among them; a tool's own popup aside, so a screen
+    beside a tool is still checked), menu or the tour; the mouse held down (a drag); a counter's panel or a row's
+    preview open.
     Something that comes up while a check is asked also keeps what it found from being put in place: it is checked
     again as soon as that ends.
   - *Only what changed*: a check asks each of the screen's reads again with the check's age as `maxAge` (60, or 600 for
