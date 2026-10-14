@@ -29,6 +29,8 @@ enum PaletteAction: Hashable {
     case forward
     case browser
     case copy(String)
+    /// (1.3.80) A tool opened in its popup over the window (the chemistry tools').
+    case tool(ToolKind)
     case nothing
 }
 
@@ -258,6 +260,7 @@ final class SearchPalette: ObservableObject {
         case .forward: engine.goForward()
         case .browser: NSWorkspace.shared.open(engine.web.baseURL)
         case .copy(let text): copyToPasteboard(text)
+        case .tool(let kind): ToolsCenter.shared.popUp(kind, engine: engine)
         case .fill, .nothing: break
         }
     }
@@ -284,6 +287,11 @@ final class SearchPalette: ObservableObject {
             c.append(PaletteCommand(name: "group", aliases: ["team"], title: "Open a Group", hint: "One of your groups", symbol: "person.2.fill", takes: "a group", lists: .groups))
         }
         c.append(PaletteCommand(name: "tools", aliases: ["tool", "widgets", "timer", "calculator"], title: "Tools", hint: "Timer, calculator, flashcards and more", symbol: "wrench.and.screwdriver", key: "⌘7", action: .go(.tools)))
+        // (1.3.80) the chemistry tools, each opened straight from here in its popup over where you are
+        c.append(PaletteCommand(name: "ptable", aliases: ["periodic", "periodic table", "elements", "element"], title: ToolKind.ptable.name, hint: "Every element, its trends and its facts", symbol: ToolKind.ptable.symbol, action: .tool(.ptable)))
+        c.append(PaletteCommand(name: "lewis", aliases: ["lewis structures", "lewis structure", "dot structure", "resonance"], title: ToolKind.lewis.name, hint: "Bonds, lone pairs, formal charges and resonance", symbol: ToolKind.lewis.symbol, action: .tool(.lewis)))
+        c.append(PaletteCommand(name: "molecule", aliases: ["molecules", "molecule builder", "vsepr", "3d molecule"], title: ToolKind.molecule.name, hint: "Build a molecule in 3D, shaped by VSEPR", symbol: ToolKind.molecule.symbol, action: .tool(.molecule)))
+        c.append(PaletteCommand(name: "atom", aliases: ["atoms", "orbitals", "orbital", "electron cloud", "shells", "bohr"], title: ToolKind.atoms.name, hint: "Any element's shells, orbitals and electron cloud in 3D", symbol: ToolKind.atoms.symbol, action: .tool(.atoms)))
         c.append(PaletteCommand(name: "external", aliases: ["external tools", "lti", "apps"], title: "External Tools", hint: "Every tool your courses use", symbol: "puzzlepiece.extension", action: .go(.externalTools)))
         c.append(PaletteCommand(name: "due", aliases: ["upcoming", "soon", "week"], title: "Due", hint: "What is due: today, tomorrow, this week, or by name", symbol: "clock", takes: "today, tomorrow, week or a name", lists: .due))
         c.append(PaletteCommand(name: "overdue", aliases: ["late", "missing"], title: "Overdue", hint: "Past its date and not handed in", symbol: "exclamationmark.circle", takes: "a name (or nothing)", lists: .overdue))
