@@ -44,13 +44,18 @@ public static class Updates
         /// <summary>A Critical Update: its notes carry the mark (<see cref="CriticalMark"/>).</summary>
         public bool Critical => Notes?.Contains(CriticalMark, StringComparison.Ordinal) == true;
 
-        /// <summary>"Oct 11, 2026 · 52.9 MB": when it came out and how large the download this copy would take is.</summary>
+        /// <summary>"Oct 11 · 52.9 MB": when it came out (the year only when it is not this one's, "Oct 11, 2025") and how
+        /// large the download this copy would take is.</summary>
         public string Detail
         {
             get
             {
                 var parts = new List<string>();
-                if (Published is { } d) parts.Add(d.ToLocalTime().ToString("MMM d, yyyy"));
+                if (Published is { } d)
+                {
+                    var local = d.ToLocalTime();
+                    parts.Add(local.ToString(local.Year == DateTime.Now.Year ? "MMM d" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture));
+                }
                 var size = Installed && Setup is { } s ? s.Size : Size;
                 if (size > 0) parts.Add(size >= 1 << 20 ? $"{size / 1048576.0:0.0} MB" : $"{size / 1024.0:0} KB");
                 return string.Join(" · ", parts);
@@ -462,6 +467,47 @@ public static class Updates
         }
         Changed?.Invoke();
         Proceed();
+    }
+
+    /// <summary>
+    /// An earlier version put in this one's place (Settings ▸ Updates ▸ Earlier versions ▸ Install…, the Mac's): for the
+    /// copy the installer put here, that version's installer downloaded and checked as an update's is, then run as one
+    /// is — Simpl closes and opens again on it. Install updates automatically turns off first, or the newer version would
+    /// go back in at the next quiet moment (a Critical Update still does). Null once it is going in, else why not — and
+    /// then all is as it was: the setting as the student had it, the versions read again for what is really newer.
+    /// </summary>
+    public static async Task<string?> InstallEarlier(Release r)
+    {
+        if (Off || !Installed || r.Setup == null || r.Run >= CurrentRun) return "This copy can’t put that version in its place: its page has the download.";
+        if (checking || restarting || State is Mode.Checking or Mode.Downloading or Mode.Installing) return "Simpl is busy with an update. Try again in a moment.";
+        var wasAutomatic = InstallAutomatically;
+        var wasFailures = failures;
+        Prefs.Set("updates:install", false); // (not the setter: nothing should go in meanwhile, nor be fetched)
+        Found = r;
+        Critical = false;
+        downloaded = null;
+        State = Mode.Available;
+        Message = null;
+        Log.Write($"update: {r.Version} asked for, in this version's place");
+        Changed?.Invoke();
+        await Download();
+        if (State == Mode.Ready && Found == r)
+        {
+            InstallAndRestart();
+            return null;
+        }
+        var why = Message ?? $"Could not download {r.Version}.";
+        Log.Write($"update: {r.Version} not put in ({why})");
+        Prefs.Set("updates:install", wasAutomatic);
+        Found = null;
+        downloaded = null;
+        State = Mode.Idle;
+        Message = null;
+        retryAt = null;
+        failures = wasFailures;
+        Changed?.Invoke();
+        _ = Check();
+        return why;
     }
 
     /// <summary>The installer fetched into <paramref name="part"/>, after what an earlier try left there when the server

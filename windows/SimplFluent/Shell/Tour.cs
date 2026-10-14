@@ -15,7 +15,7 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Shell;
 
 /// <summary>The parts of the window the tour lights (the Mac's TourSpot).</summary>
-public enum TourSpot { Pane, Account, Search, DashboardRow, GradesRow, ToolsRow, FirstCourse, GradeRing, GradeDetails, WhatIfSwitch, WhatIfScore, ToolPin, CounterNext, CounterPanel, Preview, Counters }
+public enum TourSpot { Pane, Account, AccountMenu, Search, DashboardRow, GradesRow, ToolsRow, FirstCourse, GradeRing, GradeDetails, WhatIfSwitch, WhatIfScore, ToolPin, CounterNext, CounterPanel, Preview, Counters }
 
 /// <summary>What a step may wait for that the window's own state does not show (the Mac's TourEvent).</summary>
 public enum TourEvent { RingHover, WhatIfOn, WhatIfEdited, WhatIfOff, CourseHover, Pinned, CounterOpened }
@@ -108,12 +108,14 @@ public static class Tour
 /// <summary>
 /// The guided tour over the window (the Mac's TourOverlay; the web's welcome.js), as a Windows 11 TeachingTip: one part
 /// lit at a time, the whole window dimmed round it — the title bar's buttons too, all but Windows' own caption buttons —
-/// the part ringed in the accent, and a callout beside it: its count, what it is, Skip tour and × to leave, Back and a
-/// Next that always works. A step may suggest something to try (click Grades) and moves on once it is done, but never
-/// waits for it. Six steps, from the Dashboard — the counters, Grades, a course, Tools, Search — to where a bug is
-/// reported. It comes once, after the app first shows with nothing over it; Escape, Skip tour or × end it, and that
-/// counts as seen; the account menu's Take the tour runs it again. Its last step's Done says it was followed to the end
-/// (<see cref="Completed"/>: Simpl then asks, once, to be kept on the taskbar).
+/// the part ringed in the accent, and a callout beside it with a tail pointing at it: its count, what it is, Skip tour
+/// and × to leave, Back and a Next that always works. A step may suggest something to try (click Grades) and moves on
+/// once it is done, but never waits for it. Six steps, from the Dashboard — the counters, Grades, a course, Tools,
+/// Search — to where a bug is reported (the account tile's ⋯, lit alone). It is offered once, not begun (the Mac's
+/// TourOffer): after the app first shows with nothing over it, "Take a 1-minute tour?" rises in at the window's foot,
+/// dimming nothing; Not now counts as seen. Escape, Skip tour or × end the tour, and that counts as seen too; the
+/// account menu's Take the tour runs it again. Its last step's Done says it was followed to the end
+/// (<see cref="Completed"/>).
 /// </summary>
 public sealed class TourOverlay : Grid
 {
@@ -134,6 +136,12 @@ public sealed class TourOverlay : Grid
     private bool ringOn;
     private bool revealed;
     private readonly Border card = new();
+    /// <summary>The callout's tail (Windows 11's TeachingTip's), drawn inside the callout so it moves with it: its fill
+    /// over the callout's edge where it joins, its outline on its two outer sides.</summary>
+    private readonly Path tailFill = new() { IsHitTestVisible = false }, tailEdge = new() { IsHitTestVisible = false, StrokeThickness = 1 };
+    private readonly Canvas tailLayer = new() { IsHitTestVisible = false };
+    /// <summary>"Take a 1-minute tour?" at the window's foot, while it is offered.</summary>
+    private Border? offer;
     private readonly Canvas layer = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private List<Step> steps = new();
@@ -143,6 +151,9 @@ public sealed class TourOverlay : Grid
     private Rect? lastHole;
 
     public bool On => index != null;
+
+    /// <summary>The tour on, or offered at the window's foot: something of it is up.</summary>
+    public bool Busy => On || offer != null;
 
     /// <summary>The last step's Done pressed: the tour followed to its end (not left early).</summary>
     public event Action? Completed;
@@ -164,6 +175,10 @@ public sealed class TourOverlay : Grid
         layer.Children.Add(ring);
         layer.Children.Add(card);
         Children.Add(layer);
+        tailFill.SetResourceReference(Shape.FillProperty, B.Flyout);
+        tailEdge.SetResourceReference(Shape.StrokeProperty, B.FlyoutStroke);
+        tailLayer.Children.Add(tailFill);
+        tailLayer.Children.Add(tailEdge);
         timer.Tick += (_, _) => Tick();
         Tour.Changed += () => { if (On) Tick(); };
         PreviewKeyDown += OnKey;
@@ -185,7 +200,7 @@ public sealed class TourOverlay : Grid
             s.Add(new("courses", TourSpot.FirstCourse, "Your courses", "Each course opens to its home, with its sections under it here."));
         s.Add(new("tools", TourSpot.ToolsRow, "Tools", "A PDF editor, a file converter, calculators, flashcards, a citation maker and more. Pin one to keep it in the title bar.", "Click Tools to look", () => At(PlaceKind.Tools)));
         s.Add(new("search", TourSpot.Search, "Search everything", "Find anything in your courses. Type / for commands, or press Ctrl+K."));
-        s.Add(new("report", TourSpot.Account, "Something wrong? Tell us here", "Report a bug or ask for something new from your account menu. You can take this tour again from the same menu.", NextLabel: "Done"));
+        s.Add(new("report", TourSpot.AccountMenu, "Something wrong? Tell us here", "Report a bug or ask for something new from your account menu. You can take this tour again from the same menu.", NextLabel: "Done"));
         return s;
     }
 
@@ -193,6 +208,9 @@ public sealed class TourOverlay : Grid
 
     public void Start(int at = 0)
     {
+        CloseOffer();
+        veil.Visibility = Visibility.Visible;
+        card.Visibility = Visibility.Visible;
         WorkPreview.Dismiss();
         // (from the start, on the Dashboard; one begun part-way, as the screenshot suite does, stays where it is opened)
         if (at == 0 && (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0)) engine.Go(Place.Dashboard);
@@ -251,10 +269,17 @@ public sealed class TourOverlay : Grid
         if (index is { } i && i > 0) Show(i - 1);
     }
 
-    /// <summary>Once, after the window first appears with nothing over it for a moment (never in the screenshot suite,
-    /// whose student has used the app, unless it asks with --open tour or tour:4).</summary>
+    /// <summary>Once, after the window first appears with nothing over it for a moment: the tour offered (never in the
+    /// screenshot suite, whose student has used the app, unless it asks — --open touroffer for the offer, --open tour or
+    /// tour:4 for the tour itself).</summary>
     public async void AutoStart()
     {
+        if (Launch.Take("touroffer") != null) // (before "tour", which it starts with)
+        {
+            await Task.Delay(3000);
+            Offer();
+            return;
+        }
         if (Launch.Take("tour") is { } at)
         {
             await Task.Delay(3000);
@@ -263,16 +288,67 @@ public sealed class TourOverlay : Grid
         }
         if (Prefs.Bool("tour:done") || Launch.IsDevelopment) return;
         var calm = 0;
-        // (as long as the app is up: a setup or a sign-in that takes a while still has the tour after it, as on the Mac)
+        // (as long as the app is up: a setup or a sign-in that takes a while still has the offer after it, as on the Mac)
         for (var ticks = 0; !Prefs.Bool("tour:done") && !On; ticks++)
         {
             await Task.Delay(500);
-            var setUp = engine.Snapshot?.SetupDone != false || SetupSheet.Seen;
+            var setUp = engine.Snapshot?.SetupDone != false || SetupSheet.Seen || SetupSheet.Later;
             var free = engine.Phase == Phase.Native && setUp && !window.Sheets.IsOpen && !engine.Login.Covers && engine.Query.Length == 0 && !WorkPreview.IsOpen;
             var ready = free && (engine.Courses.Count > 0 || ticks >= 20);
             calm = ready ? calm + 1 : 0;
-            if (calm >= 5) { Start(); return; }
+            if (calm >= 5) { Offer(); return; }
         }
+    }
+
+    // ---- the offer ----
+
+    /// <summary>
+    /// "Take a 1-minute tour?" (the Mac's TourOffer), after a setup that was already a few pages long: one line on a
+    /// flyout card at the window's foot with Not now and Take the tour. It dims nothing and takes no keys of its own —
+    /// the window works round it — and rises in from the foot (a transform and a fade, 250 ms; at once with animations
+    /// off). Not now counts as seen: the account menu's Take the tour still has it.
+    /// </summary>
+    private void Offer()
+    {
+        if (On || offer != null) return;
+        veil.Visibility = Visibility.Collapsed;
+        card.Visibility = Visibility.Collapsed;
+        Ring(false);
+        var spark = K.Icon(SymbolRegular.Sparkle24, 18, B.AccentText, filled: true);
+        var words = K.Text("Take a 1-minute tour?", Ty.BodyStrong);
+        words.TextTrimming = TextTrimming.CharacterEllipsis;
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var later = K.Button("Not now", () => { CloseOffer(); Prefs.Set("tour:done", true); });
+        later.ToolTip = "Take it any time from your account menu";
+        var take = K.Button("Take the tour", () => Start(), accent: true);
+        var row = K.Columns("auto, *, auto, auto",
+            spark.Margin(0, 0, 12, 0).Col(0), words.Col(1), later.Margin(12, 0, 8, 0).Col(2), take.Col(3));
+        offer = new Border
+        {
+            Child = row, MaxWidth = 460, Padding = new Thickness(18, 10, 10, 10), CornerRadius = new CornerRadius(8),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(24, 0, 24, 22), Effect = K.Shadow(24, 6, 0.22),
+        }.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+        System.Windows.Automation.AutomationProperties.SetName(offer, "Take a 1-minute tour?");
+        Children.Add(offer);
+        BeginAnimation(OpacityProperty, null); // (a tour's fade-out holds the overlay at 0 otherwise)
+        Opacity = 1;
+        Visibility = Visibility.Visible;
+        Motion.Enter(offer, 0, 16, Motion.Medium);
+        Shot.Moved();
+    }
+
+    /// <summary>The offer put away (answered, or the tour begun from the account menu meanwhile).</summary>
+    private void CloseOffer()
+    {
+        if (offer == null) return;
+        var o = offer;
+        offer = null;
+        Motion.FadeOut(o, () =>
+        {
+            Children.Remove(o);
+            if (!On) Visibility = Visibility.Collapsed;
+        }, Motion.Normal);
     }
 
     // ---- each beat: was the step's suggestion taken, and where is its part now ----
@@ -340,7 +416,8 @@ public sealed class TourOverlay : Grid
         moves.Children.Add(K.Button(s.NextLabel, Next, accent: true));
         buttons.Children.Add(moves.Col(2));
         v.Children.Add(buttons.Margin(0, 2, 0, 0));
-        card.Child = v;
+        (tailLayer.Parent as Panel)?.Children.Remove(tailLayer);
+        card.Child = new Grid { Children = { v, tailLayer } };
         card.Width = 340;
         card.Padding = new Thickness(18, 14, 18, 16);
         card.CornerRadius = new CornerRadius(8);
@@ -382,14 +459,23 @@ public sealed class TourOverlay : Grid
         var cs = card.DesiredSize;
         const double gap = 14, margin = 14, top = MainWindow.TitleBarHeight + 8;
         Point at;
-        if (hole is not { } hr) at = new Point((size.Width - cs.Width) / 2, Math.Max(top, (size.Height - cs.Height) / 2));
+        var side = Dock.Left; // (the callout's edge its tail leaves from; none when it stands in the middle)
+        var tailed = true;
+        if (hole is not { } hr) { at = new Point((size.Width - cs.Width) / 2, Math.Max(top, (size.Height - cs.Height) / 2)); tailed = false; }
         else if (hr.Right < size.Width * 0.4 && hr.Right + gap + cs.Width <= size.Width - margin)
             at = new Point(hr.Right + gap, Math.Clamp(hr.Y + hr.Height / 2 - cs.Height / 2, top, Math.Max(top, size.Height - cs.Height - margin)));
         else if (hr.Bottom + gap + cs.Height <= size.Height - margin)
+        {
             at = new Point(Math.Clamp(hr.X + hr.Width / 2 - cs.Width / 2, margin, Math.Max(margin, size.Width - cs.Width - margin)), hr.Bottom + gap);
+            side = Dock.Top;
+        }
         else if (hr.Y - gap - cs.Height >= top)
+        {
             at = new Point(Math.Clamp(hr.X + hr.Width / 2 - cs.Width / 2, margin, Math.Max(margin, size.Width - cs.Width - margin)), hr.Y - gap - cs.Height);
-        else at = new Point((size.Width - cs.Width) / 2, hr.Y + hr.Height / 2 > size.Height / 2 ? top : size.Height - cs.Height - margin);
+            side = Dock.Bottom;
+        }
+        else { at = new Point((size.Width - cs.Width) / 2, hr.Y + hr.Height / 2 > size.Height / 2 ? top : size.Height - cs.Height - margin); tailed = false; }
+        Tail(tailed && hole is { } aim ? (side, new Point(aim.X + aim.Width / 2 - at.X, aim.Y + aim.Height / 2 - at.Y)) : null, cs);
         // (a callout not placed yet is placed, never slid from nowhere)
         var placed = !double.IsNaN(Canvas.GetLeft(card)) && !double.IsNaN(Canvas.GetTop(card));
         if (placed && (step ? travel : animate && Motion.On))
@@ -405,6 +491,65 @@ public sealed class TourOverlay : Grid
             Canvas.SetTop(card, at.Y);
         }
         return travel && placed;
+    }
+
+    /// <summary>
+    /// The callout's tail toward the lit part (Windows 11's TeachingTip): from the edge facing it — the left when the
+    /// callout is beside the part, the top when under it, the foot when over it — at the part's middle, kept clear of the
+    /// callout's rounded corners; none when the callout stands in the middle. Worked out in the callout's own coordinates
+    /// (its origin at its outer corner) and drawn in the layer inside its edge and padding, so it travels with it.
+    /// </summary>
+    private void Tail((Dock Side, Point Aim)? at, Size size)
+    {
+        if (at is not { } a) { tailLayer.Visibility = Visibility.Collapsed; return; }
+        tailLayer.Visibility = Visibility.Visible;
+        const double half = 10, reach = 10, clear = 8 + half; // (the corners' radius is 8)
+        // (the layer's origin: inside the callout's 1-pixel edge and its padding)
+        var ox = 1 + card.Padding.Left;
+        var oy = 1 + card.Padding.Top;
+        Point P(double x, double y) => new(x - ox, y - oy);
+        Point a1, tip, a2;
+        switch (a.Side)
+        {
+            case Dock.Top:
+            {
+                var x = Math.Clamp(a.Aim.X, clear, Math.Max(clear, size.Width - clear));
+                a1 = P(x - half, 0.5); tip = P(x, 0.5 - reach); a2 = P(x + half, 0.5);
+                break;
+            }
+            case Dock.Bottom:
+            {
+                var x = Math.Clamp(a.Aim.X, clear, Math.Max(clear, size.Width - clear));
+                a1 = P(x - half, size.Height - 0.5); tip = P(x, size.Height - 0.5 + reach); a2 = P(x + half, size.Height - 0.5);
+                break;
+            }
+            default:
+            {
+                var y = Math.Clamp(a.Aim.Y, clear, Math.Max(clear, size.Height - clear));
+                a1 = P(0.5, y - half); tip = P(0.5 - reach, y); a2 = P(0.5, y + half);
+                break;
+            }
+        }
+        // (the fill reaches a pixel into the callout, over its edge, so the two read as one shape)
+        var inward = a.Side switch { Dock.Top => new Vector(0, 1), Dock.Bottom => new Vector(0, -1), _ => new Vector(1, 0) };
+        var fill = new StreamGeometry();
+        using (var g = fill.Open())
+        {
+            g.BeginFigure(a1 + inward, true, true);
+            g.LineTo(tip, false, false);
+            g.LineTo(a2 + inward, false, false);
+        }
+        fill.Freeze();
+        var edge = new StreamGeometry();
+        using (var g = edge.Open())
+        {
+            g.BeginFigure(a1, false, false);
+            g.LineTo(tip, true, true);
+            g.LineTo(a2, true, true);
+        }
+        edge.Freeze();
+        tailFill.Data = fill;
+        tailEdge.Data = edge;
     }
 
     /// <summary>The ring faded in where a part is lit, and out (where it was) when none is (Motion.Normal).</summary>

@@ -99,11 +99,43 @@ public static class Appearance
         var theme = Dark ? ApplicationTheme.Dark : ApplicationTheme.Light;
         ApplicationThemeManager.Apply(theme, Backdrop, AccentHex == null);
         if (AccentHex is { } h && Hex(h) is { } c) ApplicationAccentColorManager.Apply(c, theme);
+        ReadableText(Application.Current.Resources, Dark);
         foreach (Window w in Application.Current.Windows)
         {
             try { WindowBackgroundManager.UpdateBackground(w, theme, w is FluentWindow fw ? fw.WindowBackdropType : WindowBackdropType.None); } catch { }
         }
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// The light theme's secondary and tertiary text, solid: Fluent's are black at 62% and 45% (#9E000000, #72000000),
+    /// and WPF draws a see-through text colour without ClearType, its glyphs' edges paler still — the picker's line,
+    /// the sign-in card's, every row's description in Settings measured about #8D8D8D on #F9F9F9 (3.2 to 1), under the
+    /// 4.5 to 1 small text needs. Solid greys instead: #5F5F5F (6 to 1 on the window, 6.4 on a card) and #707070 (4.7 and
+    /// 5), the second still a step dimmer than the first, the first a step dimmer than the text itself (#1B1B1B). Written
+    /// at the application's level, over the theme's dictionary (as the accent is); the dark theme keeps Fluent's own,
+    /// which read well (#C5FFFFFF on #202020 is 10 to 1).
+    /// </summary>
+    internal static void ReadableText(ResourceDictionary app, bool dark)
+    {
+        (string Key, Color Light)[] solid =
+        {
+            ("TextFillColorSecondary", Color.FromRgb(0x5F, 0x5F, 0x5F)),
+            ("TextFillColorTertiary", Color.FromRgb(0x70, 0x70, 0x70)),
+        };
+        foreach (var (key, light) in solid)
+        {
+            if (dark)
+            {
+                app.Remove(key);
+                app.Remove(key + "Brush");
+                continue;
+            }
+            app[key] = light;
+            var brush = new SolidColorBrush(light);
+            brush.Freeze();
+            app[key + "Brush"] = brush;
+        }
     }
 
     /// <summary>The accent now (Windows' own, or the one chosen), kept until the look is worn again (Apply).</summary>
@@ -130,6 +162,44 @@ public static class Appearance
 
     public static void SetKind(string slot, string kind) { Prefs.Set($"photo:{slot}:kind", kind); Changed?.Invoke(); }
 
+    /// <summary>How far a place's picture is moved from where it is pinned (the Mac's drag in its preview), as a share
+    /// of the place's size each way: (0, 0) where it is pinned, at most half the place either way.</summary>
+    public static (double X, double Y) Pan(string slot) =>
+        (Math.Clamp(Prefs.Double($"photo:{slot}:x", 0), -0.5, 0.5), Math.Clamp(Prefs.Double($"photo:{slot}:y", 0), -0.5, 0.5));
+
+    public static void SetPan(string slot, double x, double y)
+    {
+        Prefs.Set($"photo:{slot}:x", Math.Abs(x) < 0.001 ? null : Math.Round(Math.Clamp(x, -0.5, 0.5), 3));
+        Prefs.Set($"photo:{slot}:y", Math.Abs(y) < 0.001 ? null : Math.Round(Math.Clamp(y, -0.5, 0.5), 3));
+        Changed?.Invoke();
+    }
+
+    /// <summary>A place's picture back where it is pinned, at its own size.</summary>
+    public static void ResetPicture(string slot)
+    {
+        Prefs.Remove($"photo:{slot}:x");
+        Prefs.Remove($"photo:{slot}:y");
+        Prefs.Set($"photo:{slot}:zoom", 1.0);
+        Changed?.Invoke();
+    }
+
+    /// <summary>The scene a place draws when it shows a drawing: one picked for it (any ready theme's — the Mac's
+    /// Drawing menu), else the worn theme's; null when neither has one (Default, nothing picked).</summary>
+    public static string? SceneFor(string slot) =>
+        Prefs.String($"photo:{slot}:scene") is { Length: > 0 } picked && ReadyThemes.Any(r => r.Scene == picked) ? picked
+        : ReadyThemes.FirstOrDefault(r => r.Name == ThemeName).Scene;
+
+    /// <summary>The drawing picked for a place (a ready theme's scene), or null to follow the theme worn.</summary>
+    public static string? PickedScene(string slot) => Prefs.String($"photo:{slot}:scene") is { Length: > 0 } s ? s : null;
+
+    /// <summary>A place set to show a drawing: a scene of its own, or (null) the theme worn's.</summary>
+    public static void SetScene(string slot, string? scene)
+    {
+        Prefs.Set($"photo:{slot}:scene", scene);
+        Prefs.Set($"photo:{slot}:kind", "drawing");
+        Changed?.Invoke();
+    }
+
     /// <summary>A picture chosen for a place: a copy of it kept in the app's folder.</summary>
     public static bool SetPhoto(string slot, string file)
     {
@@ -141,6 +211,8 @@ public static class Appearance
             Prefs.Set("photo:" + slot, dest);
             Prefs.Set($"photo:{slot}:kind", "photo");
             Prefs.Set($"photo:{slot}:zoom", 1.0);
+            Prefs.Remove($"photo:{slot}:x");
+            Prefs.Remove($"photo:{slot}:y");
             Changed?.Invoke();
             return true;
         }
@@ -153,6 +225,9 @@ public static class Appearance
         Prefs.Remove("photo:" + slot);
         Prefs.Remove($"photo:{slot}:kind");
         Prefs.Remove($"photo:{slot}:zoom");
+        Prefs.Remove($"photo:{slot}:x");
+        Prefs.Remove($"photo:{slot}:y");
+        Prefs.Remove($"photo:{slot}:scene"); // (back to the worn theme's drawing, not one picked before the photo)
         Changed?.Invoke();
     }
 }

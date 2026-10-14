@@ -19,11 +19,12 @@ using Image = System.Windows.Controls.Image;
 namespace Simpl.Shell;
 
 /// <summary>
-/// Simpl kept on the taskbar, one click away (as a Mac app is kept in the Dock): asked once, when the guided tour has
-/// been followed to its last step's Done — never when it is left early — and any time from Settings ▸ General's Pin to
-/// taskbar…. Nothing is asked when Simpl is pinned already. For the installed copy, where Windows lets an app ask for
-/// itself (TaskbarManager), Windows' own question comes up; elsewhere — a copy run from its zip, a PC whose Windows does
-/// not ask — a dialog shows where Pin to taskbar is, drawn, while Simpl's taskbar button flashes until it is closed.
+/// Simpl kept on the taskbar, one click away (as a Mac app is kept in the Dock): asked once, the third time Simpl is
+/// opened, at a calm moment — not in the middle of the first run, straight after a setup and a tour — and any time from
+/// Settings ▸ General's Pin to taskbar…. Nothing is asked when Simpl is pinned already. For the installed copy, where
+/// Windows lets an app ask for itself (TaskbarManager), Windows' own question comes up; elsewhere — a copy run from its
+/// zip, a PC whose Windows does not ask — a dialog shows where Pin to taskbar is, drawn, while Simpl's taskbar button
+/// flashes until it is closed.
 /// </summary>
 public static class Taskbar
 {
@@ -31,13 +32,36 @@ public static class Taskbar
     public enum Answer { AlreadyPinned, Pinned, NotPinned, Shown }
 
     private const string AskedKey = "taskbar:asked";
+    /// <summary>How many times Simpl has been opened: started with its screens up, or brought back from the
+    /// notification area (where it keeps running, so a start alone would be rare).</summary>
+    private const string OpensKey = "taskbar:opens";
+    /// <summary>The opening that asks (onboarding-4: "for example on the 3rd launch").</summary>
+    private const int AskOnOpen = 3;
+    private static bool waiting;
 
-    /// <summary>The tour's last step done: asked, once (never unasked in a picture).</summary>
-    public static async void AfterTour(MainWindow window)
+    /// <summary>
+    /// Simpl opened (its screens up at a start, or its window brought back): counted, and from the third on, asked once
+    /// — a minute in, when nothing is over the window (<paramref name="busy"/>: a dialog, the tour, the sign-in) and the
+    /// window is shown and in front. Never in a development run or a picture.
+    /// </summary>
+    public static async void Opened(MainWindow window, Func<bool> busy)
     {
-        if (Prefs.Bool(AskedKey) || Shot.Asked) return;
+        if (Prefs.Bool(AskedKey) || Shot.Asked || Launch.IsDevelopment) return;
+        var opens = (int)Prefs.Double(OpensKey) + 1;
+        Prefs.Set(OpensKey, (double)opens);
+        if (opens < AskOnOpen || waiting) return;
+        waiting = true;
+        await Task.Delay(TimeSpan.FromMinutes(1));
+        // (a calm moment: nothing over the window, the window shown and in front — looked for every few seconds, for as
+        //  long as Simpl runs)
+        while (busy() || !window.IsVisible || !window.IsActive || window.WindowState == WindowState.Minimized)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            if (Prefs.Bool(AskedKey)) return;
+        }
+        waiting = false;
+        if (Prefs.Bool(AskedKey)) return;
         Prefs.Set(AskedKey, true);
-        await Task.Delay(600); // (the tour fades away first)
         try { await Ask(window); }
         catch (Exception e) { Log.Write("taskbar: " + e.Message); }
     }
@@ -67,7 +91,7 @@ public static class Taskbar
         if (Updates.Installed && await AskWindows() is { } pinned)
         {
             if (pinned) return Answer.Pinned;
-            if (!asked) return Answer.NotPinned; // (after the tour: the student's No, not asked twice)
+            if (!asked) return Answer.NotPinned; // (asked by itself: the student's No, not asked twice)
         }
         await ShowSheet(over);
         return IsPinned() ? Answer.Pinned : Answer.Shown;

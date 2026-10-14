@@ -1,12 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using Simpl.Kit;
 using Simpl.Models;
 using Simpl.Support;
 using Wpf.Ui.Controls;
-using Image = System.Windows.Controls.Image;
 using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace Simpl.Shell;
@@ -23,6 +21,11 @@ public sealed class SetupChoices
         public string Color { get; set; } = "";
         public bool On { get; set; }
         public string Target { get; set; } = "A+";
+        /// <summary>(2.99.33) The name the navigation pane will show (its nickname, else its name), and what is new
+        /// about it — its real title under a nickname, its term, its teacher ("Fall 2026 · Yue Lei"). Null from an
+        /// older page.</summary>
+        public string? Label { get; set; }
+        public string? Sub { get; set; }
     }
 
     public bool Done { get; set; }
@@ -30,18 +33,25 @@ public sealed class SetupChoices
     public List<string> Grades { get; set; } = new();
     public double Goal { get; set; } = 4;
     public bool Tracking { get; set; } = true;
+    /// <summary>(2.99.33) The goal as the engine writes it ("4.00").</summary>
+    public string? GoalText { get; set; }
 }
 
 /// <summary>
-/// The guided setup (the Mac's SetupScreen), as a Windows 11 dialog over the window: a welcome; the courses that count,
-/// by their names; a nickname for each, if you like; the grade history, its GPA goal and the grade aimed for in each
-/// course; and a read-back. Back and Next sit at its foot with Windows' pips for the steps between, and each step slides
-/// in from the side it is going to. Shown on the first run, and again from Settings ▸ General ▸ Courses and goals
-/// (straight to the courses, with Cancel).
+/// The guided setup (the Mac's SetupScreen), as a Windows 11 dialog over the window: straight to the courses Simpl shows
+/// (the school's search has already said "Welcome to Simpl"), each by one name on one line; a nickname for each, if you
+/// like; the grade history, the term's GPA goal and the grade aimed for in each course; and a read-back. Back and Next
+/// sit at its foot with Windows' pips for the four steps, and each step slides in from the side it is going to. Shown on
+/// the first run, every current course ticked, with Set up later (the app works as it stands until then, and the setup
+/// is not put up again at launch); and again from Settings ▸ General ▸ Courses shown and goals, with Cancel.
 /// </summary>
 public sealed class SetupSheet
 {
-    private enum Step { Welcome, Courses, Nicknames, Grades, Done }
+    private enum Step { Courses, Nicknames, Grades, Done }
+
+    /// <summary>The first run's setup was put off (Set up later) and not finished since: not put up again at launch
+    /// (Engine), and the tour may be offered meanwhile.</summary>
+    public static bool Later => Prefs.Bool(Engine.Engine.SetupLaterKey);
 
     private readonly Engine.Engine engine;
     private readonly Sheet sheet = new() { Bare = true, Width = 640, Height = 560, Modal = true };
@@ -49,7 +59,7 @@ public sealed class SetupSheet
     private readonly Grid foot = new();
     private SetupChoices? d;
     private string? loadError;
-    private Step step = Step.Welcome;
+    private Step step = Step.Courses;
     private bool forward = true, saving;
     private string? error;
     private readonly HashSet<string> chosen = new();
@@ -85,15 +95,17 @@ public sealed class SetupSheet
         try
         {
             d = await engine.Call<SetupChoices>("setupInfo");
+            // (--setup-first yes, a development run's: the setup as a first run shows it — Set up later, no Cancel — for
+            //  the pictures, whose student has set up before)
+            if (Launch.IsDevelopment && Launch.Flag("setup-first")) d.Done = false;
             foreach (var c in d.Courses)
             {
                 if (c.On) chosen.Add(c.Id);
-                nicknames[c.Id] = c.Nickname;
+                nicknames[c.Id] = c.Nickname ?? "";
                 targets[c.Id] = string.IsNullOrEmpty(c.Target) ? "A+" : c.Target;
             }
             tracking = d.Tracking;
-            goal = d.Goal;
-            if (d.Done) step = Step.Courses; // (run again from Settings: straight to the courses)
+            goal = GoalFigure.Value(d.Goal);
             sheet.Modal = !d.Done;
         }
         catch (Exception e) { loadError = e.Message; sheet.Modal = false; }
@@ -116,14 +128,13 @@ public sealed class SetupSheet
         if (d == null) content = K.LoadState(loadError, () => { loadError = null; Draw(); _ = Retry(); });
         else content = step switch
         {
-            Step.Welcome => Welcome(),
             Step.Courses => Courses(d),
             Step.Nicknames => Nicknames(d),
             Step.Grades => Grades(d),
             _ => ReadBack(d),
         };
         stepHost.Content = content;
-        if (d != null && step != Step.Welcome) Motion.SlideIn(content, forward);
+        if (d != null) Motion.SlideIn(content, forward);
         Footer();
         Shot.Moved();
     }
@@ -136,40 +147,57 @@ public sealed class SetupSheet
 
     // ---- the steps ----
 
-    private FrameworkElement Welcome()
+    /// <summary>A step's title and the line under it, in grey (onboarding-1: an accent-coloured line read as a link).</summary>
+    private static FrameworkElement Heading(string title, string sub) =>
+        K.V(4, K.Text(title, Ty.Subtitle), K.Wrapped(sub, Ty.Body, B.Text2)).Margin(30, 26, 30, 14);
+
+    /// <summary>The course's own name: what the navigation pane shows when it has no nickname.</summary>
+    private static string OwnName(SetupChoices.Course c) => !string.IsNullOrEmpty(c.Name) ? c.Name : c.Code ?? "";
+
+    /// <summary>The name the pane will show once this is saved: the nickname typed here (a saved one arrives typed), else
+    /// the course's own.</summary>
+    private string Shown(SetupChoices.Course c) =>
+        nicknames.TryGetValue(c.Id, out var n) && !string.IsNullOrWhiteSpace(n) ? n.Trim() : OwnName(c);
+
+    /// <summary>What the page says is new about a course (its term and teacher, its real title under a nickname), less
+    /// anything that only repeats <paramref name="name"/> — never the code over the same name spelled another way
+    /// ("MATH-021-20" over "F26-MATH 021 20").</summary>
+    private static string Detail(SetupChoices.Course c, string name)
     {
-        var icon = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 88, Height = 88, HorizontalAlignment = HorizontalAlignment.Center };
-        var title = K.Text("Welcome to Simpl", Ty.Title).Center();
-        var sub = K.Wrapped($"{engine.LmsName}, simply, on your PC. A few quick questions and you’re in.", Ty.BodyLarge, B.Text2).Center();
-        sub.TextAlignment = TextAlignment.Center;
-        FrameworkElement Feature(SymbolRegular s, Color c, string t, string text) =>
-            K.Columns("auto, *", K.IconTile(s, c, 36).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0),
-                K.V(2, K.Text(t, Ty.BodyStrong), K.Wrapped(text, Ty.Body, B.Text2)).Margin(14, 0, 0, 0).Col(1));
-        var features = K.V(16,
-            Feature(SymbolRegular.WeatherSunny24, Color.FromRgb(0xf7, 0x8c, 0x1a), "Dashboard", "What is due, what is new, and what was graded — at a glance."),
-            Feature(SymbolRegular.DataBarVertical24, Color.FromRgb(0x2f, 0xa8, 0x4f), "Grades", "Rings for every course, your GPA, and what-if scores."),
-            Feature(SymbolRegular.TaskListLtr24, Color.FromRgb(0x29, 0x7b, 0xe6), "Quizzes and hand-ins", "Take quizzes and hand in work without leaving the app."));
-        features.MaxWidth = 420;
-        features.Margin = new Thickness(0, 8, 0, 0);
-        var v = K.V(20, icon, K.V(6, title, sub), features);
-        v.HorizontalAlignment = HorizontalAlignment.Center;
-        v.VerticalAlignment = VerticalAlignment.Center;
-        v.Margin = new Thickness(48, 24, 48, 24);
-        Motion.Stagger(new UIElement[] { icon }.Concat(v.Children.OfType<UIElement>().Skip(1)).Concat(features.Children.OfType<UIElement>()), 60, 10);
-        return v;
+        var sub = (c.Sub ?? "").Trim();
+        if (sub == name) return "";
+        if (sub.StartsWith(name + " · ", StringComparison.Ordinal)) return sub[(name.Length + 3)..];
+        return sub;
     }
 
-    private static FrameworkElement Heading(string title, string sub, bool accent = false)
+    /// <summary>A course on one line (onboarding-30): the pane's name for it, bold, and after it in grey what that name
+    /// does not say, cut with an ellipsis where it runs out of room — the whole of it in the tooltip — so a term's list
+    /// is in view.</summary>
+    private static FrameworkElement Line(string name, string more)
     {
-        var s = K.Wrapped(sub, Ty.Body, accent ? B.AccentText : B.Text2);
-        if (accent) s.FontWeight = FontWeights.SemiBold;
-        return K.V(4, K.Text(title, Ty.Subtitle), s).Margin(30, 26, 30, 14);
+        var bold = K.Text(name, Ty.BodyStrong);
+        bold.TextTrimming = TextTrimming.CharacterEllipsis;
+        bold.MaxWidth = 300;
+        var line = K.Columns("auto, *", bold.Col(0));
+        if (more.Length > 0)
+        {
+            var grey = K.Text(more, Ty.Body, B.Text2);
+            grey.TextTrimming = TextTrimming.CharacterEllipsis;
+            grey.Margin = new Thickness(12, 0, 0, 0);
+            grey.VerticalAlignment = VerticalAlignment.Center;
+            line.Children.Add(grey.Col(1));
+        }
+        line.ToolTip = more.Length > 0 ? $"{name} · {more}" : name;
+        return line;
     }
 
+    /// <summary>A course by its own name, and what is new about it under it (the nicknames step, where the name typed
+    /// beside it would replace it).</summary>
     private static FrameworkElement Names(SetupChoices.Course c)
     {
-        var v = K.V(1, K.Text(c.Code, Ty.BodyStrong));
-        if (!string.IsNullOrEmpty(c.Name) && c.Name != c.Code) v.Children.Add(K.Wrapped(c.Name, Ty.Caption, B.Text2, 2));
+        var name = OwnName(c);
+        var v = K.V(1, K.Text(name, Ty.BodyStrong));
+        if (Detail(c, name) is { Length: > 0 } more) v.Children.Add(K.Wrapped(more, Ty.Caption, B.Text2, 1));
         return v;
     }
 
@@ -178,7 +206,12 @@ public sealed class SetupSheet
 
     private FrameworkElement Courses(SetupChoices data)
     {
-        var head = Heading("Which classes are you in?", "Only select the courses that count towards your GPA.", accent: true);
+        // (onboarding-1) what a tick does — the course in the pane and on the Dashboard, and on Canvas one of the student's
+        // favourites (Brightspace's ticks are kept on this PC) — and where the GPA is decided instead: never "only the
+        // courses that count towards your GPA", which hid a lab's or a pass/fail course's work
+        const string shownWhere = "Ticked courses show in the navigation pane and on your Dashboard";
+        const string gpa = "Pass/Fail, on the Grades step, keeps a course out of your GPA.";
+        var head = Heading("Which courses should Simpl show?", engine.OnBrightspace ? $"{shownWhere}. {gpa}" : $"{shownWhere}, and become your Canvas favourites. {gpa}");
         if (data.Courses.Count == 0)
             return K.Rows("auto, *", head.Row(0), Scroll(K.Row(SymbolRegular.Info24, "No active courses right now", "You can finish now and choose courses later from Settings.")).Row(1));
         var count = K.Text($"{chosen.Count} of {data.Courses.Count} selected", Ty.Body, B.Text2);
@@ -192,12 +225,14 @@ public sealed class SetupSheet
         var rows = K.V(0);
         foreach (var c in data.Courses)
         {
-            var cb = new CheckBox { IsChecked = chosen.Contains(c.Id), Content = Names(c), VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 0, 0, 0) };
+            var name = Shown(c);
+            var cb = new CheckBox { IsChecked = chosen.Contains(c.Id), Content = Line(name, Detail(c, name)), VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 0, 0, 0), HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            System.Windows.Automation.AutomationProperties.SetName(cb, name);
             var id = c.Id;
             cb.Checked += (_, _) => { chosen.Add(id); count.Text = $"{chosen.Count} of {data.Courses.Count} selected"; Footer(); };
             cb.Unchecked += (_, _) => { chosen.Remove(id); count.Text = $"{chosen.Count} of {data.Courses.Count} selected"; Footer(); };
             if (rows.Children.Count > 0) rows.Children.Add(K.Divider());
-            rows.Children.Add(cb.Margin(16, 10, 16, 10));
+            rows.Children.Add(cb.Margin(16, 8, 16, 8));
         }
         var list = K.V(8, bar.Margin(2, 0, 2, 0), K.Card(rows, new Thickness(0), 4));
         return K.Rows("auto, *", head.Row(0), Scroll(list).Row(1));
@@ -218,13 +253,13 @@ public sealed class SetupSheet
         if (picked.Count == 0) rows.Children.Add(K.Row(null, "No courses chosen: nothing to name.", null));
         foreach (var c in picked)
         {
-            var box = new TextBox { PlaceholderText = c.Code, Text = nicknames.TryGetValue(c.Id, out var n) ? n : "", Width = 220, MaxLength = 60 };
+            var box = new TextBox { PlaceholderText = OwnName(c), Text = nicknames.TryGetValue(c.Id, out var n) ? n : "", Width = 220, MaxLength = 60 };
             var id = c.Id;
             box.TextChanged += (_, _) => nicknames[id] = box.Text;
             var row = K.Card(K.Columns("*, auto", Names(c).Margin(0, 0, 16, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(0), box.Col(1)), new Thickness(16, 12, 16, 12), 4);
             rows.Children.Add(row);
         }
-        rows.Children.Add(K.Wrapped(engine.OnBrightspace ? "A nickname shows everywhere in place of the course’s code — on this PC only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.", Ty.Caption, B.Text2).Margin(2, 6, 2, 0));
+        rows.Children.Add(K.Wrapped(engine.OnBrightspace ? "A nickname shows everywhere in place of the course’s name — on this PC only." : "A nickname shows everywhere in place of the course’s name — in Canvas too.", Ty.Caption, B.Text2).Margin(2, 6, 2, 0));
         return K.Rows("auto, *", head.Row(0), Scroll(rows).Row(1));
     }
 
@@ -232,20 +267,24 @@ public sealed class SetupSheet
     {
         var head = Heading("Grades", $"{engine.LmsName} keeps no history. Simpl can, on this PC.");
         var keep = new ToggleSwitch { IsChecked = tracking };
-        var goalBox = new NumberBox { Value = goal, Minimum = 0, Maximum = 4, SmallChange = 0.05, MaxDecimalPlaces = 2, Width = 140, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        goalBox.ValueChanged += (_, _) => goal = Math.Clamp(Math.Round((goalBox.Value ?? 4) * 100) / 100, 0, 4);
-        var goalRow = K.Row(SymbolRegular.Target24, "GPA goal", null, goalBox);
+        // (onboarding-20: one name for each, as Settings ▸ Grades says them — grade history, the term GPA goal — and the
+        //  goal with its two decimals, kept half up as the engine keeps it)
+        // (three places kept by the box, so it never rounds a typed 3.425 its own way first: GoalFigure rounds it, and
+        //  shows two)
+        var goalBox = new NumberBox { Value = goal, Minimum = 0, Maximum = 4, SmallChange = 0.05, MaxDecimalPlaces = 3, Width = 140, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, NumberFormatter = new GoalFigure.Formatter() };
+        goalBox.ValueChanged += (_, _) => goal = GoalFigure.Value(goalBox.Value ?? 4);
+        var goalRow = K.Row(SymbolRegular.Target24, "Term GPA goal", null, goalBox);
         goalRow.Visibility = tracking ? Visibility.Visible : Visibility.Collapsed;
         keep.Checked += (_, _) => { tracking = true; goalRow.Visibility = Visibility.Visible; };
         keep.Unchecked += (_, _) => { tracking = false; goalRow.Visibility = Visibility.Collapsed; };
-        var v = K.V(4, K.Row(SymbolRegular.History24, "Keep a history", "One snapshot a day, on this PC only.", keep), goalRow);
+        var v = K.V(4, K.Row(SymbolRegular.History24, "Keep grade history", "One snapshot a day, on this PC.", keep), goalRow);
         v.Children.Add(K.SectionHeader("Aiming for", 24));
         var picked = data.Courses.Where(c => chosen.Contains(c.Id)).ToList();
         if (picked.Count == 0) v.Children.Add(K.Row(null, "No courses chosen: nothing to aim at yet.", null));
         var grades = data.Grades.AsEnumerable().Reverse().Concat(new[] { "Pass/Fail" }).ToList();
         foreach (var c in picked)
         {
-            var label = nicknames.TryGetValue(c.Id, out var n) && n.Trim().Length > 0 ? n.Trim() : c.Code;
+            var label = Shown(c);
             var box = new ComboBox { ItemsSource = grades, MinWidth = 140 };
             var t = targets.TryGetValue(c.Id, out var tv) ? tv : "A+";
             box.SelectedItem = t == "P/F" ? "Pass/Fail" : grades.Contains(t) ? t : grades.FirstOrDefault();
@@ -261,7 +300,7 @@ public sealed class SetupSheet
     {
         var seal = K.Icon(SymbolRegular.CheckmarkStarburst24, 44, Color.FromRgb(0x2f, 0xa8, 0x4f), filled: true);
         seal.HorizontalAlignment = HorizontalAlignment.Left;
-        var head = K.V(6, seal, K.Text("You’re set", Ty.Subtitle), K.Wrapped("Change any of this later in Settings (Ctrl+,) ▸ General ▸ Courses and goals.", Ty.Body, B.Text2));
+        var head = K.V(6, seal, K.Text("You’re set", Ty.Subtitle), K.Wrapped("Change any of this later in Settings (Ctrl+,) ▸ General ▸ Courses shown and goals.", Ty.Body, B.Text2));
         head.Margin = new Thickness(30, 26, 30, 14);
         var s = new ScaleTransform(0.6, 0.6);
         seal.RenderTransformOrigin = new Point(0.5, 0.5);
@@ -270,7 +309,7 @@ public sealed class SetupSheet
         Motion.FromTo(s, ScaleTransform.ScaleYProperty, 0.6, 1, 420, Motion.Gentle, 120);
         var rows = K.V(4,
             K.Row(SymbolRegular.BookOpen24, "Courses shown", null, K.Text($"{chosen.Count} of {data.Courses.Count}", Ty.Body, B.Text2)),
-            K.Row(SymbolRegular.History24, "Grade history", null, K.Text(tracking ? $"On · goal {goal:0.00}" : "Off", Ty.Body, B.Text2)));
+            K.Row(SymbolRegular.History24, "Grade history", null, K.Text(tracking ? $"On · goal {GoalFigure.Text(goal)}" : "Off", Ty.Body, B.Text2)));
         if (error != null)
         {
             var bar = new InfoBar { Title = "Couldn’t save", Message = error, Severity = InfoBarSeverity.Error, IsOpen = true, IsClosable = false };
@@ -279,7 +318,7 @@ public sealed class SetupSheet
         return K.Rows("auto, *", head.Row(0), Scroll(rows).Row(1));
     }
 
-    // ---- the foot: Cancel, the pips, Back, Next ----
+    // ---- the foot: Cancel (or Set up later), the pips, Back, Next ----
 
     private void Footer()
     {
@@ -288,13 +327,20 @@ public sealed class SetupSheet
         foreach (var w in new[] { "auto", "*", "auto" }) foot.ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
         var canCancel = d?.Done == true || (d == null && loadError != null);
         if (canCancel) foot.Children.Add(K.Button("Cancel", () => sheet.Close()).Col(0));
-        // (the first run's save failed: never a dead end — it can be done later from Settings)
-        else if (error != null) foot.Children.Add(K.Button("Skip for Now", () => sheet.Close()).Col(0));
-        if (d != null && step != Step.Welcome)
+        else if (d != null)
         {
-            // Windows' PipsPager: a pip for each step after the welcome, the current one longer and in the accent
+            // (onboarding-4) the first run's way past it — a save that failed too: never a dead end; the app works as it
+            // stands meanwhile, and Settings ▸ General ▸ Courses shown and goals runs it whenever the student likes
+            var later = Enabled(K.Button("Set up later", PutOff), !saving);
+            later.ToolTip = "Use Simpl as it is now, and set it up any time from Settings ▸ General ▸ Courses shown and goals";
+            foot.Children.Add(later.Col(0));
+        }
+        if (d != null)
+        {
+            // Windows' PipsPager: a pip for each step, the current one longer and in the accent
             var pips = K.H(6);
-            for (var i = 1; i < 5; i++)
+            var count = Enum.GetValues<Step>().Length;
+            for (var i = 0; i < count; i++)
             {
                 var on = i <= (int)step;
                 var pip = new Border { Width = i == (int)step ? 18 : 6, Height = 6, CornerRadius = new CornerRadius(3) };
@@ -303,15 +349,14 @@ public sealed class SetupSheet
             }
             pips.HorizontalAlignment = HorizontalAlignment.Center;
             pips.VerticalAlignment = VerticalAlignment.Center;
-            System.Windows.Automation.AutomationProperties.SetName(pips, $"Step {(int)step} of 4");
+            System.Windows.Automation.AutomationProperties.SetName(pips, $"Step {(int)step + 1} of {count}");
             foot.Children.Add(pips.Col(1));
         }
         if (d == null) return;
         var buttons = K.H(8);
-        if ((int)step > (d.Done ? 1 : 0)) buttons.Children.Add(Enabled(K.Button("Back", () => Go(-1)), !saving));
+        if (step > Step.Courses) buttons.Children.Add(Enabled(K.Button("Back", () => Go(-1)), !saving));
         var word = step switch
         {
-            Step.Welcome => "Get started",
             Step.Done => saving ? "Saving…" : d.Done ? "Done" : "Start using Simpl",
             _ => "Next",
         };
@@ -360,27 +405,45 @@ public sealed class SetupSheet
             Log.Write("setup save: " + e);
             error = e.Message;
             forward = true;
-            sheet.Modal = false; // (a save that fails never keeps the student in: Escape, or Skip for Now, lets them go)
+            sheet.Modal = false; // (a save that fails never keeps the student in: Escape, or Set up later, lets them go)
             saving = false;
             Draw();
             return;
         }
         // saved: what follows tells the rest of the app, and nothing it meets can make the save look as if it failed
         saving = false;
-        Quietly("pending", () => Prefs.Set(Engine.Engine.SetupPendingKey, false));
+        Quietly("pending", () => { Prefs.Set(Engine.Engine.SetupPendingKey, false); Prefs.Remove(Engine.Engine.SetupLaterKey); });
         Quietly("close", sheet.Close);
         Quietly("data", engine.DataChanged);
         _ = engine.LoadSidebar(); // (the pane's courses: the ones just chosen, by their new names)
-        // (the Mac's NotificationAsk.afterSetup: once the setup is done, reminders and new-activity alerts are on —
-        // Windows asks nothing for them; Settings ▸ Notifications turns either off)
-        if (!Prefs.Bool("notifications:asked") && !Launch.IsDevelopment)
-            Quietly("notifications", () =>
-            {
-                Prefs.Set("notifications:asked", true);
-                Prefs.Set("reminders:on", true);
-                Prefs.Set("activity:on", true);
-                Notices.SettingsChanged();
-            });
+        NoticesOn();
+    }
+
+    /// <summary>
+    /// (onboarding-4) Set up later: nothing saved — the courses stay as the school's site has them, the Dashboard working
+    /// with them as it does — and the setup not put up again at launch; Settings ▸ General ▸ Courses shown and goals (or
+    /// Courses ▸ Choose courses) runs it whenever the student likes.
+    /// </summary>
+    private void PutOff()
+    {
+        Prefs.Set(Engine.Engine.SetupLaterKey, true);
+        Prefs.Set(Engine.Engine.SetupPendingKey, false);
+        sheet.Close();
+        NoticesOn();
+    }
+
+    /// <summary>The Mac's NotificationAsk.afterSetup: once the first setup is done or put off, reminders and new-activity
+    /// alerts are on — Windows asks nothing for them; Settings ▸ Notifications turns either off.</summary>
+    private static void NoticesOn()
+    {
+        if (Prefs.Bool("notifications:asked") || Launch.IsDevelopment) return;
+        Quietly("notifications", () =>
+        {
+            Prefs.Set("notifications:asked", true);
+            Prefs.Set("reminders:on", true);
+            Prefs.Set("activity:on", true);
+            Notices.SettingsChanged();
+        });
     }
 
     private static void Quietly(string what, Action a)

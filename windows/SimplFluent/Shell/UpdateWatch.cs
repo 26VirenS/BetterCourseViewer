@@ -184,17 +184,17 @@ public static class UpdateWatch
         FrameworkElement icon = critical ? K.Icon(SymbolRegular.Warning24, 16, Color.FromRgb(0xe3, 0x6c, 0x0a), filled: true) : K.Icon(SymbolRegular.ArrowSync24, 16, B.AccentText);
         if (Updates.State == Updates.Mode.Installing)
         {
-            text = critical ? $"Installing Critical Update {v} — Simpl opens again in a moment." : $"Updating Simpl to {v} — it opens again in a moment.";
+            text = critical ? $"Installing critical update {v} — Simpl opens again in a moment." : $"Updating Simpl to {v} — it opens again in a moment.";
             icon = K.Spinner(16);
             stays = true;
         }
         else if (Updates.State == Updates.Mode.Ready && Updates.Waiting is { When: { } when })
         {
-            text = critical ? $"Critical Update {v} installs {when}." : $"Simpl updates to {v} {when}.";
+            text = critical ? $"Critical update {v} installs {when}." : $"Simpl updates to {v} {when}.";
             stays = critical;
         }
         else if (critical && Updates.State == Updates.Mode.Failed && Updates.Found != null)
-            text = $"Critical Update {v} couldn’t be installed yet; Simpl tries again shortly.";
+            text = $"Critical update {v} couldn’t be installed yet; Simpl tries again shortly.";
 
         if (text == null) { Hide(); return; }
         if (!stays && text == briefShown && pill.Visibility != Visibility.Visible) return; // (said once already)

@@ -228,6 +228,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     {
         if (engine == null) return;
         Prefs.Remove("school");
+        SchoolName.Forget(engine.Host);
+        Prefs.Remove(Engine.Engine.SetupLaterKey); // (another school's first setup is put up as any first setup is)
         var old = engine;
         engine = null;
         old.PropertyChanged -= OnEngine;
@@ -303,7 +305,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 shell = new AppShell(engine, this);
                 Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
-                tour.Completed += () => Taskbar.AfterTour(this);
+                // (onboarding-4: Keep Simpl on your taskbar? is asked the third time Simpl is opened, not after the tour)
+                Taskbar.Opened(this, Busy);
                 // (over the title bar too: its buttons dimmed with the page, all but Windows' own caption buttons)
                 Grid.SetRow(tour, 0);
                 Grid.SetRowSpan(tour, 2);
@@ -335,7 +338,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (sheets.IsOpen && pageArea.Visibility == Visibility.Visible) pageArea.Visibility = Visibility.Hidden;
         shell?.SheetOpen(sheets.IsOpen);
         var app = engine.Phase == Phase.Native && !login.Covers;
-        trailing.Content = !app && login.OnSchoolPage && !login.Handoff ? StartOverButton() : app ? Pins() : null;
+        // (Start over in the title bar only over the school's own page with nothing of Simpl's on it, as on the Mac: the
+        //  sign-in card has Change school, "Logging you in" and the hand-off note their own Start over)
+        trailing.Content = !app && !login.Covers && login.OnSchoolPage && !login.Handoff ? StartOverButton() : app ? Pins() : null;
         UpdateTitleButtons();
         if (login.AskStay && !stayAsked) AskStay();
     }
@@ -539,9 +544,14 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         }
     }
 
+    /// <summary>Something of Simpl's over the window that a question of its own should wait for: a dialog, the tour, the
+    /// sign-in. (Not the tour's offer: it dims nothing and may be left unanswered all day.)</summary>
+    private bool Busy() => sheets.IsOpen || tour?.On == true || engine == null || engine.Login.Covers || engine.Phase != Phase.Native;
+
     /// <summary>Brought back (the notification area's icon, Simpl opened again): shown, restored, in front.</summary>
     public void Bring()
     {
+        if (!IsVisible && shell != null) Taskbar.Opened(this, Busy);
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
