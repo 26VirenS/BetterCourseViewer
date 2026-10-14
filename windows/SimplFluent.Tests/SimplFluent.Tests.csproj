@@ -2,7 +2,8 @@
 
   <!-- Simpl for Windows' models, tested on their own: the Lewis maker's and the elements' chemistry, the calculator's
        sums, the saved sign-in's record and its Windows Hello seal, when Windows Hello is asked for it (one prompt
-       however many ask, none once it has answered), the vault's seal, the JSON the bridge writes. No
+       however many ask, none once it has answered), the vault's seal, the JSON the bridge writes, which published
+       version an update takes (a beta only with Get beta updates on). No
        window is opened and no school is asked: each test takes milliseconds. CI runs them on every push to the Windows
        branch (windows-fluent.yml, "Unit tests and warnings"); by hand: dotnet test windows/SimplFluent.Tests. They build
        anywhere (EnableWindowsTargeting) and run on Windows: the app is WPF, and its models use WPF's points and colours. -->

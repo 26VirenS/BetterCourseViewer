@@ -1313,7 +1313,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             K.Row(SymbolRegular.ArrowDownload24, "Install updates automatically", Updates.Installed || dev
                 ? "A new version goes in when it arrives, and Simpl opens again where you were — never while a quiz, a tool or a dialog is open."
                 : "This copy wasn’t installed with Simpl-Setup.exe, so it can’t put a new version in its own place: Download opens the version’s page.", install),
-            K.Row(SymbolRegular.Beaker24, "Get beta updates", "Try new features before everyone else. A beta may have rough edges; turn this off to go back to the usual releases when the next one comes out.", beta)));
+            K.Row(SymbolRegular.Beaker24, "Get beta updates", "Get test versions of Simpl before everyone else. A beta may have rough edges. Turn this off to stop getting betas: Simpl keeps the version you have until a newer regular version comes out.", beta)));
 
         // the versions published before (onboarding-6): folded away, as the Mac's are; for the copy the installer put here,
         // each one installs in this one's place (the Mac's Install…), else opens on the website

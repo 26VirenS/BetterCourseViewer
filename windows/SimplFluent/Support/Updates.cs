@@ -17,8 +17,9 @@ namespace Simpl.Support;
 /// <summary>
 /// Settings ▸ Updates, and Simpl keeping itself up to date (the Mac's Updater). At launch when the last look is over an
 /// hour old, and every hour after (Check for updates automatically, on unless turned off), it reads the versions
-/// published — GitHub's releases of this repository, the Windows ones — and a newer one is offered in Settings ▸
-/// Updates, with the versions published before and whether betas are wanted. When updates install themselves (Install
+/// published — GitHub's releases of this repository, the Windows ones (Support/UpdatesChoice.cs: a beta only with Get
+/// beta updates on) — and a newer one is offered in Settings ▸ Updates, with the versions published before and whether
+/// betas are wanted. When updates install themselves (Install
 /// updates automatically, on unless turned off), a copy Simpl-Setup.exe installed downloads the new version's installer
 /// by itself (picked up where it stopped, tried again a while later when it fails; checked against the size and
 /// SHA-256 published, and — when this copy is signed — signed by the same publisher) and puts it in at once, unless
@@ -32,7 +33,7 @@ namespace Simpl.Support;
 /// development run never checks or installs anything; --update-test plays an update through against a local file
 /// (windows/SimplFluent/README.md, Updates).
 /// </summary>
-public static class Updates
+public static partial class Updates
 {
     public enum Mode { Idle, Checking, UpToDate, Available, Downloading, Ready, Installing, Failed }
 
@@ -121,6 +122,9 @@ public static class Updates
         get => Prefs.Bool("updates:install", true);
         set { Prefs.Set("updates:install", value); Changed?.Invoke(); if (value) Proceed(); }
     }
+    /// <summary>Get beta updates (Settings ▸ Updates; off unless turned on): the betas are offered too, not only the usual
+    /// releases (<see cref="Choose"/>). Turned off, the versions are read again — a beta found and not yet in is let go —
+    /// and a copy on a beta stays on it until a usual release newer than it comes.</summary>
     public static bool Beta
     {
         get => Prefs.Bool("updates:beta", false);
@@ -132,9 +136,6 @@ public static class Updates
     /// </summary>
     public static bool Paused { get => Prefs.Bool("updates:paused"); set { Prefs.Set("updates:paused", value ? true : null); Changed?.Invoke(); } }
 
-    /// <summary>This copy is itself a preview (0.x: every Windows 11-look build so far, each published as a pre-release):
-    /// the next preview is its ordinary update, betas asked for or not — without it, a new install never found one.</summary>
-    private static bool Preview => Version.StartsWith("0.", StringComparison.Ordinal);
     public static DateTime? LastCheck
     {
         get => DateTime.TryParse(Prefs.String("updates:checked"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d : null;
@@ -286,16 +287,16 @@ public static class Updates
             var list = await Releases();
             // (an update that began going in meanwhile is left to finish)
             if (restarting) { checking = false; return; }
-            var mine = list.Where(r => Beta || !r.Beta || Preview).ToList();
-            var newest = mine.FirstOrDefault();
-            if (newest != null && newest.Run > CurrentRun)
+            // (the newest this copy may take: a beta only with Get beta updates on)
+            var (newest, critical) = Choose(list, CurrentRun, Beta);
+            if (newest != null)
             {
                 // (the same version downloaded already: ready to go in as it was)
                 var ready = Found?.Tag == newest.Tag && downloaded != null && File.Exists(downloaded);
                 if (!ready) downloaded = null;
                 Found = newest;
-                // (a Critical Update newer than this copy: the newest goes in, whatever the settings)
-                Critical = mine.Any(r => r.Run > CurrentRun && r.Critical);
+                // (a Critical Update newer than this copy, of those it may take: the newest goes in, whatever the settings)
+                Critical = critical;
                 State = ready ? Mode.Ready : Mode.Available;
                 if (was is not (Mode.Available or Mode.Ready)) Log.Write($"update: {newest.Version} found{(Critical ? " (a Critical Update)" : "")}");
             }
@@ -341,41 +342,7 @@ public static class Updates
         using var res = await Http.SendAsync(req);
         if (!res.IsSuccessStatusCode) throw new Exception($"GitHub answered {(int)res.StatusCode}.");
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
-        var list = new List<Release>();
-        foreach (var r in doc.RootElement.EnumerateArray())
-        {
-            if (r.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True) continue;
-            var tag = r.GetProperty("tag_name").GetString() ?? "";
-            var m = Regex.Match(tag, @"^windows-fluent-v(\d+)$");
-            if (!m.Success) continue;
-            var run = int.Parse(m.Groups[1].Value);
-            // (the zip's size, as the version's download; the installer apart, for a copy it installed)
-            long size = 0;
-            Asset? setup = null;
-            if (r.TryGetProperty("assets", out var assets))
-                foreach (var a in assets.EnumerateArray())
-                {
-                    var name = a.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-                    var bytes = a.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt64() : 0;
-                    if (name.Equals(SetupName, StringComparison.OrdinalIgnoreCase)
-                        && a.TryGetProperty("browser_download_url", out var u) && u.GetString() is { Length: > 0 } url)
-                    {
-                        // (GitHub gives each file's digest, "sha256:…", on releases made since mid-2025)
-                        var digest = a.TryGetProperty("digest", out var dg) && dg.ValueKind == JsonValueKind.String && dg.GetString() is { } dgs
-                                     && dgs.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) ? dgs[7..] : null;
-                        setup = new Asset(url, bytes, digest);
-                    }
-                    else size += bytes;
-                }
-            DateTime? published = r.TryGetProperty("published_at", out var p) && DateTime.TryParse(p.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d : null;
-            // (a beta says so in its title. Not GitHub's pre-release mark: every Windows 11-look build is published as a
-            // pre-release, the usual ones too, and with that as the mark Get beta updates off would never offer one)
-            var title = r.TryGetProperty("name", out var nm) && nm.ValueKind == JsonValueKind.String ? nm.GetString() ?? "" : "";
-            var beta = Regex.IsMatch(title, @"\bbeta\b", RegexOptions.IgnoreCase);
-            list.Add(new Release(tag, run, $"v{run:000}", beta, published, size,
-                r.TryGetProperty("html_url", out var hu) ? hu.GetString() ?? "" : "", r.TryGetProperty("body", out var b) ? b.GetString() : null, setup));
-        }
-        list.Sort((a, b) => b.Run.CompareTo(a.Run));
+        var list = Parse(doc.RootElement);
         Known = list;
         Changed?.Invoke();
         return list;
@@ -795,6 +762,21 @@ public static class Updates
     public static void Proceed()
     {
         if (!started || restarting) return;
+        // (a beta found, or still downloading, as Get beta updates was turned off: let go, not fetched or put in by
+        //  itself, and the versions read again. Not one asked for in Earlier versions, which nothing puts in by itself)
+        if (Found is { Beta: true } r && !Beta && GoesInByItself && State is Mode.Available or Mode.Ready or Mode.Failed)
+        {
+            Log.Write($"update: {r.Version} is a beta, and Get beta updates is off: let go");
+            Found = null;
+            Critical = false;
+            downloaded = null;
+            retryAt = null;
+            State = Mode.Idle;
+            Message = null;
+            Changed?.Invoke();
+            _ = Check();
+            return;
+        }
         if (State == Mode.Available && InstallsHere && GoesInByItself)
         {
             if (!Critical && Metered)
@@ -925,10 +907,10 @@ public static class Updates
         {
             var root = Path.Combine(Path.GetTempPath(), "Simpl-Update");
             if (!Directory.Exists(root) || CurrentRun == 0) return;
+            // (each in a folder named by its version's tag, a beta's too)
             foreach (var d in Directory.EnumerateDirectories(root))
             {
-                var m = Regex.Match(Path.GetFileName(d), @"^windows-fluent-v(\d+)$");
-                if (!m.Success || int.Parse(m.Groups[1].Value) > CurrentRun) continue;
+                if (Read(Path.GetFileName(d), "") is not { } v || v.Run > CurrentRun) continue;
                 try { Directory.Delete(d, true); } catch { /* (its installer still running: the next start) */ }
             }
         }

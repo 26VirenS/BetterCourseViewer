@@ -10,12 +10,13 @@ then at the same time pictures it against the mock Canvas in eight parts, tries 
 timings (`windows-fluent-perf`); the parts come back together as `windows-fluent-shots`. A push takes about five
 minutes, and a newer push cancels the run before it (never a run that publishes). A preview (`windows-fluent-v<run>`) is published
 when a commit message carries `[preview]`, or by Run workflow, which publishes the green run already made for the
-commit (or the run named by `from_run`) as it is, in about a minute. Keep changes to the workflow in commits of their
+commit (or the run named by `from_run`) as it is, in about a minute; Run workflow ▸ beta publishes it as a beta instead
+(`windows-fluent-beta-v<run>`: Updates ▸ Betas, below). Keep changes to the workflow in commits of their
 own: GitHub lets a workflow tag a commit only if the commit itself leaves the workflows alone.
 
 Beside the build, the models' unit tests (`windows/SimplFluent.Tests`, xUnit: the chemistry, the calculator, the
 vault's and the saved sign-in's seals, when Windows Hello is asked for the saved password and how the run holds it,
-the bridge's JSON — `dotnet test windows/SimplFluent.Tests` on Windows; they
+the bridge's JSON, which published version an update takes — `dotnet test windows/SimplFluent.Tests` on Windows; they
 build anywhere with `-p:EnableWindowsTargeting=true`) and the compiler's warnings against the ones already known
 (`scripts/dev/baselines/windows-warnings.txt`: a new one fails). After the pictures, every picture each part was to
 take is checked to be there and to show something, and every Simpl's log (with the page's own errors, which a
@@ -97,8 +98,10 @@ window's side of it, `Shell/UpdateWatch.cs`:
 
 - **When it looks**: at launch when the last look is over an hour old, then every hour (looked at every ten minutes and
   whenever Simpl comes to the front, so a PC asleep does not count its hours) — one request for GitHub's releases of
-  this repository, the `windows-fluent-v<run>` ones, compared by run number. **Check for updates automatically** (on)
-  turns it off. A development run (the mock, a demo, a picture) never looks.
+  this repository, the usual releases' `windows-fluent-v<run>` and the betas' `windows-fluent-beta-v<run>`, compared
+  by run number (`Support/UpdatesChoice.cs`: the newest newer than this copy that it may take — a beta only with Get
+  beta updates on, Betas below). **Check for updates automatically** (on) turns it off. A development run (the mock,
+  a demo, a picture) never looks.
 - **Install updates automatically** (on): a copy the installer put here downloads the newest version's Simpl-Setup.exe
   by itself — picked up where it stopped (an HTTP range), tried again 2, 10, 30 and then 60 minutes after a failure,
   and not on a metered connection (Windows' own word for a phone's hotspot or a capped plan; Download fetches it
@@ -132,7 +135,16 @@ window's side of it, `Shell/UpdateWatch.cs`:
   and a failed download is tried again every ten minutes. Unlike the Mac's, it still waits for what is open — a quiz,
   a hand-in, a dialog — though only five seconds for the student's own typing; its notice stays while it waits
   ("Critical Update v132 installs when you close the quiz."). Turning Check for updates automatically off stops every
-  look, a Critical Update's too: the student asked Simpl not to look.
+  look, a Critical Update's too: the student asked Simpl not to look. A usual release's Critical Update reaches every
+  copy; a beta's (Run workflow ▸ beta and critical) only the copies with Get beta updates on.
+- **Betas** (**Get beta updates**, off; the Mac's beta feed): a beta is published under a tag of its own,
+  `windows-fluent-beta-v<run>` (Run workflow ▸ beta; titled "Simpl for Windows 0.3.1 beta (v105)"), and offered only
+  to a copy with Get beta updates on; a release under the usual tag whose title says "beta" counts as one too. A copy
+  taking betas takes the newest of all, so a usual release newer than a beta takes over from it. Turned off, a beta
+  found and not yet in is let go, and a copy on a beta stays on it — never back to an older version — until a usual
+  release newer than it comes. Simpl 0.3.0 and earlier list `windows-fluent-v<run>` alone (and took any 0.x version
+  there, a beta too): a beta's own tag keeps it from them. The same run published both ways (a beta promoted) is
+  listed once, as the usual release.
 - **Paused** (the Mac's Developer ▸ Pause updates): `Simpl.exe --pause-updates on` (with Simpl quit; `off` again) keeps
   the hourly look but installs nothing by itself, a Critical Update apart. Settings ▸ Updates says so.
 - **A copy run from its zip** cannot put a version in its own place: it says one is available, and Download opens its
@@ -162,6 +174,20 @@ Simpl.exe as the file, and plays one through for real in the installer job (2b):
 and its window in the notification area, the installer just made as the next version — every step logged in its
 order, the installer run and Simpl opened again, then that profile opened again: at the Grades, out of sight, its
 engine running.
+
+**Publishing a beta, and promoting it.** A version for testers only goes out as a beta, from the commit's green run:
+`gh workflow run windows-fluent.yml --ref claude/windows-liquid-glass -f preview=true -f reuse=true -f beta=true`
+(`-f from_run=<id>` for another green run; `-f critical=true` makes it a Critical Update for beta testers alone). It
+is a GitHub pre-release, `windows-fluent-beta-v<run>`, its notes RELEASE_NOTES.md's with a line first saying how to
+get it; the website's /download/windows (`scripts/publish-site.sh`, newest `windows-fluent-v<run>` with a
+Simpl-Setup.exe) stays on the newest usual release. **A tester gets the first beta** by downloading Simpl-Setup.exe
+from the newest `windows-fluent-beta-v…` release on GitHub and opening it (it installs over the Simpl there, settings
+and sign-in kept), then turning on **Settings ▸ Updates ▸ Get beta updates**, so each next beta comes by itself.
+**To promote a beta** to everyone, publish the same green run again with beta off:
+`gh workflow run windows-fluent.yml --ref claude/windows-liquid-glass -f preview=true -f reuse=true -f from_run=<the
+beta's run id>` (beta is off unless given). That makes `windows-fluent-v<run>` of the very same build: every copy
+older than it takes it, 0.3.0 too, and the testers already on that run stay as they are. RELEASE_NOTES.md is the
+notes either way: write it for the version being published before Run workflow.
 
 ## Signing
 
