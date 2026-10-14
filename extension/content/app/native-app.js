@@ -1872,6 +1872,153 @@
     return { url: absUrl(page), name: '', sessionless: false };
   }
 
+  // ---- More from Canvas: what the school added to Canvas's own navigation -----------------------------------------
+  // A school adds things to Canvas's left-hand nav that no API lists: account-level tools with a global placement ("My
+  // Materials", Studio, a library), History, Help, sometimes an admin link. The web's sidebar shows them under its own
+  // navigation (extras.js, read from the page's #menu, the last menu seen kept for a page without one); the apps show
+  // the same under theirs, asked for here. History and Help open as the apps' popups listing the rows the web's sheets
+  // list (moreHistory, moreHelp); a tool opens in the app's external-tool window on Canvas's launch page for it, without
+  // Canvas's chrome round it (exttool.js borderless, as the web opens it); a link opens its page in the app's own
+  // browser window. On Brightspace: the links its navbar offers that the apps do not draw themselves.
+  const SAVED_NAV = 'globalNav'; // (extras.js keeps the last menu seen under it, per school)
+  const D2L_DRAWN = /^\/d2l\/(?:home(?:\/|$)|logout|le\/calendar|lms\/email|le\/news|lms\/news|le\/content|lms\/grades|lms\/dropbox|lms\/quizzing|le\/\d+\/discussions|le\/discussions|lms\/discussions|lms\/classlist|le\/classlist)/i;
+  /** Brightspace's navbar: its links (one of its own, or one in a group's menu), less what the apps draw themselves. */
+  function navbarLinks() {
+    const bar = document.querySelector('.d2l-navigation-s-main-wrapper');
+    if (!bar) return [];
+    const out = [];
+    const seen = new Set();
+    const add = (text, href) => {
+      const label = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!label || !href || /^(?:#|javascript:)/i.test(href)) return;
+      let u;
+      try { u = new URL(href, location.href); } catch { return; }
+      if (!/^https?:$/.test(u.protocol) || (u.origin === location.origin && D2L_DRAWN.test(u.pathname)) || seen.has(u.href)) return;
+      seen.add(u.href);
+      out.push({ kind: 'link', label, href: u.href });
+    };
+    for (const a of bar.querySelectorAll('a.d2l-navigation-s-link')) add(a.textContent, a.getAttribute('href'));
+    for (const m of bar.querySelectorAll('d2l-menu-item-link[href]')) add(m.getAttribute('text') || m.textContent, m.getAttribute('href'));
+    return out;
+  }
+  /** The colour the nav draws a tool's icon on (the school's own, from its theme; Canvas's default without one), as
+   *  "#rrggbb": a tool's icon is made for it (often white), so the app draws it on a tile of this colour. */
+  function navTile() {
+    const fallback = '#2d3b45'; // (the web sidebar's tile, content/styles/app.css .bcv-nav__ic--tool)
+    try {
+      const v = getComputedStyle(html).getPropertyValue('--ic-brand-global-nav-bgd').trim();
+      if (!v) return fallback;
+      const x = document.createElement('canvas').getContext('2d');
+      x.fillStyle = fallback;
+      x.fillStyle = v; // (a colour the canvas cannot read leaves the fallback)
+      return /^#[0-9a-f]{6}$/i.test(x.fillStyle) ? x.fillStyle.toLowerCase() : fallback;
+    } catch { return fallback; }
+  }
+  const iconPngs = new Map(); // a tool icon's address → the PNG drawn from it (a promise), null when it could not be
+  /** A tool's icon as a 64-pixel PNG (data: address) drawn here, so the app shows whatever Canvas gives — an SVG, a
+   *  picture only the signed-in page can read — without loading it itself. null when the page cannot draw it (another
+   *  site's picture that does not allow it): the app loads `icon` instead. */
+  function iconPng(src) {
+    if (!src) return Promise.resolve(null);
+    if (!iconPngs.has(src)) {
+      iconPngs.set(src, new Promise((resolve) => {
+        const img = new Image();
+        const end = (v) => { clearTimeout(slow); img.onload = img.onerror = null; resolve(v); };
+        const slow = setTimeout(() => { iconPngs.delete(src); end(null); }, 3000); // (a slow one is tried again next time)
+        img.onload = () => {
+          try {
+            const S = 64;
+            const c = document.createElement('canvas');
+            c.width = S;
+            c.height = S;
+            const w = img.naturalWidth || S, h = img.naturalHeight || S;
+            const k = Math.min(S / w, S / h);
+            c.getContext('2d').drawImage(img, (S - w * k) / 2, (S - h * k) / 2, w * k, h * k);
+            end(c.toDataURL('image/png'));
+          } catch { end(null); } // (a picture of another site's, drawn: the canvas will not give it back)
+        };
+        img.onerror = () => end(null);
+        try { if (!/^data:/i.test(src) && new URL(src, location.href).origin !== location.origin) img.crossOrigin = 'anonymous'; } catch { /* drawn as it comes */ }
+        img.src = src;
+      }));
+    }
+    return iconPngs.get(src);
+  }
+  /** The items for the app's sidebar, in the nav's order: { title, items: [{ id, kind (history, help, tool, link),
+   *  label, note, href, icon, iconData, tile, external, open (history, help, tool, browser), url }], from (page: this
+   *  page's own menu; saved: the last one seen; none) }. No items: the app shows no section. */
+  async function moreFromCanvas() {
+    const d2l = !!BCV.lms?.d2l;
+    let list = [];
+    let from = 'none';
+    if (d2l) {
+      list = navbarLinks();
+      if (list.length) from = 'page';
+    } else {
+      const X = BCV.extras;
+      const live = X?.parseMenu?.() || [];
+      list = live.length ? X.items() : []; // (items() writes the menu down for the pages without one, once it differs)
+      if (list.length) from = 'page';
+      else {
+        const saved = await store.pref(SAVED_NAV, null).catch(() => null);
+        if (Array.isArray(saved) && saved.length) { list = saved; from = 'saved'; }
+      }
+    }
+    const tile = navTile();
+    const site = d2l ? 'Brightspace' : 'Canvas';
+    const items = await Promise.all(list.filter((it) => it && ['history', 'help', 'tool', 'link'].includes(it.kind)).map(async (it, i) => {
+      const href = it.href ? absUrl(it.href) : null;
+      const ours = (() => { try { return new URL(href).origin === location.origin; } catch { return false; } })();
+      const icon = it.kind === 'tool' && it.icon ? (/^data:/i.test(it.icon) ? it.icon : absUrl(it.icon)) : null;
+      const base = { id: `${it.kind}:${href || it.label || i}`, kind: it.kind, label: String(it.label || '').trim() || (it.kind === 'history' ? 'History' : it.kind === 'help' ? 'Help' : 'Tool'), href, icon, iconData: null, tile: null, external: it.kind === 'tool' || it.kind === 'link' };
+      if (it.kind === 'history') return { ...base, note: 'What you opened lately', open: 'history', url: null };
+      if (it.kind === 'help') return { ...base, note: 'Your school\'s help links', open: 'help', url: null };
+      if (!href) return null;
+      if (it.kind === 'tool') {
+        const url = ours && BCV.exttool?.borderless ? BCV.exttool.borderless(href) : href;
+        return { ...base, note: 'Opens in its own window', iconData: await iconPng(icon), tile, open: 'tool', url };
+      }
+      return { ...base, note: ours ? `Opens ${site}'s page for it` : `Opens ${new URL(href).hostname.replace(/^www\./, '')}`, open: 'browser', url: href };
+    }));
+    return { title: `More from ${site}`, items: items.filter(Boolean), from };
+  }
+  /** Where a row of History or Help leads, for the app: `place` — an address of the school's own, opened as the app
+   *  opens any of them (its own screen where it has one, else the school's page for it); `browser` — another site, in
+   *  the app's own browser window. */
+  const openOf = (url) => { try { return new URL(url).origin === location.origin ? 'place' : 'browser'; } catch { return 'browser'; } };
+  /** History as the app's popup: { title, note, empty, rows: [{ id, title, sub, kind (Canvas's icon name for it:
+   *  assignment, quiz, discussion…), category, course, color, when, whenText, url, open }] } — the web's sheet's rows
+   *  (extras.js historyList), each course named as the sidebar names it and each time as the apps write one. */
+  async function moreHistory() {
+    if (!BCV.extras?.historyList) throw new Error('History could not be loaded.');
+    let d;
+    try { d = await BCV.extras.historyList(); } catch (e) { throw new Error(`History could not be loaded: ${e?.message || e}`); }
+    const [sel, all] = await Promise.all([selection(), store.courses().catch(() => [])]);
+    const byId = new Map((all || []).map((c) => [String(c.id), c]));
+    return {
+      title: d.title, note: d.note, empty: d.empty,
+      rows: d.rows.map((r, i) => {
+        const url = absUrl(r.url) || absUrl('/');
+        const cid = (/^\/courses\/(\d+)(?:\/|$)/.exec((() => { try { return new URL(url).pathname; } catch { return ''; } })()) || [])[1] || null;
+        const fav = cid ? sel.list.find((c) => String(c.id) === cid) : null;
+        const c = cid ? byId.get(cid) : null;
+        const course = fav?.shortName || c?.nickname || c?.name || r.course || '';
+        const whenText = r.at ? recentText(r.at) : '';
+        return { id: `${i}:${url}`, title: r.title, sub: [course, r.category, whenText].filter(Boolean).join(' · '), kind: r.kind || 'page', category: r.category, course, color: fav?.color || c?.color || null, when: r.at ? iso(U.parse(r.at)) : null, whenText, url, open: openOf(url) };
+      }),
+    };
+  }
+  /** Help as the app's popup: { title, note, empty, foot, rows: [{ id, title, sub, url, open }] } — the web's sheet's
+   *  (extras.js helpList): the school's help links, less what needs Canvas's own form (said in `foot`). */
+  async function moreHelp() {
+    if (!BCV.extras?.helpList) throw new Error('Help could not be loaded.');
+    const d = await BCV.extras.helpList();
+    return {
+      title: d.title, note: d.note, empty: d.empty, foot: d.foot,
+      rows: d.rows.map((r, i) => { const url = absUrl(r.url); return url ? { id: `${i}:${url}`, title: r.title, sub: r.sub, url, open: openOf(url) } : null; }).filter(Boolean),
+    };
+  }
+
   // ---- A quiz taken in the app's own screens (Classic Quizzes) -------------------------------------------
   // The web quiz screen's rules (screens/quiz.js: BCV.screens.quiz.logic) and its sources: Canvas's quiz
   // submission API for every action, and Canvas's own take page for a quiz set to one question at a time
@@ -2746,6 +2893,7 @@
     return { id: key, now: now === null || !Number.isFinite(now) ? null : r1(now), weighted, own: !!own, pieces };
   }
   CALLS.gradeNeeded = gradeNeeded;
+  Object.assign(CALLS, { moreFromCanvas, moreHistory, moreHelp });
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];

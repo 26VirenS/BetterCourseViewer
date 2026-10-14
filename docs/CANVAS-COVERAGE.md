@@ -50,8 +50,9 @@ requirement, the account menu's e-mail and pronouns, and every row's status word
 | Inbox: files attached to a new message or a reply | **Drawn** (Mac and Windows apps) | Each file uploaded as it is picked to the student's "conversation attachments" folder (`messageUpload`), its id sent with the message; 50 MB at most. Not in the browser extension's own Inbox |
 | Inbox: archive/unarchive, delete, mark unread, forward, media (voice and video) on compose/reply, bulk actions, address book browsing | Missing | |
 | Notifications (Canvas has no page; Simpl's own feed) | **Drawn** | Overdue (two weeks back), Due soon, Graded (posted only), Feedback, Messages, Discussions, Announcements, System (with its category) |
-| History | **Drawn** (sheet) | |
-| Help menu | **Drawn** (sheet) | Report a problem is Canvas's form |
+| History | **Drawn** (sheet) | The Mac and Windows apps list the same rows (engine call `moreHistory`) |
+| Help menu | **Drawn** (sheet) | Report a problem is Canvas's form. The apps list the same rows (`moreHelp`) |
+| The school's own entries in Canvas's global nav (account tools such as My Materials or Studio, an admin link) | **Drawn** (the sidebar's More from Canvas) | Read from the page's `#menu` (the last menu seen kept for a page without one), with the tool's own icon, a picture or Canvas's inline drawing; a tool opens Canvas's launch page for it. The apps ask the engine for the same items (`moreFromCanvas`) |
 | Account: profile (bio, links), settings (language, time zone, feature options, tokens, registered services), notification preferences | Canvas's page | Links from the account menu; the row and the menu show your pronouns and e-mail (`users/self/profile`) |
 | Account: personal files (My Files, quota), ePortfolios, QR for mobile login, Shared content, Observing | Missing | Canvas's left nav is hidden on those pages, and no Simpl link exists |
 | Search everything | **Drawn** | Courses, assignments, announcements, pages, discussions, files, people, Wikipedia; "/" commands (submit, download, convert, open a tool, todo…), a row's actions, sums, ⌘K from any screen — Canvas has no equivalent |
