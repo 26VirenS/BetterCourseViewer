@@ -152,6 +152,31 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   shows results) and when it was handed in, the one Canvas keeps by the quiz's scoring rule marked Kept (`quizIntro`'s
   `attempts`, from the quiz assignment's `submission_history`). A quiz's card preview reads the quiz's own assignment
   (`quizAssignment`), so a graded quiz shows its score wherever its card is, not only "Graded".
+- **Assignments, quizzes and the publishers' popups (1.3.78, the UI pass).** Each fact is said once, in the words and
+  figures the engine writes (its 2.99.33 strings). An assignment page in one column reads in order: its
+  next step, the facts in a line under it (`factsLine`, "Due Sep 30 at 10:30 AM · 16 pts · 1 of 2 attempts used"), the
+  grade once there is one, then the instructions; two columns keep the facts card. The rubric is a row under the name in
+  one column and a button on the grade card in two, never both. The toolbar's copy of the next step shows only once the
+  page's own button has scrolled out of sight (macOS 15 and later). A quiz's attempts come from its intro wherever it is
+  read (the facts' Attempts, the line, New Attempt), and New Attempt keeps its place, greyed with a spinner, until the
+  intro answers. The grade's ring and letter take the grade's colour band (`Components/GradeBand.swift`: A green, B
+  teal, C yellow, D orange, F red — the Grades screen's), its figures the engine's (`pctText`, `pctWhole`). In a quiz:
+  the intro is the quiz's facts and one attempts line (the bar names the quiz and its course); Begin Attempt keeps its
+  name, greyed until an access code is typed; a question's plain words are drawn by the Mac itself (`QuizStemText`:
+  paragraphs, marks, links, the blanks' boxes holding what was picked or typed) and Canvas's rich text is kept for
+  pictures, formulas and tables, the answers held back until it has its height (at most 0.6 s), so a question's answers
+  never show before its words; answer rows about 46 points tall, the number key shown on the row under the pointer;
+  "Select all that apply" above the boxes; each blank's field says the words around it ("the ___ of"); the count of
+  answered questions is said once, at the foot, the side column a bar and a one-line key; answered tiles a deeper wash
+  with a tick in dark mode; the review's words take the row (up to three lines) above a docked bar; the feedback's ring
+  in its grade band, its Back a "‹ Quiz" chevron by the title. Every full popup — the quiz, Knewton Alta, Macmillan, the
+  feedback on a file — has Close at its bar's right end. The feedback on a file with no comments has no empty pane: the
+  bar says "No comments on this submission". Alta's header writes its due date as every date is written (Canvas's
+  `dueLine`, else Alta's own read and written the same way), its start screen shows only what the bar and the rail do
+  not (status, grade, the note, Start, and the topics with their estimates), and its mastery before Alta says it is the
+  mean of the objectives'. Macmillan's popup is titled with the Canvas assignment's name (else its page's heading) over
+  "Macmillan Learning · Due …". The sidebar keeps the row of the place showing in sight (a window more opened on a
+  course's Grades shows its row).
 - **Send from Phone (1.3.78, the Mac and Windows apps only).** Hand In's *Send from Phone…* (beside Choose Files…, for
   an assignment that takes files) opens a panel over the form with a QR code. The phone's own camera opens it: a page
   this Mac serves itself (`Resources/PhoneHandIn.html`, the same file as the Windows app's), with the assignment, its
@@ -163,11 +188,14 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the panel closes, when the hand-in is sent or cancelled, and after 15 minutes with nothing from the phone. The
   address holds a 128-bit one-time key (compared in constant time); every other path is 404; only private addresses may
   connect; one file is at most 50 MB (Hand In's own limit) and a session 500 MB; names are made safe; what came is kept
-  in a temporary folder (`SimplPhone-…`) that goes with the hand-in. The phone and the Mac must be on the same Wi-Fi:
-  some school networks keep devices apart (a phone's hotspot works), and with no Wi-Fi address the panel says "Connect
-  this computer to Wi-Fi to use your phone." An assignment that takes PDFs and not pictures offers *Combine photos into
-  one PDF*: the photos, turned upright and made no larger than 2200 pixels, a page each in the order they came, as one
-  PDF named for the assignment. The code (`PhoneQR`: Core Image's generator, correction M, its modules read back) is
+  in a temporary folder (`SimplPhone-…`) that goes with the hand-in. The phone and the Mac must be on the same network,
+  and the panel says so in those words: "Your phone needs to be on the same network as this Mac (your phone’s hotspot
+  works)." This Mac's network and address are behind *Trouble Connecting?* (some school networks keep devices apart),
+  and the whole note goes once the phone has connected; with no address at all the panel says "Connect this Mac to
+  Wi-Fi or a network to use your phone." Done, at the panel's foot, is its one way to close. An assignment that takes
+  PDFs and not pictures offers *Combine photos into one PDF* under the code, before anything is sent ("Photos become
+  one PDF: project01.pdf"): the photos, turned upright and made no larger than 2200 pixels, a page each in the order they
+  came, as one PDF named for the assignment; once a photo has come, its row says which page it is. The code (`PhoneQR`: Core Image's generator, correction M, its modules read back) is
   drawn in one Canvas — softly rounded modules, dark on white even in dark mode, four modules of quiet space — and
   arrives once: the panel grows from the button (from 96%, fading in, 240 ms, cubic-bezier(0.23, 1, 0.32, 1)), the
   finder squares settle (from 85%), then the data ripples out from the centre (each module from 60% over 120 ms, all of
