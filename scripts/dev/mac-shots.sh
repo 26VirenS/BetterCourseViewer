@@ -43,7 +43,8 @@ shoot() {
   local slot
   slot="$(take_slot)"
   local settle=YES
-  # (What's New comes up once the page is loaded and the app is quiet: a settled picture caught it on its way in, faint)
+  # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
+  # settled picture caught it on its way in, faint, so its picture waits its whole time)
   case " $* " in *PickerConfirm*|*" tool:"*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
@@ -458,7 +459,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-05-calendar 12 -SimplPlace calendar
   shoot light-08-course 14 -SimplPlace course:101
   shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
-  shoot light-12b-hand-in-preview 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
+  shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.78) Send from Phone: its panel with the code; the phone connected and two files in (posted by phone_send); a
   # PDF-only assignment's photos made into one PDF, and a kind it does not take refused
   shoot light-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
@@ -468,7 +469,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
   curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
   shoot light-22-setup 20 -SimplOpen setup
-  shoot light-53-whats-new 20 -SimplOpen whatsnew
+  shoot light-53-whats-new 32 -SimplOpen whatsnew
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
   # (1.3.52) the full Periodic Table: coloured by electronegativity with its trend arrows; an element's page; the Lewis
   # maker; the 3D molecule builder
