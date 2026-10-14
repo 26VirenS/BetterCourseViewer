@@ -487,7 +487,7 @@ final class Engine: ObservableObject, ShellListener {
         if let primary { await primary.refreshSnapshot(); return }
         if let s = try? await call("snapshot", as: Snapshot.self) {
             snapshot = s
-            liveMarks.set("snapshot", to: nil) // (1.3.80: the counts shown are this read's now, not the last live check's)
+            liveMarks.shown("snapshot", by: self) // (1.3.80: the counts shown are this read's, the answer a live check asks after)
             if !countsLive { withAnimation(Motion.gentle) { countsLive = true } }
             if let k = s.lms, k != lms { lms = k; NotificationCenter.default.post(name: .simplLMSKnown, object: nil, userInfo: ["lms": k]) }
         }
