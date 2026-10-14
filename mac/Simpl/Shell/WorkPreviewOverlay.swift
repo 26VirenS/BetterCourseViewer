@@ -9,9 +9,10 @@ import SwiftUI
 // Windows dims nothing). (1.3.79) Nor is anything round it caught: it never blocks the window — a press round it does
 // what it does and leaves the card up, and going to another screen leaves it where it is — until its ✕, Escape (while
 // it has the keys) or its row pressed again closes it; dragged, it moves. It folds back into the row when it closes.
-// Under Reduce Motion it fades in and out in its place. (1.3.79) A row in a popup over the window — a counter's list,
-// a popup of its own above this overlay — has its card come up in a popup over that one, just under the row
-// (PopupPreviewCard), never hidden under it.
+// Under Reduce Motion it fades in and out in its place. (1.3.79) A row in a popup over the window — a popup of its own
+// above this overlay — has its card come up in a popup over that one, just under the row (PopupPreviewCard), never
+// hidden under it. (1.3.80: a counter's list, the popup 1.3.79 did this for, grows in the page again — its rows' cards
+// come up here.)
 
 struct WorkPreviewOverlay: View {
     @EnvironmentObject private var engine: Engine
@@ -37,7 +38,7 @@ struct WorkPreviewOverlay: View {
     @State private var poppedOut = -1
     @FocusState private var focused: Bool
 
-    /// (1.3.79) The card's row is in a popup over the window (a counter's list), which this overlay is under: the card
+    /// (1.3.79) The card's row is in a popup over the window, which this overlay is under: the card
     /// comes up in a popup of its own over it (`popUpCard`), not here.
     private var elsewhere: Bool {
         popped == preview.token || preview.anchor?.view?.window is PopupPanel
@@ -76,7 +77,7 @@ struct WorkPreviewOverlay: View {
         }
     }
 
-    /// (1.3.79) A card whose row is in a popup over this window — a counter's list — comes up in a popup of its own over
+    /// (1.3.79) A card whose row is in a popup over this window comes up in a popup of its own over
     /// that one, just under its row from the row's start, or just over it when there is no room under, as the card here
     /// does; closed (its ✕, Escape, ⌘W), the card folds back. Any other card — or none — takes that popup away.
     private func popUpCard() {
@@ -241,7 +242,7 @@ struct WorkPreviewOverlay: View {
     }
 }
 
-/// (1.3.79) The card for a row of a popup over the window (a counter's list), in a popup of its own over that one: the
+/// (1.3.79) The card for a row of a popup over the window, in a popup of its own over that one: the
 /// card as the overlay draws it, on its glass, at the overlay's width; dragged, it moves; Escape or its ✕ folds it back,
 /// and Return opens the work.
 private struct PopupPreviewCard: View {

@@ -93,36 +93,44 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   plain footnotes, one Version row with the interface's version in it, the goal half up on its decimal value, a
   drawing pop-up that shows what a place wears, the colour wheel's names at 11 points ("Shade") with a Hex field under
   it, and panes 620 points tall.
-- **The Dashboard's counters (1.3.78; 1.3.79: 1.3.77's tiles again).** On a window 1024 points wide or wider — the
-  sidebar out or not — the six counters stand in one row of six, each 1.3.77's tile: its symbol in its colour beside its
-  name at the top, its number large under them, and its line under that, over its photo. In the row of six each tile is
-  as tall as it is wide (up to 150 points; never shorter than what is on it). Where a tile is too narrow for the
-  shortest names beside their symbols (the row beside the sidebar on a 1024-point window, about 96 points a tile) each
-  symbol stands over its name; a name is never cut short. A tile's line is shown whole, in up to two lines, or left
-  out — measured as the tile wraps it (`DashCounterTile.noteFits`), never cut in the middle of a word — and its tooltip
-  always says it ("4 due today · 35 points total"). A narrower window keeps 1.3.77's two rows of three (two across on a
-  page under 520 points). The rule reads the window's own width (`DashboardView.rowOfSix`, `WindowWidthProbe`), not the
-  page's, so showing the sidebar or the side column coming in never sends the row back to two. A tile's panel still
-  opens over the page from its tile: the first from its left edge, the last from its right, one between them in step,
-  each kept on the page and in the window. (The compact strip of 1.3.78 — a name over a number, a cut line and a small
-  symbol in the corner — is gone.)
+- **The Dashboard's counters (1.3.78; 1.3.79: 1.3.77's tiles again; 1.3.80: 1.3.77's heights, rows and grow again, and
+  each in its colour).** Each counter is 1.3.77's tile: its symbol in its colour beside its name at the top, its number
+  large under them, and its line under that, over its photo — as tall as what is on it (about 110 points), every tile
+  in a row as tall as the row's tallest (the squares of 1.3.79 are gone). They stand six across where the page is 900
+  points wide or wider (a 1024-point window with the sidebar folded away, or a 1280-point one with it out), else three
+  across (two on a page under 520 points), as 1.3.77 had them (`DashboardView.counters`; the window-wide row of six of
+  1.3.78, which made 96-point tiles beside the sidebar, is gone). Each row shows every full name where all fit beside
+  their symbols, else every short one, never a name cut (a tile too narrow for even those puts each symbol over its
+  name). A tile's line is shown whole, in up to two lines, or left out — measured as the tile wraps it
+  (`DashCounterTile.noteFits`), never cut in the middle of a word — and its tooltip always says it ("4 due today · 35
+  points total"). Every tile wears a soft wash of its own colour over the whole tile, over its photo and under its
+  words, and a faint edge in it (`DashCounterTile.wash`: the colour its symbol wears — Due today the accent, Tomorrow
+  #ff9f0a, Next 7 days #34c759, Overdue the system red, Unread #ff9500, Graded #5856d6, or the colour worn — at 12% by
+  day and 18% by night), drawn by the tile and not as the glass's tint, which macOS mutes in a window in the
+  background; Overdue with work in it wears the stronger red wash and a red edge, and its number is red. Pressed, a
+  tile grows where it stands into its panel, over the page (matchedGeometryEffect, `dashMorph`, on the house's gentle
+  spring): the first tile's panel from its left edge, the last one's from its right, one between them in step, each
+  kept on the page and in the window; nothing under it moves. Its ✕, Escape, the tile pressed again (the panel's head,
+  where the tile was) or a click anywhere else in the app folds it back into its tile — that click still does what it
+  does, so the panel never blocks the app. Under Reduce Motion nothing grows: the panel fades in over its tile. (The
+  compact strip of 1.3.78 and the popup over the window of 1.3.79, which faded in, are gone.)
 - **The Dashboard and the window, after the UI review (the home findings; the same on Windows).** The view (Cards,
   List, Activity) and a labelled New Task sit in the page by the greeting, so a tool pinned to the toolbar never pushes
   them into its » menu; on a one-column page the view chosen comes straight under the counters. Each row of tiles shows
   every counter's full name ("Announcements" with "3 unread · 2 courses", "Graded this week") where every one fits as
   the tile draws it, else every short one with the engine's note ("Unread", "announcements · 2 courses") — never a mix,
   never a name cut; tooltips and VoiceOver say the count in words ("3 unread announcements"). Red is for late work only:
-  Overdue with work in it wears a red wash and edge of its own (not the glass's tint, which macOS mutes in a window in
-  the background), Due today the accent. While the page shows what was kept from last time, the numbers stay, faint, and
+  Overdue with work in it wears a stronger red wash and a red edge of its own (not the glass's tint, which macOS mutes
+  in a window in the background), Due today the accent. While the page shows what was kept from last time, the numbers stay, faint, and
   the date line says "Updating…". (1.3.79) A counter's panel is 1.3.77's again: its symbol, name and number with its
   line beside the number and its ✕ at the right; a row is its course's colour, its title and the engine's line under
   it (course, points, due time) with a chevron or Dismiss, three and a half rows before it scrolls (less where the
-  window has less room); a row pressed brings its card up over the panel, just under the row or over it where the
-  screen has no room under (a popup of its own over the panel's: `PopupPreviewCard`, `PopupLayout.under`), never
-  opened inside the panel, and closing the panel closes its row's card. The panel opens over its tile as AppKit places
-  the tile (an unseen view behind the counters), not by SwiftUI's global frame, which stood 20 points off. The card
-  says what the work's own facts say once they are read — never the row's line again under them ("Due 11:59 PM" under
-  "Due Oct 14 at 11:59 PM"). The panel and the card are popups that never block the window (below). Course cards:
+  window has less room); a row pressed brings its card up over the window, just under the row or over it where there
+  is no room under, never opened inside the panel; a click on the card is the card's, and closing the panel closes
+  its row's card. (1.3.80) Where the panel and the card are, for the click that folds the panel back, is read from
+  AppKit (`TourFrames`), not from SwiftUI's global frame, which stood 20 points off. The card says what the work's own
+  facts say once they are read — never the row's line again under them ("Due 11:59 PM" under "Due Oct 14 at 11:59
+  PM"). Neither blocks the window. Course cards:
   a 48-point band with the sidebar's name, the term and teacher under it, "2 new" announcements, quick links named where
   the card is wide. A colour worn marks the sidebar's chosen row's glyph and the controls — never the words or the
   titles — and a drawn scene stays faint behind the sidebar's rows; (1.3.79) a counter's tile wears its photo whole
@@ -687,7 +695,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   sidebar while it is out) less 20 points all round, at most 1480 × 1040, sized again as the window is (`\.popupSize`
   tells what it shows), a large one over another a step down and along; *fitted* — as large as what it shows asks, as
   a sheet was, centred across the screen's side a little above its middle, its top and middle kept as it grows; *at* a
-  point, as a counter's list over its tile. A `.floatingPopup(key, title:, item:/isPresented:)` modifier puts one up
+  point (a counter's list over its tile in 1.3.79; unused since 1.3.80, when the list grows out of its tile in the page
+  again). A `.floatingPopup(key, title:, item:/isPresented:)` modifier puts one up
   as `.sheet` did. What each popup is now: a **tool opened whole** — from its tile on the Tools page, its pin's popover
   or floating panel (its name, or what it hands on), the pin's Open, a hand-off from another tool (`BioTools.open`) or
   `-SimplTool` — a large popup over the window (`ToolsCenter.popUp`, `ToolPopup`; one at a time, another switched in
@@ -696,11 +705,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   piece of work and the **rubric ring**: large popups; **What's New**, **Hand In** (with Send from Phone and the file
   preview inside it, the popup widening for the preview), **New Task**, **New Message** (File ▸ New Message, or a
   person's Message in a course), the **grading scale**, a **what-if** assignment, a course's **nickname**, a counter's
-  **card photo**, the Cell Explorer's **POPC** and Crosses' **Why these gametes?**: fitted popups; a **counter's
-  list**: a popup at its tile (its glass its own; another counter's takes its place; Overdue's number follows its rows
-  cleared); the **quick look** at a piece of work: still the card grown out of its row in the window, but a press
-  round it no longer closes it, going to another screen leaves it where it is, and dragged it moves (its ✕ and Escape
-  close it) — a row of a counter's list has its card in a popup of its own over the list, just under the row (or over
+  **card photo**, the Cell Explorer's **POPC** and Crosses' **Why these gametes?**: fitted popups (1.3.80: a
+  **counter's list** is no popup — it grows out of its tile over the page and folds back into it, as in 1.3.77); the
+  **quick look** at a piece of work: still the card grown out of its row in the window, but a press round it no longer
+  closes it, going to another screen leaves it where it is, and dragged it moves (its ✕ and Escape close it) — a row in
+  a popup has its card in a popup of its own over it, just under the row (or over
   it). A popup's SwiftUI view sits in a plain view of the popup's own, never as its window's content view (which sized
   the window to what it showed, and a tool asking for more room the more it had grew it until AppKit stopped the app),
   and a large popup is placed again once the sidebar is shown or hidden (the window says whether it is out:
@@ -710,8 +719,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool's popup put up as the window opened lay over the sidebar). A fitted
   popup is measured as what it shows appears and as it changes (a measure handed up as a SwiftUI preference never
   reached a popup whose view is not its window's content view: Hand In, New Task, New Message and Why these gametes?
-  stayed at the size they were guessed at, cut off at their sides); one that draws its own glass — a counter's list, a
-  work's card — measures itself and sizes its popup (`PopupHandle.fit`). Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
+  stayed at the size they were guessed at, cut off at their sides); one that draws its own glass — a work's card —
+  measures itself and sizes its popup (`PopupHandle.fit`). Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
   own panel and the Alta graph's window (all of which never blocked the window), the external tools' windows, and
   Alta's own pop-ups (a sheet on its popup alone). Still blocking, by design: a quiz being taken (a sheet: its timer and
   its integrity), the first run's setup, the sign-in, the tour, the Mac's confirmations and file choosers. An update
@@ -793,7 +802,9 @@ and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, 
 `-SimplCalView week|list` (the Calendar opened on that view), `-SimplWhatIf YES` (a course's grades with What-If on,
 nothing typed), `-SimplAttach <file>` (with `-SimplOpen compose`: New Message with that file attached, uploaded to the
 mock), `-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
-Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away).
+Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away), `-SimplMorphHold <share>`
+(with `-SimplSheet <counter>`: the counter's tile grows that share of the way into its panel, 0.5 half-way, and stays
+there — the real grow, stopped, so a picture shows it under way; `DashMorphHold`).
 
 ## Releasing
 

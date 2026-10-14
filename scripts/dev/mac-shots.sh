@@ -426,10 +426,16 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-01d-dashboard-counter 14 -SimplSheet next
   shoot light-01r-counter-middle 14 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   # (1.3.78) the row of six: the first tile's panel from its left edge, the last one's from its right; and the row with
-  # the sidebar folded away, each symbol beside its name
+  # the sidebar folded away
   shoot light-01e-counter-first 14 -SimplSheet today
   shoot light-01f-counter-last 14 -SimplSheet graded
   shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
+  # (1.3.80) a 1024-point window: with the sidebar out, the tiles three across in two rows, as tall as what is on them;
+  # with it folded away, six across — each tile washed with its own colour; a tile half-way through growing into its
+  # panel over the page (held there: -SimplMorphHold)
+  SIZE=1024x820 shoot light-01k-dashboard-1024 12
+  SIZE=1024x820 shoot light-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
+  shoot light-01m-counter-morph 14 -SimplSheet next -SimplMorphHold 0.5
   # (1.3.79) a window under 1024 points with the sidebar out: 1.3.77's tiles in two rows of three
   SIZE=940x820 shoot light-40-narrow-dashboard 14
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
@@ -522,6 +528,13 @@ if [ "${SHOTS:-full}" = quick ]; then
   # (1.3.79) a counter's panel, and the card of one of its rows over the window, in dark
   shoot dark-01d-dashboard-counter 16 -SimplSheet next
   shoot dark-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter
+  # (1.3.80) the tiles in their colours by night at 1024 points, the sidebar out and folded away; the first tile of the
+  # second row grown into its panel over the page under it; the last tile half-way through growing
+  SIZE=1024x820 shoot dark-01k-dashboard-1024 12
+  SIZE=1024x820 shoot dark-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
+  SIZE=1024x820 shoot dark-01n-counter-1024-overdue 14 -SimplSheet overdue
+  shoot dark-01m-counter-morph 14 -SimplSheet graded -SimplMorphHold 0.4
+  SIZE=940x820 shoot dark-40-narrow-dashboard 14
   shoot dark-03-todo 12 -SimplPlace todo
   shoot dark-04-grades 12 -SimplPlace grades
   shoot dark-05-calendar 12 -SimplPlace calendar
@@ -591,6 +604,11 @@ for MODE in light dark; do
   # as soon as it has settled, its wait only the longest)
   shoot "$MODE-01d-dashboard-counter" 30 -SimplSheet next
   shoot "$MODE-01q-counter-preview" 45 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
+  # (1.3.80) the tiles at 1024 points, the sidebar out (three across) and folded away (six); a tile half-way through
+  # growing into its panel
+  SIZE=1024x820 shoot "$MODE-01k-dashboard-1024" 14
+  SIZE=1024x820 shoot "$MODE-01l-dashboard-1024-no-sidebar" 14 -SimplSidebar hidden
+  shoot "$MODE-01m-counter-morph" 30 -SimplSheet tomorrow -SimplMorphHold 0.5
   shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/

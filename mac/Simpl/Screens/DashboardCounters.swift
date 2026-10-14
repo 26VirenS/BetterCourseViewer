@@ -2,11 +2,11 @@ import AppKit
 import SwiftUI
 
 // The Dashboard's six counters (1.2): each a glass tile with its symbol, its number and the line under it. Pressed, a
-// tile opens a panel over itself (1.2.8: a panel's width, from the tile's corner) listing what it counted — (1.3.79) a
-// popup over the window that never blocks it (Shell/FloatingPopup.swift): a click round it leaves it up, as going to
-// another screen does; its ✕, Escape, ⌘W or the tile pressed again closes it, and its head drags it. (1.3.78) On a
-// window 1024 points wide or wider they stand in one row of six; (1.3.79) each the tile it was in 1.3.77, as tall as it
-// is wide there — the compact strip of 1.3.78 is gone, and the panel is 1.3.77's again.
+// tile grows where it stands into a panel floating over the page (1.2.8: a panel's width, from the tile's corner)
+// listing what it counted, and folds back into its tile when closed (its ✕, Escape, a click anywhere else — which still
+// does what it does — or the tile). (1.3.80) As 1.3.77 had them, again: each tile as tall as what is on it (not the
+// squares of 1.3.79), the panel growing out of it in the page (not the popup over the window of 1.3.79, which faded
+// in); and each tile now washed with its own colour.
 
 /// A counter's look, as the web Dashboard's: its symbol and colour, and its name in full for the panel it opens.
 enum DashCounterLook {
@@ -69,6 +69,38 @@ enum DashCounterLook {
     }
 }
 
+extension View {
+    /// The counter's tile and its panel drawn as one shape moving from one to the other (matchedGeometryEffect), unless
+    /// Reduce Motion is on: then the panel simply fades in under its tile.
+    @ViewBuilder
+    func dashMorph(_ id: String, in ns: Namespace.ID, enabled: Bool) -> some View {
+        if enabled {
+            self.matchedGeometryEffect(id: id, in: ns)
+        } else {
+            self
+        }
+    }
+}
+
+/// (1.3.80) The screenshot suite's grow, held part-way (`-SimplMorphHold 0.5`): the tile and its panel go that share of
+/// the way on an ease-out and stay there — the real morph stopped, so a picture shows the panel growing out of its tile
+/// over the page. Never used without the launch argument.
+struct DashMorphHold: CustomAnimation {
+    let fraction: Double
+
+    /// The hold asked for at launch (a share between 0 and 1), if any.
+    static let asked: DashMorphHold? = {
+        let f = UserDefaults.standard.double(forKey: "SimplMorphHold")
+        return f > 0 && f < 1 ? DashMorphHold(fraction: f) : nil
+    }()
+
+    func animate<V: VectorArithmetic>(value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+        // (there in a quarter of a second, then held: never done)
+        let t = min(time / 0.25, 1)
+        return value.scaled(by: fraction * (1 - (1 - t) * (1 - t)))
+    }
+}
+
 /// A counter's number: rolling to a new count on the house spring, a dash while it is still being counted. (home-25)
 /// `stale`: the number kept from last time, shown faint while the live one is on its way — it rolls to the live one in
 /// place, as the list under it changes in place.
@@ -95,10 +127,11 @@ struct DashCount: View {
 }
 
 /// A counter's tile, as 1.3.77 drew it (1.3.79: brought back from the compact strip of 1.3.78): its symbol in its
-/// colour and its name, its number, and the line under it, whole — over its photo, whole too.
+/// colour and its name, its number, and the line under it, whole — over its photo, whole too. (1.3.80) As tall as what
+/// is on it (the row makes every tile in it as tall as its tallest), and washed with its own colour.
 struct DashCounterTile: View {
-    /// How its head is laid out: its symbol beside its name, as 1.3.77's; or, in a tile too narrow for both on one line
-    /// (the row of six beside the sidebar on the narrowest window), its symbol over its name.
+    /// How its head is laid out: its symbol beside its name, as 1.3.77's; or, in a tile too narrow for both on one line,
+    /// its symbol over its name.
     enum Style: Equatable {
         case beside
         case over
@@ -115,13 +148,12 @@ struct DashCounterTile: View {
     var style: Style = .beside
     /// (1.3.79) How wide the row lays the tile out: its line is shown only where it fits whole at that width.
     var width: CGFloat = 0
-    /// (1.3.79) How tall it stands at least: in the row of six, as tall as it is wide (a square).
-    var minHeight: CGFloat = 0
     /// (1.3.79) What it counts, in full words, for its tooltip with its count: a line left out stays said there.
     var tip: String? = nil
     let action: () -> Void
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
+    @Environment(\.colorScheme) private var scheme
 
     private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
 
@@ -140,7 +172,7 @@ struct DashCounterTile: View {
             }
             .padding(.horizontal, Self.padding(style))
             .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 // (1.3.1) its photo, frosted under its words, the whole tile over (Settings ▸ Appearance, or its context
                 // menu) — the colour a theme gives the tile, as 1.3.77 had it
@@ -148,14 +180,18 @@ struct DashCounterTile: View {
                     SlotPhotoView(slot: slot)
                         .clipShape(shape)
                 }
-                // (home-1) something late: a red wash and a red edge of the tile's own, over its photo — drawn here, not
-                // as the glass's tint, which macOS mutes in a window in the background — whatever is worn
-                if alert {
-                    shape.fill(DashCounterTile.alertWash)
-                }
+                // (1.3.80) its own colour, a soft wash over the whole tile, over its photo and under its words; (home-1)
+                // something late, a stronger red one — both drawn here, not as the glass's tint, which macOS mutes in a
+                // window in the background — whatever is worn
+                shape.fill(alert ? DashCounterTile.alertWash : wash)
             }
             .overlay {
-                if alert { shape.strokeBorder(DashCounterLook.alert.opacity(0.55), lineWidth: 1.5) }
+                // (1.3.80) a faint edge in its colour; something late, a red one
+                if alert {
+                    shape.strokeBorder(DashCounterLook.alert.opacity(0.55), lineWidth: 1.5)
+                } else {
+                    shape.strokeBorder(DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.32 : 0.26), lineWidth: 1)
+                }
             }
         }
         .buttonStyle(CardButtonStyle(radius: 18))
@@ -180,6 +216,13 @@ struct DashCounterTile: View {
     /// (home-1) The wash under a late count, drawn by the tile so a window in the background keeps it: 1.3.77's pink by
     /// day (the glass's red tint it had then), and by night one that reads on dark glass, where that tint never showed.
     static let alertWash = Theme.dynamic(light: NSColor.systemRed.withAlphaComponent(0.22), dark: NSColor.systemRed.withAlphaComponent(0.24))
+
+    /// (1.3.80) The wash every tile wears: the colour its symbol wears (Due today the accent, Tomorrow orange, Next 7
+    /// days green, Overdue red, Unread orange, Graded purple; a colour worn, that one), soft enough that its number and
+    /// words read as plainly as on bare glass — a little more of it by night, where dark glass takes more to show it.
+    private var wash: Color {
+        DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.18 : 0.12)
+    }
 
     /// Its count in words, and its line in full: "4 due today · 35 points total".
     private var tooltip: String {
@@ -279,8 +322,6 @@ struct DashCounterPanel: View {
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
     private var engine: Engine { link.acting }
-    /// (1.3.79) The popup it is shown in, sized to it as it is measured here.
-    @Environment(\.popup) private var popup
     @State private var data: ItemsSheetData?
     @State private var error: String?
 
@@ -291,27 +332,21 @@ struct DashCounterPanel: View {
             .background {
                 GeometryReader { p in
                     Color.clear
-                        .onAppear { measured(p.size) }
-                        .onChange(of: p.size) { _, s in measured(s) }
+                        .onAppear { onHeight(p.size.height) }
+                        .onChange(of: p.size.height) { _, h in onHeight(h) }
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
             .clipShape(shape)
             .glass(shape, tint: DashCounterLook.color(counter.key).opacity(0.10))
             .contentShape(shape)
+            .onTapGesture {} // (1.2.2: a click on the panel is the panel's — one anywhere else folds it back)
             .onExitCommand { close() }
             .task { await load() }
             // (1.3.79) a row's card folds back with the panel it came from: it never stays over a panel that is gone
             .onDisappear {
                 if WorkPreview.shared.item?.id.hasPrefix("sheet:\(counter.key):") == true { WorkPreview.shared.close() }
             }
-    }
-
-    /// What it shows, measured: told to the page, and (1.3.79) its popup made that size — its glass is its own, so the
-    /// popup takes its size from here.
-    private func measured(_ s: CGSize) {
-        onHeight(s.height)
-        popup.fit(s)
     }
 
     private var content: some View {
@@ -367,8 +402,9 @@ struct DashCounterPanel: View {
             .help("Close (Esc)")
             .accessibilityLabel("Close")
         }
-        // (1.3.79) its head drags its popup (its ✕, Escape, ⌘W or the tile pressed again close it)
-        .popupHeader()
+        // (1.2.11) the card pressed again — its head, where the tile was — closes it (the ✕ keeps its own press)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: close)
     }
 
     @ViewBuilder
@@ -495,6 +531,19 @@ struct DashTileAnchors: PreferenceKey {
     static let defaultValue: [String: Anchor<CGRect>] = [:]
     static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
         value.merge(nextValue()) { $1 }
+    }
+}
+
+/// (1.3.80) Where each counter's panel is in its window, as AppKit has it (a PreviewAnchor for each counter, made as it
+/// is first asked for): the page's watch for a click round the open panel reads it.
+final class DashPanelAnchors {
+    private var anchors: [String: PreviewAnchor] = [:]
+
+    func callAsFunction(_ key: String) -> PreviewAnchor {
+        if let a = anchors[key] { return a }
+        let a = PreviewAnchor()
+        anchors[key] = a
+        return a
     }
 }
 
