@@ -107,22 +107,29 @@ public static class Tour
 
 /// <summary>
 /// The guided tour over the window (the Mac's TourOverlay; the web's welcome.js), as a Windows 11 TeachingTip: one part
-/// lit at a time, the window dimmed round it and the part ringed in the accent, and a callout beside it — its count,
-/// what it is, what to do — with Next where the step waits for nothing. A step that asks for something (click Grades,
-/// hover a ring, turn on what-if) waits for it and moves on once it is done. It comes once, after the app first shows
-/// with nothing over it; the account menu's Take the tour runs it again. It ends on its last step, whose Done says it
-/// was followed to the end (<see cref="Completed"/>: Simpl then asks, once, to be kept on the taskbar).
+/// lit at a time, the whole window dimmed round it — the title bar's buttons too, all but Windows' own caption buttons —
+/// the part ringed in the accent, and a callout beside it: its count, what it is, Skip tour and × to leave, Back and a
+/// Next that always works. A step may suggest something to try (click Grades) and moves on once it is done, but never
+/// waits for it. Six steps, from the Dashboard — the counters, Grades, a course, Tools, Search — to where a bug is
+/// reported. It comes once, after the app first shows with nothing over it; Escape, Skip tour or × end it, and that
+/// counts as seen; the account menu's Take the tour runs it again. Its last step's Done says it was followed to the end
+/// (<see cref="Completed"/>: Simpl then asks, once, to be kept on the taskbar).
 /// </summary>
 public sealed class TourOverlay : Grid
 {
-    private sealed record Step(string Id, TourSpot? Spot, string Title, string Body, string? Doing = null, string Gesture = "click", Func<bool>? Done = null, string NextLabel = "Next");
+    private sealed record Step(string Id, TourSpot? Spot, string Title, string Body, string? Doing = null, Func<bool>? Done = null, string NextLabel = "Next");
+
+    /// <summary>Windows' caption buttons at the title bar's right (minimise, maximise, close): left lit and working
+    /// through the tour.</summary>
+    private const double CaptionButtons = 138;
 
     private readonly Engine.Engine engine;
     private readonly MainWindow window;
     private readonly Path veil = new();
-    // (the light and its ring are one shape, so one move carries both: the dim is the window less it)
-    private readonly RectangleGeometry whole = new(), light = new() { RadiusX = 10, RadiusY = 10 };
-    private readonly CombinedGeometry dim;
+    // (the light and its ring are one shape, so one move carries both: the dim is the window less it — and less
+    //  Windows' caption buttons, which stay as they are)
+    private readonly RectangleGeometry whole = new(), captions = new(), light = new() { RadiusX = 10, RadiusY = 10 };
+    private readonly CombinedGeometry bare, dim;
     private readonly Path ring = new() { StrokeThickness = 2, IsHitTestVisible = false, Opacity = 0, Visibility = Visibility.Collapsed };
     private bool ringOn;
     private bool revealed;
@@ -132,7 +139,6 @@ public sealed class TourOverlay : Grid
     private List<Step> steps = new();
     private int? index;
     private bool advancing;
-    private DateTime since;
     private int seenEvents;
     private Rect? lastHole;
 
@@ -148,8 +154,9 @@ public sealed class TourOverlay : Grid
         Visibility = Visibility.Collapsed;
         veil.Fill = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)128 : (byte)72, 0, 0, 0));
         veil.MouseLeftButtonDown += (_, e) => { Nudge(); e.Handled = true; };
-        dim = new CombinedGeometry(GeometryCombineMode.Exclude, whole, light);
-        veil.Data = whole;
+        bare = new CombinedGeometry(GeometryCombineMode.Exclude, whole, captions);
+        dim = new CombinedGeometry(GeometryCombineMode.Exclude, bare, light);
+        veil.Data = bare;
         ring.Data = light;
         ring.SetResourceReference(Shape.StrokeProperty, B.Accent);
         ring.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 0, Opacity = 0.6, Color = Appearance.Accent };
@@ -163,33 +170,22 @@ public sealed class TourOverlay : Grid
         Focusable = true;
     }
 
-    // ---- the steps (the Mac's: welcome.js's setup run, but the Simpl switch's) ----
+    // ---- the steps (the Mac's, and the web's welcome.js) ----
 
     private List<Step> Steps()
     {
         var nav = engine.Nav;
         bool At(PlaceKind k) => nav.Current.Place.Kind == k && nav.Current.Path.Count == 0;
-        bool Event(TourEvent e) => Tour.Events > seenEvents && Tour.LastEvent == e;
         var s = new List<Step>
         {
-            new("report", TourSpot.Account, "Report a bug", "Found a bug or want something added? Tell us here — it’s in your account’s menu."),
-            new("grades", TourSpot.GradesRow, "Grades", "All your grades in one place.", "Click Grades", Done: () => At(PlaceKind.Grades)),
-            new("ring", TourSpot.GradeRing, "A quick breakdown", "Each ring shows what makes up the grade.", "Hover over a ring", "hover", () => Event(TourEvent.RingHover)),
-            new("details", TourSpot.GradeDetails, "What if?", "See every grade, and try out scores.", "Click it", Done: () => nav.Current.Place is { Kind: PlaceKind.Section, Arg: "grades" }),
-            new("whatif", TourSpot.WhatIfSwitch, "Try what-if scores", "See how new scores would change your grade.", "Turn on What-If Scores", Done: () => Event(TourEvent.WhatIfOn)),
-            new("score", TourSpot.WhatIfScore, "Change a score", "Type any score. Nothing is saved.", "Change a score", "type", () => Event(TourEvent.WhatIfEdited)),
-            new("real", TourSpot.WhatIfSwitch, "Back to the real scores", "Turn it off to go back to your real scores.", "Turn What-If off", Done: () => Event(TourEvent.WhatIfOff)),
+            new("dashboard", TourSpot.Counters, "Everything due, at a glance", "Each counter opens what it counts: work due today, tomorrow and in the next 7 days, anything overdue, new announcements and this week’s grades."),
+            new("grades", TourSpot.GradesRow, "Grades", "All your grades and your GPA in one place.", "Click Grades to look", () => At(PlaceKind.Grades)),
         };
         if (engine.Courses.Count > 0)
-            s.Add(new("courses", TourSpot.FirstCourse, "Your courses", "Your classes are listed here, each with its sections.", "Hover over a course", "hover", () => Event(TourEvent.CourseHover)));
-        s.Add(new("tools", TourSpot.ToolsRow, "Tools and widgets", "Find a PDF Editor, File Converter, Calculators, Flashcards, Citation Generator & more.", "Click Tools", Done: () => At(PlaceKind.Tools)));
-        s.Add(new("pin", TourSpot.ToolPin, "Pin the graphing calculator", "Pin it to keep it at the top, one click away.", "Click the graphing calculator’s pin", Done: () => Event(TourEvent.Pinned)));
-        s.Add(new("dashboard", TourSpot.DashboardRow, "Back to the Dashboard", "Everything due, at a glance.", "Click Dashboard", Done: () => At(PlaceKind.Dashboard)));
-        s.Add(new("cards", TourSpot.CounterNext, "The cards open", "Click a card to see what’s in it.", "Click Next 7 days", Done: () => Event(TourEvent.CounterOpened)));
-        s.Add(new("look", TourSpot.CounterPanel, "A quick look", "Click anything to preview it here.", "Click an item", Done: () => WorkPreview.IsOpen || nav.Current.Path.Count > 0));
-        s.Add(new("close", TourSpot.Preview, "Close it", "You’ll be right where you were.", "Close it", Done: () => !WorkPreview.IsOpen && nav.Current.Path.Count == 0));
-        s.Add(new("search", TourSpot.Search, "Search everything", "Find anything in your courses. Type / for commands."));
-        s.Add(new("end", null, "You’re all set", "Replay it any time from your account’s menu ▸ Take the tour.", NextLabel: "Done"));
+            s.Add(new("courses", TourSpot.FirstCourse, "Your courses", "Each course opens to its home, with its sections under it here."));
+        s.Add(new("tools", TourSpot.ToolsRow, "Tools", "A PDF editor, a file converter, calculators, flashcards, a citation maker and more. Pin one to keep it in the title bar.", "Click Tools to look", () => At(PlaceKind.Tools)));
+        s.Add(new("search", TourSpot.Search, "Search everything", "Find anything in your courses. Type / for commands, or press Ctrl+K."));
+        s.Add(new("report", TourSpot.Account, "Something wrong? Tell us here", "Report a bug or ask for something new from your account menu. You can take this tour again from the same menu.", NextLabel: "Done"));
         return s;
     }
 
@@ -213,17 +209,16 @@ public sealed class TourOverlay : Grid
 
     private void Show(int i)
     {
-        // (from a part lit to the next part, the callout goes with the light, as the Mac's does; the first step and the
-        // last, with nothing lit, pop in place)
+        // (from a part lit to the next part, the callout goes with the light, as the Mac's does; a step with nothing lit
+        // pops in place)
         var shown = index != null && card.ActualHeight > 0;
         index = i;
         revealed = false;
-        since = DateTime.UtcNow;
         seenEvents = Tour.Events;
         advancing = false;
         BuildCard();
         if (!Arrange(animate: shown, step: true)) Motion.Pop(card);
-        Dispatcher.BeginInvoke(() => { if (steps[i].Done == null) Focus(); }, DispatcherPriority.Input);
+        Dispatcher.BeginInvoke(() => Focus(), DispatcherPriority.Input);
         Shot.Moved();
     }
 
@@ -233,6 +228,14 @@ public sealed class TourOverlay : Grid
         timer.Stop();
         Prefs.Set("tour:done", true);
         Motion.FadeOut(this, () => Visibility = Visibility.Collapsed, Motion.Normal);
+    }
+
+    /// <summary>Left before its end (Skip tour, ×, Escape): it is over, and counts as seen — the account menu's Take the
+    /// tour brings it back.</summary>
+    public void Skip()
+    {
+        if (index == null) return;
+        Finish();
     }
 
     private void Next()
@@ -272,7 +275,7 @@ public sealed class TourOverlay : Grid
         }
     }
 
-    // ---- each beat: is the step's thing done, and where is its part now ----
+    // ---- each beat: was the step's suggestion taken, and where is its part now ----
 
     private void Tick()
     {
@@ -287,9 +290,10 @@ public sealed class TourOverlay : Grid
 
     private void OnKey(object sender, KeyEventArgs e)
     {
-        if (index is not { } i || steps[i].Done != null) return;
+        if (index == null) return;
         if (e.Key is Key.Right or Key.Enter) { Next(); e.Handled = true; }
         else if (e.Key == Key.Left) { Back(); e.Handled = true; }
+        else if (e.Key == Key.Escape) { Skip(); e.Handled = true; }
     }
 
     private void Nudge()
@@ -309,29 +313,35 @@ public sealed class TourOverlay : Grid
     {
         var s = steps[index!.Value];
         var i = index.Value;
+        var last = i == steps.Count - 1;
         var count = K.Text($"{i + 1} of {steps.Count}", Ty.Caption, B.Text2);
+        var close = K.IconButton(SymbolRegular.Dismiss24, Skip, "Close the tour (Esc)", 12, 28);
+        close.Margin = new Thickness(0, -6, -10, 0);
+        var top = K.Columns("*, auto", count.Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), close.Col(1));
         var title = K.Wrapped(s.Title, Ty.Subtitle);
         var body = K.Wrapped(s.Body, Ty.Body, B.Text2);
-        var v = K.V(8, count, title, body);
-        var waiting = s.Done != null;
+        var v = K.V(8, top, title, body);
         if (s.Doing != null)
         {
-            var sym = s.Gesture switch { "hover" => SymbolRegular.CursorHover24, "type" => SymbolRegular.Keyboard24, _ => SymbolRegular.CursorClick24 };
             var doing = K.Text(s.Doing, Ty.BodyStrong, B.AccentText);
-            v.Children.Add(K.H(8, K.Icon(sym, 16, B.AccentText), doing).Margin(0, 4, 0, 0));
+            v.Children.Add(K.H(8, K.Icon(SymbolRegular.CursorClick24, 16, B.AccentText), doing).Margin(0, 4, 0, 0));
         }
         v.Children.Add(K.Bar((i + 1.0) / steps.Count, Appearance.Accent, 3).Margin(0, 6, 0, 2));
-        var buttons = K.H(8);
-        if (i > 0) buttons.Children.Add(K.Button("Back", Back));
-        // (a step that waits shows Next only once it has waited a while, in case the thing it asks for cannot be done)
-        var next = K.Button(s.NextLabel, Next, accent: true);
-        next.Visibility = waiting ? Visibility.Collapsed : Visibility.Visible;
-        buttons.Children.Add(next);
-        buttons.HorizontalAlignment = HorizontalAlignment.Right;
-        v.Children.Add(buttons);
-        card.Tag = next;
+        var buttons = K.Columns("auto, *, auto");
+        if (!last)
+        {
+            var skip = K.Button("Skip tour", Skip);
+            skip.MinWidth = 0;
+            skip.ToolTip = "End the tour (Esc). Take it again from your account menu.";
+            buttons.Children.Add(skip.Col(0));
+        }
+        var moves = K.H(8);
+        if (i > 0) moves.Children.Add(K.Button("Back", Back));
+        moves.Children.Add(K.Button(s.NextLabel, Next, accent: true));
+        buttons.Children.Add(moves.Col(2));
+        v.Children.Add(buttons.Margin(0, 2, 0, 0));
         card.Child = v;
-        card.Width = 320;
+        card.Width = 340;
         card.Padding = new Thickness(18, 14, 18, 16);
         card.CornerRadius = new CornerRadius(8);
         card.Effect = K.Shadow(36, 10, 0.3);
@@ -346,13 +356,12 @@ public sealed class TourOverlay : Grid
         var s = steps[i];
         var size = new Size(ActualWidth, ActualHeight);
         if (size.Width < 10) return false;
-        // (a step waiting a while: Next appears, in case what it asks cannot be done here)
-        if (card.Tag is UIElement nx && s.Done != null && (DateTime.UtcNow - since).TotalSeconds > 6) nx.Visibility = Visibility.Visible;
         // (the step's part brought into sight first, once a step, when it waits out of sight in its list)
         if (!revealed && s.Spot is { } wanted) revealed = Tour.Reveal(wanted, this);
         Rect? hole = s.Spot is { } spot ? Tour.Find(spot, this) : null;
         if (hole is { } h) { h.Inflate(6, 6); hole = h; }
         whole.Rect = new Rect(size);
+        captions.Rect = new Rect(Math.Max(0, size.Width - CaptionButtons), 0, Math.Min(CaptionButtons, size.Width), MainWindow.TitleBarHeight);
         if (!step && hole == lastHole && card.ActualHeight > 0 && animate) return false;
         var from = lastHole;
         lastHole = hole;
@@ -365,21 +374,22 @@ public sealed class TourOverlay : Grid
             else if (r != from) light.BeginAnimation(RectangleGeometry.RectProperty, new System.Windows.Media.Animation.RectAnimation(r, Motion.Ms(Motion.Slow)) { EasingFunction = Motion.Decelerate });
             veil.Data = dim;
         }
-        else veil.Data = whole;
+        else veil.Data = bare;
         Ring(hole != null);
-        // the callout beside the lit part: to its right on the window's left side, else under it, over it; in the middle with none
-        card.Measure(new Size(320, double.PositiveInfinity));
+        // the callout beside the lit part: to its right on the window's left side, else under it, over it; in the middle
+        // with none — never up in the title bar
+        card.Measure(new Size(card.Width, double.PositiveInfinity));
         var cs = card.DesiredSize;
-        const double gap = 14, margin = 14;
+        const double gap = 14, margin = 14, top = MainWindow.TitleBarHeight + 8;
         Point at;
-        if (hole is not { } hr) at = new Point((size.Width - cs.Width) / 2, (size.Height - cs.Height) / 2);
+        if (hole is not { } hr) at = new Point((size.Width - cs.Width) / 2, Math.Max(top, (size.Height - cs.Height) / 2));
         else if (hr.Right < size.Width * 0.4 && hr.Right + gap + cs.Width <= size.Width - margin)
-            at = new Point(hr.Right + gap, Math.Clamp(hr.Y + hr.Height / 2 - cs.Height / 2, margin, Math.Max(margin, size.Height - cs.Height - margin)));
+            at = new Point(hr.Right + gap, Math.Clamp(hr.Y + hr.Height / 2 - cs.Height / 2, top, Math.Max(top, size.Height - cs.Height - margin)));
         else if (hr.Bottom + gap + cs.Height <= size.Height - margin)
             at = new Point(Math.Clamp(hr.X + hr.Width / 2 - cs.Width / 2, margin, Math.Max(margin, size.Width - cs.Width - margin)), hr.Bottom + gap);
-        else if (hr.Y - gap - cs.Height >= margin)
+        else if (hr.Y - gap - cs.Height >= top)
             at = new Point(Math.Clamp(hr.X + hr.Width / 2 - cs.Width / 2, margin, Math.Max(margin, size.Width - cs.Width - margin)), hr.Y - gap - cs.Height);
-        else at = new Point((size.Width - cs.Width) / 2, hr.Y + hr.Height / 2 > size.Height / 2 ? margin : size.Height - cs.Height - margin);
+        else at = new Point((size.Width - cs.Width) / 2, hr.Y + hr.Height / 2 > size.Height / 2 ? top : size.Height - cs.Height - margin);
         // (a callout not placed yet is placed, never slid from nowhere)
         var placed = !double.IsNaN(Canvas.GetLeft(card)) && !double.IsNaN(Canvas.GetTop(card));
         if (placed && (step ? travel : animate && Motion.On))
