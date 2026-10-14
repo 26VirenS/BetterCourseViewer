@@ -184,6 +184,15 @@ public sealed class BioSceneView : Grid
     }
     private bool showLabels = true;
 
+    /// <summary>The view's bottom-left corner kept clear of labels (what a page lays over it there: Cell Explorer's scale
+    /// bar), its width and height; none by default.</summary>
+    public Size LabelKeepClear
+    {
+        get => labelKeepClear;
+        set { if (labelKeepClear == value) return; labelKeepClear = value; labelSignature = ""; Wake(); }
+    }
+    private Size labelKeepClear;
+
     /// <summary>Auto-turn (the "Turn" button): once round in 30 s; never with Windows' animations off.</summary>
     public bool Turning
     {
@@ -398,11 +407,16 @@ public sealed class BioSceneView : Grid
         var c = BioWpf.P(s.Centre);
         var m = Matrix3D.Identity;
         m.RotateAt(q, c);
+        // (a scene that names the ball to frame keeps to it: a bacterium's long flagella reach far past the cell its ball
+        //  holds, and fitting them all left the cell a speck)
+        var held = content?.Frame != null;
+        double Held(double v, double mid) => held ? Math.Clamp(v, mid - s.Radius, mid + s.Radius) : v;
         double d = 0, front = double.MinValue;
         foreach (var (lo, hi) in extents)
             for (var i = 0; i < 8; i++)
             {
-                var p = m.Transform(new Point3D((i & 1) == 0 ? lo.X : hi.X, (i & 2) == 0 ? lo.Y : hi.Y, (i & 4) == 0 ? lo.Z : hi.Z)) - c;
+                var corner = new Point3D(Held((i & 1) == 0 ? lo.X : hi.X, s.Centre.X), Held((i & 2) == 0 ? lo.Y : hi.Y, s.Centre.Y), Held((i & 4) == 0 ? lo.Z : hi.Z, s.Centre.Z));
+                var p = m.Transform(corner) - c;
                 // (the camera at the centre and d out along +z: this corner is d − p.Z in front of it, and shows
                 //  |p.X|·f / (d − p.Z) from the view's middle)
                 d = Math.Max(d, p.Z + Math.Max(Math.Abs(p.X) * f / hw, Math.Abs(p.Y) * f / hh));
@@ -885,7 +899,9 @@ public sealed class BioSceneView : Grid
         // (the model's circle on the view: its framing ball's centre and edge, projected)
         var c = Project(framing.Centre);
         var r = ActualHeight / (2 * Tan20) * framing.Radius / Math.Max(distance, 1e-6);
-        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox());
+        var clear = labelKeepClear.Width > 0 && labelKeepClear.Height > 0
+            ? new BioLabelBox(0, ActualHeight - labelKeepClear.Height, labelKeepClear.Width, ActualHeight) : (BioLabelBox?)null;
+        var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox(), clear);
         DrawLabels(placed, more);
     }
 

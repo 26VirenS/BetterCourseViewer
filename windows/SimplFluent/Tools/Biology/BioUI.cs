@@ -16,11 +16,11 @@ namespace Simpl.Tools;
 
 public static class BioUI
 {
-    /// <summary>The chemistry builders' layout (ChemLayout, the Mac's PTWorkLayout): controls, the drawing and the facts
-    /// side by side from 1100 wide; from 760 (a 1280 or 1366 window beside the navigation pane) the drawing beside one
-    /// column, the controls over the facts, each scrolling in its own share of it; narrower (a 1024 window beside the pane,
-    /// a narrow one with the pane folded), the drawing over the two, short enough that their first controls show under it.
-    /// The controls and the facts are never out of sight.</summary>
+    /// <summary>The chemistry builders' layout (ChemLayout, the Mac's PTWorkLayout), decided on the width the tool is given
+    /// (its popup's): controls, the drawing and the facts side by side from 1180 wide; from 840 (the popup on a 1280 or 1366
+    /// window) the drawing beside one column, the controls over the facts, each scrolling in its own share of it; narrower
+    /// (the popup on a 1024 window, or a narrow one), the drawing over the two, short enough that their headings and first
+    /// controls show under it. The controls and the facts are never out of sight.</summary>
     public static FrameworkElement Work(FrameworkElement left, FrameworkElement centre, FrameworkElement right) => new ChemLayout(left, centre, right, tall: true);
 
     /// <summary>A pin's flyout's way to its whole tool: one accent button across the flyout, the same in every biology

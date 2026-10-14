@@ -300,7 +300,7 @@ internal sealed class BiomolNucleicPage : BiomolPageView
             Right.Children.Add(BioUI.Card("DNA or RNA?", null, null,
                 K.Wrapped("Two differences: the sugar (deoxyribose has H at 2′ where ribose has –OH, not at 3′) and one base (DNA has thymine, T; RNA has uracil, U, which is T without its methyl group).", Ty.Body)));
         if (PickedAtom(Picked) is { } id && mol.Model(BiomoleculeBuilderModel.Ph7) is { } m && id < m.Atoms.Count)
-            Right.Children.Add(PickedCard($"{BiomolNucleotide.ShortName(code)} · {m.Atoms[id].Name}", m.Atoms[id].Element, BiomolNucleotide.Part(m.Atoms[id].Name).Name));
+            Right.Children.Insert(0, PickedCard($"{BiomolNucleotide.ShortName(code)} · {m.Atoms[id].Name}", m.Atoms[id].Element, BiomolNucleotide.Part(m.Atoms[id].Name).Name));
         Right.Children.Add(Legend(b));
     }
 
@@ -337,7 +337,7 @@ internal sealed class BiomolNucleicPage : BiomolPageView
         {
             var a = d.Atoms[id];
             var number = a.Strand == 1 ? a.Pair + 1 : n - a.Pair;
-            Right.Children.Add(PickedCard($"Strand {a.Strand} · {a.Base} {number} · {a.Name}", a.Element, BiomolNucleotide.Part(a.Name).Name));
+            Right.Children.Insert(0, PickedCard($"Strand {a.Strand} · {a.Base} {number} · {a.Name}", a.Element, BiomolNucleotide.Part(a.Name).Name));
         }
         Right.Children.Add(Legend(null));
     }
@@ -666,7 +666,7 @@ internal sealed class BiomolCarbPage : BiomolPageView
                 // (side by side, a pick names its sugar: "alpha:…" or "beta:…")
                 var pickedCode = CompareShown && Picked is { } pk ? (pk.StartsWith("beta:", StringComparison.Ordinal) ? "BGC" : "GLC") : code;
                 if (PickedAtom(Picked) is { } id && BioData.Molecule(pickedCode) is { } pm && pm.Model() is { } m && id < m.Atoms.Count)
-                    Right.Children.Add(PickedCard($"{BiomolSugar.ShortName(pickedCode)} · {m.Atoms[id].Name}", m.Atoms[id].Element, BiomolScenes.SugarPart(m.Atoms[id].Name, pm, BiomolSugar.RingOf(pm)).Name));
+                    Right.Children.Insert(0, PickedCard($"{BiomolSugar.ShortName(pickedCode)} · {m.Atoms[id].Name}", m.Atoms[id].Element, BiomolScenes.SugarPart(m.Atoms[id].Name, pm, BiomolSugar.RingOf(pm)).Name));
                 Right.Children.Add(Legend(false));
                 break;
             }
@@ -835,7 +835,7 @@ internal sealed class BiomolLipidPage : BiomolPageView
             var codes = code == "STE+OLA" ? new[] { "STE", "OLA" } : new[] { code };
             var k = Picked!.StartsWith("mol:1:", StringComparison.Ordinal) ? 1 : 0;
             if (k < codes.Length && BioData.Molecule(codes[k]) is { } mol2 && mol2.Model(BiomoleculeBuilderModel.Ph7) is { } m && id < m.Atoms.Count)
-                Right.Children.Add(PickedCard($"{BiomolLipid.ShortName(codes[k])} · {m.Atoms[id].Name}", m.Atoms[id].Element, BiomolLipid.Detail(m.Atoms[id].Name, mol2)));
+                Right.Children.Insert(0, PickedCard($"{BiomolLipid.ShortName(codes[k])} · {m.Atoms[id].Name}", m.Atoms[id].Element, BiomolLipid.Detail(m.Atoms[id].Name, mol2)));
         }
         var items = new List<(Color, string)>();
         if (BiomoleculeBuilderModel.ColourBy == BiomolColourBy.Element)

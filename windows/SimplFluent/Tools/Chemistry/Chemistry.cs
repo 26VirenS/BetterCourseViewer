@@ -76,8 +76,8 @@ internal static class ChemSheet
 /// <summary>
 /// The Lewis maker's, the molecule builder's and the biology tools' layout (the Mac's PTWorkLayout), made so the controls
 /// and the facts are in sight at every size: on a wide page the controls, the drawing and the facts side by side, each
-/// scrolling on its own; on a middling one (a 1280 or 1366 window beside the navigation pane) the drawing beside one
-/// column, the controls over the facts, each in its own share of it and scrolling on its own (<see cref="ChemSide"/>); and
+/// scrolling on its own; on a middling one (a tool's popup on a 1280 or 1366 window) the drawing beside one column, the
+/// controls over the facts, each in its own share of it and scrolling on its own (<see cref="ChemSide"/>); and
 /// on a page narrower than that, the drawing across the top and the controls and facts side by side under it, all
 /// scrolling as one. There the drawing is about half the page (the chemistry builders, which put their preset and way of
 /// making in the drawing's own heading: <see cref="WideChanged"/>) or, for the biology tools (<c>tall</c>), as tall as
@@ -111,8 +111,8 @@ internal sealed class ChemLayout : Grid
     public event Action? WideChanged;
 
     /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall, as
-    /// tall as leaves 170 of the page for the first controls under it, from 240 to 560.</summary>
-    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 170)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
+    /// tall as leaves 130 of the page for the columns' headings and first controls under it, from 240 to 560.</summary>
+    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 130)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
 
     /// <summary>The least the drawing is given over the rest (320): more while the drawing's card holds more than the
     /// drawing — the Lewis maker's resonance structures under it, which left the structure itself a few lines tall.</summary>

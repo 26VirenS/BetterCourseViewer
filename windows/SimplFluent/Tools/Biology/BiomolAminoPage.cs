@@ -185,7 +185,7 @@ internal sealed class BiomolAminoPage : BiomolPageView
         if (PickedAtom(Picked) is { } id && BiomolAminoAcid.Model(aa.One, BiomoleculeBuilderModel.Ph7, mirrored) is { } m && id < m.Atoms.Count && BiomolAminoAcid.Template(aa.One) is { } t)
         {
             var a = m.Atoms[id];
-            Right.Children.Add(PickedCard($"{aa.Three} · {a.Name}", a.Element, BiomolAminoAcid.Part(a.Name, t).Name));
+            Right.Children.Insert(0, PickedCard($"{aa.Three} · {a.Name}", a.Element, BiomolAminoAcid.Part(a.Name, t).Name));
         }
         Right.Children.Add(Legend());
     }

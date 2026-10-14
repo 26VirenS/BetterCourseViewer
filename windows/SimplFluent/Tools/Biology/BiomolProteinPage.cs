@@ -595,7 +595,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
         {
             var a = p.Atoms[k];
             var part = BiomolScenes.BackboneNames.Contains(a.Name) ? "backbone" : "R group (side chain)";
-            Right.Children.Add(PickedCard($"{p.ResidueName(a.Residue)} · {a.Name}", a.Element, part));
+            Right.Children.Insert(0, PickedCard($"{p.ResidueName(a.Residue)} · {a.Name}", a.Element, part));
         }
     }
 
@@ -638,7 +638,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
                 Right.Children.Add(BioUI.Legend(BioAAClasses.All.Select(c => (BioColors.Of(c), c.Label()))));
                 Right.Children.Add(BioUI.Caption("The sequence is the one on the Build side; change it there."));
                 if (Picked is { } id && id.StartsWith("bead:", StringComparison.Ordinal) && int.TryParse(id[5..], out var i) && i < seq.Length && BioAminoAcids.ByOne.GetValueOrDefault(seq[i]) is { } aa)
-                    Right.Children.Add(BioUI.Card($"{aa.Three} {i + 1}", BioColors.Of(aa.Group), $"{aa.Name} · {aa.Group.Label()}", BioUI.Caption(aa.Note)));
+                    Right.Children.Insert(0, BioUI.Card($"{aa.Three} {i + 1}", BioColors.Of(aa.Group), $"{aa.Name} · {aa.Group.Label()}", BioUI.Caption(aa.Note)));
                 break;
             }
             case "secondary":
@@ -677,7 +677,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
                         "glu6" => "β6 Glu: the residue sickle-cell changes to Val",
                         _ => null,
                     };
-                    if (what != null) Right.Children.Add(BioUI.Card("Picked", null, what));
+                    if (what != null) Right.Children.Insert(0, BioUI.Card("Picked", null, what));
                 }
                 break;
             }
@@ -700,7 +700,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
                 Right.Children.Add(BioUI.Legend(BioAAClasses.All.Select(c => (BioColors.Of(c), $"Side chain: {c.Label()}"))
                     .Concat(new[] { ('H', "α-helix"), ('E', "β-strand"), ('C', "Coil (loop)") }.Select(x => (BioPalette.Secondary(x.Item1).ToColor(), x.Item2)))));
                 if (Picked is { } id && id.StartsWith("res:", StringComparison.Ordinal) && int.TryParse(id[4..], out var i) && u.FirstOrDefault(x => x.I == i) is { } res && BioAminoAcids.ByOne.GetValueOrDefault(res.Aa) is { } aa)
-                    Right.Children.Add(BioUI.Card($"{aa.Three} {i}", BioColors.Of(aa.Group), $"{aa.Name} · {aa.Group.Label()} · {(res.Ss == 'H' ? "in the helix" : res.Ss == 'E' ? "in a strand" : "in a loop")}", BioUI.Caption(aa.Note)));
+                    Right.Children.Insert(0, BioUI.Card($"{aa.Three} {i}", BioColors.Of(aa.Group), $"{aa.Name} · {aa.Group.Label()} · {(res.Ss == 'H' ? "in the helix" : res.Ss == 'E' ? "in a strand" : "in a loop")}", BioUI.Caption(aa.Note)));
                 break;
             }
         }

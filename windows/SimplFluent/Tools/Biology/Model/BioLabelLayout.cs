@@ -60,9 +60,11 @@ public static class BioLabelLayout
     public const int BandRows = 3;
 
     /// <summary>The labels placed round a model whose screen circle is centred at (cx, cy) with radius r, in a view w × h;
-    /// given the model's box, labels that would hide what they name move to rows above or below it. Returns the placements
-    /// and how many visible labels were left out.</summary>
-    public static (List<BioLabelPlacement> Placed, int More) Layout(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model = null)
+    /// given the model's box, labels that would hide what they name move to rows above or below it; given a box to keep
+    /// clear (a scale bar over the view's corner), no label goes over it. Returns the placements and how many visible
+    /// labels were left out.</summary>
+    public static (List<BioLabelPlacement> Placed, int More) Layout(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model = null,
+        BioLabelBox? keepClear = null)
     {
         var shown = inputs.Where(i => i.Visible).ToList();
         const double step = Height + Gap;
@@ -81,22 +83,12 @@ public static class BioLabelLayout
             if (Math.Abs(shown[k].X - cx) > 0.5 * half) break;
             onLeft[k] = !from;
         }
-        // (a column holds what the view's height has room for, 22 apart inside its edges: past that, the objects covering
-        //  the most of the screen keep their labels and the rest are counted)
-        var holds = Math.Max(1, (int)Math.Floor((h - 2 * Inset - Height) / step + 1e-9) + 1);
         var more = 0;
         var out_ = new List<BioLabelPlacement>();
         foreach (var left in new[] { true, false })
         {
             var mine = Enumerable.Range(0, shown.Count).Where(i => onLeft[i] == left).ToList();
-            if (mine.Count > holds)
-            {
-                var keep = mine.OrderByDescending(i => shown[i].Area).ThenBy(i => i).Take(holds).ToHashSet();
-                more += mine.Count - holds;
-                mine = mine.Where(keep.Contains).ToList();
-            }
-            var column = mine.Select(i => shown[i]).OrderBy(l => l.Y).ThenBy(l => l.Id, StringComparer.Ordinal).ToList();
-            if (column.Count == 0) continue;
+            if (mine.Count == 0) continue;
             // (the column's edge toward the model — 24 out from its box, when the box is narrower than its circle; a label
             //  too wide to fit outside it in the view is moved in alone, so one long label does not pull the column's
             //  shorter ones onto the model)
@@ -104,6 +96,23 @@ public static class BioLabelLayout
             if (model is { } b && b.X1 > b.X0) edge = left ? Math.Max(edge, b.X0 - ColumnOffset) : Math.Min(edge, b.X1 + ColumnOffset);
             double EdgeOf(BioLabelInput l) => left ? Math.Max(edge, Inset + l.Width) : Math.Min(edge, w - Inset - l.Width);
             double top = Inset + Height / 2, bottom = h - Inset - Height / 2;
+            // (a column that reaches over the box kept clear ends above it, with a line's room for "+N more")
+            if (keepClear is { } kc)
+            {
+                double x0 = mine.Min(i => left ? EdgeOf(shown[i]) - shown[i].Width : EdgeOf(shown[i]));
+                double x1 = mine.Max(i => left ? EdgeOf(shown[i]) : EdgeOf(shown[i]) + shown[i].Width);
+                if (x0 < kc.X1 && x1 > kc.X0) bottom = Math.Min(bottom, kc.Y0 - Gap - Height);
+            }
+            // (a column holds what its height has room for, 22 apart inside its edges: past that, the objects covering the
+            //  most of the screen keep their labels and the rest are counted)
+            var holds = Math.Max(1, (int)Math.Floor((bottom - top) / step + 1e-9) + 1);
+            if (mine.Count > holds)
+            {
+                var keep = mine.OrderByDescending(i => shown[i].Area).ThenBy(i => i).Take(holds).ToHashSet();
+                more += mine.Count - holds;
+                mine = mine.Where(keep.Contains).ToList();
+            }
+            var column = mine.Select(i => shown[i]).OrderBy(l => l.Y).ThenBy(l => l.Id, StringComparer.Ordinal).ToList();
             var ys = column.Select(l => Math.Max(l.Y, top)).ToArray();
             for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + step);
             if (ys[^1] > bottom)
@@ -128,13 +137,14 @@ public static class BioLabelLayout
                 out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, elbow));
             }
         }
-        if (model is { } box) IntoBands(out_, box, w, h);
+        if (model is { } box) IntoBands(out_, box, w, h, keepClear);
         return (out_, more);
     }
 
     /// <summary>Each label that would hide its own anchor, or reach well into a narrow model, moved to a row just above the
-    /// model (an anchor in its upper half) or below it, as near over its anchor as the row allows.</summary>
-    private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h)
+    /// model (an anchor in its upper half) or below it, as near over its anchor as the row allows (and never over the box
+    /// kept clear).</summary>
+    private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h, BioLabelBox? keepClear)
     {
         const double step = Height + Gap, space = 6;
         var narrow = box.X1 - box.X0 < 0.7 * w;
@@ -159,6 +169,8 @@ public static class BioLabelLayout
             var y = RowY(above, k);
             list = placed.Where(p => !moving.Contains(p) && Math.Abs(p.Y - y) < Height + Gap / 2)
                 .Select(p => (p.Frame.X - space, p.Frame.X + p.Frame.Width + space)).ToList();
+            // (the box kept clear stands in a row that reaches it, as a capsule would)
+            if (keepClear is { } kc && y + Height / 2 > kc.Y0 && y - Height / 2 < kc.Y1) list.Add((kc.X0 - space, kc.X1 + space));
             fixedIn[(above, k)] = list;
             return list;
         }

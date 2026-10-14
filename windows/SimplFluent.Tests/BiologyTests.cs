@@ -451,6 +451,13 @@ public class BiologyTests
         var far = Enumerable.Range(0, 6).Select(k => new BioLabelInput($"f{k}", "Far", 700, 100 + 30 * k, Width: 60)).ToList();
         var (kept, _) = BioLabelLayout.Layout(far, 400, 300, 200, 900, 600);
         Assert.All(kept, p => Assert.False(p.Left));
+        // (a scale bar over the view's bottom-left corner: the left column ends above it, the right one is left as it is)
+        var low = Enumerable.Range(0, 8).Select(k => new BioLabelInput($"l{k}", $"Low {k}", k < 4 ? 300 : 500, 120 + 20 * k, Area: k, Width: 70)).ToList();
+        var bar = new BioLabelBox(0, 150, 200, 200);
+        var (clear, gone) = BioLabelLayout.Layout(low, 400, 100, 150, 800, 200, keepClear: bar);
+        Assert.All(clear.Where(p => p.Left), p => Assert.True(p.Frame.Y + p.Frame.Height <= bar.Y0 + 1e-9));
+        Assert.Equal(4, clear.Count(p => !p.Left));
+        Assert.Equal(8, clear.Count + gone);
     }
 
     [Fact]

@@ -287,9 +287,10 @@ internal sealed class DnaToggle : Grid
 /// <summary>
 /// A page laid out in two columns (the drawing and its cards) from 1000 wide, the drawing over the cards below that — for
 /// the pages whose 2D drawing needs more room than the three-column layout's middle (replication: beside a column on a
-/// 1366 window its letters and enzymes' names came out 7 px tall). Over the cards, the drawing is as tall as leaves 170 of
-/// the page for the first card under it (240 to 640), so the step's card is in sight under it. (It once gave the drawing
-/// the page's whole height, and the step's card sat out of sight below it.)
+/// 1366 window its letters and enzymes' names came out 7 px tall). Over the cards, the drawing is as tall as leaves 110 of
+/// the page for the first card's title under it (240 to 640), so the step's card is in sight under it and the fork's words
+/// stay readable in a tool's popup. (It once gave the drawing the page's whole height, and the step's card sat out of
+/// sight below it.)
 /// </summary>
 internal sealed class DnaTwoColumns : Grid
 {
@@ -314,7 +315,7 @@ internal sealed class DnaTwoColumns : Grid
         return base.MeasureOverride(available);
     }
 
-    private static double NarrowHeight(double page) => Math.Max(240, Math.Min(640, page - 170));
+    private static double NarrowHeight(double page) => Math.Max(240, Math.Min(640, page - 110));
 
     private void Lay(Size size)
     {

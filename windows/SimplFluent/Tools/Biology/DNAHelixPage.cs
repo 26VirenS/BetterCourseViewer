@@ -289,7 +289,9 @@ internal sealed class DnaHelixPage : Grid
             ("Strands", "Antiparallel", null),
             ("GC content", $"{BioSeq.GcContent(seq) * 100:0.#}%", null),
         }));
-        right.Children.Add(SelectionCard(seq));
+        // (what is selected first, so its card is the first thing in sight beside the model)
+        if (DNAToolModel.Selected != null) right.Children.Insert(0, SelectionCard(seq));
+        else right.Children.Add(SelectionCard(seq));
         right.Children.Add(BioUI.Caption("Watson and Crick’s 1953 model, and many textbooks, give 10 bp and 3.4 nm a turn. DNA in solution averages 10.4–10.5 bp a turn, which this model uses (the Arnott B-DNA fiber model, 3.40 Å a base pair)."));
     }
 

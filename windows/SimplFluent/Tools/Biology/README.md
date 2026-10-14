@@ -271,12 +271,13 @@ anim.Stop();`): `phase.From`, `phase.To`, `phase.T` (eased; 600 ms at 1×; back 
 `.Maternal`, `.HBond` … are `BioHexPair`s (`Light`, `Dark`, `HexFor(dark)`): `.ToColor()` (as the app is drawn now),
 `.ToColor(dark)`, `.ToBrush()`; `BioColors.Base(char)`, `.AminoAcid(char)`, `.Of(BioAAClass)`, `.Tool(key)`,
 `.Hex(color)`. Never colour alone: show the letter or a `BioUI.Legend`. Pieces: `BioUI.Work(left, centre, right)` (the
-chemistry builders' layout, `ChemLayout`: the three columns side by side from 1180 wide; from 840 — a 1280 or 1366
-window beside the navigation pane — the drawing beside one column, the controls over the facts, each scrolling in its
-own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and 45%); narrower — a 1024 window beside
-the pane, a narrow one with it folded — the drawing across the top, as tall as leaves 170 of the page for the two
-columns' first controls under it (240 to 560). The controls and the facts are always in sight: 0.3.0 gave the drawing
-the whole page under 1180, and they sat out of sight below it),
+chemistry builders' layout, `ChemLayout`, decided on the width it is given — a tool's popup's: the three columns side
+by side from 1180 wide; from 840 — the popup on a 1280 or 1366 window — the drawing beside one column, the controls
+over the facts, each scrolling in its own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and
+45%); narrower — the popup on a 1024 window, or a narrow one — the drawing across the top, as tall as leaves 130 of the
+page for the two columns' headings and first controls under it (240 to 560). The controls and the facts are always in
+sight: 0.3.0 gave the drawing the whole page under 1180, and they sat out of sight below it. A scene's
+`LabelKeepClear` keeps its labels off a corner a page lays something over — Cell Explorer's scale bar),
 `BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
 `BioUI.FactRow(label, text, tint)`, `BioUI.Facts(rows)`, `BioUI.Legend(items)`, `BioUI.SequenceText`, `BioUI.OpenButton`,
 `BioQuickOpen`, `BioToolPlaceholder`.
@@ -370,8 +371,8 @@ written as DNA), `nucleotide` (the Nucleotides page; `molecule` read as the same
 happens in S phase" opens
 `replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is). The
 Replication page (`DnaTwoColumns`) puts the fork beside its cards from 1000 wide (beside a column on a 1366 window its
-letters came out 7 px tall); narrower, the fork and its controls are as tall as leaves 170 of the page for the step's
-card under them (240 to 640), so its words stay readable and the card is in sight.
+letters came out 7 px tall); narrower, the fork and its controls are as tall as leaves 110 of the page for the step's
+card's title under them (240 to 640), so its words stay readable and the card is in sight.
 
 ## Cell Division (`divide`)
 

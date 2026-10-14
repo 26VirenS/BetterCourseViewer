@@ -461,7 +461,8 @@ internal abstract class BiomolPageView : Grid
     /// <summary>An element's name ("Nitrogen").</summary>
     protected static string ElementName(string symbol) => MBChem.Element(symbol)?.Name ?? symbol;
 
-    /// <summary>The facts' "Picked" card for an atom: "Lys 12 · NZ", its element and what it is part of.</summary>
+    /// <summary>The facts' "Picked" card for an atom: "Lys 12 · NZ", its element and what it is part of. The pages put it
+    /// first in the facts, so what was picked is the first thing in sight beside the model.</summary>
     protected static FrameworkElement PickedCard(string where, string element, string? part = null) =>
         BioUI.Card(where, MBChem.ColorOf(element), $"{ElementName(element)}{(part != null ? " · " + part : "")}",
             BioUI.Caption("Picked in the 3D view. Press Escape or empty space to let go."));

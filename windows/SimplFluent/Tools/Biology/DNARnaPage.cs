@@ -266,7 +266,8 @@ internal sealed class DnaRnaPage : Grid
                     ("Reads", "5′-UUC-3′ (and UUU): Phe", null),
                     ("Modified bases", $"{BioData.Trna.Modified.Count} in the real molecule", null),
                 }));
-                if (DNAToolModel.TrnaSelected is { } i && i is >= 1 and <= 76) right.Children.Add(BaseCard(i));
+                // (the base pressed first, so its card is the first thing in sight beside the cloverleaf)
+                if (DNAToolModel.TrnaSelected is { } i && i is >= 1 and <= 76) right.Children.Insert(0, BaseCard(i));
                 right.Children.Add(BioUI.Card("Anticodon meets codon", BioColors.Base('G'), "Antiparallel, like DNA’s strands",
                     BioUI.FactRow("Pairing", "The anticodon, written 3′-AAG-5′, pairs with the codon 5′-UUC-3′: C with G34, U with A35, U with A36."),
                     BioUI.FactRow("Wobble", "G34 can also pair with U, so this one tRNA reads UUU too — both codons mean phenylalanine."),

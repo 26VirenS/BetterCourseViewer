@@ -351,6 +351,8 @@ internal sealed class CellScaleBar : Grid
         var plate = K.Card(K.H(0, stack, badge), new Thickness(10, 6, 10, 7), 9);
         plate.Bg(B.Solid);
         Children.Add(plate);
+        // (the scene's labels kept off it: on a short scene the left column's last labels went under it)
+        SizeChanged += (_, _) => scene.LabelKeepClear = new Size(Margin.Left + ActualWidth + 6, Margin.Bottom + ActualHeight + 6);
         Loaded += (_, _) => Watch();
         Unloaded += (_, _) => { if (camera != null) camera.Changed -= OnCamera; camera = null; };
         scene.SizeChanged += (_, _) => Update();

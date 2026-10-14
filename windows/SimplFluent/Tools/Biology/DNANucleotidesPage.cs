@@ -227,7 +227,8 @@ internal sealed class DnaNucleotidesPage : Grid
                     () => { DNAToolModel.NucleotidePart = DNAToolModel.NucleotidePart == k ? null : k; DNAToolModel.Tell(); }, swatch));
             }
             right.Children.Add(BioUI.Card("Parts", null, null, list));
-            if (DNAToolModel.NucleotidePart is { } part) right.Children.Add(PartCard(part, code));
+            // (the part pressed first, so its card is the first thing in sight beside the model)
+            if (DNAToolModel.NucleotidePart is { } part) right.Children.Insert(0, PartCard(part, code));
         }
         right.Children.Add(BioUI.Card("DNA vs RNA", null, null,
             BioUI.FactRow("Sugar", "DNA: deoxyribose — its 2′ carbon has only H. RNA: ribose — its 2′ carbon has an OH. The difference is at 2′, not 3′."),
