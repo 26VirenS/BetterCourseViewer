@@ -393,10 +393,22 @@ final class LiveHolds {
     }
 
     /// The student is typing: a field being edited (its field editor has the keys), or a key pressed in the last 5 seconds.
+    /// (The toolbar's search field left with the keys is not the screen's: nothing a check puts in place moves it, and
+    /// after a search it keeps them while the student goes on with the mouse — only a key pressed in it holds a check.)
     private var typing: Bool {
         if Date().timeIntervalSince(Self.lastKey) < 5 { return true }
-        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return false }
-        return editor.isEditable
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isEditable else { return false }
+        return !Self.inToolbar(editor.delegate as? NSView)
+    }
+
+    /// A view in the window's toolbar (the search field): one of the views it is in is the toolbar's.
+    private static func inToolbar(_ view: NSView?) -> Bool {
+        var v = view
+        while let x = v {
+            if String(describing: type(of: x)).contains("Toolbar") { return true }
+            v = x.superview
+        }
+        return false
     }
 
     /// A sheet or a dialog over the window, a popover (a pinned tool's quick version, a picker's), a popup of its own (a
