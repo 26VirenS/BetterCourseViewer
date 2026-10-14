@@ -1,3 +1,12 @@
+**What's new in 0.3.2** (beta)
+
+- **Chemistry tools** — the Periodic Table, Lewis Structures, Molecule Builder and Atoms & Orbitals, each its own tool in a new Chemistry section.
+- **Live updates** — an open screen checks for new work every minute while Simpl is in view; course pages every 10 minutes.
+- **Dashboard cards** — the counter cards grow into their lists again and fold back, are as tall as what is on them, and each wears its own colour.
+- **Wider tool popups** — a tool opens across the whole window, over the pane; drag an edge to resize it, and it remembers the size.
+- **Only what changed** — the Dashboard updates just the counters, cards and rows that changed, nothing else moves.
+- **Messages stay unread** — a check never marks a message or reply read while you are away, and nothing is checked while the PC is locked.
+
 **What's new in 0.3.1**
 
 - **More from Canvas** — History, Help and your school's own tools in the sidebar.

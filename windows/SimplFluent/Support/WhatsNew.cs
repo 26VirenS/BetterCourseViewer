@@ -26,6 +26,13 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.2", "2026-10-14",
+            ("new", "Chemistry tools", "Periodic Table, Lewis, Molecule Builder, Atoms & Orbitals."),
+            ("new", "Live updates", "Open screens check for new work every minute."),
+            ("improved", "Dashboard cards", "Cards grow into their lists again, each in its colour."),
+            ("improved", "Wider tool popups", "Tools span the whole window; drag an edge to resize."),
+            ("improved", "Only what changed", "Your Dashboard updates just the parts that changed."),
+            ("fixed", "Messages stay unread", "Checks never mark messages read while you're away.")),
         R("0.3.1", "2026-10-14",
             ("new", "More from Canvas", "History, Help and your school's own tools in the sidebar."),
             ("new", "Beta updates", "Turn on Get beta updates to try new versions first."),
