@@ -265,9 +265,10 @@ public sealed partial class DashboardScreen : Screen
     /// Next 7 days, has room at its own size in them only so — at 12 it was shrunk a little to fit.</summary>
     private const double SquarePadTight = 10;
 
-    /// <summary>The tallest a square tile grows: as tall as it is wide up to a 1080p window's tiles (about 246), no taller
-    /// on a wider screen, where a tile as tall as wide would push the work under the counters out of view.</summary>
-    private const double SquareMost = 248;
+    /// <summary>The tallest a square tile grows: as tall as it is wide on a window up to about 1650 wide; on a wider one (a
+    /// 1080p window's tiles are about 246 wide) it stops here, square enough, where a tile as tall as wide would only add
+    /// empty colour under its words and push the work under the counters further down.</summary>
+    private const double SquareMost = 200;
 
     /// <summary>
     /// How the counters are laid out for a page and a window this wide: on a window 1024 wide or wider, one row of six
@@ -461,34 +462,68 @@ public sealed partial class DashboardScreen : Screen
     }
 
     /// <summary>
-    /// The line about a count, in whole words: on as many lines as it takes, up to two, where every word of it fits the
-    /// tile's width — else not at all (never a word cut, never "…"; the tile's tooltip and what a screen reader says keep
-    /// it). Decided as it is measured, so a tile that widens or narrows with the window shows it or leaves it out by
-    /// itself. A tile without one keeps a line's room, so its number sits where its neighbours' numbers do.
+    /// The line about a count, whole: on as many lines as it takes, up to two — its parts ("announcements · 2 courses" is
+    /// two) kept whole on lines of their own where each fits the tile's width ("announcements" over "2 courses", not
+    /// "announcements · 2" over "courses"), else wrapped at its words where each word fits — or not at all (never a word
+    /// cut, never "…"; the tile's tooltip and what a screen reader says keep it). Decided as it is measured, so a tile
+    /// that widens or narrows with the window shows it or leaves it out by itself. A tile without one keeps a line's
+    /// room, so its number sits where its neighbours' numbers do.
     /// </summary>
     private sealed class NoteLines : Decorator
     {
         private const int Most = 2;
         private readonly TextBlock text;
-        private readonly double[] words;
+        private readonly string note;
+        private readonly string[] parts;
+        private readonly double[] partWidths, wordWidths;
+        private double room = double.NaN;
 
         public NoteLines(string? note)
         {
-            var s = note ?? "";
-            text = K.Text(s, Ty.Caption, B.Text2, TextWrapping.WrapWithOverflow);
+            this.note = note ?? "";
+            parts = this.note.Split(" · ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            partWidths = parts.Select(p => WordsWidth(p, Ty.Caption)).ToArray();
+            wordWidths = this.note.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => WordsWidth(w, Ty.Caption)).ToArray();
+            text = K.Text("", Ty.Caption, B.Text2, TextWrapping.WrapWithOverflow);
             text.TextTrimming = TextTrimming.None;
-            words = s.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => WordsWidth(w, Ty.Caption)).ToArray();
             Child = text;
         }
 
         protected override Size MeasureOverride(Size available)
         {
             var line = K.Ramp(Ty.Caption).Line;
+            if (!available.Width.Equals(room))
+            {
+                room = available.Width;
+                var shown = Lines(room);
+                if (text.Text != shown) text.Text = shown;
+            }
             text.Measure(new Size(available.Width, double.PositiveInfinity));
             // (Hidden, not Collapsed: showing or hiding it here asks for no second measure)
-            var whole = words.Length > 0 && words.All(w => w <= available.Width + 0.5) && text.DesiredSize.Height <= Most * line + 0.5;
+            var whole = text.Text.Length > 0 && text.DesiredSize.Height <= Most * line + 0.5;
             text.Visibility = whole ? Visibility.Visible : Visibility.Hidden;
             return whole ? text.DesiredSize : new Size(0, line);
+        }
+
+        /// <summary>The note as it shows in this room: its parts packed whole onto their lines where each part fits a
+        /// line, else the note as it is, to wrap at its words where each word fits one; nothing where neither.</summary>
+        private string Lines(double room)
+        {
+            if (note.Length == 0 || double.IsInfinity(room)) return note;
+            if (partWidths.All(w => w <= room + 0.5))
+            {
+                var lines = new List<string>();
+                var at = "";
+                foreach (var part in parts)
+                {
+                    var joined = at.Length == 0 ? part : $"{at} · {part}";
+                    if (at.Length == 0 || WordsWidth(joined, Ty.Caption) <= room + 0.5) at = joined;
+                    else { lines.Add(at); at = part; }
+                }
+                lines.Add(at);
+                if (lines.Count <= Most) return string.Join("\n", lines);
+            }
+            return wordWidths.All(w => w <= room + 0.5) ? note : "";
         }
     }
 
