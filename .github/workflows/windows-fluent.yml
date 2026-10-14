@@ -715,6 +715,18 @@ jobs:
             if ($card -ne 'Fe') { Write-Host "::error::ptable-hover: the table's top showed '$card' when it was pictured, not Fe (shots/profile-ptable-hover.log)"; exit 1 }
             Write-Host "ptable-hover: the table's top showed $card"
           }
+          # and nothing there when nothing was pointed at: the table settling under a still pointer must not put in an
+          # element (ptable and ptable-offer are pictured with no --ptable-hover)
+          foreach ($still in @('ptable', 'ptable-offer')) {
+            if ($script:mine -notcontains $still) { continue }
+            $card = $null
+            foreach ($l in @(Get-Content "shots/profile-$still.log" -ErrorAction SilentlyContinue)) {
+              if ($l -match ' picture at ') { break }
+              if ($l -match 'ptable hover card: (\S+)') { $card = $Matches[1] }
+            }
+            if ($card -and $card -ne 'none') { Write-Host "::error::${still}: the table's top showed '$card' with nothing pointed at (shots/profile-$still.log)"; exit 1 }
+            Write-Host "${still}: the table's top was empty"
+          }
           if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
           # printed whole, with the bridge's own error, so its cause can be read here)
