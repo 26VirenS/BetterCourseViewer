@@ -5328,6 +5328,71 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   } // the look off and on
 
+  if (on('canvas banners')) {
+  // ---- Canvas's own banners (its flash messages): never drawn or read out over Simpl; an error comes up as Simpl's toast ----
+  console.log('canvas banners');
+  // (?mockflash=1: the mock's page arrives with an error in Canvas's jQuery holder, and its planner's alert is put up through
+  // InstUI's holder 1.2 s after it loads — mock-canvas.mjs flashScript.) Every frame from the page's first, in its own world:
+  // any banner of Canvas's on screen, and every toast of Simpl's with its words.
+  await page.addInitScript(() => {
+    if (!/[?&]mockflash=1\b/.test(location.search)) return;
+    const seen = (window.__flashSeen = []);
+    const toasts = (window.__toastsSeen = []);
+    const t0 = performance.now();
+    const look = () => {
+      for (const el of document.querySelectorAll('#flashalert_message_holder > *, #flash_message_holder > *')) {
+        if (el.checkVisibility() && el.textContent.trim()) seen.push({ at: Math.round(performance.now() - t0), words: el.textContent.replace(/\s+/g, ' ').trim().slice(0, 60), on: document.documentElement.classList.contains('bcv-on') });
+      }
+      for (const t of document.querySelectorAll('.bcv-toast')) {
+        const words = t.querySelector('.bcv-toast__text')?.textContent || '';
+        if (!(t.__said ||= []).includes(words)) { t.__said.push(words); toasts.push({ words, error: t.classList.contains('bcv-toast--error'), code: t.dataset.code || null, role: t.getAttribute('role') }); }
+      }
+      if (performance.now() - t0 < 9000) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  const ERR = "Oops! The last request didn't work out.";
+  const PLAN = 'Nothing planned today. Selecting most recent item.';
+  const flashState = () => page.evaluate(() => ({
+    seen: window.__flashSeen || null,
+    toasts: window.__toastsSeen || null,
+    left: [...document.querySelectorAll('#flashalert_message_holder > *, #flash_message_holder > *')].map((e) => e.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean),
+    shown: [...document.querySelectorAll('#flashalert_message_holder > *, #flash_message_holder > *')].filter((e) => e.checkVisibility() && e.textContent.trim()).length,
+    holders: ['flashalert_message_holder', 'flash_message_holder', 'flash_screenreader_holder'].map((id) => { const el = document.getElementById(id); return el ? getComputedStyle(el).display : null; }),
+    sr: document.getElementById('flash_screenreader_holder')?.textContent.replace(/\s+/g, ' ').trim() || '',
+  }));
+  // (the planner's alert in: its holder made, and a moment for it to be drawn into its box and dealt with)
+  const plannerIn = async () => { await page.waitForFunction(() => !!document.getElementById('flashalert_message_holder'), null, { timeout: 10000 }); await page.waitForTimeout(500); };
+  // Simpl's Dashboard, over Canvas's own (whose planner says "Nothing planned today" as it lands)
+  await page.goto(`${BASE}/?mockflash=1`);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 15000 });
+  await plannerIn();
+  const fd = await flashState();
+  const errSaid = (fd.toasts || []).filter((t) => t.words === ERR);
+  check(!!fd.seen && fd.seen.length === 0 && fd.left.length === 0 && fd.holders.every((d) => d === 'none'),
+    `Canvas's banners never draw over Simpl's Dashboard, not for a frame — the planner's "Nothing planned today" and the error alike — and are taken off the page; its holders and its live region stay hidden (nothing read out): ${JSON.stringify({ seen: fd.seen, left: fd.left, holders: fd.holders })}`);
+  check(errSaid.length === 1 && errSaid[0].error && errSaid[0].code === 'SC-X-APP' && errSaid[0].role === 'status' && !(fd.toasts || []).some((t) => t.words.includes('Nothing planned')),
+    `Canvas's error comes up once as Simpl's own toast — red, with its code, announced as a status — and the planner's talk is dropped: ${JSON.stringify(fd.toasts)}`);
+  // a page Canvas draws inside the shell: the same — no banner over the shell, the error passed on, the loading talk dropped
+  await page.goto(`${BASE}/profile?mockflash=1`);
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
+  await plannerIn();
+  const fp = await flashState();
+  check(!!fp.seen && fp.seen.length === 0 && fp.left.length === 0 && (fp.toasts || []).filter((t) => t.words === ERR && t.error).length === 1 && !(fp.toasts || []).some((t) => t.words.includes('Nothing planned')),
+    `on a page Canvas draws inside the shell, no banner over the shell either: the error comes up as Simpl's toast, the planner's talk does not: ${JSON.stringify({ seen: fp.seen, left: fp.left, toasts: fp.toasts })}`);
+  // Canvas's own page, the shell not up (the look off): its banners are Canvas's, exactly as Canvas has them
+  await setSettings({ appearance: { skin: false } });
+  await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 8000 });
+  await page.goto(`${BASE}/?mockflash=1`);
+  await page.waitForSelector('#application', { timeout: 10000 });
+  await plannerIn();
+  const fs = await flashState();
+  check(fs.left.length === 2 && fs.left.some((w) => w.includes(ERR)) && fs.left.some((w) => w.includes(PLAN)) && fs.shown === 2 && fs.holders[0] === 'block' && fs.holders[1] === 'block' && fs.sr.includes(PLAN) && !(await page.$('#bcv-app')) && (fs.toasts || []).length === 0,
+    `with the look off, Canvas's page keeps its banners as Canvas has them — both up, its live region speaking — and Simpl puts up nothing of its own: ${JSON.stringify({ left: fs.left, shown: fs.shown, holders: fs.holders, toasts: fs.toasts })}`);
+  await setSettings({ appearance: { skin: true } });
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 15000 });
+  } // canvas banners
+
   if (on('guided setup')) {
   // ---- guided setup + the welcome --------------------------------------------------------------------------
   console.log('guided setup');

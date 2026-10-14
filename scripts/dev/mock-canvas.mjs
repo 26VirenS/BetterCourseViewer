@@ -494,6 +494,26 @@ const conversations = [
 ];
 
 // ---- HTML pages -------------------------------------------------------------------------------
+// Canvas's flash banners, on a page asked for with ?mockflash=1 (set for the one answer that draws it, below): an error
+// already in the jQuery holder as the page arrives — the way Canvas's front end puts up a notice the page brought —
+// and, a moment after the page has loaded, its planner's alert under the Dashboard as InstUI draws one: the holder
+// made at the end of <body> and pinned over everything, the alert drawn into its box a beat after the box arrives,
+// and its words read out through the live region (FlashAlert.jsx).
+let flashNow = false;
+const FLASH_ERROR = "Oops! The last request didn't work out.";
+const FLASH_PLANNER = 'Nothing planned today. Selecting most recent item.';
+const flashScript = () => `<script>setTimeout(function () {
+  var holder = document.getElementById('flashalert_message_holder');
+  if (!holder) { holder = document.createElement('div'); holder.id = 'flashalert_message_holder'; holder.className = 'clickthrough-container'; holder.setAttribute('style', 'position: fixed; top: 0; left: 0; width: 100%; z-index: 100000;'); document.body.appendChild(holder); }
+  var box = document.createElement('div');
+  box.setAttribute('style', 'max-width:57em;margin:1rem auto;pointer-events:all');
+  holder.appendChild(box);
+  setTimeout(function () {
+    box.innerHTML = '<div class="css-1x2y3z-view-alert" style="display:flex;background:#fff;border:2px solid #0374b5;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.25);font:16px/1.4 sans-serif;color:#2d3b45"><div class="css-4a5b6c-alert__icon" style="display:flex;align-items:center;padding:0 14px;background:#0374b5;color:#fff"><svg name="IconInfoBorderless" viewBox="0 0 1920 1920" width="20" height="20" fill="currentColor"><path d="M1040 800v800H880V800zM960 400a80 80 0 110 160 80 80 0 010-160z"/></svg></div><div class="css-7d8e9f-alert__content" style="flex:1;padding:12px 16px"><p style="margin:0 -5px">${FLASH_PLANNER}</p></div><button type="button" style="border:0;background:none;padding:0 14px;font-size:20px;cursor:pointer"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Close</span>&times;</button></div>';
+    var sr = document.getElementById('flash_screenreader_holder');
+    if (sr) { var said = document.createElement('div'); said.textContent = '${FLASH_PLANNER}'; sr.appendChild(said); }
+  }, 40);
+}, 1200);</script>`;
 function page({ title, path = '', courseId, body }) {
   // like Canvas, the page's ENV carries the dashboard view the user last saved
   const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: null }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/Los_Angeles', DOMAIN_ROOT_ACCOUNT_ID: '1', PREFERENCES: { dashboard_view: dashboardView, custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) } };
@@ -520,8 +540,15 @@ function page({ title, path = '', courseId, body }) {
   /* Canvas's own field styles, weightier than one class: a white box with a border and a focus shadow (the search box's input showed one inside its pill) */
   input[type="text"],input[type="search"]{background:#fff;border:1px solid #c7cdd1;border-radius:3px;padding:6px 8px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);height:38px;margin:0 0 6px}
   input[type="text"]:focus,input[type="search"]:focus{border-color:#0374b5;box-shadow:0 0 0 2px #0374b5;outline:none}
+  /* Canvas's flash banners: a white bar at the top of the window, its kind's colour in a tile with the icon */
+  #flash_message_holder{position:fixed;top:0;left:0;right:0;z-index:100000;margin:0;padding:0;list-style:none}
+  #flash_message_holder li{display:flex;align-items:center;max-width:57em;margin:16px auto 0;background:#fff;border:2px solid #e0061f;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.25);font-size:16px}
+  .ic-flash__icon{align-self:stretch;display:flex;align-items:center;padding:0 14px;margin-right:14px;background:#e0061f;color:#fff}.ic-flash-error .close_link{margin-left:auto;border:0;background:none;padding:12px 14px}.icon-warning::before{content:"!";font-weight:700}.icon-x::before{content:"\\00d7";font-size:18px}
+  #flash_screenreader_holder{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style></head>
 <body>
+<div id="flash_message_holder">${flashNow ? `<li class="ic-flash-error"><div class="ic-flash__icon" aria-hidden="true"><i class="icon-warning"></i></div>${FLASH_ERROR}<button type="button" class="Button Button--icon-action close_link" aria-label="Close"><i class="icon-x" aria-hidden="true"></i></button></li>` : ''}</div>
+<div id="flash_screenreader_holder" role="alert" aria-live="assertive" aria-relevant="additions text" class="screenreader-only">${flashNow ? FLASH_ERROR : ''}</div>
 <div id="application" class="ic-app">
 <header id="header" class="ic-app-header no-print"><div class="ic-app-header__logomark-container"><a href="/" class="ic-app-header__logomark"></a></div><ul id="menu"><li class="menu-item"><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link"><span class="menu-item__text">Dashboard</span></a></li><li class="menu-item"><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link"><span class="menu-item__text">Courses</span></a></li><li class="menu-item"><a id="global_nav_calendar_link" href="/calendar" class="ic-app-header__menu-list-link"><span class="menu-item__text">Calendar</span></a></li><li class="menu-item"><button id="global_nav_history_link" class="ic-app-header__menu-list-link" type="button"><span class="menu-item__text">History</span></button></li><li class="menu-item ic-app-header__menu-list-item"><a class="ic-app-header__menu-list-link" href="/accounts/1/external_tools/77?launch_type=global_navigation"><img class="ic-icon-svg ic-icon-svg--lti" src="/images/tool-icon.svg" alt=""><span class="menu-item__text">My Materials</span></a></li><li class="menu-item"><a id="global_nav_help_link" href="#" class="ic-app-header__menu-list-link"><span class="menu-item__text">Help</span></a></li></ul></header>
 <div id="wrapper" class="ic-Layout-wrapper">
@@ -530,7 +557,7 @@ function page({ title, path = '', courseId, body }) {
     <aside id="right-side-wrapper"><div id="right-side"><h2>To Do</h2><p>Canvas's own sidebar</p></div></aside>
   </div>
   <footer id="footer">Canvas footer</footer>
-</div></div></body></html>`;
+</div></div>${flashNow ? flashScript() : ''}</body></html>`;
 }
 const htmlPages = {
   '/': () => page({ title: 'Dashboard', body: '<h1 class="ic-Dashboard-header__title">Dashboard</h1><div id="dashboard">stock dashboard</div>' }),
@@ -1613,7 +1640,9 @@ window.mockDialog = function () { var d = document.createElement('div'); d.class
       return slow(() => { res.writeHead(302, { location: recordAnswer(cid, quizId, sid, raw) }); res.end(); });
     }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
+    flashNow = url.searchParams.get('mockflash') === '1'; // (Canvas's banners up on this page: see flashScript)
     res.end(handler ? handler() : page({ title: path.split('/').pop() || 'Canvas', courseId: (path.match(/^\/courses\/(\d+)/) || [])[1], body: `<h1>${path}</h1><p>Mock page rendered by Canvas.</p>` }));
+    flashNow = false;
   });
 });
 
