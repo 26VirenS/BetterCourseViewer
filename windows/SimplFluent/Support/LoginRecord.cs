@@ -14,8 +14,6 @@ public enum HelloResult
     Canceled,
     /// <summary>Simpl's key is not there any more (Windows Hello reset, its PIN removed, another PC or user).</summary>
     Gone,
-    /// <summary>Windows Hello cannot give the same key back each time on this PC (two signatures of one challenge differ).</summary>
-    Unusable,
     /// <summary>Anything else Windows answered (an error, the security chip locked after wrong PINs, no Windows Hello).</summary>
     Failed,
 }
@@ -139,13 +137,10 @@ public sealed class LoginRecord
         finally { CryptographicOperations.ZeroMemory(plain); }
     }
 
-    /// <summary>The key a signature of Windows Hello's gives: its SHA-256 (32 bytes, AES-256's), to be zeroed once used.</summary>
+    /// <summary>The key a signature of Windows Hello's gives: its SHA-256 (32 bytes, AES-256's), to be zeroed once used.
+    /// The same each time, as a Windows Hello key's RSA PKCS#1 v1.5 signature of one challenge is; were a PC's ever not,
+    /// <see cref="OpenPass"/> would not open with it, and LoginVault would forget the sign-in.</summary>
     public static byte[] KeyFrom(ReadOnlySpan<byte> signature) => SHA256.HashData(signature);
-
-    /// <summary>Two signatures of one challenge, the same: Windows Hello's key gives the same key back each time
-    /// (its RSA signatures are; one that were not could never open what it locked).</summary>
-    public static bool SameSignature(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second) =>
-        first.Length > 0 && first.Length == second.Length && CryptographicOperations.FixedTimeEquals(first, second);
 
     /// <summary>At its use (Simpl just signed in with it), to be locked with Windows Hello now: one an earlier Simpl kept
     /// in the vault alone (or kept there while Windows Hello was not set up), on a PC where it is — never one whose lock

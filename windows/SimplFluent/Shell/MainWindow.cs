@@ -443,7 +443,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     }
 
     /// <summary>"Stay logged in?", once Canvas is reached with details typed in the card (the Mac's alert): where Windows
-    /// Hello is set up, the details are locked with it (Stay Logged In has Windows Hello ask once: LoginVault).</summary>
+    /// Hello is set up, the details are locked with it (Stay Logged In has Windows Hello ask as little as it can: one
+    /// signature, after making Simpl's key where there is none; then nothing more this run: LoginVault).</summary>
     private void AskStay()
     {
         if (engine == null || stayAsked) return;

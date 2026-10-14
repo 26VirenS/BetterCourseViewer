@@ -12,17 +12,21 @@ namespace Simpl.Engine;
 ///   is typed there goes into the page's own fields and its own button is pressed.
 /// - the saved sign-in page coming up: "Logging you in" from its first frame, the saved details filled and sent; a
 ///   two-step page gets the username, then the password on the next step.
-///   A saved password locked with Windows Hello is asked for first (LoginVault.UnlockAsync), under that cover: the
-///   prompt cancelled, nothing is filled and the school's page is shown, to sign in by hand; Windows Hello's key gone,
-///   the saved sign-in is forgotten and the app's form comes up with the username in it.
+///   A saved password locked with Windows Hello is asked for first (LoginVault.UnlockAsync), under that cover — once a
+///   run for the whole app: the page reported again while Windows Hello asks waits for the same answer, and once it
+///   has given the password, it is used without asking. The prompt cancelled, nothing is filled and the school's page
+///   is shown, to sign in by hand, and Windows Hello is not asked again by itself until the student asks (Start Over,
+///   the form, Settings, or signing in by hand); Windows Hello's key gone, the saved sign-in is forgotten and the
+///   app's form comes up with the username in it.
 /// - a page with nothing to fill after that (a two-factor prompt, a consent page): the cover lifts and the page is
 ///   shown, to be finished by hand (LoginOverlay's note says so); the sign-in carries on from there.
 /// - the sign-in form again after a press (a wrong password): the form, saying so. Saved details that failed are not
-///   tried again until new ones are given.
+///   tried again until new ones are given, and what the run held of the saved password is let go.
 /// - Canvas reached after details typed in the form: "Stay logged in?". Reached with saved details an earlier Simpl
 ///   kept in the vault alone: they are locked with Windows Hello now, where it is set up (LoginVault.LockAtUseAsync).
 /// - a school page that says the sign-in went stale ("Stale Request", an expired request): started again from Canvas
-///   by itself, once a minute at most; and on every school page shown, Start Over does the same by hand.
+///   by itself, once a minute at most (after a cancelled Windows Hello prompt, without asking it again); and on every
+///   school page shown, Start Over does the same by hand.
 ///
 /// The details are kept, when the student says so, encrypted in Simpl's own vault and locked with Windows Hello
 /// (LoginVault) — never by the browser, whose own password saving is off. Nothing here writes them down anywhere else,
@@ -67,8 +71,6 @@ public sealed class LoginAssist : Observable
     /// <summary>Details typed in the form, until "Stay logged in?" is answered.</summary>
     private (string User, string Pass, string Host)? typed;
     private bool autoOff, declined;
-    /// <summary>The saved password is being asked of Windows Hello: one request at a time, and the watchdog waits.</summary>
-    private bool unlocking;
     private string kindHere = "full";
     private CancellationTokenSource? watchdog;
     private DateTime? lastAutoRestart;
@@ -119,18 +121,23 @@ public sealed class LoginAssist : Observable
             return;
         }
         lastAutoRestart = DateTime.UtcNow;
-        Restart();
+        Restart(byStudent: false);
     }
 
     /// <summary>Start Over: whatever sign-in was under way forgotten, and Canvas loaded afresh (it sends the school a new
-    /// request); saved details are tried again on the way.</summary>
-    public void Restart()
+    /// request); saved details are tried again on the way (Windows Hello asked again, after a cancelled prompt).</summary>
+    public void Restart() => Restart(byStudent: true);
+
+    /// <summary>Started over — by the student (Start Over), or by itself (a stale page): only the student's asks Windows
+    /// Hello again after a cancelled prompt; by itself, the sign-in page shows Simpl's card instead.</summary>
+    private void Restart(bool byStudent)
     {
         Disarm();
         attempt = null;
         navigatedSinceAttempt = false;
         autoOff = false;
         declined = false;
+        if (byStudent) LoginVault.AskAgain();
         Handoff = false;
         if (Phase != Mode.Idle) Phase = Mode.Idle;
         OnRestart?.Invoke();
@@ -154,7 +161,7 @@ public sealed class LoginAssist : Observable
             return;
         }
         var saved = LoginVault.Load();
-        if (saved != null && saved.Host == host && !autoOff) { FillSaved(saved, host); return; }
+        if (saved != null && saved.Host == host && !autoOff && !LoginVault.HeldBack) { FillSaved(saved, host); return; }
         if (declined)
         {
             if (Phase == Mode.Working) Reveal();
@@ -176,20 +183,19 @@ public sealed class LoginAssist : Observable
     // MARK: - Filling
 
     /// <summary>
-    /// The saved sign-in's page: its password asked for — Windows Hello asks, for one locked with it — under "Logging you
-    /// in", then filled and sent. Cancelled (or Windows could not): nothing filled, and the school's page shown to sign
-    /// in by hand, the saved details not tried again until Simpl starts over. Its Windows Hello key gone: forgotten, and
-    /// the app's form with the username in it ("Stay logged in?" keeps it again after).
+    /// The saved sign-in's page: its password asked for under "Logging you in" — Windows Hello asks, for one locked with
+    /// it, unless it already gave it this run — then filled and sent. Cancelled (or Windows could not): nothing filled,
+    /// and the school's page shown to sign in by hand, the saved details not tried again (nor Windows Hello asked, by
+    /// any of Simpl's sign-ins) until the student asks. Its Windows Hello key gone: forgotten, and the app's form with
+    /// the username in it ("Stay logged in?" keeps it again after).
     /// </summary>
     private async void FillSaved(SavedLogin saved, string host)
     {
-        if (unlocking) return; // (the page said so twice while Windows Hello asks: once is enough)
-        unlocking = true;
         Phase = Mode.Working;
         var before = attempt;
-        string? pass;
-        try { pass = await LoginVault.UnlockAsync("Unlock your saved sign-in with Windows Hello"); }
-        finally { unlocking = false; }
+        // (one request for the whole app: the page saying so again while Windows Hello asks waits for the same answer,
+        //  and the first of them to have it fills the page — the rest find the attempt moved on, below)
+        var pass = await LoginVault.UnlockAsync("Unlock your saved sign-in with Windows Hello");
         // (Start Over, Show the Page, or details filled meanwhile: what was asked for is not filled in now)
         if (Phase != Mode.Working || !ReferenceEquals(attempt, before)) return;
         if (pass != null) { Fill(saved.User, pass, host, kindHere, auto: true); return; }
@@ -229,7 +235,11 @@ public sealed class LoginAssist : Observable
     private void Failed(string host, string? error, bool auto)
     {
         attempt = null;
-        if (auto) autoOff = true;
+        if (auto)
+        {
+            autoOff = true;
+            LoginVault.Refused(); // (the saved password did not work: the run lets go of it)
+        }
         var saved = LoginVault.Load();
         PrefillUser = typed?.User ?? saved?.User ?? PrefillUser;
         typed = null;
@@ -273,7 +283,7 @@ public sealed class LoginAssist : Observable
         catch (OperationCanceledException) { return; }
         if (cts != watchdog) return;
         // (a page still on its way, or Windows Hello still asking for the saved password: a little longer)
-        if (engine.Loading || unlocking) { Arm(2); return; }
+        if (engine.Loading || LoginVault.Unlocking) { Arm(2); return; }
         if (Phase == Mode.Working) HandOver();
     }
 
@@ -286,6 +296,7 @@ public sealed class LoginAssist : Observable
         var host = CaptureHost;
         typed = (user, pass, host);
         autoOff = false;
+        LoginVault.AskAgain(); // (signing in by hand: a cancelled Windows Hello prompt may be asked again later)
         Fill(user, pass, host, kindHere, auto: false);
     }
 
@@ -330,7 +341,7 @@ public sealed class LoginAssist : Observable
         if (attempt != null) navigatedSinceAttempt = true;
         SchoolPage(url);
         // the saved sign-in page coming up: covered from its first frame, not after it has shown
-        if (Phase == Mode.Idle && !autoOff && host != canvasHost && LoginVault.Load() is { } s && s.Host == host)
+        if (Phase == Mode.Idle && !autoOff && !LoginVault.HeldBack && host != canvasHost && LoginVault.Load() is { } s && s.Host == host)
         {
             Phase = Mode.Working;
             Arm(25);
@@ -351,6 +362,8 @@ public sealed class LoginAssist : Observable
             if (attempt is { Auto: true }) _ = LoginVault.LockAtUseAsync();
             attempt = null;
             autoOff = false;
+            // (signed in — by hand, after a cancelled Windows Hello prompt: it may be asked the next time the school does)
+            LoginVault.AskAgain();
             Handoff = false;
             Reveal();
             // details typed in the form got the student in: they are offered to be kept (or kept anew, where the saved
