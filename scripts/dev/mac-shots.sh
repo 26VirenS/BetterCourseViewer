@@ -276,6 +276,60 @@ bio_full() {
   MODE=light shoot light-54e-pin-biolab 14 -SimplPinnedTools biolab -SimplPinOpen biolab
 }
 
+# (1.3.78) the UI review's new states, each once (in both sets: what the review's findings changed, seen on every
+# push): the Dashboard's cards and the Announcements panel, Search's answer to a sum, the tour's search step and its
+# offer; a quiz's access code and its multiple answers, an assignment's rubric wide and narrow; the periodic table's
+# tour offered and an element compared, the citation, unit and Grade needed tools, the PDF tools with a file; the
+# Calendar's Week and List, What-If, a message with a file, Grades, To Do and Notifications wide; a locked module,
+# People and the Future courses; the first-run setup, the sign-in still going, a school's preview that failed, and the
+# Settings tabs
+ui_review() {
+  MODE=light shoot light-01g-dashboard-cards 14 -SimplDashView cards
+  MODE=light SIZE=1440x900 shoot light-01h-dashboard-cards-wide 14 -SimplDashView cards
+  MODE=light shoot light-01u-counter-unread 14 -SimplSheet unread
+  MODE=light shoot light-30b-palette-sum 14 -SimplOpen "palette:12*4"
+  MODE=light shoot light-29b-tour-search 16 -SimplOpen tour:5
+  MODE=light shoot light-27b-tour-offer 8 -SimplOpen touroffer
+  MODE=light shoot light-18b-quiz-code 14 -SimplOpen quiz:102:10019
+  MODE=light shoot light-19g-quiz-multiple 18 -SimplOpen quiz:101:9011:take:2
+  MODE=light SIZE=1440x900 shoot light-10g-assignment-rubric-wide 12 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001
+  MODE=light shoot light-10h-assignment-rubric 12 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001
+  MODE=light shoot light-55m-ptable-tour-offer 14 -SimplPlace tools -SimplTool ptable -SimplPTTourOffer YES
+  MODE=light SIZE=1440x1200 shoot light-55n-ptable-element-compare 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
+  MODE=light shoot light-56-tool-cite 12 -SimplPlace tools -SimplTool cite
+  MODE=light shoot light-57-tool-units 12 -SimplPlace tools -SimplTool units
+  MODE=light shoot light-54e-pin-need 14 -SimplPinnedTools need -SimplPinOpen need
+  # (a PDF of the fixture photo, for the annotator and Merge & Split: one PDF opens Split)
+  [ -f "$HOMES/shot.pdf" ] || sips -s format pdf "$PWD/scripts/dev/fixtures/photo.jpg" --out "$HOMES/shot.pdf" >/dev/null 2>&1 || true
+  MODE=light shoot light-58-tool-annotate 14 -SimplPlace tools -SimplTool mark -SimplToolFile "$HOMES/shot.pdf"
+  MODE=light shoot light-58b-tool-split 14 -SimplPlace tools -SimplTool pdfx -SimplToolFile "$HOMES/shot.pdf"
+  MODE=light shoot light-05w-calendar-week 12 -SimplPlace calendar -SimplCalView week
+  MODE=light shoot light-05l-calendar-list 12 -SimplPlace calendar -SimplCalView list
+  MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
+  MODE=light shoot light-25b-compose-attached 16 -SimplPlace inbox -SimplOpen compose -SimplAttach "$PWD/docs/screenshots/calendar.png"
+  MODE=light SIZE=1720x1040 shoot light-45-wide-grades 14 -SimplPlace grades
+  MODE=light SIZE=1440x900 shoot light-46-wide-todo 12 -SimplPlace todo
+  MODE=light SIZE=1440x900 shoot light-47-wide-notifications 12 -SimplPlace notifications
+  MODE=light shoot light-14b-modules-locked 12 -SimplPlace section:courses/102:modules
+  MODE=light shoot light-14c-people 12 -SimplPlace section:courses/101:people
+  MODE=light shoot light-02c-courses-future 12 -SimplPlace courses -SimplCoursesFilter future
+  MODE=light shoot light-22b-setup-first 14 -SimplOpen setup -SimplSetupFirstRun YES
+  MODE=light BASE=http://localhost:8802 shoot light-60b-logging-in 6 -SimplShowLoggingIn YES
+  MODE=dark shoot dark-26c-school-confirm-failed 10 -SimplPicker catcourses -SimplPickerConfirm YES -SimplPreviewFail YES
+  MODE=light shoot light-23c-settings-grades 12 -SimplOpen settings -SimplSettingsTab grades
+  MODE=light shoot light-23d-settings-data 12 -SimplOpen settings -SimplSettingsTab data
+  MODE=light shoot light-23e-settings-about 12 -SimplOpen settings -SimplSettingsTab about
+  MODE=light shoot light-23f-settings-notifications 12 -SimplOpen settings -SimplSettingsTab notifications
+}
+
+# (1.3.78) a discussion's post that never measured in its web view says so on the console (Components/RichText.swift,
+# in a picture's run only: its words are shown natively meanwhile); said here as a warning of the run
+richtext_check() {
+  local hits
+  hits="$(grep -l '\[richtext\] not measured' "$OUT_ABS"/console-*.txt 2>/dev/null | xargs -n1 basename 2>/dev/null | tr '\n' ' ')"
+  if [ -n "$hits" ]; then echo "::warning::a post's web view never measured (its words shown as plain text): $hits"; fi
+}
+
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
 # SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
 if [ "${SHOTS:-full}" = quick ]; then
@@ -388,10 +442,14 @@ if [ "${SHOTS:-full}" = quick ]; then
   # the page its launch asked for (-SimplTool <key> -SimplToolState <page>[:…]) — every page of each is in the full set
   MODE=light SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES
   phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
+  # (1.3.78) the PDF-only assignment waiting for the phone: Combine photos under the code before anything is sent
+  shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
+  ui_review
   bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
   wait
   walks
   phone_check
+  richtext_check
   keep_crashes
   exit 0
 fi
@@ -439,6 +497,10 @@ for MODE in light dark; do
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
 done
 bio_full # (1.3.78) the biology toolkit, every tool's pages
+ui_review # (1.3.78) the UI review's new states
+# (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
+curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
+MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
 # (1.2) in light only: more of the redesign, and the narrow window's layouts
 MODE=light
 shoot light-01c-dashboard-activity 14 -SimplDashView activity
@@ -446,7 +508,7 @@ shoot light-02b-courses-past 12 -SimplPlace courses -SimplCoursesFilter past
 shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4
 shoot light-23b-settings-updates 12 -SimplOpen settings -SimplSettingsTab updates
 shoot light-28-tour-grades 16 -SimplOpen tour:2
-shoot light-29-tour-cards 16 -SimplOpen tour:12
+shoot light-29-tour-last 16 -SimplOpen tour:6 # (1.3.78: the tour's last step, Report a Bug at the account menu)
 shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
 shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
 shoot light-33-rubric-grid 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:grid
@@ -478,6 +540,8 @@ walks
 # (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
 shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
 shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
+shoot light-54f-pin-timer 14 -SimplFocusDemo YES -SimplPinnedTools pomo -SimplPinOpen pomo # (1.3.78: the timer's quick version)
 wait
+richtext_check
 keep_crashes
 exit 0
