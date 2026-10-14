@@ -15,7 +15,7 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Shell;
 
 /// <summary>The parts of the window the tour lights (the Mac's TourSpot).</summary>
-public enum TourSpot { Pane, Account, Search, DashboardRow, GradesRow, ToolsRow, FirstCourse, GradeRing, GradeDetails, WhatIfSwitch, WhatIfScore, ToolPin, CounterNext, CounterPanel, Preview }
+public enum TourSpot { Pane, Account, Search, DashboardRow, GradesRow, ToolsRow, FirstCourse, GradeRing, GradeDetails, WhatIfSwitch, WhatIfScore, ToolPin, CounterNext, CounterPanel, Preview, Counters }
 
 /// <summary>What a step may wait for that the window's own state does not show (the Mac's TourEvent).</summary>
 public enum TourEvent { RingHover, WhatIfOn, WhatIfEdited, WhatIfOff, CourseHover, Pinned, CounterOpened }
