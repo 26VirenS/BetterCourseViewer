@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
@@ -7,22 +9,57 @@ using Simpl.Engine;
 using Simpl.Kit;
 using Simpl.Support;
 using Wpf.Ui.Controls;
+using Button = System.Windows.Controls.Button;
+using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace Simpl.Shell;
 
 /// <summary>
-/// A page of the school's own in a window of its own, signed in as the app is (the engine's web data): what a tool, a
-/// quiz or "Open in Canvas" opens until its own screen is on Windows (the Mac's ToolWindow, in its plainest form) — a
-/// Windows 11 window, Mica round the page, the page's title in the title bar.
+/// A tool, or a page of the school's own, in a window of its own, signed in as the app is (the engine's web data) — the
+/// Mac's ToolWindow, as Windows 11 draws one: Mica round the page, the page's title in the title bar, and Back, Forward
+/// and Refresh at the title bar's left (Alt+←, Alt+→, F5), More at its right (Open in browser, Copy link), a thin line
+/// under the title bar while a page loads. An external tool opens by the school's one-time launch (the engine's
+/// toolLaunch, as the Mac's window asks it): the tool alone, at the top of the window, not inside a second copy of the
+/// school's page — the school's own page for it only when the launch cannot be had. A tool that will not open says why
+/// in the window, with Try again.
 /// </summary>
 public sealed class WebWindow : FluentWindow
 {
-    private readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.Transparent };
-    private readonly TitleBar bar;
+    private const double BarHeight = 48;
 
-    public WebWindow(Uri url, string title, Window? owner)
+    private sealed class LaunchAnswer
     {
-        Title = string.IsNullOrEmpty(title) ? "Simpl" : title;
+        public string Url { get; set; } = "";
+        public string? Name { get; set; }
+    }
+
+    private readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.Transparent, Visibility = Visibility.Hidden };
+    private readonly TitleBar bar;
+    private readonly Engine.Engine? engine;
+    private readonly ToolLaunch? launch;
+    private readonly string name;
+    private readonly Button back, forward, refresh, more;
+    /// <summary>The line under the title bar while a page loads.</summary>
+    private readonly ProgressBar loading = new() { IsIndeterminate = true, Height = 2, MinHeight = 2, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+    /// <summary>Over the page's place until it shows: "Opening …", or why it could not open.</summary>
+    private readonly ContentControl state = new() { Focusable = false };
+    /// <summary>The address the window opens (known at once for a page; the launch's answer for a tool).</summary>
+    private Uri? start;
+    private bool ready, opening;
+
+    /// <summary>A page of the school's (or another site's), at its address.</summary>
+    public WebWindow(Uri url, string title, Window? owner) : this(null, null, url, title, owner) { }
+
+    /// <summary>A launch (a tool, a page): a tool by the school's one-time launch, else at its address.</summary>
+    public WebWindow(Engine.Engine engine, ToolLaunch t, Window? owner) : this(engine, t, null, t.Title, owner) { }
+
+    private WebWindow(Engine.Engine? engine, ToolLaunch? launch, Uri? url, string title, Window? owner)
+    {
+        this.engine = engine;
+        this.launch = launch;
+        start = url;
+        name = string.IsNullOrEmpty(title) ? "Simpl" : title;
+        Title = name;
         Owner = owner;
         WindowBackdropType = Appearance.Backdrop;
         ExtendsContentIntoTitleBar = true;
@@ -31,18 +68,65 @@ public sealed class WebWindow : FluentWindow
         if (Shot.Asked || Fx.Opaque) SetResourceReference(BackgroundProperty, B.Window);
         Placement.Restore(this, "web", 1100, 760, 480, 360);
         if (owner != null) WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+        // the title bar: Back, Forward and Refresh at its left (outside the drag area), the page's title, More at its right
+        back = BarButton(SymbolRegular.ArrowLeft24, "Back (Alt+Left)", () => { if (web.CoreWebView2?.CanGoBack == true) web.CoreWebView2.GoBack(); });
+        forward = BarButton(SymbolRegular.ArrowRight24, "Forward (Alt+Right)", () => { if (web.CoreWebView2?.CanGoForward == true) web.CoreWebView2.GoForward(); });
+        refresh = BarButton(SymbolRegular.ArrowClockwise24, "Refresh (F5)", Refresh);
+        more = K.IconButton(SymbolRegular.MoreHorizontal24, () => More(), "More", 16, 40);
+        more.Height = 36;
+        more.VerticalAlignment = VerticalAlignment.Center;
+        var lead = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 6, 0, 6), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Children = { back, forward, refresh } };
+        bar = new TitleBar
+        {
+            Title = Title, Height = BarHeight, Margin = new Thickness(8 + 3 * 40 + 4, 0, 0, 0), TrailingContent = more,
+            Icon = new ImageIcon { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 16, Height = 16 },
+        };
+        loading.SetResourceReference(Control.ForegroundProperty, B.Accent);
+        loading.Background = Brushes.Transparent;
+        // (with Windows' animation effects off, a still line in place of the running one)
+        if (!Motion.On) { loading.IsIndeterminate = false; loading.Value = 100; loading.Opacity = 0.6; }
         var root = new Grid();
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(BarHeight) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        bar = new TitleBar { Title = Title, Icon = new ImageIcon { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 16, Height = 16 } };
         root.Children.Add(bar);
+        root.Children.Add(lead);
+        // (on the title bar's foot, not over the page: the page is a window of its own, and nothing drawn here goes over it)
+        root.Children.Add(loading);
         Grid.SetRow(web, 1);
         root.Children.Add(web);
+        Grid.SetRow(state, 1);
+        root.Children.Add(state);
         Content = root;
+        Paint();
+
         SizeChanged += (_, _) => Placement.Save(this, "web");
-        Loaded += async (_, _) =>
+        PreviewKeyDown += OnKey;
+        PreviewMouseDown += (_, e) =>
         {
-            try
+            if (e.ChangedButton == MouseButton.XButton1) { back.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)); e.Handled = true; }
+            if (e.ChangedButton == MouseButton.XButton2) { forward.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)); e.Handled = true; }
+        };
+        Loaded += (_, _) => Open();
+    }
+
+    private static Button BarButton(SymbolRegular icon, string tip, Action click)
+    {
+        var b = K.IconButton(icon, click, tip, 14, 40);
+        b.Height = 36;
+        ToolTipService.SetShowOnDisabled(b, true);
+        return b;
+    }
+
+    /// <summary>The page opened: the web view made (once), the tool's launch asked for (a tool), then its address loaded.</summary>
+    private async void Open()
+    {
+        if (opening) return;
+        opening = true;
+        state.Content = Waiting();
+        try
+        {
+            if (!ready)
             {
                 var env = await Engine.Engine.WebEnvironment();
                 await web.EnsureCoreWebView2Async(env);
@@ -55,13 +139,128 @@ public sealed class WebWindow : FluentWindow
                     bar.Title = Title;
                 };
                 web.CoreWebView2.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
-                web.CoreWebView2.Navigate(url.ToString());
+                web.CoreWebView2.NavigationStarting += (_, _) => { loading.Visibility = Visibility.Visible; Paint(); };
+                web.CoreWebView2.NavigationCompleted += (_, _) => { loading.Visibility = Visibility.Collapsed; Paint(); };
+                web.CoreWebView2.HistoryChanged += (_, _) => Paint();
+                ready = true;
             }
-            catch (Exception e) { Dialogs.Fail("The page could not open", e.Message, owner); Close(); }
-        };
+            start ??= await Launch();
+            if (start == null) throw new InvalidOperationException("Simpl could not find where this tool opens.");
+            state.Content = null;
+            web.Visibility = Visibility.Visible;
+            web.CoreWebView2.Navigate(start.ToString());
+        }
+        catch (Exception e)
+        {
+            web.Visibility = Visibility.Hidden;
+            state.Content = Failed(e.Message);
+        }
+        opening = false;
+        Paint();
     }
 
-    /// <summary>Where a launch leads on the school's site.</summary>
+    /// <summary>
+    /// Where a launch opens: an address as it is; a tool by the school's one-time launch (the engine's toolLaunch, as the
+    /// Mac's window asks it) — the tool on its own page — and, when that cannot be had, the school's own page for it.
+    /// </summary>
+    private async Task<Uri?> Launch()
+    {
+        if (launch == null || engine == null) return null;
+        if (launch.Args.TryGetValue("page", out _)) return Address(engine.BaseUrl, launch);
+        if (launch.Args.ContainsKey("course"))
+        {
+            try
+            {
+                var a = await engine.Call<LaunchAnswer>("toolLaunch", launch.Args.ToDictionary(p => p.Key, p => (object)p.Value));
+                if (Uri.TryCreate(a.Url, UriKind.Absolute, out var u))
+                {
+                    if (a.Name is { Length: > 0 } n && Title == name) { Title = n; bar.Title = n; }
+                    return u;
+                }
+            }
+            catch (Exception e) { Log.Write($"WebWindow: toolLaunch {e.Message}"); }
+        }
+        return Address(engine.BaseUrl, launch);
+    }
+
+    private void Refresh()
+    {
+        if (web.Visibility == Visibility.Visible && web.CoreWebView2 != null) web.CoreWebView2.Reload();
+        else Open();
+    }
+
+    /// <summary>Back and Forward as the page's history stands; Refresh and More once there is a page.</summary>
+    private void Paint()
+    {
+        var core = ready ? web.CoreWebView2 : null;
+        back.IsEnabled = core?.CanGoBack == true;
+        forward.IsEnabled = core?.CanGoForward == true;
+        refresh.IsEnabled = !opening;
+        more.IsEnabled = Current() != null;
+    }
+
+    /// <summary>The address showing now (or the one to open).</summary>
+    private Uri? Current()
+    {
+        if (ready && web.Visibility == Visibility.Visible && Uri.TryCreate(web.CoreWebView2.Source, UriKind.Absolute, out var u) && u.Scheme is "http" or "https") return u;
+        return start;
+    }
+
+    /// <summary>More: the page in the browser Windows has, or its address on the clipboard.</summary>
+    private void More()
+    {
+        if (Current() is not { } u) return;
+        var menu = new ContextMenu { PlacementTarget = more, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, MinWidth = 200 };
+        MenuItem Item(string text, SymbolRegular icon, Action act)
+        {
+            var mi = new MenuItem { Header = text, Icon = new SymbolIcon { Symbol = icon } };
+            mi.Click += (_, _) => act();
+            return mi;
+        }
+        menu.Items.Add(Item("Open in browser", SymbolRegular.Globe24, () => Engine.Engine.OpenExternally(u)));
+        menu.Items.Add(Item("Copy link", SymbolRegular.Link24, () => { try { Clipboard.SetText(u.ToString()); } catch { /* the clipboard busy */ } }));
+        menu.IsOpen = true;
+    }
+
+    /// <summary>Alt+← and Alt+→ walk the page's history, F5 (or Ctrl+R) loads it again.</summary>
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+        var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        if (alt && key == Key.Left && back.IsEnabled) { web.CoreWebView2?.GoBack(); e.Handled = true; }
+        else if (alt && key == Key.Right && forward.IsEnabled) { web.CoreWebView2?.GoForward(); e.Handled = true; }
+        else if (key == Key.F5 || ctrl && key == Key.R) { Refresh(); e.Handled = true; }
+    }
+
+    /// <summary>While the tool's launch is asked for: a spinner and what is opening.</summary>
+    private FrameworkElement Waiting()
+    {
+        var v = K.V(12, K.Spinner(28), K.Text($"Opening {name}…", Ty.Body, B.Text2).Center());
+        v.HorizontalAlignment = HorizontalAlignment.Center;
+        v.VerticalAlignment = VerticalAlignment.Center;
+        return new Grid { Children = { v } };
+    }
+
+    /// <summary>Why it could not open, in the window (it stays open), and Try again.</summary>
+    private FrameworkElement Failed(string why)
+    {
+        var again = K.Button("Try again", Open, accent: true);
+        again.HorizontalAlignment = HorizontalAlignment.Center;
+        var v = K.V(12,
+            K.Icon(SymbolRegular.PuzzlePiece24, 40, B.Text3),
+            K.Text($"{name} could not open", Ty.Subtitle).Center(),
+            K.Wrapped(why, Ty.Body, B.Text2).Center(),
+            again.Margin(0, 4, 0, 0));
+        v.HorizontalAlignment = HorizontalAlignment.Center;
+        v.VerticalAlignment = VerticalAlignment.Center;
+        v.MaxWidth = 440;
+        v.Margin = new Thickness(24);
+        Motion.FadeIn(v);
+        return new Grid { Children = { v } };
+    }
+
+    /// <summary>Where a launch leads on the school's site: its own page for the tool (the launch's fallback), or the page.</summary>
     public static Uri? Address(Uri baseUrl, ToolLaunch t)
     {
         var a = t.Args;

@@ -175,7 +175,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         pageArea.Children.Add(engine.Web);
         handoff.Bind(engine);
         engine.PropertyChanged += OnEngine;
-        engine.ToolRequested += t => { if (WebWindow.Address(engine.BaseUrl, t) is { } u) new WebWindow(u, t.Title, this).Show(); };
+        engine.ToolRequested += t => { if (engine is { } e) new WebWindow(e, t, this).Show(); };
         engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
         engine.AltaRequested += a => Simpl.Screens.AltaPopup.Show(engine, a, this);
         engine.MacmillanRequested += a => Simpl.Screens.MacmillanPopup.Show(engine, a, this);
