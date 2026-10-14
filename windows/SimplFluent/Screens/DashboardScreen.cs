@@ -224,6 +224,12 @@ public sealed partial class DashboardScreen : Screen
         _ => Appearance.Accent,
     };
 
+    /// <summary>The colour a counter's tile and its panel wear: the counter's own, except that Overdue wears its red only
+    /// while something is overdue — with nothing in it, or while it is still counted, a quiet grey — so red on the
+    /// Dashboard always means late work.</summary>
+    private static Color TileColor(Counter c, int? value) =>
+        c.Tone == "red" && (value ?? 0) <= 0 ? Color.FromRgb(0x8a, 0x8a, 0x8a) : CounterColor(c.Key);
+
     /// <summary>What a counter counts, in full: its panel's title until the panel's own comes.</summary>
     private static string FullName(string key, string label) => key switch
     {
@@ -248,24 +254,29 @@ public sealed partial class DashboardScreen : Screen
         };
     }
 
-    /// <summary>A window this wide or wider shows the six counters in one row, however wide the page beside the
-    /// navigation pane is (1024 is the pictures' usual window, the page beside the pane 640 of it).</summary>
+    /// <summary>A window this wide or wider shows the six counters in one row of square tiles, however wide the page
+    /// beside the navigation pane is (1024 is the pictures' usual window, the page beside the pane 640 of it).</summary>
     private const double OneRowFrom = 1024;
 
-    /// <summary>A one-row tile's padding at its sides, its symbol's size and the room between the symbol and its words.</summary>
-    private const double RowPad = 12, RowSymbol = 22, RowGap = 8;
+    /// <summary>A square tile's padding, its symbol's size and the room between the symbol and its name.</summary>
+    private const double SquarePad = 12, SquareSymbol = 24, SquareGap = 8;
 
-    /// <summary>The narrowest one-row tiles' padding at their sides (the Mac's too): on a 1024 window the longest name,
+    /// <summary>The narrowest square tiles' padding at their sides (the Mac's too): on a 1024 window the longest name,
     /// Next 7 days, has room at its own size in them only so — at 12 it was shrunk a little to fit.</summary>
-    private const double RowPadTight = 10;
+    private const double SquarePadTight = 10;
+
+    /// <summary>The tallest a square tile grows: as tall as it is wide up to a 1080p window's tiles (about 246), no taller
+    /// on a wider screen, where a tile as tall as wide would push the work under the counters out of view.</summary>
+    private const double SquareMost = 248;
 
     /// <summary>
-    /// How the counters are laid out for a page and a window this wide: on a window 1024 wide or wider, one row of six —
-    /// told by the window, so a page that narrows as the pane or the rail takes room never puts them back in two rows —
-    /// and whether each of those tiles has room for its symbol beside its name (else the symbol goes beside its number);
-    /// on a narrower window, three to a row, or two on the narrowest page. And which names the row wears, decided once for
-    /// all six: the full ones ("Announcements", "Graded this week") where every one of them fits as its tile draws it,
-    /// else the short ones every tile fits ("Unread", "Graded"), whose lines then say the rest — never a name cut.
+    /// How the counters are laid out for a page and a window this wide: on a window 1024 wide or wider, one row of six
+    /// square tiles — told by the window, so a page that narrows as the pane or the rail takes room never puts them back
+    /// in two rows — and whether each of those tiles has room for its symbol beside its name at its top (else the name
+    /// has the top to itself and the symbol goes beside the number); on a narrower window, three to a row, or two on the
+    /// narrowest page. And which names the row wears, decided once for all six: the full ones ("Announcements", "Graded
+    /// this week") where every one of them fits as its tile draws it, else the short ones every tile fits ("Unread",
+    /// "Graded"), whose lines then say the rest — never a name cut.
     /// </summary>
     private (int Cols, bool Roomy, bool Full) CounterLayout(double page, double window)
     {
@@ -276,10 +287,10 @@ public sealed partial class DashboardScreen : Screen
             var tile = (Math.Max(320, page) - (cols - 1) * 12) / cols - 2;
             return (cols, false, tile - 2 * 14 - 28 - 10 >= WidestLabel(full: true) + 2);
         }
-        var words = (Math.Max(320, page) - 5 * 12) / 6 - 2 - 2 * RowPad;
-        var roomy = words >= RowSymbol + RowGap + WidestLabel(full: false) + 2;
-        // (the narrowest tiles' words sit RowPadTight in from their sides, so they have that much more room)
-        var room = roomy ? words - RowSymbol - RowGap : words + 2 * (RowPad - RowPadTight);
+        var words = (Math.Max(320, page) - 5 * 12) / 6 - 2 - 2 * SquarePad;
+        var roomy = words >= SquareSymbol + SquareGap + WidestLabel(full: false) + 2;
+        // (the narrowest tiles' words sit SquarePadTight in from their sides, so they have that much more room)
+        var room = roomy ? words - SquareSymbol - SquareGap : words + 2 * (SquarePad - SquarePadTight);
         return (6, roomy, room >= WidestLabel(full: true) + 2);
     }
 
@@ -327,7 +338,7 @@ public sealed partial class DashboardScreen : Screen
         for (var k = 0; k < items.Count; k++)
         {
             var c = items[k];
-            var tile = cols == 6 ? RowTile(c, layout.Roomy, layout.Full) : Tile(c, layout.Full);
+            var tile = cols == 6 ? SquareTile(c, layout.Roomy, layout.Full) : Tile(c, layout.Full);
             Grid.SetColumn(tile, (k % cols) * 2);
             Grid.SetRow(tile, (k / cols) * 2);
             grid.Children.Add(tile);
@@ -356,91 +367,65 @@ public sealed partial class DashboardScreen : Screen
     /// </summary>
     private static Color AlertRed => Appearance.Dark ? Color.FromRgb(0xff, 0x5a, 0x4f) : Color.FromRgb(0xc4, 0x2b, 0x1c);
 
-    /// <summary>A counter's tile three to a row (two on the narrowest page): its symbol and name, its number, the line under it.</summary>
+    /// <summary>A counter's tile three to a row (two on the narrowest page): its symbol and name, its number, the line
+    /// under it in whole words.</summary>
     private Button Tile(Counter c, bool full)
     {
         var n = Count(c, full);
         var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
-        var color = CounterColor(c.Key);
+        var color = TileColor(c, n.Value);
         var label = K.Text(NameOf(c, full), Ty.Body, B.Text2);
         var head = K.Columns("auto, *", K.IconTile(Glyph.Counter(c.Key), color, 28).Col(0), label.Margin(10, 0, 0, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1));
         var count = Number(n, alert);
         count.Margin = new Thickness(0, 10, 0, 0);
-        var noteT = K.Text(n.Note ?? " ", Ty.Caption, B.Text2);
-        var content = K.V(0, head, count, noteT);
+        var content = K.V(0, head, count, new NoteLines(n.Note));
         content.Margin = new Thickness(14, 14, 14, 12);
-        return TileButton(c, content, n.Value, alert, color);
+        return TileButton(c, content, n, alert, color, square: false);
     }
 
     /// <summary>
-    /// A counter's tile in one row of six, made for it — two lines, about 72 tall, so the work under the counters stays
-    /// in view: its name (never cut short) over its number, the symbol beside the name where both fit; where they do
-    /// not (the narrowest tiles, on a window not much over 1024), beside the number instead. The line about the count
-    /// follows the number, cut short at its end, and is left out where too little of it would show.
+    /// A counter's tile in one row of six: square — as tall as it is wide, never shorter than its words need nor taller
+    /// than <see cref="SquareMost"/> — and laid out as the tile always was, so each counter reads as a card of its own
+    /// colour: its symbol and name at the top, its number under them, the line about the count under that in whole words
+    /// on up to two lines, and the rest of the square its colour (or its theme's picture, pinned at its foot). Where the
+    /// symbol and the name do not fit side by side (the narrowest tiles, on a window not much over 1024), the name has
+    /// the top to itself and the symbol leads the number.
     /// </summary>
-    private Button RowTile(Counter c, bool roomy, bool full)
+    private Button SquareTile(Counter c, bool roomy, bool full)
     {
         var n = Count(c, full);
         var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
-        var color = CounterColor(c.Key);
-        var symbol = K.IconTile(Glyph.Counter(c.Key), color, RowSymbol);
+        var color = TileColor(c, n.Value);
+        var symbol = K.IconTile(Glyph.Counter(c.Key), color, SquareSymbol);
         var label = K.Text(NameOf(c, full), Ty.Body, B.Text2);
         label.TextTrimming = TextTrimming.None;
         // (a name wider than its room, were there ever one, shrunk to fit rather than cut; a number likewise)
         var name = new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        var head = roomy ? K.Columns("auto, *", symbol.Col(0), name.Margin(RowGap, 0, 0, 0).Col(1)) : K.Columns("*", name);
-        head.Height = RowSymbol;
         var count = Number(n, alert);
-        count.FontSize = 28;
-        count.LineHeight = 32;
         count.TextTrimming = TextTrimming.None;
-        Grid line;
+        FrameworkElement head, line;
         if (roomy)
         {
-            line = K.Columns("auto, *", count.Col(0));
-            if (!string.IsNullOrEmpty(n.Note))
-            {
-                var noteT = K.Text(n.Note!, Ty.Caption, B.Text2).Margin(RowGap, 0, 0, 5).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom).Col(1);
-                noteT.TextTrimming = TextTrimming.None;
-                // (never cut in the middle of a word: as many of its parts — "announcements · 2 courses" is two — as fit
-                //  whole, "announcements" alone where both do not; none where not even the first does, the tooltip and
-                //  what a screen reader says then the whole of it)
-                //  (the room is the row's less the number's, not the line's own width: a line of words wider than its room
-                //  is laid out at its whole width and clipped, so its own width would always say it fits)
-                var parts = n.Note!.Split(" · ");
-                var widths = Enumerable.Range(1, parts.Length).Select(k => WordsWidth(string.Join(" · ", parts.Take(k)), Ty.Caption)).ToArray();
-                var row = line;
-                void Fit()
-                {
-                    var room = row.ActualWidth - count.ActualWidth - RowGap;
-                    var fit = 0;
-                    while (fit < parts.Length && widths[fit] <= room + 0.5) fit++;
-                    var words = fit == 0 ? "" : string.Join(" · ", parts.Take(fit));
-                    if (noteT.Text != words) noteT.Text = words;
-                    noteT.Visibility = fit == 0 ? Visibility.Hidden : Visibility.Visible;
-                }
-                row.SizeChanged += (_, _) => Fit();
-                count.SizeChanged += (_, _) => Fit();
-                line.Children.Add(noteT);
-            }
+            head = K.Columns("auto, *", symbol.Col(0), name.Margin(SquareGap, 0, 0, 0).Col(1));
+            line = count;
         }
         else
         {
-            // (no line about the count: beside the symbol and the number, too little of it would ever show)
-            var number = new Viewbox { Child = count, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(RowGap, 0, 0, 0) };
+            head = name;
+            var number = new Viewbox { Child = count, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(SquareGap, 0, 0, 0) };
             line = K.Columns("auto, *", symbol.Col(0), number.Col(1));
         }
-        line.Height = 32;
-        var content = K.V(0, head, line);
-        content.Margin = roomy ? new Thickness(RowPad, 8, RowPad, 8) : new Thickness(RowPadTight, 8, RowPadTight, 8);
-        return TileButton(c, content, n.Value, alert, color);
+        line.Margin = new Thickness(0, 8, 0, 0);
+        var content = K.V(0, head, line, new NoteLines(n.Note));
+        content.Margin = roomy ? new Thickness(SquarePad, SquarePad, SquarePad, 10) : new Thickness(SquarePadTight, 10, SquarePadTight, 10);
+        return TileButton(c, content, n, alert, color, square: true);
     }
 
     /// <summary>A counter's tile round its words: its colour washed across it (or its theme's picture), opening its panel
-    /// when pressed, what it counts with its number its tooltip and what a screen reader says. Overdue with something in
-    /// it wears the alert on its own face — a solid red tint ringed in red, over any wash, picture or theme — so it never
-    /// looks like a tile with nothing in it.</summary>
-    private Button TileButton(Counter c, FrameworkElement content, int? value, bool alert, Color color)
+    /// when pressed, what it counts with its number — and the line about it, whole, wherever the tile had no room for
+    /// it — its tooltip and what a screen reader says. Overdue with something in it wears the alert on its own face — a
+    /// solid red tint ringed in red, over any wash, picture or theme — so it never looks like a tile with nothing in it.</summary>
+    private Button TileButton(Counter c, FrameworkElement content, (int? Value, string? Note, bool Kept) n, bool alert, Color color, bool square)
     {
         // (its theme's scene, or a photo of the student's, under its words — Settings ▸ Appearance)
         var face = new Grid();
@@ -454,11 +439,57 @@ public sealed partial class DashboardScreen : Screen
         if (alert) face.Children.Add(AlertFace());
         face.Children.Add(content);
         face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
-        var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
-        var spoken = Spoken(c.Key, c.Label, value);
-        b.ToolTip = spoken;
+        var b = K.CardButton(square ? new Square { Child = face, Most = SquareMost } : face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
+        var spoken = Spoken(c.Key, c.Label, n.Value);
+        b.ToolTip = string.IsNullOrEmpty(n.Note) ? spoken : $"{spoken}\n{n.Note}";
         System.Windows.Automation.AutomationProperties.SetName(b, spoken);
+        if (!string.IsNullOrEmpty(n.Note)) System.Windows.Automation.AutomationProperties.SetHelpText(b, n.Note);
         return b;
+    }
+
+    /// <summary>A square tile's face: as tall as it is wide, up to its most, and never shorter than what it holds needs.</summary>
+    private sealed class Square : Decorator
+    {
+        public double Most { get; init; } = double.PositiveInfinity;
+
+        protected override Size MeasureOverride(Size available)
+        {
+            var held = base.MeasureOverride(available);
+            var side = double.IsInfinity(available.Width) ? 0 : Math.Min(available.Width, Most);
+            return new Size(held.Width, Math.Max(held.Height, side));
+        }
+    }
+
+    /// <summary>
+    /// The line about a count, in whole words: on as many lines as it takes, up to two, where every word of it fits the
+    /// tile's width — else not at all (never a word cut, never "…"; the tile's tooltip and what a screen reader says keep
+    /// it). Decided as it is measured, so a tile that widens or narrows with the window shows it or leaves it out by
+    /// itself. A tile without one keeps a line's room, so its number sits where its neighbours' numbers do.
+    /// </summary>
+    private sealed class NoteLines : Decorator
+    {
+        private const int Most = 2;
+        private readonly TextBlock text;
+        private readonly double[] words;
+
+        public NoteLines(string? note)
+        {
+            var s = note ?? "";
+            text = K.Text(s, Ty.Caption, B.Text2, TextWrapping.WrapWithOverflow);
+            text.TextTrimming = TextTrimming.None;
+            words = s.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => WordsWidth(w, Ty.Caption)).ToArray();
+            Child = text;
+        }
+
+        protected override Size MeasureOverride(Size available)
+        {
+            var line = K.Ramp(Ty.Caption).Line;
+            text.Measure(new Size(available.Width, double.PositiveInfinity));
+            // (Hidden, not Collapsed: showing or hiding it here asks for no second measure)
+            var whole = words.Length > 0 && words.All(w => w <= available.Width + 0.5) && text.DesiredSize.Height <= Most * line + 0.5;
+            text.Visibility = whole ? Visibility.Visible : Visibility.Hidden;
+            return whole ? text.DesiredSize : new Size(0, line);
+        }
     }
 
     /// <summary>The alert's face: Windows' critical background, solid, ringed in the alert's red.</summary>
@@ -577,7 +608,7 @@ public sealed partial class DashboardScreen : Screen
         frame = new Border
         {
             CornerRadius = new CornerRadius(8), ClipToBounds = true,
-            Child = new Grid { Children = { Wash(CounterColor(key)), new Canvas { Children = { panelContent } } } },
+            Child = new Grid { Children = { Wash(TileColor(c, Count(c).Value)), new Canvas { Children = { panelContent } } } },
             Effect = K.Shadow(32, 10, 0.22), SnapsToDevicePixels = true,
         };
         frame.Bg(B.Flyout).Stroke(B.FlyoutStroke);
@@ -657,7 +688,7 @@ public sealed partial class DashboardScreen : Screen
         var data = sheet.Data;
         var n = Count(c, full: true);
         var alert = c.Tone == "red" && (n.Value ?? 0) > 0;
-        var color = CounterColor(key);
+        var color = TileColor(c, n.Value);
         var close = K.IconButton(SymbolRegular.Dismiss24, () => SetOpen(null), "Close", 14, 32);
         var titleRow = K.Columns("auto, *, auto",
             K.IconTile(Glyph.Counter(key), color, 28).Col(0),

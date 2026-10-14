@@ -400,9 +400,12 @@ public sealed class TodoScreen : Screen
   commands at the title's right, a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
   `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
-  `WindowLayoutChanges` for its thresholds: the Dashboard's six counters sit in one row on a window 1024 wide or wider
-  (compact tiles, about 72 tall: the name over the number and its line), and three to a row (two on the narrowest page)
-  on a narrower one.
+  `WindowLayoutChanges` for its thresholds: the Dashboard's six counters sit in one row of square tiles on a window 1024
+  wide or wider (each as tall as it is wide, up to 248 on a wider screen than 1080p, never shorter than its words: the
+  symbol and name at the top — the name alone there on the narrowest tiles, the symbol then beside the number — the
+  number, and the line about it in whole words on up to two lines, or left out, the tooltip saying it), and three to a
+  row (two on the narrowest page) on a narrower one. Each tile wears its counter's colour washed across it; Overdue's red
+  only while something is overdue (a quiet grey with nothing in it), Due today Windows' blue.
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
   light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`). In the
   light theme `B.Text2` and `B.Text3` are solid greys (#5F5F5F, #707070; `Appearance.ReadableText`): Fluent's
