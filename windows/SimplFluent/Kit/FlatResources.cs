@@ -32,6 +32,10 @@ public static class FlatResources
     /// <summary>The rest of the copy, done at once and put in place (null once done, or never asked).</summary>
     private static Action? finish;
 
+    /// <summary>The copy still under way: once whole it is put in WPF-UI's place, and the controls take their templates
+    /// again from it — a list scrolled before then is back at its top (the screenshot suite's --open more waits).</summary>
+    public static bool Copying => finish != null;
+
     /// <summary>The application's WPF-UI control styles, copied while the window is idle, then put in their place.</summary>
     public static void Apply(Application app)
     {
