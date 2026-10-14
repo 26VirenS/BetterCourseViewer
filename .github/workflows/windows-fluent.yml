@@ -438,12 +438,15 @@ jobs:
           Shot 'ptable-hover' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-hover', 'Fe'))
           Shot 'ptable-search' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-search', 'ne'))
           Shot 'ptable-element' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe'))
-          Shot 'ptable-orbitals' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'C', '--ptable-orbitals'))
-          Shot 'ptable-cloud' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'C', '--ptable-cloud'))
-          Shot 'ptable-cloud-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe', '--ptable-cloud', '--ptable-subshell', '3d'))
+          # (0.3.2: an element's atom, orbitals and cloud, and the Lewis maker and the molecule builder, are tools of their
+          #  own — Atoms & Orbitals, Lewis Structures, Molecule Builder — opened in a launch's state: --tool-state names
+          #  the element, the view and the subshell, or the molecule)
+          Shot 'atom-orbitals' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'C:orbitals'))
+          Shot 'atom-cloud' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'C:cloud'))
+          Shot 'atom-cloud-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Fe:cloud:3d'))
           Shot 'ptable-tour' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '1'))
-          Shot 'ptable-lewis' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-lewis', 'NO3-'))
-          Shot 'ptable-molecule' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-molecule', 'Ethanol'))
+          Shot 'lewis-no3' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'lewis', '--tool-state', 'NO3-'))
+          Shot 'molecule-ethanol' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'molecule', '--tool-state', 'Ethanol'))
           Shot 'pin-ptable' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'ptable', '--pin-open', 'ptable', '--ptable-pin-element', '25'))
           Shot 'lewis-sheet' '1366x778' 45 ($mock + @('--appearance', 'dark', '--lewis', 'Benzene'))
           Shot 'molecule-sheet' '1024x681' 45 ($mock + @('--appearance', 'light', '--pin', 'calc,ptable', '--molecule', 'CH4'))
@@ -645,14 +648,14 @@ jobs:
           Shot 'courses-past' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'courses', '--courses-filter', 'past'))
           Shot 'courses-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'courses'))
           Shot 'section-modules-one' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'section:courses/101:modules'))
-          # the Tools page at two sizes; the periodic table's tour offered and at its second step; its Lewis structures
-          # and Molecules pages on a 1024 window (their controls in the drawing's heading)
+          # the Tools page at two sizes; the periodic table's tour offered and at its second step; Lewis Structures and
+          # the Molecule Builder on a 1024 window (their controls in the drawing's heading)
           Shot 'tools-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools'))
           Shot 'tools-1366' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools'))
           Shot 'ptable-offer' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-offer'))
           Shot 'ptable-tour-2' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '2'))
-          Shot 'ptable-lewis-narrow' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-page', 'lewis'))
-          Shot 'ptable-molecule-narrow' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-page', 'molecules'))
+          Shot 'lewis-narrow' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'lewis'))
+          Shot 'molecule-narrow' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'molecule'))
           # (the UI fix pass's second round, added at the end so the pictures before keep their parts) a wrong password in
           # dark; a pin's quick version pulled out into its own window over a quiz, light and dark; a graded quiz's quick
           # look from the calendar; Updates' earlier versions as an installed copy lists them; an assignment in a window of
@@ -702,6 +705,22 @@ jobs:
           Shot 'bio-open-cell-720' '720x520' 50 ($mock + @('--place', 'tools', '--appearance', 'dark', '--tool', 'cell'))
           Shot 'bio-biomol-amino-phe' '1366x778' 50 ($mock + @('--place', 'tools', '--appearance', 'light', '--tool', 'biomol', '--tool-state', 'amino:aa=F'))
           Shot 'tool-window-framed' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--open', 'tool:101:19', '--web-scheme', 'dark'))
+          # (the Chemistry section, at the end so the pictures before keep their parts) the Tools page scrolled to it, light
+          # and dark; Lewis Structures, the Molecule Builder and Atoms & Orbitals opened plainly over the Tools page (the
+          # Periodic Table's own is 'ptable'), Lewis Structures and Atoms & Orbitals in dark too, Atoms & Orbitals on a
+          # 1024 window and a narrow one as well (the element, the view and the facts in sight); and Atoms & Orbitals
+          # opened from an element's facts page — its See it in 3D pressed, the Periodic Table's popup turned into it for
+          # that element (checked below)
+          Shot 'tools-chemistry' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tools-scroll', 'chemistry'))
+          Shot 'tools-chemistry-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tools-scroll', 'chemistry'))
+          Shot 'chem-lewis' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'lewis'))
+          Shot 'chem-lewis-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'lewis', '--tool-state', 'O3'))
+          Shot 'chem-molecule' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'molecule'))
+          Shot 'chem-atom' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom'))
+          Shot 'chem-atom-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Cu:orbitals:3d'))
+          Shot 'chem-atom-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Na:cloud'))
+          Shot 'chem-atom-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'O'))
+          Shot 'chem-atom-from-element' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe', '--ptable-atoms'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -829,6 +848,13 @@ jobs:
             }
             if ($card -and $card -ne 'none') { Write-Host "::error::${still}: the table's top showed '$card' with nothing pointed at (shots/profile-$still.log)"; exit 1 }
             Write-Host "${still}: the table's top was empty"
+          }
+          # Atoms & Orbitals opened from iron's facts page: the Periodic Table's popup turned into it (ToolPopup.Change
+          # writes "tool popup changed to: …" in a picture run), showing iron (the tool writes "atoms: shows …")
+          if ($script:mine -contains 'chem-atom-from-element') {
+            $l = PhoneLog 'chem-atom-from-element'
+            Write-Host "chem-atom-from-element: $((@($l -split "`n" | Where-Object { $_ -match 'tool popup|atoms: shows' }) -join ' | '))"
+            if (-not $l.Contains('tool popup changed to: atom') -or -not $l.Contains('atoms: shows Fe')) { Write-Host "::error::chem-atom-from-element: iron's facts page did not hand its element to Atoms & Orbitals (shots/profile-chem-atom-from-element.log)"; exit 1 }
           }
           # Cell Explorer opened under a still pointer: nothing pointed at before its picture (the 3D view writes "bio scene:
           # pointed at …" in a picture run when what is under the pointer changes)
