@@ -5,7 +5,7 @@ import SwiftUI
 // structure), Nucleic acids, Carbohydrates and Lipids — each in the chemistry tools' layout (controls, the 3D card,
 // facts), sharing one state (BiomolState) so a page keeps its choices while the tool comes and goes. A launch's state
 // (-SimplTool biomol -SimplToolState <page>:<options>, see `apply`) sets a page up for the screenshot suite; another
-// tool can hand it a sequence or a molecule (["sequence": "MAFSDWQKG"], ["molecule": "TRP"]).
+// tool can hand it a protein, a sequence or a molecule (["protein": "MAFSDWQKG"], ["sequence": "ATGC"], ["molecule": "TRP"]).
 
 struct BiomoleculeTool: View {
     /// What the launch asked of it, if it opened it (BioLaunchState).
@@ -123,13 +123,22 @@ struct BiomoleculeTool: View {
         if let v = st.value("select") { s.selection = v }
     }
 
-    /// What another tool handed over (§3.2 hand-off), taken once: a sequence (a protein's one-letter codes, or a short DNA
-    /// strand) or a molecule's code (an amino acid "TRP", a nucleotide "DA", a sugar "MAL", a lipid "POV").
+    /// What another tool handed over (§3.2 hand-off), taken once: a page, a protein (Gene Expression's "Open in
+    /// Biomolecule Builder": its one-letter codes, built in the peptide builder), a sequence (a protein's one-letter
+    /// codes, or a short DNA strand) or a molecule's code (an amino acid "TRP", a nucleotide "DA", a sugar "MAL", a lipid
+    /// "POV") — the keys both apps send.
     @MainActor
     static func takeHandOff() {
         let tools = ToolsCenter.shared
         let s = BiomolState.shared
         let nav = BioNav.shared
+        if let p = tools.takeInfo("page"), pages.contains(where: { $0.id == p }) { nav.set(.biomol, p) }
+        if let protein = tools.takeInfo("protein")?.uppercased().filter({ $0.isLetter }), !protein.isEmpty {
+            nav.set(.biomol, "proteins")
+            s.proteinMode = .build
+            s.sheetDemo = false
+            s.applySequence(protein, animate: false)
+        }
         if let seq = tools.takeInfo("sequence")?.uppercased().filter({ !$0.isWhitespace }), !seq.isEmpty {
             if seq.count <= BiomolStrand.maxLength && seq.allSatisfy({ "ACGT".contains($0) }) {
                 nav.set(.biomol, "nucleic")
