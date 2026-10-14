@@ -350,7 +350,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once when the tour is followed to its end, and Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -499,8 +499,13 @@ internal static class CalculatorRegistration
 
 The whole tool opens over the window (`ToolPopup`), from its tile on the Tools page, a pin's flyout or a command
 alike; the quick version is the pin's flyout. `ToolContext` hands it the engine, what
-was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` for the flyout. `ToolKit` has the page, two
-columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
+was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` (the flyout, or the sheet the whole tool is in).
+`ToolKit` has the page, two columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
+
+The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
+`BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
+plant:cutaway`); their shared data, 3D view, labels with leader lines, step-through and self-check (`--bio-check`) are
+described in `Tools/Biology/README.md`.
 
 ## Icons
 

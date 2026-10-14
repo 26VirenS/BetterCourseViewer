@@ -65,8 +65,9 @@ public static class ToolsPins
 /// Tools (the Mac's ToolsView and ToolsGrid): the things Simpl does on its own — a citation generator, a focus timer, a
 /// calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge &amp; split PDFs, a PDF
 /// annotator, Image to text, flashcards and a unit converter — a tile each: its symbol on a wash of its colour, its name
-/// and line, and its pin. A tile opens its tool whole, over the window (<see cref="Simpl.Tools.ToolPopup"/>), as a pin's
-/// flyout does; Done or Escape folds it away, back to the tiles.
+/// and line, and its pin; then, under a "Biology" heading, the biology toolkit's ten (Tools/Biology). A tile opens its
+/// tool whole, over the window (<see cref="Simpl.Tools.ToolPopup"/>), as a pin's flyout does; Done or Escape folds it
+/// away, back to the tiles.
 /// </summary>
 public sealed class ToolsScreen : Screen
 {
@@ -76,7 +77,10 @@ public sealed class ToolsScreen : Screen
         public Color Color => K.Hex(Hex);
     }
 
-    public static readonly Kind[] Kinds =
+    /// <summary>Every tool: the twelve under no heading, then the biology toolkit's ten under "Biology" (Tools/Biology/BioTools.cs).</summary>
+    public static readonly Kind[] Kinds = Everyday.Concat(Simpl.Tools.BioTools.Kinds).ToArray();
+
+    private static Kind[] Everyday => new Kind[]
     {
         new("cite", "Citation generator", "Cite a source in MLA, APA or Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
         new("pomo", "Focus timer", "Focus for a while, then take a break.", SymbolRegular.Timer24, "#ff9500"),
@@ -136,6 +140,9 @@ public sealed class ToolsScreen : Screen
         // (the screenshot suite: --tool calc opens the Calculator, as the Mac's -SimplTool)
         if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.FirstOrDefault(t => t.Key == k) is { } kind)
             Application.Current.Dispatcher.BeginInvoke(() => OpenTool(engine, kind, View), System.Windows.Threading.DispatcherPriority.Loaded);
+        // (a development run's --bio-demo: the biology toolkit's foundation seen working, Tools/Biology/BioDemo.cs)
+        else if (Launch.IsDevelopment && Launch.Take("", "bio-demo") != null)
+            Application.Current.Dispatcher.BeginInvoke(() => Simpl.Tools.BioDemo.Show(View != null ? Window.GetWindow(View) : null), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnClock(object? sender, EventArgs e) => Tick();
@@ -154,20 +161,34 @@ public sealed class ToolsScreen : Screen
     {
         timerLine = null;
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
-        var grid = new MoreGrid(300, 16, Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true);
+        var grid = new MoreGrid(300, 16, Kinds.Where(k2 => !Simpl.Tools.BioTools.IsBiology(k2.Key)).Select(k2 => (UIElement)Tile(k2)), stretch: true);
         page.Children.Add(grid);
+        // (the biology toolkit's ten under a heading of their own, as the Mac's Tools page has them)
+        var heading = K.V(4, K.Text("Biology", Ty.Subtitle),
+            K.Wrapped("Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.", Ty.Body, B.Text2));
+        heading.Margin = new Thickness(0, 14, 0, -8);
+        System.Windows.Automation.AutomationProperties.SetHeadingLevel(heading.Children[0], System.Windows.Automation.AutomationHeadingLevel.Level2);
+        page.Children.Add(heading);
+        page.Children.Add(new MoreGrid(300, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
         if (ToolsPins.Pinned.Count == 0)
             page.Children.Add(MoreKit.Note(SymbolRegular.Pin24, "Press a tile’s pin to keep that tool in the title bar. Its button there opens a quick version of it."));
         var sv = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
         sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);
         sv.Padding = new Thickness(40, 0, 40, 40);
+        // (the screenshot suite: --tools-scroll biology, the page scrolled to the Biology section, as the Mac's -SimplToolsScroll)
+        if (Launch.Take("biology", "tools-scroll") != null)
+            sv.Loaded += (_, _) => sv.Dispatcher.BeginInvoke(() => sv.ScrollToVerticalOffset(Math.Max(0, heading.TranslatePoint(new Point(0, 0), page).Y - 8)),
+                System.Windows.Threading.DispatcherPriority.Loaded);
+        // (--bio-check: the biology toolkit's self-check in the log, as the Mac's Tools page starts it)
+        Simpl.Tools.BioTools.SelfCheckIfAsked();
         return sv;
     }
 
     /// <summary>A tool's tile: its symbol on a wash of its colour, its name and line, and its pin at its corner.</summary>
     private FrameworkElement Tile(Kind kind)
     {
-        var words = K.V(4, K.Text(kind.Name, Ty.BodyStrong), K.Wrapped(kind.Note, Ty.Body, B.Text2));
+        // (a long name — Photosynthesis & Respiration — on two lines rather than cut short)
+        var words = K.V(4, K.Wrapped(kind.Name, Ty.BodyStrong, maxLines: 2), K.Wrapped(kind.Note, Ty.Body, B.Text2));
         if (kind.Key == "pomo" && Simpl.Tools.ToolRegistry.Timer is { Active: true } t)
         {
             timerLine = K.Text(TimerWords(t), Ty.BodyStrong);

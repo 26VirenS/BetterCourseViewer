@@ -4,7 +4,9 @@ namespace Simpl.Support;
 /// What the app was started with — the Mac's launch arguments, Windows-style (--name value). For the screenshot suite and
 /// development: --base-url http://localhost:8800 (the mock Canvas, as -SimplBaseURL), --demo (as a student who has used
 /// it), --place grades (where the window opens), --push /courses/101/assignments/1001, --open quiz:101:9011,
-/// --appearance dark, --shot file.png --shot-after 12 (a picture of the window, then quit), --window-size 1280x820.
+/// --appearance dark, --shot file.png --shot-after 12 (a picture of the window, then quit), --window-size 1280x820,
+/// --place tools --tool cell --tool-state plant:cutaway (a tool opened, a biology tool in that state; --bio-seq ATGC and
+/// any --bio-&lt;name&gt; too: Tools/Biology/README.md), --bio-check (the biology toolkit's self-check in the log).
 /// </summary>
 public static class Launch
 {

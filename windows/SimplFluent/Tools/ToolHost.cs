@@ -38,7 +38,7 @@ public sealed class ToolContext
     /// <summary>From the quick version: the whole tool over the window, with details or files for it.</summary>
     public Action<Dictionary<string, string>?, IReadOnlyList<string>?> OpenFull { get; init; } = (_, _) => { };
 
-    /// <summary>From the quick version: the flyout closed.</summary>
+    /// <summary>The flyout (the quick version) or the sheet (the whole tool, over the window) it is in, closed.</summary>
     public Action Close { get; init; } = () => { };
 
     /// <summary>The files handed to the tool, taken once (the Mac's ToolsCenter.takeFiles).</summary>
@@ -49,7 +49,8 @@ public sealed class ToolContext
 }
 
 /// <summary>
-/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc).
+/// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; and
+/// the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy, through BioTools.Register).
 /// Each tool's file registers its own from a module initializer, so a tool added is a file added.
 /// </summary>
 public static class ToolRegistry
@@ -155,13 +156,15 @@ public static class ToolsCenter
     {
         "cite" => "Cite", "pomo" => "Focus", "calc" => "Calculator", "graph" => "Graphing", "ptable" => "Elements",
         "need" => "Grade needed", "conv" => "Convert", "units" => "Units", "pdfx" => "Merge & split", "mark" => "Mark up",
-        "ocr" => "Image to text", "fc" => "Flashcards", _ => key,
+        "ocr" => "Image to text", "fc" => "Flashcards",
+        "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
+        "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy", _ => key,
     };
 
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
     public static double FlyoutWidth(string key) => key switch
     {
-        "calc" or "ptable" => 420, "cite" => 400, "graph" => 360, "fc" => 340, _ => 330,
+        "calc" or "ptable" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" => 360, "fc" => 340, _ => 330,
     };
 
     /// <summary>The files a tool takes from its pin's flyout (null: none), as an open dialog's filter.</summary>
@@ -181,10 +184,11 @@ public static class ToolsCenter
 /// <summary>The pieces every tool is made of, so they look one family.</summary>
 public static class ToolKit
 {
-    /// <summary>A tool's scrolling body: the page's side margins, its content as wide as the window allows.</summary>
+    /// <summary>A tool's scrolling body: the page's side margins, its content as wide as the window allows up to its
+    /// widest, and centred past that (the Mac's ToolPage).</summary>
     public static ScrollViewer Page(UIElement content, double maxWidth = 1480, double spacing = 20)
     {
-        if (content is FrameworkElement fe) { fe.MaxWidth = maxWidth; fe.HorizontalAlignment = HorizontalAlignment.Left; }
+        if (content is FrameworkElement fe) Fit(fe, maxWidth);
         var sv = new ScrollViewer
         {
             Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -197,42 +201,22 @@ public static class ToolKit
     /// <summary>A tool's scrolling body made of parts one under another.</summary>
     public static ScrollViewer Page(double spacing, params UIElement?[] parts) => Page(K.V(spacing, parts));
 
+    /// <summary>
+    /// A page's content given the page's whole width up to its widest (a page kept, with new content, too): its columns
+    /// share out the page, not what their content happens to ask for.
+    /// </summary>
+    public static void Fit(FrameworkElement content, double maxWidth)
+    {
+        content.MaxWidth = maxWidth;
+        content.HorizontalAlignment = HorizontalAlignment.Stretch;
+    }
+
     /// <summary>Two columns side by side on a wide window (the work and its side panel), one over the other on a narrow one.</summary>
     public static FrameworkElement Columns(UIElement main, UIElement side, double sideWidth = 380, double breakpoint = 900, double spacing = 28)
     {
-        var g = new Grid();
-        g.Children.Add(main);
-        g.Children.Add(side);
-        var wide = (bool?)null;
-        void Lay()
-        {
-            var w = g.ActualWidth >= breakpoint;
-            if (wide == w) return;
-            wide = w;
-            g.ColumnDefinitions.Clear();
-            g.RowDefinitions.Clear();
-            if (w)
-            {
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(spacing) });
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(sideWidth) });
-                Grid.SetColumn(main, 0); Grid.SetRow(main, 0);
-                Grid.SetColumn(side, 2); Grid.SetRow(side, 0);
-            }
-            else
-            {
-                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(spacing) });
-                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                Grid.SetColumn(main, 0); Grid.SetRow(main, 0);
-                Grid.SetColumn(side, 0); Grid.SetRow(side, 2);
-            }
-        }
-        g.SizeChanged += (_, _) => Lay();
-        g.Loaded += (_, _) => Lay();
         if (main is FrameworkElement m) m.VerticalAlignment = VerticalAlignment.Top;
         if (side is FrameworkElement s) s.VerticalAlignment = VerticalAlignment.Top;
-        return g;
+        return new ToolColumns(main, side, sideWidth, breakpoint, spacing);
     }
 
     /// <summary>A labelled field: its label over it, a hint under it, a word after it (a unit, "%").</summary>
@@ -314,6 +298,66 @@ public static class ToolKit
         K.V(10, trailing == null ? K.Text(title, Ty.BodyStrong) : K.Columns("*, auto", K.Text(title, Ty.BodyStrong).Col(0), trailing.Col(1)), K.Card(content, new Thickness(16)));
 }
 
+/// <summary>
+/// The work and its side panel (the Mac's ToolColumns): side by side when the width given holds the breakpoint, the
+/// side at its own width and the work taking the rest, one over the other below that. The choice is made from the width
+/// offered as it is measured, never from its own size, and it takes the whole of that width either way — so its width
+/// cannot feed back into the choice, and it lands the same whatever order the layout happens in.
+/// </summary>
+internal sealed class ToolColumns : Panel
+{
+    private readonly UIElement main, side;
+    private readonly double sideWidth, breakpoint, spacing;
+
+    public ToolColumns(UIElement main, UIElement side, double sideWidth, double breakpoint, double spacing)
+    {
+        this.main = main;
+        this.side = side;
+        this.sideWidth = sideWidth;
+        this.breakpoint = breakpoint;
+        this.spacing = spacing;
+        Children.Add(main);
+        Children.Add(side);
+    }
+
+    private bool Wide(double width) => !double.IsInfinity(width) && width >= breakpoint;
+
+    private double MainWidth(double width) => Math.Max(0, width - spacing - sideWidth);
+
+    protected override Size MeasureOverride(Size available)
+    {
+        var w = available.Width;
+        if (Wide(w))
+        {
+            main.Measure(new Size(MainWidth(w), available.Height));
+            side.Measure(new Size(sideWidth, available.Height));
+            return new Size(w, Math.Max(main.DesiredSize.Height, side.DesiredSize.Height));
+        }
+        main.Measure(new Size(w, double.PositiveInfinity));
+        side.Measure(new Size(w, double.PositiveInfinity));
+        // (no width to fill, as in a row: as wide as the wider of the two)
+        var width = double.IsInfinity(w) ? Math.Max(main.DesiredSize.Width, side.DesiredSize.Width) : w;
+        return new Size(width, main.DesiredSize.Height + spacing + side.DesiredSize.Height);
+    }
+
+    protected override Size ArrangeOverride(Size final)
+    {
+        var w = final.Width;
+        if (Wide(w))
+        {
+            main.Arrange(new Rect(0, 0, MainWidth(w), final.Height));
+            side.Arrange(new Rect(MainWidth(w) + spacing, 0, sideWidth, final.Height));
+        }
+        else
+        {
+            var top = main.DesiredSize.Height;
+            main.Arrange(new Rect(0, 0, w, top));
+            side.Arrange(new Rect(0, top + spacing, w, side.DesiredSize.Height));
+        }
+        return final;
+    }
+}
+
 /// <summary>Windows' own dialogs for a tool's files, and the checks on what was dropped (the Mac's ToolFiles).</summary>
 public static class Files
 {
@@ -391,7 +435,8 @@ public static class ToolPopup
         var w = Math.Max(760, (win?.ActualWidth ?? 1280) - 70);
         var h = Math.Max(560, (win?.ActualHeight ?? 860) - 90);
         var sheet = new Sheet { Bare = true, Width = w, Height = h };
-        var c = new ToolContext { Engine = engine, Key = key, Owner = win };
+        // (Close: the sheet folded away — a tool handing something to another closes itself first, BioTools.Open)
+        var c = new ToolContext { Engine = engine, Key = key, Owner = win, Close = () => sheet.Close() };
         var body = ToolRegistry.Full(c) ?? Missing(kind);
         var done = K.Button("Done", () => sheet.Close());
         done.ToolTip = $"Close {kind.Name} (Esc)";
@@ -430,7 +475,8 @@ public static class ToolHeader
         words.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(words.Col(2));
         if (ToolRegistry.Header(c) is { } extra) { extra.Margin = new Thickness(12, 0, 12, 0); extra.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(extra.Col(3)); }
-        row.Children.Add(PinButton(kind, squished: kind.Key == "ptable").Col(4));
+        // (a header full of the tool's own controls — the Periodic Table's, a biology tool's pages — the pin a symbol alone)
+        row.Children.Add(PinButton(kind, squished: kind.Key == "ptable" || BioTools.Pages(kind.Key).Count > 1).Col(4));
         return row;
     }
 
@@ -489,11 +535,18 @@ public sealed class PinBar : StackPanel
         tick.Tick += (_, _) => { if (timer?.Active == true) Draw(); };
         Loaded += (_, _) => { Hook(); Draw(); };
         Draw();
-        // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch)
+        // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch, and keeps it open: CI
+        //  starts three copies of Simpl at once, and another's window coming forward would close a flyout that closes when
+        //  its window is left, so the picture showed the bar without it)
         if (Launch.Take("", "pin-open") is { Length: > 0 } k)
         {
             var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
-            t.Tick += (_, _) => { t.Stop(); OpenFlyout(k); };
+            t.Tick += (_, _) =>
+            {
+                t.Stop();
+                OpenFlyout(k);
+                if (flyout != null) flyout.StaysOpen = true;
+            };
             t.Start();
         }
     }

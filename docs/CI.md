@@ -46,8 +46,10 @@ branch's place in its concurrency group and on `mac-shots` or `ios-shots`).
   (C# for Windows, Swift and clang for the Mac and the iPhone), known by file and words rather than line, against the
   baseline in `scripts/dev/baselines/`. One that is not there fails, with an annotation on its line.
 - **Unit tests**: Windows' models (`windows/SimplFluent.Tests`, xUnit: the chemistry, the calculator, the vault's and
-  the saved sign-in's seals, the bridge's JSON) and the Mac's (`scripts/dev/swift-checks/main.swift`: the elements'
-  data, VSEPR's shapes).
+  the saved sign-in's seals, the bridge's JSON, the biology toolkit's data and algorithms against its specification's
+  test vectors — `BiologyTests`, its self-check all OK) and the Mac's (`scripts/dev/swift-checks/main.swift`: the
+  elements' data, VSEPR's shapes). The Windows pictures' `tools-biology` runs the biology self-check in the app too
+  (`--bio-check`), and its log must end with `bio-check summary n/n OK`.
 - The checks that were already there stay as they were: the Mac's project as the generator writes it and its What's
   New entry, kept data sealed (Mac, Windows), Send from Phone, the installer tried, the test school as the mock makes it.
 

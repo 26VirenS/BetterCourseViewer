@@ -19,6 +19,8 @@ public static class Shot
     private static DateTime lastActivity = DateTime.UtcNow;
     private static bool armed, everBegan;
 
+    /// <summary>Something asked that the picture waits for (an answer from the page; a biology tool's 3D scene being made
+    /// off the UI thread, BioSceneView.Show; its self-check, --bio-check): on the UI thread, with an Ended for each.</summary>
     public static void Began() { inFlight++; everBegan = true; lastActivity = DateTime.UtcNow; }
 
     public static void Ended() { inFlight = Math.Max(0, inFlight - 1); lastActivity = DateTime.UtcNow; }
