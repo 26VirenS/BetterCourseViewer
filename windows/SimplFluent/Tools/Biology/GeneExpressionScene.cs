@@ -391,9 +391,9 @@ internal sealed class GXPainter
         {
             foreach (var (dx, dy, l) in new[] { (6.0, -2.0, 'A'), (8.5, 14.0, 'U'), (11.0, 2.0, 'G'), (13.5, 16.0, 'C'), (15.5, 0.0, 'A') })
                 Ntp(dc, l, new Point(X(F.PolX + dx), Y(Y3) + dy), 0.6 * F.Polymerase);
-            // (their name kept whole inside the view, its last letter was cut at the edge)
+            // (their name kept whole inside the view, the clip 4 past its right: its last letter was cut at the edge)
             var half = v.Measure("free NTPs", 10, FontWeights.SemiBold) / 2;
-            Text(dc, "free NTPs", new Point(Math.Min(X(F.PolX + 10.5), right + 10 - half), Y(Y3) + 32), 10, alpha: F.Polymerase);
+            Text(dc, "free NTPs", new Point(Math.Min(X(F.PolX + 10.5), right + 2 - half), Y(Y3) + 32), 10, alpha: F.Polymerase);
         }
     }
 
@@ -808,8 +808,14 @@ internal sealed class GXPainter
             v.Say(dc, r.Aa.ToString(), pt, 12, FontWeights.Black, Colors.White);
             if (r.Alpha < 0.99) dc.Pop();
         }
+        // (the N-terminus named to the left of the first residue: "N" alone where its whole name would run under the lanes'
+        //  names, and nothing where not even that fits — a cut "…s" was all that showed; the card says N→C)
         if (s.Residues.Count > 1 || F.Stage >= GXStage.TlEnd)
-            Text(dc, "N-terminus", new Point(pts[0].X - 16, pts[0].Y), 10, FontWeights.Bold, anchor: GXDraw.Anchor.Trailing);
+        {
+            var room = pts[0].X - 16 - left;
+            var name = room >= v.Measure("N-terminus", 10, FontWeights.Bold) ? "N-terminus" : (room >= v.Measure("N", 10, FontWeights.Bold) ? "N" : null);
+            if (name != null) Text(dc, name, new Point(pts[0].X - 16, pts[0].Y), 10, FontWeights.Bold, anchor: GXDraw.Anchor.Trailing);
+        }
         if (F.Result > 0.01)
             Text(dc, "C-terminus", new Point(pts[^1].X + 16, pts[^1].Y), 10, FontWeights.Bold, anchor: GXDraw.Anchor.Leading, alpha: F.Result);
     }

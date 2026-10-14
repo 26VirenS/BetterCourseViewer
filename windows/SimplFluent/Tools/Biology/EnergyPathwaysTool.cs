@@ -718,7 +718,7 @@ internal sealed class EnergyMap : Grid
         Region("matrix", new Path { Data = folds, Fill = Br(Matrix), StrokeThickness = 0 }, only: "krebs");
         Region("inner", new Path { Data = folds, Fill = Brushes.Transparent, Stroke = Br(Inner), StrokeThickness = 4 }, strokeOnly: true);
         Words("Mitochondrion", new Point(742, 102), 13.5, B.Text, strong: true);
-        Words("matrix", new Point(690, 315), 11, B.Text2);
+        Words("matrix", new Point(668, 298), 11, B.Text2);
         Words("inner membrane", new Point(830, 370), 11, B.Text2);
 
         // the molecules' way between the parts
