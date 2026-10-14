@@ -981,7 +981,10 @@ jobs:
             if ($script:mine -notcontains $name) { continue }
             $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'more from canvas: (.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Last 1
             if ($said -notmatch '^History, My Materials \(picture\), Help ') { Write-Host "::error::${name}: More from Canvas was not History, My Materials with its picture, Help ('$said') (shots/profile-$name.log)"; exit 1 }
-            Write-Host "${name}: $said"
+            # (the pane scrolled to its end, where the section is: "more from canvas: the pane scrolled to <at> of <most>")
+            $scrolled = [regex]::Match((Get-Content "shots/profile-$name.log" -Raw -ErrorAction SilentlyContinue), 'the pane scrolled to (\d+) of (\d+)')
+            if (-not $scrolled.Success -or [int]$scrolled.Groups[1].Value -lt [int]$scrolled.Groups[2].Value - 2) { Write-Host "::error::${name}: the pane was not scrolled to More from Canvas ('$($scrolled.Value)') (shots/profile-$name.log)"; exit 1 }
+            Write-Host "${name}: $said; $($scrolled.Value)"
           }
           foreach ($list in @(@('more-history', 'history'), @('more-help', 'help'))) {
             if ($script:mine -notcontains $list[0]) { continue }
