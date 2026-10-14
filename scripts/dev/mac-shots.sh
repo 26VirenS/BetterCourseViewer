@@ -483,7 +483,7 @@ for MODE in light dark; do
   shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
   shoot "$MODE-21g-alta-float" 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc
   shoot "$MODE-22-setup" 20 -SimplOpen setup
-  shoot "$MODE-23-settings" 12 -SimplOpen settings
+  shoot "$MODE-23-settings" 18 -SimplOpen settings
   shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
   shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
   shoot "$MODE-26-school" 8 -SimplPicker merced
