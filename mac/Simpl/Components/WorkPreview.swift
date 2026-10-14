@@ -370,7 +370,11 @@ struct PreviewLink<Label: View>: View {
         guard PreviewShot.wanted, !PreviewShot.taken, PreviewShot.wants(item) else { return }
         let item = item
         let anchor = anchor
+        // (1.3.79) the picture waits for the card as it waits for an answer: it comes a moment after its row, and a
+        // counter's panel had been pictured without it
+        Shot.began()
         Task { @MainActor in
+            defer { Shot.ended() }
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             guard !PreviewShot.taken, anchor.rect() != nil else { return }
             PreviewShot.taken = true

@@ -24,6 +24,9 @@ enum PopupLayout {
     /// As large as what it shows asks, its top left at a point on the screen (AppKit's coordinates): a counter's list,
     /// over its tile.
     case at(CGPoint)
+    /// As large as what it shows asks, just under a rect on the screen (AppKit's coordinates) from its start — or just
+    /// over it when the screen has no room under, as a menu from it: a work's card, from its row in a counter's list.
+    case under(CGRect)
 
     var isLarge: Bool {
         if case .large = self { return true }
@@ -315,7 +318,15 @@ final class FloatingPopups {
         panel.model.content = view
         let host = NSHostingView(rootView: PopupRoot(model: panel.model, engine: engine, handle: PopupHandle(panel: panel)))
         host.sizingOptions = [] // (the popup is sized here, never by what it shows pulling at the window)
-        panel.contentView = host
+        // (in a plain view of the popup's own, sized with it, not as the window's content view: a hosting view that is
+        // its window's content view sizes the window to what it shows each time it is laid out — a tool whose content
+        // asks for more room the more it is given grew its popup past the screen, pass after pass, until AppKit stopped
+        // the app for laying the window out too many times)
+        let holder = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
+        host.frame = holder.bounds
+        host.autoresizingMask = [.width, .height]
+        holder.addSubview(host)
+        panel.contentView = holder
         panels[key] = panel
         watch(window)
         if layout.isLarge {
@@ -353,6 +364,15 @@ final class FloatingPopups {
         for panel in panels.values where panel.popupLayout.isLarge { panel.place() }
     }
 
+    /// The window's sidebar shown or hidden: its large popups placed again in the screen's side of the window once the
+    /// sidebar has moved — one put up while the sidebar was out kept clear of where it had been, off the window's middle,
+    /// and one put up while it was folded away lay over it when it came out.
+    func sidebarMoved() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.windowResized()
+        }
+    }
+
     // MARK: Where a popup goes
 
     /// The screen's side of a window, on the screen: under its toolbar, past its sidebar while that is out.
@@ -372,6 +392,18 @@ final class FloatingPopups {
         let w = max(320, min(a.width - margin * 2, 1480))
         let h = max(260, min(a.height - margin * 2, 1040))
         return NSRect(x: (a.midX - w / 2 + moved.width).rounded(), y: (a.midY - h / 2 + moved.height).rounded(), width: w, height: h)
+    }
+
+    /// A popup `s` large just under `r` (8 points in from its start), or just over it when the screen has no room under
+    /// it — on the roomier side when there is room for neither (then kept on the screen).
+    static func under(_ r: CGRect, size s: CGSize, on screen: NSScreen?) -> NSRect {
+        let gap: CGFloat = 12
+        let below = NSRect(x: r.minX + 8, y: r.minY - gap - s.height, width: s.width, height: s.height)
+        let above = NSRect(x: r.minX + 8, y: r.maxY + gap, width: s.width, height: s.height)
+        guard let v = (screen ?? NSScreen.main)?.visibleFrame else { return below }
+        if below.minY >= v.minY { return below }
+        if above.maxY <= v.maxY { return above }
+        return r.minY - v.minY >= v.maxY - r.maxY ? below : above
     }
 
     /// A popup's frame all on the screen where it fits there (moved, never shrunk; a taller one with its top on it).
@@ -446,6 +478,8 @@ final class PopupPanel: NSPanel {
     fileprivate weak var over: NSWindow?
     /// How far a large popup was moved from where it opens (kept as the window is sized again).
     fileprivate var moved = CGSize.zero
+    /// (1.3.79) Dragged since it was put where it opens: sized again, it keeps its top where it was left.
+    private var userMoved = false
     /// Put where it opens (a fitted one once what it shows has been measured), and come in.
     private var placed = false
     private var shown = false
@@ -520,19 +554,30 @@ final class PopupPanel: NSPanel {
             f = placed ? NSRect(x: frame.minX, y: frame.maxY - s.height, width: s.width, height: s.height)
                 : NSRect(x: p.x, y: p.y - s.height, width: s.width, height: s.height)
             f = FloatingPopups.within(f, on: over.screen)
+        case .under(let r):
+            // (under its row, or over it, again as it grows — until it is dragged somewhere of its own)
+            let s = size ?? frame.size
+            f = placed && userMoved ? NSRect(x: frame.minX, y: frame.maxY - s.height, width: s.width, height: s.height)
+                : FloatingPopups.under(r, size: s, on: over.screen)
+            f = FloatingPopups.within(f, on: over.screen)
         }
         setFrame(f, display: true)
         placed = true
         invalidateShadow()
     }
 
-    /// Asked to show something under a new layout: a popup at a point moved to the new one (a counter's list, opened
-    /// from another tile); any other kept where it is.
+    /// Asked to show something under a new layout: a popup at a point or by a rect moved to the new one (a counter's
+    /// list, opened from another tile; a work's card, from another row); any other kept where it is.
     fileprivate func moveTo(_ next: PopupLayout) {
-        guard case .at(let p) = next else { return }
-        if case .at(let was) = popupLayout, was == p { return }
+        switch (next, popupLayout) {
+        case (.at(let p), .at(let was)) where p == was: return
+        case (.under(let r), .under(let was)) where r == was: return
+        case (.at, _), (.under, _): break
+        default: return
+        }
         popupLayout = next
         placed = false
+        userMoved = false
         place()
     }
 
@@ -605,6 +650,7 @@ final class PopupPanel: NSPanel {
     /// Its head dragged: the popup follows the pointer until the button is let go.
     fileprivate func dragged() {
         guard drag == nil, !closing else { return }
+        userMoved = true
         drag = (NSEvent.mouseLocation, frame.origin)
         dragWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self] e in
             guard let self, let d = self.drag else { return e }

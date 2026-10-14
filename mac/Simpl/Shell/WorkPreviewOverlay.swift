@@ -77,8 +77,8 @@ struct WorkPreviewOverlay: View {
     }
 
     /// (1.3.79) A card whose row is in a popup over this window — a counter's list — comes up in a popup of its own over
-    /// that one, just under its row, from the row's start, as the card here does; closed (its ✕, Escape, ⌘W), the card
-    /// folds back. Any other card — or none — takes that popup away.
+    /// that one, just under its row from the row's start, or just over it when there is no room under, as the card here
+    /// does; closed (its ✕, Escape, ⌘W), the card folds back. Any other card — or none — takes that popup away.
     private func popUpCard() {
         let t = preview.token
         guard preview.item != nil, let row = preview.anchor?.view, let rowWindow = row.window as? PopupPanel,
@@ -90,7 +90,8 @@ struct WorkPreviewOverlay: View {
             }
             return
         }
-        // (the row on the screen — cut to what its list shows — and the room under it there for the card's excerpt)
+        // (the row on the screen — cut to what its list shows — and the room under or over it there for the card's
+        // excerpt, as the card here has it)
         var r = row.convert(row.bounds, to: nil)
         if let scroll = row.enclosingScrollView {
             let shown = r.intersection(scroll.convert(scroll.bounds, to: nil))
@@ -98,12 +99,12 @@ struct WorkPreviewOverlay: View {
         }
         let onScreen = rowWindow.convertToScreen(r)
         let visible = (rowWindow.screen ?? NSScreen.main)?.visibleFrame ?? onScreen
-        let room = onScreen.minY - PreviewPlacement.gap - PreviewPlacement.margin - visible.minY
+        let gap = PreviewPlacement.gap + PreviewPlacement.margin
+        let room = max(onScreen.minY - gap - visible.minY, visible.maxY - gap - onScreen.maxY)
         let lines = room >= 640 ? 8 : (room >= 460 ? 5 : (room >= 340 ? 3 : 2))
-        let corner = CGPoint(x: onScreen.minX + 8, y: onScreen.minY - PreviewPlacement.gap)
         popped = t
         poppedOut = -1
-        engine.popups.present(PopupPreviewCard.key, title: preview.item?.title ?? "Preview", layout: .at(corner), ground: false,
+        engine.popups.present(PopupPreviewCard.key, title: preview.item?.title ?? "Preview", layout: .under(onScreen), ground: false,
                               anchor: .top, onClose: { if WorkPreview.shared.token == t { WorkPreview.shared.close() } }) {
             PopupPreviewCard(lines: lines).id(t)
         }

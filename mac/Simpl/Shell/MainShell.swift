@@ -121,7 +121,10 @@ struct MainShell: View {
         }
         // (1.3.79) another screen (its own toolbar buttons) or the sidebar shown or hidden: the pins' room measured afresh
         .onChange(of: engine.nav.current) { _, _ in fit.reset() }
-        .onChange(of: columns) { _, _ in fit.reset() }
+        .onChange(of: columns) { _, _ in
+            fit.reset()
+            engine.popups.sidebarMoved() // (1.3.79: a tool's popup kept in the screen's side of the window)
+        }
     }
 }
 

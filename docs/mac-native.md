@@ -117,8 +117,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the date line says "Updating…". (1.3.79) A counter's panel is 1.3.77's again: its symbol, name and number with its
   line beside the number and its ✕ at the right; a row is its course's colour, its title and the engine's line under
   it (course, points, due time) with a chevron or Dismiss, three and a half rows before it scrolls (less where the
-  window has less room); a row pressed brings its card up over the panel, just under the row (a popup of its own over
-  the panel's: `PopupPreviewCard`), never opened inside the panel, and closing the panel closes its row's card. The card
+  window has less room); a row pressed brings its card up over the panel, just under the row or over it where the
+  screen has no room under (a popup of its own over the panel's: `PopupPreviewCard`, `PopupLayout.under`), never
+  opened inside the panel, and closing the panel closes its row's card. The panel opens over its tile as AppKit places
+  the tile (an unseen view behind the counters), not by SwiftUI's global frame, which stood 20 points off. The card
   says what the work's own facts say once they are read — never the row's line again under them ("Due 11:59 PM" under
   "Due Oct 14 at 11:59 PM"). The panel and the card are popups that never block the window (below). Course cards:
   a 48-point band with the sidebar's name, the term and teacher under it, "2 new" announcements, quick links named where
@@ -687,7 +689,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   list**: a popup at its tile (its glass its own; another counter's takes its place; Overdue's number follows its rows
   cleared); the **quick look** at a piece of work: still the card grown out of its row in the window, but a press
   round it no longer closes it, going to another screen leaves it where it is, and dragged it moves (its ✕ and Escape
-  close it) — a row of a counter's list has its card in a popup of its own over the list, just under the row. Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
+  close it) — a row of a counter's list has its card in a popup of its own over the list, just under the row (or over
+  it). A popup's SwiftUI view sits in a plain view of the popup's own, never as its window's content view (which sized
+  the window to what it showed, and a tool asking for more room the more it had grew it until AppKit stopped the app),
+  and a large popup is placed again once the sidebar is shown or hidden. Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
   own panel and the Alta graph's window (all of which never blocked the window), the external tools' windows, and
   Alta's own pop-ups (a sheet on its popup alone). Still blocking, by design: a quiz being taken (a sheet: its timer and
   its integrity), the first run's setup, the sign-in, the tour, the Mac's confirmations and file choosers. An update
