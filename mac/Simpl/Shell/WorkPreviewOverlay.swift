@@ -250,12 +250,15 @@ private struct PopupPreviewCard: View {
 
     let lines: Int
     @ObservedObject private var preview = WorkPreview.shared
+    /// Its popup, sized to the card as the card measures itself (its glass is its own).
+    @Environment(\.popup) private var popup
     @FocusState private var focused: Bool
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         if let item = preview.item {
-            PreviewCard(item: item, width: PreviewPlacement.width, lines: lines, onMeasure: { _ in })
+            PreviewCard(item: item, width: PreviewPlacement.width, lines: lines,
+                        onMeasure: { h in popup.fit(CGSize(width: PreviewPlacement.width, height: h)) })
                 .clipShape(shape)
                 .glass(shape)
                 .contentShape(shape)

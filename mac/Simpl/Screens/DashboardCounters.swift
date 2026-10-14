@@ -279,6 +279,8 @@ struct DashCounterPanel: View {
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
     private var engine: Engine { link.acting }
+    /// (1.3.79) The popup it is shown in, sized to it as it is measured here.
+    @Environment(\.popup) private var popup
     @State private var data: ItemsSheetData?
     @State private var error: String?
 
@@ -289,8 +291,8 @@ struct DashCounterPanel: View {
             .background {
                 GeometryReader { p in
                     Color.clear
-                        .onAppear { onHeight(p.size.height) }
-                        .onChange(of: p.size.height) { _, h in onHeight(h) }
+                        .onAppear { measured(p.size) }
+                        .onChange(of: p.size) { _, s in measured(s) }
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
@@ -303,6 +305,13 @@ struct DashCounterPanel: View {
             .onDisappear {
                 if WorkPreview.shared.item?.id.hasPrefix("sheet:\(counter.key):") == true { WorkPreview.shared.close() }
             }
+    }
+
+    /// What it shows, measured: told to the page, and (1.3.79) its popup made that size — its glass is its own, so the
+    /// popup takes its size from here.
+    private func measured(_ s: CGSize) {
+        onHeight(s.height)
+        popup.fit(s)
     }
 
     private var content: some View {

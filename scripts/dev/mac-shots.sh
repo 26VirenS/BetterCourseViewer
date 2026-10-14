@@ -157,7 +157,7 @@ bio() {
 # a push's biology pictures: each of the ten tools once, in light
 bio_quick() {
   bio light 57-cell-animal 30 cell animal
-  bio light 58a-dna-helix 16 dna helix:measure:pair=3
+  bio light 58a-dna-helix 24 dna helix:measure:pair=3
   bio light 59a-gene-transcribe 14 gene express:eukaryote:gene=teaching:step=22
   bio light 61b-biomol-peptide 16 biomol proteins:build:ribbon=over:colour=part
   bio light 62a-cross-dihybrid 14 cross cross -SimplBioCross "AaBb x AaBb"
@@ -186,9 +186,9 @@ bio_plain() {
 # the plain opens of the three tools the owner's report named: the Cell Explorer (its animal cell), DNA & RNA (its
 # double helix) and the Biomolecule Builder (its amino acids, phenylalanine)
 bio_plain_all() {
-  bio_plain 57z-cell-plain 30 cell
-  bio_plain 58z-dna-plain 16 dna
-  bio_plain 61z-biomol-plain 16 biomol
+  bio_plain 57z-cell-plain 45 cell
+  bio_plain 58z-dna-plain 24 dna
+  bio_plain 61z-biomol-plain 24 biomol
 }
 
 # every biology tool's pages and what each is for (the full set): 57 Cell Explorer, 58 DNA & RNA, 59 Gene Expression,
@@ -381,8 +381,8 @@ tool_popups() {
   for m in light dark; do
     MODE="$m" SIZE=1024x768 shoot "$m-35p-popup-ptable" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
     MODE="$m" SIZE=780x700 shoot "$m-35p-popup-ptable-narrow" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
-    MODE="$m" SIZE=1024x768 shoot "$m-35q-popup-cell" 30 -SimplPlace tools -SimplTool cell -SimplToolState animal
-    MODE="$m" SIZE=780x700 shoot "$m-35q-popup-cell-narrow" 30 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    MODE="$m" SIZE=1024x768 shoot "$m-35q-popup-cell" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    MODE="$m" SIZE=780x700 shoot "$m-35q-popup-cell-narrow" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
     MODE="$m" SIZE=1024x768 shoot "$m-35r-popup-flashcards" 12 -SimplPlace tools -SimplTool fc
     MODE="$m" SIZE=780x700 shoot "$m-35r-popup-flashcards-narrow" 12 -SimplPlace tools -SimplTool fc
   done
@@ -422,7 +422,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-36c-external-tools-macmillan 12 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
-  shoot light-01q-counter-preview 18 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a row of the panel's own)
+  shoot light-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a row of the panel's own)
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
   shoot light-02-courses 10 -SimplPlace courses
   shoot light-04-grades 12 -SimplPlace grades
@@ -499,7 +499,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-01-dashboard 12
   # (1.3.79) a counter's panel, and the card of one of its rows over the window, in dark
   shoot dark-01d-dashboard-counter 16 -SimplSheet next
-  shoot dark-01q-counter-preview 18 -SimplSheet today -SimplOpen preview:counter
+  shoot dark-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter
   shoot dark-03-todo 12 -SimplPlace todo
   shoot dark-04-grades 12 -SimplPlace grades
   shoot dark-05-calendar 12 -SimplPlace calendar
@@ -566,7 +566,7 @@ for MODE in light dark; do
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
   shoot "$MODE-01d-dashboard-counter" 16 -SimplSheet next
-  shoot "$MODE-01q-counter-preview" 18 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
+  shoot "$MODE-01q-counter-preview" 30 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
   shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
