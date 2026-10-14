@@ -742,6 +742,25 @@ jobs:
             }
           }
           PopupEdgeShots 5
+          # the live check (Shell/LiveCheck.cs), each picture against a mock school of its own — one a check changes must
+          # change no other picture: --live-every 5 checks the screen every five seconds (a course's page every fifty)
+          # with the engine's maxAge 5, and --live-change done:25 has the engine change the mock behind its back 25 s
+          # after the screens show — the soonest work marked done, a task added for today, a course's total moved.
+          # Pictured at 60 s, whatever is asked meanwhile; their logs' "live:" lines are checked below
+          function LiveShot($name, $part, $port, $size, $extra) {
+            if ($shard -ne $part) { return }
+            $script:mine += $name
+            Start-Process -FilePath node -ArgumentList @('scripts/dev/mock-canvas.mjs', "$port", "$($port + 1)") -RedirectStandardOutput "mock-$port.log" -RedirectStandardError "mock-$port.err.log" | Out-Null
+            for ($i = 0; $i -lt 60; $i++) { try { Invoke-WebRequest -Uri "http://localhost:$port/" -TimeoutSec 2 -SkipHttpErrorCheck | Out-Null; break } catch { Start-Sleep -Milliseconds 500 } }
+            while (@($script:running | Where-Object { -not $_.HasExited }).Count -ge 3) { Start-Sleep -Milliseconds 400 }
+            $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
+            $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', '60', '--shot-settle', 'no', '--profile', $prof, '--window-size', $size, '--base-url', "http://localhost:$port", '--demo') + $extra
+            $script:running += Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+          }
+          LiveShot 'live-dashboard-done' 0 8810 '1366x778' @('--appearance', 'light', '--dash-view', 'list', '--live-every', '5', '--live-change', 'done:25')
+          LiveShot 'live-dashboard-task' 1 8812 '1366x778' @('--appearance', 'dark', '--dash-view', 'list', '--live-every', '5', '--live-change', 'task:25')
+          LiveShot 'live-dashboard-grade' 0 8814 '1366x778' @('--appearance', 'light', '--dash-view', 'cards', '--live-every', '5', '--live-change', 'grade:25')
+          LiveShot 'live-course' 1 8816 '1024x681' @('--appearance', 'light', '--place', 'course:101', '--live-every', '3')
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -937,6 +956,38 @@ jobs:
             $second = $keptSaid.Substring([Math]::Min($keptSaid.Length, $dragSaid.Length))
             if ($second -notmatch "large popup tool:dna opens at $kw\D+$kh \(the student's\)") { Write-Host "::error::popup-kept: the tool's popup did not open at the size kept, $kw by $kh (shots/popup-kept.log)"; exit 1 }
             Write-Host "popup-drag: sized by its edge to $kw by $kh and kept; popup-kept: opened at it"
+          }
+          # the live check (Shell/LiveCheck.cs): before the mock changed, a check found nothing new; after, one found the
+          # change and showed only that part — a counter's number and a row of Coming up drawn again (done), a row added
+          # (task), one course's card (grade) — and nothing built the page again from then on; then a check found nothing
+          # new again. Each check's line, with the reads it cost, is printed
+          foreach ($live in @(@('live-dashboard-done', @('counter:', 'list(~1)')), @('live-dashboard-task', @('list(+1')), @('live-dashboard-grade', @('card:')))) {
+            $name = $live[0]
+            if ($script:mine -notcontains $name) { continue }
+            $phase = 'before'; $quietBefore = 0; $quietAfter = 0; $built = 0; $updates = @()
+            foreach ($l in @(Get-Content "shots/profile-$name.log" -ErrorAction SilentlyContinue)) {
+              if ($l -match ' picture at ') { break }
+              if ($l -match 'live: ') { Write-Host "${name}: $($l -replace '^\S+ ', '')" }
+              if ($l -match 'live: the mock school changed: \w+ \(ok') { $phase = 'changed'; continue }
+              if ($l -match 'live: dashboard unchanged') { if ($phase -eq 'before') { $quietBefore++ } elseif ($phase -eq 'updated') { $quietAfter++ }; continue }
+              if ($l -match 'live: dashboard updated (.+) \S \S+ reads$') { if ($phase -ne 'before') { $updates += $Matches[1]; $phase = 'updated' }; continue }
+              if ($l -match 'live: dashboard built' -and $phase -ne 'before') { $built++ }
+            }
+            $bad = @()
+            if ($quietBefore -lt 1) { $bad += 'no check found nothing new before the mock changed' }
+            if ($phase -eq 'before') { $bad += 'the mock school was not changed' }
+            if ($updates.Count -eq 0) { $bad += 'no check found the change' }
+            foreach ($want in $live[1]) { if (-not (@($updates | Where-Object { $_.Contains($want) }).Count)) { $bad += "no update showed $want (it showed: $($updates -join ' | '))" } }
+            if ($built -gt 0) { $bad += "the page was built again $built times after the change" }
+            if ($quietAfter -lt 1) { $bad += 'no check found nothing new after the update' }
+            if ($bad.Count -gt 0) { $bad | ForEach-Object { Write-Host "::error::${name}: $_ (shots/profile-$name.log)" }; exit 1 }
+            Write-Host "${name}: $quietBefore checks found nothing new, then $($updates -join ' | '), then $quietAfter found nothing new; the page not built again"
+          }
+          # a course's page checked every ten intervals, not every one: with --live-every 3, once or twice in the minute
+          if ($script:mine -contains 'live-course') {
+            $checks = @(Select-String -Path 'shots/profile-live-course.log' -Pattern 'live: contexthome (unchanged|updated|could not)' -ErrorAction SilentlyContinue)
+            $checks | ForEach-Object { Write-Host "live-course: $($_.Line -replace '^\S+ ', '')" }
+            if ($checks.Count -lt 1 -or $checks.Count -gt 2) { Write-Host "::error::live-course: a course's home was checked $($checks.Count) times in a minute with --live-every 3, not once or twice (shots/profile-live-course.log)"; exit 1 }
           }
           if ($script:mine -match 'hand-in-phone-') { Write-Host "Send from Phone: $(Get-Content shots/phone-test.txt -Raw -ErrorAction SilentlyContinue)" }
           # setup's save, as a student's Start using Simpl: it must save, and nothing after it may fail (a failure is
