@@ -214,7 +214,7 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   fades, pressable, hover outlines their object) come from `Labels`; give a convex shell's label a `Normal`, else a ray
   decides what hides it. A label too wide for the room beside its column is moved in on its own (the Mac moves the whole
   column in for its widest, which in this app's narrower view put the short labels over the model), and an anchor past
-  a label's far edge is led to that edge. Given the model's box on the view (its content's box, projected), a label
+  a label's far edge is led to that edge. Given the model's box on the view (its items' boxes, projected), a label
   that would still hide its own anchor, or reach more than 40 into a model narrower than 70% of the view (over half its
   width, for a short label), goes to a row just above the model (an anchor in its upper half) or below it, its leader
   straight up or down and never through a capsule in a row nearer the model; with no room there it stays in its column. It draws frame by frame only while something moves. Keep a scene under 300k

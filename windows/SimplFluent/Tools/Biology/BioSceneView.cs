@@ -46,8 +46,9 @@ public sealed class BioSceneView : Grid
     // (what is drawn: the scene, its batches by model, and what each model's vertices belong to)
     private BioSceneContent? content;
     private BioSphere framing = new(BioVec.Zero, 1);
-    /// <summary>The content's box in its own space (least and greatest x, y, z), for the labels' room round the model.</summary>
-    private (BioVec Min, BioVec Max)? extent;
+    /// <summary>The content as up to 256 boxes in its own space (least and greatest x, y, z of a run of items), for the
+    /// labels' room round the model: one box round it all would be drawn far wider than the model by its near corners.</summary>
+    private List<(BioVec Min, BioVec Max)> extents = new();
     private List<(BioMaterial Material, int Order, BioMeshBatch Batch, MeshGeometry3D Mesh)> batches = new();
     private readonly Dictionary<GeometryModel3D, (BioMeshBatch? Batch, string? Id, bool Translucent)> pickMap = new();
     private List<(BioBillboard Board, TranslateTransform3D Move)> boards = new();
@@ -216,7 +217,7 @@ public sealed class BioSceneView : Grid
         Task.Run(() =>
         {
             var made = build();
-            return (Made: made, Parts: BioWpf.Batches(made.Items), Frame: made.Framing, Extent: Extent(made));
+            return (Made: made, Parts: BioWpf.Batches(made.Items), Frame: made.Framing, Extents: Extents(made));
         }).ContinueWith(t => Dispatcher.BeginInvoke(() =>
         {
             spinnerTimer.Stop();
@@ -227,7 +228,7 @@ public sealed class BioSceneView : Grid
                 buildingKey = null;
                 builtKey = key;
                 spinnerHost.Content = null;
-                extent = t.Result.Extent;
+                extents = t.Result.Extents;
                 Apply(t.Result.Made, t.Result.Parts, t.Result.Frame, frameKey);
             }
             finally { Shot.Ended(); }
@@ -743,39 +744,53 @@ public sealed class BioSceneView : Grid
         DrawLabels(placed, more);
     }
 
-    /// <summary>The content's box (least and greatest x, y, z over every item's points), or null for an empty scene.</summary>
-    private static (BioVec Min, BioVec Max)? Extent(BioSceneContent c)
+    /// <summary>The content as boxes: its items in runs (one item a run for up to 256 of them), each run's least and greatest
+    /// x, y and z.</summary>
+    private static List<(BioVec Min, BioVec Max)> Extents(BioSceneContent c)
     {
-        float x0 = float.MaxValue, y0 = float.MaxValue, z0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue, z1 = float.MinValue;
-        foreach (var it in c.Items)
-            foreach (var q in it.Mesh.Positions)
-            {
-                if (q.X < x0) x0 = q.X;
-                if (q.Y < y0) y0 = q.Y;
-                if (q.Z < z0) z0 = q.Z;
-                if (q.X > x1) x1 = q.X;
-                if (q.Y > y1) y1 = q.Y;
-                if (q.Z > z1) z1 = q.Z;
-            }
-        return x0 > x1 ? null : (new BioVec(x0, y0, z0), new BioVec(x1, y1, z1));
+        var boxes = new List<(BioVec Min, BioVec Max)>();
+        var items = c.Items.Where(i => i.Mesh.VertexCount > 0).ToList();
+        var per = Math.Max(1, (items.Count + 255) / 256);
+        for (var start = 0; start < items.Count; start += per)
+        {
+            float x0 = float.MaxValue, y0 = float.MaxValue, z0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue, z1 = float.MinValue;
+            for (var k = start; k < Math.Min(start + per, items.Count); k++)
+                foreach (var q in items[k].Mesh.Positions)
+                {
+                    if (q.X < x0) x0 = q.X;
+                    if (q.Y < y0) y0 = q.Y;
+                    if (q.Z < z0) z0 = q.Z;
+                    if (q.X > x1) x1 = q.X;
+                    if (q.Y > y1) y1 = q.Y;
+                    if (q.Z > z1) z1 = q.Z;
+                }
+            boxes.Add((new BioVec(x0, y0, z0), new BioVec(x1, y1, z1)));
+        }
+        return boxes;
     }
 
-    /// <summary>The model's box on the view: its eight corners where the camera and the turn put them (null while one is
-    /// behind the camera).</summary>
+    /// <summary>The model's box on the view: the corners of its boxes where the turn and the camera put them (as Project
+    /// does), their least and greatest x and y; null for an empty scene, or while a corner is behind the camera.</summary>
     private BioLabelBox? ModelBox()
     {
-        if (extent is not { } e) return null;
+        if (extents.Count == 0) return null;
+        var m = turn.Value;
+        var eye = camera.Position;
+        var f = ActualHeight / (2 * Tan20);
         double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
-        for (var i = 0; i < 8; i++)
-        {
-            var corner = new BioVec((i & 1) == 0 ? e.Min.X : e.Max.X, (i & 2) == 0 ? e.Min.Y : e.Max.Y, (i & 4) == 0 ? e.Min.Z : e.Max.Z);
-            var (x, y, front, _) = Project(corner);
-            if (!front) return null;
-            x0 = Math.Min(x0, x);
-            y0 = Math.Min(y0, y);
-            x1 = Math.Max(x1, x);
-            y1 = Math.Max(y1, y);
-        }
+        foreach (var (lo, hi) in extents)
+            for (var i = 0; i < 8; i++)
+            {
+                var w = m.Transform(new Point3D((i & 1) == 0 ? lo.X : hi.X, (i & 2) == 0 ? lo.Y : hi.Y, (i & 4) == 0 ? lo.Z : hi.Z));
+                var v = w - eye;
+                var z = -v.Z;
+                if (z <= camera.NearPlaneDistance) return null;
+                double x = ActualWidth / 2 + v.X * f / z, y = ActualHeight / 2 - v.Y * f / z;
+                x0 = Math.Min(x0, x);
+                y0 = Math.Min(y0, y);
+                x1 = Math.Max(x1, x);
+                y1 = Math.Max(y1, y);
+            }
         return new BioLabelBox(Math.Max(x0, 0), Math.Max(y0, 0), Math.Min(x1, ActualWidth), Math.Min(y1, ActualHeight));
     }
 
