@@ -351,7 +351,7 @@ public sealed class RichText : RichTextBox
                 // (one of Canvas's formulas: typeset in the text's colour, or written out as plain maths — never its TeX)
                 if (Formula.TexOf(n.Attrs) is { } tex)
                 {
-                    if (Formula.Shape(tex, size) is { } shape) into.Add(new InlineUIContainer(shape) { BaselineAlignment = BaselineAlignment.Center });
+                    if (Formula.Shape(tex, size) is { } shape) into.Add(new InlineUIContainer(shape) { BaselineAlignment = Formula.Alignment(shape) });
                     else into.Add(new Run(Formula.Readable(tex)));
                     return;
                 }

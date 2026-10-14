@@ -39,40 +39,93 @@ public static class Formula
         return string.IsNullOrWhiteSpace(tex) ? null : tex.Trim();
     }
 
-    private static readonly Dictionary<(string, double), Geometry?> Typeset = new();
+    private static readonly Dictionary<(string, double), (Geometry Shape, double? Baseline)?> Typeset = new();
 
-    /// <summary>The formula typeset at a text size: a shape in the text's colour, or null for TeX WPF-Math cannot read.</summary>
+    /// <summary>TeX's maths is drawn in Latin Modern, whose small letters stand lower than Segoe UI's (an x-height of
+    /// 0.43 of its size against 0.5): typeset this much larger, a formula's letters are as tall as the sentence's round
+    /// it, as MathJax matches a page's own type.</summary>
+    private const double MathScale = 1.15;
+
+    /// <summary>Marks a formula's shape that knows where its baseline is: it then stands on the sentence's baseline
+    /// (the shape's foot is the baseline, what hangs below it drawn below), not centred on the line.</summary>
+    private static readonly object OnBaseline = new();
+
+    /// <summary>How a formula's shape stands in its line of text: on the text's baseline, as a typeset formula does,
+    /// when its baseline is known; else centred on the line.</summary>
+    public static BaselineAlignment Alignment(FrameworkElement shape) => shape.Tag == OnBaseline ? BaselineAlignment.Baseline : BaselineAlignment.Center;
+
+    /// <summary>The formula typeset at a text size: a shape in the text's colour, or null for TeX WPF-Math cannot read.
+    /// It stands on the text's baseline (<see cref="Alignment"/>), so "such as v⃗?" reads as one line and an answer that
+    /// is only a formula sits level with its letter.</summary>
     public static FrameworkElement? Shape(string tex, double size)
     {
         var key = (tex, size);
-        if (!Typeset.TryGetValue(key, out var geometry))
+        if (!Typeset.TryGetValue(key, out var made))
         {
             try
             {
+                var scale = size * MathScale;
                 var formula = WpfTeXFormulaParser.Instance.Parse(tex);
-                var environment = WpfTeXEnvironment.Create(TexStyle.Text, size, "Segoe UI");
-                geometry = formula.RenderToGeometry(environment, size);
-                if (geometry.Bounds.IsEmpty || geometry.Bounds.Width <= 0) geometry = null;
-                else geometry.Freeze();
+                var environment = WpfTeXEnvironment.Create(TexStyle.Text, scale, "Segoe UI");
+                // (drawn as RenderToGeometry draws it, its first element told apart: WPF-Math draws a formula from the
+                //  top of its box, the whole box first, at the box's baseline — the line the formula stands on)
+                var geometry = new GeometryGroup();
+                var finder = new BaselineFinder(new GeometryElementRenderer(geometry, scale));
+                XamlMath.Rendering.TeXFormulaExtensions.RenderTo(formula, finder, environment, 0, 0);
+                if (geometry.Bounds.IsEmpty || geometry.Bounds.Width <= 0) made = null;
+                else
+                {
+                    geometry.Freeze();
+                    var b = geometry.Bounds;
+                    // (a baseline is believed only where it falls within the formula's ink, or just under it)
+                    double? baseline = finder.Y is { } y && y * scale >= b.Top && y * scale <= b.Bottom + scale ? y * scale : null;
+                    made = (geometry, baseline);
+                }
             }
             catch (Exception e)
             {
                 Support.Log.Write($"formula: {e.GetType().Name} {e.Message}");
-                geometry = null;
+                made = null;
             }
             if (Typeset.Count > 400) Typeset.Clear();
-            Typeset[key] = geometry;
+            Typeset[key] = made;
         }
-        if (geometry == null) return null;
-        var b = geometry.Bounds;
-        var path = new Path { Data = geometry, Stretch = Stretch.None, Margin = new Thickness(1, 0, 1, 0), SnapsToDevicePixels = false };
+        if (made is not { } m) return null;
+        var bounds = m.Shape.Bounds;
+        var path = new Path { Data = m.Shape, Stretch = Stretch.None, SnapsToDevicePixels = false };
         path.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, B.Text);
         // (from the shape's own top-left, so nothing of it is cut and nothing hangs in the air above it)
-        path.RenderTransform = new TranslateTransform(-b.X, -b.Y);
-        var holder = new System.Windows.Controls.Canvas { Width = b.Width + 2, Height = b.Height, ClipToBounds = false, Children = { path } };
+        path.RenderTransform = new TranslateTransform(-bounds.X, -bounds.Y);
+        // (standing on its baseline, the holder is only as tall as what rises above it: what hangs below — a fraction's
+        //  lower half, a subscript — is drawn under the holder's foot, which a canvas never cuts)
+        var tall = m.Baseline is { } line ? Math.Max(1, line - bounds.Top) : bounds.Height;
+        var holder = new System.Windows.Controls.Canvas { Width = bounds.Width + 2, Height = tall, Margin = new Thickness(1, 0, 1, 0), ClipToBounds = false, Children = { path } };
+        if (m.Baseline != null) holder.Tag = OnBaseline;
         System.Windows.Automation.AutomationProperties.SetName(holder, Readable(tex));
         holder.ToolTip = null;
         return holder;
+    }
+
+    /// <summary>Passes WPF-Math's drawing on to the renderer that makes the shape, keeping where the formula's whole box
+    /// was drawn: its baseline, in the formula's own units.</summary>
+    private sealed class BaselineFinder : XamlMath.Rendering.IElementRenderer
+    {
+        private readonly XamlMath.Rendering.IElementRenderer inner;
+        public double? Y { get; private set; }
+
+        public BaselineFinder(XamlMath.Rendering.IElementRenderer inner) => this.inner = inner;
+
+        public void RenderElement(XamlMath.Boxes.Box box, double x, double y)
+        {
+            Y ??= y;
+            inner.RenderElement(box, x, y);
+        }
+
+        public void RenderCharacter(XamlMath.CharInfo info, double x, double y, XamlMath.Rendering.IBrush? foreground) => inner.RenderCharacter(info, x, y, foreground);
+        public void RenderRectangle(XamlMath.Rendering.Rectangle rectangle, XamlMath.Rendering.IBrush? foreground) => inner.RenderRectangle(rectangle, foreground);
+        public void RenderLine(XamlMath.Rendering.Point point0, XamlMath.Rendering.Point point1, XamlMath.Rendering.IBrush? foreground) => inner.RenderLine(point0, point1, foreground);
+        public void RenderTransformed(XamlMath.Boxes.Box box, IEnumerable<XamlMath.Rendering.Transformations.Transformation> transforms, double x, double y) => inner.RenderTransformed(box, transforms, x, y);
+        public void FinishRendering() => inner.FinishRendering();
     }
 
     // ---- the last fallback: the formula as plain maths ----
