@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,24 +12,23 @@ namespace Simpl.Shell;
 
 /// <summary>
 /// What changed in Simpl for Windows (the Mac's WhatsNewSheet), after an update or from the account menu: the app's
-/// mark, each version's notes with their kind's symbol on its tile — new, better, fixed — and Continue, as a Windows 11
-/// dialog over the window.
+/// mark, then each version — named once, over its notes, with the day it came out as every date is written ("Oct 13") —
+/// its notes with their kind's symbol on its tile — new, better, fixed — and Continue, as a Windows 11 dialog over the
+/// window. The build ("v058") is Settings ▸ About's to say.
 /// </summary>
 public static class WhatsNewSheet
 {
     public static void Show(WhatsNewData data, Window over)
     {
         var icon = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 64, Height = 64, HorizontalAlignment = HorizontalAlignment.Center };
-        var head = K.V(6, icon, K.Text("What’s New in Simpl for Windows", Ty.Subtitle).Center());
-        if ((data.Version ?? data.Releases.FirstOrDefault()?.Version) is { } v) head.Children.Add(K.Text($"Version {v}", Ty.Body, B.Text2).Center());
+        var head = K.V(6, icon, K.Text("What’s new in Simpl for Windows", Ty.Subtitle).Center());
         head.Margin = new Thickness(0, 28, 0, 16);
 
         var list = new Stack { Orientation = Orientation.Vertical, Spacing = 18 };
         foreach (var r in data.Releases)
         {
             var group = new Stack { Orientation = Orientation.Vertical, Spacing = 10 };
-            if (data.Releases.Count > 1)
-                group.Children.Add(K.Columns("*, auto", K.Text($"Version {r.Version}", Ty.BodyStrong).Col(0), K.Text(r.Date ?? "", Ty.Caption, B.Text2).Col(1)));
+            group.Children.Add(K.Columns("*, auto", K.Text($"Version {r.Version}", Ty.BodyStrong).Col(0), K.Text(r.DateText ?? DateOf(r.Date), Ty.Caption, B.Text2).Col(1)));
             foreach (var n in r.Notes)
             {
                 var (sym, tone) = n.Kind switch
@@ -50,5 +50,13 @@ public static class WhatsNewSheet
         s.Add("Continue", SheetButtonKind.Primary);
         Motion.Stagger(list.Children.OfType<UIElement>(), 60, 16);
         Dialogs.Show(s, over);
+    }
+
+    /// <summary>A release's day ("2026-10-13") as every date is written: "Oct 13", with its year only when it is not
+    /// this one ("Oct 13, 2025").</summary>
+    public static string DateOf(string? iso)
+    {
+        if (string.IsNullOrEmpty(iso) || !DateTime.TryParseExact(iso, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)) return iso ?? "";
+        return d.ToString(d.Year == DateTime.Today.Year ? "MMM d" : "MMM d, yyyy", CultureInfo.InvariantCulture);
     }
 }
