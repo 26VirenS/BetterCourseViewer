@@ -476,19 +476,47 @@ internal abstract class BiomolPageView : Grid
 /// <summary>The builder's molecules handed to the chemistry builder and its pages handed to the other biology tools.</summary>
 internal static class BiomolHandOver
 {
+    /// <summary>Ids far above the builder's own count, so atoms it adds later never share one (and a molecule handed over
+    /// from here is known by them).</summary>
+    private const int First = 1_000_000;
+
     /// <summary>
     /// The atoms and bonds (with H if shown) in the chemistry builder's molecule, as they are — §4.4: its VSEPR relax is not
-    /// run on them — centred, ids clear of the builder's own; then the builder opened over the window.
+    /// run on them — centred, ids clear of the builder's own; then the builder opened over the window. A molecule the
+    /// student made there is asked about first, as it would be lost.
     /// </summary>
     public static void ToMoleculeBuilder(ToolContext c, BioMoleculeModel model, string name, bool hydrogens)
+    {
+        var owner = c.Owner ?? Application.Current?.MainWindow;
+        var m = MoleculeModel.Shared;
+        if (Made(m))
+            Simpl.Shell.Dialogs.Confirm(owner, "Replace the molecule in the Molecule Builder?",
+                $"{name} takes the place of the molecule there ({ToolKit.Plural(m.Atoms.Count, "atom")}), which is not kept.", "Replace",
+                () => Hand(c, owner, model, name, hydrogens));
+        else Hand(c, owner, model, name, hydrogens);
+    }
+
+    /// <summary>Whether the builder holds a molecule of the student's own: not one of its presets as it loads them, nor
+    /// one handed over from here.</summary>
+    private static bool Made(MoleculeModel m)
+    {
+        if (m.Atoms.Count == 0 || m.Atoms.All(a => a.Id >= First)) return false;
+        if (!MoleculeModel.Presets.Contains(m.Title)) return true;
+        var preset = new MoleculeModel(empty: true);
+        preset.LoadPreset(m.Title);
+        static string Formula(MoleculeModel x) =>
+            string.Join(",", x.Atoms.Select(a => a.Symbol).OrderBy(s => s, StringComparer.Ordinal)) + "|" + x.Bonds.Sum(b => b.Order);
+        return Formula(preset) != Formula(m);
+    }
+
+    private static void Hand(ToolContext c, Window? owner, BioMoleculeModel model, string name, bool hydrogens)
     {
         var (_, atoms, bonds) = BiomolHandOff.Parse(BiomolHandOff.Text(model, name, hydrogens));
         if (atoms.Count == 0) return;
         var centre = BioV.BoundingSphere(atoms.Select(a => a.Pos).ToList()).Centre;
         var m = MoleculeModel.Shared;
         m.Clear();
-        // (ids far above the builder's own count, so atoms it adds later never share one)
-        const int first = 1_000_000;
+        const int first = First;
         for (var i = 0; i < atoms.Count; i++)
         {
             var p = atoms[i].Pos - centre;
@@ -498,7 +526,7 @@ internal static class BiomolHandOver
             m.Bonds.Add(new MBBond { Id = first + atoms.Count + k, A = first + bonds[k].A, B = first + bonds[k].B, Order = bonds[k].Order });
         m.Selected = null;
         Log.Write($"biomol: {name} handed to the molecule builder ({atoms.Count} atoms, {bonds.Count} bonds)");
-        if ((c.Owner ?? Application.Current?.MainWindow) is { } owner) Chemistry.OpenMolecule(owner, c.Engine, null);
+        if (owner != null) Chemistry.OpenMolecule(owner, c.Engine, null);
     }
 
     /// <summary>Another biology tool opened at a page, with something for it (BioTools.Open closes this one's sheet).</summary>

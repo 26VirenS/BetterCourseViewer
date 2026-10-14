@@ -21,6 +21,18 @@ public static class BioUI
     /// Tools page, beside the navigation pane, a 1366 window is narrower than that.</summary>
     public static FrameworkElement Work(FrameworkElement left, FrameworkElement centre, FrameworkElement right) => new ChemLayout(left, centre, right, tall: true);
 
+    /// <summary>A pin's flyout's way to its whole tool: one accent button across the flyout, the same in every biology
+    /// tool's quick version ("Open in Genetics Crosses", "Open Bio Lab Calculator").</summary>
+    public static Wpf.Ui.Controls.Button OpenButton(string text, Action open, string tip)
+    {
+        var b = K.Button(text, open, accent: true);
+        b.HorizontalAlignment = HorizontalAlignment.Stretch;
+        b.HorizontalContentAlignment = HorizontalAlignment.Center;
+        b.MinHeight = 36;
+        b.ToolTip = tip;
+        return b;
+    }
+
     /// <summary>A side column's heading, as the molecule builder's ("Preset", "View").</summary>
     public static TextBlock Heading(string text)
     {
@@ -132,12 +144,8 @@ public sealed class BioQuickOpen : ContentControl
         var words = K.V(3, K.Text(name, Ty.BodyStrong), K.Wrapped(kind?.Note ?? "", Ty.Body, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         var top = K.Columns("auto, *", (kind != null ? K.IconTile(kind.Symbol, kind.Color, 40) : new Border()).Margin(0, 0, 12, 0).Col(0), words.Col(1));
-        var open = K.Button($"Open {name}", () => c.OpenFull(null, null), accent: true);
-        open.HorizontalAlignment = HorizontalAlignment.Stretch;
-        open.HorizontalContentAlignment = HorizontalAlignment.Center;
-        open.MinHeight = 36;
+        var open = BioUI.OpenButton($"Open {name}", () => c.OpenFull(null, null), $"Open {name} full size (Enter)");
         open.IsDefault = true;
-        open.ToolTip = $"Open {name} full size (Enter)";
         Content = K.V(12, top, open);
     }
 }

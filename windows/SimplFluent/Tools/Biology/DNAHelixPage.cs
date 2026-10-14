@@ -208,7 +208,7 @@ internal sealed class DnaHelixPage : Grid
                 var made = DnaHelix.Build(o, paint);
                 letters = made.Letters;
                 return made.Content;
-            }, frameKey: $"helix|{seq}", billboards: () => DnaWpf.Billboards(letters, o.Dark));
+            }, frameKey: $"helix|{seq}", billboards: () => DnaWpf.Billboards(letters, o.Dark), marks: () => DnaWpf.Marks(letters));
         }
         scene.Selection = DNAToolModel.Selected;
         scene.Accessibility = $"3D model of B-DNA, {n} base pairs, {DNAToolModel.Style.Label().ToLowerInvariant()}; right-handed, 10.5 base pairs a turn, "

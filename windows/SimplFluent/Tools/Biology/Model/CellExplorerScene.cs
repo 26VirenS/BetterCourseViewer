@@ -149,7 +149,7 @@ public static partial class CEBuild
                     Label("organelle:chloroplast", "Envelope (two membranes)", new BioVec(-2.47, 0, -0.02), 9);
                     Label("inside:chloroplast:granum", "Granum (thylakoid stack)", new BioVec(0, 0.243, 0), 10);
                     Label("inside:chloroplast:stroma", "Stroma", new BioVec(0.9, -0.62, -0.9), 8);
-                    if (FirstLamella() is { } lam) Label("inside:chloroplast:lamella", "Stroma lamella", lam, 6);
+                    if (OuterLamella() is { } lam) Label("inside:chloroplast:lamella", "Stroma lamella", lam, 6);
                     Label("inside:chloroplast:starch", "Starch grain", new BioVec(1.5, 0.15, -0.85), 5);
                     Label("inside:chloroplast:dna", "DNA", new BioVec(-0.02, 0, -0.6), 4);
                 }
@@ -175,14 +175,21 @@ public static partial class CEBuild
         return (instances, labels);
     }
 
-    /// <summary>The first stroma lamella's middle, in a chloroplast's frame (as CERecipes.Chloroplast lays them).</summary>
-    public static BioVec? FirstLamella()
+    /// <summary>The middle of a stroma lamella toward the chloroplast's −x side, away from the middle granum that "Granum"
+    /// names (the first one, next to it, put both leaders' ends on one point), in a chloroplast's frame (as
+    /// CERecipes.Chloroplast lays them).</summary>
+    public static BioVec? OuterLamella()
     {
         var kept = CERecipes.GranaCentres.Where(c => c.Z <= 0.3).ToList();
+        BioVec? best = null;
         for (var i = 0; i < kept.Count; i++)
             for (var j = i + 1; j < kept.Count; j++)
-                if (Math.Abs(BioV.Distance(kept[i], kept[j]) - 1.0) < 0.05) return (kept[i] + kept[j]) / 2 + new BioVec(0, 0.1, 0);
-        return null;
+                if (Math.Abs(BioV.Distance(kept[i], kept[j]) - 1.0) < 0.05)
+                {
+                    var mid = (kept[i] + kept[j]) / 2;
+                    if (BioV.Length(mid) < 1.2 && (best is not { } b || mid.X < b.X - 1e-9)) best = mid;
+                }
+        return best is { } m ? m + new BioVec(0, 0.1, 0) : null;
     }
 
     // ---- the Compare page's three cells (§4.1 item 8) ----

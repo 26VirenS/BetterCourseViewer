@@ -66,6 +66,12 @@ internal sealed class CellPage : Grid
         scene.Picked += OnPicked;
         scene.DoubleClicked += id => { if (CellExplorerModel.Quiz == null && PartOf(id) is { } p) Select(p); };
         scene.HoverChanged += OnHover;
+        // ("+N more": the parts list brought into view, its first part focused)
+        scene.MorePressed += () =>
+        {
+            partsList.BringIntoView();
+            partsList.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.First));
+        };
 
         var sceneHost = new Grid { ClipToBounds = true };
         sceneHost.Children.Add(scene);

@@ -234,14 +234,18 @@ public static class BioPrefs
 
 /// <summary>
 /// A biology tool's pages in its header, left of its pin (the Periodic Table's PTHeaderControls): their names where the
-/// header has room, else their symbols; the page shown in the accent.
+/// header has room; else the page shown named and the others by their symbols; else only symbols. The page shown is in
+/// the accent, and each says its name in its tooltip.
 /// </summary>
 internal sealed class BioPages : ContentControl
 {
     private readonly string key;
     private Grid? headerGrid;
-    private bool? squished;
+    private Named? named;
     private string? drawn;
+
+    /// <summary>Which pages' names fit in the header.</summary>
+    private enum Named { All, Shown, None }
 
     public BioPages(ToolContext c)
     {
@@ -282,16 +286,16 @@ internal sealed class BioPages : ContentControl
 
     private void Draw(bool force)
     {
-        var squish = !Room();
         var page = BioNav.Page(key);
-        if (!force && squish == squished && page == drawn) return;
-        squished = squish;
+        var fit = Room(page);
+        if (!force && fit == named && page == drawn) return;
+        named = fit;
         drawn = page;
         var row = K.H(6);
         foreach (var p in BioTools.Pages(key))
         {
             var id = p.Id;
-            var b = PTKit.Choice(p.Title, page == id, () => BioNav.Set(key, id), p.Symbol, squish);
+            var b = PTKit.Choice(p.Title, page == id, () => BioNav.Set(key, id), p.Symbol, fit == Named.None || (fit == Named.Shown && page != id));
             b.ToolTip = p.Help.Length > 0 ? p.Help : p.Title;
             System.Windows.Automation.AutomationProperties.SetName(b, page == id ? $"{p.Title}, shown" : p.Title);
             row.Children.Add(b);
@@ -299,10 +303,11 @@ internal sealed class BioPages : ContentControl
         Content = row;
     }
 
-    /// <summary>Whether the pages' names fit beside the title and the pin.</summary>
-    private bool Room()
+    /// <summary>Which of the pages' names fit beside the title and the pin: all, the shown page's (the others' symbols
+    /// about 40 wide), or none.</summary>
+    private Named Room(string page)
     {
-        if (headerGrid is not { ActualWidth: > 0 } g || BioTools.Kind(key) is not { } kind) return true;
+        if (headerGrid is not { ActualWidth: > 0 } g || BioTools.Kind(key) is not { } kind) return Named.All;
         static double Words(string s, Ty ty, bool strong = false)
         {
             var t = K.Text(s, ty);
@@ -310,9 +315,13 @@ internal sealed class BioPages : ContentControl
             t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             return t.DesiredSize.Width;
         }
-        var need = BioTools.Pages(key).Sum(p => Words(p.Title, Ty.Body, true) + 52) + 6 * BioTools.Pages(key).Count + 24 + 48 + 16;
+        var pages = BioTools.Pages(key);
+        var rest = 6 * pages.Count + 24 + 48 + 16;
+        var all = pages.Sum(p => Words(p.Title, Ty.Body, true) + 52) + rest;
+        var shown = pages.Sum(p => p.Id == page ? Words(p.Title, Ty.Body, true) + 52 : 40) + rest;
         var title = Math.Max(Words(kind.Name, Ty.Title), Words(kind.Note, Ty.Body));
         // (the title and its line, the tile, and the sheet's Done)
-        return g.ActualWidth - (title + 190) >= need;
+        var room = g.ActualWidth - (title + 190);
+        return room >= all ? Named.All : room >= shown ? Named.Shown : Named.None;
     }
 }

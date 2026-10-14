@@ -59,6 +59,15 @@ internal sealed class CellDivisionTool : Grid
         Load();
         if (state != null) Apply(state);
         CellDivisionModel.Prime();
+        // (Genetics Crosses' "See it in Cell Division", from independent assortment: meiosis at Metaphase I, where each
+        //  pair lines up either way round)
+        if (c.TakeInfo("focus") == "assortment")
+        {
+            BioNav.Set(Key, "meiosis");
+            var steps = CellDivisionModel.MeiosisSteps;
+            for (var i = 0; i < steps.Steps.Count; i++)
+                if (steps.Steps[i].Title == "Metaphase I") { steps.Go(i, animated: false); break; }
+        }
         Show();
         void Nav(string k) { if (k == Key) Show(); }
         Loaded += (_, _) => { BioNav.Changed -= Nav; BioNav.Changed += Nav; Show(); };

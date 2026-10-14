@@ -372,7 +372,8 @@ public sealed class BioCross
     /// <summary>
     /// A cross typed as text: "AaBb × aaBb", "AaBb x aaBb", "I^A i × I^B i", "X^A X^a × X^a Y", "C^RC^W x C^RC^W". Genes are
     /// taken in the order they first appear; "aA" is read as "Aa". Inheritance is guessed from the symbols (X^ X-linked
-    /// recessive, I^A/I^B ABO, another ^ incomplete dominance, else complete) and can be changed after.
+    /// recessive, I^A/I^B ABO, A^Y with a plain recessive a lethal homozygote, another ^ incomplete dominance, else
+    /// complete) and can be changed after.
     /// </summary>
     public static (BioCross? Cross, string? Error) Parse(string text)
     {
@@ -402,7 +403,11 @@ public sealed class BioCross
                 // (superscripts: incomplete dominance, the alleles as typed, an uppercase plain one first, else typed order)
                 var sorted = syms.Select((s, i) => (s, i)).OrderBy(x => Rank(x.s)).ThenBy(x => x.i).Select(x => x.s).ToList();
                 var plainLow = syms.Any(s => !s.Contains('^') && s == s.ToLowerInvariant());
-                genes.Add(new BioGene(k[0], plainLow ? BioInheritance.Complete : BioInheritance.Incomplete, sorted));
+                // (a ^Y allele over a plain recessive, as the yellow mouse's A^Y over a: dominant for its colour, lethal
+                //  when homozygous — so A^Y a × A^Y a is born 2 yellow : 1 non-yellow, as the Yellow mice example)
+                if (plainLow && sorted.Count == 2 && sorted[0] == $"{k[0]}^Y")
+                    genes.Add(new BioGene(k[0], BioInheritance.LethalDominantHomozygote, sorted, k[0] == 'A' ? new[] { "yellow", "non-yellow" } : null));
+                else genes.Add(new BioGene(k[0], plainLow ? BioInheritance.Complete : BioInheritance.Incomplete, sorted));
             }
             else genes.Add(new BioGene(k[0], BioInheritance.Complete));
         }

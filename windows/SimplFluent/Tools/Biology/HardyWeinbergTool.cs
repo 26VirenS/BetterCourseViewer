@@ -406,11 +406,7 @@ internal sealed class HardyWeinbergCompact : ContentControl
             e.Handled = true;
             Open();
         };
-        var open = K.Button("Open in Hardy–Weinberg", Open, accent: true);
-        open.HorizontalAlignment = HorizontalAlignment.Stretch;
-        open.HorizontalContentAlignment = HorizontalAlignment.Center;
-        open.MinHeight = 36;
-        open.ToolTip = "The steps, the 100 people, the test and the simulation (Enter)";
+        var open = BioUI.OpenButton("Open in Hardy–Weinberg", Open, "The steps, the 100 people, the test and the simulation (Enter)");
         Content = K.V(12, K.Columns("190, 8, *", menu.Col(0), box.Col(2)), result, open);
         Draw();
     }

@@ -211,7 +211,8 @@ public static class DnaNucleotides
                 if (Number(a.Name, b) is not { } text) continue;
                 var outward = BioV.Unit(a.Pos - mid);
                 var r = paint.Radius(a.Element, DnaStyle.Atoms);
-                numbers.Add(new DnaLetter(text, a.Pos + outward * (r + 0.42), 0.62, 0.6, $"part:{PartKey(PartOf(a))}:{a.Id}", null));
+                // (over the model, clear of the atom's disc: in 3D the number sat behind its neighbours — 3′ read as "3")
+                numbers.Add(new DnaLetter(text, a.Pos + outward * (r + 0.42), 0.62, 0.6, $"part:{PartKey(PartOf(a))}:{a.Id}", null, OnTop: true, Atom: a.Pos, AtomRadius: r));
             }
         }
         return (new BioSceneContent { Items = items, Labels = labels }, numbers);

@@ -30,7 +30,9 @@ public sealed record BioSceneItem(string? Id, BioMesh Mesh, BioMaterial Material
 /// <param name="Normal">For a convex outer shell: shown only while this outward normal faces the camera. Without one, the
 /// label is shown while a ray from the camera reaches its object first (or within 2% of the anchor's distance).</param>
 /// <param name="Area">How much it matters when there are more than 14 (its object's size).</param>
-public sealed record BioLabel3D(string Id, string Text, BioVec Anchor, BioVec? Normal = null, double Area = 1);
+/// <param name="Always">Shown whatever covers its anchor (while the anchor is in front of the camera): a strand's ends,
+/// which a question about the helix must always find named.</param>
+public sealed record BioLabel3D(string Id, string Text, BioVec Anchor, BioVec? Normal = null, double Area = 1, bool Always = false);
 
 /// <summary>A ball: what a camera frames.</summary>
 public readonly record struct BioSphere(BioVec Centre, double Radius);

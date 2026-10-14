@@ -124,7 +124,7 @@ internal sealed class DnaNucleotidesPage : Grid
                     var (content, nums) = DnaNucleotides.Build(o, paint);
                     numbers = nums;
                     return content;
-                }, frameKey: $"nt|{code}", billboards: () => DnaWpf.Billboards(numbers, o.Dark));
+                }, frameKey: $"nt|{code}", billboards: () => DnaWpf.Billboards(numbers, o.Dark), marks: () => DnaWpf.Marks(numbers));
             }
             scene.Selection = DNAToolModel.NucleotidePart switch
             {
@@ -313,21 +313,25 @@ internal sealed class DnaPairsDrawing : DnaDrawing
             $"Base pairs drawn flat. {a.Name}: {a.HBonds.Count} hydrogen bonds ({Bonds(a)}). G·C: 3 hydrogen bonds ({Bonds(g)}). Purines A and G have two rings; pyrimidines have one.");
     }
 
-    protected override Size Design => new(640, 700);
+    /// <summary>The two pairs side by side where that draws them larger (a wide, short view: the Tools page beside the
+    /// navigation pane), else one over the other; each pair's panel 500 wide side by side, 640 one over the other.</summary>
+    private bool SideBySide => ActualWidth > 0 && ActualHeight > 0 && Math.Min(ActualWidth / 1000, ActualHeight / 350) > Math.Min(ActualWidth / 640, ActualHeight / 700);
+
+    protected override Size Design => SideBySide ? new(1000, 350) : new(640, 700);
 
     private const double Scale = 31;
 
     protected override void Draw(DrawingContext dc)
     {
-        Panel(dc, DnaNucleotides.Pair2D(uracil ? "AU" : "AT"), 0);
-        Panel(dc, DnaNucleotides.Pair2D("GC"), 350);
+        var side = SideBySide;
+        Panel(dc, DnaNucleotides.Pair2D(uracil ? "AU" : "AT"), 0, side ? 250 : 320);
+        Panel(dc, DnaNucleotides.Pair2D("GC"), side ? 0 : 350, side ? 750 : 320);
     }
 
-    private void Panel(DrawingContext dc, DnaPairDrawing d, double top)
+    private void Panel(DrawingContext dc, DnaPairDrawing d, double top, double cx)
     {
         var text = TextColour;
         var text2 = Text2Colour;
-        var cx = 320.0;
         // (the pair's y runs from −1.7 Å, the minor groove's side, to 5.5 Å, the major's: drawn under its two lines of words)
         var oy = top + 56 + 5.55 * Scale;
         Point P(int i) => new(cx + d.Atoms[i].X * Scale, oy - d.Atoms[i].Y * Scale);

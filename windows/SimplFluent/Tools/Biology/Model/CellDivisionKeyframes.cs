@@ -1021,6 +1021,14 @@ public sealed class DivisionBuilder
         }
         const double nr = 0.26;
         var centres = new[] { new DivPoint(-Q, D), new DivPoint(Q, D), new DivPoint(-Q, -D), new DivPoint(Q, -D) };
+        // (a nucleus given three chromosomes by nondisjunction: side by side across it — the two copies of one pair had
+        //  one place, and the three were drawn as one tangle)
+        foreach (var g in Enumerable.Range(0, ks.Length).GroupBy(i => ks[i].Nucleus).Where(g => g.Key >= 0 && g.Key < 4 && g.Count() > 2))
+        {
+            var list = g.OrderBy(i => ks[i].C.Y).ThenBy(i => i).ToList();
+            for (var j = 0; j < list.Count; j++)
+                ks[list[j]].C = new DivPoint(centres[g.Key].X + (j - (list.Count - 1) / 2.0) * 0.1, centres[g.Key].Y);
+        }
         var ns = NucleiAt(centres, nr, 1, nucleolus: 0.05, nucleolusAlpha: 0.8, confine: 1);
         var ps = Enumerable.Range(0, 4).Select(i => PoleAt(centres[i] + new DivPoint(i % 2 == 0 ? -0.24 : 0.24, i < 2 ? 0.3 : -0.3), new DivPoint(0, i < 2 ? D : -D), aster: 0.2)).ToArray();
         var f = Frame(FourCells(), ns, ps, Spindles(), CellPlates(first: 0.95, firstAlpha: 0, second: D, secondAlpha: 0.75), Furrows(), ks);

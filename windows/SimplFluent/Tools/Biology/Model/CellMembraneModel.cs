@@ -349,7 +349,10 @@ public static class CEMembrane
         out_.Arrow = (d.Apply(new BioVec(ch.X, 5.5, Half + 1.2)), d.Apply(new BioVec(ch.X, -5.5, Half + 1.2)));
         out_.Up = d.ApplyVector(new BioVec(0, 1, 0));
         out_.Triangles = items.Sum(i => i.Mesh.TriangleCount);
-        out_.Content = new BioSceneContent { Items = items, Labels = Labels(), Frame = new BioSphere(BioVec.Zero, 29) };
+        // (framed with room round it, the patch drawn about a fifth smaller: framed at 29 nm, less than its half-width, its
+        //  corners seen at a slant reached into the labels' columns, and "Carrier protein" and "Hydrophilic head" were
+        //  drawn over what they name)
+        out_.Content = new BioSceneContent { Items = items, Labels = Labels(), Frame = new BioSphere(BioVec.Zero, 36) };
         return out_;
     }
 

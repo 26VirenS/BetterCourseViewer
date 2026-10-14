@@ -38,10 +38,12 @@ public sealed class BioSceneView : Grid
     private readonly RotateTransform3D turn;
     private readonly Canvas overlay = new() { ClipToBounds = true };
     private readonly Canvas labelLayer = new();
+    private readonly Canvas markLayer = new() { IsHitTestVisible = false };
     private readonly Path leaders = new() { StrokeThickness = 1, IsHitTestVisible = false, Opacity = 0.55 };
     private readonly ContentControl spinnerHost = new() { Focusable = false, IsHitTestVisible = false, Margin = new Thickness(14), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly Dictionary<string, FrameworkElement> labelViews = new();
-    private TextBlock? moreText;
+    private FrameworkElement? moreText;
+    private string? moreWords;
 
     // (what is drawn: the scene, its batches by model, and what each model's vertices belong to)
     private BioSceneContent? content;
@@ -56,6 +58,8 @@ public sealed class BioSceneView : Grid
     private string? builtKey, buildingKey, framedKey;
     private bool framedOnce;
     private Func<IEnumerable<BioBillboard>>? extras;
+    private Func<IEnumerable<BioMark>>? markSource;
+    private List<(BioMark Mark, TextBlock View)> marks = new();
 
     // (the camera: what it looks at, how far it is; the model's turn)
     private Point3D target;
@@ -102,6 +106,7 @@ public sealed class BioSceneView : Grid
         view.Children.Add(billboardLayer);
         Children.Add(view);
         leaders.SetResourceReference(Shape.StrokeProperty, B.Text);
+        overlay.Children.Add(markLayer);
         overlay.Children.Add(leaders);
         overlay.Children.Add(labelLayer);
         Children.Add(overlay);
@@ -115,6 +120,7 @@ public sealed class BioSceneView : Grid
             // (40° is the height's field of view, as SceneKit's; WPF's is the width's)
             if (e.NewSize.Height > 0) camera.FieldOfView = 2 * Math.Atan(Tan20 * e.NewSize.Width / e.NewSize.Height) * 180 / Math.PI;
             labelSignature = "";
+            PlaceMarks();
             Wake();
         };
     }
@@ -190,6 +196,8 @@ public sealed class BioSceneView : Grid
     public event Action<string?>? DoubleClicked;
     /// <summary>The object under the pointer, or its label's, changed.</summary>
     public event Action<string?>? HoverChanged;
+    /// <summary>"+N more" pressed (§3.5: it opens the parts list). Without a handler it is words only.</summary>
+    public event Action? MorePressed;
     /// <summary>Whether a press sets <see cref="Selection"/> itself (off: the tool does, from <see cref="Picked"/>).</summary>
     public bool PickSelects { get; set; } = true;
 
@@ -203,11 +211,14 @@ public sealed class BioSceneView : Grid
     /// put in the key everything the scene depends on (the page, the options, light or dark), and make the build capture
     /// copies of what it needs, never a view. The camera frames the first scene, and any scene whose
     /// <paramref name="frameKey"/> is new (a new cell, not a new option). <paramref name="billboards"/> are made on the
-    /// UI thread with each new scene (an atom's symbol: BioMoleculeScene.Symbols).
+    /// UI thread with each new scene (an atom's symbol: BioMoleculeScene.Symbols), and so are <paramref name="marks"/>, drawn
+    /// in 2D over the whole model (a strand's "3′", a carbon's number).
     /// </summary>
-    public void Show(string key, Func<BioSceneContent> build, string? frameKey = null, Func<IEnumerable<BioBillboard>>? billboards = null)
+    public void Show(string key, Func<BioSceneContent> build, string? frameKey = null, Func<IEnumerable<BioBillboard>>? billboards = null,
+        Func<IEnumerable<BioMark>>? marks = null)
     {
         extras = billboards;
+        markSource = marks;
         if (key == builtKey || key == buildingKey) return;
         buildingKey = key;
         Shot.Began();
@@ -278,6 +289,7 @@ public sealed class BioSceneView : Grid
             boards.Add((b, mv));
             if (b.Model is GeometryModel3D gm && b.Id != null) boardPick[gm] = b;
         }
+        MakeMarks();
         ApplySelection();
         // (the camera frames the first scene, and a scene whose frame key is new)
         if (!framedOnce || (frameKey != null && frameKey != framedKey))
@@ -376,7 +388,53 @@ public sealed class BioSceneView : Grid
             mv.OffsetY = p.Y;
             mv.OffsetZ = p.Z + b.Lift;
         }
+        PlaceMarks();
         Wake();
+    }
+
+    /// <summary>The marks' words for a new scene, each with a halo of the ground round it, so it reads over atoms.</summary>
+    private void MakeMarks()
+    {
+        markLayer.Children.Clear();
+        marks = new List<(BioMark, TextBlock)>();
+        var ground = Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Colors.White;
+        foreach (var m in markSource?.Invoke() ?? Array.Empty<BioMark>())
+        {
+            var t = new TextBlock { Text = m.Text, FontWeight = FontWeights.Bold, IsHitTestVisible = false };
+            t.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
+            t.Effect = new System.Windows.Media.Effects.DropShadowEffect { ShadowDepth = 0, BlurRadius = 5, Opacity = 1, Color = ground };
+            markLayer.Children.Add(t);
+            marks.Add((m, t));
+        }
+    }
+
+    /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them, and an atom's number
+    /// just outside the atom's disc, out from it the way its point is (or, seen end on, away from the model's centre).</summary>
+    private void PlaceMarks()
+    {
+        if (marks.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
+        var f = ActualHeight / (2 * Tan20);
+        var c = Project(framing.Centre);
+        foreach (var (m, t) in marks)
+        {
+            var (x, y, front, dist) = Project(m.Anchor);
+            t.Visibility = front ? Visibility.Visible : Visibility.Collapsed;
+            if (!front) continue;
+            t.FontSize = Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 11, 17);
+            t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var (w, h) = (t.DesiredSize.Width, t.DesiredSize.Height);
+            if (m.Atom is { } atom && Project(atom) is { InFront: true } a)
+            {
+                double dx = x - a.X, dy = y - a.Y;
+                if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (a.X - c.X, a.Y - c.Y);
+                var len = Math.Sqrt(dx * dx + dy * dy);
+                if (len < 1) (dx, dy, len) = (1, 0, 1);
+                var reach = m.AtomRadius * f / Math.Max(a.Distance, 1e-6) + Math.Max(w, h) / 2 + 1;
+                (x, y) = (a.X + dx / len * reach, a.Y + dy / len * reach);
+            }
+            Canvas.SetLeft(t, x - w / 2);
+            Canvas.SetTop(t, y - h / 2);
+        }
     }
 
     /// <summary>Handled (dragged, scrolled, a key): auto-turn waits three seconds after the last touch; labels wait for the
@@ -720,12 +778,13 @@ public sealed class BioSceneView : Grid
         {
             var (x, y, front, dist) = Project(l.Anchor);
             var visible = front;
-            if (visible && l.Normal is { } nrm)
+            // (one always shown is not tested for what covers it)
+            if (visible && !l.Always && l.Normal is { } nrm)
             {
                 var wn = turn.Transform(BioWpf.V(nrm));
                 visible = Vector3D.DotProduct(wn, camera.Position - turn.Transform(BioWpf.P(l.Anchor))) > 0;
             }
-            else if (visible)
+            else if (visible && !l.Always)
             {
                 if (still)
                 {
@@ -845,17 +904,39 @@ public sealed class BioSceneView : Grid
         if (more > 0 && placed.Count > 0)
         {
             var last = placed.OrderBy(p => p.Y).Last();
-            moreText ??= K.Text("", Ty.Caption, B.Text2);
-            if (moreText.Parent == null) labelLayer.Children.Add(moreText);
-            moreText.Text = $"+{more} more";
-            moreText.IsHitTestVisible = false;
-            Canvas.SetLeft(moreText, last.Frame.X + 10);
-            Canvas.SetTop(moreText, last.Y + 13);
+            var words = $"+{more} more";
+            if (moreText != null && moreWords != words)
+            {
+                labelLayer.Children.Remove(moreText);
+                moreText = null;
+            }
+            if (moreText == null)
+            {
+                // (a link to the parts list where the tool has one, else words)
+                if (MorePressed != null)
+                {
+                    var link = K.Link(words, () => MorePressed?.Invoke(), Ty.Caption);
+                    link.ToolTip = "The parts without a label, in the parts list";
+                    link.Padding = new Thickness(4, 1, 4, 2);
+                    moreText = link;
+                }
+                else
+                {
+                    var text = K.Text(words, Ty.Caption, B.Text2);
+                    text.IsHitTestVisible = false;
+                    moreText = text;
+                }
+                moreWords = words;
+                labelLayer.Children.Add(moreText);
+            }
+            Canvas.SetLeft(moreText, last.Frame.X + 6);
+            Canvas.SetTop(moreText, last.Y + 11);
         }
         else if (moreText != null)
         {
             labelLayer.Children.Remove(moreText);
             moreText = null;
+            moreWords = null;
         }
     }
 

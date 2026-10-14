@@ -61,9 +61,10 @@ BioTools.Register("gene", (c, state) => new GeneExpressionTool(c, state), GeneEx
 ```
 
 - `BioTools.Register(key, full, pages, quick)`: `full(ToolContext c, BioLaunchState? state)` makes the whole tool;
-  `pages` (`BioPage[]`, two or more) show in its header (`BioPages`: PTKit.Choice buttons, squished to symbols when
-  tight, the pin then a symbol alone); `quick(c, state)` makes the pin's flyout (null: `BioQuickOpen` — its tile, its
-  line, Open). Flyout widths (spec §3.2): gene 420, cross 400, biolab 380, popgen 360, the rest 330
+  `pages` (`BioPage[]`, two or more) show in its header (`BioPages`: PTKit.Choice buttons; when tight the page shown
+  keeps its name and the others are symbols, then all are symbols, each named in its tooltip; the pin then a symbol
+  alone); `quick(c, state)` makes the pin's flyout (null: `BioQuickOpen` — its tile, its line, Open); every flyout's
+  way to its whole tool is `BioUI.OpenButton(text, open, tip)`, one accent button across it. Flyout widths (spec §3.2): gene 420, cross 400, biolab 380, popgen 360, the rest 330
   (`ToolsCenter.FlyoutWidth`); short names Cells, DNA, Genes, Biomolecules, Crosses, Division, Hardy–Weinberg, Lab maths,
   Enzymes, Energy (`ToolsCenter.ShortName`).
 - `BioTools.Kinds` (the ten `ToolsScreen.Kind`s: key, name, line, `SymbolRegular`, hex), `BioTools.IsBiology(key)`,
@@ -158,7 +159,9 @@ P, Phenotype, Dies, Carrier; `Phenotypes` (born); `GenotypicRatio(Text)`, `BornG
   `ApplyExample` (§5.3.1's `CrossExamples`), `TestCross`, `Parse`, `Encoded` for `SimplBio.cross.setup`).
   `CrossPunnett`, `CrossForkedLine`, `CrossProbability` (chips, the product and sum rules, at least one / exactly k of
   n), `ChiSquareWork` (the null hypothesis, AP's conclusion), `Pedigree` and `PedigreeChecker` (four modes, the people
-  who rule each out). `CrossesModel` keeps the pages' state. Hand-offs it takes: `["cross"] = "AaBb × aaBb"`, and
+  who rule each out). A typed `A^Y a × A^Y a` is read as the yellow mouse's lethal allele (born 2 yellow : 1
+  non-yellow, as the Yellow mice example; on Windows only for now — the Mac's parser reads it as complete dominance).
+  `CrossesModel` keeps the pages' state. Hand-offs it takes: `["cross"] = "AaBb × aaBb"`, and
   `["chi"] = "round:3:5474;wrinkled:1:1850"` (name:ratio:observed) for the Chi-square page.
 - **Hardy–Weinberg** (`HardyWeinbergTool.cs`, `HardyWeinbergPages.cs`; `Model/HardyWeinbergModel.cs`):
   `HardyWeinberg.Calculate(given, value)` / `Calculate(counts)` (each step as text), `.Test(counts, df)` (df 1 by
@@ -198,7 +201,7 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   `Ribbon(points, width, thickness, guides:, arrow:, elliptical:)`. `BioFrame` places a mesh (`Along(dir, origin)`,
   `Rotation(axis, degrees)`); `mesh.Transformed/Translated/Scaled/Flipped/Copy`. `BioMoleculeMeshes.Dashes` for H-bonds.
 - **A scene** is values: `new BioSceneContent { Items = [new BioSceneItem(id, mesh, material, order)], Labels =
-  [new BioLabel3D(id, text, anchor, normal:, area:)], Frame = sphere? }`. Ids are what a press picks (`atom:12`,
+  [new BioLabel3D(id, text, anchor, normal:, area:, Always:)], Frame = sphere? }`. Ids are what a press picks (`atom:12`,
   `residue:7`, `organelle:mito:3`); selecting `organelle:mito` selects every `organelle:mito:…`.
   `new BioMaterial(hex, Alpha:, Roughness:, Emission:, Unlit:, DoubleSided:)` or `new BioMaterial(pair, dark)` —
   alpha < 1 is drawn after the opaque, from both sides (`Order` stacks shells: outer last; Viewport3D sorts nothing).
@@ -206,20 +209,24 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   radii; UV spheres up to 300 atoms, icospheres above); `BioMoleculeScene.Symbols(model, style)` the atom letters as
   billboards (on the UI thread).
 - **The view:** `var scene = new BioSceneView("3D model of …")`, then `scene.Show(key, () => MakeScene(copies…),
-  frameKey:, billboards:)`. The build runs off the UI thread — capture copies, never a view — and again only when `key`
+  frameKey:, billboards:, marks:)`. The build runs off the UI thread — capture copies, never a view — and again only when `key`
   changes (put the page, the options and light or dark in it). The camera frames the content (40°, 1.15·R/sin 20°) on
   the first scene and when `frameKey` is new; `ResetView()` puts it back; `ZoomTo(id)` frames an object. Set
   `Selection` (the selection glows, the rest dims to 35%: `DimOthers`), `ShowLabels`, `Turning` (auto-turn, 30 s a turn;
-  never with animations off), `PickSelects`, `Accessibility`; listen to `Picked`, `DoubleClicked`, `HoverChanged`.
+  never with animations off), `PickSelects`, `Accessibility`; listen to `Picked`, `DoubleClicked`, `HoverChanged`, and
+  `MorePressed` ("+N more" is a link to the parts list while it has a handler; Cell Explorer brings its list into view).
   Click picks (the nearest opaque object, through translucent membranes); hover outlines in the accent with a hand;
   drag turns, right-drag pans, the wheel zooms; ← → ↑ ↓ turn 15°, + − zoom, Escape deselects; double-click zooms to an
   object (or resets on empty space). Labels with leader lines (§3.5: two columns 22 apart, ≤ 14 with "+N more", 120 ms
   fades, pressable, hover outlines their object) come from `Labels`; give a convex shell's label a `Normal`, else a ray
-  decides what hides it. A label too wide for the room beside its column is moved in on its own (the Mac moves the whole
+  decides what hides it; `Always` shows it whatever covers it (a strand's ends: both ends of both strands are always
+  named). Cell Explorer's nucleus, cut open, is anchored on its envelope's ring at the cut face that turns most to the
+  camera, with that face's normal (at the back of the envelope the nucleolus and the chromatin hid it). A label too wide for the room beside its column is moved in on its own (the Mac moves the whole
   column in for its widest, which in this app's narrower view put the short labels over the model), and an anchor past
   a label's far edge is led to that edge. Given the model's box on the view (its items' boxes, projected), a label
-  that would still hide its own anchor, or reach more than 40 into a model narrower than 70% of the view (over half its
-  width, for a short label), goes to a row just above the model (an anchor in its upper half) or below it; a row's
+  that would still hide its own anchor, reach more than 40 into a model narrower than 70% of the view (over half its
+  width, for a short label), or lead over another label's anchor (two leaders seeming to end at one point), goes to a
+  row just above the model (an anchor in its upper half) or below it; a row's
   labels are packed side by side in their anchors' order, their leaders straight up or down and never through a capsule
   in a row nearer the model; a label that fits no row stays in its column. It draws frame by frame only while something
   moves. Keep a scene under 300k triangles (§3.4: Viewport3D draws on one thread; icospheres for the many small
@@ -227,7 +234,10 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   chemistry builder's card.
 - WPF side (`BioScene.cs`): `BioWpf.Mesh(mesh)` (frozen `MeshGeometry3D`), `BioWpf.Material(material, fade)`,
   `BioWpf.Batches(items)` (one mesh per material and order, with `BioMeshBatch.ObjectAtVertex/ObjectAtTriangle`),
-  `BioWpf.P/V/B` conversions, `BioBillboards.Text(s, size, colour, glow)`, `BioBillboard(model, anchor, lift, id)`.
+  `BioWpf.P/V/B` conversions, `BioBillboards.Text(s, size, colour, glow)`, `BioBillboard(model, anchor, lift, id)`
+  (drawn in the scene, so the model can hide it), and `BioMark(text, anchor, size, atom, atomRadius)`: a few letters
+  in 2D over the whole model, 11–17 px, an atom's number set just outside its atom's disc (DNA & RNA's "5′" and "3′"
+  and the carbons' numbers: `DnaLetter(…, OnTop: true)`, `DnaWpf.Marks`).
 
 ## Step-through (§3.6)
 
@@ -253,8 +263,8 @@ anim.Stop();`): `phase.From`, `phase.To`, `phase.T` (eased; 600 ms at 1×; back 
 chemistry builders' three columns from 1100 wide; narrower — the Tools page beside the navigation pane, on a 1366
 window — the scene across the top as tall as the page shows, 460 to 640, as the Mac's, and the two columns under it),
 `BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
-`BioUI.FactRow(label, text, tint)`, `BioUI.Facts(rows)`, `BioUI.Legend(items)`, `BioUI.SequenceText`, `BioQuickOpen`,
-`BioToolPlaceholder`.
+`BioUI.FactRow(label, text, tint)`, `BioUI.Facts(rows)`, `BioUI.Legend(items)`, `BioUI.SequenceText`, `BioUI.OpenButton`,
+`BioQuickOpen`, `BioToolPlaceholder`.
 
 ## Self-check (§10.1)
 
@@ -384,7 +394,7 @@ The keys are the Mac's, so a hand-off reads the same on both; a tool also reads 
 | Biomolecule Builder → DNA & RNA ("See it in DNA & RNA") | `nucleotide` = DT … (page `nucleotides`; `molecule` read as the same) |
 | Cell Division → DNA & RNA | `page` = replication |
 | Cell Explorer → Flashcards | `deck` |
-| Genetics Crosses → Cell Division ("How meiosis makes them") | `focus` = assortment (not read yet on either app: Cell Division opens on Meiosis, at the step it was on) |
+| Genetics Crosses → Cell Division ("See it in Cell Division") | `focus` = assortment (Cell Division opens on Meiosis at Metaphase I, where each pair lines up either way round) |
 | a pin's quick version → its tool | Crosses `cross`, `chi`; Hardy–Weinberg `given`, `value`, `counts`; Gene Expression `codon`; Bio Lab `calc` |
 
 ## Numbers (rounding)

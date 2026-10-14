@@ -455,9 +455,9 @@ internal sealed class DnaCloverleafDrawing : DnaDrawing
         dc.DrawLine(PenOf(BioPalette.Rna.ToColor(Dark), 2.5), new Point(c0.X - 46, c0.Y), new Point(c2.X + 46, c2.Y));
         Say(dc, "…", c0.X - 58, c0.Y, 14, text2);
         Say(dc, "…", c2.X + 58, c2.Y, 14, text2);
-        Say(dc, "3′", c0.X - 80, c0.Y, 13, text, strong: true);
-        Say(dc, "5′", c2.X + 80, c2.Y, 13, text, strong: true);
-        Say(dc, "mRNA codon 5′-UUC-3′ (here read right to left) → Phe", (c0.X + c2.X) / 2, c0.Y + 28, 12.5, text, strong: true);
+        Say(dc, "3′", c0.X - 80, c0.Y, 14.5, text, strong: true);
+        Say(dc, "5′", c2.X + 80, c2.Y, 14.5, text, strong: true);
+        Say(dc, "mRNA codon 5′-UUC-3′ (here read right to left) → Phe", (c0.X + c2.X) / 2, c0.Y + 30, 14, text, strong: true);
 
         // (the rungs: a pair's bases joined; a dotted rung for G·U)
         foreach (var (i, j) in BioData.Trna.Pairs)
@@ -481,8 +481,8 @@ internal sealed class DnaCloverleafDrawing : DnaDrawing
         var phe = new Point(a76.X + r + 40, a76.Y);
         dc.DrawLine(PenOf(text2, 2, dashed: true), a76 + new Vector(r + 4, 0), phe - new Vector(20, 0));
         dc.DrawRoundedRectangle(K.Brush(K.WithAlpha(BioPalette.Nonpolar.ToColor(Dark), 0.9)), null, new Rect(phe.X - 20, phe.Y - 12, 40, 24), 12, 12);
-        Say(dc, "Phe", phe.X, phe.Y, 12, Colors.White, strong: true);
-        Say(dc, "joins A76’s 3′ end when charged", phe.X + 28, phe.Y, 11.5, text2, align: 0);
+        Say(dc, "Phe", phe.X, phe.Y, 13, Colors.White, strong: true);
+        Say(dc, "joins A76’s 3′ end when charged", phe.X + 28, phe.Y, 13, text2, align: 0);
         dc.DrawEllipse(null, PenOf(accent, 2.5), a76, r + 4, r + 4);
 
         // (the bases, lettered in their colours; the codon's too)
@@ -494,7 +494,7 @@ internal sealed class DnaCloverleafDrawing : DnaDrawing
             var col = Base(ch);
             dc.DrawEllipse(K.Brush(col), null, p, r, r);
             if (hovered == i) dc.DrawEllipse(null, PenOf(text, 1.5), p, r + 2, r + 2);
-            Say(dc, $"{ch}", p.X, p.Y, 13, DnaWpf.WhiteOn(BioColors.Hex(col)) ? Colors.White : ink, strong: true, mono: true);
+            Say(dc, $"{ch}", p.X, p.Y, 14.5, DnaWpf.WhiteOn(BioColors.Hex(col)) ? Colors.White : ink, strong: true, mono: true);
         }
         for (var k = 0; k < 3; k++)
         {
@@ -502,7 +502,7 @@ internal sealed class DnaCloverleafDrawing : DnaDrawing
             var ch = DnaTrna.Codon[k].Base;
             var col = Base(ch);
             dc.DrawEllipse(K.Brush(col), null, p, r, r);
-            Say(dc, $"{ch}", p.X, p.Y, 13, DnaWpf.WhiteOn(BioColors.Hex(col)) ? Colors.White : ink, strong: true, mono: true);
+            Say(dc, $"{ch}", p.X, p.Y, 14.5, DnaWpf.WhiteOn(BioColors.Hex(col)) ? Colors.White : ink, strong: true, mono: true);
         }
         if (selected is { } s && b.TryGetValue(s, out var su))
         {
@@ -512,18 +512,18 @@ internal sealed class DnaCloverleafDrawing : DnaDrawing
 
         // (the ends, and the arms' names)
         var p1 = P(b[1]);
-        Say(dc, "5′", p1.X - 30, p1.Y, 13, text, strong: true);
-        Say(dc, "3′", a76.X, a76.Y - 30, 13, text, strong: true);
-        Say(dc, "Acceptor stem", P(b[4]).X - 30, P(b[4]).Y, 12.5, text, align: 1, strong: true);
+        Say(dc, "5′", p1.X - 30, p1.Y, 14.5, text, strong: true);
+        Say(dc, "3′", a76.X, a76.Y - 30, 14.5, text, strong: true);
+        Say(dc, "Acceptor stem", P(b[4]).X - 30, P(b[4]).Y, 14.5, text, align: 1, strong: true);
         var d = layout.Centres["d"];
-        Say(dc, "D arm", P(d).X, P(d).Y - 66, 12.5, text, strong: true);
+        Say(dc, "D arm", P(d).X, P(d).Y - 66, 14.5, text, strong: true);
         // (the T arm named over its stem, clear of its loop's numbers and badges)
-        Say(dc, "T arm (TΨC)", (P(b[61]).X + P(b[65]).X) / 2, P(b[63]).Y - r - 14, 12.5, text, strong: true);
-        Say(dc, "Anticodon arm", P(b[29]).X - 30, P(b[29]).Y, 12.5, text, align: 1, strong: true);
+        Say(dc, "T arm (TΨC)", (P(b[61]).X + P(b[65]).X) / 2, P(b[63]).Y - r - 15, 14.5, text, strong: true);
+        Say(dc, "Anticodon arm", P(b[29]).X - 30, P(b[29]).Y, 14.5, text, align: 1, strong: true);
         var p36 = P(b[36]);
-        Say(dc, "Anticodon", p36.X + r + 10, p36.Y + 22, 12.5, K.Darkened(accent), align: 0, strong: true);
+        Say(dc, "Anticodon", p36.X + r + 10, p36.Y + 22, 14.5, K.Darkened(accent), align: 0, strong: true);
         var v47 = P(b[47]);
-        Say(dc, "Variable loop", v47.X + r + 10, v47.Y, 12.5, text, align: 0, strong: true);
+        Say(dc, "Variable loop", v47.X + r + 10, v47.Y, 14.5, text, align: 0, strong: true);
 
         // (numbers every ten, and the real molecule's modified bases as badges — a badge carries its base's number)
         var mods = modified ? BioData.Trna.Modified.Where(m => b.ContainsKey(m.Position)).ToList() : new List<(string Label, int Position)>();
@@ -531,14 +531,14 @@ internal sealed class DnaCloverleafDrawing : DnaDrawing
         {
             if (mods.Any(m => m.Position == i)) continue;
             var at = P(DnaTrna.Beside(i, b, codon, DnaTrna.NumberDistance, DnaTrna.NumberClearance));
-            Say(dc, $"{i}", at.X, at.Y, 10.5, text2);
+            Say(dc, $"{i}", at.X, at.Y, 12, text2);
         }
         foreach (var (label, pos) in mods)
         {
             var at = P(DnaTrna.Beside(pos, b, codon, DnaTrna.BadgeDistance, DnaTrna.BadgeClearance));
-            var words = Words(DnaTrna.Numbered.Contains(pos) ? $"{label}{pos}" : label, 10.5, Colors.White, strong: true);
+            var words = Words(DnaTrna.Numbered.Contains(pos) ? $"{label}{pos}" : label, 11.5, Colors.White, strong: true);
             var w = Math.Max(18, words.Width + 10);
-            dc.DrawRoundedRectangle(K.Brush(Color.FromRgb(0x8e, 0x5c, 0xd9)), null, new Rect(at.X - w / 2, at.Y - 8, w, 16), 8, 8);
+            dc.DrawRoundedRectangle(K.Brush(Color.FromRgb(0x8e, 0x5c, 0xd9)), null, new Rect(at.X - w / 2, at.Y - 9, w, 18), 9, 9);
             dc.DrawText(words, new Point(at.X - words.Width / 2, at.Y - words.Height / 2));
         }
     }

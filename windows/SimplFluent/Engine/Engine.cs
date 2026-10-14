@@ -649,7 +649,10 @@ public sealed partial class Engine : Observable, IShellListener
         Exception last = new EngineException($"{LmsName} is still loading. Try again in a moment.");
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            await WhenReady();
+            var hold = !ready && Shot.WaitsForPage;
+            if (hold) Shot.Began();
+            try { await WhenReady(); }
+            finally { if (hold) Shot.Ended(); }
             if (!ready || Web.CoreWebView2 == null) throw new EngineException($"{LmsName} is still loading. Try again in a moment.");
             var id = ++nextCall;
             var done = new TaskCompletionSource<(bool Ok, string Text)>();

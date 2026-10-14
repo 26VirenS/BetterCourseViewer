@@ -40,7 +40,7 @@ internal sealed class BioLabTool : Grid
     {
         new("solutions", "Solutions", SymbolRegular.Drop24, "Molarity, dilutions and percent solutions"),
         new("microscopy", "Microscopy", SymbolRegular.Microscope24, "Magnification, field of view and size"),
-        new("cells", "Cells", SymbolRegular.CircleSmall24, "Surface area to volume, water potential, cell counts"),
+        new("cells", "Cells", SymbolRegular.ShapeOrganic24, "Surface area to volume, water potential, cell counts"),
         new("stats", "Statistics", SymbolRegular.DataBarVertical24, "Mean, standard deviation, error bars, chi-square"),
         new("ecology", "Populations", SymbolRegular.LeafTwo24, "Growth, rate and diversity"),
         new("molecules", "Molecules", SymbolRegular.Molecule24, "Absorbance, PCR, centrifuges, pH and Q₁₀"),
@@ -705,9 +705,8 @@ internal sealed class BioLabCompact : ContentControl
             BioPrefs.Set("biolab", "quick", calc);
             Build();
         };
-        var open = K.Link("Open Bio Lab Calculator", Open);
-        open.HorizontalAlignment = HorizontalAlignment.Left;
-        open.ToolTip = "The whole calculator, with these numbers (Enter)";
+        // (an accent button across the flyout, as every biology pin's is)
+        var open = BioUI.OpenButton("Open Bio Lab Calculator", Open, "The whole calculator, with these numbers (Enter)");
         Content = K.V(12, pick, body, answer, open);
         Build();
         void Changed(string which) { if (which == calc || which.Length == 0) Refresh(); }

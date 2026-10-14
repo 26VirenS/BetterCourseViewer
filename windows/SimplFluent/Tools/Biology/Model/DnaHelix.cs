@@ -27,8 +27,11 @@ public sealed record DnaBaseBox(int Pair, int Strand, char Base, BioVec Start, B
 }
 
 /// <summary>A word drawn flat toward the viewer over the scene (a base's letter, "5′"): what it says, where, how tall
-/// (Å), how far toward the viewer it is lifted, what a press on it picks, and the colour it sits on (null: the page).</summary>
-public sealed record DnaLetter(string Text, BioVec Anchor, double Size, double Lift, string? Id, string? Behind);
+/// (Å), how far toward the viewer it is lifted, what a press on it picks, and the colour it sits on (null: the page).
+/// <paramref name="OnTop"/>: drawn over the whole model in 2D (a BioMark of the view), never hidden behind it — a
+/// strand's "5′" and "3′", a carbon's number — and, given its <paramref name="Atom"/> and that atom's radius, kept clear
+/// of the atom's disc on the screen.</summary>
+public sealed record DnaLetter(string Text, BioVec Anchor, double Size, double Lift, string? Id, string? Behind, bool OnTop = false, BioVec? Atom = null, double AtomRadius = 0);
 
 /// <summary>Element colours and radii for the atom styles (the view hands in the chemistry tables', MBChem's).</summary>
 public sealed record DnaAtomPaint(Func<string, string> Hex, Func<string, DnaStyle, double> Radius)
@@ -443,8 +446,9 @@ public static class DnaHelix
             }
             var five = path[0];
             var three = path[^1];
-            labels.Add(new BioLabel3D($"end:{s}:5", atoms && s == 1 ? "Strand 1 · 5′ end (5′ phosphate)" : $"Strand {s} · 5′ end", five, Area: 2));
-            labels.Add(new BioLabel3D($"end:{s}:3", $"Strand {s} · 3′ end", three, Area: 2));
+            // (shown even where the other strand covers the end: both ends of both strands are always named, §10.2)
+            labels.Add(new BioLabel3D($"end:{s}:5", atoms && s == 1 ? "Strand 1 · 5′ end (5′ phosphate)" : $"Strand {s} · 5′ end", five, Area: 2, Always: true));
+            labels.Add(new BioLabel3D($"end:{s}:3", $"Strand {s} · 3′ end", three, Area: 2, Always: true));
             // ("5′" and "3′" a little beyond each end, out from the axis)
             BioVec Out(BioVec p, BioVec beyond)
             {
@@ -453,8 +457,9 @@ public static class DnaHelix
             }
             var startDir = BioV.Unit(path[0] - path[1]);
             var endDir = BioV.Unit(path[^1] - path[^2]);
-            letters.Add(new DnaLetter("5′", Out(five, startDir), 2.4, 0.5, $"end:{s}:5", null));
-            letters.Add(new DnaLetter("3′", Out(three, endDir), 2.4, 0.5, $"end:{s}:3", null));
+            // (over the model: an end behind the other strand's backbone kept its mark out of sight)
+            letters.Add(new DnaLetter("5′", Out(five, startDir), 2.4, 0.5, $"end:{s}:5", null, OnTop: true));
+            letters.Add(new DnaLetter("3′", Out(three, endDir), 2.4, 0.5, $"end:{s}:3", null, OnTop: true));
         }
     }
 
@@ -532,7 +537,8 @@ public static class DnaHelix
             mesh.Append(Cone(b - dir * 1.2, b, 0.45, 12));
             items.Add(new BioSceneItem(id, mesh, mat));
         }
-        var bottom = -3.2;
+        // (under the strands' "5′" and "3′" marks at the foot, which it ran through 3.2 Å down)
+        var bottom = -6.5;
         Dimension("measure:width", new BioVec(-10, bottom, 0), new BioVec(10, bottom, 0), new BioVec(0, 1, 0));
         labels.Add(new BioLabel3D("measure:width", "2 nm wide", new BioVec(0, bottom, 0), Area: 6));
         var k = Math.Max(0, Math.Min(n - 2, n / 2 - 1));

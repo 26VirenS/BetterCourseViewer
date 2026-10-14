@@ -142,8 +142,12 @@ public sealed record CEPart(string Id, CEKind Kind, string Name, string Label, s
     /// <summary>"animal ✓ · plant ✓ · bacteria ✗" (§5.1.6).</summary>
     public string FoundInText => string.Join(" · ", CEKinds.All.Zip(FoundIn).Select(z => $"{z.First.FoundName()} {z.Second.Mark.Symbol()}"));
 
-    /// <summary>The Compare table's notes for each cell, where it has one ("plant: 80S (+70S in chloroplasts and mitochondria)").</summary>
-    public IReadOnlyList<string> FoundInNotes => CEKinds.All.Zip(FoundIn).Where(z => z.Second.Note.Length > 0).Select(z => $"{z.First.FoundName()}: {z.Second.Note}").ToList();
+    /// <summary>The Compare table's notes for each cell, where it has one ("plant: 80S (+70S in chloroplasts and mitochondria)";
+    /// a note the table puts in brackets after its mark without them: "bacteria: respiration on the plasma membrane").</summary>
+    public IReadOnlyList<string> FoundInNotes => CEKinds.All.Zip(FoundIn).Where(z => z.Second.Note.Length > 0).Select(z => $"{z.First.FoundName()}: {Unbracketed(z.Second.Note)}").ToList();
+
+    private static string Unbracketed(string note) =>
+        note.Length > 2 && note[0] == '(' && note[^1] == ')' && note.IndexOf(')') == note.Length - 1 ? note[1..^1] : note;
 }
 
 // ---- the catalogue ----

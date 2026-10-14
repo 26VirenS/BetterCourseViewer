@@ -120,12 +120,10 @@ internal sealed class GeneExpressionCompact : ContentControl
             e.Handled = true;
         };
         var top = K.Columns("auto, *", field.Col(0), answer.Margin(12, 2, 0, 0).Col(1));
-        var link = K.Link("Open in the codon table", Open, Ty.Caption);
-        link.ToolTip = "The whole codon table, with this lookup (Enter)";
+        // (the way to the whole tool an accent button across the flyout, as every biology pin's is)
+        var open = BioUI.OpenButton("Open in the codon table", Open, "The whole codon table, with this lookup (Enter)");
         var note = K.Text("AUG starts translation and codes Met.", Ty.Caption, B.Text2);
-        note.VerticalAlignment = VerticalAlignment.Center;
-        var foot = K.Columns("*, auto", note.Col(0), link.Col(1));
-        Content = K.V(12, top, gridHost, foot);
+        Content = K.V(12, top, gridHost, note, open);
         Loaded += (_, _) => Dispatcher.BeginInvoke(() => { field.Focus(); field.CaretIndex = field.Text.Length; }, DispatcherPriority.Input);
         Draw();
     }

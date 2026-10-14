@@ -557,12 +557,13 @@ public sealed partial class CEBuilder
                     var r = nucleusRadius;
                     if (Cut)
                     {
-                        // (cut: on the cut face that turns most to the camera — the nucleoplasm's, inside the envelope's
-                        //  ring — on the side away from the nucleolus, with the face's normal, so the label shows while
-                        //  that face is seen, as a cut membrane's does. A point at the back of the envelope, seen through
-                        //  the cut, was hidden behind the nucleolus or the chromatin, and the nucleus went unnamed. Where
-                        //  the face is behind an opaque wall — the plant's nucleus, outside the wall's cut — the back of
-                        //  the envelope stays the anchor, for the view's ray to find hidden)
+                        // (cut: on the envelope's ring where the cut face that turns most to the camera meets it — what
+                        //  "Nuclear envelope" names when the nucleus is looked inside — on the side away from the
+                        //  nucleolus, with the face's normal, so the label shows while that face is seen, as a cut
+                        //  membrane's does. A point at the back of the envelope, seen through the cut, was hidden
+                        //  behind the nucleolus or the chromatin, and the nucleus went unnamed. Where the face is
+                        //  behind an opaque wall — the plant's nucleus, outside the wall's cut — the back of the
+                        //  envelope stays the anchor, for the view's ray to find hidden)
                         var faces = new[]
                         {
                             (N: new BioVec(0, 0, 1), A: new BioVec(1, 0, 0), B: new BioVec(0, 1, 0)),
@@ -572,7 +573,7 @@ public sealed partial class CEBuilder
                         var face = faces.MaxBy(f => BioV.Dot(f.N, v));
                         foreach (var a in new[] { 0.3, 1.27 })
                         {
-                            var p = n + (face.A * Math.Cos(a) + face.B * Math.Sin(a)) * (0.8 * r);
+                            var p = n + (face.A * Math.Cos(a) + face.B * Math.Sin(a)) * (r - 0.03);
                             if (CanSee(p)) Offer(part, i, p, face.N, 2 + 0.01 * BioV.Dot(p, v) / Model.CellRadius);
                         }
                         Offer(part, i, n - v * (r - 0.065), score: 1);

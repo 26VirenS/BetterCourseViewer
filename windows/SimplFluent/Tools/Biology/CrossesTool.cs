@@ -482,12 +482,9 @@ internal sealed class CrossesCompact : ContentControl
         var phenotypes = K.V(2, K.Text("Phenotypes", Ty.Caption, B.Text2).Strong(), CrossInk.Wrapped(r.Phenotypes.Count == 1 ? "all " + r.Phenotypes[0].Text : r.PhenotypicRatioText, 14, FontWeights.SemiBold));
         var ratios = K.V(8, genotypes, phenotypes);
         var middle = K.Columns("auto, 14, *", new PunnettGrid(new CrossPunnett(cross), small: true).Col(0), ratios.Col(2));
-        var open = K.Button("Open in Genetics Crosses", () => c.OpenFull(new Dictionary<string, string> { ["cross"] = setup.Text }, null), accent: true);
-        open.HorizontalAlignment = HorizontalAlignment.Stretch;
-        open.HorizontalContentAlignment = HorizontalAlignment.Center;
-        open.MinHeight = 36;
+        var open = BioUI.OpenButton("Open in Genetics Crosses", () => c.OpenFull(new Dictionary<string, string> { ["cross"] = setup.Text }, null),
+            "This cross in the whole tool, with dihybrids, other patterns, probability and chi-square (Enter)");
         open.IsDefault = true;
-        open.ToolTip = "This cross in the whole tool, with dihybrids, other patterns, probability and chi-square (Enter)";
         Content = K.V(12, parents, middle, open);
     }
 }

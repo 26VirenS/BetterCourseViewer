@@ -30,6 +30,12 @@ public static class Shot
 
     public static bool Asked => Launch.Get("shot") != null;
 
+    /// <summary>A picture of a tool (--tool, --pin): the page's calls waiting for it to load count as asked
+    /// (Engine.CallText), so the window round the tool — the account, the pane's courses — is read before it is pictured;
+    /// on a slow start a biology tool was pictured with "Signed in · localhost" over an empty list. Other pictures keep
+    /// their timing (some show what a slow start looks like).</summary>
+    public static bool WaitsForPage => Asked && (Launch.Get("tool") != null || Launch.Get("pin") != null);
+
     public static void ArmIfAsked()
     {
         var file = Launch.Get("shot");

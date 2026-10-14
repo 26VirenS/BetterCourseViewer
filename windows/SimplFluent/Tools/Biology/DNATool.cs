@@ -182,12 +182,18 @@ internal static class DnaWpf
         return (1.05) / (lum + 0.05) >= (lum + 0.05) / 0.05;
     }
 
-    /// <summary>Words over a scene as billboards: white or near-black on a colour (a base's letter), else the page's text colour.</summary>
+    /// <summary>The words drawn over the whole model (<see cref="DnaLetter.OnTop"/>) as the view's marks.</summary>
+    public static IEnumerable<BioMark> Marks(IReadOnlyList<DnaLetter>? letters) =>
+        letters?.Where(l => l.OnTop).Select(l => new BioMark(l.Text, l.Anchor, l.Size, l.Atom, l.AtomRadius)) ?? Enumerable.Empty<BioMark>();
+
+    /// <summary>Words over a scene as billboards: white or near-black on a colour (a base's letter), else the page's text
+    /// colour; those drawn over the whole model are the view's marks instead (<see cref="Marks"/>).</summary>
     public static IEnumerable<BioBillboard> Billboards(IReadOnlyList<DnaLetter>? letters, bool dark)
     {
         if (letters == null) yield break;
         foreach (var l in letters)
         {
+            if (l.OnTop) continue;
             Color colour;
             bool glow;
             if (l.Behind is { } behind)

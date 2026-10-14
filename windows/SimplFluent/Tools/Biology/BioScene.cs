@@ -94,6 +94,12 @@ public static class BioWpf
 /// object a press on it picks (if any).</summary>
 public sealed record BioBillboard(Model3D Model, BioVec Anchor, double Lift = 0, string? Id = null);
 
+/// <summary>A few letters drawn in 2D over a 3D scene, on top of the whole model, following a point of it as it turns
+/// (a strand's "3′", a carbon's "2′"): what it says, the point, how tall it is in the scene's units (drawn 11–17 px
+/// whatever the zoom), and — for an atom's number — the atom's centre and radius, so it is set just outside the atom's
+/// disc on the screen whichever way the model is turned.</summary>
+public sealed record BioMark(string Text, BioVec Anchor, double Size, BioVec? Atom = null, double AtomRadius = 0);
+
 /// <summary>Billboards as the molecule builder draws its labels.</summary>
 public static class BioBillboards
 {

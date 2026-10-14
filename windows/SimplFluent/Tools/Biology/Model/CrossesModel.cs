@@ -1213,14 +1213,17 @@ public static partial class BioSelfCheck
                 && d.Phenotypes[0].Carriers == new BioFrac(1, 2) && m.GenotypicRatioText == "1 X^A Y : 1 X^a Y" && sonsAffected == new BioFrac(1, 2));
         }
         else r.Check("cross.page.X-carrier×normal", "unparsed", false);
-        // (the lethal row, by switching the typed gene's pattern as the page's menu does)
+        // (the lethal row: typed, A^Y is read as the yellow mouse's lethal allele, named as the example names it — and
+        //  choosing the pattern on the page's menu leaves it so)
         if (Setup("A^Y a × A^Y a") is { } y)
         {
+            var typed = y.Genes[0].Pattern;
             y.SetPattern(BioInheritance.LethalDominantHomozygote, 0);
             var res = y.Cross.Result();
             r.Check("cross.page.lethal", res.GenotypicRatioText + "|born" + BioRatio.Text(res.BornGenotypicRatio) + "|" + res.PhenotypicRatioText,
-                res.GenotypicRatioText == "1 A^Y A^Y : 2 A^Y a : 1 aa" && res.Genotypes.FirstOrDefault()?.Dies == true && res.BornGenotypicRatio.SequenceEqual(new[] { 2, 1 })
-                && res.PhenotypicRatio.SequenceEqual(new[] { 2, 1 }) && y.Parent1[0].SequenceEqual(new[] { 0, 1 }));
+                typed == BioInheritance.LethalDominantHomozygote
+                && res.GenotypicRatioText == "1 A^Y A^Y : 2 A^Y a : 1 aa" && res.Genotypes.FirstOrDefault()?.Dies == true && res.BornGenotypicRatio.SequenceEqual(new[] { 2, 1 })
+                && res.PhenotypicRatio.SequenceEqual(new[] { 2, 1 }) && res.PhenotypicRatioText == "2 yellow : 1 non-yellow" && y.Parent1[0].SequenceEqual(new[] { 0, 1 }));
         }
         else r.Check("cross.page.lethal", "unparsed", false);
         // (the examples give §5.3.1's phenotypes)
