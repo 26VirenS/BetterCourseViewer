@@ -413,6 +413,47 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the first tool whose name has that word (the screenshot suite's `light-36b-external-tools-list` and
   `dark-36b-external-tools-list`).
 
+- **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
+  Focus timer, Citation generator, Grade needed), *Math & science* (Calculator, Graphing calculator, Unit converter,
+  Periodic table), *Files* (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
+  Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
+  `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
+  Toolbar*); the window's toolbar no longer adds a second. The toolbar holds three tools at most: past that, two and a
+  *Tools* pull-down with the rest (`ToolsCenter.toolbarSplit`, `MorePinsMenu`; while a session runs, the timer — its
+  pin as wide as two — and the pull-down), so a screen's own buttons keep their room — the same in a tool window and on
+  a popup's bar (`PopupPins`). A tool picked in the pull-down opens its quick version in a popover under it.
+  A pin's popover and its floating panel are headed by the tool's tile name with a › that opens the whole tool (the one
+  way to; *Unpin* is in the pin's own menu, not a button beside the name), and the popover has *Pop Out*, which takes
+  the quick panel out into its floating window (`ToolFloats.popOut`); the floating panel has a plain ✕ at its top left
+  (Esc too) in place of the two window lights. Every running-timer label — the pin, the dial, the panel, the tile —
+  reads one second hand (`FocusClock`, moved on the second the time left changes), so they never disagree; the timer's
+  Pause/Start is in its phase's colour (`glassButton(prominent:tint:)`: a `.tint` put on a glass button from outside
+  never showed; every tool's coloured button now takes its colour this way); the ring no longer names the phase the
+  picker shows; the panel's foot reads "Session 1 of 4 · none finished today"; "Ends 7:17 PM".
+  *Periodic table*: its heading names the page shown (Periodic table, Lewis structures, Molecule builder), with the
+  pages in words as a segmented control on a row of their own under it, beside the search and Tour (`PTPageBar`, which
+  replaced `PTHeaderControls`); the 3D builder's symbol is its own. On an element's page the heading's one back is
+  "‹ Table" (⌘[) (`PTNav.elementOpen`, `closeElement`). The tour is offered the first time ("Take a quick tour?", Take
+  the Tour / Not Now; `-SimplPTTourOffer YES` shows it for a picture), never started on its own; every card has Skip
+  Tour, a ✕, Back and a Next that always works; Esc ends it (the sheet's Done gives Escape up while it is on); ended
+  early it counts as seen; the card sits beside the lit spot — under, over, or to its right (`PTTourOverlay.place`) —
+  the first steps lighting the top rows and carbon rather than the whole table. Coloured by a property, a square too
+  small for three lines shows the value in place of the number, and the trend gutter is slimmer. The legend and colour
+  rows fade at a cut edge with a chevron that scrolls them on (`ChipScroller`). The element page's "Drag to turn ·
+  scroll to zoom" sits on one line at the 3D view's foot; its comparison bars show the rank the words beside them give
+  ("above 59%"), in the element's colour for that view. The Lewis and 3D builders, laid out narrow, carry Quick/Draw and
+  the preset in the drawing's heading, the drawing about half the height (`PTNarrowReader`); the 3D builder's turning is
+  a button named for what a press does (*Stop Turning* / *Turn*); a lone ion's charge sits at its symbol's top right,
+  readable in the resonance thumbnails. The pin's small table shows the hovered element (or the first match) in its own
+  card only, its squares larger (480-point popover). *Grade needed*: on a narrow window the answer comes first; the long note is under *How This Works*; the
+  pieces and their groups use the engine's words ("Midterm 2 · 28.5% of your grade", "Midterms are 57% of the grade");
+  the pin's fields are *Grade now %*, *Still to come % of grade*, *Goal %*; its sums round half up on the decimal value.
+  *Citations*: the fields' hints say the form wanted ("First Last; First Last", "YYYY", "e.g. The Atlantic"), never a
+  made-up value. *Unit converter*: the answer with its unit ("212 °F") and "= 100 °C" under it; Value, From, ⇅, To in
+  one column. *PDF annotator*: "Select words on the page to highlight, underline or strike them." on the page until
+  words are selected; *Merge & split*: "Click a page to leave it out. ⟳ turns it.", the turn button larger with a
+  tooltip. *Flashcards*: studying, the bar reads "‹ Cell Biology  Learn" and the tool's line under its name makes way.
+
 - **Fast and fluid (1.3.78).** A screen shows its whole content at once whenever this session has already read what
   it shows, and the window moves the same way however it is moved:
   - *Held answers* (`AnswerMemo`, Engine/ReadAhead.swift): every read's answer is held in memory, decoded, by its call
