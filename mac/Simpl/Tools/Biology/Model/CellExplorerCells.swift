@@ -495,8 +495,10 @@ extension CEBuilder {
             case (_, "nucleus"):
                 let N = nucleusCentre, R = nucleusRadius
                 if cut {
-                    // (the back of the inner membrane, seen through the cut)
-                    offer(part, i, N - v * (R - 0.065), score: 1)
+                    // (the back of the inner membrane, seen through the cut — with its normal, toward the camera: tested
+                    // with a ray, the label was hidden by the nucleolus and chromatin in front of it, and the Cell
+                    // Explorer's pictures had no "Nucleus" at all, nor the nucleus looked inside its "Nuclear envelope")
+                    offer(part, i, N - v * (R - 0.065), normal: v, score: 1)
                 } else {
                     let d = facing(BioVec(-1, 0, 0))
                     offer(part, i, N + d * R, normal: d, score: 1)

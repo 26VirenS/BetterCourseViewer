@@ -128,8 +128,12 @@ extension CEBuild {
         case "mito", "chloroplast":
             guard let a = m.anchors[part], let f = m.instances[a.instance].frame else { break }
             let half = CEGeo.frame(y: f.y, towardZ: m.view, at: f.origin)
+            // (each with the cut face's normal, toward the camera: the inside is one object, so a ray to a crista or the
+            // matrix met another part of it first and hid the label — the picture inside a mitochondrion had neither
+            // "Cristae" nor "Matrix")
+            let facing = d.applyVector(half.applyVector(BioVec(0, 0, 1)))
             func label(_ id: String, _ text: String, _ local: BioVec, _ priority: Double) {
-                labels.append(BioLabel3D(id: id, text: text, anchor: d.apply(half.apply(local)), area: priority))
+                labels.append(BioLabel3D(id: id, text: text, anchor: d.apply(half.apply(local)), normal: facing, area: priority))
             }
             if part == "mito" {
                 label("organelle:mito", "Outer membrane", BioVec(-0.443, -0.35, -0.03), 9)

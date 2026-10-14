@@ -288,7 +288,10 @@ enum DNARNA {
         side = BioV.unit(side)
         for p in [anticodon, end] { ruler.append(DNAMesh.line(p - side * 1.6, p + side * 1.6, radius: 0.18)) }
         items.append(BioSceneItem(id: nil, mesh: ruler, material: BioMaterial(ink, unlit: true)))
-        let marks = [DNATextMark(text: "≈7 nm (\(Int(anticodonTo3Prime.rounded())) Å)", pos: (anticodon + end) / 2 + side * 3.6, size: 3.4, hex: ink, onTop: true)]
+        // (the words beside the ruler, running away from it: centred on a point beside a slanting ruler, it crossed
+        // their middle)
+        let marks = [DNATextMark(text: "≈7 nm (\(Int(anticodonTo3Prime.rounded())) Å)", pos: (anticodon + end) / 2 + side * 3, size: 3.4, hex: ink,
+                                 align: side.x < 0 ? .trailing : .leading, onTop: true)]
 
         func near(_ arm: DNATRNAArm) -> (Int, BioVec)? {
             let members = (1...76).filter { DNATRNAArm.of($0) == arm }
