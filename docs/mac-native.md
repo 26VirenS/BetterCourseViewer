@@ -518,7 +518,9 @@ Launch arguments (each read once): `-SimplPlace dashboard|courses|todo|calendar|
 search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas address>`, `-SimplOpen quiz:<course>:<quiz>
 [:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin | tour[:<n>] |
 touroffer`, `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
-and Set Up Later), `-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
+and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, "Still signing in…" after a moment),
+`-SimplPreviewFail YES` (with `-SimplPickerConfirm YES`: "Is this your school?" with a preview that could not load),
+`-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
 Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away).
 
 ## Releasing

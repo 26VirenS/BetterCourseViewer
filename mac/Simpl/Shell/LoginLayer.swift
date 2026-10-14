@@ -8,6 +8,8 @@ struct LoginLayer: View {
     /// The school's page is what the window shows (the app's own screens are not up over it).
     var pageShown = true
 
+    private static let shotLoggingIn = UserDefaults.standard.bool(forKey: "SimplShowLoggingIn")
+
     var body: some View {
         ZStack {
             switch assist.phase {
@@ -27,6 +29,11 @@ struct LoginLayer: View {
             case .capture(let host, let error):
                 LoginForm(assist: assist, host: host, error: error)
                     .transition(.opacity)
+            }
+            // (the screenshot suite: -SimplShowLoggingIn YES puts "Logging you in" over the window for the run, its
+            // "Still signing in…" offer coming after a moment as it does; its buttons do nothing)
+            if LoginLayer.shotLoggingIn {
+                LoggingInView()
             }
         }
         .animation(.easeInOut(duration: 0.22), value: assist.phase)

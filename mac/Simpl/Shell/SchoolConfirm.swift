@@ -149,6 +149,11 @@ struct LoginPreview: NSViewRepresentable {
         func load(_ view: WKWebView, host: String) {
             self.host = host
             set(.loading)
+            // (the screenshot suite: -SimplPreviewFail YES — a preview that could not be loaded, without waiting for one)
+            if UserDefaults.standard.bool(forKey: "SimplPreviewFail") {
+                set(.failed)
+                return
+            }
             guard let url = URL(string: "https://\(host)/") else { set(.failed); return }
             view.load(URLRequest(url: url, timeoutInterval: 15))
             // (a page that never finishes — a sign-in that keeps redirecting — shows what it has after a while)
