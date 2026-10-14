@@ -39,6 +39,8 @@ public sealed class BioSceneView : Grid
     private readonly Canvas overlay = new() { ClipToBounds = true };
     private readonly Canvas labelLayer = new();
     private readonly Canvas markLayer = new() { IsHitTestVisible = false };
+    // (charges' signs over the labels too: a label too wide for its room, moved in over the model, hid the carboxyl's −)
+    private readonly Canvas chargeLayer = new() { IsHitTestVisible = false };
     private readonly Path leaders = new() { StrokeThickness = 1, IsHitTestVisible = false, Opacity = 0.55 };
     private readonly ContentControl spinnerHost = new() { Focusable = false, IsHitTestVisible = false, Margin = new Thickness(14), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly Dictionary<string, FrameworkElement> labelViews = new();
@@ -110,6 +112,7 @@ public sealed class BioSceneView : Grid
         overlay.Children.Add(markLayer);
         overlay.Children.Add(leaders);
         overlay.Children.Add(labelLayer);
+        overlay.Children.Add(chargeLayer);
         Children.Add(overlay);
         Children.Add(spinnerHost);
         Accessibility = accessibility;
@@ -490,6 +493,7 @@ public sealed class BioSceneView : Grid
     private void MakeMarks()
     {
         markLayer.Children.Clear();
+        chargeLayer.Children.Clear();
         marks = new List<(BioMark, TextBlock)>();
         var ground = Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Colors.White;
         foreach (var m in markSource?.Invoke() ?? Array.Empty<BioMark>())
@@ -498,14 +502,14 @@ public sealed class BioSceneView : Grid
             if (m.Colour is { } colour) t.Foreground = new SolidColorBrush(colour);
             else t.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
             t.Effect = new System.Windows.Media.Effects.DropShadowEffect { ShadowDepth = 0, BlurRadius = 5, Opacity = 1, Color = ground };
-            markLayer.Children.Add(t);
+            (m.Charge ? chargeLayer : markLayer).Children.Add(t);
             marks.Add((m, t));
         }
     }
 
     /// <summary>The marks where their points are on the view now: 11–17 px tall as the zoom has them (a charge's sign
-    /// 14–22), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end on, away
-    /// from the model's centre); a charge's sign just outside it at the upper right.</summary>
+    /// 18–26), and an atom's number just outside the atom's disc, out from it the way its point is (or, seen end on, away
+    /// from the model's centre); a charge's sign on the disc's edge at the upper right, as N⁺ is written.</summary>
     private void PlaceMarks()
     {
         if (marks.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
@@ -516,7 +520,7 @@ public sealed class BioSceneView : Grid
             var (x, y, front, dist) = Project(m.Anchor);
             t.Visibility = front ? Visibility.Visible : Visibility.Collapsed;
             if (!front) continue;
-            t.FontSize = m.Charge ? Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 14, 22) : Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 11, 17);
+            t.FontSize = m.Charge ? Math.Clamp(1.6 * m.Size * f / Math.Max(dist, 1e-6), 18, 26) : Math.Clamp(m.Size * f / Math.Max(dist, 1e-6), 11, 17);
             t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var (w, h) = (t.DesiredSize.Width, t.DesiredSize.Height);
             if (m.Atom is { } atom && Project(atom) is { InFront: true } a)
@@ -526,7 +530,9 @@ public sealed class BioSceneView : Grid
                 else if (Math.Sqrt(dx * dx + dy * dy) < 1) (dx, dy) = (a.X - c.X, a.Y - c.Y);
                 var len = Math.Sqrt(dx * dx + dy * dy);
                 if (len < 1) (dx, dy, len) = (1, 0, 1);
-                var reach = m.AtomRadius * f / Math.Max(a.Distance, 1e-6) + Math.Max(w, h) / 2 + 1;
+                // (a sign's glyph is about a third of its line: set so it just overlaps the disc's edge, a superscript)
+                var disc = m.AtomRadius * f / Math.Max(a.Distance, 1e-6);
+                var reach = m.Charge ? disc + 0.3 * t.FontSize : disc + Math.Max(w, h) / 2 + 1;
                 (x, y) = (a.X + dx / len * reach, a.Y + dy / len * reach);
             }
             Canvas.SetLeft(t, x - w / 2);
