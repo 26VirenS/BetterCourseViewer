@@ -194,8 +194,8 @@ internal static class AssignKit
         catch { return null; }
     }
 
-    /// <summary>"Open in Microsoft Edge", or "Open in Default App" when Windows names none.</summary>
-    public static string OpenTitle(string name) => AppFor(name) is { } app ? $"Open in {app}" : "Open in Default App";
+    /// <summary>"Open in Microsoft Edge", or "Open in default app" when Windows names none.</summary>
+    public static string OpenTitle(string name) => AppFor(name) is { } app ? $"Open in {app}" : "Open in default app";
 
     /// <summary>A file of the school's opened (fetched with the session, kept in Downloads, opened in its app).</summary>
     public static void OpenFile(Engine.Engine engine, string url, string name)
@@ -221,7 +221,7 @@ internal static class AssignKit
         m.Items.Add(Item(OpenTitle(name), SymbolRegular.Open24, () => OpenFile(engine, url, name)));
         m.Items.Add(Item("Download", SymbolRegular.ArrowDownload24, () => Download(engine, url, name)));
         m.Items.Add(new Separator());
-        m.Items.Add(Item("Copy Link", SymbolRegular.Link24, () => { if (engine.Absolute(url) is { } u) Copy(u.ToString()); }));
+        m.Items.Add(Item("Copy link", SymbolRegular.Link24, () => { if (engine.Absolute(url) is { } u) Copy(u.ToString()); }));
         return m;
     }
 
@@ -401,7 +401,7 @@ internal static class AssignScroll
 
 /// <summary>An assignment's next step, as its button says it (the Mac's AssignStep): the words, the symbol, the tooltip; the
 /// shorter words for beside another step; and a quiz's own kinds of step (its feedback, a new attempt).</summary>
-internal sealed record AssignStep(string Title, SymbolRegular Symbol, string Help, string? Short = null, bool Feedback = false, bool Again = false);
+internal sealed record AssignStep(string Title, SymbolRegular Symbol, string Help, string? Short = null, bool Feedback = false, bool Again = false, bool Pending = false);
 
 /// <summary>The first of its children that fits the width it is given (the Mac's ViewThatFits): a step's words, then its
 /// shorter words, then those without the symbol.</summary>

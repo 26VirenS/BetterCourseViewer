@@ -17,7 +17,7 @@ namespace Simpl.Screens;
 /// <summary>
 /// The attempt before it is handed in (the Mac's QuizReviewPane): every question as a row — whether it is answered, its
 /// words, its answer at the row's end (or that it is blank, or flagged) — a click on one to change it; on a wide popup a
-/// column beside it of how much is answered. Back to Questions and Submit (Ctrl+Enter) at the foot.
+/// column beside it of how much is answered. Back to questions and Submit (Ctrl+Enter) at the foot.
 /// </summary>
 internal sealed class QuizReviewPane : IQuizPane
 {
@@ -45,9 +45,9 @@ internal sealed class QuizReviewPane : IQuizPane
         }
         var pad = new Border { Child = page, Padding = new Thickness(40, 22, 40, 32) };
 
-        backButton = QuizUi.Button("Back to Questions", () => _ = Run.KeepWorking(), icon: SymbolRegular.ChevronLeft24);
+        backButton = QuizUi.Button("Back to questions", () => _ = Run.KeepWorking(), icon: SymbolRegular.ChevronLeft24);
         backButton.ToolTip = "Back to the question you were on";
-        submitButton = QuizUi.Button(Run.Attempt?.Survey == true ? "Submit Survey…" : "Submit Quiz…", s.AskSubmit, accent: true, icon: SymbolRegular.Send24);
+        submitButton = QuizUi.Button(Run.Attempt?.Survey == true ? "Submit survey…" : "Submit quiz…", s.AskSubmit, accent: true, icon: SymbolRegular.Send24);
         submitButton.ToolTip = "Submit this attempt (Ctrl+Enter)";
         submitting.VerticalAlignment = VerticalAlignment.Center;
         var foot = K.Columns("auto, *, auto, auto", backButton.Col(0), submitting.Margin(0, 0, 14, 0).Col(2), submitButton.Col(3));
@@ -79,7 +79,7 @@ internal sealed class QuizReviewPane : IQuizPane
 
     private FrameworkElement Heading(bool wide)
     {
-        var v = K.V(6, K.Text("Review Your Answers", Ty.Title));
+        var v = K.V(6, K.Text("Review your answers", Ty.Title));
         if (!wide) v.Children.Add(K.Text(CountLine, Ty.Body, B.Text2).Digits());
         return v;
     }
@@ -182,7 +182,7 @@ internal sealed class QuizReceiptPane : IQuizPane
         this.s = s;
         var r = s.Run.Receipt;
         var tick = K.Icon(SymbolRegular.CheckmarkCircle24, 72, QuizUi.Green, filled: true);
-        var title = K.Wrapped(r?.Title ?? "Attempt Submitted", Ty.Title).Center();
+        var title = K.Wrapped(QuizUi.Sentence(r?.Title ?? "Attempt submitted"), Ty.Title).Center();
         title.TextTrimming = TextTrimming.None;
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 18, HorizontalAlignment = HorizontalAlignment.Center, MaxWidth = 560 };
         v.Children.Add(tick);
@@ -238,7 +238,7 @@ internal sealed class QuizReceiptPane : IQuizPane
         if (r?.Feedback == true)
         {
             row.Children.Add(K.Button("Done", s.Dismiss));
-            row.Children.Add(K.Button("See Feedback", SeeFeedback, accent: true));
+            row.Children.Add(K.Button("See feedback", SeeFeedback, accent: true));
         }
         else row.Children.Add(K.Button("Done", s.Dismiss, accent: true));
         return row;
@@ -247,14 +247,14 @@ internal sealed class QuizReceiptPane : IQuizPane
 
 /// <summary>
 /// A finished attempt question by question (the Mac's QuizFeedbackPane): the score as a ring, the attempt to show, a
-/// filter (all, to review, correct), the instructor's comments, and each question with what was answered, the correct
-/// answer where the quiz shows it, every option, and the worked solution. The questions are sections of the page with a
-/// hairline between them; on a wide popup the score, the filter and a tile per question (a click goes to it) stay in a
-/// column at the side.
+/// filter (all, to review, correct — each with its count), the instructor's comments, and each question with what was
+/// answered, the correct answer where the quiz shows it, every option, and the worked solution. The questions are
+/// sections of the page with a hairline between them; on a wide popup the score, the filter and a tile per question (a
+/// click goes to it) stay in a column at the side.
 /// </summary>
 internal sealed class QuizFeedbackPane : IQuizPane
 {
-    private static readonly string[] FilterNames = { "All", "To Review", "Correct" };
+    private static readonly string[] FilterNames = { "All", "To review", "Correct" };
     private readonly QuizSheet s;
     private readonly bool wide;
     private readonly ContentControl host = new() { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
@@ -289,7 +289,7 @@ internal sealed class QuizFeedbackPane : IQuizPane
         }
         if (fb.Hidden is { } why)
         {
-            var v = K.V(12, K.Icon(SymbolRegular.EyeOff24, 40, B.Text3), K.Text("Results Not Released", Ty.Subtitle).Center(), K.Wrapped(why, Ty.Body, B.Text2).Center());
+            var v = K.V(12, K.Icon(SymbolRegular.EyeOff24, 40, B.Text3), K.Text("Results not released", Ty.Subtitle).Center(), K.Wrapped(why, Ty.Body, B.Text2).Center());
             v.HorizontalAlignment = HorizontalAlignment.Center;
             v.VerticalAlignment = VerticalAlignment.Center;
             v.MaxWidth = 440;
@@ -357,12 +357,10 @@ internal sealed class QuizFeedbackPane : IQuizPane
         if (fb.Released == true) v.Children.Add(FilterRows(rows));
         if (rows.Count > 0)
         {
-            // the questions as a small card of tiles, as the attempt's are
+            // the questions as a small card of tiles, as the attempt's are (how many were right is the filter's count)
             var grid = new UniformGrid { Columns = 5, Margin = new Thickness(-3) };
             foreach (var r in rows) grid.Children.Add(VerdictTile(r));
-            var right = K.Text($"{rows.Count(r => r.Verdict == "right")} of {rows.Count} right", Ty.Caption, B.Text2).Digits();
-            var head = K.Columns("*, auto", K.Text("Questions", Ty.BodyStrong).Col(0), right.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
-            v.Children.Add(K.Card(K.V(12, head, grid), new Thickness(14)));
+            v.Children.Add(K.Card(K.V(12, K.Text("Questions", Ty.BodyStrong), grid), new Thickness(14)));
         }
         return v;
     }
@@ -389,8 +387,8 @@ internal sealed class QuizFeedbackPane : IQuizPane
         face.Opacity = Passes(r) ? 1 : 0.4;
         var b = K.Subtle(face, () => GoTo(r), new Thickness(0), 6);
         b.Margin = new Thickness(3);
-        b.ToolTip = $"Question {r.N} · {r.VerdictText}";
-        System.Windows.Automation.AutomationProperties.SetName(b, $"Question {r.N}, {r.VerdictText}");
+        b.ToolTip = $"Question {r.N} · {QuizUi.Sentence(r.VerdictText)}";
+        System.Windows.Automation.AutomationProperties.SetName(b, $"Question {r.N}, {QuizUi.Sentence(r.VerdictText)}");
         return b;
     }
 
@@ -410,21 +408,27 @@ internal sealed class QuizFeedbackPane : IQuizPane
 
     private Color ScoreColor(QuizFeedback fb) => fb.Color is { Length: > 0 } hex ? K.Hex(hex, s.Tint) : s.Tint;
 
+    /// <summary>The ring's whole percent: the engine's, from the one-decimal figure shown elsewhere (81.25 → 81.3% → 81),
+    /// else half up on the decimal value — never banker's rounding.</summary>
+    private static int? Whole(QuizFeedback fb) =>
+        fb.PctWhole ?? (fb.Pct is { } p ? (int)Math.Round(Math.Round((decimal)p, 1, MidpointRounding.AwayFromZero), MidpointRounding.AwayFromZero) : null);
+
     private FrameworkElement ScoreRing(QuizFeedback fb, double size)
     {
         var c = ScoreColor(fb);
-        var pct = K.Text(fb.Pct is { } p ? $"{(int)Math.Round(p)}%" : "—", Ty.Subtitle).Digits().Center();
+        var pct = K.Text(Whole(fb) is { } w ? $"{w}%" : "–", Ty.Subtitle).Digits().Center();
         pct.FontWeight = FontWeights.Bold;
         pct.Foreground = QuizUi.Ink(c);
         pct.VerticalAlignment = VerticalAlignment.Center;
         var ring = K.Ring(fb.Pct is { } f ? f / 100 : null, c, size, 9, pct);
         ring.HorizontalAlignment = HorizontalAlignment.Left;
+        if (fb.PctText is { Length: > 0 } text) ring.ToolTip = text;
         return ring;
     }
 
     private static FrameworkElement ScoreWords(QuizFeedback fb)
     {
-        var v = K.V(4, K.Text($"{fb.Score ?? "—"} / {fb.Possible ?? "—"}", Ty.Title).Digits(), K.Text($"Attempt {fb.Attempt ?? 1}", Ty.BodyStrong));
+        var v = K.V(4, K.Text($"{fb.Score ?? "–"} / {fb.Possible ?? "–"}", Ty.Title).Digits(), K.Text($"Attempt {fb.Attempt ?? 1}", Ty.BodyStrong));
         if (fb.Summary is { Length: > 0 } sum) v.Children.Add(K.Wrapped(sum, Ty.Caption, B.Text2));
         v.VerticalAlignment = VerticalAlignment.Center;
         return v;
@@ -456,7 +460,7 @@ internal sealed class QuizFeedbackPane : IQuizPane
     {
         if (fb.Released != true) return NotReleased();
         var n = Counts(rows);
-        var bar = new SelectorBar(new[] { $"All {n[0]}", $"To Review {n[1]}", $"Correct {n[2]}" }, filter) { HorizontalAlignment = HorizontalAlignment.Left };
+        var bar = new SelectorBar(new[] { $"All {n[0]}", $"To review {n[1]}", $"Correct {n[2]}" }, filter) { HorizontalAlignment = HorizontalAlignment.Left };
         bar.Changed += SetFilter;
         return bar;
     }
@@ -502,7 +506,7 @@ internal sealed class QuizFeedbackPane : IQuizPane
             g.Margin = new Thickness(0, 10, 0, 10);
             rows.Children.Add(g);
         }
-        return QuizUi.Section("Instructor Comments", K.Card(rows, new Thickness(16, 2, 16, 2)));
+        return QuizUi.Section("Instructor comments", K.Card(rows, new Thickness(16, 2, 16, 2)));
     }
 
     private FrameworkElement Questions(List<QuizFeedback.Row> shown)
@@ -576,7 +580,7 @@ internal sealed class QuizFeedbackQuestion
         var g = K.Columns("auto, auto, auto, *, auto",
             icon.Margin(0, 0, 10, 0).Col(0),
             K.Text($"Question {row.N}", Ty.Subtitle).Col(1),
-            Inked(K.Text(row.VerdictText, Ty.BodyStrong)).Margin(12, 0, 0, 3).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(2));
+            Inked(K.Text(QuizUi.Sentence(row.VerdictText), Ty.BodyStrong)).Margin(12, 0, 0, 3).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(2));
         if (row.Score.Length > 0) g.Children.Add(Inked(K.Text(row.Score, Ty.BodyStrong).Digits()).Align(HorizontalAlignment.Right, VerticalAlignment.Bottom).Margin(12, 0, 0, 3).Col(4));
         return g;
     }
@@ -587,11 +591,11 @@ internal sealed class QuizFeedbackQuestion
         var mine = row.Verdict == "none" ? null : Verdict;
         if (row.Essay || row.Right.Count == 0)
         {
-            var v = K.V(16, Answer("Your Answer", row.Yours, mine, "No answer"));
-            if (row.Right.Count > 0) v.Children.Add(Answer("Correct Answer", row.Right, QuizUi.Green, "—"));
+            var v = K.V(16, Answer("Your answer", row.Yours, mine, "No answer"));
+            if (row.Right.Count > 0) v.Children.Add(Answer("Correct answer", row.Right, QuizUi.Green, "–"));
             return v;
         }
-        return K.Columns("*, 28, *", Answer("Your Answer", row.Yours, mine, "No answer").Col(0), Answer("Correct Answer", row.Right, QuizUi.Green, "—").Col(2));
+        return K.Columns("*, 28, *", Answer("Your answer", row.Yours, mine, "No answer").Col(0), Answer("Correct answer", row.Right, QuizUi.Green, "–").Col(2));
     }
 
     /// <summary>An answer under its label, a line of the verdict's colour at its edge; its words in that colour (an
@@ -674,7 +678,7 @@ internal sealed class QuizFeedbackQuestion
         list.Visibility = Visibility.Collapsed;
         list.Margin = new Thickness(0, 6, 0, 0);
         var chevron = K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2);
-        var words = K.Text($"Show All {opts.Count} Options", Ty.BodyStrong);
+        var words = K.Text($"Show all {opts.Count} options", Ty.BodyStrong);
         var toggle = K.Subtle(K.H(10, chevron, words), null, new Thickness(8, 6, 10, 6));
         toggle.HorizontalAlignment = HorizontalAlignment.Left;
         toggle.Margin = new Thickness(-8, 0, 0, 0);
@@ -683,7 +687,7 @@ internal sealed class QuizFeedbackQuestion
             var open = list.Visibility != Visibility.Visible;
             list.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
             chevron.Symbol = open ? SymbolRegular.ChevronDown20 : SymbolRegular.ChevronRight20;
-            words.Text = open ? "Hide the Options" : $"Show All {opts.Count} Options";
+            words.Text = open ? "Hide the options" : $"Show all {opts.Count} options";
             if (open) Motion.Enter(list, 0, 8, 250);
         };
         return K.V(0, toggle, list);
@@ -693,7 +697,7 @@ internal sealed class QuizFeedbackQuestion
     {
         if (row.Solution is { } sol)
         {
-            var head = K.H(8, K.Icon(SymbolRegular.Lightbulb24, 16, B.Text), K.Text("Worked Solution", Ty.BodyStrong));
+            var head = K.H(8, K.Icon(SymbolRegular.Lightbulb24, 16, B.Text), K.Text("Worked solution", Ty.BodyStrong));
             FrameworkElement text = sol.Html.Length > 0 ? QuizUi.Rich(s.Engine, sol.Html, 15) : K.Wrapped(sol.Text, Ty.Body);
             return QuizUi.Edge(K.V(8, head, text), s.Tint, 0.55);
         }

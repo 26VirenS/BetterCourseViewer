@@ -22,8 +22,10 @@ namespace Simpl.Screens;
 /// Submit. A file of a kind the assignment does not take is converted to one it does where the web's converter can; the
 /// assignment's own file types are checked before anything is sent. A file chosen is looked at in a pane at the dialog's
 /// right, the dialog widening for it (the Mac's HandInPreview). While it goes, the dialog says so, and says why if it
-/// could not. Send from Phone… (beside Choose Files…) opens a panel over the form whose QR code a phone's camera opens;
-/// what the phone sends comes into the hand-in as a file chosen here would (PhoneHandIn.cs).
+/// could not. Send from phone… (beside Choose files…) opens a panel over the form whose QR code a phone's camera opens;
+/// what the phone sends comes into the hand-in as a file chosen here would (PhoneHandIn.cs). Each thing is said once: the
+/// kind chosen is the selector's (no heading under it saying it again), the drop zone says where files go and the
+/// buttons under it how else to choose them.
 /// </summary>
 internal sealed class HandInSheet
 {
@@ -185,7 +187,7 @@ internal sealed class HandInSheet
         var subtitle = string.Join(" · ", new[] { a.Title, a.AttemptsText ?? "" }.Where(s => s.Length > 0));
         var head = K.Columns("auto, *",
             K.IconTile(SymbolRegular.ArrowUpload24, Accent, 36).Margin(0, 0, 12, 0).Col(0),
-            K.V(2, K.Text(a.Resubmit == true ? "Hand In Again" : "Hand In", Ty.Subtitle), K.Text(subtitle, Ty.Body, B.Text2)).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1));
+            K.V(2, K.Text(a.Resubmit == true ? "Hand in again" : "Hand in", Ty.Subtitle), K.Text(subtitle, Ty.Body, B.Text2)).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(1));
         head.Margin = new Thickness(24, 22, 24, 10);
 
         var form = new Stack { Orientation = Orientation.Vertical, Spacing = 18 };
@@ -227,7 +229,7 @@ internal sealed class HandInSheet
         var label = new Border
         {
             Child = K.H(8, K.Icon(SymbolRegular.DocumentArrowDown20, 18, B.Text, filled: true),
-                K.Text(a.Types.Contains("online_upload") ? "Drop to Add Files" : "Drop to Add the Link", Ty.BodyStrong)),
+                K.Text(a.Types.Contains("online_upload") ? "Drop to add files" : "Drop to add the link", Ty.BodyStrong)),
             Padding = new Thickness(18, 10, 18, 10), CornerRadius = new CornerRadius(20), HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center, Effect = K.Shadow(20, 4, 0.18),
         };
@@ -297,16 +299,19 @@ internal sealed class HandInSheet
 
     private FrameworkElement FilesSection()
     {
-        var choose = K.Button("Choose Files…", ChooseFiles, icon: SymbolRegular.Folder24);
-        var pictures = K.Button("Choose Pictures…", ChoosePictures, icon: SymbolRegular.ImageMultiple24);
+        var choose = K.Button("Choose files…", ChooseFiles, icon: SymbolRegular.Folder24);
+        var pictures = K.Button("Choose pictures…", ChoosePictures, icon: SymbolRegular.ImageMultiple24);
         pictures.ToolTip = "Pictures and videos from your Pictures folder";
-        // (Send from Phone beside them, onto a line of its own when the three will not fit)
-        var fromPhone = K.Button("Send from Phone…", () => OpenPhone(phoneButton), icon: SymbolRegular.Phone24);
+        // (Send from phone beside them, onto a line of its own when the three will not fit)
+        var fromPhone = K.Button("Send from phone…", () => OpenPhone(phoneButton), icon: SymbolRegular.Phone24);
         fromPhone.ToolTip = "Scan a code with your phone to send photos and files to this hand-in";
         phoneButton = fromPhone;
         var buttons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, -8) };
         foreach (var b in new FrameworkElement[] { choose, pictures, fromPhone }) buttons.Children.Add(b.Margin(0, 0, 10, 8));
-        return K.V(8, K.Text("Files", Ty.BodyStrong), filesList, buttons, filesFoot);
+        // (its heading only where no kind selector above says "Files" already)
+        var v = K.V(8, filesList, buttons, filesFoot);
+        if (a.Types.Count <= 1) v.Children.Insert(0, K.Text("Files", Ty.BodyStrong));
+        return v;
     }
 
     /// <summary>What the dialog says now: the files, the line under them, whether Submit can be pressed, the error, the
@@ -336,13 +341,13 @@ internal sealed class HandInSheet
         errorRow.Visibility = message == null ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    /// <summary>A press on it opens the Open dialog, as Choose Files… does.</summary>
+    /// <summary>Where files are dropped — its words that alone, the buttons under it the other ways in; a press on it still
+    /// opens the Open dialog, as Choose files… does.</summary>
     private FrameworkElement DropZone()
     {
         var words = K.V(6,
             K.Icon(SymbolRegular.DocumentArrowDown20, 26, B.Text2).Align(HorizontalAlignment.Center),
-            K.Text("Drop files here", Ty.BodyStrong).Center(),
-            K.Text("or click to choose them", Ty.Caption, B.Text2).Center());
+            K.Text("Drop files here", Ty.BodyStrong).Center());
         var dash = new Rectangle { RadiusX = 8, RadiusY = 8, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 3.4, 2.6 } };
         dash.SetResourceReference(Shape.StrokeProperty, B.StrongStroke);
         var g = new Grid { Children = { dash, words.Margin(0, 18, 0, 18) } };
@@ -367,7 +372,7 @@ internal sealed class HandInSheet
         var remove = K.IconButton(SymbolRegular.DismissCircle24, () => Remove(f), $"Remove {f.Name}", 16, 30);
         var g = K.Columns("*, auto", press.Col(0), remove.Margin(4, 0, 0, 0).Col(1));
         var menu = new ContextMenu();
-        menu.Items.Add(AssignKit.Item(open ? "Close Preview" : "Preview", SymbolRegular.Eye24, () => Toggle(f)));
+        menu.Items.Add(AssignKit.Item(open ? "Close preview" : "Preview", SymbolRegular.Eye24, () => Toggle(f)));
         menu.Items.Add(AssignKit.Item("Remove", SymbolRegular.Delete24, () => Remove(f)));
         g.ContextMenu = menu;
         return g;

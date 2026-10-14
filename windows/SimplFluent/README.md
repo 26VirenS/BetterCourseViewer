@@ -181,7 +181,7 @@ Branch, `claude/windows-liquid-glass` (pushes and Run workflow both run there) �
 Certificate Profile Signer** role on the signing account.
 
 What is signed: the build job signs every `.exe` and `.dll` in the published folder that nobody signed (Simpl's own,
-WPF-UI's, PDFsharp's; .NET's and WebView2's are Microsoft's already), so the zip and the installer carry them signed;
+WPF-UI's, PDFsharp's, QRCoder's, WPF-Math's; .NET's and WebView2's are Microsoft's already), so the zip and the installer carry them signed;
 the installer job has Inno Setup sign `Simpl-Setup.exe` and its uninstaller (`ISCC /DSign /Ssimpl=…`, `SignTool` in
 `Installer/Simpl.iss`). Both check the signatures, and the log says who signed. Each signature counts against the
 account's monthly 5,000 (about a dozen a run).
@@ -352,8 +352,8 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | --- | --- |
 | `Engine/` | The school's site in WebView2 as the app's engine (carried over): `Engine.Call<T>(name, args)` asks the page (the extension's `BCVNative.call`), navigation (`Go`, `Push`, `Open`, `OpenWeb`, `GoBack`), the sign-in assist. |
 | `Models/` | The page's answers, generated from the Swift models (`windows/tools/models.sh`). Since 2.99.33 the page also writes the figures, dates and course names it sends (`pctText`, `gpaText`, `goalLine`, `dueLine`, `altName`, `gradedText`…): show those strings as they come rather than formatting the numbers here, so Windows reads every grade, date and course exactly as the Mac does. |
-| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `Styles.xaml` (card, subtle and row buttons). |
-| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
+| `Kit/` | Windows 11 pieces in code: `K` (text ramp, icons, cards, settings rows, chips, rings, bars, avatars, load and empty states, frozen colour brushes), `B` (theme brush keys), `Motion` (WinUI curves and transitions, the pages' motion), `Ahead` (a screen ready before the click), `Decoding` (pictures decoded at the size shown), `FlatResources` (WPF-UI's styles in one dictionary), `SelectorBar`, `CheckCircle`, `Heading`, `Sheet`/`SheetHost` (dialogs), `Glyph` (symbols for the school's things), `RichText` (Canvas's own HTML as Windows text), `Formula` (Canvas's formulas typeset from their TeX with WPF-Math, MIT, drawn in the text's colour; written out as plain maths where they cannot be), `Styles.xaml` (card, subtle and row buttons). |
+| `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place in a window of its own (`PlaceWindow`: a pane row's Open in new window, or Shift+click), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins and their flyouts, a tool opened whole over the window, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table), `Chemistry/` (its Lewis maker and molecule builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
@@ -505,11 +505,11 @@ light-dismiss flyout: nothing behind it is dimmed.
 
 ## Send from Phone
 
-Hand In's *Send from Phone…* (beside Choose Files…, for an assignment that takes files) opens a panel over the form
+Hand in's *Send from phone…* (beside Choose files…, for an assignment that takes files) opens a panel over the form
 with a QR code (`Screens/Assignment/PhoneHandIn.cs`). The phone's own camera opens it: a page this PC serves itself
 (`Assets/PhoneHandIn.html`, an embedded resource — the same file as the Mac app's), with the assignment, its course and
 the kinds of file it takes, *Take Photo* and *Choose Files*, each file's progress and Retry, then "Sent to your PC —
-finish handing in there." Each file comes into the hand-in as if chosen with Choose Files… (its type checked, converted
+finish handing in there." Each file comes into the hand-in as if chosen with Choose files… (its type checked, converted
 where it must be); the student looks it over and presses Submit on the PC — nothing is handed in by itself.
 
 - **No server anywhere.** `Support/PhoneServer.cs` is a small web server on plain sockets (`TcpListener`, not
@@ -555,9 +555,12 @@ internal static class CalculatorRegistration
 ```
 
 The whole tool opens over the window (`ToolPopup`), from its tile on the Tools page, a pin's flyout or a command
-alike; the quick version is the pin's flyout. `ToolContext` hands it the engine, what
-was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` (the flyout, or the sheet the whole tool is in).
-`ToolKit` has the page, two columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
+alike; the quick version is the pin's flyout. The pins sit in the header of a popup that covers the title bar too (a
+quiz, Knewton Alta, Macmillan: `PinBar(engine, inPopup: true)`), their flyouts over it; from there the whole tool opens
+in a window of its own beside it (`ToolsCenter.Float`, `ToolWindow`), since a sheet over the window would wait behind
+the popup. `ToolContext` hands it the engine, what
+was handed over (`TakeFiles`, `TakeInfo`), and `OpenFull` / `Close` for the flyout. `ToolKit` has the page, two
+columns, fields, notes and the drop zone; `Files` has Windows' file dialogs.
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state

@@ -45,19 +45,34 @@ internal static class AltaLook
         Keyboard.Focus(body);
     }
 
-    /// <summary>The popup's header row: the vendor's tile, the assignment's name over its line, what the popup adds, and Close.</summary>
-    public static FrameworkElement Header(FrameworkElement tile, TextBlock title, TextBlock subtitle, UIElement? extra, Action close, string closeTip)
+    /// <summary>The popup's header row: the vendor's tile, the assignment's name over its line, what the popup adds, the
+    /// tools pinned to the title bar (which the popup covers), and Close.</summary>
+    public static FrameworkElement Header(Engine.Engine engine, FrameworkElement tile, TextBlock title, TextBlock subtitle, UIElement? extra, Action close, string closeTip)
     {
         var words = K.V(0, title, subtitle);
         words.VerticalAlignment = VerticalAlignment.Center;
         var closeButton = K.Button("Close", close, icon: SymbolRegular.Dismiss24);
         closeButton.ToolTip = closeTip;
-        var trailing = K.H(8, extra, closeButton);
+        var trailing = K.H(8, extra, new Simpl.Tools.PinBar(engine, inPopup: true), closeButton);
         trailing.VerticalAlignment = VerticalAlignment.Center;
         var row = K.Columns("auto, *, auto", tile.Margin(0, 0, 14, 0).Col(0), words.Col(1), trailing.Margin(12, 0, 0, 0).Col(2));
         row.Margin = new Thickness(24, 14, 16, 14);
         return row;
     }
+
+    /// <summary>(2.99.33) The Canvas assignment a vendor's popup opens — its name, and its due line as every screen writes it
+    /// ("Due Oct 12 at 11:59 PM", "" with none) — or null where it cannot be read.</summary>
+    public static async Task<Simpl.Models.AssignmentData?> Assignment(Engine.Engine engine, Simpl.Engine.AltaLaunch launch)
+    {
+        if (string.IsNullOrEmpty(launch.Course) || string.IsNullOrEmpty(launch.Assignment)) return null;
+        try { return await engine.Call<Simpl.Models.AssignmentData>("assignment", new { course = launch.Course, id = launch.Assignment }); }
+        catch { return null; }
+    }
+
+    /// <summary>A due time the popup writes itself (no Canvas assignment to say it), as the engine writes one: "Due Oct 12
+    /// at 11:59 PM", the year only when it is not this year.</summary>
+    public static string DueText(DateTime d) =>
+        $"Due {d.ToString(d.Year == DateTime.Now.Year ? "MMM d" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} at {d.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)}";
 
     /// <summary>The popup's Loading while the vendor's page opens (the Mac's ProgressView with its words).</summary>
     public static FrameworkElement Opening(string words)

@@ -739,7 +739,11 @@ internal sealed class AltaSession
             {
                 if (Overview?.Completed == true) return 1;
                 if (LivePercent is { } lp) return lp;
-                return Math.Clamp((Overview?.Percent ?? 0) / 100, 0, 1);
+                if (Overview?.Percent is { } op) return Math.Clamp(op / 100, 0, 1);
+                // (no overall figure yet — the start screen, before Alta's report: the mean of the objectives the rail
+                // shows, never a 0% over "1 of 3 objectives mastered")
+                var shown = Objectives;
+                return shown.Count == 0 ? 0 : shown.Average(o => o.Mastery);
             }
             if (r.Completed || (r.Status ?? "").ToLowerInvariant() == "complete") return 1;
             if (LivePercent is { } p) return p;

@@ -12,7 +12,8 @@ namespace Simpl.Kit;
 /// <summary>
 /// Canvas's own rich text inside a native screen (an announcement, a discussion, an assignment's instructions, a page;
 /// the Mac's RichText): the HTML the page has already cleaned, drawn as Windows text — paragraphs, headings, lists,
-/// quotes, tables, code, pictures at the column's width, links that go through the app — in the theme's colours, its
+/// quotes, tables, code, pictures at the column's width, Canvas's formulas typeset (Formula), a quiz's blanks as numbered
+/// marks, links that go through the app — in the theme's colours, its
 /// height as tall as what it holds, the page's scroll wheel passing over it. Pictures come with the school's session.
 /// </summary>
 public sealed class RichText : RichTextBox
@@ -214,7 +215,7 @@ public sealed class RichText : RichTextBox
     private static Paragraph NewParagraph() => new() { Margin = new Thickness(0, 0, 0, 10) };
 
     private static bool IsLargeImage(Node n) =>
-        !(int.TryParse(n.Attrs.GetValueOrDefault("width"), out var w) && w <= 48) && !(n.Attrs.GetValueOrDefault("class") ?? "").Contains("equation");
+        !(int.TryParse(n.Attrs.GetValueOrDefault("width"), out var w) && w <= 48) && !(n.Attrs.GetValueOrDefault("class") ?? "").Contains("equation") && Formula.TexOf(n.Attrs) == null;
 
     private Block? Block(Node n, double size)
     {
@@ -351,6 +352,13 @@ public sealed class RichText : RichTextBox
         {
             case "br": into.Add(new LineBreak()); return;
             case "img":
+                // (one of Canvas's formulas: typeset in the text's colour, or written out as plain maths — never its TeX)
+                if (Formula.TexOf(n.Attrs) is { } tex)
+                {
+                    if (Formula.Shape(tex, size) is { } shape) into.Add(new InlineUIContainer(shape) { BaselineAlignment = BaselineAlignment.Center });
+                    else into.Add(new Run(Formula.Readable(tex)));
+                    return;
+                }
                 if (Picture(n) is { } img) into.Add(new InlineUIContainer(img) { BaselineAlignment = BaselineAlignment.Center });
                 return;
             case "a":
@@ -361,6 +369,9 @@ public sealed class RichText : RichTextBox
                 into.Add(span);
                 return;
             }
+            case "span" when n.Attrs.ContainsKey("data-blank"):
+                into.Add(new InlineUIContainer(BlankMark(TextOf(n).Trim(), n.Attrs.ContainsKey("data-picked"), size)) { BaselineAlignment = BaselineAlignment.Center });
+                return;
         }
         Span s = n.Tag switch
         {
@@ -391,6 +402,24 @@ public sealed class RichText : RichTextBox
             else Inlines(k, s.Inlines, size);
         }
         into.Add(s);
+    }
+
+    /// <summary>A quiz's blank in the sentence (the quiz marks it data-blank): its number in a pill edged in the accent — the
+    /// same pill its field wears beside it (QuizQuestionPage) — or, once picked, the word picked, in the accent's colour, so
+    /// the sentence reads whole.</summary>
+    internal static FrameworkElement BlankMark(string text, bool picked, double size)
+    {
+        var t = new TextBlock { Text = text, FontSize = size - 1, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center };
+        t.SetResourceReference(TextBlock.ForegroundProperty, B.AccentText);
+        var b = new Border
+        {
+            Child = t, CornerRadius = new CornerRadius(size * 0.6), Padding = new Thickness(picked ? 9 : 7, 0, picked ? 9 : 7, 1),
+            MinWidth = size * 1.7, Margin = new Thickness(2, 0, 2, 0), BorderThickness = new Thickness(picked ? 0 : 1.2),
+        };
+        b.SetResourceReference(Border.BorderBrushProperty, B.AccentText);
+        b.SetResourceReference(Border.BackgroundProperty, picked ? B.Subtle3 : B.Subtle);
+        System.Windows.Automation.AutomationProperties.SetName(b, picked ? text : $"Blank {text}");
+        return b;
     }
 
     private Hyperlink Link(string href, Inline? content)

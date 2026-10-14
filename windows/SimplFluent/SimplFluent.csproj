@@ -41,6 +41,9 @@
     <PackageReference Include="PDFsharp" Version="6.2.4" />
     <!-- Send from Phone's QR code: its modules (MIT); the app draws them itself -->
     <PackageReference Include="QRCoder" Version="1.6.0" />
+    <!-- Canvas's formulas typeset from their TeX (MIT; its fonts OFL), drawn as the app's own text: Canvas sends them as
+         SVG pictures, which Windows' text cannot show -->
+    <PackageReference Include="WpfMath" Version="2.1.0" />
   </ItemGroup>
 
   <!-- (the models' unit tests, windows/SimplFluent.Tests, reach the tools' internal models) -->

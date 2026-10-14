@@ -18,8 +18,10 @@ namespace Simpl.Screens;
 /// <summary>
 /// Your work and what was said about it, in a dialog over the assignment (the Mac's SubmissionReview): on the left the file
 /// in the school's own viewer (DocViewer: the teacher's marks drawn on it, as Canvas shows them), one file at a time where
-/// there are several; on the right the comments. A file the school has no viewer for is fetched and shown here; work with
-/// no file at all shows the submission's own page; handed-in text shows as text. Escape or Done closes it.
+/// there are several; on the right the comments on the submission. With none, there is no column saying "No comments"
+/// beside the notes the teacher left on the page (which Canvas's API cannot read): the file has the whole width, and the
+/// header says there are no comments on this submission. A file the school has no viewer for is fetched and shown here;
+/// work with no file at all shows the submission's own page; handed-in text shows as text. Escape or Done closes it.
 /// </summary>
 internal sealed class SubmissionReview : Grid
 {
@@ -65,10 +67,14 @@ internal sealed class SubmissionReview : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Children.Add(Top().Row(0));
         Children.Add(new Border().Bg(B.Divider).Row(1));
-        var commentsWidth = Math.Min(360, Math.Max(280, width * 0.28));
-        var body = K.Columns($"*, 1, {commentsWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
-            viewer.Col(0), new Border().Bg(B.Divider).Col(1), Comments().Col(2));
-        Children.Add(body.Row(2));
+        if (a.Comments.Count == 0) Children.Add(viewer.Row(2));
+        else
+        {
+            var commentsWidth = Math.Min(360, Math.Max(280, width * 0.28));
+            var body = K.Columns($"*, 1, {commentsWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+                viewer.Col(0), new Border().Bg(B.Divider).Col(1), Comments().Col(2));
+            Children.Add(body.Row(2));
+        }
         ShowWork();
     }
 
@@ -76,7 +82,9 @@ internal sealed class SubmissionReview : Grid
 
     private FrameworkElement Top()
     {
-        var titles = K.V(1, K.Text("Feedback", Ty.BodyStrong), K.Text(a.Title, Ty.Body, B.Text2));
+        // (with no comments on the submission, the header says so: no column beside the page saying it)
+        var line = a.Comments.Count == 0 ? $"{a.Title} · No comments on this submission" : a.Title;
+        var titles = K.V(1, K.Text("Feedback", Ty.BodyStrong), K.Text(line, Ty.Body, B.Text2));
         titles.VerticalAlignment = VerticalAlignment.Center;
         var g = K.Columns("auto, *, auto, auto, auto",
             K.IconTile(SymbolRegular.Comment24, K.Hex(a.Color, Appearance.Accent), 30).Margin(0, 0, 12, 0).Col(0),
@@ -147,7 +155,7 @@ internal sealed class SubmissionReview : Grid
         var v = K.V(10, K.Icon(icon, 40, B.Text3), K.Text(title, Ty.Subtitle).Center(), K.Wrapped(note, Ty.Body, B.Text2).Center());
         if (retry != null)
         {
-            var again = K.Button("Try Again", retry);
+            var again = K.Button("Try again", retry);
             again.HorizontalAlignment = HorizontalAlignment.Center;
             v.Children.Add(again.Margin(0, 6, 0, 0));
         }
@@ -187,7 +195,7 @@ internal sealed class SubmissionReview : Grid
         catch (Exception e)
         {
             if (gen != generation) return;
-            viewer.Child = Unavailable(SymbolRegular.Warning24, "No Preview", e.Message, () => FetchAndShow(f));
+            viewer.Child = Unavailable(SymbolRegular.Warning24, "No preview", e.Message, () => FetchAndShow(f));
         }
     }
 
@@ -197,9 +205,8 @@ internal sealed class SubmissionReview : Grid
     {
         var list = a.Comments;
         var head = K.Columns("*, auto", K.Text("Comments", Ty.BodyStrong).Col(0));
-        if (list.Count > 0) head.Children.Add(K.Text(list.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), Ty.Body, B.Text2).Col(1));
+        head.Children.Add(K.Text(list.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), Ty.Body, B.Text2).Col(1));
         head.Margin = new Thickness(18, 14, 18, 14);
-        if (list.Count == 0) return K.V(0, head, K.Empty(SymbolRegular.Comment24, "No comments yet.").Margin(18, 0, 18, 0));
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 16, Margin = new Thickness(18, 0, 18, 20) };
         foreach (var c in list) v.Children.Add(Comment(c));
         var scroll = new ScrollViewer { Content = v, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -253,7 +260,8 @@ internal sealed class SubmissionReview : Grid
 /// <summary>
 /// The school's file viewer (DocViewer) dressed to sit in a Windows 11 dialog (the Mac's AssignDocViewerSkin): its toolbar a
 /// quiet bar in Segoe UI, its buttons rounded and lit under the pointer, the tool in use in the accent, its dashed rules
-/// hairlines, its page field a rounded field — light or dark as the page is. DocViewer's markup is its own and unnamed, so
+/// hairlines, its page field a rounded field, its scroll bars Windows 11's thin ones (no arrow buttons: no Win32 bar in a
+/// Fluent dialog) — light or dark as the page is. DocViewer's markup is its own and unnamed, so
 /// the bar is found by its shape (a bar across the top of the page holding several buttons), looked for again as the viewer
 /// draws itself; a viewer it does not find is left exactly as the school draws it.
 /// </summary>
@@ -286,7 +294,14 @@ internal static class AssignDocViewerSkin
             .simpl-bar .simpl-rule { border-style: solid !important; border-color: rgba(0,0,0,.08) !important; }
             .simpl-empty { display: none !important; }
             .simpl-bar .simpl-bar { background: transparent !important; border-bottom: 0 !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+            ::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+            ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+            ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+            ::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,.36); border-radius: 6px; border: 4px solid transparent; background-clip: content-box; }
+            ::-webkit-scrollbar-thumb:hover { background-color: rgba(0,0,0,.5); border-width: 3px; }
             @media (prefers-color-scheme: dark) {
+              ::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,.4); }
+              ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.55); }
               .simpl-bar { background: rgba(32,32,32,.86) !important; border-bottom-color: rgba(255,255,255,.08) !important; color: #fff !important; }
               .simpl-bar button:hover, .simpl-bar [role="button"]:hover, .simpl-bar a:hover { background: rgba(255,255,255,.06) !important; }
               .simpl-bar button:active, .simpl-bar [role="button"]:active { background: rgba(255,255,255,.04) !important; color: rgba(255,255,255,.78) !important; }

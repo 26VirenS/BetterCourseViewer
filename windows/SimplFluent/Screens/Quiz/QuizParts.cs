@@ -13,7 +13,7 @@ namespace Simpl.Screens;
 /// <summary>
 /// The quiz popup's shared pieces (the Mac's QuizLayout, QuizFloatingBar, QuizOptionText and its small helpers): its
 /// measures, the foot each pane's buttons sit in (Windows 11's dialog foot), a section's heading, a coloured edge beside
-/// an answer, Canvas's text with its formulas left readable, and the symbols of the quiz's rules.
+/// an answer, Canvas's text with its formulas typeset and its blanks marked, and the symbols of the quiz's rules.
 /// </summary>
 internal static class QuizUi
 {
@@ -28,6 +28,25 @@ internal static class QuizUi
 
     /// <summary>The quiz's colour: its course's, else the Mac's blue.</summary>
     public static Color TintOf(string? hex) => K.Hex(hex, Color.FromRgb(0x0a, 0x84, 0xff));
+
+    private static readonly HashSet<string> KeepCase = new(StringComparer.Ordinal) { "Canvas", "Browser", "I" };
+
+    /// <summary>
+    /// The page's words for a button or a heading (written in the Mac's Title Case: "Begin Attempt", "Partly Right") in
+    /// Windows 11's sentence case: "Begin attempt", "Partly right". Names keep theirs ("Canvas", "LockDown Browser").
+    /// </summary>
+    public static string Sentence(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return s ?? "";
+        var words = s.Split(' ');
+        for (var i = 1; i < words.Length; i++)
+        {
+            var w = words[i];
+            if (w.Length < 2 || !char.IsUpper(w[0]) || KeepCase.Contains(w) || w.Skip(1).Any(char.IsUpper)) continue; // (a name, LockDown, an acronym)
+            words[i] = char.ToLowerInvariant(w[0]) + w[1..];
+        }
+        return string.Join(' ', words);
+    }
 
     /// <summary>A colour as words on the page (its course's, a verdict's): deepened on light, lightened on dark.</summary>
     public static SolidColorBrush Ink(Color c) => new(K.Darkened(c));
@@ -87,40 +106,28 @@ internal static class QuizUi
 
     // ---- Canvas's text ----
 
-    /// <summary>Canvas's own HTML (a question, an option, a solution): its links through the app, its formulas as their TeX.</summary>
-    public static RichText Rich(Engine.Engine engine, string html, double size)
+    /// <summary>Canvas's own HTML (a question, an option, a solution): its links through the app, its formulas typeset
+    /// (Kit/Formula), a blank's numbered mark as a mark — or, once its menu has a pick, the word picked in its place.</summary>
+    public static RichText Rich(Engine.Engine engine, string html, double size, IReadOnlyDictionary<int, string>? picked = null)
     {
-        var r = new RichText(ReadableMath(html), u => engine.GoTo(u), engine.BaseUrl, size);
+        var r = new RichText(BlankMarks(html, picked), u => engine.GoTo(u), engine.BaseUrl, size);
         return r;
     }
 
-    private static readonly Regex Img = new(@"<img\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>The engine's mark for a blank in a question's words (a numbered pill: its style, as native-app.js writes it).</summary>
+    private static readonly Regex Blank = new(@"<span style=""display:inline-block;min-width:1\.5em;[^""]*"">([^<]{1,4})</span>", RegexOptions.Compiled);
 
-    /// <summary>
-    /// Canvas's formulas are pictures it draws from their TeX (often SVG, which Windows' text cannot show): each is put
-    /// back as its TeX, in code type, so the formula still reads (the Mac typesets it with KaTeX).
-    /// </summary>
-    public static string ReadableMath(string html)
+    /// <summary>Each blank's mark as RichText draws one (data-blank: its number, and the word picked for it, if any).</summary>
+    public static string BlankMarks(string html, IReadOnlyDictionary<int, string>? picked = null)
     {
-        if (string.IsNullOrEmpty(html) || html.IndexOf("equation", StringComparison.OrdinalIgnoreCase) < 0) return html ?? "";
-        return Img.Replace(html, m =>
+        if (string.IsNullOrEmpty(html) || html.IndexOf("min-width:1.5em", StringComparison.Ordinal) < 0) return html ?? "";
+        return Blank.Replace(html, m =>
         {
-            var tag = m.Value;
-            var tex = Attr(tag, "data-equation-content");
-            var isEquation = tex != null || (Attr(tag, "class") ?? "").Contains("equation_image") || (Attr(tag, "src") ?? "").Contains("/equation_images/");
-            if (!isEquation) return tag;
-            tex ??= Attr(tag, "title") ?? Regex.Replace(Attr(tag, "alt") ?? "", @"^LaTeX:\s*", "", RegexOptions.IgnoreCase);
-            if (string.IsNullOrWhiteSpace(tex)) return tag;
-            return $"<code>{WebUtility.HtmlEncode(tex.Trim())}</code>";
+            var n = m.Groups[1].Value;
+            if (picked != null && int.TryParse(n, out var k) && picked.TryGetValue(k, out var word) && word.Length > 0)
+                return $"<span data-blank=\"{n}\" data-picked=\"1\">{WebUtility.HtmlEncode(word)}</span>";
+            return $"<span data-blank=\"{n}\">{n}</span>";
         });
-    }
-
-    private static string? Attr(string tag, string name)
-    {
-        var m = Regex.Match(tag, $@"\s{Regex.Escape(name)}\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase);
-        if (!m.Success) return null;
-        var v = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
-        return WebUtility.HtmlDecode(v);
     }
 
     /// <summary>

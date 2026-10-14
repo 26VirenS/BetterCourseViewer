@@ -175,6 +175,10 @@ public sealed partial class AppShell : Grid, IDisposable
         BuildPane();
         _ = engine.LoadSidebar();
         prefetch.Start();
+        // (the screenshot suite: --place-window section:courses/101:grades opens that place in a window of its own, over
+        // the main one, once it is up)
+        if (Launch.Take("", "place-window") is { Length: > 0 } apart && Engine.Engine.PlaceNamed(apart) is { } elsewhere)
+            Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, elsewhere), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     /// <summary>A screen is being read ahead now (a pointer resting on another waits its turn).</summary>
@@ -349,9 +353,30 @@ public sealed partial class AppShell : Grid, IDisposable
                 }).ToList(),
             });
         }
+        foreach (var e in list) Apart(e);
         if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
         else nav.Show(list, SelectedKey(engine.Nav.Current.Place));
         foreach (var ctx in toRead) _ = engine.LoadSections(ctx);
+    }
+
+    /// <summary>A row's place in a window of its own (its menu's Open in new window, Shift+click): every place row, its
+    /// sections too — the place read back from the row's key.</summary>
+    private void Apart(NavEntry e)
+    {
+        if (!e.Header && !e.Separator && PlaceOfKey(e.Key) is { } place) e.OpenApart = () => PlaceWindow.Open(engine, place);
+        foreach (var c in e.Children ?? new List<NavEntry>()) Apart(c);
+    }
+
+    /// <summary>The place a pane row's key names (SelectedKey backwards): "grades", "courses/101", "courses/101:assignments".</summary>
+    private static Place? PlaceOfKey(string key)
+    {
+        if (key.Length == 0) return null;
+        if (key.StartsWith("courses/") || key.StartsWith("groups/"))
+        {
+            var at = key.IndexOf(':');
+            return at < 0 ? Place.Home(key) : Place.Section(key[..at], key[(at + 1)..]);
+        }
+        return Engine.Engine.PlaceNamed(key);
     }
 
     private static string Initial(string s)
@@ -574,7 +599,8 @@ public sealed partial class AppShell : Grid, IDisposable
         {
             var (title, go) = crumbs[i];
             var last = i == crumbs.Count - 1;
-            var t = K.Text(title, Ty.Title, last ? B.Text : B.Text2);
+            var t = last && current.TitleLines > 1 ? K.Wrapped(title, Ty.Title, B.Text, current.TitleLines) : K.Text(title, Ty.Title, last ? B.Text : B.Text2);
+            if (last) TipWhenCut(t);
             if (go != null)
             {
                 var b = K.Subtle(t, go, new Thickness(2, 0, 2, 0));
@@ -588,6 +614,21 @@ public sealed partial class AppShell : Grid, IDisposable
         if (subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
         titleHost.Content = stack;
         commandsHost.Content = commands;
+    }
+
+    /// <summary>The title's whole words as its tooltip, while it is cut short (too long for the header beside the
+    /// commands); none while it all shows.</summary>
+    private static void TipWhenCut(TextBlock t)
+    {
+        t.SizeChanged += (_, _) =>
+        {
+            if (t.ActualWidth <= 0) return;
+            var face = new Typeface(t.FontFamily, t.FontStyle, t.FontWeight, t.FontStretch);
+            var full = new FormattedText(t.Text, System.Globalization.CultureInfo.CurrentUICulture, t.FlowDirection, face, t.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(t).PixelsPerDip);
+            if (t.TextWrapping != TextWrapping.NoWrap) full.MaxTextWidth = t.ActualWidth;
+            var cut = t.TextWrapping == TextWrapping.NoWrap ? full.Width > t.ActualWidth + 0.5 : full.Height > t.ActualHeight + 1;
+            t.ToolTip = cut ? t.Text : null;
+        };
     }
 
     private double ContentWidth => Math.Max(200, page.ActualWidth - 80);

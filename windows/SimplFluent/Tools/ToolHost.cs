@@ -133,6 +133,14 @@ public static class ToolsCenter
         ToolPopup.Show(key, engine, owner);
     }
 
+    /// <summary>The whole tool in a window of its own (the Mac's floating tool window): what a pin opens from a popup that
+    /// holds the window (a quiz, Knewton Alta, Macmillan), where a sheet over the window would wait behind the popup.</summary>
+    public static void Float(string key, Engine.Engine engine, Window? owner, IReadOnlyList<string>? files = null, Dictionary<string, string>? info = null)
+    {
+        Hand(key, files, info);
+        ToolWindow.Show(key, engine, owner);
+    }
+
     private static void Hand(string key, IReadOnlyList<string>? files, Dictionary<string, string>? info)
     {
         handoff = files?.ToList() ?? new();
@@ -462,6 +470,48 @@ public static class ToolPopup
     }
 }
 
+/// <summary>
+/// A tool opened whole in a window of its own, beside the popup it was opened from (ToolsCenter.Float): a Windows 11
+/// window, Mica round it, the tool's heading and the tool, its own dialogs over itself. It stays until it is closed.
+/// </summary>
+public sealed class ToolWindow : FluentWindow, ISheetWindow
+{
+    private readonly SheetHost sheets = new();
+
+    public SheetHost Sheets => sheets;
+
+    private ToolWindow(ToolsScreen.Kind kind, Engine.Engine engine, Window? owner)
+    {
+        Title = kind.Name;
+        Owner = owner;
+        WindowBackdropType = Appearance.Backdrop;
+        ExtendsContentIntoTitleBar = true;
+        FontFamily = K.TextFace;
+        SetResourceReference(ForegroundProperty, B.Text);
+        SetResourceReference(BackgroundProperty, B.Window);
+        Width = 980;
+        Height = 720;
+        MinWidth = 560;
+        MinHeight = 420;
+        WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
+        var c = new ToolContext { Engine = engine, Key = kind.Key, Owner = this };
+        var body = ToolRegistry.Full(c) ?? ToolPopup.Missing(kind);
+        var head = ToolHeader.Make(kind, c, null);
+        head.Margin = new Thickness(32, 4, 32, 12);
+        var bar = new TitleBar { Title = kind.Name };
+        var root = K.Rows("auto, auto, *", bar.Row(0), head.Row(1), body.Row(2));
+        Grid.SetRowSpan(sheets, 3);
+        root.Children.Add(sheets);
+        Content = root;
+    }
+
+    public static void Show(string key, Engine.Engine engine, Window? owner)
+    {
+        if (ToolsCenter.KindOf(key) is not { } kind) return;
+        new ToolWindow(kind, engine, owner ?? Application.Current?.MainWindow).Show();
+    }
+}
+
 /// <summary>A tool's heading over it when opened whole: Done, its tile, its name and line, its own controls, its pin.</summary>
 public static class ToolHeader
 {
@@ -513,27 +563,39 @@ public static class ToolHeader
 /// <summary>
 /// The tools pinned to the title bar, on every screen: a button each in its tool's colour; a press opens a flyout with
 /// the tool's quickest use, and its name opens the whole tool. A running focus timer is live in its pin (it borrows a
-/// pin while it runs if the timer is not pinned). A pin's menu opens, moves or unpins it.
+/// pin while it runs if the timer is not pinned). A pin's menu opens, moves or unpins it. The same pins sit in the
+/// header of a popup that covers the title bar (a quiz, Knewton Alta, Macmillan: inPopup), their flyouts over it and the
+/// whole tool in a window of its own beside it (ToolsCenter.Float) — a sheet would wait behind the popup.
 /// </summary>
 public sealed class PinBar : StackPanel
 {
     private readonly Engine.Engine engine;
+    private readonly bool inPopup;
     private readonly DispatcherTimer tick = new() { Interval = TimeSpan.FromSeconds(1) };
     private ITimerState? timer;
     private Popup? flyout;
     private string? flyoutKey;
 
-    public PinBar(Engine.Engine engine)
+    public PinBar(Engine.Engine engine, bool inPopup = false)
     {
         this.engine = engine;
+        this.inPopup = inPopup;
         Orientation = Orientation.Horizontal;
         VerticalAlignment = VerticalAlignment.Center;
         Margin = new Thickness(0, 0, 6, 0);
         // (the screenshot suite: --pin calc,ptable pins those tools first)
         if (Launch.Take("", "pin") is { Length: > 0 } pinned) Prefs.Set("pinnedTools", pinned);
-        ToolsPins.Changed += Draw;
         tick.Tick += (_, _) => { if (timer?.Active == true) Draw(); };
-        Loaded += (_, _) => { Hook(); Draw(); };
+        // (heard only while it is on screen: a popup's pins go with the popup, never kept alive by the pins' event)
+        Loaded += (_, _) => { ToolsPins.Changed -= Draw; ToolsPins.Changed += Draw; Hook(); Draw(); };
+        Unloaded += (_, _) =>
+        {
+            ToolsPins.Changed -= Draw;
+            if (timer != null) timer.Changed -= Draw;
+            timer = null;
+            tick.Stop();
+            CloseFlyout();
+        };
         Draw();
         // (the screenshot suite: --pin-open ptable opens that pin's flyout a moment after launch, and keeps it open: CI
         //  starts three copies of Simpl at once, and another's window coming forward would close a flyout that closes when
@@ -776,7 +838,8 @@ public sealed class PinBar : StackPanel
         void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files)
         {
             CloseFlyout();
-            ToolsCenter.PopUp(key, engine, owner, files, info);
+            if (inPopup) ToolsCenter.Float(key, engine, owner, files, info);
+            else ToolsCenter.PopUp(key, engine, owner, files, info);
         }
         var c = new ToolContext { Engine = engine, Key = key, Quick = true, Owner = owner, OpenFull = Full, Close = CloseFlyout };
 

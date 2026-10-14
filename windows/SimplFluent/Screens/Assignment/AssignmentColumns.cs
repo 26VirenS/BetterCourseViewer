@@ -69,7 +69,7 @@ public sealed partial class AssignmentScreen
             row.ToolTip = $"Open {link}";
             var menu = new ContextMenu();
             menu.Items.Add(AssignKit.Item("Open", SymbolRegular.Open24, () => Visit(link)));
-            menu.Items.Add(AssignKit.Item("Copy Link", SymbolRegular.Link24, () => AssignKit.Copy(link)));
+            menu.Items.Add(AssignKit.Item("Copy link", SymbolRegular.Link24, () => AssignKit.Copy(link)));
             row.ContextMenu = menu;
             rows.Children.Add(row);
         }
@@ -78,7 +78,7 @@ public sealed partial class AssignmentScreen
             if (i > 0 || submitted.Length > 0 || text.Length > 0 || link.Length > 0) rows.Children.Add(K.Divider(54));
             rows.Children.Add(AttachmentRow(d, files[i]));
         }
-        return K.V(0, Heading.Section("Your Work"), K.Card(rows, new Thickness(8)));
+        return K.V(0, Heading.Section("Your work"), K.Card(rows, new Thickness(8)));
     }
 
     /// <summary>A file handed in, as a row of Your Work: a click — or Preview — opens it with its feedback (the school's
@@ -103,7 +103,7 @@ public sealed partial class AssignmentScreen
         UIElement? add = null;
         if (!commenting)
         {
-            var b = K.Button("Add a Comment", StartCommenting, icon: SymbolRegular.CommentAdd24);
+            var b = K.Button("Add a comment", StartCommenting, icon: SymbolRegular.CommentAdd24);
             b.ToolTip = "Write a comment for your teacher";
             add = b;
         }
@@ -155,7 +155,7 @@ public sealed partial class AssignmentScreen
         if (c.Text.Length > 0)
         {
             var m = new ContextMenu();
-            m.Items.Add(AssignKit.Item("Copy Comment", SymbolRegular.Copy24, () => AssignKit.Copy(c.Text)));
+            m.Items.Add(AssignKit.Item("Copy comment", SymbolRegular.Copy24, () => AssignKit.Copy(c.Text)));
             g.ContextMenu = m;
         }
         return g;
@@ -175,13 +175,36 @@ public sealed partial class AssignmentScreen
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 16 };
         gradePart = null;
         gradeLit = null;
-        if (ActionPanel(d) is { } action) v.Children.Add(action);
+        actionPart = ActionPanel(d);
+        if (actionPart != null) v.Children.Add(actionPart);
         if (d.Grade is { } g) v.Children.Add(GradeCard(g, d));
-        else if (d.Held == true)
-            v.Children.Add(K.Card(Note(SymbolRegular.EyeOff24, "Graded, but your teacher has not released the grade yet.", Ty.Body)));
+        else if (d.Held == true) v.Children.Add(HeldNote());
         v.Children.Add(FactsCard(d));
         return v;
     }
+
+    /// <summary>
+    /// One column (a narrow page): what there is to do comes first — the next step, the facts in a line under it — then,
+    /// once something is graded, the grade; then the instructions, the work and the comments. The facts' full card is the
+    /// two columns' (its four rows would push the instructions below the fold).
+    /// </summary>
+    private FrameworkElement NarrowColumn(AssignmentData d, FrameworkElement main)
+    {
+        gradePart = null;
+        gradeLit = null;
+        var top = new Stack { Orientation = Orientation.Vertical, Spacing = 12 };
+        actionPart = ActionPanel(d);
+        if (actionPart != null) top.Children.Add(actionPart);
+        top.Children.Add(FactsLine(d));
+        var v = new Stack { Orientation = Orientation.Vertical, Spacing = Gap };
+        v.Children.Add(top);
+        if (d.Grade is { } g) v.Children.Add(GradeCard(g, d));
+        else if (d.Held == true) v.Children.Add(HeldNote());
+        v.Children.Add(main);
+        return v;
+    }
+
+    private static FrameworkElement HeldNote() => K.Card(Note(SymbolRegular.EyeOff24, "Graded, but your teacher has not released the grade yet.", Ty.Body));
 
     private static FrameworkElement Note(SymbolRegular icon, string text, Ty ty = Ty.Body) =>
         K.Columns("auto, *", K.Icon(icon, 16, B.Text2).Margin(0, 2, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), K.Wrapped(text, ty, B.Text2).Col(1));
@@ -205,8 +228,9 @@ public sealed partial class AssignmentScreen
                 {
                     Content = StepLabel(step), Appearance = i == steps.Count - 1 ? ControlAppearance.Primary : ControlAppearance.Secondary,
                     HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                    Padding = new Thickness(12, 10, 12, 10), MinHeight = 44, ToolTip = step.Help,
+                    Padding = new Thickness(12, 10, 12, 10), MinHeight = 44, ToolTip = step.Help, IsEnabled = !step.Pending,
                 };
+                ToolTipService.SetShowOnDisabled(b, true);
                 System.Windows.Automation.AutomationProperties.SetName(b, step.Title);
                 b.Click += (_, _) => Act(d, step);
                 row.Children.Add(b.Col(i * 2));
@@ -220,7 +244,7 @@ public sealed partial class AssignmentScreen
         var inner = K.V(12, Note(SymbolRegular.Info24, why));
         if (HasWork(d))
         {
-            var see = K.Button("See Feedback", () => Review(d, d.Submission?.Files?.FirstOrDefault()), icon: SymbolRegular.Comment24);
+            var see = K.Button("See feedback", () => Review(d, d.Submission?.Files?.FirstOrDefault()), icon: SymbolRegular.Comment24);
             see.HorizontalAlignment = HorizontalAlignment.Stretch;
             see.ToolTip = "Your work, with your teacher's marks and comments";
             inner.Children.Add(see);
@@ -228,14 +252,16 @@ public sealed partial class AssignmentScreen
         return K.Card(inner);
     }
 
-    /// <summary>A step's symbol and words; a title too long for its half of the column is said shorter, then without its
-    /// symbol, rather than cut off.</summary>
+    /// <summary>A step's symbol and words — a spinner for the symbol while it waits on the quiz — and a title too long for
+    /// its half of the column is said shorter, then without its symbol, rather than cut off.</summary>
     private static FrameworkElement StepLabel(AssignStep step)
     {
         FrameworkElement Row(string words, bool symbol)
         {
             var t = new TextBlock { Text = words, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-            return symbol ? K.H(8, new SymbolIcon { Symbol = step.Symbol, FontSize = 18, VerticalAlignment = VerticalAlignment.Center }, t) : t;
+            if (!symbol) return t;
+            UIElement mark = step.Pending ? K.Spinner(16) : new SymbolIcon { Symbol = step.Symbol, FontSize = 18, VerticalAlignment = VerticalAlignment.Center };
+            return K.H(8, mark, t);
         }
         var fit = new AssignFit();
         fit.Children.Add(Row(step.Title, true));
@@ -267,7 +293,7 @@ public sealed partial class AssignmentScreen
             {
                 var t = new TextBlock
                 {
-                    Text = word.Length == 0 ? g.Pct is { } p ? $"{Math.Round(p, MidpointRounding.AwayFromZero)}%" : "" : word,
+                    Text = word.Length == 0 ? Whole(g) is { } w ? $"{w}%" : "" : word,
                     FontSize = 22, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, Foreground = K.Brush(K.Darkened(color)),
                 };
                 return new Viewbox { Child = t, StretchDirection = StretchDirection.DownOnly, MaxWidth = 54, MaxHeight = 40 };
@@ -275,17 +301,41 @@ public sealed partial class AssignmentScreen
         }
     }
 
-    /// <summary>The grade: its ring and letter, the points, the percentage, what lateness took, the class's numbers (and
-    /// their box plot), and the way to the rubric.</summary>
+    /// <summary>The grade's whole percent for its ring: the engine's, from the one-decimal figure shown beside it.</summary>
+    private static int? Whole(GradeInfo g) =>
+        g.PctWhole ?? (g.Pct is { } p ? (int)Math.Round(Math.Round((decimal)p, 1, MidpointRounding.AwayFromZero), MidpointRounding.AwayFromZero) : null);
+
+    /// <summary>The percentage as every app writes it: "81.3%" (the engine's; else half up to one decimal, ".0" dropped).</summary>
+    private static string? PctText(GradeInfo g) =>
+        g.PctText is { Length: > 0 } t ? t : g.Pct is { } p ? Math.Round((decimal)p, 1, MidpointRounding.AwayFromZero).ToString("0.#", CultureInfo.InvariantCulture) + "%" : null;
+
+    /// <summary>
+    /// The colour a grade is drawn in: its band's (A green, B teal, C yellow, D orange, F red — as Grades draws letters),
+    /// never the course's (a green F, an orange A+); complete or pass green; incomplete, fail or no band a quiet grey.
+    /// </summary>
+    private static Color GradeTone(GradeInfo g)
+    {
+        var word = (g.Letter ?? "").Trim().ToLowerInvariant();
+        if (word is "complete" or "pass") return K.Tone("green");
+        if (word is "incomplete" or "fail") return K.Tone(null);
+        var band = g.Band;
+        if (string.IsNullOrEmpty(band) && word.Length > 0 && "abcdf".Contains(word[0]) && (word.Length == 1 || "+-−".Contains(word[1]))) band = word[..1].ToUpperInvariant();
+        if (string.IsNullOrEmpty(band) && Whole(g) is { } w) band = w >= 90 ? "A" : w >= 80 ? "B" : w >= 70 ? "C" : w >= 60 ? "D" : "F";
+        return string.IsNullOrEmpty(band) ? K.Tone(null) : GradesKit.LetterColor(band!);
+    }
+
+    /// <summary>The grade: its ring and letter (in its band's colour), the points, the percentage, what lateness took, the
+    /// class's numbers (and their box plot), and — in two columns — the way to the rubric (one column has it under the title).</summary>
     private FrameworkElement GradeCard(GradeInfo g, AssignmentData d)
     {
         var color = Tint(d);
-        var ring = K.Ring(g.Pct is { } pct ? pct / 100 : null, color, 76, 7, RingMark(g, color));
+        var tone = GradeTone(g);
+        var ring = K.Ring(g.Pct is { } pct ? pct / 100 : null, tone, 76, 7, RingMark(g, tone));
         TextBlock score;
         if (g.Score is { } s && g.Possible is { } p && p > 0) score = K.Text($"{AssignKit.Num(s)} / {AssignKit.Num(p)}", Ty.Subtitle);
         else score = K.Wrapped(g.Text, Ty.Subtitle);
         var facts = K.V(3, score);
-        if (g.Pct is { } pc) facts.Children.Add(K.Text(pc.ToString("0.0", CultureInfo.InvariantCulture) + "%", Ty.Body, B.Text2));
+        if (PctText(g) is { } pc) facts.Children.Add(K.Text(pc, Ty.Body, B.Text2));
         if (!string.IsNullOrEmpty(g.Late))
         {
             var late = K.Text(g.Late!, Ty.BodyStrong);
@@ -301,7 +351,7 @@ public sealed partial class AssignmentScreen
             var plot = new AssignClassPlot(cs, color);
             v.Children.Add(K.Columns("auto, *", K.Text("Class", Ty.Caption, B.Text2).Margin(0, 0, 10, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), plot.Col(1)).Margin(0, 6, 0, 0));
         }
-        if (d.Rubric.Count > 0) v.Children.Add(RubricJump(d));
+        if (d.Rubric.Count > 0 && wide) v.Children.Add(RubricJump(d));
         var card = K.Card(v, new Thickness(18));
         gradeLit = Lit(d, 8);
         gradePart = new Grid { Children = { card, gradeLit } };
@@ -327,19 +377,44 @@ public sealed partial class AssignmentScreen
         return b;
     }
 
-    /// <summary>The facts, one to a line: when it is due, what it is worth, when it opens and closes, how it is handed in,
-    /// the attempts used.</summary>
-    private static FrameworkElement FactsCard(AssignmentData d)
+    /// <summary>The attempts as the quiz itself counts them once its intro is in (the count New attempt follows), else
+    /// as the assignment does.</summary>
+    private string? AttemptsNow(AssignmentData d) => quizIntro?.AttemptsText is { Length: > 0 } q ? q : d.AttemptsText;
+
+    /// <summary>The grade card shows the points already ("13 / 16").</summary>
+    private static bool PointsShown(AssignmentData d) => d.Grade is { Score: not null, Possible: > 0 };
+
+    /// <summary>The facts in one line under the next step, for one column — "Due Sep 30 at 10:30 AM · 16 pts · 1 of 2
+    /// attempts used" (the engine's words; the quiz's own once its intro is in) — and under it, when there are any, when
+    /// it opens and closes and how it is handed in.</summary>
+    private FrameworkElement FactsLine(AssignmentData d)
+    {
+        var line = quizIntro?.FactsLine is { Length: > 0 } q ? q
+            : d.FactsLine is { Length: > 0 } f ? f
+            : string.Join(" · ", new[] { d.DueLine is { Length: > 0 } due ? due : "No due date", d.Points ?? "", AttemptsNow(d) ?? "" }.Where(x => x.Length > 0));
+        var words = K.V(2, AssignKit.Selectable(line, Ty.Body));
+        var more = new List<string>();
+        if (!string.IsNullOrEmpty(d.Available)) more.Add(d.Available!);
+        if (!string.IsNullOrEmpty(d.TypesText)) more.Add($"Handed in as {d.TypesText}");
+        if (more.Count > 0) words.Children.Add(K.Wrapped(string.Join(" · ", more), Ty.Caption, B.Text2));
+        var row = K.Columns("auto, *", K.Icon(SymbolRegular.CalendarLtr24, 16, B.Text2).Margin(0, 2, 10, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), words.Col(1));
+        System.Windows.Automation.AutomationProperties.SetName(row, string.Join(". ", more.Prepend(line)));
+        return row;
+    }
+
+    /// <summary>The facts, one to a line: when it is due, what it is worth (unless the grade card says it), when it opens
+    /// and closes, how it is handed in, the attempts used.</summary>
+    private FrameworkElement FactsCard(AssignmentData d)
     {
         var color = Tint(d);
         var lines = new List<(SymbolRegular Symbol, string Label, string Value)>
         {
             (SymbolRegular.CalendarLtr24, "Due", string.IsNullOrEmpty(d.Due) ? "No due date" : d.Due!),
         };
-        if (!string.IsNullOrEmpty(d.Points)) lines.Add((SymbolRegular.Star24, "Points", d.Points!));
+        if (!string.IsNullOrEmpty(d.Points) && !PointsShown(d)) lines.Add((SymbolRegular.Star24, "Points", d.Points!));
         if (!string.IsNullOrEmpty(d.Available)) lines.Add((SymbolRegular.Clock24, "Available", d.Available!));
         if (!string.IsNullOrEmpty(d.TypesText)) lines.Add((SymbolRegular.ArrowUpload24, "Handed in as", d.TypesText!));
-        if (!string.IsNullOrEmpty(d.AttemptsText)) lines.Add((SymbolRegular.ArrowCounterclockwise24, "Attempts", d.AttemptsText!));
+        if (AttemptsNow(d) is { Length: > 0 } attempts) lines.Add((SymbolRegular.ArrowCounterclockwise24, "Attempts", attempts));
         var v = new Stack { Orientation = Orientation.Vertical };
         for (var i = 0; i < lines.Count; i++)
         {

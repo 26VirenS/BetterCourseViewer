@@ -58,7 +58,7 @@ internal sealed class PhoneHandIn
     private readonly Color accent;
     private readonly Grid root = new() { Visibility = Visibility.Collapsed };
     private readonly ContentControl iconHost = new() { Width = 46, Height = 46, Focusable = false };
-    private readonly TextBlock title = K.Text("Send from Phone", Ty.Subtitle);
+    private readonly TextBlock title = K.Text("Send from phone", Ty.Subtitle);
     private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly ContentControl stateHost = new() { Focusable = false };
     private readonly Stack whereNote = new() { Orientation = Orientation.Vertical, Spacing = 4 };
@@ -125,7 +125,7 @@ internal sealed class PhoneHandIn
         root.Children.Add(top);
 
         iconHost.Content = K.IconTile(SymbolRegular.Phone24, accent, 40);
-        var close = K.IconButton(SymbolRegular.Dismiss24, Close, "Close Send from Phone", 14, 32);
+        var close = K.IconButton(SymbolRegular.Dismiss24, Close, "Close Send from phone", 14, 32);
         var words = K.V(2, title, subtitle);
         words.VerticalAlignment = VerticalAlignment.Center;
         var head = K.Columns("auto, *, auto", iconHost.Margin(0, 0, 12, 0).Col(0), words.Col(1), close.Align(HorizontalAlignment.Right, VerticalAlignment.Top).Col(2));
@@ -143,7 +143,7 @@ internal sealed class PhoneHandIn
         root.Children.Add(grid);
         root.Children.Add(flight);
         root.RenderTransform = new ScaleTransform(1, 1);
-        System.Windows.Automation.AutomationProperties.SetName(root, "Send from Phone");
+        System.Windows.Automation.AutomationProperties.SetName(root, "Send from phone");
     }
 
     /// <summary>The panel opened over the form, grown from <paramref name="from"/> (the button, in the panel's own
@@ -463,21 +463,21 @@ internal sealed class PhoneHandIn
     private void Show(Phase p, string? why = null)
     {
         phase = p;
-        title.Text = "Send from Phone";
+        title.Text = "Send from phone";
         subtitle.Text = setup?.Title ?? "";
         iconHost.Content = K.IconTile(SymbolRegular.Phone24, accent, 40);
         FrameworkElement view = p switch
         {
             Phase.First => Problem(SymbolRegular.Shield24, "Windows will ask whether Simpl may use this network.",
-                "Choose Allow, so your phone can reach this PC. Simpl only listens while this panel is open.", "Show the Code", () =>
+                "Choose Allow, so your phone can reach this PC. Simpl only listens while this panel is open.", "Show the code", () =>
                 {
                     Prefs.Set("phoneAsked", true);
                     Start();
                 }, accentButton: true),
             Phase.NoNetwork => Problem(SymbolRegular.WifiOff24, "Connect this computer to Wi-Fi to use your phone.",
-                "Your phone must be on the same Wi-Fi. Some school networks block this — your phone’s hotspot works.", "Try Again", Start),
-            Phase.Failed => Problem(SymbolRegular.Warning24, "Send from Phone couldn’t start.", why, "Try Again", Start),
-            Phase.Idle => Problem(SymbolRegular.Clock24, "Stopped after 15 minutes without use.", "Start again to get a new code.", "Start Again", Start),
+                "Your phone must be on the same Wi-Fi. Some school networks block this — your phone’s hotspot works.", "Try again", Start),
+            Phase.Failed => Problem(SymbolRegular.Warning24, "Send from phone couldn’t start.", why, "Try again", Start),
+            Phase.Idle => Problem(SymbolRegular.Clock24, "Stopped after 15 minutes without use.", "Start again to get a new code.", "Start again", Start),
             _ => Waiting(),
         };
         stateHost.Content = view;
