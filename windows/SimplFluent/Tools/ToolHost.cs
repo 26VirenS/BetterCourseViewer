@@ -141,9 +141,11 @@ public static class ToolsCenter
     /// Tools place again opens on it (Engine.OpensOn); null once the tiles show again.</summary>
     public static string? Open { get; set; }
 
+#pragma warning disable CA2255
     [System.Runtime.CompilerServices.ModuleInitializer]
     internal static void Remember() =>
         Engine.Engine.OpensOn = place => place == Place.Tools && Open is { } k && KindOf(k) != null ? Route.Tool(k) : null;
+#pragma warning restore CA2255
 
     /// <summary>
     /// A tool opened whole from anywhere (its tile, a pin's menu, a command, another tool handing it something), with
@@ -1148,8 +1150,11 @@ public sealed class PinBar : StackPanel
     private void OnWindowPress(object? sender, MouseButtonEventArgs e)
     {
         if (flyoutKept || flyoutKey == null) return;
-        // (its own pin pressed: the pin's click folds it, rather than folding here and opening again there)
-        if (buttons.GetValueOrDefault(flyoutKey) is { } pin && Within(e.OriginalSource as DependencyObject, pin)) return;
+        var source = e.OriginalSource as DependencyObject;
+        // (a press inside the flyout reaches the window too — a popup hands its content's events to its parent — and is
+        //  the flyout's own; its own pin pressed: the pin's click folds it, rather than folding here and opening again there)
+        if (flyout?.Child is { } card && Within(source, card)) return;
+        if (buttons.GetValueOrDefault(flyoutKey) is { } pin && Within(source, pin)) return;
         CloseFlyout("pressed elsewhere");
     }
 
