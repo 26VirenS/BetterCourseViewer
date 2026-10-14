@@ -394,7 +394,9 @@ internal sealed class PdfMergeSplitTool : ContentControl
         FileKit.Detach(notes);
         Notes();
         if (s.Mode == "merge") { Files(); Merged(); } else Split();
-        var body = s.Mode == "merge" ? K.V(20, filesHost, mergedHost) : (UIElement)splitHost;
+        // (merging: the files at the left, the merged PDF with its Merge at the right — one over the other on a narrow
+        //  window — so the one thing the page is for is never down a long column with the page's right empty)
+        var body = s.Mode == "merge" ? ToolKit.Columns(filesHost, mergedHost, 400, 960) : (UIElement)splitHost;
         page = FileKit.Page(page, K.V(20, modes, notes, body));
         Content = page;
     }
@@ -437,7 +439,7 @@ internal sealed class PdfMergeSplitTool : ContentControl
 
     private FrameworkElement FileRow(PdfxFile f)
     {
-        var all = FileKit.Button("Add All", null, () => s.AddAll(f));
+        var all = FileKit.Button("Add all", null, () => s.AddAll(f));
         var remove = K.IconButton(SymbolRegular.Dismiss24, () => s.RemoveFile(f), "Take this file away");
         var head = K.Columns("auto, auto, auto, *, auto, auto",
             K.Dot(f.Color, 10).Margin(0, 0, 10, 0).Col(0),
@@ -463,7 +465,7 @@ internal sealed class PdfMergeSplitTool : ContentControl
         var v = K.V(16);
         if (s.Picks.Count == 0)
         {
-            v.Children.Add(K.Wrapped(s.Files.Count == 0 ? "Add some PDFs first." : "Press a page above to put it here, or Add All for a whole file.", Ty.Body, B.Text2).Margin(0, 8, 0, 8));
+            v.Children.Add(K.Wrapped(s.Files.Count == 0 ? "Add some PDFs first." : "Click a page of a file to put it here, or Add all for a whole file.", Ty.Body, B.Text2).Margin(0, 8, 0, 8));
             tray = null;
         }
         else
@@ -541,8 +543,8 @@ internal sealed class PdfMergeSplitTool : ContentControl
             return;
         }
         var kept = K.Text("", Ty.Body, B.Text2);
-        var keepAll = FileKit.Link("Keep All", () => { s.Removed.Clear(); Split(); });
-        var another = FileKit.Button("Choose Another…", SymbolRegular.Document24, () =>
+        var keepAll = FileKit.Link("Keep all", () => { s.Removed.Clear(); Split(); });
+        var another = FileKit.Button("Choose another…", SymbolRegular.Document24, () =>
         {
             var pick = global::Simpl.Tools.Files.Choose(PdfxState.Filter, false, Owner);
             if (pick.Count > 0) s.OpenSingle(pick[0]);
@@ -550,8 +552,8 @@ internal sealed class PdfMergeSplitTool : ContentControl
         var title = K.Text(f.Name, Ty.Subtitle);
         var head = K.Columns("auto, auto, *, auto, auto", title.Margin(0, 0, 12, 0).Col(0), kept.Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(1),
             keepAll.Margin(8, 0, 8, 0).Col(3), another.Col(4));
-        var save = FileKit.Button("Save Kept Pages…", SymbolRegular.Save24, () => s.SaveTrimmed(Owner), accent: true);
-        var each = FileKit.Button("Split into Single Pages…", SymbolRegular.SplitVertical24, () => s.SaveEachPage(Owner));
+        var save = FileKit.Button("Save kept pages…", SymbolRegular.Save24, () => s.SaveTrimmed(Owner), accent: true);
+        var each = FileKit.Button("Split into single pages…", SymbolRegular.SplitVertical24, () => s.SaveEachPage(Owner));
         void Counts()
         {
             kept.Text = $"{f.Count - s.Removed.Count} of {ToolKit.Plural(f.Count, "page")} kept";
@@ -561,12 +563,13 @@ internal sealed class PdfMergeSplitTool : ContentControl
         var cells = new List<UIElement>();
         for (var n = 0; n < f.Count; n++) cells.Add(SplitPage(f, n, Counts));
         var grid = new MoreGrid(150, 18, cells);
+        // (the two things a page does, said plainly over the pages, as the Mac's: a click leaves it out, ⟳ turns it)
+        var how = K.H(8, K.Icon(SymbolRegular.Info16, 14, B.Text2), K.Wrapped("Click a page to leave it out. ⟳ turns it.", Ty.Body, B.Text2));
         var foot = new WrapPanel { Orientation = Orientation.Horizontal };
         foot.Children.Add(save.Margin(0, 0, 10, 8));
         foot.Children.Add(each.Margin(0, 0, 14, 8));
-        foot.Children.Add(FileKit.Foot("Press a page to take it out (or put it back); its button turns it.").Margin(0, 8, 0, 8));
         Counts();
-        splitHost.Content = K.V(18, head, grid, foot);
+        splitHost.Content = K.V(18, head, how, grid, foot);
     }
 
     private FrameworkElement SplitPage(PdfxFile f, int n, Action counts)
@@ -594,12 +597,13 @@ internal sealed class PdfMergeSplitTool : ContentControl
             counts();
         };
         Paint();
+        // (a target big enough to find, its tooltip saying what it does)
         var turn = K.IconButton(SymbolRegular.ArrowRotateClockwise24, () =>
         {
             var r = (s.Turns.GetValueOrDefault(n) + 90) % 360;
             s.Turns[n] = r;
             thumb.Rotation = r;
-        }, "Turn a quarter", 14, 28);
+        }, $"Turn page {n + 1} a quarter to the right", 16, 32);
         var caption = K.H(6, K.Text($"Page {n + 1}", Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center), turn);
         caption.HorizontalAlignment = HorizontalAlignment.Center;
         return K.V(6, button, caption);

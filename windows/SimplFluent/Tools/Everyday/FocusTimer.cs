@@ -144,6 +144,10 @@ public sealed class FocusTimer : ITimerState
 
     public int DoneToday => R.Day == Today() ? R.Done : 0;
 
+    /// <summary>The focus sessions finished today, said so it never seems to disagree with "Session 1 of 4" beside it (the
+    /// Mac's finishedLine): "none finished today", "2 finished today".</summary>
+    public string FinishedLine => DoneToday == 0 ? "none finished today" : $"{DoneToday} finished today";
+
     /// <summary>What just finished ("focus" or "break"): the timer says so once.</summary>
     public string? Ended => ended;
 

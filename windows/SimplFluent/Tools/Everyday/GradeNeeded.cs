@@ -35,6 +35,13 @@ internal sealed class NeedPiece
     public double? GroupPts { get; set; }
     public double? Total { get; set; }
     public string? Due { get; set; }
+    /// <summary>(2.99.33) "28.5% of your grade".</summary>
+    public string? WorthText { get; set; }
+    /// <summary>(2.99.33) The picker's words: "Midterm 2 · 28.5% of your grade".</summary>
+    public string? Label { get; set; }
+    /// <summary>(2.99.33) Its group's share, said as it reads: "Midterms are 57% of the grade" (is/are as the name takes
+    /// it); by points, "20 of the course’s 122 points".</summary>
+    public string? GroupText { get; set; }
 }
 
 /// <summary>A course's score now and the work still to come (native-app.js gradeNeeded).</summary>
@@ -360,7 +367,8 @@ internal sealed class GradeNeededTool
         {
             piecesShown = s.Data;
             piece.Items.Clear();
-            foreach (var p in s.Pieces) piece.Items.Add(Everyday.Item($"{p.Name} · {NeedMath.Text(p.Worth)}%", p.Id));
+            // (the engine's words: "Midterm 2 · 28.5% of your grade" — what the share is a share of, said)
+            foreach (var p in s.Pieces) piece.Items.Add(Everyday.Item(p.Label is { Length: > 0 } l ? l : $"{p.Name} · {NeedMath.Text(p.Worth)}% of your grade", p.Id));
             if (s.Pieces.Count > 0) piece.Items.Add(Everyday.Divider());
             piece.Items.Add(Everyday.Item("Something else…", "custom"));
         }
@@ -395,10 +403,14 @@ internal sealed class GradeNeededTool
     {
         if (s.PickedPiece is { } p)
         {
-            var pts = ToolKit.Plural((int)Math.Round(p.Pts ?? 0, MidpointRounding.AwayFromZero), "point");
+            var pts = ToolKit.Plural((int)Math.Round((decimal)(p.Pts ?? 0), MidpointRounding.AwayFromZero), "point");
+            // (the engine's words for the group, as the Mac's: "Midterms are 57% of the grade", is or are as the name takes it)
             if (s.Data?.Weighted == true)
-                return $"{p.Group ?? "Its group"} is {NeedMath.Text(p.GroupWeight ?? 0)}% of the grade{(s.Data?.Own == true ? " (your own weights)" : "")}; this is {pts} of the group’s {NeedMath.Text(p.GroupPts ?? 0)}.";
-            return $"{pts} of the course’s {NeedMath.Text(p.Total ?? 0)}.";
+            {
+                var group = p.GroupText is { Length: > 0 } g ? g : $"{p.Group ?? "Its group"} is {NeedMath.Text(p.GroupWeight ?? 0)}% of the grade";
+                return $"{group}{(s.Data?.Own == true ? " (your own weights)" : "")}; this is {pts} of the group’s {NeedMath.Text(p.GroupPts ?? 0)}.";
+            }
+            return p.GroupText is { Length: > 0 } t ? $"This is {t}." : $"{pts} of the course’s {NeedMath.Text(p.Total ?? 0)}.";
         }
         if (s.Loading) return "Reading the assignments…";
         if (chosen != null && s.Data != null && s.Pieces.Count == 0) return $"Nothing left ungraded that {Lms} knows of. Type what the work is worth.";
@@ -488,10 +500,29 @@ internal sealed class GradeNeededCompact
         // (the screenshot suite: --need-numbers 88,25,90 fills them in)
         if (Launch.Take("", "need-numbers") is { Length: > 0 } nums && nums.Split(',') is { Length: 3 } parts)
             (keptNow, keptWorth, keptGoal) = (parts[0].Trim(), parts[1].Trim(), parts[2].Trim());
-        now = Box(keptNow, "88", "Your grade now", t => keptNow = t);
-        worth = Box(keptWorth, "25", "What the work left is worth", t => keptWorth = t);
-        goal = Box(keptGoal, "90", "The grade you want", t => keptGoal = t);
-        var fields = K.Columns("*, 8, *, 8, *", Field("Now", now).Col(0), Field("Left", worth).Col(2), Field("Goal", goal).Col(4));
+        // (each number named for what it is, with its unit, as the Mac's: "Still to come" is a share of the grade, not a
+        //  count of assignments)
+        now = Box(keptNow, "88", "Grade now, percent", t => keptNow = t);
+        worth = Box(keptWorth, "25", "Still to come, percent of the grade", t => keptWorth = t);
+        goal = Box(keptGoal, "90", "Goal, percent", t => keptGoal = t);
+        var fields = K.Columns("auto, 72, auto");
+        void Row(int at, string label, TextBox box, string unit)
+        {
+            fields.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var t = K.Text(label, Ty.Body, B.Text2);
+            t.FontWeight = FontWeights.SemiBold;
+            t.VerticalAlignment = VerticalAlignment.Center;
+            t.Margin = new Thickness(0, at == 0 ? 0 : 8, 12, 0);
+            box.Margin = new Thickness(0, at == 0 ? 0 : 8, 0, 0);
+            var u = K.Text(unit, Ty.Body, B.Text2).Margin(8, at == 0 ? 0 : 8, 0, 0);
+            u.VerticalAlignment = VerticalAlignment.Center;
+            fields.Children.Add(t.Row(at).Col(0));
+            fields.Children.Add(box.Row(at).Col(1));
+            fields.Children.Add(u.Row(at).Col(2));
+        }
+        Row(0, "Grade now", now, "%");
+        Row(1, "Still to come", worth, "% of grade");
+        Row(2, "Goal", goal, "%");
         View = K.V(12, fields, K.V(2, Everyday.Shrinks(big), sub));
         Update();
     }
@@ -509,13 +540,6 @@ internal sealed class GradeNeededCompact
         return b;
     }
 
-    private static FrameworkElement Field(string label, TextBox box)
-    {
-        var t = K.Text(label, Ty.Caption, B.Text2);
-        t.FontWeight = FontWeights.SemiBold;
-        return K.V(4, t, box);
-    }
-
     private void Update()
     {
         if (now == null || worth == null || goal == null) return;
@@ -525,7 +549,7 @@ internal sealed class GradeNeededCompact
         else big.Foreground = new SolidColorBrush(r.Kind == NeedMath.Kind.Over ? NeedMath.Red : NeedMath.Tint);
         sub.Text = r?.Kind switch
         {
-            null => "Your grade now, what is left, the grade you want.",
+            null => "Your grade now, the share of it still to come, the grade you want.",
             NeedMath.Kind.Ok => "on everything still to come",
             NeedMath.Kind.Over => "not even full marks would get there",
             _ => "the goal is already yours",

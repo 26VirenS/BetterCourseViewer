@@ -332,10 +332,10 @@ internal sealed class ImageToTextTool : ContentControl
     {
         var row = new WrapPanel { Orientation = Orientation.Horizontal };
         void Add(UIElement e) { ((FrameworkElement)e).Margin = new Thickness(0, 0, 10, 8); row.Children.Add(e); }
-        Add(FileKit.Button("Paste Picture", SymbolRegular.ClipboardPaste24, s.Paste));
-        Add(FileKit.Button("Capture from Screen…", SymbolRegular.Screenshot24, s.Capture, tip: "Drag over part of the screen; its words are read"));
+        Add(FileKit.Button("Paste picture", SymbolRegular.ClipboardPaste24, s.Paste));
+        Add(FileKit.Button("Capture from screen…", SymbolRegular.Screenshot24, s.Capture, tip: "Drag over part of the screen; its words are read"));
         if (s.HasSource)
-            Add(FileKit.Button("Choose Another…", SymbolRegular.ImageMultiple24, () =>
+            Add(FileKit.Button("Choose another…", SymbolRegular.ImageMultiple24, () =>
             {
                 var f = Files.Choose(OcrState.Filter, false, Owner);
                 if (f.Count > 0) s.Open(f[0]);
@@ -415,8 +415,8 @@ internal sealed class ImageToTextTool : ContentControl
         v.VerticalAlignment = VerticalAlignment.Top;
         if (s.Error != null) v.Children.Add(ToolKit.Note(s.Error));
         v.Children.Add(new Grid { Children = { box, none } });
-        var copy = FileKit.Button(s.Copied ? "Copied" : "Copy Text", s.Copied ? SymbolRegular.Checkmark24 : SymbolRegular.Copy24, s.Copy, accent: true);
-        var save = FileKit.Button("Save as Text…", SymbolRegular.Save24, () => s.Save(Owner));
+        var copy = FileKit.Button(s.Copied ? "Copied" : "Copy text", s.Copied ? SymbolRegular.Checkmark24 : SymbolRegular.Copy24, s.Copy, accent: true);
+        var save = FileKit.Button("Save as text…", SymbolRegular.Save24, () => s.Save(Owner));
         copyButton = copy;
         saveButton = save;
         v.Children.Add(K.H(10, copy, save));

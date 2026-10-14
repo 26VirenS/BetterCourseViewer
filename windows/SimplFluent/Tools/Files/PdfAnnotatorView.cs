@@ -595,11 +595,22 @@ internal sealed class PdfAnnotatorTool : ContentControl
             frame.Stroke(B.CardStroke);
             frame.SizeChanged += (_, e) => frame.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 8, 8);
             var side = K.Rows("auto, *");
-            var copy = FileKit.Link("Copy Notes", () => FileKit.Copy(m.NotesText));
+            var copy = FileKit.Link("Copy notes", () => FileKit.Copy(m.NotesText));
             copyNotes = copy;
             side.Children.Add(K.Columns("auto, *, auto", K.Text("Marks", Ty.Subtitle).Col(0), copy.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(2)).Margin(0, 0, 0, 12).Row(0));
             side.Children.Add(panelBody.Row(1));
-            var body = K.Columns("*, 20, 330", frame.Col(0), side.Col(2));
+            // (why Highlight, Underline and Strike wait, said on the page itself — not only in their tooltips — until words
+            //  are selected and the buttons come on, as the Mac's)
+            var hintWords = K.H(8, K.Icon(SymbolRegular.Highlight24, 16, B.Text2), K.Text("Select words on the page to highlight, underline or strike them.", Ty.Body, B.Text2));
+            selectHint = new Border
+            {
+                Child = hintWords, Padding = new Thickness(14, 7, 14, 7), CornerRadius = new CornerRadius(16), BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(12, 12, 12, 0),
+                IsHitTestVisible = false, Effect = K.Shadow(16, 4, 0.16),
+            };
+            selectHint.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+            var pageArea = new Grid { Children = { frame, selectHint } };
+            var body = K.Columns("*, 20, 330", pageArea.Col(0), side.Col(2));
             editor = K.Rows("auto, auto, *", toolbar.Row(0), message.Row(1), body.Row(2));
             editor.Margin = new Thickness(40, 8, 40, 24);
         }
@@ -620,6 +631,8 @@ internal sealed class PdfAnnotatorTool : ContentControl
     // ---- the toolbar ----
 
     private bool shownSelection;
+    /// <summary>"Select words on the page…", over the page's top while nothing is selected.</summary>
+    private Border? selectHint;
 
     /// <summary>The selection changed: the marking buttons come on or go off (only when there comes to be one, or none).</summary>
     private void Selected()
@@ -630,6 +643,12 @@ internal sealed class PdfAnnotatorTool : ContentControl
     private void Toolbar()
     {
         if (!m.IsOpen) return;
+        // (the hint fades out as words are selected, and back when none are)
+        if (selectHint != null && (selectHint.Tag == null || m.HasSelection != shownSelection))
+        {
+            selectHint.Tag = true;
+            Motion.To(selectHint, OpacityProperty, m.HasSelection ? 0 : 1, Motion.Normal);
+        }
         shownSelection = m.HasSelection;
         var tools = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         void Add(FrameworkElement e, double right = 6) { e.Margin = new Thickness(0, 0, right, 8); tools.Children.Add(e); }
@@ -671,8 +690,8 @@ internal sealed class PdfAnnotatorTool : ContentControl
         save.CornerRadius = new CornerRadius(4, 0, 0, 4);
         var more = new Wpf.Ui.Controls.Button { Icon = new SymbolIcon { Symbol = SymbolRegular.ChevronDown24 }, Padding = new Thickness(8, 6, 8, 6), CornerRadius = new CornerRadius(0, 4, 4, 0), Margin = new Thickness(1, 0, 0, 0), ToolTip = "More ways to save" };
         var menu = MoreKit.Menu(
-            ("Save As…", SymbolRegular.Save24, () => m.Save(true, Owner)),
-            ("Open Another PDF…", SymbolRegular.FolderOpen24, () =>
+            ("Save as…", SymbolRegular.Save24, () => m.Save(true, Owner)),
+            ("Open another PDF…", SymbolRegular.FolderOpen24, () =>
             {
                 var f = Files.Choose(MarkModel.Filter, false, Owner);
                 if (f.Count > 0) m.Open(f[0]);

@@ -11,7 +11,7 @@ namespace Simpl.Tools;
 // fill it. The values live in one set keyed by field name, so author, title and year survive a change of type — and only
 // the active type's fields are ever read, so a value it has no field for can never leak into the citation (a website's
 // URL on a book). The citation forms as you type; what is still needed is named, and Copy and Save wait until it is
-// whole. Saved citations stay on this PC; Copy List gives them alphabetically.
+// whole. Saved citations stay on this PC; Copy list gives them alphabetically.
 
 #pragma warning disable CA2255
 internal static class CitationRegistration
@@ -59,6 +59,11 @@ public static class CiteBuilder
 
     public static string StyleName(string key) => Styles.FirstOrDefault(s => s.Key == key).Name ?? "MLA 9";
 
+    /// <summary>
+    /// A source type's fields, each with its hint for an empty box — the form an answer takes ("YYYY", "First Last; First
+    /// Last", "e.g. 47"), never a made-up answer that reads as filled in (and could be copied into the citation), as the
+    /// Mac's.
+    /// </summary>
     public static IReadOnlyList<CiteField> Fields(string type, string lms)
     {
         static CiteField F(string key, string label, string hint, bool required = false, bool wide = true) => new(key, label, hint, required, wide);
@@ -66,30 +71,30 @@ public static class CiteBuilder
         {
             "journal" => new[]
             {
-                F("author", "Author", "Jane R. Okonkwo", true), F("title", "Article title", "Reading Habits in First-Year Courses", true),
-                F("container", "Journal", "Journal of Higher Education", true), F("volume", "Volume", "47", wide: false), F("issue", "Issue", "3", wide: false),
-                F("year", "Year", "2026", true, wide: false), F("pages", "Pages", "112–137", wide: false), F("doi", "DOI", "10.1080/00221546.2026.1234567"),
+                F("author", "Author", "First Last; First Last", true), F("title", "Article title", "Title of the article", true),
+                F("container", "Journal", "Name of the journal", true), F("volume", "Volume", "e.g. 47", wide: false), F("issue", "Issue", "e.g. 3", wide: false),
+                F("year", "Year", "YYYY", true, wide: false), F("pages", "Pages", "e.g. 112–137", wide: false), F("doi", "DOI", "e.g. 10.1080/…"),
             },
             "book" => new[]
             {
-                F("author", "Author", "Jane R. Okonkwo", true), F("title", "Book title", "The Unread Syllabus", true), F("edition", "Edition", "2nd ed.", wide: false),
-                F("city", "City", "Chicago", wide: false), F("publisher", "Publisher", "University of Chicago Press", true), F("year", "Year", "2026", true, wide: false),
+                F("author", "Author", "First Last; First Last", true), F("title", "Book title", "Title of the book", true), F("edition", "Edition", "e.g. 2nd ed.", wide: false),
+                F("city", "City", "Where it was published", wide: false), F("publisher", "Publisher", "Name of the publisher", true), F("year", "Year", "YYYY", true, wide: false),
             },
             "video" => new[]
             {
-                F("author", "Uploader", "Simpl Courses", true), F("title", "Video title", "Reading a Rubric in Two Minutes", true), F("container", "Platform", "YouTube", true, wide: false),
-                F("month", "Month", "March", wide: false), F("day", "Day", "4", wide: false), F("year", "Year", "2026", true, wide: false), F("url", "URL", "youtube.com/watch?v=…", true),
+                F("author", "Uploader", "Channel or person", true), F("title", "Video title", "Title of the video", true), F("container", "Platform", "e.g. YouTube", true, wide: false),
+                F("month", "Month", "Month", wide: false), F("day", "Day", "Day", wide: false), F("year", "Year", "YYYY", true, wide: false), F("url", "URL", "https://…", true),
             },
             "coursefile" => new[]
             {
-                F("author", "Instructor", "Yuwen Li", true), F("title", "File title", "Lec06 — Composition of Functions", true), F("course", "Course", "MATH 021", true, wide: false),
-                F("institution", "Institution", "UC Merced", true, wide: false), F("year", "Year", "2026", true, wide: false), F("url", "URL", $"Optional {lms} link"),
+                F("author", "Instructor", "First Last", true), F("title", "File title", "Title of the file", true), F("course", "Course", "e.g. MATH 021", true, wide: false),
+                F("institution", "Institution", "Your school", true, wide: false), F("year", "Year", "YYYY", true, wide: false), F("url", "URL", $"Optional {lms} link"),
             },
             _ => new[]
             {
-                F("author", "Author", "Jane R. Okonkwo; Amir Haddad", true), F("title", "Page title", "How Students Actually Read Syllabi", true), F("container", "Website", "The Atlantic", true, wide: false),
-                F("publisher", "Publisher", "Optional if same as site", wide: false), F("month", "Month", "March", wide: false), F("day", "Day", "4", wide: false), F("year", "Year", "2026", true, wide: false),
-                F("url", "URL", "theatlantic.com/…", true), F("accessed", "Date accessed", "12 September 2026", wide: false),
+                F("author", "Author", "First Last; First Last", true), F("title", "Page title", "Title of the page", true), F("container", "Website", "Name of the site", true, wide: false),
+                F("publisher", "Publisher", "If not the site’s own", wide: false), F("month", "Month", "Month", wide: false), F("day", "Day", "Day", wide: false), F("year", "Year", "YYYY", true, wide: false),
+                F("url", "URL", "https://…", true), F("accessed", "Date accessed", "D Month YYYY", wide: false),
             },
         };
     }

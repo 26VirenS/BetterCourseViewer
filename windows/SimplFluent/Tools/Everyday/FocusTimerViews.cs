@@ -127,7 +127,8 @@ internal sealed class FocusTimerCompact
         syncing = true;
         if (minutes.Value is not { } m || (int)Math.Round(m) != timer.Minutes(timer.Current)) minutes.Value = timer.Minutes(timer.Current);
         syncing = false;
-        foot.Text = $"{ToolKit.Plural(timer.DoneToday, "session")} today · {timer.CycleLine}";
+        // ("Session 1 of 4 · none finished today": the session under way, then what is done)
+        foot.Text = $"{timer.CycleLine} · {timer.FinishedLine}";
     }
 }
 
@@ -164,14 +165,15 @@ internal static class FocusParts
     }
 }
 
-/// <summary>The dial (the Mac's FocusDial): a ring of what is left, the time in its middle, the phase over it and when it ends under it.</summary>
+/// <summary>The dial (the Mac's FocusDial): a ring of what is left in the phase's colour, the time in its middle and when
+/// it ends under it — the phase named once, by the picker over it, not again inside the ring.</summary>
 internal sealed class FocusDial
 {
     private readonly FocusTimer timer = FocusTimer.Shared;
     private readonly double size, line;
     private readonly Ellipse track;
     private readonly Path arc;
-    private readonly TextBlock phase, clock, ends;
+    private readonly TextBlock clock, ends;
 
     public Grid View { get; }
 
@@ -181,11 +183,10 @@ internal sealed class FocusDial
         line = Math.Max(10, size * 0.045);
         track = new Ellipse { StrokeThickness = line };
         arc = new Path { StrokeThickness = line, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-        phase = new TextBlock { FontSize = size * 0.045, FontWeight = FontWeights.SemiBold, FontFamily = K.TextFace, HorizontalAlignment = HorizontalAlignment.Center };
         clock = Everyday.Figures("", size * 0.22, FontWeights.SemiBold);
         ends = new TextBlock { FontSize = size * 0.045, FontFamily = K.TextFace, HorizontalAlignment = HorizontalAlignment.Center };
         ends.Fg(B.Text2);
-        var words = K.V(6, phase, Everyday.Shrinks(clock, HorizontalAlignment.Center), ends);
+        var words = K.V(6, Everyday.Shrinks(clock, HorizontalAlignment.Center), ends);
         words.VerticalAlignment = VerticalAlignment.Center;
         words.Margin = new Thickness(line * 2);
         View = new Grid { Width = size, Height = size, Children = { track, arc, words } };
@@ -199,8 +200,6 @@ internal sealed class FocusDial
         arc.Stroke = new SolidColorBrush(color);
         var f = timer.Fraction;
         arc.Data = f > 0 ? K.ArcGeometry(size, line, f) : null;
-        phase.Text = timer.PhaseName.ToUpperInvariant();
-        phase.Foreground = new SolidColorBrush(color);
         var left = timer.RemainingSeconds();
         clock.Text = FocusTimer.Clock(left);
         ends.Text = timer.EndsText ?? (timer.Paused ? "Paused" : $"{timer.Minutes(timer.Current)} minutes");
@@ -218,7 +217,7 @@ internal sealed class FocusControls
 
     public FocusControls(bool large)
     {
-        start = K.Button("Start Timer", () => timer.Toggle(), icon: SymbolRegular.Play24);
+        start = K.Button("Start timer", () => timer.Toggle(), icon: SymbolRegular.Play24);
         cancel = K.Button("Cancel", () => timer.Reset());
         skip = K.Button("Skip", () => timer.Skip(), icon: SymbolRegular.Next24);
         start.FontWeight = FontWeights.SemiBold;
@@ -235,7 +234,7 @@ internal sealed class FocusControls
     public void Update()
     {
         var running = timer.Running;
-        start.Content = running ? "Pause" : timer.Paused ? "Resume" : "Start Timer";
+        start.Content = running ? "Pause" : timer.Paused ? "Resume" : "Start timer";
         start.Icon = new SymbolIcon { Symbol = running ? SymbolRegular.Pause24 : SymbolRegular.Play24, Filled = true, Foreground = Brushes.White };
         FocusParts.Tint(start, FocusTimer.ColorOf(timer.Current));
         var show = timer.Active ? Visibility.Visible : Visibility.Collapsed;
@@ -301,8 +300,9 @@ internal sealed class FocusSettings
         }
         dots.Children.Add(K.Text(timer.CycleLine, Ty.Body, B.Text2).Margin(6, 0, 0, 0));
         AutomationProperties.SetName(dots, timer.CycleLine);
+        // ("Today · 2 finished" over "Session 3 of 4": what is done, said apart from the session under way)
         today.Content = Everyday.Section("Today", K.V(12, dots, K.Wrapped("After every fourth focus session the break is a long one.", Ty.Caption, B.Text2)),
-            ToolKit.Plural(timer.DoneToday, "session"));
+            timer.DoneToday == 0 ? "none finished" : $"{timer.DoneToday} finished");
     }
 }
 

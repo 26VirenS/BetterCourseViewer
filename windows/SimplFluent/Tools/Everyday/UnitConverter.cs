@@ -129,6 +129,9 @@ internal static class UnitMath
         if (a != 0 && (a >= 1e15 || a < 1e-6)) return v.ToString("0.#####e+00", CultureInfo.InvariantCulture).Replace("-", "−");
         return CalcEngine.Significant(v, 10, true).Replace("-", "−");
     }
+
+    /// <summary>A number with its unit, as the Mac's: "212 °F", "3.28 ft" — the angle marks close up, as written: "90°", "30′".</summary>
+    public static string WithUnit(double v, UnitChoice u) => u.Symbol is "°" or "′" or "″" ? Text(v) + u.Symbol : $"{Text(v)} {u.Symbol}";
 }
 
 /// <summary>
@@ -177,9 +180,9 @@ internal sealed class UnitsState
 }
 
 /// <summary>
-/// Unit converter (the Mac's UnitConverterTool): the kind of unit across the top; the value and its unit, the unit wanted
-/// and the answer large; and beside it on a wide window, the value in every unit of its kind (a press makes that the unit
-/// wanted).
+/// Unit converter (the Mac's UnitConverterTool): the kind of unit across the top; one column — the value, From, Swap
+/// (⇅) between From and To, To — and the answer large with its unit ("212 °F"), what it came from under it ("= 100 °C");
+/// and beside it on a wide window, the value in every unit of its kind (a press makes that the unit wanted).
 /// </summary>
 internal sealed class UnitConverterTool
 {
@@ -204,22 +207,19 @@ internal sealed class UnitConverterTool
         to.SelectionChanged += (_, _) => { if (!syncing && UnitsParts.Unit(to) is { } u) s.SetTo(u); };
         AutomationProperties.SetName(from, "From");
         AutomationProperties.SetName(to, "To");
-        var swap = K.Button("Swap", () => s.Swap(), icon: SymbolRegular.ArrowSort24);
-        swap.MinHeight = 32;
-        swap.VerticalAlignment = VerticalAlignment.Bottom;
-        copy = K.Button("Copy", () => { if (s.Result is { } r) Everyday.Copy(UnitMath.Text(r).Replace("−", "-")); }, icon: SymbolRegular.Copy24);
+        // (Swap between From and To, in one column with them: ⇅)
+        var swap = K.IconButton(SymbolRegular.ArrowSort24, () => s.Swap(), "Swap From and To", 16, 36);
+        swap.HorizontalAlignment = HorizontalAlignment.Left;
+        copy = K.Button("Copy", () => { if (s.Result is { } r) Everyday.Copy(UnitMath.WithUnit(r, s.To).Replace("−", "-")); }, icon: SymbolRegular.Copy24);
         copy.HorizontalAlignment = HorizontalAlignment.Left;
 
         var valueField = ToolKit.Field("Value", value);
-        valueField.MaxWidth = 240;
-        var fromField = UnitsParts.Labelled("From", from);
-        valueField.VerticalAlignment = VerticalAlignment.Bottom;
-        fromField.VerticalAlignment = VerticalAlignment.Bottom;
-        var first = new LeftMax { Max = 240 + 12 + 260, Child = K.Columns("*, 12, auto", valueField.Col(0), fromField.Col(2)) };
-        var second = K.H(12, swap, UnitsParts.Labelled("To", to));
-        result.ContextMenu = MoreKit.Menu(("Copy", SymbolRegular.Copy24, () => { if (s.Result is { } r) Everyday.Copy(UnitMath.Text(r).Replace("−", "-")); }));
+        valueField.Width = 260;
+        valueField.HorizontalAlignment = HorizontalAlignment.Left;
+        var column = K.V(12, valueField, UnitsParts.Labelled("From", from), swap, UnitsParts.Labelled("To", to));
+        result.ContextMenu = MoreKit.Menu(("Copy", SymbolRegular.Copy24, () => { if (s.Result is { } r) Everyday.Copy(UnitMath.WithUnit(r, s.To).Replace("−", "-")); }));
         var answer = K.Card(K.V(6, Everyday.Shrinks(result), line, copy.Margin(0, 6, 0, 0)), new Thickness(24));
-        var converter = K.V(20, first, second, answer);
+        var converter = K.V(20, column, answer);
         View = Everyday.Page(K.V(20, kinds, ToolKit.Columns(converter, every, 400, 960)));
         Update();
         Everyday.Follow(View, () => { s.Changed += Update; Update(); }, () => s.Changed -= Update);
@@ -253,11 +253,14 @@ internal sealed class UnitConverterTool
         if (value.Text != s.Value) value.Text = s.Value;
         syncing = false;
 
+        // ("212 °F" large, with its unit — never a bare number to copy without one — and "= 100 °C" under it)
         var r = s.Result;
-        result.Text = r is { } x ? UnitMath.Text(x) : "—";
-        line.Text = s.To.Name.ToLowerInvariant() + (UnitMath.Number(s.Value) is { } v ? $" in {UnitMath.Text(v)} {s.From.Symbol}" : "");
+        result.Text = r is { } x ? UnitMath.WithUnit(x, s.To) : "—";
+        line.Text = UnitMath.Number(s.Value) is { } v ? $"= {UnitMath.WithUnit(v, s.From)}" : "";
+        line.Visibility = line.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         copy.IsEnabled = r != null;
-        AutomationProperties.SetName(result, $"{result.Text} {s.To.Name.ToLowerInvariant()}");
+        copy.ToolTip = r is { } y ? $"Copy {UnitMath.WithUnit(y, s.To)}" : "Copy";
+        AutomationProperties.SetName(result, r is { } z ? $"{UnitMath.Text(z)} {s.To.Name.ToLowerInvariant()}" : "No answer yet");
         every.Content = Everyday.Section("In every unit", EveryUnit());
     }
 
@@ -330,7 +333,7 @@ internal sealed class UnitConverterCompact
         UnitsParts.Show(to, s.To);
         if (value.Text != s.Value) value.Text = s.Value;
         syncing = false;
-        result.Text = s.Result is { } r ? $"{UnitMath.Text(r)} {s.To.Symbol}" : "—";
+        result.Text = s.Result is { } r ? UnitMath.WithUnit(r, s.To) : "—";
     }
 }
 
