@@ -224,6 +224,25 @@ enum CEGeo {
 // MARK: - Organelles in their own frames (§5.1.5)
 
 /// One organelle's look: its pieces, each a mesh and how it is shaded (filled in with the part's colours when placed).
+/// Shapes kept by a key, for a recipe that makes the same shape many times (cells are built off the main thread, and
+/// two at once, so behind a lock).
+final class CEShapeShelf: @unchecked Sendable {
+    private let lock = NSLock()
+    private var shapes: [String: CEShape] = [:]
+
+    func take(_ key: String) -> CEShape? {
+        lock.lock()
+        defer { lock.unlock() }
+        return shapes[key]
+    }
+
+    func put(_ key: String, _ shape: CEShape) {
+        lock.lock()
+        defer { lock.unlock() }
+        shapes[key] = shape
+    }
+}
+
 struct CEShape: Sendable {
     enum Role: Sendable {
         /// The part's own colour.
@@ -391,9 +410,29 @@ enum CERecipes {
     /// left out), cut if asked; and the nucleoplasm inside, translucent.
     static func envelope(radius R: Double, pores: [BioVec], cut: Bool) -> CEShape {
         var s = CEShape()
+        // (1.3.78) the pores sorted by height: a triangle need only be checked against those within the hole's angle of
+        // it in height — a few of the 110 — when they are directions (a pore is that near only if its direction is
+        // within asin(0.06 / |c|) of the centroid's, and heights differ by no more than the angle). The same holes; it
+        // was a quarter of a plant cell's build in a debug build.
+        let byHeight = pores.sorted { $0.y < $1.y }
+        let heights = byHeight.map(\.y)
+        let directions = pores.allSatisfy { abs(BioV.length($0) - 1) < 1e-9 }
         func holed(_ m: BioMesh) -> BioMesh {
             CEGeo.filtered(m) { c in
-                for p in pores {
+                let r = BioV.length(c)
+                var from = 0, to = byHeight.count
+                if directions && r > 0.06 {
+                    let w = asin(0.06 / r) + 1e-9, uy = c.y / r
+                    var lo = 0, hi = heights.count
+                    while lo < hi {
+                        let mid = (lo + hi) / 2
+                        if heights[mid] < uy - w { lo = mid + 1 } else { hi = mid }
+                    }
+                    from = lo
+                    to = lo
+                    while to < heights.count && heights[to] <= uy + w { to += 1 }
+                }
+                for p in byHeight[from..<to] {
                     let along = BioV.dot(c, p)
                     guard along > 0 else { continue }
                     if BioV.length(c - p * along) < 0.06 { return false }
@@ -570,6 +609,18 @@ enum CERecipes {
     /// detail, 70S ribosomes and a loop of DNA. Cut lengthwise (z > 0 removed), the envelope is two shells and only the
     /// grana on the kept side are drawn.
     static func chloroplast(detail: Bool, half: Bool, ribosomeRadius: Double, fine: Bool = false) -> CEShape {
+        // (1.3.78) made once for each way of asking, then only placed: a plant cell's sixty chloroplasts are two shapes)
+        let key = "\(detail)|\(half)|\(ribosomeRadius)|\(fine)"
+        if let made = madeChloroplasts.take(key) { return made }
+        let made = makeChloroplast(detail: detail, half: half, ribosomeRadius: ribosomeRadius, fine: fine)
+        madeChloroplasts.put(key, made)
+        return made
+    }
+
+    /// The chloroplasts made so far, by how they were asked for.
+    private static let madeChloroplasts = CEShapeShelf()
+
+    private static func makeChloroplast(detail: Bool, half: Bool, ribosomeRadius: Double, fine: Bool) -> CEShape {
         let (rings, segments) = fine ? (28, 56) : (16, 32)
         var s = CEShape()
         let lens = { (scale: Double) in BioShapes.lensRadius(diameter: 5.0 * scale, thickness: 2.4 * scale) }

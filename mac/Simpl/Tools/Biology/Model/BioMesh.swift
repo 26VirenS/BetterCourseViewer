@@ -61,8 +61,16 @@ struct BioMesh: Sendable {
         out.positions.reserveCapacity(positions.count)
         out.normals.reserveCapacity(normals.count)
         for p in positions { let q = f.apply(BioVec(Double(p.x), Double(p.y), Double(p.z))); out.positions.append(SIMD3<Float>(Float(q.x), Float(q.y), Float(q.z))) }
-        for n in normals { let q = f.applyNormal(BioVec(Double(n.x), Double(n.y), Double(n.z))); out.normals.append(SIMD3<Float>(Float(q.x), Float(q.y), Float(q.z))) }
-        if f.determinant < 0 {
+        // (1.3.78: applyNormal's matrix — three cross products and the determinant — worked out once rather than for each
+        // normal: the same numbers, and a debug build's cell, hundreds of thousands of normals, built much sooner)
+        let flip = f.determinant < 0
+        let s: Double = flip ? -1 : 1
+        let cyz = BioV.cross(f.y, f.z), czx = BioV.cross(f.z, f.x), cxy = BioV.cross(f.x, f.y)
+        for n in normals {
+            let q = BioV.unit((Double(n.x) * cyz + Double(n.y) * czx + Double(n.z) * cxy) * s)
+            out.normals.append(SIMD3<Float>(Float(q.x), Float(q.y), Float(q.z)))
+        }
+        if flip {
             out.indices.reserveCapacity(indices.count)
             for t in stride(from: 0, to: indices.count - 2, by: 3) {
                 out.indices += [indices[t], indices[t + 2], indices[t + 1]]
@@ -282,23 +290,59 @@ enum BioShapes {
         return byDistance(sdf, level: level, reach: BioV.length(half) * 1.5)
     }
 
-    /// A lens's (two spherical caps): `diameter` across in x and z, `thickness` in y.
+    /// A lens's (two spherical caps): `diameter` across in x and z, `thickness` in y. (1.3.78: where the ray leaves the
+    /// nearer of the two spheres, worked out, rather than found by halving: the same surface — its signed distance's
+    /// `level` is the spheres' radius grown by it — for a plant cell's sixty chloroplasts in a fraction of the time.)
     static func lensRadius(diameter: Double, thickness: Double, level: Double = 0) -> (BioVec) -> Double {
         let c = (diameter * diameter - thickness * thickness) / (4 * thickness)
-        let rho = c + thickness / 2
-        let sdf: (BioVec) -> Double = { p in
-            max(BioV.length(p - BioVec(0, -c, 0)) - rho, BioV.length(p - BioVec(0, c, 0)) - rho)
+        let r = c + thickness / 2 + level
+        return { d in
+            let dd = BioV.dot(d, d)
+            guard dd > 0 else { return 0 }
+            // (|t·d − C|² = r² for C = (0, ∓c, 0): t = (d·C + √((d·C)² − |d|²(c² − r²))) / |d|², the nearer exit)
+            var exit = Double.infinity
+            for dc in [-c * d.y, c * d.y] {
+                let disc = dc * dc - dd * (c * c - r * r)
+                guard disc >= 0 else { return 0 }
+                exit = min(exit, (dc + disc.squareRoot()) / dd)
+            }
+            return min(max(exit, 0), diameter)
         }
-        return byDistance(sdf, level: level, reach: diameter)
     }
 
-    /// The radius along each direction where a signed distance reaches `level`, found by bisection (48 halvings).
+    /// The radius along each direction where a signed distance reaches `level`. (1.3.78) Found by false position,
+    /// Illinois' way, within the bracket from the centre to `reach`: a signed distance changes along a ray about as
+    /// fast as the ray goes, so the straight line between the bracket's ends lands close — a dozen evaluations where
+    /// halving took 48, which in a debug build made a plant cell's walls most of the many seconds it took. Without a
+    /// bracket (the centre outside, or `reach` inside) it halves, as it did.
     static func byDistance(_ sdf: @escaping (BioVec) -> Double, level: Double = 0, reach: Double) -> (BioVec) -> Double {
         { d in
             var lo = 0.0, hi = reach
-            for _ in 0..<48 {
-                let mid = (lo + hi) / 2
-                if sdf(d * mid) < level { lo = mid } else { hi = mid }
+            var flo = sdf(d * lo) - level, fhi = sdf(d * hi) - level
+            guard flo < 0, fhi >= 0 else {
+                for _ in 0..<48 {
+                    let mid = (lo + hi) / 2
+                    if sdf(d * mid) < level { lo = mid } else { hi = mid }
+                }
+                return (lo + hi) / 2
+            }
+            let tolerance = reach * 1e-12
+            var side = 0
+            for _ in 0..<100 {
+                let t = (lo * fhi - hi * flo) / (fhi - flo)
+                let ft = sdf(d * t) - level
+                if ft < 0 {
+                    lo = t
+                    flo = ft
+                    if side < 0 { fhi /= 2 }
+                    side = -1
+                } else {
+                    hi = t
+                    fhi = ft
+                    if side > 0 { flo /= 2 }
+                    side = 1
+                }
+                if abs(ft) <= tolerance || hi - lo <= tolerance { return t }
             }
             return (lo + hi) / 2
         }
