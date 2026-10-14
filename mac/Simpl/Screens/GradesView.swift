@@ -22,6 +22,8 @@ struct GradesView: View {
     @State private var picked: String?
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
+    /// (1.3.80) What the live checks know of the answer shown (its fingerprint: LiveRefresh).
+    @State private var marks = LiveMarks()
 
     var body: some View {
         Group {
@@ -50,6 +52,8 @@ struct GradesView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        // (1.3.80: checked every minute while it is on show; a course's new total moves its rings and the GPA)
+        .liveChecks("grades", since: { marks.at }) { engine, age in try await liveCheck(engine, age) }
         .onChange(of: goal) { _, g in goalChanged(g) }
     }
 
@@ -392,12 +396,32 @@ struct GradesView: View {
                 data = d
                 error = nil
             }
+            marks.shown("grades", by: engine) // (1.3.80: the answer a live check asks after)
             // (the screenshot suite: -SimplOpen grades:101 opens that course's grades)
             if let id = LaunchOpen.take("grades:"), d.rows.contains(where: { $0.id == id }) {
                 engine.go(.section("courses/\(id)", "grades"))
             }
         } catch {
             if data == nil { self.error = error.localizedDescription }
+        }
+    }
+
+    /// (1.3.80) The live check (LiveRefresh): the grades asked again with the check's age; a new answer put in place — a
+    /// course's new total moving its rings, its row and the term GPA — the rest left as it is. The goal being set is
+    /// never undone by it.
+    private func liveCheck(_ engine: Engine, _ age: Double) async throws -> LiveFound {
+        guard let shown = data, let c = try await engine.liveCheck("grades", as: GradesData.self, shown: shown, marks: marks, maxAge: age) else {
+            marks.at = Date()
+            return .unchanged
+        }
+        return LiveFound(parts: ["grades"]) {
+            c.put {
+                withAnimation(LiveRefresh.motion) {
+                    data = c.value
+                    error = nil
+                }
+            }
+            marks.at = Date()
         }
     }
 
@@ -1144,6 +1168,9 @@ struct CourseGradesView: View {
     @State private var twoColumns = false
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
+    /// (1.3.80) What the live checks know of the grades shown (LiveRefresh), and who holds them back while What-If is on.
+    @State private var marks = LiveMarks()
+    @State private var holdToken = UUID()
     @FocusState private var focused: String?
 
     // (written out: the state above is of this file's own types, which would keep a synthesized one in this file)
@@ -1180,6 +1207,12 @@ struct CourseGradesView: View {
             // (the screenshot suite: -SimplWhatIf YES turns What-If on once the grades are in, nothing typed)
             if data != nil, !whatIf, LaunchOpen.take("", key: "SimplWhatIf") != nil { setWhatIf(true) }
         }
+        // (1.3.80) checked every ten minutes while it is on show — never while What-If is on: nothing changes under the
+        // scores being tried, in this window or another
+        .liveChecks("course grades", pace: .course, since: { marks.at }) { engine, age in try await liveCheck(engine, age) }
+        .onChange(of: whatIf) { _, on in LiveHolds.shared.set("what-if", holdToken, on) }
+        .onAppear { if whatIf { LiveHolds.shared.set("what-if", holdToken, true) } }
+        .onDisappear { LiveHolds.shared.set("what-if", holdToken, false) }
         // (1.3.79: a popup over the window that never blocks it)
         .floatingPopup("whatif-add", title: "What-If Assignment", item: $addingTo) { g in
             AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
@@ -1785,6 +1818,27 @@ struct CourseGradesView: View {
         }
     }
 
+    /// (1.3.80) The live check (LiveRefresh): the course's real grades asked again with the check's age — only while
+    /// nothing is tried (What-If on holds every check back) — and a new answer put in place: a grade that came lands in
+    /// its row, the rings and the total move to it, the rest stays as it is.
+    private func liveCheck(_ engine: Engine, _ age: Double) async throws -> LiveFound {
+        guard !whatIf, drafts.isEmpty, added.isEmpty, let shown = data,
+              let c = try await engine.liveCheck("courseGrades", Self.firstRead(courseId), as: CourseGradesData.self, shown: shown, marks: marks, maxAge: age) else {
+            marks.at = Date()
+            return .unchanged
+        }
+        return LiveFound(parts: ["grades"]) {
+            guard !whatIf, drafts.isEmpty, added.isEmpty else { return } // (What-If turned on meanwhile: never undone)
+            c.put {
+                withAnimation(LiveRefresh.motion) {
+                    data = c.value
+                    error = nil
+                }
+            }
+            marks.at = Date()
+        }
+    }
+
     /// (1.3.78) The read a course's grades open on (nothing tried, nothing added, What-If off), as reading ahead asks it.
     static func firstRead(_ courseId: String) -> [String: Any] {
         ["id": courseId, "tried": [String: Any](), "added": [[String: Any]](), "on": false, "fresh": true]
@@ -1831,6 +1885,8 @@ struct CourseGradesView: View {
                     error = nil
                 }
             }
+            // (1.3.80: the real grades shown — nothing tried — are the answer a live check asks after)
+            if !whatIf, drafts.isEmpty, added.isEmpty { marks.shown("courseGrades", Self.firstRead(courseId), by: engine) }
         } catch {
             guard read == reads else { return }
             if data == nil { self.error = error.localizedDescription }

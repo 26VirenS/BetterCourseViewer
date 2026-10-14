@@ -47,6 +47,9 @@ struct TopicView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        // (1.3.80: checked every ten minutes while on show — the page marks it read again only when Canvas says
+        // something in it is unread)
+        .liveChecks(model, pace: .course)
     }
 
     private var replyTip: String {

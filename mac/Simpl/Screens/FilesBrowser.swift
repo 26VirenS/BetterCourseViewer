@@ -50,6 +50,7 @@ struct FilesBrowser: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model, pace: .course) // (1.3.80: a course's files checked every ten minutes while on show)
         .task(id: picked) { await loadPreview() }
     }
 

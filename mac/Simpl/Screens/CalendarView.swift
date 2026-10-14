@@ -28,6 +28,8 @@ struct CalendarView: View {
     @State private var choosing = false
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
+    /// (1.3.80) What the live checks know of the span shown (its fingerprint: LiveRefresh).
+    @State private var marks = LiveMarks()
     /// The way the last move went (the month slides in from that side): set a frame before the move itself, so the
     /// month leaving reads it as it leaves.
     @State private var dir = 1
@@ -101,6 +103,8 @@ struct CalendarView: View {
             if let asked { mode = asked }
             await load(animated: false)
         }
+        // (1.3.80: checked every minute while it is on show; an event or a due date that changed moves into place)
+        .liveChecks("calendar", since: { marks.at }) { engine, age in try await liveCheck(engine, age) }
     }
 
     // MARK: - The toolbar
@@ -783,6 +787,7 @@ struct CalendarView: View {
         do {
             let d = try await engine.read("calendar", Self.args((s, e)), as: CalendarData.self)
             guard asked == ask else { return } // (a later move asked for another span)
+            marks.shown("calendar", Self.args((s, e)), by: engine) // (1.3.80: the answer a live check asks after)
             if data == nil || !animated {
                 var t = Transaction()
                 t.disablesAnimations = true
@@ -807,6 +812,29 @@ struct CalendarView: View {
             }
         }
         loading = false
+    }
+
+    /// (1.3.80) The live check (LiveRefresh): the span shown asked again with the check's age; a new answer put in place
+    /// — an event that came, a due date that moved — the rest left as it is. A move to another span made meanwhile is
+    /// never undone by it.
+    private func liveCheck(_ engine: Engine, _ age: Double) async throws -> LiveFound {
+        let ask = asked
+        let args = Self.args(range)
+        guard let shown = data, !loading,
+              let c = try await engine.liveCheck("calendar", args, as: CalendarData.self, shown: shown, marks: marks, maxAge: age) else {
+            marks.at = Date()
+            return .unchanged
+        }
+        return LiveFound(parts: ["calendar"]) {
+            guard asked == ask else { return }
+            c.put {
+                withAnimation(LiveRefresh.motion) {
+                    data = c.value
+                    failure = nil
+                }
+            }
+            marks.at = Date()
+        }
     }
 }
 

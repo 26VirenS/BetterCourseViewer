@@ -28,6 +28,7 @@ struct ContextHome: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model, pace: .course) // (1.3.80: a course's pages checked every ten minutes while on show)
     }
 
     /// The id in a context: "courses/101" → "101".
