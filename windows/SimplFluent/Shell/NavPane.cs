@@ -9,7 +9,7 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Shell;
 
 /// <summary>An entry in the navigation pane: a place to go, its symbol and colour (Windows 11 Settings' colourful
-/// icons), a count beside it, and — for a course — its sections under it.</summary>
+/// icons), a count beside it saying what it counts, and — for a course — its sections under it (for Groups, the groups).</summary>
 public sealed class NavEntry
 {
     public string Key = "";
@@ -20,6 +20,12 @@ public sealed class NavEntry
     public Color? Square;
     public string? Letter;
     public int Badge;
+    /// <summary>What the count counts, in words ("2 unread announcements"): its tooltip, and what a screen reader says.</summary>
+    public string? BadgeLabel;
+    /// <summary>The row's tooltip ("Settings (Ctrl+,)"); a long name is its own otherwise.</summary>
+    public string? Tip;
+    /// <summary>What folds out under it, for its chevron's tooltip: "sections", "groups".</summary>
+    public string Folds = "sections";
     public Action? Go;
     public List<NavEntry>? Children;
     public bool Expanded;
@@ -106,7 +112,7 @@ public sealed class NavList : Grid
                 .Append(e.Key).Append('\u001f').Append(e.Title).Append('\u001f')
                 .Append((int)e.Icon).Append('\u001f').Append(e.Tint.ToString()).Append('\u001f')
                 .Append(e.Square?.ToString()).Append('\u001f').Append(e.Letter).Append('\u001f')
-                .Append(e.Badge).Append('\u001f').Append(e.Expanded ? '+' : '-').Append(e.Toggle != null ? 'T' : '_')
+                .Append(e.Badge).Append('\u001f').Append(e.BadgeLabel).Append('\u001f').Append(e.Tip).Append('\u001f').Append(e.Folds).Append('\u001f').Append(e.Expanded ? '+' : '-').Append(e.Toggle != null ? 'T' : '_')
                 .Append(e.Hover != null ? 'h' : '_').Append('\u001f').Append(e.Spot?.ToString()).Append('\u001e');
             if (e.Expanded && e.Children != null)
                 foreach (var c in e.Children) Sign(c, depth + 1);
@@ -157,6 +163,7 @@ public sealed class NavList : Grid
             };
             badge.SetResourceReference(Border.BackgroundProperty, B.Accent);
             ((TextBlock)badge.Child).SetResourceReference(TextBlock.ForegroundProperty, B.OnAccent);
+            badge.ToolTip = e.BadgeLabel;
             grid.Children.Add(badge.Col(2));
         }
         if (e.Toggle != null)
@@ -166,14 +173,15 @@ public sealed class NavList : Grid
             t.Width = 28;
             t.Height = 28;
             t.Margin = new Thickness(4, 0, -6, 0);
-            t.ToolTip = e.Expanded ? "Hide sections" : "Show sections";
+            t.ToolTip = e.Expanded ? $"Hide {e.Folds}" : $"Show {e.Folds}";
+            System.Windows.Automation.AutomationProperties.SetName(t, (e.Expanded ? $"Hide {e.Folds} of " : $"Show {e.Folds} of ") + e.Title);
             grid.Children.Add(t.Col(3));
         }
         var b = K.Subtle(grid, () => e.Go?.Invoke(), new Thickness(12 + depth * 28, 0, 8, 0));
         b.Height = 36;
         b.Margin = new Thickness(4, 0, 4, 0);
-        b.ToolTip = e.Title.Length > 26 ? e.Title : null;
-        System.Windows.Automation.AutomationProperties.SetName(b, e.Title);
+        b.ToolTip = e.Tip ?? (e.Title.Length > 26 ? e.Title : e.Badge > 0 ? e.BadgeLabel : null);
+        System.Windows.Automation.AutomationProperties.SetName(b, e.Badge > 0 && e.BadgeLabel != null ? $"{e.Title}, {e.BadgeLabel}" : e.Title);
         return b;
     }
 

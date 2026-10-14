@@ -439,12 +439,33 @@ no picture of the one before it to move from: it arrives by its own entrance (th
 - Never `using` both `Wpf.Ui.Controls` and `System.Windows.Controls` without aliasing the clashes (`Button`,
   `TextBlock`, `TextBox`, `Image`, `MenuItem`). Inside a `Screen`, the engine is the field `engine`.
 
+## The pane, the title bar and the tour
+
+- **Title bar** (`MainWindow`): Back and Refresh (F5; its arrow turns while Simpl reads, it dims instead with
+  animations off) at its left. Below 880 wide the pane folds away and the pane's button and Search join them; Search
+  lends the pane's own search box to the title bar (`AppShell.OpenSearchBar`, also Ctrl+F and Ctrl+K), and it goes back
+  to the pane once let go of.
+- **Pane** (`AppShell.BuildPane`, `NavPane`): the course open folds out its sections (as the Mac's sidebar does; the
+  chevron folds out any other); a course's unread announcements are a badge like Notifications', its tooltip and screen
+  reader saying what it counts ("2 unread announcements"); one Groups row opens the Groups page and its chevron lists
+  the groups. At the foot, Settings (Windows 11's place for it), then the account tile: name, email and the school,
+  each said once. A theme's picture stays faint (15%) behind the rows and shows whole only in the room under them.
+- **Search box** (`Shell/Search/`): typing only suggests; the full search runs on Enter or *Search for*, so the page
+  never changes under the student. Enter on a sum copies its answer. A command's arguments show as grey placeholders
+  (`/course ‹course› ‹section›`). Everything is in sentence case.
+- **Tour** (`Shell/Tour.cs`): six steps from the Dashboard's counters (Grades, a course, Tools, Search) to *Something
+  wrong? Tell us here*. Each card has ×, *Skip tour*, Back and a Next that always works (a suggested click moves it on,
+  but no step waits for one); Escape ends it; leaving counts as seen; the account menu's *Take the tour* runs it again.
+  Its dim covers the title bar too, all but Windows' caption buttons.
+
 ## The quick look
 
 A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grows a card out of itself with
 `WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
-Calendar's `CalendarPeek`). The card reads the work's details as it opens, Mark done ticks it, a double-click or a
-Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row.
+Calendar's `CalendarPeek`). The card reads the work's details as it opens — about five lines of what the work says,
+its lists, bold and links kept (`RichText`), fading out where it runs on — Mark done ticks it, a double-click or a
+Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row. It is a
+light-dismiss flyout: nothing behind it is dimmed.
 
 ## Send from Phone
 

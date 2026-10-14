@@ -59,6 +59,8 @@ public sealed class WorkRow
     public string? PriShort { get; set; }
     public string? Type { get; set; }
     public int? Series { get; set; }
+    public string? Kind { get; set; }
+    public string? Pts { get; set; }
 }
 
 public sealed class Counter
@@ -69,6 +71,8 @@ public sealed class Counter
     public string? Tone { get; set; }
     public bool? Pending { get; set; }
     public string? Note { get; set; }
+    public string? FullLabel { get; set; }
+    public string? FullNote { get; set; }
 }
 
 public sealed class TodayList
@@ -86,6 +90,7 @@ public sealed class LoadRow
     public string? Color { get; set; }
     public int Done { get; set; }
     public int Total { get; set; }
+    public string? Text { get; set; }
 }
 
 public sealed class Today
@@ -98,6 +103,7 @@ public sealed class Today
     public List<LoadRow>? Load { get; set; }
     public int? Idle { get; set; }
     public bool? HasCourses { get; set; }
+    public string? LoadCaption { get; set; }
 }
 
 public sealed class TodayCounts
@@ -106,6 +112,7 @@ public sealed class TodayCounts
     public int? Graded { get; set; }
     public string? OverdueNote { get; set; }
     public string? GradedNote { get; set; }
+    public string? GradedFullNote { get; set; }
 }
 
 public sealed class SheetRow
@@ -117,6 +124,11 @@ public sealed class SheetRow
     public bool? Quiet { get; set; }
     public string? Key { get; set; }
     public bool? Clearable { get; set; }
+    public string? Course { get; set; }
+    public string? Kind { get; set; }
+    public string? Detail { get; set; }
+    public string? When { get; set; }
+    public string? Date { get; set; }
 }
 
 public sealed class SheetSection
@@ -148,6 +160,11 @@ public sealed class CourseRow
     public string Url { get; set; } = "";
     public bool? Chosen { get; set; }
     public string? Term { get; set; }
+    public string? AltName { get; set; }
+    public string? Detail { get; set; }
+    public string? ScoreWhy { get; set; }
+    public int? ScoreWhole { get; set; }
+    public string? UnreadLabel { get; set; }
 }
 
 public sealed class CoursesData
@@ -225,6 +242,8 @@ public sealed class GradeRow
     public List<GradeCategory> Cats { get; set; } = new();
     public List<ScaleStep>? Scale { get; set; }
     public bool? OwnScale { get; set; }
+    public string? AltName { get; set; }
+    public string? GradedText { get; set; }
 }
 
 public sealed class ScaleStep
@@ -264,6 +283,7 @@ public sealed class GradesData
     public List<TrendPoint>? Trend { get; set; }
     public double? MinY { get; set; }
     public double? MaxY { get; set; }
+    public string? GpaText { get; set; }
 }
 
 public sealed class CalEvent
@@ -367,6 +387,7 @@ public sealed class Release
     public string Version { get; set; } = "";
     public string? Date { get; set; }
     public List<ReleaseNote> Notes { get; set; } = new();
+    public string? DateText { get; set; }
 }
 
 public sealed class WhatsNewData
@@ -939,6 +960,11 @@ public sealed class DashCourse
     public DashNext? Next { get; set; }
     public List<DashLink>? Links { get; set; }
     public string Url { get; set; } = "";
+    public string? AltName { get; set; }
+    public string? ScoreWhy { get; set; }
+    public int? ScoreWhole { get; set; }
+    public string? UnreadText { get; set; }
+    public string? UnreadLabel { get; set; }
 }
 
 public sealed class DashCoursesData
@@ -1016,6 +1042,8 @@ public sealed class DashSkyCourse
     public double? Score { get; set; }
     public string? Url { get; set; }
     public List<DashSkyWindow>? Windows { get; set; }
+    public string? ScoreText { get; set; }
+    public int? ScoreWhole { get; set; }
 }
 
 public sealed class DashSkylineData

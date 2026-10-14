@@ -42,6 +42,8 @@ public sealed record PaletteAction(PaletteDo Do, Place? To = null, string Text =
 public sealed record PaletteItem(string Id, string Title, SymbolRegular Symbol, PaletteAction Action)
 {
     public string? Sub { get; init; }
+    /// <summary>What a command takes, drawn after its name as grey placeholders ("‹course› ‹section›"), never as part of it.</summary>
+    public string? Args { get; init; }
     /// <summary>A course's (or a group's) colour, as the page gives it: the symbol drawn in it.</summary>
     public string? Color { get; init; }
     public string? Trailing { get; init; }
@@ -94,15 +96,10 @@ internal sealed class PaletteCommand
         return null;
     }
 
-    /// <summary>Its row under "/": "/course a course, then a section".</summary>
-    public PaletteItem SlashRow
-    {
-        get
-        {
-            var extra = Fills && Takes != null ? " " + Takes : "";
-            return new PaletteItem($"cmd.{Name}", $"/{Name}{extra}", Symbol, Fills ? PaletteAction.Fill($"/{Name} ") : Action) { Sub = Hint, Trailing = Key };
-        }
-    }
+    /// <summary>Its row under "/": "/course" with what it takes after it as placeholders ("‹course› ‹section›"), the
+    /// line under it saying what it does with an example.</summary>
+    public PaletteItem SlashRow =>
+        new($"cmd.{Name}", $"/{Name}", Symbol, Fills ? PaletteAction.Fill($"/{Name} ") : Action) { Sub = Hint, Trailing = Key, Args = Fills ? Takes : null };
 
     /// <summary>Its row among words typed: "Grades", what it does, and its shortcut (or its name, for one that takes something).</summary>
     public PaletteItem PlainRow =>
@@ -118,7 +115,8 @@ internal sealed class PaletteCommand
         };
 
     /// <summary>Every command the box knows, as the web box's (hub.js COMMANDS) where the app has the same thing; the
-    /// shortcuts are Windows' (Ctrl for ⌘, Alt+Left and Alt+Right for Back and Forward).</summary>
+    /// shortcuts are Windows' (Ctrl for ⌘, Alt+Left and Alt+Right for Back and Forward), the names in Windows 11's
+    /// sentence case (a place keeps the name its page has), and what each takes written as placeholders.</summary>
     public static List<PaletteCommand> Catalog(Engine.Engine engine)
     {
         var lms = engine.LmsName;
@@ -129,44 +127,44 @@ internal sealed class PaletteCommand
             C("todo", ["tasks", "planner"], "To Do", "Everything to do this week", SymbolRegular.TaskListLtr24, PaletteAction.Go(Place.Todo), "Ctrl+2"),
             C("calendar", ["cal", "schedule"], "Calendar", "Your courses’ calendar", SymbolRegular.CalendarLtr24, PaletteAction.Go(Place.Calendar), "Ctrl+3"),
             C("grades", ["gpa", "grade", "marks"], "Grades", "Your GPA and every course’s grade — or one: /grades bio", SymbolRegular.DataBarVertical24,
-                PaletteAction.Go(Place.Grades), "Ctrl+4", "a course", PaletteLists.Grades, quick: true),
+                PaletteAction.Go(Place.Grades), "Ctrl+4", "‹course›", PaletteLists.Grades, quick: true),
             C("notifications", ["alerts", "activity"], "Notifications", "What’s new in your courses", SymbolRegular.Alert24, PaletteAction.Go(Place.Notifications), "Ctrl+5"),
         };
         if (canvas) c.Add(C("inbox", ["messages", "mail", "conversations"], "Inbox", "Your messages", SymbolRegular.Mail24, PaletteAction.Go(Place.Inbox), "Ctrl+6"));
         c.Add(C("courses", ["classes"], "All Courses", "Every course you are in", SymbolRegular.Library24, PaletteAction.Go(Place.Courses)));
-        c.Add(C("course", ["class", "go", "open"], "Open a Course", "A course — or one of its sections: /course bio files", SymbolRegular.Book24,
-            takes: "a course, then a section", lists: PaletteLists.Courses));
+        c.Add(C("course", ["class", "go", "open"], "Open a course", "A course — or one of its sections: /course bio files", SymbolRegular.Book24,
+            takes: "‹course› ‹section›", lists: PaletteLists.Courses));
         if (canvas)
         {
             c.Add(C("groups", [], "Groups", "Your groups", SymbolRegular.People24, PaletteAction.Go(Place.Groups)));
-            c.Add(C("group", ["team"], "Open a Group", "One of your groups", SymbolRegular.PeopleTeam24, takes: "a group", lists: PaletteLists.Groups));
+            c.Add(C("group", ["team"], "Open a group", "One of your groups", SymbolRegular.PeopleTeam24, takes: "‹group›", lists: PaletteLists.Groups));
         }
         c.Add(C("tools", ["tool", "widgets", "timer", "calculator"], "Tools", "Timer, calculator, flashcards and more", SymbolRegular.Toolbox24, PaletteAction.Go(Place.Tools), "Ctrl+7"));
         c.Add(C("external", ["external tools", "lti", "apps"], "External Tools", "Every tool your courses use", SymbolRegular.PuzzlePiece24, PaletteAction.Go(Place.ExternalTools)));
         c.Add(C("due", ["upcoming", "soon", "week"], "Due", "What is due: today, tomorrow, this week, or by name", SymbolRegular.Clock24,
-            takes: "today, tomorrow, week or a name", lists: PaletteLists.Due));
-        c.Add(C("overdue", ["late", "missing"], "Overdue", "Past its date and not handed in", SymbolRegular.ErrorCircle24, takes: "a name (or nothing)", lists: PaletteLists.Overdue));
-        c.Add(C("assignment", ["hw", "homework", "assignments"], "Assignments", "Find an assignment", SymbolRegular.DocumentText24, takes: "an assignment", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
-        c.Add(C("quiz", ["quizzes", "test", "exam"], "Quizzes", "Find a quiz", SymbolRegular.TaskListSquareLtr24, takes: "a quiz", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
-        c.Add(C("announcement", ["ann", "news", "announcements"], "Announcements", "Find an announcement", SymbolRegular.Megaphone24, takes: "an announcement", lists: PaletteLists.Kinds, kinds: ["Announcements"]));
-        c.Add(C("discussion", ["disc", "thread", "discussions"], "Discussions", "Find a discussion", SymbolRegular.ChatMultiple24, takes: "a discussion", lists: PaletteLists.Kinds, kinds: ["Discussions"]));
-        c.Add(C("page", ["wiki", "pages"], "Pages", "Find a page in your courses", SymbolRegular.DocumentOnePage24, takes: "a page", lists: PaletteLists.Kinds, kinds: ["Pages"]));
-        c.Add(C("file", ["files", "read", "download", "pdf"], "Files", "Find a course file — it opens on this PC", SymbolRegular.Folder24, takes: "a file", lists: PaletteLists.Kinds, kinds: ["Files"]));
-        c.Add(C("people", ["person", "who", "classmate", "teacher", "ta"], "People", "Find someone in your courses", SymbolRegular.PersonCircle24, takes: "a name", lists: PaletteLists.Kinds, kinds: ["People"]));
-        c.Add(C("find", ["search", "show", "what", "whats"], "Search", "Search everything for the words", SymbolRegular.Search24, takes: "anything", lists: PaletteLists.Words));
-        c.Add(C("note", ["task", "remind", "add"], "Add a Task", "A task for today in To Do: /note read chapter 4", SymbolRegular.AddCircle24, key: "Ctrl+N", takes: "what to do", lists: PaletteLists.Task));
-        if (canvas) c.Add(C("message", ["compose", "write", "email", "send"], "New Message", "Write to a teacher or a classmate", SymbolRegular.Compose24, PaletteAction.Of(PaletteDo.NewMessage), "Ctrl+Shift+N"));
+            takes: "‹when or name›", lists: PaletteLists.Due));
+        c.Add(C("overdue", ["late", "missing"], "Overdue", "Past its date and not handed in", SymbolRegular.ErrorCircle24, takes: "‹name›", lists: PaletteLists.Overdue));
+        c.Add(C("assignment", ["hw", "homework", "assignments"], "Assignments", "Find an assignment", SymbolRegular.DocumentText24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
+        c.Add(C("quiz", ["quizzes", "test", "exam"], "Quizzes", "Find a quiz", SymbolRegular.TaskListSquareLtr24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Assignments"]));
+        c.Add(C("announcement", ["ann", "news", "announcements"], "Announcements", "Find an announcement", SymbolRegular.Megaphone24, takes: "‹words›", lists: PaletteLists.Kinds, kinds: ["Announcements"]));
+        c.Add(C("discussion", ["disc", "thread", "discussions"], "Discussions", "Find a discussion", SymbolRegular.ChatMultiple24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Discussions"]));
+        c.Add(C("page", ["wiki", "pages"], "Pages", "Find a page in your courses", SymbolRegular.DocumentOnePage24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Pages"]));
+        c.Add(C("file", ["files", "read", "download", "pdf"], "Files", "Find a course file — it opens on this PC", SymbolRegular.Folder24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["Files"]));
+        c.Add(C("people", ["person", "who", "classmate", "teacher", "ta"], "People", "Find someone in your courses", SymbolRegular.PersonCircle24, takes: "‹name›", lists: PaletteLists.Kinds, kinds: ["People"]));
+        c.Add(C("find", ["search", "show", "what", "whats"], "Search", "Search everything for the words", SymbolRegular.Search24, takes: "‹words›", lists: PaletteLists.Words));
+        c.Add(C("note", ["task", "remind", "add"], "Add a task", "A task for today in To Do: /note read chapter 4", SymbolRegular.AddCircle24, key: "Ctrl+N", takes: "‹task›", lists: PaletteLists.Task));
+        if (canvas) c.Add(C("message", ["compose", "write", "email", "send"], "New message", "Write to a teacher or a classmate", SymbolRegular.Compose24, PaletteAction.Of(PaletteDo.NewMessage), "Ctrl+Shift+N"));
         c.Add(C("reload", ["refresh", "update"], "Reload", $"Everything asked of {lms} afresh", SymbolRegular.ArrowClockwise24, PaletteAction.Of(PaletteDo.Refresh), "Ctrl+R"));
         c.Add(C("back", ["previous"], "Back", "Where you were before", SymbolRegular.ArrowLeft24, PaletteAction.Of(PaletteDo.Back), "Alt+Left"));
         c.Add(C("forward", ["next"], "Forward", "Where you went next", SymbolRegular.ArrowRight24, PaletteAction.Of(PaletteDo.Forward), "Alt+Right"));
-        c.Add(C("dark", ["night"], "Dark Appearance", "Simpl in dark, whatever Windows is set to", SymbolRegular.WeatherMoon24, PaletteAction.Look("dark")));
-        c.Add(C("light", ["day"], "Light Appearance", "Simpl in light, whatever Windows is set to", SymbolRegular.WeatherSunny24, PaletteAction.Look("light")));
-        c.Add(C("system", ["auto", "appearance", "theme", "look"], "System Appearance", "Light or dark as Windows is set", SymbolRegular.DarkTheme24, PaletteAction.Look("system")));
+        c.Add(C("dark", ["night"], "Dark appearance", "Simpl in dark, whatever Windows is set to", SymbolRegular.WeatherMoon24, PaletteAction.Look("dark")));
+        c.Add(C("light", ["day"], "Light appearance", "Simpl in light, whatever Windows is set to", SymbolRegular.WeatherSunny24, PaletteAction.Look("light")));
+        c.Add(C("system", ["auto", "appearance", "theme", "look"], "System appearance", "Light or dark as Windows is set", SymbolRegular.DarkTheme24, PaletteAction.Look("system")));
         c.Add(C("settings", ["preferences", "options", "prefs"], "Settings", "Simpl’s settings", SymbolRegular.Settings24, PaletteAction.Of(PaletteDo.Settings), "Ctrl+,"));
-        c.Add(C("whatsnew", ["changes", "version", "new", "release"], "What’s New", "What changed in this version", SymbolRegular.Sparkle24, PaletteAction.Of(PaletteDo.WhatsNew)));
-        c.Add(C("setup", ["goals"], "Guided Setup", "Choose your courses and goals again", SymbolRegular.CheckmarkCircle24, PaletteAction.Of(PaletteDo.Setup)));
-        c.Add(C("tour", ["welcome", "guide", "intro", "onboarding"], "Take the Tour", "A quick look round the app", SymbolRegular.Map24, PaletteAction.Of(PaletteDo.Tour)));
-        c.Add(C("browser", ["web", "site", "canvas", "brightspace"], $"Open {lms} in Browser", "The school’s own site", SymbolRegular.Globe24, PaletteAction.Of(PaletteDo.Browser)));
+        c.Add(C("whatsnew", ["changes", "version", "new", "release"], "What’s new", "What changed in this version", SymbolRegular.Sparkle24, PaletteAction.Of(PaletteDo.WhatsNew)));
+        c.Add(C("setup", ["goals"], "Guided setup", "Choose your courses and goals again", SymbolRegular.CheckmarkCircle24, PaletteAction.Of(PaletteDo.Setup)));
+        c.Add(C("tour", ["welcome", "guide", "intro", "onboarding"], "Take the tour", "A quick look round the app", SymbolRegular.Map24, PaletteAction.Of(PaletteDo.Tour)));
+        c.Add(C("browser", ["web", "site", "canvas", "brightspace"], $"Open {lms} in browser", "The school’s own site", SymbolRegular.Globe24, PaletteAction.Of(PaletteDo.Browser)));
         c.Add(C("help", ["?", "commands"], "Commands", "Every command", SymbolRegular.AppsList24, lists: PaletteLists.Commands));
         return c;
     }

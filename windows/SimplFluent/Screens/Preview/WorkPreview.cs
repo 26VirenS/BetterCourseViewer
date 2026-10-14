@@ -356,6 +356,8 @@ public static class WorkPreview
         private AssignmentData? assignment;
         private PageData? page;
         private string? excerpt;
+        /// <summary>What the work says, as its HTML (its lists, bold and links kept), once it is read.</summary>
+        private string? excerptHtml;
         private bool loading;
         public event Action<double>? Resized;
 
@@ -401,7 +403,8 @@ public static class WorkPreview
                 facts.Children.Add(K.Columns("auto, *", K.Icon(sym, 14, B.Text2).Margin(0, 3, 9, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), t.Col(1)));
             }
             if (facts.Children.Count > 0) v.Children.Add(facts);
-            if ((excerpt ?? item.Excerpt) is { Length: > 0 } ex) v.Children.Add(K.Wrapped(ex, Ty.Body, B.Text2, 5));
+            if (excerptHtml is { Length: > 0 } html && Formatted(html) is { } rich) v.Children.Add(rich);
+            else if ((excerpt ?? item.Excerpt) is { Length: > 0 } ex) v.Children.Add(K.Wrapped(ex, Ty.Body, B.Text2, 5));
 
             // what can be done: Mark Done at the start; its own action and Open at the end
             var actions = K.Columns("auto, *, auto");
@@ -536,9 +539,50 @@ public static class WorkPreview
 
         private void Show(AssignmentData? a, PageData? p)
         {
-            if (a != null) { assignment = a; excerpt = Plain(a.Html); }
-            if (p != null) { page = p; excerpt = Plain(p.Html); }
+            if (a != null) { assignment = a; excerpt = Plain(a.Html); excerptHtml = Lean(a.Html); }
+            if (p != null) { page = p; excerpt = Plain(p.Html); excerptHtml = Lean(p.Html); }
             Redraw();
+        }
+
+        /// <summary>About five lines of what the work says, as the school wrote it — its bullets, numbers, bold and links
+        /// (a link opened through the app, the card folding away) — in the card's quieter colour; what runs on fades out
+        /// at the fifth line rather than stopping mid-word. Null when there are no words in it.</summary>
+        private FrameworkElement? Formatted(string html)
+        {
+            if (excerpt == null) return null;
+            var e = engine;
+            var text = new RichText(html, url => { Dismiss(); e.GoTo(url); }, engine.BaseUrl, 14);
+            text.Document.SetResourceReference(System.Windows.Documents.FlowDocument.ForegroundProperty, B.Text2);
+            // (five of its lines: 14 at 1.45 each)
+            var most = Math.Ceiling(14 * 1.45 * 5) + 2;
+            text.Measure(new Size(Math.Max(120, width - 2 - 34), double.PositiveInfinity));
+            var holder = new Border { Child = text, MaxHeight = most, ClipToBounds = true };
+            if (text.DesiredSize.Height > most + 1)
+            {
+                var fade = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+                fade.GradientStops.Add(new GradientStop(Colors.Black, 0));
+                fade.GradientStops.Add(new GradientStop(Colors.Black, 0.72));
+                fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+                fade.Freeze();
+                holder.OpacityMask = fade;
+            }
+            return holder;
+        }
+
+        /// <summary>The work's HTML for the card: its words and their formatting only — pictures, frames, media and
+        /// tables left out (the whole page has them) — and no more than its first few thousand characters, cut at a tag's
+        /// end.</summary>
+        private static string? Lean(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return null;
+            var s = Regex.Replace(html, @"<(script|style|table|iframe|video|audio|object|figure)\b[^>]*>.*?</\1\s*>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"<(img|embed|source|iframe|input)\b[^>]*>", " ", RegexOptions.IgnoreCase);
+            if (s.Length > 4000)
+            {
+                var cut = s.LastIndexOf('>', 4000);
+                s = cut > 0 ? s[..(cut + 1)] : s[..4000];
+            }
+            return s;
         }
 
         private (string Course, string Quiz)? QuizIds(string raw)
