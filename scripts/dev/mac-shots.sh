@@ -449,16 +449,17 @@ live_shots() {
   node scripts/dev/mock-canvas.mjs 8810 8811 > "$HOMES/mock-live.log" 2>&1 &
   local mock=$! live=(-SimplLiveEvery 4 -SimplLiveShotAfter 5)
   sleep 2
+  # (each picture waited for by its own worker's pid: a bare `wait` would wait for the mock above too, which never ends)
   MODE=light BASE=http://localhost:8810 shoot light-48a-live-dashboard 50 "${live[@]}" -SimplLiveChange done:6
-  wait
+  wait "$!"
   MODE=light BASE=http://localhost:8810 shoot light-48b-live-cards 50 "${live[@]}" -SimplDashView cards -SimplLiveChange grade:6
-  wait
+  wait "$!"
   MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 "${live[@]}" -SimplPlace todo -SimplLiveChange task:6
-  wait
+  wait "$!"
   # (a course's page at its own pace: every 4 seconds here too, -SimplLiveCourseEvery, ten minutes in the app)
   MODE=light BASE=http://localhost:8810 shoot light-48d-live-course 40 -SimplLiveEvery 4 -SimplLiveCourseEvery 4 -SimplLiveShotAfter 3 \
     -SimplPlace section:courses/101:assignments
-  wait
+  wait "$!"
   kill "$mock" >/dev/null 2>&1 || true
 }
 
