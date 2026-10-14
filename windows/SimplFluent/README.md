@@ -445,10 +445,11 @@ no picture of the one before it to move from: it arrives by its own entrance (th
 A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grows a card out of itself with
 `WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
 Calendar's `CalendarPeek`). The card reads the work's details as it opens, Mark done ticks it, a double-click or a
-Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row. It is one width
-(440, as the Mac's card; narrower only on a page too narrow for it) whatever it grew from — a month's narrow chip as a
-Dashboard row — and says where the work stands once: a graded piece's score and letter as one chip, the engine's
-`grade.chip` ("13/16 · B−"), with no "Graded" beside it; Late, Missing and Submitted stay.
+Ctrl-click opens the work whole, and a click round it, Escape or Close folds it back into its row.
+
+The card is one width (440, as the Mac's card; narrower only on a page too narrow for it) whatever it grew from — a
+month's narrow chip as a Dashboard row — and says where the work stands once: a graded piece's score and letter as one
+chip, the engine's `grade.chip` ("13/16 · B−"), with no "Graded" beside it; Late, Missing and Submitted stay.
 
 ## Files with a message
 
