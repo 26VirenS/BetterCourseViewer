@@ -212,15 +212,24 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   billboards (on the UI thread).
 - **The view:** `var scene = new BioSceneView("3D model of …")`, then `scene.Show(key, () => MakeScene(copies…),
   frameKey:, billboards:, marks:)`. The build runs off the UI thread — capture copies, never a view — and again only when `key`
-  changes (put the page, the options and light or dark in it). The camera frames the content (40°, 1.15·R/sin 20°) on
-  the first scene and when `frameKey` is new; `ResetView()` puts it back; `ZoomTo(id)` frames an object. Set
+  changes (put the page, the options and light or dark in it); asked again for the scene shown while another is being
+  made, it lets the other go. The camera frames the content on the first scene and when `frameKey` is new: 40°, as far
+  off as makes the model's own boxes (not its ball) fill 85% of its room each way — the view, less a column for the
+  labels at each side while they are shown — so a long helix or a wide cell fills its view; it keeps that share as the
+  view is resized (a zoom of the student's own kept as the same share of it); `ResetView()` frames it again;
+  `ZoomTo(id)` frames an object. Set
   `Selection` (the selection glows, the rest dims to 35%: `DimOthers`), `ShowLabels`, `Turning` (auto-turn, 30 s a turn;
   never with animations off), `PickSelects`, `Accessibility`; listen to `Picked`, `DoubleClicked`, `HoverChanged`, and
   `MorePressed` ("+N more" is a link to the parts list while it has a handler; Cell Explorer brings its list into view).
-  Click picks (the nearest opaque object, through translucent membranes); hover outlines in the accent with a hand;
+  Click picks (the nearest opaque object, through translucent membranes); hover outlines in the accent with a hand —
+  only on the pointer's own movement (`ScreenPointer`: a view opening, or a scene or a label drawn, under a still
+  pointer points at nothing; in 0.3.0 the part under it showed as pointed at from the first frame), and never with a
+  see-through object's hull, which tinted everything inside a membrane in the accent;
   drag turns, right-drag pans, the wheel zooms; ← → ↑ ↓ turn 15°, + − zoom, Escape deselects; double-click zooms to an
-  object (or resets on empty space). Labels with leader lines (§3.5: two columns 22 apart, ≤ 14 with "+N more", 120 ms
-  fades, pressable, hover outlines their object) come from `Labels`; give a convex shell's label a `Normal`, else a ray
+  object (or resets on empty space). Labels with leader lines (§3.5: two columns 22 apart, 24 out from the model's box
+  on the view — beside the model, not at the view's edges — kept even, a column holding as many as the view's height
+  has room for before "+N more", 120 ms fades, pressable, hover outlines their object) come from `Labels`; give a
+  convex shell's label a `Normal`, else a ray
   decides what hides it; `Always` shows it whatever covers it (a strand's ends: both ends of both strands are always
   named). Cell Explorer's nucleus, cut open, is anchored on its envelope's ring at the cut face that turns most to the
   camera, with that face's normal (at the back of the envelope the nucleolus and the chromatin hid it). A label too wide for the room beside its column is moved in on its own (the Mac moves the whole
@@ -262,8 +271,12 @@ anim.Stop();`): `phase.From`, `phase.To`, `phase.T` (eased; 600 ms at 1×; back 
 `.Maternal`, `.HBond` … are `BioHexPair`s (`Light`, `Dark`, `HexFor(dark)`): `.ToColor()` (as the app is drawn now),
 `.ToColor(dark)`, `.ToBrush()`; `BioColors.Base(char)`, `.AminoAcid(char)`, `.Of(BioAAClass)`, `.Tool(key)`,
 `.Hex(color)`. Never colour alone: show the letter or a `BioUI.Legend`. Pieces: `BioUI.Work(left, centre, right)` (the
-chemistry builders' three columns from 1100 wide; narrower — the Tools page beside the navigation pane, on a 1366
-window — the scene across the top as tall as the page shows, 460 to 640, as the Mac's, and the two columns under it),
+chemistry builders' layout, `ChemLayout`: the three columns side by side from 1180 wide; from 840 — a 1280 or 1366
+window beside the navigation pane — the drawing beside one column, the controls over the facts, each scrolling in its
+own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and 45%); narrower — a 1024 window beside
+the pane, a narrow one with it folded — the drawing across the top, as tall as leaves 170 of the page for the two
+columns' first controls under it (240 to 560). The controls and the facts are always in sight: 0.3.0 gave the drawing
+the whole page under 1180, and they sat out of sight below it),
 `BioUI.Heading`, `BioUI.Caption`, `BioUI.Card(title, swatch, subtitle, rows…)`,
 `BioUI.FactRow(label, text, tint)`, `BioUI.Facts(rows)`, `BioUI.Legend(items)`, `BioUI.SequenceText`, `BioUI.OpenButton`,
 `BioQuickOpen`, `BioToolPlaceholder`.
@@ -324,7 +337,10 @@ Pages `amino`, `proteins`, `nucleic`, `carbs`, `lipids`. `Model/BiomoleculeBuild
 chains turned apart), `BiomolProteins.cs` (ubiquitin's and haemoglobin's four levels, denature and refold),
 `BiomolMolecules.cs` and `BiomolScenes.cs` (nucleotides joined into a strand, sugars and their glycosidic bonds,
 cellulose and starch, fats, phospholipids, cholesterol). A sugar's or a nucleotide's carbons are numbered over the
-whole model, each just outside its atom (in the scene the H or O in front hid them). Haemoglobin's chains are each
+whole model, each just outside its atom (in the scene the H or O in front hid them). A charge's sign sits on its atom,
+at the atom's upper right on the view as a charge is written (N⁺, O⁻), in front of it, whichever way the model is
+turned (`BioBillboard`'s shift; set out from the molecule's centre in the scene, a sign sat beside a neighbouring H or
+out in the open). Haemoglobin's chains are each
 named at the residue nearest a third of the way along that the first view (down z) shows 12 Å clear of every heme, on
 the chain's near side, so no chain's leader ends on a heme. Views: `BiomoleculeTool.cs`, `BiomolStage.cs` (an animation
 layer added to the shared 3D view), `BiomolDrawings.cs`, `BiomolAminoPage.cs`, `BiomolProteinPage.cs`,
@@ -353,8 +369,9 @@ page (`DNAHelixPage.cs` … `DNARnaPage.cs`). Launch, in the Mac's words with th
 written as DNA), `nucleotide` (the Nucleotides page; `molecule` read as the same) and `page` (Cell Division's "What
 happens in S phase" opens
 `replication`). Base letters in 3D are always shown (the shared view does not say how near the camera is). The
-Replication page (`DnaTwoColumns`) puts the fork beside its cards from 1000 wide; narrower, the fork and its controls
-are as tall as the page shows, 480 to 640, like `BioUI.Work`'s scene, so its words stay readable.
+Replication page (`DnaTwoColumns`) puts the fork beside its cards from 760 wide (840 with the page's room round it, as
+`BioUI.Work`'s one column beside the drawing); narrower, the fork and its controls are as tall as leaves 170 of the
+page for the step's card under them (240 to 560).
 
 ## Cell Division (`divide`)
 
@@ -426,7 +443,11 @@ still passes.
 `-replication(-dark)`, `-okazaki`, `-trna(-dark)`, `-trna3d`, `-mrna`, `-ribosome`; `bio-divide-mitosis`, `-meiosis`,
 `-gametes`, `-plant`, `-pick`, `-compare`, `-cycle`, each with `-dark`; `bio-lab-dilution`, `-stats-dark`,
 `-cells-dark`, `pin-biolab`, `bio-enzyme-competitive`, `-denatured-dark`, `bio-energy-map`, `-respiration-dark`,
-`-photosynthesis`, `-atoms`. An argument with a space in it (a cross typed `AaBb x AaBb`) is put in quotes by the
+`-photosynthesis`, `-atoms`. Cell Explorer, DNA & RNA and the Biomolecule Builder are also pictured opened plainly —
+no state, nothing selected — in dark, at 1024×681 beside the navigation pane and at 780×683 with it folded
+(`bio-open-cell-1024`, `-780`, `bio-open-dna-…`, `bio-open-biomol-…`), and Cell Explorer under a still pointer put over
+the cell before Simpl starts, alone on the runner (`bio-cell-pointer`: the workflow fails it if the view's log names
+anything "pointed at" before the picture). An argument with a space in it (a cross typed `AaBb x AaBb`) is put in quotes by the
 workflow's `Shot`. A pin's flyout opened by `--pin-open` stays open (`ToolHost.cs`): three copies of Simpl start at once
 in CI, and another's window coming forward closed it before its picture. A picture waits for Hardy–Weinberg's
 simulation from the moment it is asked for, not only once it runs (`HWRunner`), and the workflow fails

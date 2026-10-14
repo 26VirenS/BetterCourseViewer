@@ -52,8 +52,10 @@ public readonly record struct BiomolLook(BioAtomStyle Style = BioAtomStyle.BallS
 /// <param name="OnTop">Drawn over the whole model in the page's text colour (the view's marks), not in the scene, so no
 /// atom in front hides it: a carbon's number.</param>
 /// <param name="Atom">The atom an on-top mark numbers: it is kept just outside the atom's disc as the view turns.</param>
+/// <param name="Charge">A charge's sign on its atom (Pos the atom's centre): kept at the atom's upper right on the view, as
+/// a charge is written (N⁺, O⁻), however the model is turned.</param>
 public sealed record BiomolMark(BioVec Pos, string Text, string? Hex = null, double Size = 0.42, double Lift = 0,
-    bool OnTop = false, BioVec? Atom = null, double AtomRadius = 0);
+    bool OnTop = false, BioVec? Atom = null, double AtomRadius = 0, bool Charge = false);
 
 /// <summary>A short motion (§4.4 Animate dehydration, the sugar's hydrolysis): groups of items, each moved from one offset
 /// to another and faded, after a delay; a <c>Pulse</c> flashes in and out (a new bond).</summary>
@@ -151,22 +153,24 @@ public static class BiomolScenes
         return pts.OrderBy(p => BioV.Distance(p, c)).First();
     }
 
-    /// <summary>The charge marks of a form ("+" blue, "−" red), each just outside its atom, away from the molecule's centre.</summary>
+    /// <summary>The charge marks of a form ("+" blue, "−" red), each on its atom: at the atom's upper right as the view has
+    /// it, as a charge is written (N⁺, O⁻), in front of the atom — set out from the molecule's centre in the scene, a sign
+    /// sat beside a neighbouring hydrogen or out in the open, and read as nobody's.</summary>
     public static List<BiomolMark> ChargeMarks(BioMoleculeModel m, IReadOnlyDictionary<string, int> charges, BiomolLook look, BiomolChem chem)
     {
         if (charges.Count == 0) return new List<BiomolMark>();
-        var centre = m.Bounds.Centre;
         var out_ = new List<BiomolMark>();
         foreach (var a in m.Atoms)
         {
             if (!charges.TryGetValue(a.Name, out var q) || q == 0) continue;
-            var dir = BioV.Unit(a.Pos - centre);
-            var r = Radius(a.Element, look, chem);
-            out_.Add(new BiomolMark(a.Pos + (BioV.Length(dir) > 0 ? dir : new BioVec(0, 1, 0)) * (r + 0.42), q > 0 ? "+" : "−",
-                (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), 0.62));
+            out_.Add(Charge(a.Pos, q, Radius(a.Element, look, chem), look, 0.62));
         }
         return out_;
     }
+
+    /// <summary>A charge's sign on its atom: at the atom's centre, lifted to its near side, set to its upper right on the view.</summary>
+    private static BiomolMark Charge(BioVec atom, int q, double radius, BiomolLook look, double size) =>
+        new(atom, q > 0 ? "+" : "−", (q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), size, Lift: radius, AtomRadius: radius, Charge: true);
 
     // ---- amino acids (§4.4 Amino acids) ----
 
@@ -449,15 +453,7 @@ public static class BiomolScenes
             var (name, q) = p.Sequence[i] switch { 'K' => ("NZ", 1), 'R' => ("NH2", 1), 'D' => ("OD2", -1), 'E' => ("OE2", -1), _ => ("", 0) };
             if (q != 0 && p.AtomIndex(i, name) is { } k) charges.Add((k, q));
         }
-        var centre = BiomolMath.Centroid(p.Atoms.Select(a => a.Pos).ToList());
-        return charges.Select(x =>
-        {
-            var a = p.Atoms[x.Atom];
-            var dir = BioV.Unit(a.Pos - centre);
-            var r = Radius(a.Element, look, chem);
-            return new BiomolMark(a.Pos + (BioV.Length(dir) > 0 ? dir : new BioVec(0, 1, 0)) * (r + 0.5), x.Q > 0 ? "+" : "−",
-                (x.Q > 0 ? BioPalette.Basic : BioPalette.Acidic).HexFor(look.Dark), 0.75);
-        }).ToList();
+        return charges.Select(x => Charge(p.Atoms[x.Atom].Pos, x.Q, Radius(p.Atoms[x.Atom].Element, look, chem), look, 0.75)).ToList();
     }
 
     // ---- nucleotides and a strand (§4.4 Nucleic acids) ----

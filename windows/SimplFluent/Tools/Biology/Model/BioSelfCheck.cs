@@ -515,13 +515,16 @@ public static partial class BioSelfCheck
         r.Check("mesh.batch", (batch.ObjectAtTriangle(79) ?? "-") + (batch.ObjectAtTriangle(80) ?? "-"),
             batch.ObjectAtTriangle(79) == "a" && batch.ObjectAtTriangle(80) == "b" && batch.ObjectAtTriangle(batch.Mesh.TriangleCount) == null
             && batch.ObjectAtVertex(ico.VertexCount - 1) == "a" && batch.ObjectAtVertex(ico.VertexCount) == "b");
-        // (labels: each side's column, at least 22 apart, inside the view; 14 at most)
+        // (labels: each side's column, at least 22 apart, inside the view — all twenty where the view is tall enough for
+        //  them, seven a column in one 200 tall, the largest objects keeping theirs)
         var inputs = Enumerable.Range(0, 20).Select(k => new BioLabelInput($"o{k}", $"Part {k}", k % 2 == 0 ? 300 : 500, 380 + k, Area: k)).ToList();
         var (placed, more) = BioLabelLayout.Layout(inputs, 400, 400, 150, 800, 800);
+        var (few, left) = BioLabelLayout.Layout(inputs, 400, 100, 150, 800, 200);
         var lefts = placed.Where(p => p.Left).OrderBy(p => p.Y).ToList();
         var gapsOK = lefts.Zip(lefts.Skip(1)).All(p => p.Second.Y - p.First.Y >= 22 - 1e-9);
         var inside = placed.All(p => p.Frame.X >= 16 - 1e-9 && p.Frame.X + p.Frame.Width <= 800 - 16 + 1e-9 && p.Frame.Y >= 16 - 1e-9);
-        r.Check("labels.layout", $"{placed.Count}+{more}", placed.Count == 14 && more == 6 && gapsOK && inside && lefts.All(p => p.EdgeX == 400 - 174 && p.ElbowX == 400 - 162));
+        r.Check("labels.layout", $"{placed.Count}+{more},{few.Count}+{left}", placed.Count == 20 && more == 0 && few.Count == 14 && left == 6
+            && few.All(p => p.Id != "o0") && gapsOK && inside && lefts.All(p => p.EdgeX == 400 - 174 && p.ElbowX == 400 - 162));
     }
 
     // ---- the step-through (§3.6), on a clock of its own ----

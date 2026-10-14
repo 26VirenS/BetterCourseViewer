@@ -90,9 +90,10 @@ public static class BioWpf
 }
 
 /// <summary>Something drawn flat toward the viewer that follows a point of the scene as it turns (an atom's symbol, a
-/// tag): its model (made facing +z, centred on the origin), the point, how far toward the viewer it is lifted, and the
-/// object a press on it picks (if any).</summary>
-public sealed record BioBillboard(Model3D Model, BioVec Anchor, double Lift = 0, string? Id = null);
+/// tag): its model (made facing +z, centred on the origin), the point, how far toward the viewer it is lifted, the object
+/// a press on it picks (if any), and how far it is set right and up from the point on the view, whichever way the model
+/// is turned (a charge's sign at its atom's upper right).</summary>
+public sealed record BioBillboard(Model3D Model, BioVec Anchor, double Lift = 0, string? Id = null, double ShiftX = 0, double ShiftY = 0);
 
 /// <summary>A few letters drawn in 2D over a 3D scene, on top of the whole model, following a point of it as it turns
 /// (a strand's "3′", a carbon's "2′"): what it says, the point, how tall it is in the scene's units (drawn 11–17 px

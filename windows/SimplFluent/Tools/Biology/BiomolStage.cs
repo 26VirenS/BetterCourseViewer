@@ -82,11 +82,13 @@ internal sealed class BiomolStage
         lock (made) return made.TryGetValue(c, out var k) && k == key;
     }
 
-    /// <summary>A mark as text facing the viewer, on its atom's near side.</summary>
+    /// <summary>A mark as text facing the viewer, on its atom's near side; a charge's sign set to its atom's upper right on
+    /// the view, just over the atom's edge, as a charge is written (N⁺, O⁻).</summary>
     private static BioBillboard Board(BiomolMark m)
     {
         var colour = m.Hex is { } h ? K.Hex(h) : Colors.White;
-        return new BioBillboard(BioBillboards.Text(m.Text, m.Size, colour, glow: true), m.Pos, m.Lift);
+        var shift = m.Charge ? (m.AtomRadius + 0.3 * m.Size) * Math.Sqrt(0.5) : 0;
+        return new BioBillboard(BioBillboards.Text(m.Text, m.Size, colour, glow: true), m.Pos, m.Lift, ShiftX: shift, ShiftY: shift);
     }
 
     // ---- motions ----

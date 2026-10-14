@@ -2,12 +2,16 @@ namespace Simpl.Tools;
 
 // Labels with leader lines (spec §3.5), laid out as the Mac's BioLabelLayout.swift does: each visible anchor's label
 // goes in the column on its side of the model (left when the anchor is left of the model's centre), the columns R + 24
-// out from the model's screen circle; a label too wide for the room between its column and the view's edge is moved in
-// on its own (the Mac moves the whole column in for its widest label, which in a narrow view here put the column's
-// short labels over the model); in a column, labels follow their anchors down and are pushed apart to 22; a column too
-// long for the view is pushed up from the bottom. Each leader runs anchor → elbow (12 short of the label, toward the
-// model) → label. At most 14 at once: the objects covering the most of the screen keep theirs, the rest are counted
-// ("+N more"). Device-independent pixels, y down.
+// out from the model's screen circle — or, given the model's box on the view, 24 out from the box, so the labels of a
+// model narrower than its circle (the double helix) sit beside it, not flung to the view's edges; a label too wide for
+// the room between its column and the view's edge is moved in on its own (the Mac moves the whole column in for its
+// widest label, which in a narrow view here put the column's short labels over the model); in a column, labels follow
+// their anchors down and are pushed apart to 22; a column too long for the view is pushed up from the bottom. Each
+// leader runs anchor → elbow (12 short of the label, toward the model) → label. The two columns are kept even: while one
+// has three or more labels more than the other, its label nearest the model's middle (within the middle half) goes over
+// — an animal cell's parts lie mostly right of its centre, and its right column ran out of room ("+1 more") beside a left
+// one of four. A column holds as many as the view's height has room for, the objects covering the most of the screen
+// keeping theirs when it has not; only those left over are counted ("+N more"). Device-independent pixels, y down.
 //
 // This app's middle column is narrower than the Mac's, so a long label moved in can land on what it names. Given the
 // model's box on the view, a label that would hide its own anchor, or (beside a model narrower than 70% of the view)
@@ -49,6 +53,8 @@ public static class BioLabelLayout
     public const double ColumnOffset = 24;
     public const double Elbow = 12;
     public const double Inset = 16;
+    /// <summary>Spec §3.5's fourteen: what the helix's and the division stages' checks hold their labels to. The view
+    /// itself shows as many labels as its height has room for.</summary>
     public const int MaxLabels = 14;
     /// <summary>Rows above (or below) the model a label may move to.</summary>
     public const int BandRows = 3;
@@ -59,22 +65,43 @@ public static class BioLabelLayout
     public static (List<BioLabelPlacement> Placed, int More) Layout(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model = null)
     {
         var shown = inputs.Where(i => i.Visible).ToList();
-        var more = 0;
-        if (shown.Count > MaxLabels)
-        {
-            var keep = shown.Select((l, i) => (l, i)).OrderByDescending(x => x.l.Area).ThenBy(x => x.i).Take(MaxLabels).Select(x => x.i).ToHashSet();
-            more = shown.Count - MaxLabels;
-            shown = shown.Where((_, i) => keep.Contains(i)).ToList();
-        }
         const double step = Height + Gap;
+        // (each label's side, kept even: the side with three or more labels more than the other gives its label nearest
+        //  the model's middle — within the middle half of the model — to the other, one at a time)
+        var onLeft = shown.Select(l => l.X < cx).ToArray();
+        var half = model is { } mb && mb.X1 > mb.X0 ? (mb.X1 - mb.X0) / 2 : r;
+        while (true)
+        {
+            var nl = onLeft.Count(x => x);
+            var nr = onLeft.Length - nl;
+            if (Math.Abs(nl - nr) <= 2) break;
+            var from = nl > nr;
+            var k = Enumerable.Range(0, onLeft.Length).Where(i => onLeft[i] == from)
+                .OrderBy(i => Math.Abs(shown[i].X - cx)).ThenBy(i => shown[i].Id, StringComparer.Ordinal).First();
+            if (Math.Abs(shown[k].X - cx) > 0.5 * half) break;
+            onLeft[k] = !from;
+        }
+        // (a column holds what the view's height has room for, 22 apart inside its edges: past that, the objects covering
+        //  the most of the screen keep their labels and the rest are counted)
+        var holds = Math.Max(1, (int)Math.Floor((h - 2 * Inset - Height) / step + 1e-9) + 1);
+        var more = 0;
         var out_ = new List<BioLabelPlacement>();
         foreach (var left in new[] { true, false })
         {
-            var column = shown.Where(l => (l.X < cx) == left).OrderBy(l => l.Y).ThenBy(l => l.Id, StringComparer.Ordinal).ToList();
+            var mine = Enumerable.Range(0, shown.Count).Where(i => onLeft[i] == left).ToList();
+            if (mine.Count > holds)
+            {
+                var keep = mine.OrderByDescending(i => shown[i].Area).ThenBy(i => i).Take(holds).ToHashSet();
+                more += mine.Count - holds;
+                mine = mine.Where(keep.Contains).ToList();
+            }
+            var column = mine.Select(i => shown[i]).OrderBy(l => l.Y).ThenBy(l => l.Id, StringComparer.Ordinal).ToList();
             if (column.Count == 0) continue;
-            // (the column's edge toward the model; a label too wide to fit outside it in the view is moved in alone, so
-            //  one long label does not pull the column's shorter ones onto the model)
+            // (the column's edge toward the model — 24 out from its box, when the box is narrower than its circle; a label
+            //  too wide to fit outside it in the view is moved in alone, so one long label does not pull the column's
+            //  shorter ones onto the model)
             var edge = left ? cx - (r + ColumnOffset) : cx + (r + ColumnOffset);
+            if (model is { } b && b.X1 > b.X0) edge = left ? Math.Max(edge, b.X0 - ColumnOffset) : Math.Min(edge, b.X1 + ColumnOffset);
             double EdgeOf(BioLabelInput l) => left ? Math.Max(edge, Inset + l.Width) : Math.Min(edge, w - Inset - l.Width);
             double top = Inset + Height / 2, bottom = h - Inset - Height / 2;
             var ys = column.Select(l => Math.Max(l.Y, top)).ToArray();

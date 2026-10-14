@@ -285,9 +285,11 @@ internal sealed class DnaToggle : Grid
 }
 
 /// <summary>
-/// A page laid out in two columns (the drawing and its cards) from 1000 wide, the drawing over the cards below that — for
-/// the pages whose 2D drawing needs more room than the three-column layout's middle (replication). Narrow, the drawing
-/// is as tall as the page shows (480 to 640), like the tall three-column layout's, so its words stay readable.
+/// A page laid out in two columns (the drawing and its cards) from 760 wide — a 1280 or 1366 window beside the navigation
+/// pane included — the drawing over the cards below that, for the pages whose 2D drawing needs more room than the
+/// three-column layout's middle (replication). Over the cards, the drawing is as tall as leaves 170 of the page for the
+/// first card under it (240 to 560), as the tall three-column layout's is, so the step's card is in sight. (It once gave
+/// the drawing the page's whole height under 1000 wide, and the step's card sat out of sight below it.)
 /// </summary>
 internal sealed class DnaTwoColumns : Grid
 {
@@ -312,11 +314,11 @@ internal sealed class DnaTwoColumns : Grid
         return base.MeasureOverride(available);
     }
 
-    private static double NarrowHeight(double page) => Math.Max(480, Math.Min(640, page));
+    private static double NarrowHeight(double page) => Math.Max(240, Math.Min(560, page - 170));
 
     private void Lay(Size size)
     {
-        var w = size.Width >= 1000;
+        var w = size.Width >= 760;
         if (!w) main.Height = NarrowHeight(size.Height);
         if (wide == w) return;
         wide = w;

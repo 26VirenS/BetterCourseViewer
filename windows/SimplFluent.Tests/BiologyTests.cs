@@ -408,8 +408,9 @@ public class BiologyTests
     {
         var inputs = Enumerable.Range(0, 20).Select(k => new BioLabelInput($"o{k}", $"Part {k}", k % 2 == 0 ? 300 : 500, 380 + k, Area: k)).ToList();
         var (placed, more) = BioLabelLayout.Layout(inputs, 400, 400, 150, 800, 800);
-        Assert.Equal(14, placed.Count);
-        Assert.Equal(6, more);
+        // (a view tall enough for them all: every label shown, none counted as "more")
+        Assert.Equal(20, placed.Count);
+        Assert.Equal(0, more);
         foreach (var side in new[] { true, false })
         {
             var col = placed.Where(p => p.Left == side).OrderBy(p => p.Y).ToList();
@@ -417,12 +418,39 @@ public class BiologyTests
         }
         Assert.All(placed, p => Assert.True(p.Frame.X >= 16 - 1e-9 && p.Frame.X + p.Frame.Width <= 784 + 1e-9 && p.Frame.Y >= 16 - 1e-9));
         Assert.All(placed.Where(p => p.Left), p => Assert.Equal((226.0, 238.0), (p.EdgeX, p.ElbowX)));
-        // (the largest objects keep their labels)
-        Assert.DoesNotContain(placed, p => p.Id == "o0");
+        // (a view 200 tall holds seven a column: the largest objects keep their labels, the rest are counted)
+        var (few, left) = BioLabelLayout.Layout(inputs, 400, 100, 150, 800, 200);
+        Assert.Equal(14, few.Count);
+        Assert.Equal(6, left);
+        Assert.DoesNotContain(few, p => p.Id == "o0");
+        Assert.All(few, p => Assert.True(p.Frame.Y >= 16 - 1e-9 && p.Frame.Y + p.Frame.Height <= 184 + 1e-9));
         // (a column too long for the view is pushed up from the bottom, still 22 apart and inside)
         var crowd = Enumerable.Range(0, 12).Select(k => new BioLabelInput($"c{k}", "x", 100, 300)).ToList();
         var (packed, _) = BioLabelLayout.Layout(crowd, 400, 150, 100, 800, 300);
         Assert.True(packed.Min(p => p.Y) >= 25 - 1e-9);
+    }
+
+    [Fact]
+    public void LabelsSitBesideANarrowModelAndAreKeptEven()
+    {
+        // (a helix-like model, narrow in a wide view, four anchors left of its middle and eleven right of it)
+        var inputs = Enumerable.Range(0, 15).Select(k => new BioLabelInput($"p{k}", $"Part {k}",
+            k < 4 ? 360 + 8 * k : 405 + 5 * (k - 4), 120 + 25 * k, Width: 80)).ToList();
+        var box = new BioLabelBox(350, 100, 450, 500);
+        var (placed, more) = BioLabelLayout.Layout(inputs, 400, 300, 200, 900, 600, box);
+        Assert.Equal(15, placed.Count);
+        Assert.Equal(0, more);
+        // (the columns 24 out from the model's box, not from its 200-wide circle: beside the model, not at the view's edges)
+        Assert.All(placed.Where(p => p.Left), p => Assert.Equal(326, p.EdgeX, 6));
+        Assert.All(placed.Where(p => !p.Left), p => Assert.Equal(474, p.EdgeX, 6));
+        // (kept even: the right column's anchors nearest the middle went over, until the two differ by two at most)
+        var lefts = placed.Count(p => p.Left);
+        Assert.True(Math.Abs(lefts - (placed.Count - lefts)) <= 2, $"{lefts} left of {placed.Count}");
+        Assert.Contains(placed, p => p.Left && p.Id == "p4");
+        // (but an anchor far out on one side is never sent across the model)
+        var far = Enumerable.Range(0, 6).Select(k => new BioLabelInput($"f{k}", "Far", 700, 100 + 30 * k, Width: 60)).ToList();
+        var (kept, _) = BioLabelLayout.Layout(far, 400, 300, 200, 900, 600);
+        Assert.All(kept, p => Assert.False(p.Left));
     }
 
     [Fact]

@@ -107,31 +107,45 @@ internal static class ChemSheet
 }
 
 /// <summary>
-/// The Lewis maker's and the molecule builder's layout (the Mac's PTWorkLayout): on a wide window, the controls, the
-/// drawing and the facts side by side, each side scrolling on its own; on a narrower one, the drawing across the top —
-/// about half the height, so the controls under it start in view (and the builder puts its preset and its way of making
-/// in the drawing's own heading: <see cref="WideChanged"/>) — and the controls and facts side by side under it, all
-/// scrolling as one. The biology tools (<c>tall</c>) give their drawing the page's whole height there, as the Mac's do
-/// (PTWorkLayout without shortDrawing): a 3D model or a step-through squeezed into half a page lost its parts.
+/// The Lewis maker's, the molecule builder's and the biology tools' layout (the Mac's PTWorkLayout), made so the controls
+/// and the facts are in sight at every size: on a wide page the controls, the drawing and the facts side by side, each
+/// scrolling on its own; on a middling one (a 1280 or 1366 window beside the navigation pane) the drawing beside one
+/// column, the controls over the facts, each in its own share of it and scrolling on its own (<see cref="ChemSide"/>); and
+/// on a page narrower than that, the drawing across the top and the controls and facts side by side under it, all
+/// scrolling as one. There the drawing is about half the page (the chemistry builders, which put their preset and way of
+/// making in the drawing's own heading: <see cref="WideChanged"/>) or, for the biology tools (<c>tall</c>), as tall as
+/// leaves the columns' first controls in view under it. (The biology tools once gave the drawing the page's whole height
+/// under 1180 — at 1366 beside the pane too — and their controls and facts sat out of sight below it, with nothing to
+/// say so.)
 /// </summary>
 internal sealed class ChemLayout : Grid
 {
+    /// <summary>The three side by side; the drawing beside one column of the controls over the facts; the drawing over the two.</summary>
+    private enum Arrangement { Three, Two, Stacked }
+
+    /// <summary>The page's widths (its room round it counted) from which the three sit side by side, and from which the
+    /// drawing keeps a column beside it — the drawing then at least 440 wide, so a model and its labels still fit it.</summary>
+    private const double ThreeFrom = 1180, TwoFrom = 840;
+
     private readonly FrameworkElement left, centre, right;
     private readonly bool tall;
     private readonly ScrollViewer leftScroll = Scroller(), rightScroll = Scroller(), oneScroll = Scroller();
     private readonly Grid narrow = new();
     private readonly Grid under = new();
-    private bool? wide;
+    /// <summary>The one column beside the drawing: the controls over the facts.</summary>
+    private readonly ChemSide side;
+    private Arrangement? arranged;
 
-    /// <summary>The three side by side (true), or the drawing over the rest (false); not laid out yet: true.</summary>
-    public bool Wide => wide != false;
+    /// <summary>The controls beside the drawing — three columns, or the drawing and one column — not under it; not laid out
+    /// yet: true.</summary>
+    public bool Wide => arranged != Arrangement.Stacked;
 
-    /// <summary>The layout changed between side by side and one over the other.</summary>
+    /// <summary>The layout changed between the controls beside the drawing and under it.</summary>
     public event Action? WideChanged;
 
-    /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall,
-    /// as tall as the page shows, from 460 to 640.</summary>
-    private double NarrowHeight(double page) => tall ? Math.Max(460, Math.Min(640, page)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
+    /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall, as
+    /// tall as leaves 170 of the page for the first controls under it, from 240 to 560.</summary>
+    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 170)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
 
     /// <summary>The least the drawing is given over the rest (320): more while the drawing's card holds more than the
     /// drawing — the Lewis maker's resonance structures under it, which left the structure itself a few lines tall.</summary>
@@ -142,7 +156,7 @@ internal sealed class ChemLayout : Grid
         {
             if (Math.Abs(floor - value) < 0.5) return;
             floor = value;
-            if (wide == false) centre.Height = NarrowHeight(page);
+            if (arranged == Arrangement.Stacked) centre.Height = NarrowHeight(page);
         }
     }
 
@@ -168,16 +182,17 @@ internal sealed class ChemLayout : Grid
         narrow.Children.Add(under);
         narrow.Margin = new Thickness(0, 0, 0, 24);
         oneScroll.Content = narrow;
+        side = new ChemSide(leftScroll, rightScroll);
         SizeChanged += (_, e) => Lay(e.NewSize);
     }
 
     /// <summary>
-    /// In a page that scrolls (no height to fill), the drawing side by side with the panels is given the Mac's narrow
-    /// height rather than none.
+    /// In a page that scrolls (no height to fill), the drawing beside the panels is given the Mac's narrow height rather
+    /// than none.
     /// </summary>
     protected override Size MeasureOverride(Size available)
     {
-        if (wide == true) centre.Height = double.IsInfinity(available.Height) ? 640 : double.NaN;
+        if (arranged is Arrangement.Three or Arrangement.Two) centre.Height = double.IsInfinity(available.Height) ? 640 : double.NaN;
         return base.MeasureOverride(available);
     }
 
@@ -188,9 +203,9 @@ internal sealed class ChemLayout : Grid
     };
 
     /// <summary>
-    /// Room round the page: side by side, all of it round the three columns; one over the other, the sides' room inside
-    /// the scroller (its padding), so its scroll bar runs down the page's edge, not inside the drawing's card (the
-    /// chemistry pages; the biology tools' pages keep theirs as they are).
+    /// Room round the page: side by side, all of it round the columns; one over the other, the sides' room inside the
+    /// scroller (its padding), so its scroll bar runs down the page's edge, not inside the drawing's card (the chemistry
+    /// pages; the biology tools' pages keep theirs as they are).
     /// </summary>
     private Thickness Edges(bool wide) => wide || tall ? new Thickness(40, 8, 40, 24) : new Thickness(0, 8, 0, 0);
 
@@ -199,57 +214,152 @@ internal sealed class ChemLayout : Grid
         // (decided on the page's own width and height, the room round it put back: the room moves as the layout does)
         var width = size.Width + Margin.Left + Margin.Right;
         page = size.Height + Margin.Top + Margin.Bottom - 32;
-        var w = width >= 1180;
-        if (!w) centre.Height = NarrowHeight(page);
-        if (wide == w) return;
-        var first = wide == null;
-        wide = w;
-        Margin = Edges(w);
-        oneScroll.Padding = w || tall ? new Thickness(0) : new Thickness(40, 0, 40, 0);
-        // (told after this layout pass: the builders move their preset and way into the drawing's heading, or back)
-        if (!first || !w) Dispatcher.BeginInvoke(() => WideChanged?.Invoke(), DispatcherPriority.Loaded);
+        var a = width >= ThreeFrom ? Arrangement.Three : width >= TwoFrom ? Arrangement.Two : Arrangement.Stacked;
+        if (a == Arrangement.Stacked) centre.Height = NarrowHeight(page);
+        if (arranged == a) return;
+        var wasWide = Wide;
+        var first = arranged == null;
+        arranged = a;
+        Margin = Edges(a != Arrangement.Stacked);
+        oneScroll.Padding = a != Arrangement.Stacked || tall ? new Thickness(0) : new Thickness(40, 0, 40, 0);
+        // (told after this layout pass, when the controls go from beside the drawing to under it or back: the builders
+        //  move their preset and way into the drawing's heading, or back)
+        if (first ? !Wide : Wide != wasWide) Dispatcher.BeginInvoke(() => WideChanged?.Invoke(), DispatcherPriority.Loaded);
         foreach (var e in new[] { left, centre, right }) ChemKit.Detach(e);
         Children.Clear();
         ColumnDefinitions.Clear();
+        side.Detach();
         leftScroll.Content = null;
         rightScroll.Content = null;
-        if (w)
+        switch (a)
         {
-            // (each side column's content held to the column's width, less room for its scroll bar)
-            centre.Height = double.NaN;
-            left.Width = 284;
-            right.Width = 300;
-            left.Margin = new Thickness(0, 0, 0, 20);
-            right.Margin = new Thickness(0, 0, 0, 20);
-            left.HorizontalAlignment = HorizontalAlignment.Left;
-            right.HorizontalAlignment = HorizontalAlignment.Left;
-            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
-            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(316) });
-            leftScroll.Content = left;
-            rightScroll.Content = right;
-            Children.Add(leftScroll.Col(0));
-            Children.Add(centre.Col(2));
-            Children.Add(rightScroll.Col(4));
+            case Arrangement.Three:
+                // (each side column's content held to the column's width, less room for its scroll bar)
+                centre.Height = double.NaN;
+                left.Width = 284;
+                right.Width = 300;
+                left.Margin = new Thickness(0, 0, 0, 20);
+                right.Margin = new Thickness(0, 0, 0, 20);
+                left.HorizontalAlignment = HorizontalAlignment.Left;
+                right.HorizontalAlignment = HorizontalAlignment.Left;
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(316) });
+                leftScroll.Content = left;
+                rightScroll.Content = right;
+                Children.Add(leftScroll.Col(0));
+                Children.Add(centre.Col(2));
+                Children.Add(rightScroll.Col(4));
+                break;
+            case Arrangement.Two:
+                // (the drawing the page's whole height, and beside it one column: the controls over the facts, each held
+                //  to the column's width less room for its scroll bar)
+                centre.Height = double.NaN;
+                left.Width = 284;
+                right.Width = 284;
+                left.Margin = new Thickness(0, 0, 0, 12);
+                right.Margin = new Thickness(0, 0, 0, 20);
+                left.HorizontalAlignment = HorizontalAlignment.Left;
+                right.HorizontalAlignment = HorizontalAlignment.Left;
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
+                leftScroll.Content = left;
+                rightScroll.Content = right;
+                side.Attach();
+                Children.Add(centre.Col(0));
+                Children.Add(side.Col(2));
+                break;
+            default:
+                left.Width = double.NaN;
+                right.Width = double.NaN;
+                left.Margin = new Thickness(0);
+                right.Margin = new Thickness(0);
+                left.HorizontalAlignment = HorizontalAlignment.Stretch;
+                right.HorizontalAlignment = HorizontalAlignment.Stretch;
+                centre.Height = NarrowHeight(page);
+                Grid.SetColumn(centre, 0);
+                Grid.SetRow(centre, 0);
+                narrow.Children.Add(centre);
+                under.Children.Add(left.Col(0));
+                under.Children.Add(right.Col(2));
+                Children.Add(oneScroll);
+                break;
+        }
+    }
+}
+
+/// <summary>
+/// The one column beside the drawing on a middling page (ChemLayout's): the controls over the facts, each scrolling on
+/// its own, so both are in sight however long either is — each as tall as it needs while they fit together; else the
+/// shorter as tall as it needs and the other the rest, or, both long, the controls 55% of the column and the facts 45%.
+/// A hairline between them while either scrolls.
+/// </summary>
+internal sealed class ChemSide : Panel
+{
+    private const double Gap = 18;
+    private readonly ScrollViewer top, bottom;
+    private readonly Border line = new() { Height = 1, Margin = new Thickness(0, 0, 16, 0), IsHitTestVisible = false };
+    private double topHeight, bottomHeight;
+
+    public ChemSide(ScrollViewer top, ScrollViewer bottom)
+    {
+        this.top = top;
+        this.bottom = bottom;
+        line.SetResourceReference(Border.BackgroundProperty, B.Divider);
+        // (what either holds grew or shrank — a part's card in place of the cell's — the column shared out again: a
+        //  scroller held to its share says nothing of it by its own size)
+        void Grew(object? s, ScrollChangedEventArgs e) { if (ReferenceEquals(e.OriginalSource, s) && Math.Abs(e.ExtentHeightChange) > 0.5) InvalidateMeasure(); }
+        top.ScrollChanged += Grew;
+        bottom.ScrollChanged += Grew;
+    }
+
+    public void Attach()
+    {
+        if (Children.Count > 0) return;
+        Children.Add(top);
+        Children.Add(bottom);
+        Children.Add(line);
+    }
+
+    public void Detach() => Children.Clear();
+
+    protected override Size MeasureOverride(Size available)
+    {
+        if (Children.Count < 3) return new Size(0, 0);
+        var w = available.Width;
+        top.Measure(new Size(w, double.PositiveInfinity));
+        bottom.Measure(new Size(w, double.PositiveInfinity));
+        line.Measure(new Size(w, 1));
+        double want1 = top.DesiredSize.Height, want2 = bottom.DesiredSize.Height;
+        if (double.IsInfinity(available.Height))
+        {
+            (topHeight, bottomHeight) = (want1, want2);
         }
         else
         {
-            left.Width = double.NaN;
-            right.Width = double.NaN;
-            left.Margin = new Thickness(0);
-            right.Margin = new Thickness(0);
-            left.HorizontalAlignment = HorizontalAlignment.Stretch;
-            right.HorizontalAlignment = HorizontalAlignment.Stretch;
-            centre.Height = NarrowHeight(page);
-            Grid.SetColumn(centre, 0);
-            Grid.SetRow(centre, 0);
-            narrow.Children.Add(centre);
-            under.Children.Add(left.Col(0));
-            under.Children.Add(right.Col(2));
-            Children.Add(oneScroll);
+            var room = Math.Max(0, available.Height - Gap);
+            var least = 0.45 * room;
+            if (want1 + want2 <= room) (topHeight, bottomHeight) = (want1, want2);
+            else if (want2 <= least) (topHeight, bottomHeight) = (room - want2, want2);
+            else if (want1 <= room - least) (topHeight, bottomHeight) = (want1, room - want1);
+            else (topHeight, bottomHeight) = (room - least, least);
         }
+        top.Measure(new Size(w, topHeight));
+        bottom.Measure(new Size(w, bottomHeight));
+        line.Visibility = want1 + want2 > topHeight + bottomHeight + 0.5 ? Visibility.Visible : Visibility.Hidden;
+        return new Size(double.IsInfinity(w) ? Math.Max(top.DesiredSize.Width, bottom.DesiredSize.Width) : w, topHeight + Gap + bottomHeight);
+    }
+
+    protected override Size ArrangeOverride(Size final)
+    {
+        if (Children.Count < 3) return final;
+        top.Arrange(new Rect(0, 0, final.Width, topHeight));
+        line.Arrange(new Rect(0, topHeight + Gap / 2, final.Width, 1));
+        bottom.Arrange(new Rect(0, topHeight + Gap, final.Width, bottomHeight));
+        return final;
     }
 }
 

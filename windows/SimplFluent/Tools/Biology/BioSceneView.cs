@@ -69,8 +69,9 @@ public sealed class BioSceneView : Grid
     private TimeSpan? lastFrame;
     private (double Start, double Duration, Point3D T0, Point3D T1, double D0, double D1, Quaternion Q0, Quaternion Q1)? move;
 
-    // (the pointer)
+    // (the pointer: where it was pressed; where it was on the screen when last noted, so a still one points at nothing)
     private Point? downAt;
+    private Point? pointerAt;
     private bool dragged, panning;
     private DateTime lastHover = DateTime.MinValue;
     private string? hovered;
@@ -120,6 +121,7 @@ public sealed class BioSceneView : Grid
             // (40° is the height's field of view, as SceneKit's; WPF's is the width's)
             if (e.NewSize.Height > 0) camera.FieldOfView = 2 * Math.Atan(Tan20 * e.NewSize.Width / e.NewSize.Height) * 180 / Math.PI;
             labelSignature = "";
+            Refit();
             PlaceMarks();
             Wake();
         };
@@ -178,7 +180,7 @@ public sealed class BioSceneView : Grid
     public bool ShowLabels
     {
         get => showLabels;
-        set { if (showLabels == value) return; showLabels = value; labelSignature = ""; if (!value) ClearLabels(); Wake(); }
+        set { if (showLabels == value) return; showLabels = value; labelSignature = ""; if (!value) ClearLabels(); Refit(); Wake(); }
     }
     private bool showLabels = true;
 
@@ -219,7 +221,14 @@ public sealed class BioSceneView : Grid
     {
         extras = billboards;
         markSource = marks;
-        if (key == builtKey || key == buildingKey) return;
+        if (key == builtKey)
+        {
+            // (back to the scene shown while another was being made — an option turned on and off again, light to dark and
+            //  back: the other is let go of, so it is never shown in place of what was asked for last)
+            if (buildingKey != null) { buildingKey = null; spinnerHost.Content = null; }
+            return;
+        }
+        if (key == buildingKey) return;
         buildingKey = key;
         Shot.Began();
         var spinnerTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
@@ -291,14 +300,19 @@ public sealed class BioSceneView : Grid
         }
         MakeMarks();
         ApplySelection();
-        // (the camera frames the first scene, and a scene whose frame key is new)
+        // (the camera frames the first scene, and a scene whose frame key is new; another keeps the camera where it is, its
+        //  fit worked out afresh for the scene's own size, so a resize after it keeps the same share of it)
         if (!framedOnce || (frameKey != null && frameKey != framedKey))
         {
             framedOnce = true;
             framedKey = frameKey;
             Frame(framing, animated: false, resetTurn: true);
         }
-        else Place();
+        else
+        {
+            fitDistance = FitDistance(framing, fitTurn);
+            Place();
+        }
         SetHover(null);
     }
 
@@ -347,16 +361,81 @@ public sealed class BioSceneView : Grid
 
     // ---- the camera ----
 
-    /// <summary>The camera framing a ball: 40° field of view, at 1.15·R / sin 20° from its centre, looking along −z.</summary>
+    /// <summary>The camera framing a scene: 40° field of view, looking along −z at its ball's centre, as far off as fills
+    /// its room with the model (<see cref="FitDistance"/>).</summary>
     private void Frame(BioSphere s, bool animated, bool resetTurn)
     {
-        var d = 1.15 * Math.Max(s.Radius, 1e-3) / Math.Sin(20 * Math.PI / 180);
+        var q = resetTurn && !Turning ? Quaternion.Identity : orientation;
+        var d = FitDistance(s, q);
+        fitTurn = q;
+        fitDistance = d;
         camera.NearPlaneDistance = Math.Max(0.001, d * 0.01);
         camera.FarPlaneDistance = d * 20;
         turn.CenterX = s.Centre.X;
         turn.CenterY = s.Centre.Y;
         turn.CenterZ = s.Centre.Z;
-        MoveCamera(BioWpf.P(s.Centre), d, resetTurn && !Turning ? Quaternion.Identity : orientation, animated && Motion.On ? 0.5 : 0);
+        MoveCamera(BioWpf.P(s.Centre), d, q, animated && Motion.On ? 0.5 : 0);
+    }
+
+    /// <summary>The distance the scene was last fitted at (0: none yet), and the turn it was fitted for.</summary>
+    private double fitDistance;
+    private Quaternion fitTurn = Quaternion.Identity;
+
+    /// <summary>
+    /// How far from its ball's centre the camera stands for the model, turned by <paramref name="q"/>, to fill 85% of its
+    /// room each way: the view, less a column for the labels at each side while they are shown. Measured on the model's
+    /// own boxes (<see cref="extents"/>), not its ball, so a long model (the helix) or a wide one (a cell) fills its view —
+    /// a ball's worth of room round a narrow helix left it small in a big empty card. Before the view has a size, or for an
+    /// empty scene: the ball at 1.15·R / sin 20°, as before.
+    /// </summary>
+    private double FitDistance(BioSphere s, Quaternion q)
+    {
+        var ball = 1.15 * Math.Max(s.Radius, 1e-3) / Math.Sin(20 * Math.PI / 180);
+        if (ActualWidth < 40 || ActualHeight < 40 || extents.Count == 0) return ball;
+        var f = ActualHeight / (2 * Tan20);
+        var room = Math.Max(ActualWidth - 2 * LabelRoom(), ActualWidth * 0.55);
+        double hw = 0.425 * room, hh = 0.425 * ActualHeight;
+        var c = BioWpf.P(s.Centre);
+        var m = Matrix3D.Identity;
+        m.RotateAt(q, c);
+        double d = 0, front = double.MinValue;
+        foreach (var (lo, hi) in extents)
+            for (var i = 0; i < 8; i++)
+            {
+                var p = m.Transform(new Point3D((i & 1) == 0 ? lo.X : hi.X, (i & 2) == 0 ? lo.Y : hi.Y, (i & 4) == 0 ? lo.Z : hi.Z)) - c;
+                // (the camera at the centre and d out along +z: this corner is d − p.Z in front of it, and shows
+                //  |p.X|·f / (d − p.Z) from the view's middle)
+                d = Math.Max(d, p.Z + Math.Max(Math.Abs(p.X) * f / hw, Math.Abs(p.Y) * f / hh));
+                front = Math.Max(front, p.Z);
+            }
+        // (never inside the model)
+        d = Math.Max(d, front + 0.05 * Math.Max(s.Radius, 1e-3));
+        return double.IsFinite(d) && d > 0 ? d : ball;
+    }
+
+    /// <summary>The room each side of the model kept for a column of labels while they are shown: its widest label (up to
+    /// 170), the column's 24 from the model and the view's 16 inset.</summary>
+    private double LabelRoom()
+    {
+        if (!showLabels || content is not { Labels.Count: > 0 } c) return 0;
+        return Math.Min(c.Labels.Max(l => LabelWidth(l.Text)), 170) + BioLabelLayout.ColumnOffset + BioLabelLayout.Inset;
+    }
+
+    /// <summary>The model kept filling its room as the view's size (or the labels' room) changes: the camera's distance
+    /// scaled by how the fit has changed — the scene framed again if the student has not zoomed, a zoom of their own kept as
+    /// the same share of it.</summary>
+    private void Refit()
+    {
+        if (content == null || fitDistance <= 0) return;
+        var fit = FitDistance(framing, fitTurn);
+        var k = fit / fitDistance;
+        fitDistance = fit;
+        if (!double.IsFinite(k) || Math.Abs(k - 1) < 1e-3) return;
+        distance *= k;
+        if (move is { } mv) move = (mv.Start, mv.Duration, mv.T0, mv.T1, mv.D0 * k, mv.D1 * k, mv.Q0, mv.Q1);
+        camera.NearPlaneDistance = Math.Max(0.001, fit * 0.01);
+        camera.FarPlaneDistance = fit * 20;
+        Place();
     }
 
     private static double Now => Environment.TickCount64 / 1000.0;
@@ -384,8 +463,8 @@ public sealed class BioSceneView : Grid
         foreach (var (b, mv) in boards)
         {
             var p = turn.Transform(BioWpf.P(b.Anchor));
-            mv.OffsetX = p.X;
-            mv.OffsetY = p.Y;
+            mv.OffsetX = p.X + b.ShiftX;
+            mv.OffsetY = p.Y + b.ShiftY;
             mv.OffsetZ = p.Z + b.Lift;
         }
         PlaceMarks();
@@ -557,7 +636,11 @@ public sealed class BioSceneView : Grid
             Handled();
             return;
         }
-        if (IsOverLabel(e.OriginalSource)) return;
+        // (only the pointer's own movement points at a part: WPF tells a view that opens, or a scene drawn, under a still
+        //  pointer as a move too — and the part under it then showed as pointed at with nothing done, its name over the
+        //  view, its label ringed and, the plasma membrane's, its outline tinting the whole cell in the accent)
+        var moved = ScreenPointer.Moved(ref pointerAt);
+        if (IsOverLabel(e.OriginalSource) || !moved) return;
         // (a hit test at most every 50 ms)
         if ((DateTime.UtcNow - lastHover).TotalMilliseconds < 50) return;
         lastHover = DateTime.UtcNow;
@@ -650,7 +733,7 @@ public sealed class BioSceneView : Grid
         {
             if (r is RayMeshGeometry3DHitTestResult bm && bm.ModelHit is GeometryModel3D bg && boardPick.TryGetValue(bg, out var board) && board.Id != null)
             {
-                var at = turn.Transform(BioWpf.P(board.Anchor)) + new Vector3D(0, 0, board.Lift);
+                var at = turn.Transform(BioWpf.P(board.Anchor)) + new Vector3D(board.ShiftX, board.ShiftY, board.Lift);
                 hits.Add((board.Id, (at - camera.Position).Length, false));
                 return HitTestResultBehavior.Continue;
             }
@@ -684,6 +767,8 @@ public sealed class BioSceneView : Grid
     {
         if (id == hovered) return;
         hovered = id;
+        // (the screenshot suite: what the pointer pointed at, for CI to read — nothing, under a still pointer)
+        if (id != null && Shot.Asked) Log.Write($"bio scene: pointed at {id}");
         Cursor = id == null ? Cursors.Arrow : Cursors.Hand;
         Outline(id);
         foreach (var (key, v) in labelViews) Ring(v, Lit(LabelIdOf(key)));
@@ -718,12 +803,13 @@ public sealed class BioSceneView : Grid
     }
 
     /// <summary>The hovered object outlined: its surface pushed out a touch and drawn from behind only, in the accent (an
-    /// inverted hull), so a rim of the accent shows round it.</summary>
+    /// inverted hull), so a rim of the accent shows round it. Not a see-through one (a membrane, the cytoplasm): its hull's
+    /// inside shows through it, and tinted all it holds — the whole cell — in the accent.</summary>
     private void Outline(string? id)
     {
         hoverLayer.Content = null;
         if (id == null || content == null) return;
-        var items = content.ItemsMatching(id);
+        var items = content.ItemsMatching(id).Where(i => !i.Material.IsTranslucent).ToList();
         if (items.Count == 0 || items.Sum(i => i.Mesh.TriangleCount) > 150_000) return;
         var push = (float)(framing.Radius * 0.006);
         var accent = new EmissiveMaterial(new SolidColorBrush(Appearance.Accent));
@@ -954,7 +1040,8 @@ public sealed class BioSceneView : Grid
         b.SetResourceReference(FrameworkElement.StyleProperty, "SubtleButton");
         K.SetCorner(b, new CornerRadius(9));
         b.Click += (_, e) => { e.Handled = true; Pick(id); };
-        b.MouseEnter += (_, _) => SetHover(id);
+        // (a label laid out under a still pointer is not pointed at: only the pointer moving onto it)
+        b.MouseEnter += (_, _) => { if (ScreenPointer.Moved(ref pointerAt)) SetHover(id); };
         b.MouseLeave += (_, _) => { if (hovered == id) SetHover(null); };
         b.ToolTip = text;
         System.Windows.Automation.AutomationProperties.SetName(b, text);
