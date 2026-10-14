@@ -1,10 +1,11 @@
+import AppKit
 import SwiftUI
 
 /// All Courses (1.2.1): every course, as the web's Courses screen has them — the ones in the sidebar (chosen in the
-/// setup) first, then the rest, each as a card in its colour, with its code and name, its score, its unread
-/// announcements, how much is handed in, and a row of its sections a click away; Past and Future in the toolbar, as the
-/// web's filter has them. A course's context menu opens its sections, gives it a nickname (shown everywhere, Canvas
-/// too), or opens it on Canvas.
+/// setup) first, then the rest, each as a card in its colour, with its name, its term and teacher (or its other name,
+/// when that says something new), its score, its unread announcements, how much is handed in, and a row of its
+/// sections a click away; Current, Past and Future in the toolbar, as the web's filter has them. A course's context
+/// menu opens its sections, gives it a nickname (shown everywhere, Canvas too), or opens it on Canvas.
 struct CoursesView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<AllCoursesData>()
@@ -16,7 +17,9 @@ struct CoursesView: View {
         Group {
             if let d = model.data {
                 Page {
-                    ScreenHeading(title: "Courses", sub: d.sub)
+                    // (courses-11: the line under the heading says what the filter shows — "2 past courses" under Past,
+                    // never the current term's count)
+                    ScreenHeading(title: "Courses", sub: d.sub(for: filter))
                     content(d)
                 }
                 .font(.sBody)
@@ -36,7 +39,9 @@ struct CoursesView: View {
                 .help("Current courses, past ones, or ones to come")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { engine.setup = true } label: { Label("Choose Courses", systemImage: "checklist") }
+                // (courses-8: a symbol of its own and its name beside it — the checklist alone read as To Do)
+                Button { engine.setup = true } label: { Label("Choose Courses", systemImage: "sidebar.squares.left") }
+                    .labelStyle(.titleAndIcon)
                     .help("Choose the courses in the sidebar")
             }
         }
@@ -57,8 +62,8 @@ struct CoursesView: View {
             } else if others.isEmpty || chosen.isEmpty {
                 grid(d.current)
             } else {
-                PageSection(title: "In the Sidebar", trailing: "\(chosen.count)") { grid(chosen) }
-                PageSection(title: "Not in the Sidebar", trailing: "\(others.count)") {
+                PageSection(title: "In the Sidebar", count: chosen.count) { grid(chosen) }
+                PageSection(title: "Not in the Sidebar", count: others.count) {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Courses you left out in the setup. Choose Courses puts them in the sidebar.")
                             .font(.sCallout)
@@ -107,27 +112,47 @@ struct CoursesView: View {
 /// Every course (allCourses): the current ones — those in the sidebar first, saying so — and the past and future ones.
 struct AllCoursesData: Decodable {
     var sub: String?
+    /// (2.99.33) The line under the heading for each filter: "Fall 2026" (the term alone when the sections count the
+    /// courses, else "Fall 2026 · 8 courses"), "2 past courses", "1 course to come" / "None yet".
+    var subs: Subs?
     var current: [CourseRow]
     var past: [CourseRow]?
     var future: [CourseRow]?
+
+    struct Subs: Decodable {
+        var current: String?
+        var past: String?
+        var future: String?
+    }
+
+    /// The line under the heading for what the filter shows.
+    func sub(for filter: CourseFilter) -> String? {
+        switch filter {
+        case .all: return subs?.current ?? sub
+        case .past: return subs?.past
+        case .future: return subs?.future
+        }
+    }
 }
 
-/// The Courses screen's filter, as the web's: the current courses, the past, the ones to come.
+/// The Courses screen's filter, as the web's: the current courses, the past, the ones to come. (`all` is the current
+/// ones, its name kept for the choice saved on this Mac; courses-12: it reads "Current", as that is all it shows.)
 enum CourseFilter: String, CaseIterable, Identifiable {
     case all, past, future
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .all: return "All"
+        case .all: return "Current"
         case .past: return "Past"
         case .future: return "Future"
         }
     }
 }
 
-/// A course's card: its colour with its code and its unread announcements, its name, how much is handed in (a bar) and
-/// its score (a ring) — a click opens the course — and (1.2) under a hairline its sections, each a click away. It lifts
-/// a little under the pointer, as the app's other cards do.
+/// A course's card: its colour with its name (the sidebar's) and its unread announcements, its term and teacher — or its
+/// other name, only when that says something new (courses-5) —, how much is handed in (a bar) and its score (a ring) —
+/// a click opens the course — and (1.2) under a hairline its sections, each a click away with its name under it. It
+/// lifts a little under the pointer, as the app's other cards do.
 private struct CourseCard: View {
     let course: CourseRow
     let progress: CourseProgress?
@@ -136,11 +161,18 @@ private struct CourseCard: View {
     @State private var hover = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let links: [(kind: String, label: String)] = [
-        ("grades", "Grades"), ("assignments", "Assignments"), ("modules", "Modules"), ("files", "Files"), ("announcements", "Announcements"),
+    /// The sections a card leads to: their names in full (its menu, the tooltips) and short enough for five side by side
+    /// under their symbols on the narrowest card (courses-14).
+    private static let links: [(kind: String, label: String, short: String)] = [
+        ("grades", "Grades", "Grades"), ("assignments", "Assignments", "Work"), ("modules", "Modules", "Modules"),
+        ("files", "Files", "Files"), ("announcements", "Announcements", "News"),
     ]
 
     private var color: Color { Color(hex: course.color) }
+    /// (courses-13) The banner's words: white only where white stands 3:1 against the course's colour (the minimum for
+    /// large text), else near-black — students pick their colours in Canvas, and many are light.
+    private var inkIsWhite: Bool { CourseCard.whiteReads(on: course.color) }
+    private var ink: Color { inkIsWhite ? .white : Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255) }
     private var ctx: String { "courses/\(course.id)" }
 
     var body: some View {
@@ -155,7 +187,7 @@ private struct CourseCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(course.code), \(course.scoreText)")
+            .accessibilityLabel("\(course.code), \(scoreWords)")
             Spacer(minLength: 0) // (the cards of a row as tall as each other, their sections along one line)
             Divider().padding(.horizontal, 14)
             sections
@@ -175,9 +207,9 @@ private struct CourseCard: View {
             LinearGradient(colors: [color, color.opacity(0.78)], startPoint: .topLeading, endPoint: .bottomTrailing)
             Text(course.code)
                 .font(.sTitle3.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(ink)
                 .lineLimit(2)
-                .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
+                .shadow(color: .black.opacity(inkIsWhite ? 0.18 : 0), radius: 2, y: 1)
                 .padding(16)
                 .padding(.trailing, 56)
             if let n = course.unread, n > 0 {
@@ -189,7 +221,8 @@ private struct CourseCard: View {
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
                         .background(.white, in: Capsule())
-                        .help("\(n) unread \(n == 1 ? "announcement" : "announcements")")
+                        .help(unreadWords(n))
+                        .accessibilityLabel(unreadWords(n))
                 }
                 .padding(13)
             }
@@ -200,20 +233,19 @@ private struct CourseCard: View {
     private var facts: some View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(course.name ?? course.code)
-                    .font(.sBody.weight(.medium))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                // (courses-5: the banner names the course — "MATH-021-20" under "F26-MATH 021 20" said it twice. Its
+                // other name only when that says something new, a nickname's real name; else its term and teacher)
+                if !secondLine.isEmpty {
+                    Text(secondLine)
+                        .font(.sBody.weight(.medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
                 if let p = progress, p.total > 0 {
                     Text("\(p.done) of \(p.total) handed in")
                         .font(.sFootnote)
                         .foregroundStyle(.secondary)
                     handedIn(p)
-                } else if course.nickname?.isEmpty == false, let o = course.original, !o.isEmpty {
-                    Text(o)
-                        .font(.sFootnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
             }
             Spacer(minLength: 6)
@@ -226,9 +258,34 @@ private struct CourseCard: View {
                     .padding(6)
             }
             .frame(width: 56, height: 56)
+            .help(course.score == nil ? (course.scoreWhy ?? "") : "") // (courses-15: why there is no figure, "No grade yet")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+    }
+
+    /// The line under the banner: the course's other name when it says something new, else its term and teacher.
+    private var secondLine: String {
+        if let a = course.altName, !a.isEmpty { return a }
+        return course.detail ?? ""
+    }
+
+    /// The score as it is said aloud: the figure, or why there is none.
+    private var scoreWords: String {
+        if course.score == nil, let why = course.scoreWhy, !why.isEmpty { return why }
+        return course.scoreText
+    }
+
+    /// The unread announcements in words ("2 unread announcements"), for the badge's tooltip and VoiceOver.
+    private func unreadWords(_ n: Int) -> String {
+        if let l = course.unreadLabel, !l.isEmpty { return l }
+        return "\(n) unread \(n == 1 ? "announcement" : "announcements")"
+    }
+
+    /// Whether white words stand 3:1 against a course's colour (WCAG's minimum for large text).
+    static func whiteReads(on hex: String?) -> Bool {
+        let l = AppearanceStore.luminance(NSColor(Color(hex: hex)))
+        return 1.05 / (l + 0.05) >= 3
     }
 
     /// How much is handed in, as a bar in the course's colour.
@@ -248,18 +305,26 @@ private struct CourseCard: View {
             .accessibilityHidden(true)
     }
 
-    /// (1.2) The course's sections, each a click away.
+    /// (1.2) The course's sections, each a click away — (courses-14) its name under its symbol, so none has to be learnt
+    /// from a tooltip.
     private var sections: some View {
         HStack(spacing: 2) {
             ForEach(CourseCard.links, id: \.kind) { link in
                 Button {
                     engine.go(.section(ctx, link.kind))
                 } label: {
-                    Image(systemName: Glyph.section(link.kind))
-                        .font(.sBody.weight(.medium))
-                        .foregroundStyle(color)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .contentShape(Rectangle())
+                    VStack(spacing: 3) {
+                        Image(systemName: Glyph.section(link.kind))
+                            .font(.sBody.weight(.medium))
+                            .foregroundStyle(color)
+                        Text(link.short)
+                            .font(.sCaption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(RowButtonStyle(radius: 9))
                 .help(link.label)

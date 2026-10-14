@@ -464,7 +464,7 @@ enum Glyph {
         case "pages": return "doc.richtext"
         case "files": return "folder"
         case "people": return "person.2"
-        case "quizzes": return "checklist"
+        case "quizzes": return "questionmark.square" // (courses-8: its own; the checklist is To Do's)
         case "syllabus": return "list.bullet.rectangle"
         case "grades": return "chart.bar"
         case "home": return "house"
@@ -477,7 +477,7 @@ enum Glyph {
     static func item(_ type: String) -> String {
         switch type {
         case "Assignment", "assignment": return "doc.text"
-        case "Quiz", "quiz": return "checklist"
+        case "Quiz", "quiz": return "questionmark.square"
         case "Discussion", "discussion", "discussion_topic": return "bubble.left.and.bubble.right"
         case "Page", "page": return "doc.richtext"
         case "File", "file": return "doc"
@@ -667,7 +667,7 @@ struct WorkAction {
 
     var label: (String, String) {
         switch (kind ?? "").lowercased() {
-        case "quiz": return ("Take Quiz", "checklist")
+        case "quiz": return ("Take Quiz", "questionmark.square")
         case "discussion", "discussion_topic": return ("Reply", "bubble.left")
         case "tool": return ("Open", "puzzlepiece.extension")
         default: return ("Hand In", "tray.and.arrow.up")

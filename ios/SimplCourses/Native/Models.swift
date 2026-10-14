@@ -139,11 +139,18 @@ struct CourseRow: Codable, Identifiable, Hashable {
     var color: String?
     var score: Double?
     var scoreText: String
+    /// (2.99.33) Why there is no score ("No grade yet", "Hidden by instructor"; "" with one), for the ring's tooltip.
+    var scoreWhy: String?
     var unread: Int?
     var url: String
     /// (Mac 1.2.1, allCourses) In the sidebar — the setup's choice — or not; and its term.
     var chosen: Bool?
     var term: String?
+    /// (2.99.33) The course's other name only when it says something its label does not ("" otherwise), its term and
+    /// first teacher ("Fall 2026 · Yue Lei"), and its unread count in words ("2 unread announcements").
+    var altName: String?
+    var detail: String?
+    var unreadLabel: String?
 }
 
 struct CoursesData: Codable {
