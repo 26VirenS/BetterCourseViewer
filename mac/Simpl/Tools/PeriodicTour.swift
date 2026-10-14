@@ -65,6 +65,8 @@ final class PTTour: ObservableObject {
     @Published var lewisNonce = 0
     /// Whether the tour is on (nothing done is told it otherwise; tools-3: and the sheet's Done leaves Escape to it).
     @Published var active = false
+    /// Which table runs it (PeriodicTableTool's mark): only that one puts it away.
+    var owner: UUID?
     @Published private(set) var event: PTTourEvent?
     @Published private(set) var events = 0
 

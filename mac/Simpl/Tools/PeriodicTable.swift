@@ -360,6 +360,8 @@ struct PeriodicTableTool: View {
     /// (1.3.64) the step's thing done: its card says so for a moment before the next comes
     @State private var tourDone = false
     @ObservedObject private var tourWord = PTTour.shared
+    /// This table's own mark on the shared tour, so only the table running it puts it away.
+    @State private var tourOwner = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var matches: Set<Int>? {
@@ -515,6 +517,7 @@ struct PeriodicTableTool: View {
         guard PTTourStep.all.indices.contains(i) else { return }
         tourHold = hold ? i : nil
         let s = PTTourStep.all[i]
+        PTTour.shared.owner = tourOwner
         PTTour.shared.active = true
         PTTourFrames.shared.wake()
         PTTour.shared.clearEvent()
@@ -578,8 +581,13 @@ struct PeriodicTableTool: View {
     /// again on its own; the tool left as it is.
     private func endTour() {
         tourSeen = true
-        PTTour.shared.active = false
-        PTTour.shared.showLewis(nil)
+        // (the shared tour put away only by the table that runs it: a table drawn afresh — the window's screens made
+        // again as the app's answers come in — runs it on, and the old one going must not stop where it lights)
+        if PTTour.shared.owner == nil || PTTour.shared.owner == tourOwner {
+            PTTour.shared.owner = nil
+            PTTour.shared.active = false
+            PTTour.shared.showLewis(nil)
+        }
         withAnimation(Motion.gentle) { tourStep = nil }
     }
 
