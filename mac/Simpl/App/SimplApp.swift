@@ -15,6 +15,7 @@ struct SimplApp: App {
 
     init() {
         Vault.prepare() // (1.3.76: what Simpl keeps is sealed; its vault opened off the main thread before the first read)
+        Shot.forgetWindowFramesIfAsked() // (1.3.79: the screenshot suite's windows open at their own size, then as asked)
     }
 
     var body: some Scene {

@@ -30,7 +30,9 @@ own Tests workflow on its own copy of the extension and suites.
   reads something before it has settled, a port another suite uses…). Nothing is skipped or loosened to get green.
 - **Every picture shows something** (`scripts/dev/check-shots.py`; Mac, iPhone, Windows): each picture the run was to
   take must be there (a missing one is an app that did not get there or quit), and must not be blank or nearly one
-  colour. Each is measured at 320 pixels wide: the spread of its grey (under 5 fails), the share of its commonest colour
+  colour. (1.3.79) On the Mac a picture not taken 15 seconds past its wait has its app's threads sampled
+  (`sample-<name>.txt` on `mac-shots`: what kept it), and the suite waits 45 seconds past its wait before giving up;
+  the pictures of 3D models are taken at most three at once (`HEAVY_SHOT` in `mac-shots.sh`). Each is measured at 320 pixels wide: the spread of its grey (under 5 fails), the share of its commonest colour
   (over 99% fails) and how many colours cover at least 0.2% of it (under 3 fails). The plainest real screens (a sign-in
   card on an empty window) measure a spread of 9 and 97–98% one colour. Every picture's numbers are in
   `shot-checks.txt` (on the `mac-shots` and `ios-shots` branches, in the Windows checks job's log).

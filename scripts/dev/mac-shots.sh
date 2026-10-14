@@ -34,13 +34,29 @@ take_slot() {
   done
 }
 
+# (1.3.79) The pictures of a 3D model (HEAVY_SHOT=yes: a cell, a molecule, the double helix) at most HEAVY at once: five
+# copies of the app each making and drawing a cell took the runner's every core, and a copy's picture, asked for at its
+# <wait>, came 20 to 30 seconds late — two never came before the suite gave up on them. A heavy picture's turn is taken
+# before its worker's.
+HEAVY="${HEAVY:-3}"
+take_heavy() {
+  while true; do
+    for i in $(seq 1 "$HEAVY"); do
+      if mkdir "$HOMES/heavy$i" 2>/dev/null; then echo "$i"; return; fi
+    done
+    sleep 0.2
+  done
+}
+
 # shoot <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it: -SimplDemo),
 # pictured once it has settled, <wait> seconds at most (SIZE=900x820 shoot …: a window of another size). It runs in the
-# background on a free worker; `wait` at the end gathers them.
+# background on a free worker; `wait` at the end gathers them. (1.3.79) A picture not taken 15 seconds after its <wait>
+# has the app's threads sampled (sample-<name>.txt: what kept it), and is waited for 45 seconds past its <wait> in all.
 shoot() {
   local name="$1" wait="$2"
   shift 2
-  local slot
+  local heavy="" slot
+  [ -n "${HEAVY_SHOT:-}" ] && heavy="$(take_heavy)"
   slot="$(take_slot)"
   local settle=YES
   # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
@@ -53,7 +69,8 @@ shoot() {
       -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
     local pid=$!
     local i=0
-    while [ ! -f "$OUT_ABS/$name.rect" ] && [ $i -lt $(( (wait + 25) * 4 )) ] && kill -0 "$pid" 2>/dev/null; do
+    while [ ! -f "$OUT_ABS/$name.rect" ] && [ $i -lt $(( (wait + 45) * 4 )) ] && kill -0 "$pid" 2>/dev/null; do
+      if [ $i -eq $(( (wait + 15) * 4 )) ]; then sample "$pid" 3 -file "$OUT_ABS/sample-$name.txt" >/dev/null 2>&1 & fi
       sleep 0.25
       i=$((i + 1))
     done
@@ -65,6 +82,7 @@ shoot() {
     # (a console with nothing worth keeping is dropped)
     [ -s "$OUT_ABS/console-$name.txt" ] || rm -f "$OUT_ABS/console-$name.txt"
     rmdir "$HOMES/lock$slot"
+    if [ -n "$heavy" ]; then rmdir "$HOMES/heavy$heavy"; fi
   ) &
 }
 
@@ -146,13 +164,15 @@ walks() {
 # (1.3.78) bio <light|dark|both> <name> <wait> <tool> <state> [flags…]: a biology tool on the Tools page at 1440×920,
 # opened as its launch's state asks (-SimplTool <tool> -SimplToolState <page>[:…], docs/mac-biology.md); "both" takes it
 # in light and in dark (<mode>-<name>). A picture's launch keeps the tool's settings to itself (BioPrefs), so one
-# picture's choices never show in the next.
+# picture's choices never show in the next. (1.3.79) A 3D model's picture — a cell, a molecule, the double helix, a
+# nucleotide, the tRNA's L — is a heavy one (HEAVY_SHOT).
 bio() {
-  local modes="$1" name="$2" wait="$3" tool="$4" state="$5" m
+  local modes="$1" name="$2" wait="$3" tool="$4" state="$5" m heavy=""
   shift 5
   [ "$modes" = both ] && modes="light dark"
+  case "$tool:$state" in cell:*|biomol:*|dna:helix*|dna:nucleotides*|dna:rna:view=lshape*) heavy=yes ;; esac
   for m in $modes; do
-    MODE="$m" SIZE=1440x920 shoot "$m-$name" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplToolState "$state" "$@"
+    HEAVY_SHOT="$heavy" MODE="$m" SIZE=1440x920 shoot "$m-$name" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplToolState "$state" "$@"
   done
 }
 
@@ -180,8 +200,8 @@ bio_quick() {
 bio_plain() {
   local name="$1" wait="$2" tool="$3" size
   for size in 1024x683 720x520; do
-    MODE=dark SIZE="$size" shoot "dark-$name-${size%%x*}" "$wait" -SimplPlace tools -SimplTool "$tool"
-    MODE=dark SIZE="$size" shoot "dark-$name-${size%%x*}-folded" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplSidebar hidden
+    HEAVY_SHOT=yes MODE=dark SIZE="$size" shoot "dark-$name-${size%%x*}" "$wait" -SimplPlace tools -SimplTool "$tool"
+    HEAVY_SHOT=yes MODE=dark SIZE="$size" shoot "dark-$name-${size%%x*}-folded" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplSidebar hidden
   done
 }
 
@@ -383,8 +403,8 @@ tool_popups() {
   for m in light dark; do
     MODE="$m" SIZE=1024x768 shoot "$m-35p-popup-ptable" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
     MODE="$m" SIZE=780x700 shoot "$m-35p-popup-ptable-narrow" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
-    MODE="$m" SIZE=1024x768 shoot "$m-35q-popup-cell" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
-    MODE="$m" SIZE=780x700 shoot "$m-35q-popup-cell-narrow" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    HEAVY_SHOT=yes MODE="$m" SIZE=1024x768 shoot "$m-35q-popup-cell" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    HEAVY_SHOT=yes MODE="$m" SIZE=780x700 shoot "$m-35q-popup-cell-narrow" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
     MODE="$m" SIZE=1024x768 shoot "$m-35r-popup-flashcards" 12 -SimplPlace tools -SimplTool fc
     MODE="$m" SIZE=780x700 shoot "$m-35r-popup-flashcards-narrow" 12 -SimplPlace tools -SimplTool fc
   done
@@ -567,8 +587,10 @@ for MODE in light dark; do
   # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
   # search field's commands
   shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
-  shoot "$MODE-01d-dashboard-counter" 16 -SimplSheet next
-  shoot "$MODE-01q-counter-preview" 30 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
+  # (1.3.79: under the full set's load the Dashboard's counts came 24 seconds in, and the panel after them: each taken
+  # as soon as it has settled, its wait only the longest)
+  shoot "$MODE-01d-dashboard-counter" 30 -SimplSheet next
+  shoot "$MODE-01q-counter-preview" 45 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
   shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/

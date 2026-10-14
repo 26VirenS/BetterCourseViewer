@@ -24,6 +24,18 @@ enum Shot {
         lastActivity = Date()
     }
 
+    /// (1.3.79) Before the windows are made: the frames and the sidebar's width the last picture's app saved in this
+    /// copy's home forgotten, so the window opens at its own size and is then sized as asked. A window that opened as
+    /// the picture before left it — 720 points wide, its sidebar folded away for want of room — had its sidebar come out
+    /// as it was widened, and a picture of a tool's popup with the sidebar folded showed it out, under the popup.
+    static func forgetWindowFramesIfAsked() {
+        let d = UserDefaults.standard
+        guard let file = d.string(forKey: "SimplShotFile"), !file.isEmpty else { return }
+        for key in d.dictionaryRepresentation().keys where key.hasPrefix("NSWindow Frame ") || key.hasPrefix("NSSplitView Subview Frames ") {
+            d.removeObject(forKey: key)
+        }
+    }
+
     static func armIfAsked() {
         let d = UserDefaults.standard
         guard let file = d.string(forKey: "SimplShotFile"), !file.isEmpty else { return }
