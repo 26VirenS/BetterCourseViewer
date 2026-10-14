@@ -205,7 +205,7 @@ struct DashTodayLine: View {
     private var kind: String {
         if let k = PreviewFormat.text(row.kind) { return k }
         if row.custom == true { return "My task" }
-        return (row.sub ?? "").components(separatedBy: " · ").first.flatMap(PreviewFormat.text) ?? "Assignment"
+        return PreviewFormat.text((row.sub ?? "").components(separatedBy: " · ").first) ?? "Assignment"
     }
 
     var body: some View {

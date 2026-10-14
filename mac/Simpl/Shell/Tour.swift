@@ -590,7 +590,7 @@ private struct TourCard: View {
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction) // (Escape ends it wherever the keys are)
-                .help("Close the Tour (Esc)")
+                .help("Close the tour (Esc)")
                 .accessibilityLabel("Close the tour")
                 .padding(.trailing, -6)
             }

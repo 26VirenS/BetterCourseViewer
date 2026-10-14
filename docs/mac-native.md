@@ -102,7 +102,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   faint behind the sidebar's rows and out of a tile's top. Typing in Search answers in its suggestions only; the page
   changes on Return (a sum's Return copies its answer). The tour is six steps (the counters, Grades, a course, Tools,
   Search, then Report a Bug at the account menu), with Skip Tour, ✕ and Escape, a Next that always works, and the whole
-  window dimmed, toolbar too, its buttons resting meanwhile; a quick look dims the toolbar's strip with the page.
+  window dimmed, toolbar too, its buttons resting meanwhile. A quick look is a light-dismiss card with nothing dimmed
+  behind it, as Windows' flyout.
 
 - **Knewton Alta (1.3.17, Mac only; cut back in 1.3.45).** Open Tool on a Knewton Alta assignment (the engine's
   `alta`: its launch address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): Close and

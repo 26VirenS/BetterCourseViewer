@@ -536,24 +536,34 @@ final class SearchPalette: ObservableObject {
         var items: [PaletteItem] = []
         let data = gradesCache?.data
         if q.isEmpty {
-            let gpa = PreviewFormat.text(data?.gpaText).flatMap { $0 == "–" ? nil : $0 }
-            items.append(PaletteItem(id: "grades.all", title: "Grades Overview", sub: gpa == nil ? "Every course, and your GPA" : "Your GPA and every course", symbol: "chart.bar.xaxis", trailing: gpa, action: .go(.grades)))
+            let gpa = data.flatMap(Self.gpaShown)
+            items.append(PaletteItem(id: "grades.all", title: "Grades Overview", sub: gpa == nil ? "Every course" : "Every course, and your GPA", symbol: "chart.bar.xaxis", trailing: gpa.map { "GPA \($0)" }, action: .go(.grades)))
         }
         if let data {
             for r in data.rows {
                 guard q.isEmpty || r.code.lowercased().contains(q) || (r.name ?? "").lowercased().contains(q) else { continue }
                 let score = [r.pctText, r.letter ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
-                let line = [PreviewFormat.text(r.altName), "Grades", PreviewFormat.text(r.gradedText)].compactMap { $0 }.joined(separator: " · ")
+                let line = (PreviewFormat.text(r.gradedText) ?? PreviewFormat.text(r.altName)).map { "Grades · \($0)" } ?? "Grades"
                 items.append(PaletteItem(id: "grade.\(r.id)", title: r.code, sub: line, symbol: "chart.bar.fill", color: r.color, trailing: score, action: .go(.section("courses/\(r.id)", "grades"))))
             }
         } else {
             for c in Self.courses(q, engine) {
-                let line = [PreviewFormat.text(c.altName), "Grades"].compactMap { $0 }.joined(separator: " · ")
+                let line = PreviewFormat.text(c.altName).map { "Grades · \($0)" } ?? "Grades"
                 items.append(PaletteItem(id: "grade.\(c.id)", title: c.code, sub: line, symbol: "chart.bar.fill", color: c.color, trailing: c.scoreText, action: .go(.section("courses/\(c.id)", "grades"))))
             }
         }
         if items.isEmpty { items.append(Self.hint("No course by that name", "chart.bar")) }
         return items
+    }
+
+    /// (home-32) The GPA as the engine writes it ("3.43", half up; none for "–"); from a page before `gpaText`, the raw
+    /// GPA half up on its decimal value, as the engine would write it.
+    private static func gpaShown(_ d: GradesData) -> String? {
+        if let t = d.gpaText { return t.isEmpty || t == "–" ? nil : t }
+        guard let g = d.gpa, g.isFinite else { return nil }
+        let half = NSDecimalNumberHandler(roundingMode: .plain, scale: 2, raiseOnExactness: false, raiseOnOverflow: false,
+                                          raiseOnUnderflow: false, raiseOnDivideByZero: false)
+        return String(format: "%.2f", NSDecimalNumber(string: "\(g)").rounding(accordingToBehavior: half).doubleValue)
     }
 
     // MARK: - What is asked for

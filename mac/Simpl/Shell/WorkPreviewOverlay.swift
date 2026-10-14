@@ -3,16 +3,16 @@ import SwiftUI
 
 // The work preview over the window (1.2.3; Components/WorkPreview.swift has what it shows and the rows that open it).
 // MainShell puts it over the split view, above the tour. Nothing is drawn, and nothing takes a press, while no card is
-// out. With one: the window — the toolbar's strip with it (home-28) — lightly dimmed but for the row it grew from, and
-// the card — Liquid Glass — growing out of that row on the house spring to its place: just under the row (1.2.20), or
-// just over it when there is no room under, else in the middle of the screen's side of the window. It folds back into
-// the row when it closes. Under Reduce Motion it fades in and out in its place.
+// out. With one: the card — Liquid Glass — growing out of the row it came from on the house spring to its place: just
+// under the row (1.2.20), or just over it when there is no room under, else in the middle of the screen's side of the
+// window. (home-28) It is a light-dismiss card with nothing dimmed behind it, as Windows' flyout is: a press round it
+// closes it (it dimmed the page but not the toolbar, and Windows dims nothing). It folds back into the row when it
+// closes. Under Reduce Motion it fades in and out in its place.
 
 struct WorkPreviewOverlay: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: a move takes the card with it)
     @ObservedObject private var preview = WorkPreview.shared
-    @ObservedObject private var tour = MacTour.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Where the overlay itself is in the window: the rows' places are read in the window and made the overlay's own.
     @State private var origin = PreviewAnchor()
@@ -31,9 +31,6 @@ struct WorkPreviewOverlay: View {
                 }
             }
         }
-        // (home-28) its dim over the whole window, the toolbar's strip too — not the page alone under a lit toolbar; the
-        // card keeps under the toolbar (`safeAreaInsets.top` is its height)
-        .ignoresSafeArea()
         .allowsHitTesting(preview.item != nil && preview.shown)
         // (the window gone somewhere else — a place picked, Back — takes the card with it)
         .onChange(of: whereabouts.nav.current) { _, _ in preview.dismiss() }
@@ -64,7 +61,7 @@ struct WorkPreviewOverlay: View {
         return Placed(source: source, target: target, lines: lines)
     }
 
-    // MARK: - The dim and the card
+    // MARK: - The card, and the press round it
 
     private func stage(_ item: PreviewItem, size: CGSize, top: CGFloat) -> some View {
         let g = geometry(size: size, top: top)
@@ -74,7 +71,8 @@ struct WorkPreviewOverlay: View {
         let start = g.source ?? g.target.insetBy(dx: g.target.width * 0.06, dy: g.target.height * 0.06)
         let r = out || reduceMotion ? g.target : start
         return ZStack(alignment: .topLeading) {
-            PreviewVeil(hole: g.source, dimmed: out && tour.step == nil) // (the tour dims the window itself)
+            // (nothing drawn: a press anywhere but the card and its row closes it)
+            Color.clear
                 .contentShape(PreviewHoleShape(hole: g.source), eoFill: true)
                 .onTapGesture { preview.close() }
                 .accessibilityHidden(true)
@@ -93,7 +91,7 @@ struct WorkPreviewOverlay: View {
             .glass(shape)
             .opacity(reduceMotion && !out ? 0 : 1)
             .contentShape(shape)
-            // (a press on the card is the card's — the dim round it closes it — but a double-click's second, landing on
+            // (a press on the card is the card's — a press round it closes it — but a double-click's second, landing on
             // the card where it came up over its row, opens the work as the row would have)
             .onTapGesture { if preview.isSecondClick { preview.openWhole() } }
             .tourSpot(.preview)
@@ -189,26 +187,6 @@ enum PreviewPlacement {
             room = area.height - margin * 2
         }
         return room >= 640 ? 8 : (room >= 460 ? 5 : (room >= 340 ? 3 : 2))
-    }
-}
-
-/// The window lightly dimmed but for the row the card grew from.
-private struct PreviewVeil: View {
-    let hole: CGRect?
-    let dimmed: Bool
-    private static let dim = Theme.dynamic(light: NSColor(white: 0, alpha: 0.14), dark: NSColor(white: 0, alpha: 0.34))
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            Rectangle().fill(PreviewVeil.dim.opacity(dimmed ? 1 : 0))
-            if let hole {
-                RoundedRectangle(cornerRadius: min(10, hole.height / 2), style: .continuous)
-                    .frame(width: hole.width, height: hole.height)
-                    .offset(x: hole.minX, y: hole.minY)
-                    .blendMode(.destinationOut)
-            }
-        }
-        .compositingGroup()
     }
 }
 
