@@ -95,15 +95,27 @@ enum Shot {
         // (1.3.78) the window brought to the front first, and pictured a moment later: the suite's copies of the app share
         // the screen, and a copy another has covered draws nothing new — an animation under way in it (its screens
         // fading in as it opens) stopped where it was and was pictured so, faint or blank. In front, it finishes.
+        chosen = target()
         front(noting: true)
         settle(file)
+    }
+
+    /// (1.3.78) The window chosen to picture when the picture was asked for: the windows brought back in front of it
+    /// (the search field's suggestions, as tall as a window) are not chosen in its place as it is brought forward again
+    /// and pictured — the Commands picture was of its suggestions alone, blank.
+    nonisolated(unsafe) private static var chosen: NSWindow?
+
+    /// The window to picture: the one chosen, while it is still up.
+    private static func pictured() -> NSWindow? {
+        if let w = chosen, w.isVisible { return w }
+        return target()
     }
 
     /// The window to picture brought to the front, with what was in front of it and over it — the search field's
     /// suggestions — noted first (`noting`, the first time), and brought back to the front after it: the window brought
     /// forward went over them, and they were left out of the picture.
     private static func front(noting: Bool = false) {
-        guard let w = target() else { return }
+        guard let w = pictured() else { return }
         if noting { lifted = above(w) }
         NSApp.activate(ignoringOtherApps: true)
         w.orderFrontRegardless()
@@ -118,6 +130,7 @@ enum Shot {
             if NSApp.isActive || attempt >= 4 {
                 capture(file)
             } else {
+                NSLog("[Simpl] shot: another copy of the app is in front; brought forward again (%d)", attempt + 1)
                 front()
                 settle(file, attempt: attempt + 1)
             }
@@ -128,7 +141,7 @@ enum Shot {
     nonisolated(unsafe) private static var lifted: [NSWindow] = []
 
     private static func capture(_ file: String, attempt: Int = 0) {
-        guard let w = target(), let primary = NSScreen.screens.first else { return }
+        guard let w = pictured(), let primary = NSScreen.screens.first else { return }
         // (the window, then what belongs to it over it: its sheets, its child windows, a popover open on it)
         var parts = [w] + w.sheets + (w.attachedSheet.map { [$0] } ?? []) + (w.childWindows ?? []).filter(\.isVisible)
         parts += NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.intersects(w.frame) }
