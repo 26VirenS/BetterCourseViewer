@@ -6,6 +6,8 @@ import SwiftUI
 /// as a list. On the calendars chosen (Canvas shows ten at most). ‹ and › — or ← and → once the calendar has been
 /// clicked — move a month or a week, sliding the way they go; Today comes back. (1.2.3) An item clicked — on the grid, in
 /// the day, the week or the list — grows its preview out of itself (Components/WorkPreview.swift); a double-click opens it.
+/// (1.3.78) As the Mac's own Calendar has them: Month, Week and List in the toolbar, ‹ Today › beside the period's title
+/// on the page (planning-8: the toolbar had no room left, and the Calendars chooser fell into its » overflow).
 struct CalendarView: View {
     @EnvironmentObject private var engine: Engine
     /// Month, week or list, as the page keeps it (`calView`).
@@ -86,6 +88,8 @@ struct CalendarView: View {
                 modeRead = true
                 if let v = try? await engine.read("calView", as: OK.self).view, Self.modes.contains(v) { mode = v }
             }
+            // (the screenshot suite: -SimplCalView week|list opens on that view, once)
+            if let v = LaunchOpen.take("", key: "SimplCalView"), Self.modes.contains(v) { mode = v }
             await load(animated: false)
         }
     }
@@ -102,27 +106,6 @@ struct CalendarView: View {
             }
             .pickerStyle(.segmented)
             .help("A month, a week, or the next three weeks")
-        }
-        ToolbarItem(placement: .primaryAction) {
-            ControlGroup {
-                Button {
-                    shift(-1)
-                } label: {
-                    Label(mode == "week" ? "Previous Week" : "Previous Month", systemImage: "chevron.left")
-                }
-                .disabled(mode == "list")
-                .help(mode == "week" ? "Previous week (←)" : "Previous month (←)")
-                Button("Today") { goToday() }
-                    .keyboardShortcut("t", modifiers: .command)
-                    .help("Today (⌘T)")
-                Button {
-                    shift(1)
-                } label: {
-                    Label(mode == "week" ? "Next Week" : "Next Month", systemImage: "chevron.right")
-                }
-                .disabled(mode == "list")
-                .help(mode == "week" ? "Next week (→)" : "Next month (→)")
-            }
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
@@ -152,8 +135,44 @@ struct CalendarView: View {
                     .controlSize(.small)
                     .transition(.opacity)
             }
+            // (planning-25) the list does not page — it is always the three weeks from today — so it has no ‹ Today ›
+            if mode != "list" {
+                pager
+                    .transition(.opacity)
+            }
         }
         .animation(Motion.gentle, value: loading)
+    }
+
+    /// ‹ Today › beside the month's or the week's title, as the Mac's Calendar has it.
+    private var pager: some View {
+        GlassGroup(spacing: 6) {
+            HStack(spacing: 6) {
+                Button {
+                    shift(-1)
+                } label: {
+                    Label(mode == "week" ? "Previous Week" : "Previous Month", systemImage: "chevron.left")
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: 14)
+                }
+                .glassButton()
+                .help(mode == "week" ? "Previous week (←)" : "Previous month (←)")
+                Button("Today") { goToday() }
+                    .glassButton()
+                    .keyboardShortcut("t", modifiers: .command)
+                    .help("Today (⌘T)")
+                Button {
+                    shift(1)
+                } label: {
+                    Label(mode == "week" ? "Next Week" : "Next Month", systemImage: "chevron.right")
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: 14)
+                }
+                .glassButton()
+                .help(mode == "week" ? "Next week (→)" : "Next month (→)")
+            }
+            .controlSize(.large)
+        }
     }
 
     /// (1.2) Under the heading: how much the month or the week holds and how much of it is missing ("14 items · 2
@@ -287,16 +306,31 @@ struct CalendarView: View {
         return Array(s[first...] + s[..<first])
     }
 
-    /// Six weeks from the first day of the week the month starts in: the grid is always as tall.
+    /// The grid's height whatever the month (six weeks of 112 points): a month of five weeks has taller days.
+    private static let monthHeight: CGFloat = 6 * 112
+
+    /// (planning-23) The weeks the month touches — five or six, four for a February that starts on the week's first day —
+    /// counted from the first day of the week it starts in. A row of the next month's days is never drawn.
+    private func weekCount() -> Int {
+        let first = Self.firstOfWeek(anchor)
+        let next = cal.date(byAdding: .month, value: 1, to: anchor) ?? anchor
+        let days = cal.dateComponents([.day], from: first, to: next).day ?? 42
+        return min(6, max(4, (days + 6) / 7))
+    }
+
+    /// The month's weeks from the first day of the week it starts in; the grid is always as tall, its days taller when
+    /// there are fewer weeks (more of each name fits).
     private func monthWeeks(_ byDay: [String: [CalEvent]]) -> some View {
         let first = Self.firstOfWeek(anchor)
-        let days = (0..<42).compactMap { cal.date(byAdding: .day, value: $0, to: first) }
+        let weeks = weekCount()
+        let height = (Self.monthHeight / CGFloat(weeks)).rounded(.down)
+        let days = (0..<(weeks * 7)).compactMap { cal.date(byAdding: .day, value: $0, to: first) }
         return VStack(spacing: 0) {
-            ForEach(0..<6, id: \.self) { w in
+            ForEach(0..<weeks, id: \.self) { w in
                 if w > 0 { Self.line.frame(height: 1) }
                 HStack(spacing: 0) {
                     ForEach(Array(days.dropFirst(w * 7).prefix(7).enumerated()), id: \.element) { i, day in
-                        dayCell(day, events: byDay[key(day)] ?? [])
+                        dayCell(day, events: byDay[key(day)] ?? [], height: height)
                             .overlay(alignment: .leading) {
                                 if i > 0 { Self.line.frame(width: 1) }
                             }
@@ -306,13 +340,24 @@ struct CalendarView: View {
         }
     }
 
-    /// A day of the month: its number (today on the accent, the day picked on its wash), and up to four of its items as
-    /// lines in their calendar's colour — (1.2) flat on the grid, no box round each.
-    private func dayCell(_ day: Date, events evs: [CalEvent]) -> some View {
+    /// A day of the month: its number (today on the accent, the day picked on its wash), and its items as lines in their
+    /// calendar's colour — (1.2) flat on the grid, no box round each. (planning-13) The open ones first, as many as the
+    /// day has room for, a name taking a second line while there is room for it; work handed in folded into one line
+    /// ("3 done", with what did not fit: "2 more · 3 done"), so the names still to do get the room.
+    private func dayCell(_ day: Date, events evs: [CalEvent], height: CGFloat) -> some View {
         let off = !cal.isDate(day, equalTo: anchor, toGranularity: .month)
         let isToday = cal.isDateInToday(day)
         let isSel = cal.isDate(day, inSameDayAs: selected)
-        let fits = evs.count > 4 ? 3 : evs.count
+        let open = evs.filter { !$0.isStruck }
+        let done = evs.count - open.count
+        // (lines of about 18 points under the day's number: four in a day of 112 points, five in one of 134)
+        let lines = max(2, Int(((height - 39 + 2) / 18.3).rounded(.down)))
+        let tail = done > 0 || open.count > lines
+        let room = lines - (tail ? 1 : 0)
+        let shown = Array(open.prefix(room))
+        let spare = room - shown.count
+        let hidden = open.count - shown.count
+        let rest = [hidden > 0 ? "\(hidden) more" : nil, done > 0 ? "\(done) done" : nil].compactMap { $0 }.joined(separator: " · ")
         return Button {
             pick(day)
         } label: {
@@ -333,23 +378,25 @@ struct CalendarView: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     // (1.2.3) an item clicked on the grid grows its preview out of it; the rest of the day picks the day
-                    ForEach(evs.prefix(fits)) { ev in
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, ev in
                         PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 5, inline: false) {
-                            CalendarChip(event: ev)
+                            CalendarChip(event: ev, lines: i < spare ? 2 : 1)
                         }
+                        .help(ev.title)
                     }
-                    if evs.count > fits {
-                        Text("\(evs.count - fits) more")
+                    if tail {
+                        Text(rest)
                             .font(.sCaption.weight(.medium))
                             .foregroundStyle(.secondary)
-                            .padding(.leading, 16)
+                            .lineLimit(1)
+                            .padding(.leading, 11)
                     }
                 }
                 .opacity(off ? 0.6 : 1)
                 Spacer(minLength: 0)
             }
             .padding(5)
-            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
             .background(Theme.accent.opacity(isSel ? 0.07 : 0))
             .animation(Motion.snappy, value: isSel)
         }
@@ -372,7 +419,7 @@ struct CalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(day.formatted(.dateTime.weekday(.wide)))
                         .font(.sTitle3)
-                    Text("\(day.formatted(.dateTime.month(.wide).day())) · \(countLine(day, evs.count))")
+                    Text("\(Self.dateWords(day)) · \(countLine(day, evs.count))")
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
@@ -411,12 +458,30 @@ struct CalendarView: View {
         .card()
     }
 
-    /// A day of the week or of the list: its name as the section's heading, its work and events in one card under it.
+    /// A day of the week or of the list: its name as the section's heading ("Tue, Oct 13"), its work and events in one card
+    /// under it.
     private func dayCard(_ day: Date, events evs: [CalEvent]) -> some View {
-        PageSection(title: day.formatted(.dateTime.weekday(.wide).month(.wide).day()), trailing: countLine(day, evs.count)) {
+        PageSection(title: Self.dateWords(day, weekday: true), trailing: countLine(day, evs.count)) {
             dayRows(evs)
         }
     }
+
+    /// (planning-28) A day as every date is written: "Oct 13", "Tue, Oct 13" with its weekday; the year only when it is
+    /// not this one ("Jan 5, 2027").
+    private static func dateWords(_ day: Date, weekday: Bool = false) -> String {
+        let thisYear = Calendar.current.isDate(day, equalTo: Date(), toGranularity: .year)
+        let format = (weekday ? "EEE, " : "") + (thisYear ? "MMM d" : "MMM d, yyyy")
+        return dateFormats[format]?.string(from: day) ?? day.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    /// The four ways `dateWords` writes a day, made once.
+    private static let dateFormats: [String: DateFormatter] = Dictionary(uniqueKeysWithValues:
+        ["MMM d", "MMM d, yyyy", "EEE, MMM d", "EEE, MMM d, yyyy"].map { format -> (String, DateFormatter) in
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = format
+            return (format, f)
+        })
 
     /// "Today · 3 items", "Tomorrow · 1 item", "2 items".
     private func countLine(_ day: Date, _ n: Int) -> String {
@@ -802,29 +867,50 @@ private extension PreviewItem {
     }
 }
 
-/// A piece of work or an event on a day of the month: (1.2) a line on the grid with its calendar's colour as a dot
-/// before its name — a red mark when it is missing, greyed once done (work handed in struck through).
+extension CalEvent {
+    /// (planning-24) Struck through: work handed in or excused, in every view (the engine's `struck`; before 2.99.33,
+    /// work handed in) — never a lecture or a lab that is only over.
+    var isStruck: Bool {
+        if let struck { return struck }
+        return missing != true && (excused == true || (done == true && ["Assignment", "Quiz", "Discussion"].contains(kind ?? "")))
+    }
+
+    /// Greyed: over (its due time or its end gone by), or struck.
+    var isPast: Bool { (past ?? (done == true)) || isStruck }
+}
+
+/// A piece of work or an event on a day of the month: (1.2) a line on the grid, (planning-13) a thin bar in its
+/// calendar's colour before its name — a red mark when it is missing; greyed once over, struck through only once
+/// handed in. A name may take `lines` lines.
 private struct CalendarChip: View {
     let event: CalEvent
+    var lines = 1
 
     var body: some View {
         let c = Color(hex: event.color)
         let missing = event.missing == true
-        let done = event.done == true && !missing
-        let work = ["Assignment", "Quiz", "Discussion"].contains(event.kind ?? "")
-        HStack(spacing: 5) {
+        let grey = event.isPast && !missing
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             if missing {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(.sCaption2.weight(.bold))
                     .foregroundStyle(.red)
                     .frame(width: 8)
-            } else {
-                Circle().fill(c).frame(width: 7, height: 7)
             }
             Text(event.title)
-                .strikethrough(done && work, color: .secondary)
-                .foregroundStyle(done ? Color.secondary : (missing ? Color.red : Color.primary))
-                .lineLimit(1)
+                .strikethrough(event.isStruck && !missing, color: .secondary)
+                .foregroundStyle(grey ? Color.secondary : (missing ? Color.red : Color.primary))
+                .lineLimit(lines)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, missing ? 0 : 7)
+                .overlay(alignment: .leading) {
+                    if !missing {
+                        Capsule()
+                            .fill(c.opacity(grey ? 0.55 : 1))
+                            .frame(width: 3)
+                            .padding(.vertical, 1.5)
+                    }
+                }
         }
         .font(.sCaption)
         .padding(.horizontal, 4)
@@ -840,15 +926,15 @@ private struct CalendarEventLine: View {
     let event: CalEvent
 
     var body: some View {
-        let done = event.done == true
         let missing = event.missing == true
         HStack(spacing: 12) {
             IconTile(symbol: CalendarEventLine.glyph(event.kind), color: Color(hex: event.color))
             VStack(alignment: .leading, spacing: 2) {
+                // (planning-24) struck through only once handed in, greyed once over: as on the month's grid
                 Text(event.title)
                     .font(.sBody)
-                    .strikethrough(done && !missing, color: .secondary)
-                    .foregroundStyle(done ? Color.secondary : Color.primary)
+                    .strikethrough(event.isStruck && !missing, color: .secondary)
+                    .foregroundStyle(event.isPast && !missing ? Color.secondary : Color.primary)
                     .lineLimit(2)
                 if let sub = event.sub, !sub.isEmpty {
                     Text(sub).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
@@ -888,13 +974,13 @@ private struct CalendarWeekBlock: View {
 
     var body: some View {
         let c = Color(hex: event.color)
-        let done = event.done == true
         let missing = event.missing == true
         VStack(alignment: .leading, spacing: 3) {
+            // (planning-24) struck through only once handed in, greyed once over: as on the month's grid
             Text(event.title)
-                .strikethrough(done && !missing, color: .secondary)
+                .strikethrough(event.isStruck && !missing, color: .secondary)
                 .font(.sCallout.weight(.medium))
-                .foregroundStyle(done ? Color.secondary : Color.primary)
+                .foregroundStyle(event.isPast && !missing ? Color.secondary : Color.primary)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
             HStack(spacing: 5) {

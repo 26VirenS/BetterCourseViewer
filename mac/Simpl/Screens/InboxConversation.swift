@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - A conversation
 
@@ -20,6 +21,9 @@ struct ConversationView: View {
     @State private var error: String?
     /// The sidebar's unread count asked for again, once, after the first answer (Canvas marks the conversation read then).
     @State private var counted = false
+    /// (planning-18) The files going with the reply, and the file chooser's being up.
+    @StateObject private var files = MessageAttachments()
+    @State private var attaching = false
     @FocusState private var typing: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -45,6 +49,10 @@ struct ConversationView: View {
             .onChange(of: link?.starred) { _, on in
                 // (the list's star is the one shown; kept here too, for when the list no longer holds the conversation)
                 if let on, model.data?.starred != on { model.data?.starred = on }
+            }
+            .onChange(of: id) { _, _ in files.clear() } // (the files picked were for the conversation left)
+            .fileImporter(isPresented: $attaching, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+                if case .success(let urls) = result { files.add(urls, engine: engine) }
             }
     }
 
@@ -185,8 +193,8 @@ struct ConversationView: View {
 
     // MARK: The reply bar
 
-    /// The reply bar, floating in glass over the foot of the thread: the reply (a line, growing to six) and Send; why a
-    /// reply did not go, above it.
+    /// The reply bar, floating in glass over the foot of the thread: (planning-18) Attach, the reply (a line, growing to
+    /// six) and Send; the files going with it and why a reply did not go, above it.
     private func replyBar(_ d: ConversationData) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let error {
@@ -196,6 +204,12 @@ struct ConversationView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .glassCapsule(tint: Color.red.opacity(0.25))
+                    .transition(.opacity)
+            }
+            if !files.items.isEmpty {
+                MessageAttachmentChips(files: files)
+                    .padding(10)
+                    .glassCard(radius: 18)
                     .transition(.opacity)
             }
             composer(d)
@@ -211,6 +225,19 @@ struct ConversationView: View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         // (1.2.3: one slim line, the words and Send on one centre line; it grows as the reply does)
         return HStack(alignment: .center, spacing: 8) {
+            Button {
+                attaching = true
+            } label: {
+                Image(systemName: "paperclip")
+                    .font(.sBody.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(sending)
+            .help("Attach files to this reply")
+            .accessibilityLabel("Attach")
             InboxReplyBox(text: draft, focus: $typing, prompt: replyPrompt(d))
             if !draft.wrappedValue.isEmpty && !sending {
                 Text("⌘↩")
@@ -220,7 +247,7 @@ struct ConversationView: View {
             }
             sendButton
         }
-        .padding(.leading, 12)
+        .padding(.leading, 6)
         .padding(.trailing, 5)
         .padding(.vertical, 4)
         // (a click anywhere on the bar puts the typing there)
@@ -279,8 +306,10 @@ struct ConversationView: View {
         return Binding(get: { store.drafts[id] ?? "" }, set: { store.drafts[id] = $0.isEmpty ? nil : $0 })
     }
 
+    /// Words to send, and (planning-18) every file picked up in Canvas (one that could not go up is taken out first).
     private var canSend: Bool {
         !sending && model.data != nil && !draft.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !files.uploading && !files.failed
     }
 
     /// Starred at once, and back if Canvas says no. Beside the Inbox's list, the list's own star does it (one star).
@@ -302,12 +331,16 @@ struct ConversationView: View {
     private func send() {
         guard canSend else { return }
         let text = draft.wrappedValue
+        var args: [String: Any] = ["id": id, "body": text]
+        if !files.ids.isEmpty { args["attachments"] = files.ids }
+        let payload = args
         sending = true
         withAnimation(Motion.snappy) { error = nil }
         Task {
             do {
-                _ = try await engine.call("sendReply", ["id": id, "body": text], as: OK.self)
+                _ = try await engine.call("sendReply", payload, as: OK.self)
                 draft.wrappedValue = ""
+                withAnimation(Motion.snappy) { files.clear() }
                 await load(animated: true)
                 engine.changed()
             } catch {

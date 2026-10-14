@@ -152,6 +152,11 @@ struct RubricModel {
         let comment: String
         /// How far up its bar its mark sits (1 with nothing marked).
         let frac: Double
+        /// (planning-5) The points given are not the given level's (Canvas lets a marker pick Partial, 3 pts, and give
+        /// 4): the mark is then drawn at the points given, and its badge says them.
+        var adjusted = false
+        /// The mark's badge: "Your mark", or "Your mark · 4 pts" when adjusted.
+        var markText = "Your mark"
     }
 
     let criteria: [Criterion]
@@ -253,9 +258,15 @@ struct RubricModel {
         let name = row.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let full = name.isEmpty ? "Criterion \(k + 1)" : name
         let comment = (row.note ?? row.comment ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "“”\" \n"))
+        // (planning-5) the points given apart from the level's: the engine's word (2.99.33), else read here
+        let given = mark >= 0 ? levels[mark].pts : nil
+        let adjusted = row.adjusted ?? (score != nil && given != nil && abs((score ?? 0) - (given ?? 0)) > 1e-9)
+        let points = score.map { "\(num($0)) \($0 == 1 ? "pt" : "pts")" } ?? ""
+        let badge = (row.markText ?? "").isEmpty ? (adjusted ? "Your mark · \(points)" : "Your mark") : (row.markText ?? "")
         return Criterion(id: row.id, index: k, name: full, short: short(full), desc: plainLines(row.desc ?? ""),
                          levels: levels, worth: worth, score: score, mark: mark, comment: comment,
-                         frac: fraction(levels, worth: worth, score: score, mark: mark))
+                         frac: fraction(levels, worth: worth, score: score, mark: mark),
+                         adjusted: adjusted, markText: badge)
     }
 
     private static func level(_ r: RubricRating) -> Level {

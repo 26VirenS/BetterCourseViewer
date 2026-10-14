@@ -228,6 +228,10 @@ struct RubricRow: Codable, Identifiable, Hashable {
     var score: Double?
     var desc: String?
     var note: String?
+    /// (2.99.33) The points given differ from the picked level's (Canvas allows it), and the mark's badge in words
+    /// ("Your mark · 4 pts" when adjusted or no level was picked, "Your mark", "" when not marked).
+    var adjusted: Bool?
+    var markText: String?
 }
 
 struct CommentRow: Codable, Identifiable, Hashable {
@@ -440,6 +444,17 @@ struct CourseGradesData: Codable {
     var rows: [CGRow]
     var gpa: Double?
     var gpaIf: Double?
+    /// (2.99.33) The course's other name only when it says something new (""); how far Simpl's own reading of the scores
+    /// is from the LMS's total, while What-If is on ("Simpl’s own estimate differs from Canvas’s total by 7.6 points.";
+    /// "" when they agree); the term GPA now and with what-if as they are shown ("3.43"; "" with none); and how much is
+    /// graded, the Grades overview's own count ("7 of 18 graded · 1 not posted yet").
+    var altName: String?
+    var estimateNote: String?
+    var gpaText: String?
+    var gpaIfText: String?
+    var graded: Int?
+    var totalItems: Int?
+    var gradedText: String?
 }
 
 struct GroupRow: Codable, Identifiable, Hashable {

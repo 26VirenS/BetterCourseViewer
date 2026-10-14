@@ -209,6 +209,13 @@ struct TodoData: Codable {
     var pct: Int
     var done: Int
     var total: Int
+    /// (2.99.33) What is left and what is late, as numbers and in words ("17 left", "1 of 18 done", "1 overdue"; "" when
+    /// nothing is overdue), for the progress card's big figure.
+    var left: Int?
+    var overdue: Int?
+    var leftText: String?
+    var doneText: String?
+    var overdueText: String?
     var group: String
     var showDone: Bool
     var sections: [TodoSection]
@@ -234,6 +241,11 @@ struct GradeRow: Codable, Identifiable, Hashable {
     var url: String?
     var pct: Double?
     var pctText: String
+    /// (2.99.33) Why there is no score ("Hidden by instructor", "No grade yet"; "" with one), whether the instructor
+    /// hides the total, and the course's first teacher.
+    var why: String?
+    var hidden: Bool?
+    var teacher: String?
     var letter: String?
     var points: Double?
     var graded: Int
@@ -270,12 +282,23 @@ struct GradeItem: Codable, Identifiable, Hashable {
 struct TrendPoint: Codable, Hashable {
     var date: String
     var gpa: Double
+    /// (2.99.33) The day's GPA and date as every app writes them, for the chart's readout ("3.43", "Oct 12").
+    var gpaText: String?
+    var dateText: String?
 }
 
 struct GradesData: Codable {
     var term: String?
     var gpa: Double?
     var goal: Double
+    /// (2.99.33) The GPA shown as a number (3.43: half up; nil with none), the goal as it is shown ("4.00"), the shown
+    /// GPA's gap to it (−0.57) and that gap in words ("0.57 below goal", "+0.12 above goal", "On your goal"; "" with no
+    /// GPA), and what the GPA is made of ("From 4 courses, each counting equally. … total is hidden by the instructor.").
+    var gpaShown: Double?
+    var goalText: String?
+    var goalGap: Double?
+    var goalLine: String?
+    var gpaNote: String?
     var scale: [ScaleStep]
     var rows: [GradeRow]
     var items: [GradeItem]
@@ -301,6 +324,10 @@ struct CalEvent: Codable, Identifiable, Hashable {
     var sub: String?
     var color: String?
     var url: String?
+    /// (2.99.33) Struck through only when it is work handed in or excused; past once its due time, or the event's end,
+    /// has gone by (greyed, never struck: a lecture that is over is not cancelled).
+    var struck: Bool?
+    var past: Bool?
 }
 
 struct CalendarChoice: Codable, Identifiable, Hashable {

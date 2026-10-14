@@ -560,22 +560,30 @@ private struct InboxSplitHandle: View {
     }
 }
 
-/// (1.2) The mailboxes as one glass switcher: each its symbol, the one showing with its name too on a wash of the
-/// accent that slides from one to the next.
+/// (1.2) The mailboxes as one glass switcher: each its symbol, the one showing on a wash of the accent that slides
+/// from one to the next. (planning-17) Where the list is wide enough, every mailbox is named; where it is not, the one
+/// showing is, and the others say their names under the pointer.
 private struct InboxMailboxSwitcher: View {
     @Binding var scope: String
     @Namespace private var pill
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            strip(named: true)
+            strip(named: false)
+        }
+    }
+
+    private func strip(named: Bool) -> some View {
         HStack(spacing: 2) {
-            ForEach(InboxMailbox.all) { m in segment(m) }
+            ForEach(InboxMailbox.all) { m in segment(m, named: named) }
         }
         .padding(3)
         .glassCapsule()
     }
 
-    private func segment(_ m: InboxMailbox) -> some View {
+    private func segment(_ m: InboxMailbox, named: Bool) -> some View {
         let on = m.id == scope
         return Button {
             withAnimation(reduceMotion ? Animation.easeInOut(duration: 0.15) : Motion.snappy) { scope = m.id }
@@ -583,7 +591,7 @@ private struct InboxMailboxSwitcher: View {
             HStack(spacing: 6) {
                 Image(systemName: m.symbol)
                     .symbolVariant(on ? .fill : .none)
-                if on {
+                if on || named {
                     Text(m.label)
                         .lineLimit(1)
                         .fixedSize()
@@ -591,13 +599,13 @@ private struct InboxMailboxSwitcher: View {
             }
             .font(.sCallout.weight(.semibold))
             .foregroundStyle(on ? Theme.accent : Color.secondary)
-            .padding(.horizontal, on ? 12 : 6)
-            .frame(maxWidth: on ? nil : CGFloat.infinity, minHeight: 34)
+            .padding(.horizontal, on || named ? 12 : 6)
+            .frame(maxWidth: on && !named ? nil : CGFloat.infinity, minHeight: 34)
             .background {
                 if on {
                     Capsule()
                         .fill(Theme.accent.opacity(0.15))
-                        .matchedGeometryEffect(id: "mailbox", in: pill)
+                        .matchedGeometryEffect(id: named ? "mailbox-named" : "mailbox", in: pill)
                 }
             }
             .contentShape(Capsule())

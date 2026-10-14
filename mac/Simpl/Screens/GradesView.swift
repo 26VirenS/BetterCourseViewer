@@ -87,35 +87,66 @@ struct GradesView: View {
             .fixedSize(horizontal: false, vertical: true) // (the cards of a row as tall as the tallest)
             .widthGate(880, wide: $wide)
         } else {
+            // (planning-38) with no trend beside them, the two cards keep the size they have beside one on a wide
+            // window, rather than stretching across it with their figures in a corner
             HStack(alignment: .top, spacing: 18) {
                 gpaCard(d)
                 goalCard(d)
             }
+            .frame(maxWidth: wide ? 540 : .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading) // (the gate measures the row, not the cards)
+            .widthGate(880, wide: $wide)
         }
     }
 
+    /// (planning-1) The term GPA as it is shown — the engine's, rounded once, half up (3.425 is 3.43) — the one figure
+    /// the bar, the goal's gap and its colour are all worked out from, so the numbers on the page add up.
+    private static func shownGPA(_ d: GradesData) -> Double? {
+        d.gpaShown ?? d.gpa.map { HalfUp.value($0, 2) }
+    }
+
+    /// The shown GPA's gap to the goal as it stands (the stepper's, while it moves), rounded as it is written.
+    private static func gap(_ d: GradesData, goal: Double) -> Double? {
+        shownGPA(d).map { HalfUp.value($0 - HalfUp.value(goal, 2), 2) }
+    }
+
+    /// The goal as the engine saved it, while the stepper is where it was saved.
+    private static func atSaved(_ d: GradesData, goal: Double) -> Bool {
+        abs(HalfUp.value(goal, 2) - d.goal) < 0.0005
+    }
+
+    /// The gap in words, as the engine's `goalLine` says it: "0.57 below goal", "+0.12 above goal", "On your goal".
+    private static func gapLine(_ d: GradesData, goal: Double, gap: Double) -> String {
+        if atSaved(d, goal: goal), let line = d.goalLine, !line.isEmpty { return line }
+        if gap == 0 { return "On your goal" }
+        return gap < 0 ? "\(HalfUp.text(-gap, 2)) below goal" : "+\(HalfUp.text(gap, 2)) above goal"
+    }
+
     private func gpaCard(_ d: GradesData) -> some View {
-        let g = d.gpa
-        let diff = g.map { $0 - goal }
+        let shown = GradesView.shownGPA(d)
+        let gap = GradesView.gap(d, goal: goal)
         let scored = d.rows.filter { $0.pct != nil }.count
         let counted: String = scored == 0 ? "No course has a score yet." : "From \(scored) \(scored == 1 ? "course" : "courses"), each counting equally."
-        let barColor: Color = diff.map { $0 >= 0 ? Color.green : Color.orange } ?? Theme.accent
+        // (planning-15) what the GPA is made of, and the courses it leaves out and why (a total the instructor hides)
+        let note = PreviewFormat.text(d.gpaNote) ?? counted
+        let barColor: Color = gap.map { $0 >= 0 ? Color.green : Color.orange } ?? Theme.accent
         return VStack(alignment: .leading, spacing: 10) {
             CardHeading(text: "Term GPA", trailing: "4.0 scale")
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(g.map { String(format: "%.2f", $0) } ?? "—")
+                Text(PreviewFormat.text(d.gpaText) ?? shown.map { HalfUp.text($0, 2) } ?? "–")
                     .font(.system(size: 46, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .contentTransition(.numericText(value: g ?? 0))
+                    .contentTransition(.numericText(value: shown ?? 0))
                 Text("of 4.00")
                     .font(.sBody)
                     .foregroundStyle(.secondary)
             }
-            GradeBar(value: g.map { $0 / 4 }, color: barColor, height: 8, mark: goal / 4, key: "grades:gpa")
-            Text(counted)
+            GradeBar(value: shown.map { $0 / 4 }, color: barColor, height: 8, mark: goal / 4, key: "grades:gpa")
+            Text(note)
                 .font(.sFootnote)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -124,11 +155,13 @@ struct GradesView: View {
     }
 
     private func goalCard(_ d: GradesData) -> some View {
-        let diff = d.gpa.map { $0 - goal }
+        let gap = GradesView.gap(d, goal: goal)
+        // (the goal as saved is the engine's "4.00"; while the stepper moves, its own figure, written the same way)
+        let goalText = GradesView.atSaved(d, goal: goal) ? (PreviewFormat.text(d.goalText) ?? HalfUp.text(goal, 2)) : HalfUp.text(goal, 2)
         return VStack(alignment: .leading, spacing: 10) {
             CardHeading(text: "Goal", trailing: "saved as you change it")
             HStack(alignment: .center, spacing: 10) {
-                Text(String(format: "%.2f", goal))
+                Text(goalText)
                     .font(.system(size: 46, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: goal))
@@ -137,16 +170,18 @@ struct GradesView: View {
                 Stepper("Goal", value: $goal.animation(Motion.snappy), in: 0...4, step: 0.05)
                     .labelsHidden()
                     .controlSize(.large)
-                    .accessibilityValue(String(format: "%.2f", goal))
+                    .accessibilityValue(goalText)
                     .help("Raise or lower your goal")
                 Spacer(minLength: 0)
             }
-            if let diff {
-                Label(diff >= 0 ? String(format: "+%.2f above goal", diff) : String(format: "%.2f below goal", abs(diff)),
-                      systemImage: diff >= 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+            if let gap {
+                // (planning-1) the gap from the GPA as it is shown, so the two add up to the goal (3.43 and 0.57 below
+                // 4.00); green on or above it, orange below
+                Label(GradesView.gapLine(d, goal: goal, gap: gap),
+                      systemImage: gap == 0 ? "checkmark.circle.fill" : gap > 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
                     .font(.sBody.weight(.medium))
-                    .foregroundStyle(diff >= 0 ? Color.green : Color.orange)
-                    .contentTransition(.numericText(value: diff))
+                    .foregroundStyle(gap >= 0 ? Color.green : Color.orange)
+                    .contentTransition(.numericText(value: gap))
             } else {
                 Text("No score to compare yet")
                     .font(.sBody)
@@ -171,7 +206,7 @@ struct GradesView: View {
         var out: [DayGPA] = []
         for p in trend {
             guard p.gpa.isFinite, let day = dayFormat.date(from: p.date), seen.insert(day).inserted else { continue }
-            out.append(DayGPA(id: day, gpa: p.gpa))
+            out.append(DayGPA(id: day, gpa: p.gpa, gpaText: PreviewFormat.text(p.gpaText), dateText: PreviewFormat.text(p.dateText)))
         }
         return out.sorted { $0.id < $1.id }
     }
@@ -197,7 +232,9 @@ struct GradesView: View {
             } else if split {
                 courseSplit(d)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                // (planning-7) two cards side by side only where each has room for its course's name: below about 340
+                // points a card cut "F26-PHYS 008 01" to "F26-PHYS…", so the cards go one under the other first
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), spacing: 16)], spacing: 16) {
                     ForEach(d.rows) { r in courseCard(r) }
                 }
             }
@@ -236,8 +273,9 @@ struct GradesView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(r.code)
                         .font(.sHeadline)
-                        .lineLimit(1)
-                    if let name = r.name, !name.isEmpty, name != r.code {
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let name = GradesView.secondName(r) {
                         Text(name)
                             .font(.sCallout)
                             .foregroundStyle(.secondary)
@@ -249,28 +287,49 @@ struct GradesView: View {
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(r.pct.map { String(format: "%.1f%%", $0) } ?? "N/A")
+                    Text(r.pctText)
                         .font(.sTitle3)
                         .monospacedDigit()
                         .foregroundStyle(r.pct == nil ? .secondary : .primary)
                         .contentTransition(.numericText(value: r.pct ?? 0))
-                    if let l = r.letter { LetterChip(letter: l) }
+                    if let l = r.letter {
+                        LetterChip(letter: l)
+                    } else if let why = GradesView.why(r) {
+                        WhyNote(text: why, hidden: r.hidden == true)
+                    }
                 }
+                .fixedSize()
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
             .modifier(PickedWash(picked: on))
         }
         .buttonStyle(RowButtonStyle())
-        .help("\(r.code): its groups and its latest grades")
+        .help(GradesView.why(r).map { "\(r.code): \($0)" } ?? "\(r.code): its groups and its latest grades")
         .accessibilityLabel(spoken(r))
         .accessibilityAddTraits(on ? .isSelected : [])
         .contextMenu { courseMenu(r) }
     }
 
-    /// "12 of 20 graded".
+    /// (planning-4) How much of the course is graded, the engine's one count for this screen and the course's own Grades
+    /// ("7 of 18 graded · 1 not posted yet"; both read 8 and 7 of 18 for one course).
     fileprivate static func gradedLine(_ r: GradeRow) -> String {
-        r.total > 0 ? "\(r.graded) of \(r.total) graded" : "Nothing graded yet"
+        if let t = PreviewFormat.text(r.gradedText) { return t }
+        return r.total > 0 ? "\(r.graded) of \(r.total) graded" : "Nothing graded yet"
+    }
+
+    /// (planning-29) The course's other name, only when it says something its label does not ("MATH-021-20" under
+    /// "F26-MATH 021 20" says nothing new, and is not shown).
+    fileprivate static func secondName(_ r: GradeRow) -> String? {
+        if let alt = r.altName { return PreviewFormat.text(alt) }
+        guard let name = r.name, !name.isEmpty, name != r.code else { return nil } // (a page from before 2.99.33)
+        return name
+    }
+
+    /// (planning-15) Why a course has no score: "Hidden by instructor", "No grade yet" (nil with a score).
+    fileprivate static func why(_ r: GradeRow) -> String? {
+        guard r.pct == nil else { return nil }
+        return PreviewFormat.text(r.why)
     }
 
     private func courseCard(_ r: GradeRow) -> some View {
@@ -301,9 +360,9 @@ struct GradesView: View {
     }
 
     private func spoken(_ r: GradeRow) -> String {
-        let score = r.pct.map { String(format: "%.1f percent", $0) } ?? "no score"
+        let score = r.pct == nil ? (GradesView.why(r) ?? "no score") : r.pctText
         let letter = r.letter.map { ", \($0)" } ?? ""
-        return "\(r.code), \(score)\(letter)"
+        return "\(r.code), \(score)\(letter), \(GradesView.gradedLine(r))"
     }
 
     // MARK: - Reading and saving
@@ -349,7 +408,7 @@ struct GradesView: View {
         goalSave = Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             guard !Task.isCancelled else { return }
-            await engine.act("setGoal", ["goal": (g * 100).rounded() / 100])
+            await engine.act("setGoal", ["goal": HalfUp.value(g, 2)]) // (half up, as the engine keeps it)
         }
     }
 }
@@ -397,19 +456,20 @@ private struct GradeCourseDetail: View {
                     .font(.sTitle2)
                     .lineLimit(2)
                     .textSelection(.enabled)
-                if let name = row.name, !name.isEmpty, name != row.code {
+                if let name = GradesView.secondName(row) {
                     Text(name)
                         .font(.sBody)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(row.pct.map { String(format: "%.1f%%", $0) } ?? "N/A")
+                    Text(row.pctText)
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(row.pct == nil ? .secondary : .primary)
                         .contentTransition(.numericText(value: row.pct ?? 0))
                     if let l = row.letter { LetterChip(letter: l) }
+                    if let why = GradesView.why(row) { WhyNote(text: why, hidden: row.hidden == true) }
                     if let t = row.target {
                         Text("Target \(t)")
                             .font(.sCallout)
@@ -629,10 +689,12 @@ private func gradeLetter(_ r: CGRow, scale: [ScaleStep]) -> String? {
     return scale.first(where: { p >= $0.min })?.letter ?? scale.last?.letter
 }
 
-/// A day of the term GPA's history.
+/// A day of the term GPA's history, with its figure and date as the engine writes them (2.99.33: "3.43", "Oct 12").
 private struct DayGPA: Identifiable, Equatable {
     let id: Date
     let gpa: Double
+    var gpaText: String? = nil
+    var dateText: String? = nil
 }
 
 /// The term GPA's history, kept by the page day by day once tracking is on: a smooth line over its area, the goal as a
@@ -657,9 +719,10 @@ private struct TrendCard: View {
 
     private var readout: String {
         if let h = hovered {
-            return "\(h.id.formatted(.dateTime.month(.abbreviated).day())) · \(String(format: "%.2f", h.gpa))"
+            // (planning-1) the day's GPA as the card above writes one: half up ("3.43", never 3.42 for 3.425)
+            return "\(h.dateText ?? h.id.formatted(.dateTime.month(.abbreviated).day())) · \(h.gpaText ?? HalfUp.text(h.gpa, 2))"
         }
-        let span = String(format: "%.2f – %.2f", range.lowerBound, range.upperBound)
+        let span = "\(HalfUp.text(range.lowerBound, 2)) – \(HalfUp.text(range.upperBound, 2))"
         return showsGoal ? "\(span) · dashed is your goal" : span
     }
 
@@ -736,16 +799,19 @@ private struct CourseGradeCard: View {
     private var header: some View {
         let color = Color(hex: row.color)
         let bands = NestedRings.bands(total: row.pct, color: color, groups: row.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3)
-        return HStack(alignment: .center, spacing: 14) {
-            NestedRings(bands: bands, outerWidth: 7, innerWidth: 4.5, gap: 2, key: "grades:\(row.id)")
-                .frame(width: 66, height: 66)
+        // (planning-7) the rings a little smaller and the name free to take a second line: a card's job is to say which
+        // course it is, and "F26-PHYS 008HL 01/PHYS 008L 01" is read whole
+        return HStack(alignment: .center, spacing: 12) {
+            NestedRings(bands: bands, outerWidth: 6, innerWidth: 4, gap: 2, key: "grades:\(row.id)")
+                .frame(width: 56, height: 56)
                 .tourSpot(.gradeRing)
                 .onHover { on in if on { MacTour.shared.did(.ringHover) } }
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.code)
                     .font(.sHeadline)
-                    .lineLimit(1)
-                if let name = row.name, !name.isEmpty, name != row.code {
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let name = GradesView.secondName(row) {
                     Text(name)
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
@@ -754,10 +820,11 @@ private struct CourseGradeCard: View {
                 Text(GradesView.gradedLine(row))
                     .font(.sFootnote)
                     .foregroundStyle(.tertiary)
+                    .lineLimit(2)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
-                Text(row.pct.map { String(format: "%.1f%%", $0) } ?? "N/A")
+                Text(row.pctText)
                     .font(.sTitle2.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(row.pct == nil ? .secondary : .primary)
@@ -768,9 +835,14 @@ private struct CourseGradeCard: View {
                             .font(.sFootnote)
                             .foregroundStyle(.secondary)
                     }
-                    if let l = row.letter { LetterChip(letter: l) }
+                    if let l = row.letter {
+                        LetterChip(letter: l)
+                    } else if let why = GradesView.why(row) {
+                        WhyNote(text: why, hidden: row.hidden == true)
+                    }
                 }
             }
+            .fixedSize() // (the figure whole; the name takes what is left)
         }
     }
 
@@ -856,7 +928,7 @@ struct GradeWeightBar: View {
             HStack(spacing: 6) {
                 Circle().fill(colors[g.id] ?? Color.secondary).frame(width: 7, height: 7)
                 Text(g.name).font(.sFootnote.weight(.semibold)).lineLimit(1)
-                Text("\(Self.percent(g.weight ?? 0)) of grade · \(g.graded == true ? (g.value ?? "—") : "nothing graded yet")")
+                Text("\(Self.percent(g.weight ?? 0)) of grade · \(g.graded == true ? (g.value ?? "–") : "nothing graded yet")")
                     .font(.sFootnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -871,7 +943,7 @@ struct GradeWeightBar: View {
     }
 
     static func percent(_ w: Double) -> String {
-        w.rounded() == w ? "\(Int(w))%" : String(format: "%.1f%%", w)
+        HalfUp.percent(w) // ("57%", "28.5%": half up)
     }
 }
 
@@ -898,7 +970,7 @@ private struct CategoryLine: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                Text(value ?? "—")
+                Text(value ?? "–")
                     .font(.sBody.weight(.semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: pct ?? 0))
@@ -1094,7 +1166,7 @@ struct CourseGradesView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if whatIf, let d = data {
-                WhatIfBar(total: d.totalText, value: d.total, letter: d.letter, gpaIf: d.gpaIf)
+                WhatIfBar(total: d.totalText, value: d.total, letter: d.letter, gpaIf: d.gpaIf, gpaIfText: d.gpaIfText)
                     .transition(slide(.bottom))
             }
         }
@@ -1103,7 +1175,11 @@ struct CourseGradesView: View {
         .openTimed("Course grades", ready: data != nil, source: source)
         .onAppear(perform: seed)
         .toolbar { toolbarItems }
-        .task(id: engine.dataVersion) { await load(fresh: true, animated: false) }
+        .task(id: engine.dataVersion) {
+            await load(fresh: true, animated: false)
+            // (the screenshot suite: -SimplWhatIf YES turns What-If on once the grades are in, nothing typed)
+            if data != nil, !whatIf, LaunchOpen.take("", key: "SimplWhatIf") != nil { setWhatIf(true) }
+        }
         .sheet(item: $addingTo) { g in
             AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
                 addWhatIf(to: g, name: name, possible: possible, score: score)
@@ -1149,12 +1225,22 @@ struct CourseGradesView: View {
         whatIf ? "Turn What-If off: your real scores come back" : "What-If: try scores and see where your grade would land"
     }
 
+    /// (planning-4, planning-29) "F26-MATH 021 20 · 7 of 18 graded": the course's other name only when it says something
+    /// new, and the Grades overview's own graded count (it counted the rows with a score here, and read 7 where the
+    /// overview read 8).
     private func headline(_ d: CourseGradesData) -> String {
-        let real = d.rows.filter { $0.added != true }
-        let graded = real.filter { $0.earned != nil }.count
         var parts = [d.code]
-        if let n = d.name, !n.isEmpty, n != d.code { parts.append(n) }
-        if !real.isEmpty { parts.append("\(graded) of \(real.count) graded") }
+        if let alt = d.altName {
+            if let a = PreviewFormat.text(alt) { parts.append(a) }
+        } else if let n = d.name, !n.isEmpty, n != d.code {
+            parts.append(n) // (a page from before 2.99.33)
+        }
+        if let t = PreviewFormat.text(d.gradedText) {
+            parts.append(t)
+        } else {
+            let real = d.rows.filter { $0.added != true }
+            if !real.isEmpty { parts.append("\(real.filter { $0.earned != nil }.count) of \(real.count) graded") }
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -1232,6 +1318,15 @@ struct CourseGradesView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        // (planning-2) What-If starts from the LMS's total; where Simpl's own reading of the scores is apart from it,
+        // by how much — so a total that moves once a score is typed is never a surprise
+        if whatIf, let e = PreviewFormat.text(d.estimateNote) {
+            Label(e, systemImage: "info.circle")
+                .font(.sFootnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(slide(.top))
+        }
         if let f = d.final, !f.isEmpty {
             Text(f)
                 .font(.sFootnote)
@@ -1293,14 +1388,16 @@ struct CourseGradesView: View {
             }
             if whatIf && (d.gpaIf != nil || !drafts.isEmpty || !added.isEmpty) {
                 HStack(spacing: 8) {
+                    // (planning-1) the term GPAs as the engine writes them, half up: the one beside "now" is the Grades
+                    // screen's own figure
                     if let g = d.gpaIf {
                         Text("Term GPA would be")
-                        Text(String(format: "%.2f", g))
+                        Text(PreviewFormat.text(d.gpaIfText) ?? HalfUp.text(g, 2))
                             .bold()
                             .monospacedDigit()
                             .contentTransition(.numericText(value: g))
-                        if let now = d.gpa {
-                            Text(String(format: "(now %.2f)", now))
+                        if let now = PreviewFormat.text(d.gpaText) ?? d.gpa.map({ HalfUp.text($0, 2) }) {
+                            Text("(now \(now))")
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -1502,7 +1599,7 @@ struct CourseGradesView: View {
     private func scoreField(_ r: CGRow, tried: Bool) -> some View {
         let real = r.effective.map { CourseGradesView.num($0) } ?? ""
         return HStack(spacing: 6) {
-            TextField("—", text: Binding(
+            TextField("–", text: Binding(
                 get: { drafts[r.id] ?? real },
                 set: { v in
                     guard v != (drafts[r.id] ?? real) else { return } // (a field ending its edit hands back what it had: no score tried)
@@ -1603,7 +1700,7 @@ struct CourseGradesView: View {
 
     /// Points as Canvas writes them: whole numbers bare, others as short as they go.
     static func num(_ v: Double) -> String {
-        !v.isFinite ? "—" : v == v.rounded() && abs(v) < 1e15 ? String(Int(v)) : String(format: "%g", v)
+        !v.isFinite ? "–" : v == v.rounded() && abs(v) < 1e15 ? String(Int(v)) : String(format: "%g", v)
     }
 
     static func tone(_ badge: String) -> String {
@@ -1747,6 +1844,8 @@ private struct WhatIfBar: View {
     let value: Double?
     let letter: String?
     let gpaIf: Double?
+    /// The term GPA with what-if as the engine writes it ("3.50").
+    var gpaIfText: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1760,7 +1859,7 @@ private struct WhatIfBar: View {
             if let letter { LetterChip(letter: letter) }
             if let g = gpaIf {
                 Divider().frame(height: 16)
-                Text("Term GPA \(String(format: "%.2f", g))")
+                Text("Term GPA \(PreviewFormat.text(gpaIfText) ?? HalfUp.text(g, 2))")
                     .font(.sBody)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -1851,7 +1950,7 @@ private struct AddWhatIfSheet: View {
         let weight = group.weightText.map { $0.isEmpty ? "" : " (\($0))" } ?? ""
         let counts = "Counts in \(group.name)\(weight). Nothing is saved to \(lmsName)."
         guard let p = points, let s = AddWhatIfSheet.number(score) else { return counts }
-        return String(format: "%.1f%%. ", s / p * 100) + counts
+        return "\(HalfUp.percent(s / p * 100)). " + counts // (half up, as every percent is written)
     }
 
     private func submit() {
@@ -1863,6 +1962,48 @@ private struct AddWhatIfSheet: View {
 }
 
 // MARK: - Pieces
+
+/// (1.3.78) A figure rounded as every app and the engine round one: half up on its decimal value — 3.425 is 3.43 and
+/// 81.25 is 81.3 — where "%.2f" on the double reads 3.425 (held as 3.42499…) as 3.42 and a true tie to even. The
+/// screen's own figures (the goal as it moves, the gap beside it, a typed what-if's percent) are written with it; a
+/// figure the engine sends ready (`gpaText`, `pctText`) is shown as it comes.
+enum HalfUp {
+    /// `v` rounded half up (away from zero) at `places` decimals, read from its shortest decimal form.
+    static func value(_ v: Double, _ places: Int) -> Double {
+        guard v.isFinite, var d = Decimal(string: "\(v)", locale: Locale(identifier: "en_US_POSIX")) else { return v }
+        var out = Decimal()
+        NSDecimalRound(&out, &d, places, .plain)
+        return NSDecimalNumber(decimal: out).doubleValue
+    }
+
+    /// Always `places` decimals: "3.43", "4.00".
+    static func text(_ v: Double, _ places: Int) -> String {
+        String(format: "%.\(places)f", value(v, places))
+    }
+
+    /// A percent to one decimal, a trailing ".0" dropped, as the engine writes one: "81.3%", "92%".
+    static func percent(_ v: Double) -> String {
+        let t = text(v, 1)
+        return (t.hasSuffix(".0") ? String(t.dropLast(2)) : t) + "%"
+    }
+}
+
+/// (planning-15) Why a course has no score, where its letter would be — "Hidden by instructor" (a slashed eye) or "No
+/// grade yet" — never a bare "N/A" beside a line that says work is graded. The pointer on it says what it means.
+private struct WhyNote: View {
+    let text: String
+    let hidden: Bool
+
+    var body: some View {
+        Label(text, systemImage: hidden ? "eye.slash" : "clock")
+            .font(.sFootnote)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .help(hidden
+                  ? "The instructor hides this course’s total, so there is no score to show. The term GPA leaves it out."
+                  : "Nothing in this course has a score yet. The term GPA leaves it out until it has one.")
+    }
+}
 
 /// A letter grade on a wash of its letter's colour, as the web's grade tags.
 private struct LetterChip: View {
