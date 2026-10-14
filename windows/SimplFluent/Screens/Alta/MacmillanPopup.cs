@@ -16,8 +16,9 @@ namespace Simpl.Screens;
 /// <summary>
 /// (Mac 1.3.66) A Macmillan Learning assignment (Achieve, Sapling, LaunchPad) in a popup over the window, as an Alta one
 /// opens (the Mac's MacmillanScreen): across the top the Canvas assignment's name over "Macmillan Learning · Due Oct 12 at
-/// 11:59 PM" (as Alta's header has it), the pinned tools and Close; below, Macmillan's page as it draws it, on white, the
-/// student working on it there — the popup's Loading while it opens, or why it could not.
+/// 11:59 PM" (as Alta's header has it), the pinned tools and Close; below, Macmillan's page as it draws it, on white and in
+/// light whatever the app's appearance (Shell's LightPages), the student working on it there — the popup's Loading while
+/// it opens, or why it could not.
 /// </summary>
 public static class MacmillanPopup
 {
@@ -164,9 +165,13 @@ internal sealed class MacmillanPopupView
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsPasswordAutosaveEnabled = false;
         core.Settings.IsGeneralAutofillEnabled = false;
+        // (Macmillan's page in light, as it is made, whatever the app's appearance: the popup's own header stays as the app is)
+        await LightPages.Apply(core);
+        if (closed) return;
         core.NavigationCompleted += (_, e) =>
         {
             if (e.IsSuccess) NameFromPage(core);
+            LightPages.Tell(core, "macmillan");
             if (!opening) return;
             opening = false;
             Hold(false);

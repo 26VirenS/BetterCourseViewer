@@ -444,8 +444,12 @@ public sealed class TodoScreen : Screen
   ToolWindow): a course's tool, a tool assignment or a module's tool by the school's one-time launch (the engine's
   `toolLaunch`) — the tool alone, its school page only as the fallback —; Back, Forward and Refresh at the title bar's
   left (Alt+←, Alt+→, F5), More at its right (Open in browser, Copy link), a thin line under the title bar while a page
-  loads, and why it could not open in the window with Try again. `--open tool:101:9` opens one at launch (the
-  screenshot suite pictures the window in front).
+  loads, and why it could not open in the window with Try again. The page is in light, whatever Simpl's appearance or
+  Windows' (`LightPages`: the page and its frames are told the student prefers light, through the browser's DevTools
+  protocol, per web view — the profile's preference is shared with the school's pages in the app, which follow the
+  app); Macmillan Learning's popup the same. `--open tool:101:9` opens one at launch (the screenshot suite pictures the
+  window in front; `--web-scheme dark` in a picture run gives its profile Windows' dark preference, and the window
+  writes "web window: the page prefers light" in simpl.log as each page comes in).
 
 ## Pages
 

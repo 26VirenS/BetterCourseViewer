@@ -35,8 +35,9 @@ public sealed class WebWindow : FluentWindow
 
     /// <summary>
     /// The page, on the white a browser gives a page that sets no background of its own: many tools and plain pages set
-    /// none, and their default black text cannot be read on the window's dark Mica. (It shows only once the page is
-    /// asked for; "Opening …" and the failure are drawn over its row before that.)
+    /// none, and their default black text cannot be read on the window's dark Mica. The page is told the student prefers
+    /// light, too (<see cref="LightPages"/>), so a tool with a dark look of its own does not take it up. (It shows only
+    /// once the page is asked for; "Opening …" and the failure are drawn over its row before that.)
     /// </summary>
     private readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.White, Visibility = Visibility.Hidden };
     private readonly TitleBar bar;
@@ -145,8 +146,10 @@ public sealed class WebWindow : FluentWindow
                 };
                 web.CoreWebView2.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
                 web.CoreWebView2.NavigationStarting += (_, _) => { loading.Visibility = Visibility.Visible; Paint(); };
-                web.CoreWebView2.NavigationCompleted += (_, _) => { loading.Visibility = Visibility.Collapsed; Paint(); };
+                web.CoreWebView2.NavigationCompleted += (_, _) => { loading.Visibility = Visibility.Collapsed; Paint(); LightPages.Tell(web.CoreWebView2, "web window"); };
                 web.CoreWebView2.HistoryChanged += (_, _) => Paint();
+                // (the tool's page in light, whatever the app's appearance or Windows': its title bar stays as the app is)
+                await LightPages.Apply(web.CoreWebView2);
                 ready = true;
             }
             start ??= await Launch();
@@ -279,5 +282,56 @@ public sealed class WebWindow : FluentWindow
             else if (a.TryGetValue("url", out var raw)) path = $"/courses/{c}/external_tools/retrieve?url={Uri.EscapeDataString(raw)}";
         }
         return path != null ? new Uri(baseUrl, path) : null;
+    }
+}
+
+/// <summary>
+/// An outside tool's page in light, whatever Simpl's appearance or Windows' (the tool windows, Macmillan Learning's
+/// popup): the tools are made for light, and a page with a dark look of its own came out unreadable in dark mode. The
+/// page — and each frame of it in a process of its own, a tool framed in the school's page or the tool's own frames — is
+/// told the student prefers light (prefers-color-scheme: light), on the white its web view already has; Simpl's own title
+/// bar and buttons round it stay as the app is. Told per web view, through the browser's own DevTools protocol: the
+/// colour scheme a WebView2 profile prefers is shared by every web view of Simpl's, and the school's pages shown in the
+/// app follow the app's appearance.
+/// </summary>
+internal static class LightPages
+{
+    private const string Light = "{\"features\":[{\"name\":\"prefers-color-scheme\",\"value\":\"light\"}]}";
+    private const string AutoAttach = "{\"autoAttach\":true,\"waitForDebuggerOnStart\":false,\"flatten\":true}";
+
+    /// <summary>The web view's page, and every frame attached to it from now on, told the student prefers light.</summary>
+    public static async Task Apply(CoreWebView2 core)
+    {
+        try
+        {
+            // (the screenshot suite: a profile that prefers dark, as a Windows in dark mode has it, so the picture shows
+            //  the tool's page in light all the same)
+            if (Shot.Asked && Launch.Get("web-scheme") == "dark") core.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark;
+            core.GetDevToolsProtocolEventReceiver("Target.attachedToTarget").DevToolsProtocolEventReceived += async (_, e) =>
+            {
+                try
+                {
+                    if (System.Text.Json.Nodes.JsonNode.Parse(e.ParameterObjectAsJson)?["sessionId"]?.GetValue<string>() is not { Length: > 0 } session) return;
+                    await core.CallDevToolsProtocolMethodForSessionAsync(session, "Emulation.setEmulatedMedia", Light);
+                    await core.CallDevToolsProtocolMethodForSessionAsync(session, "Target.setAutoAttach", AutoAttach);
+                }
+                catch (Exception x) { Log.Write("light page: a frame: " + x.Message); }
+            };
+            await core.CallDevToolsProtocolMethodAsync("Emulation.setEmulatedMedia", Light);
+            await core.CallDevToolsProtocolMethodAsync("Target.setAutoAttach", AutoAttach);
+        }
+        catch (Exception x) { Log.Write("light page: " + x.Message); }
+    }
+
+    /// <summary>(the screenshot suite) Whether the page shown prefers light, in simpl.log, for CI to read.</summary>
+    public static async void Tell(CoreWebView2? core, string what)
+    {
+        if (!Shot.Asked || core == null) return;
+        try
+        {
+            var dark = await core.ExecuteScriptAsync("matchMedia('(prefers-color-scheme: dark)').matches");
+            Log.Write($"{what}: the page prefers {(dark == "true" ? "dark" : "light")}");
+        }
+        catch (Exception x) { Log.Write($"{what}: {x.Message}"); }
     }
 }
