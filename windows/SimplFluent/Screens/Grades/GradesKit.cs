@@ -44,8 +44,18 @@ internal static class GradesKit
     public static string Num(double v) =>
         !double.IsFinite(v) ? "—" : v == Math.Round(v) && Math.Abs(v) < 1e15 ? ((long)v).ToString(Inv) : v.ToString("G6", Inv);
 
-    /// <summary>A score as a percentage to one place ("87.5%"), or N/A.</summary>
-    public static string Percent(double? v) => v is { } x ? x.ToString("0.0", Inv) + "%" : "N/A";
+    /// <summary>A course's score as the engine writes it ("87.5%", "92%"; "–" with none) — worked out here, the same way,
+    /// only for a page a version older that sends no words for it.</summary>
+    public static string Percent(string? text, double? v) =>
+        !string.IsNullOrEmpty(text) && text != "N/A" ? text! : v is { } x ? Half(x, 1).ToString("0.#", Inv) + "%" : "–";
+
+    /// <summary>A number rounded as every Simpl writes it: half up on its decimal value (3.425 is 3.43, 81.25 is 81.3), not
+    /// on the binary double (which holds 3.425 as 3.42499…) nor to even (.NET's own Math.Round).</summary>
+    public static decimal Half(double v, int places) =>
+        double.IsFinite(v) ? Math.Round((decimal)v, places, MidpointRounding.AwayFromZero) : 0;
+
+    /// <summary>A GPA or a goal to two places, half up ("3.43", "4.00").</summary>
+    public static string Gpa(double v) => Half(v, 2).ToString("0.00", Inv);
 
     /// <summary>A share of the grade: whole numbers bare ("40%"), others to one place.</summary>
     public static string Share(double w) => w == Math.Round(w) ? ((long)w).ToString(Inv) + "%" : w.ToString("0.0", Inv) + "%";
@@ -57,8 +67,33 @@ internal static class GradesKit
         return double.TryParse(s.Replace(",", ".").Trim(), NumberStyles.Float, Inv, out var v) && double.IsFinite(v) ? v : null;
     }
 
-    /// <summary>"12 of 20 graded".</summary>
-    public static string GradedLine(GradeRow r) => r.Total > 0 ? $"{r.Graded} of {r.Total} graded" : "Nothing graded yet";
+    /// <summary>"7 of 18 graded · 1 not posted yet", as the engine counts it for this page and the course's own Grades
+    /// alike (its own count only from a page a version older).</summary>
+    public static string GradedLine(GradeRow r) =>
+        !string.IsNullOrEmpty(r.GradedText) ? r.GradedText! : r.Total > 0 ? $"{r.Graded} of {r.Total} graded" : "Nothing graded yet";
+
+    /// <summary>A course's second line: its other name, only when it says something its label does not — never the same
+    /// code again with dashes ("MATH-021-20" under "F26-MATH 021 20"). A page a version older sends no AltName: its name,
+    /// where it differs.</summary>
+    public static string? SecondName(GradeRow r) =>
+        r.AltName != null ? (r.AltName.Length > 0 ? r.AltName : null) : !string.IsNullOrEmpty(r.Name) && r.Name != r.Code ? r.Name : null;
+
+    /// <summary>Why a course has no score, in words ("Hidden by instructor", "No grade yet"), or null with a score.</summary>
+    public static string? Why(GradeRow r) => r.Pct != null || string.IsNullOrEmpty(r.Why) ? null : r.Why;
+
+    /// <summary>What that means, for its tooltip (the Mac's words).</summary>
+    public static string WhyTip(GradeRow r) => r.Hidden == true
+        ? "The instructor hides this course’s total, so there is no score to show. The term GPA leaves it out."
+        : "Nothing in this course has a score yet. The term GPA leaves it out until it has one.";
+
+    /// <summary>Why a course has no score, where its letter would be: a slashed eye for a total the instructor hides, a
+    /// clock for one with nothing graded yet, and the words — never a bare "N/A" beside a line saying work is graded.</summary>
+    public static FrameworkElement WhyNote(GradeRow r, string why)
+    {
+        var h = K.H(5, K.Icon(r.Hidden == true ? SymbolRegular.EyeOff16 : SymbolRegular.Clock16, 12, B.Text2), K.Text(why, Ty.Caption, B.Text2));
+        h.ToolTip = WhyTip(r);
+        return h;
+    }
 
     /// <summary>Digits all one width, so a column of scores lines up (the Mac's monospacedDigit).</summary>
     public static T Tabular<T>(this T e) where T : DependencyObject
@@ -231,7 +266,7 @@ internal static class GradesKit
             K.Dot(color, 9).Margin(0, 0, 8, 0).Col(0),
             K.Text(name, Ty.Body).Col(1),
             string.IsNullOrEmpty(weight) ? null : K.Text(weight!, Ty.Caption, B.Text2).Margin(6, 0, 8, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(2),
-            K.Text(value ?? "—", Ty.BodyStrong).Tabular().Col(3));
+            K.Text(value ?? "–", Ty.BodyStrong).Tabular().Col(3));
         var v = K.V(5, top, Bar(pct / 100, color, 6, null, key));
         AutomationProperties.SetName(v, string.Join(", ", new[] { name, weight, value ?? "no score" }.Where(s => !string.IsNullOrEmpty(s))));
         return v;
@@ -332,7 +367,7 @@ internal static class GradesKit
         yield return Item(open, SymbolRegular.Open24, () => engine.GoTo(url, title));
         yield return new Separator();
         yield return Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url, title));
-        yield return Item("Copy Link", SymbolRegular.Link24, () => Copy(engine, url));
+        yield return Item("Copy link", SymbolRegular.Link24, () => Copy(engine, url));
     }
 
     /// <summary>The page's More (the Mac's CanvasMenu): Open in Canvas and Copy Link for the page's own address.</summary>
@@ -346,7 +381,7 @@ internal static class GradesKit
             var m = Menu(new object[]
             {
                 Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(u, title())),
-                Item("Copy Link", SymbolRegular.Link24, () => Copy(engine, u)),
+                Item("Copy link", SymbolRegular.Link24, () => Copy(engine, u)),
             });
             if (m != null) Open(m, b);
         }, "More");

@@ -196,6 +196,12 @@ public sealed class TodoData
     public string? Empty { get; set; }
     public List<NamedColor>? Courses { get; set; }
     public List<RepeatChoice>? Repeats { get; set; }
+    // (2.99.33) what is left and what is late, counted and in words: "17 left", "1 of 18 done", "1 overdue" ("" when none)
+    public int? Left { get; set; }
+    public int? Overdue { get; set; }
+    public string? LeftText { get; set; }
+    public string? DoneText { get; set; }
+    public string? OverdueText { get; set; }
 }
 
 public sealed class GradeCategory
@@ -212,6 +218,11 @@ public sealed class GradeRow
     public string Id { get; set; } = "";
     public string Code { get; set; } = "";
     public string? Name { get; set; }
+    // (2.99.33) the course's first teacher; why it has no score ("Hidden by instructor", "No grade yet", ""), and whether
+    // the instructor hides its total
+    public string? Teacher { get; set; }
+    public string? Why { get; set; }
+    public bool? Hidden { get; set; }
     public string? Color { get; set; }
     public string? Url { get; set; }
     public double? Pct { get; set; }
@@ -225,6 +236,8 @@ public sealed class GradeRow
     public List<GradeCategory> Cats { get; set; } = new();
     public List<ScaleStep>? Scale { get; set; }
     public bool? OwnScale { get; set; }
+    public string? AltName { get; set; }
+    public string? GradedText { get; set; }
 }
 
 public sealed class ScaleStep
@@ -250,6 +263,9 @@ public sealed class TrendPoint
 {
     public string Date { get; set; } = "";
     public double Gpa { get; set; }
+    // (2.99.33) the day's figure and date as the readout writes them ("3.43", "Oct 12")
+    public string? GpaText { get; set; }
+    public string? DateText { get; set; }
 }
 
 public sealed class GradesData
@@ -257,6 +273,13 @@ public sealed class GradesData
     public string? Term { get; set; }
     public double? Gpa { get; set; }
     public double Goal { get; set; }
+    // (2.99.33) the GPA rounded once, half up ("3.43", 3.43), the goal ("4.00"), the gap worked out from the rounded GPA
+    // (signed) and in words ("0.57 below goal"), and what the GPA is made of ("From 4 courses, …")
+    public double? GpaShown { get; set; }
+    public string? GoalText { get; set; }
+    public double? GoalGap { get; set; }
+    public string? GoalLine { get; set; }
+    public string? GpaNote { get; set; }
     public List<ScaleStep> Scale { get; set; } = new();
     public List<GradeRow> Rows { get; set; } = new();
     public List<GradeItem> Items { get; set; } = new();
@@ -264,6 +287,7 @@ public sealed class GradesData
     public List<TrendPoint>? Trend { get; set; }
     public double? MinY { get; set; }
     public double? MaxY { get; set; }
+    public string? GpaText { get; set; }
 }
 
 public sealed class CalEvent
@@ -281,6 +305,9 @@ public sealed class CalEvent
     public string? Sub { get; set; }
     public string? Color { get; set; }
     public string? Url { get; set; }
+    // (2.99.33) struck through only when handed in or excused; past once its due time (or its end) has gone by
+    public bool? Struck { get; set; }
+    public bool? Past { get; set; }
 }
 
 public sealed class CalendarChoice
@@ -588,6 +615,12 @@ public sealed class GradeInfo
     public double? Pct { get; set; }
     public string? Letter { get; set; }
     public string? Late { get; set; }
+    // (2.99.33) the figures as every app shows them: "81.3%", the ring's 81, the band (A–F) its colour comes from, and
+    // the score and letter as one chip ("13/16 · B−")
+    public string? PctText { get; set; }
+    public int? PctWhole { get; set; }
+    public string? Band { get; set; }
+    public string? Chip { get; set; }
 }
 
 public sealed class RubricRating
@@ -610,6 +643,9 @@ public sealed class RubricRow
     public double? Score { get; set; }
     public string? Desc { get; set; }
     public string? Note { get; set; }
+    // (2.99.33) the points given differ from the level picked; the mark's words ("Your mark · 4 pts", "Your mark", "")
+    public bool? Adjusted { get; set; }
+    public string? MarkText { get; set; }
 }
 
 public sealed class CommentRow
@@ -825,6 +861,15 @@ public sealed class CourseGradesData
     public List<CGRow> Rows { get; set; } = new();
     public double? Gpa { get; set; }
     public double? GpaIf { get; set; }
+    // (2.99.33) the course's other name when it says something new; how far Simpl's own reading is from the LMS's total
+    // ("" when they agree); the term GPA now and with what-if ("3.43", "" when there is none); the overview's graded count
+    public string? AltName { get; set; }
+    public string? EstimateNote { get; set; }
+    public string? GpaText { get; set; }
+    public string? GpaIfText { get; set; }
+    public int? Graded { get; set; }
+    public int? TotalItems { get; set; }
+    public string? GradedText { get; set; }
 }
 
 public sealed class GroupRow
