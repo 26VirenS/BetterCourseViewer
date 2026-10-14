@@ -3,11 +3,12 @@ import simd
 
 // The Mac app's models that need no window, checked on their own: compiled with swiftc beside the files they check —
 // mac/Simpl/Tools/PeriodicData.swift, PeriodicExtraData.swift (the elements' data), MoleculeShape.swift (VSEPR, the
-// molecule builder's and the Lewis maker's shapes) and every file in mac/Simpl/Tools/Biology/Model (the biology
-// toolkit's data and arithmetic, and its self-check) — and run, in seconds, by the Mac app's workflow (Models). By hand
-// on a Mac: swiftc -o /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
-// mac/Simpl/Tools/Biology/Model/*.swift scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is
-// printed with what was found, and the exit code is the number that failed.
+// molecule builder's and the Lewis maker's shapes), every file in mac/Simpl/Tools/Biology/Model (the biology
+// toolkit's data and arithmetic, and its self-check) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks'
+// plan, fingerprint and comparison) — and run, in seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc
+// -o /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
+// mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift &&
+// /tmp/model-checks. A failed check is printed with what was found, and the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -91,6 +92,64 @@ let bio = BioSelfCheck.run()
 for line in bio.lines {
     check(line.hasSuffix(" OK"), String(line.dropFirst("bio-check ".count).dropLast(line.hasSuffix(" OK") ? 3 : 5)))
 }
+
+// ---- live checks ----------------------------------------------------------------------------------------------
+// (mac/Simpl/Engine/LivePlan.swift, 1.3.80: when the screen on show is checked again, the fingerprint the page gives an
+// answer, the comparison of two answers, and the console's line a check makes, as CI reads it)
+print("live checks")
+let t0 = Date(timeIntervalSince1970: 1_000_000)
+var plan = LivePlan(every: 60, since: t0)
+check(plan.decide(now: t0.addingTimeInterval(59), holds: [], busy: false) == .wait(1), "a minute's check waits out its minute")
+check(plan.decide(now: t0.addingTimeInterval(60), holds: [], busy: false) == .check, "and is due on it")
+check(plan.decide(now: t0.addingTimeInterval(61), holds: ["typing"], busy: false) == .hold("typing"), "held back while the student types")
+check(plan.decide(now: t0.addingTimeInterval(30), holds: ["typing"], busy: false) == .wait(30), "a hold says nothing before the check is due")
+check(plan.decide(now: t0.addingTimeInterval(61), holds: [], busy: true) == .busy, "skipped while another check is under way")
+check(plan.decide(now: t0.addingTimeInterval(3600), holds: [], busy: false) == .check, "a window back after an hour away checks at once")
+plan.began()
+check(plan.decide(now: t0.addingTimeInterval(61), holds: [], busy: false) == .busy, "one check at a time")
+var waits: [TimeInterval] = []
+var at = t0
+for _ in 0..<5 {
+    at = at.addingTimeInterval(1)
+    plan.began()
+    plan.ended(worked: false, at: at)
+    waits.append(plan.wait)
+}
+check(waits == [120, 240, 300, 300, 300], "checks that do not work wait 2, 4, then 5 minutes (\(waits.map { Int($0) }))")
+plan.began()
+plan.ended(worked: true, at: at)
+check(plan.wait == 60 && plan.failures == 0, "one that works goes back to a minute")
+plan.began()
+plan.held()
+check(plan.decide(now: at.addingTimeInterval(61), holds: [], busy: false) == .check, "a check held back runs as soon as it may")
+var course = LivePlan(every: LivePlan.interval(.course, every: nil, courseEvery: nil), since: t0)
+check(course.every == 600 && course.decide(now: t0.addingTimeInterval(599), holds: [], busy: false) == .wait(1), "a course's pages every ten minutes")
+course.began()
+course.ended(worked: false, at: t0)
+check(course.wait == 1200, "and after one that did not work, twenty")
+check(LivePlan.interval(.minute, every: 5, courseEvery: nil) == 5 && LivePlan.interval(.course, every: 5, courseEvery: nil) == 50
+      && LivePlan.interval(.course, every: 5, courseEvery: 4) == 4 && LivePlan.interval(.minute, every: 0, courseEvery: nil) == 60,
+      "the screenshot suite's intervals (-SimplLiveEvery, -SimplLiveCourseEvery)")
+// (the page's own fingerprints of these, from native-app.js's fingerprint run under node)
+let prints: [(String, String)] = [
+    ("", "0-wvjl67o803"), ("null", "4-1omwfhr5hyy"), ("{\"ok\":true}", "b-1lqi3tjosz"),
+    ("{\"counters\":[{\"key\":\"today\",\"value\":3}],\"list\":{\"heading\":\"Due today\",\"rows\":[]}}", "29-n81zikjo5s"),
+    ("{\"title\":\"Café — naïve 📚 ✓\",\"n\":92.4}", "12-qrqb26rejq"), (String(repeating: "x", count: 5000), "3uw-ymivxkut0y"),
+]
+let printed = prints.filter { LiveFingerprint.of($0.0) != $0.1 }.map { "\($0.0.prefix(20)) \(LiveFingerprint.of($0.0)) not \($0.1)" }
+check(printed.isEmpty, "an answer's fingerprint is the page's, accents, emoji and all\(printed.isEmpty ? "" : ": \(printed)")")
+struct Shown: Codable { var a: Int; var b: [String: Double]; var c: String? }
+check(LiveCompare.same(Shown(a: 1, b: ["x": 1, "y": 2.5], c: nil), Shown(a: 1, b: ["y": 2.5, "x": 1], c: nil)), "two answers that say the same are the same")
+check(!LiveCompare.same(Shown(a: 1, b: [:], c: "3 due"), Shown(a: 1, b: [:], c: "2 due")), "and one word apart, not")
+check(!LiveCompare.same(1, "1"), "nor two of different kinds")
+check(LivePlan.line("dashboard", parts: [], reads: 0, draws: 0) == "live: dashboard unchanged · 0 reads · 0 redraws"
+      && LivePlan.line("dashboard", parts: ["counters", "list"], reads: 7, draws: 1) == "live: dashboard updated counters,list · 7 reads · 1 redraw"
+      && LivePlan.line("assignments", parts: [], reads: 1, draws: nil) == "live: assignments unchanged · 1 read",
+      "the console's line for a check, as CI reads it")
+let change = LivePlan.devChange("done:8"), plainChange = LivePlan.devChange("task")
+check(change?.what == "done" && change?.after == 8 && plainChange?.what == "task" && plainChange?.after == 8
+      && LivePlan.devChange(":8") == nil && LivePlan.devChange("done:soon") == nil && LivePlan.devChange(nil) == nil,
+      "the screenshot suite's change to the mock school (-SimplLiveChange done:8)")
 
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))
