@@ -561,6 +561,8 @@ try {
   const wk3 = ds.sections?.flatMap((x) => x.rows).find((r) => r.title === 'Week 3 Discussion');
   const dt = wk3 ? await nc('topic', { ctx: 'courses/31001', id: wk3.id }) : {};
   check(!ds.error && wk3?.graded && dt.entries?.length > 0 && dt.canReply && !dt.announcement, `Discussions: a graded topic and its posts, threaded, open to a reply: ${JSON.stringify({ topics: ds.sections?.flatMap((x) => x.rows).map((r) => r.title), posts: dt.entries?.length, depth: dt.entries?.map((e) => e.depth) })}`);
+  // (2.99.33) a topic has no author in Brightspace: its forum is said as the forum it is, never as a person with initials
+  check(wk3?.author === '' && wk3?.forum === 'Weekly Discussions' && dt.author === '' && dt.forum === 'Weekly Discussions' && !dt.avatar, `a Brightspace topic's forum comes as its forum, not as its author: ${JSON.stringify({ row: [wk3?.author, wk3?.forum], topic: [dt.author, dt.forum] })}`);
   const rp = wk3 ? await nc('reply', { ctx: 'courses/31001', id: wk3.id, text: 'A virus needs a host to copy itself.' }) : {};
   const posted = (await mockLog()).filter((e) => e.kind === 'post').pop();
   check(rp.ok && posted?.topic === 902 && /needs a host/.test(posted.html), `a reply from the app is posted to the topic: ${JSON.stringify(posted)}`);

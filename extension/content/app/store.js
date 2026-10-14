@@ -689,7 +689,8 @@
       if (!it.isDue || it.submitted || it.complete || it.dismissed || it.excused || !it.date) continue;
       const ms = it.date - t;
       const pts = it.points !== null && it.points !== undefined ? ` · ${it.points} pts` : '';
-      const base = { title: it.title, courseId: it.courseId, course: label(it.course) || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now' };
+      // (2.99.33) `parts`: the facts one by one, for the apps' shorter line (native-app.js notifications)
+      const base = { title: it.title, courseId: it.courseId, course: label(it.course) || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now', parts: { kind: it.kind, points: it.points ?? null, missing: !!it.missing, quiz: it.type === 'quiz' } };
       if (ms < 0 && ms > -14 * 24 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'overdue', note: `${it.missing ? 'Marked missing' : 'Nothing submitted'} · ${pastText(it.date, t)}${pts}` });
       else if (ms >= 0 && ms < 48 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'soon', note: `${it.kind}${pts} · ${it.type === 'quiz' ? 'not started' : 'no submission'}` });
     }
@@ -704,7 +705,7 @@
         const comments = Array.isArray(a.submission_comments) ? a.submission_comments.filter((x) => x && x.comment) : [];
         const name = a.assignment?.name || String(a.title || 'Submission').replace(/\s+graded\b.*$/i, '');
         const possible = a.assignment?.points_possible;
-        if (scored) out.push({ ...base, id: `stream:${a.id}`, cat: 'graded', title: `${name} graded`, note: `${a.score ?? a.grade}${possible !== undefined && possible !== null ? ` / ${possible}` : ''}${a.grade && a.score !== undefined && a.score !== null && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : ''}`, action: 'See grades' });
+        if (scored) out.push({ ...base, id: `stream:${a.id}`, cat: 'graded', title: `${name} graded`, note: `${a.score ?? a.grade}${possible !== undefined && possible !== null ? ` / ${possible}` : ''}${a.grade && a.score !== undefined && a.score !== null && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : ''}`, action: 'See grades', parts: { score: a.score ?? null, possible: possible ?? null, grade: a.grade ?? null } });
         if (comments.length) {
           const last = comments[comments.length - 1];
           out.push({ ...base, id: `stream:${a.id}:comment`, cat: 'feedback', when: U.parse(last.created_at) || when, title: `${last.author_name || 'Your instructor'} left a comment on ${name}`, note: `“${stripHtml(last.comment).slice(0, 140)}”`, action: 'Read comment' });
@@ -940,14 +941,15 @@
     await C.put(`/api/v1/conversations/${id}`, { conversation: { starred } });
     await invalidateInbox();
   }
-  async function replyTo(id, body) {
-    const r = await C.post(`/api/v1/conversations/${id}/add_message`, { body });
+  async function replyTo(id, body, attachmentIds = []) {
+    const r = await C.post(`/api/v1/conversations/${id}/add_message`, { body, ...(attachmentIds?.length ? { attachment_ids: attachmentIds.map(String) } : {}) });
     await invalidateInbox();
     return r;
   }
-  async function compose({ recipients, subject, body, contextCode }) {
+  async function compose({ recipients, subject, body, contextCode, attachmentIds = [] }) {
     const payload = { recipients, subject, body, group_conversation: recipients.length > 1 };
     if (contextCode) payload.context_code = contextCode;
+    if (attachmentIds?.length) payload.attachment_ids = attachmentIds.map(String);
     const r = await C.post('/api/v1/conversations', payload);
     await invalidateInbox();
     return r;
@@ -1252,7 +1254,16 @@
    *  POST the bytes there (progress reaches the row), then confirm when storage
    *  answers with a location instead of the file. Returns the file id. */
   async function uploadSubmissionFile(cid, aid, file, onProgress) {
-    const pre = await C.post(preflightPath(cid, aid), { name: file.name, size: file.size, content_type: file.type || undefined, on_duplicate: 'rename' });
+    return uploadFileTo(preflightPath(cid, aid), {}, file, onProgress);
+  }
+  /** (2.99.33) A file for an Inbox message or a reply: uploaded to the student's own "conversation attachments" folder,
+   *  where Canvas's own Inbox puts one, by the same three steps. Returns the file id, which the message then names. */
+  async function uploadMessageFile(file, onProgress) {
+    return uploadFileTo('/api/v1/users/self/files', { parent_folder_path: 'conversation attachments' }, file, onProgress);
+  }
+  /** The three steps of a Canvas upload, to the preflight at `path` (with `extra` beside the file's own fields). */
+  async function uploadFileTo(path, extra, file, onProgress) {
+    const pre = await C.post(path, { name: file.name, size: file.size, content_type: file.type || undefined, ...extra, on_duplicate: 'rename' });
     if (!pre?.upload_url) throw new Error(`${BCV.lms.name} did not return an upload URL`);
     const form = new FormData();
     for (const [k, v] of Object.entries(pre.upload_params || {})) form.append(k, v);
@@ -1691,11 +1702,12 @@
       const possible = items.reduce((s, r) => s + r.possible, 0);
       return {
         ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted, dropped: dropped.map((r) => r.name),
-        pct: possible > 0 ? Math.round((earned / possible) * 100) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
+        // (2.99.33) a whole percent, half up on the decimal figure (87 of 120 is 72.5: 73, where Math.round read 72.4999…)
+        pct: possible > 0 ? roundHalfUp((earned / possible) * 100, 0) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
       };
     });
     const scored = groupStats.filter((g) => g.graded);
-    const round1 = (x) => Math.round(x * 10) / 10; // (one decimal, as Canvas shows a total: 89.5 is not 90)
+    const round1 = (x) => roundHalfUp(x, 1); // (one decimal, as Canvas shows a total: 89.5 is not 90)
     let total = null;
     let note = '';
     if (weighted) {
@@ -1771,7 +1783,20 @@
     };
   }
   function fmtPts(n) {
-    return Number.isInteger(n) ? String(n) : Number(n).toFixed(1).replace(/\.0$/, '');
+    // (2.99.33) half up on the decimal figure, as every number the apps show: 4.35 is 4.4, never the 4.3 toFixed reads
+    // in the binary 4.34999…
+    return Number.isInteger(n) ? String(n) : (roundHalfUp(n, 1) ?? Number(n)).toFixed(1).replace(/\.0$/, '');
+  }
+  /** (2.99.33) Decimal half-up rounding, whatever the binary double holds: 3.425 (held as 3.42499…) → 3.43, 81.25 →
+   *  81.3, 72.5 → 73; a negative figure rounds the same way from zero (−2.5 → −3). Every figure Simpl shows goes
+   *  through this (native-app.js: pctFmt, gpaFmt), so the Mac, Windows and the iPhone read one number the same. */
+  function roundHalfUp(v, places = 0) {
+    const n = Number(v);
+    if (v === null || v === undefined || v === '' || !Number.isFinite(n)) return null;
+    const m = 10 ** places;
+    const x = Math.abs(n) * m;
+    const r = Math.floor(x + 0.5 + 1e-9 * Math.max(1, x)) / m;
+    return n < 0 ? -r : r;
   }
   /** Where a planner item stands (a To Do row, the Dashboard's list, the phone's), in the same words
    *  workStatus() uses for an assignment: [{ word, kind }] — the state first (Excused, Graded,
@@ -1830,8 +1855,8 @@
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
-    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts,
+    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts, roundHalfUp,
     notifications, notifState, setNotifState, notifUnread,
-    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
+    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, uploadMessageFile, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };
 })();
